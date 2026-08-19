@@ -727,7 +727,7 @@ jobs:
       # into test CPU vs framework overhead. continue-on-error so a cancelled lane
       # (no artifact) degrades to "no breakdown" instead of failing this advisory job.
       - name: Download unit-test attributions (for the test-vs-overhead split)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           pattern: unit-test-attribution-*
