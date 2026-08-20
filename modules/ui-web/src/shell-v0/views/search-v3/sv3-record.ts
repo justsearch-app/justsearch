@@ -32,6 +32,13 @@ import type { RetrievalCitation } from '../../components/chat/citationTypes.js';
 // live path already uses. Nothing about the evidence is derived here.
 import { claimsFromRecord, matchesFromRecord } from '../../components/chat/recordEvidence.js';
 import { claimsToCitations } from '../../components/chat/citationResolve.js';
+// Tempdoc 859 §5a — the SAME delegate-plane projection the live terminal writes through, so a
+// delegate turn the reader watched and one they came back to hold one value from one function.
+import { agentAnswerEvidence } from '../../components/chat/agentEvidence.js';
+import type {
+  AgentSentenceCite,
+  AgentSource,
+} from '../../../api/generated/shape-handlers/shared.js';
 import type { Sv3RunFeedItem } from './sv3-run.js';
 import { isSv3StoreMessageId, type Sv3Turn, type Sv3TurnEvidence } from './sv3-sessions.js';
 
@@ -92,9 +99,33 @@ export function recordToolCall(item: UnifiedTurnItem): ToolCall {
  * the SAME producer-gated envelope reader, so a reloaded answer and the live one cannot mark
  * differently (561 P-A). `retrievalMode` is `''` because the record does not carry it — the panel
  * reads that as "not told", which is what it is.
+ *
+ * <p>Tempdoc 859 §5a / Reach 1 — the PLANE is discriminated on `attributes.sources`, the key
+ * present on exactly one of them, as the legacy reader already does
+ * (`UnifiedChatView.ts:3543-3544`). `attributes.citations` carries two incompatible shapes:
+ * retrieval SOURCES on the answer plane (`InteractionThreadController.chatTurn`) and per-sentence
+ * CITES on the action plane (`AgentInteractionMapper`), whose sources live under a separate
+ * `sources` key. Reading `citations` and casting it to `RetrievalCitation[]` — which this function
+ * used to do — is a silent reinterpretation, and it yielded a confident wrong number rather than an
+ * error: a delegate turn's 12 sentence-cites were reported to the reader as 12 retrieved sources,
+ * through the disclosure's accessible name and the panel. Never cast at a read site; key on a
+ * discriminator.
  */
 function recordEvidenceOf(item: UnifiedTurnItem): Sv3TurnEvidence | null {
   const a = item.attributes;
+  // The ACTION plane: an agent run's persisted assistant message. Its `sources` are `AgentSource`s
+  // and its `citations` are `AgentSentenceCite`s, projected through the one shared module the live
+  // terminal also writes through.
+  if (Array.isArray(a.sources)) {
+    const scorer = typeof a.citationScorer === 'string' ? a.citationScorer : null;
+    const evidence = agentAnswerEvidence(
+      a.sources as AgentSource[],
+      Array.isArray(a.citations) ? (a.citations as AgentSentenceCite[]) : [],
+      scorer,
+    );
+    return { ...evidence, retrievalMode: '' };
+  }
+  // The ANSWER plane, unchanged.
   const hasSources = Array.isArray(a.citations);
   const claimMatches = a.claimMatches;
   const hasMatches =

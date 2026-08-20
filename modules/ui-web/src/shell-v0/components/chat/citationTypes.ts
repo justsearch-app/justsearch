@@ -113,19 +113,46 @@ export interface SourceCoverage {
  */
 export type ContextInclusion = 'included' | 'partial' | 'dropped';
 
-/** Retrieval-time citation from rag.citations event. */
-export interface RetrievalCitation {
+/**
+ * Tempdoc 859 §5b — a source an ANSWER stands on, on either plane.
+ *
+ * <p>Two producers supply evidence sources and they do not carry the same facts. The RAG plane's
+ * `rag.citations` reports a retrieval passage in full (char span, chunk total, retrieval score,
+ * heading level). The delegate plane's `AgentEvent.AgentSource` reports a chunk-identified local
+ * passage and NONE of those five — the agent search hits carry chunk identity and lines, and the
+ * matcher re-fetches by that identity rather than by span.
+ *
+ * <p>So the shared fields are REQUIRED here and the retrieval-only ones are OPTIONAL, with
+ * {@link RetrievalCitation} re-requiring them for its own plane. The alternative — widening
+ * `RetrievalCitation` and zero-filling the agent plane — fabricates retrieval facts into a panel
+ * that groups and grades by them (849's forbidden class). The same reasoning the backend's own
+ * `ContextCitation` doc encodes: *"0 is not 'unknown' — it is a claim that the text is the
+ * document's FIRST chunk"* (`DocumentService.java:268-273`).
+ *
+ * <p>ABSENT therefore means "this producer does not report that", and every reader of an optional
+ * field must state its absence answer rather than defaulting one.
+ */
+export interface AnswerEvidenceSource {
   parentDocId: string;
   chunkIndex: number;
-  chunkTotal: number;
-  startChar: number;
-  endChar: number;
-  score: number;
   excerpt: string;
   startLine: number;
   endLine: number;
   headingText: string;
-  headingLevel: number;
+  /** Retrieval-only: how many chunks the parent document has. */
+  chunkTotal?: number;
+  /**
+   * Retrieval-only: the passage's character span in the parent document. Absent on the delegate
+   * plane, which never reports one — and MUST NOT be zero-filled to make a join work: `(0, 0)` on
+   * every source of a document resolves a followed citation to that document's FIRST passage, which
+   * is exactly the wrong-target deep link 822 §3b removed.
+   */
+  startChar?: number;
+  endChar?: number;
+  /** Retrieval-only: the retriever's own score. Never a grounding tier input. */
+  score?: number;
+  /** Retrieval-only: the markdown heading depth of {@link headingText}. */
+  headingLevel?: number;
   /**
    * Tempdoc 849 — ABSENT ⇒ the producer said nothing about inclusion, and the reader says nothing.
    * Not "included": every turn persisted before 849 is absent, and describing those retroactively
@@ -136,13 +163,32 @@ export interface RetrievalCitation {
   contextIncludedChars?: number;
 }
 
+/**
+ * Retrieval-time citation from rag.citations event — {@link AnswerEvidenceSource} with the five
+ * retrieval facts REQUIRED, because this plane's producer always reports them.
+ */
+export interface RetrievalCitation extends AnswerEvidenceSource {
+  chunkTotal: number;
+  startChar: number;
+  endChar: number;
+  score: number;
+  headingLevel: number;
+}
+
 /** Emitted on citation click for navigate-to-source. */
 export interface CitationSelectDetail {
   parentDocId: string;
   startLine: number;
   endLine: number;
-  startChar: number;
-  endChar: number;
+  /**
+   * Tempdoc 859 §5b — ABSENT when the source that was followed reports no character span (the
+   * delegate plane never does). `sv3CitationAnchor` already answers that case: it refuses a
+   * non-finite span and the pane shows the document while highlighting nothing, rather than
+   * anchoring on a span nobody reported. Never zero-filled — `(0, 0)` would claim the document's
+   * opening characters.
+   */
+  startChar?: number;
+  endChar?: number;
   /** Tempdoc 526 §14.5 T2 — excerpt for G21 kind-flip into a typed citation selection. */
   excerpt: string;
 }

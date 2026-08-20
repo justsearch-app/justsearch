@@ -17,7 +17,7 @@
  * a threshold calibrated on the cross-encoder cutoff. The gate is structural, not a check: there is
  * no field on `Citation` a lexical score could be written into.
  */
-import type { Claim, RetrievalCitation } from './citationTypes.js';
+import type { AnswerEvidenceSource, Claim } from './citationTypes.js';
 import type { Citation } from './MarkdownBlock.js';
 import { filenameOf, isVerifiedProducer } from './evidenceProjection.js';
 import type {
@@ -27,7 +27,10 @@ import type {
 
 export function claimsToCitations(
   claims: readonly Claim[],
-  sources: readonly RetrievalCitation[],
+  // Tempdoc 859 §5b — the SUPERTYPE, so a caller holding a turn's evidence record (which now spans
+  // both planes) can pass it. The answer plane always supplies the retrieval fields; when one is
+  // absent it travels absent onto the mark's detail, where `sv3CitationAnchor` already answers it.
+  sources: readonly AnswerEvidenceSource[],
 ): Citation[] {
   if (claims.length === 0 || sources.length === 0) return [];
   const out: Citation[] = [];
@@ -87,6 +90,33 @@ export function claimsToCitations(
 }
 
 /**
+ * Tempdoc 847 §2.1d/§2.1e — the agent payload carries no sentence ordinal, only per-(sentence,
+ * source) cites in sentence order, so the ordinal is DERIVED: consecutive cites bearing the SAME
+ * sentence text are that sentence's several sources and share one anchor. The honest limit, stated
+ * rather than hidden: an answer that repeats an identical sentence and cites both occurrences is
+ * indistinguishable from that in this payload, and is read as the multi-source case — which costs a
+ * duplicate mark position in a rare shape, where the other reading costs a real second source's mark
+ * in a common one. The RAG path does not rely on this: its `sentenceIndex` is the producer's.
+ *
+ * <p>Tempdoc 859 §3a — exported so the projected `CitationMatch[]` (`agentEvidence.ts`) and the
+ * marks below run the SAME walk. Two independent derivations of "the same" ordinal is the fork that
+ * would let an inline mark and its panel card describe different sentences.
+ */
+export function agentSentenceOrdinals(
+  cites: readonly AgentSentenceCite[],
+): ReadonlyArray<{ readonly cite: AgentSentenceCite; readonly sentenceIndex: number }> {
+  let sentenceIndex = -1;
+  let prevText: string | null = null;
+  return cites.map((cite) => {
+    if (cite.sentenceText !== prevText) {
+      sentenceIndex++;
+      prevText = cite.sentenceText;
+    }
+    return { cite, sentenceIndex };
+  });
+}
+
+/**
  * Tempdoc 577 Goal 1 Phase 1 (Move F) — the ONE agent-answer resolver: the `done`-event grounding
  * record (`AgentSource[]` + `AgentSentenceCite[]`) → the `MarkdownBlock` citation weave. Extracted
  * verbatim from `UnifiedChatView.resolveAnswerCitations` (tempdoc 565 §3.C / §15.B) so the
@@ -97,23 +127,25 @@ export function claimsToCitations(
 export function resolveAnswerCitations(
   sources: readonly AgentSource[],
   cites: readonly AgentSentenceCite[],
+  // Tempdoc 859 §4 — which producer wrote `AgentSentenceCite.similarity`. See the gate below.
+  scorer?: string | null,
 ): Citation[] {
   if (sources.length === 0 || cites.length === 0) return [];
+  // Tempdoc 859 §4 — the PRODUCER gate, the agent plane's half of the one 836 §4 rule, through the
+  // SAME `isVerifiedProducer` authority `claimsToCitations` uses above (not a copy, not a
+  // parameterisation). It belongs here because `Citation.similarity` is what colours the mark
+  // (`groundingClass` in the `MarkdownBlock` weave, whose legend tells the reader the colour means
+  // something) and, since 859 §3a projects matches, what `sourceGrounding` feeds to `evidenceTier`
+  // — a GRADING authority whose thresholds are anchored on the cross-encoder cutoff. A cosine score
+  // is a number on a different scale, so admitting it here mis-colours a mark and mis-grades a
+  // source. Failing closed yields sources-without-marks, which is `AgentCitationResolver`'s own
+  // documented degradation mode (565 §10) — the product already has words for it.
+  //
+  // The pre-stamp allowance carries over unchanged: an ABSENT stamp means a run persisted before
+  // the field existed, not an unknown producer today.
+  if (!isVerifiedProducer(scorer)) return [];
   const out: Citation[] = [];
-  // Tempdoc 847 §2.1d/§2.1e — the agent payload carries no sentence ordinal, only per-(sentence,
-  // source) cites in sentence order, so the ordinal is derived: consecutive cites bearing the SAME
-  // sentence text are that sentence's several sources and share one anchor. The honest limit, stated
-  // rather than hidden: an answer that repeats an identical sentence and cites both occurrences is
-  // indistinguishable from that in this payload, and is read as the multi-source case — which costs
-  // a duplicate mark position in a rare shape, where the other reading costs a real second source's
-  // mark in a common one. The RAG path does not rely on this: its `sentenceIndex` is the producer's.
-  let sentenceIndex = -1;
-  let prevText: string | null = null;
-  for (const c of cites) {
-    if (c.sentenceText !== prevText) {
-      sentenceIndex++;
-      prevText = c.sentenceText;
-    }
+  for (const { cite: c, sentenceIndex } of agentSentenceOrdinals(cites)) {
     const s = sources[c.sourceIndex];
     if (!s) continue;
     out.push({

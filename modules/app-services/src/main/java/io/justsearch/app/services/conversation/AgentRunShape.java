@@ -113,7 +113,12 @@ public final class AgentRunShape {
               // Tempdoc 565 §3.A — the answer's grounding sources + per-sentence inline citations.
               // Optional: empty when the run was ungrounded or the matcher did not run/match.
               EventField.arrayOfObject("sources", "AgentSource").asOptional(),
-              EventField.arrayOfObject("citations", "AgentSentenceCite").asOptional()),
+              EventField.arrayOfObject("citations", "AgentSentenceCite").asOptional(),
+              // Tempdoc 859 §4 — which producer scored the `citations` above (the `ScorerKind` wire
+              // name). Optional because ABSENT is load-bearing on the READ side: a record persisted
+              // before this field is a pre-stamp record, which the 836 §4 gate admits, whereas a
+              // known non-cross-encoder producer fails closed. Every live emitter stamps it.
+              EventField.string("citationScorer").asOptional()),
           EventDescriptor.ofTraced(
               "error",
               EventField.string("error"),

@@ -46,6 +46,7 @@ final class AgentEventTracing {
               e.totalTokensUsed(),
               e.sources(),
               e.citations(),
+              e.citationScorer(),
               trace);
       case AgentEvent.AgentError e ->
           new AgentEvent.AgentError(

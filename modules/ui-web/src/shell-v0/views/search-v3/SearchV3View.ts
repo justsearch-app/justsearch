@@ -267,6 +267,8 @@ import {
   sameCitationHeader,
   type CitationHeader,
 } from '../../components/chat/evidenceProjection.js';
+// Tempdoc 859 §3 — the ONE delegate-plane evidence projection, shared with the record reader.
+import { agentAnswerEvidence } from '../../components/chat/agentEvidence.js';
 import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
 import {
   sv3CitationHeader,
@@ -2446,6 +2448,41 @@ export class SearchV3View extends JfElement {
    * surface cannot write its numbers into this window's turn.
    */
   private concludeRun(local: Sv3RunLocal, feed: Sv3RunFeed): void {
+    // Tempdoc 859 §3b — the run's EVIDENCE, written at the same terminal as its receipt and through
+    // the same shared projection the record reader uses, so live and record produce one value from
+    // one function over the same bytes. This is the C-small defect: the delegate path resolved
+    // grounding on the backend, persisted it, and then never wrote it onto the turn, so a delegate
+    // answer rendered with no marks and no sources while the evidence sat on the wire.
+    //
+    // §3c — GUARDED by the run the evidence belongs to. `concludeRun` fires on every terminal,
+    // including the ones that emit no `done` (error, abort, watchdog, budget stop), and only `onDone`
+    // writes the controller's evidence fields. Without this test a failed run N would settle wearing
+    // run N-1's sources.
+    //
+    // TWO conditions, because the id test alone has a hole: a dispatch the server never named
+    // leaves `ctrl.sessionId` still holding the PREVIOUS run's id, which the id test would then
+    // read as a match. `acknowledged` is the window's own latch for "the server said something
+    // about the run I opened" — the same identity discipline `entryStart` and `adoptedRunIds`
+    // apply, and the reason it is not `runInFlight`/`isStreaming` (both local optimism, set inside
+    // `send()` before the server answers).
+    const ctrl = this.agentController();
+    if (
+      ctrl !== null &&
+      local.acknowledged &&
+      ctrl.answerEvidenceRunId !== null &&
+      ctrl.answerEvidenceRunId === ctrl.sessionId
+    ) {
+      const evidence = agentAnswerEvidence(
+        ctrl.answerSources,
+        ctrl.answerCitations,
+        ctrl.answerCitationScorer,
+      );
+      this.sessions = setTurnEvidence(
+        this.sessions,
+        { sessionId: local.sessionId, turnId: local.turnId },
+        { ...evidence, retrievalMode: '' },
+      );
+    }
     this.sessions = settleAgentTurn(
       this.sessions,
       { sessionId: local.sessionId, turnId: local.turnId },

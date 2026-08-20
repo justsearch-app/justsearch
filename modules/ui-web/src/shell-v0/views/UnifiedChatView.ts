@@ -3542,9 +3542,17 @@ export class UnifiedChatView extends JfElement {
       const e = events[i];
       const sources = e?.attributes?.sources;
       if (e?.kind === 'ASSISTANT_MESSAGE' && Array.isArray(sources) && sources.length > 0) {
+        const scorer = e.attributes.citationScorer;
         this.agentCtrl?.hydrateAnswerEvidence(
           sources as AgentSource[],
           Array.isArray(e.attributes.citations) ? (e.attributes.citations as AgentSentenceCite[]) : [],
+          // The run whose evidence this is: the controller's own, since this rehydrates the run the
+          // window is displaying (tempdoc 859 §3c).
+          this.agentCtrl?.sessionId ?? null,
+          // Tempdoc 859 §4 / amendment 6 — the record's producer stamp, or `null` for a record
+          // written before the field existed (the pre-stamp allowance). Without carrying it here the
+          // legacy surface would pass `undefined` forever and the gate would never fire on it.
+          typeof scorer === 'string' ? scorer : null,
         );
         return;
       }
@@ -3586,17 +3594,22 @@ export class UnifiedChatView extends JfElement {
     return this.resolveAnswerCitations(
       this.agentCtrl?.answerSources ?? [],
       this.agentCtrl?.answerCitations ?? [],
+      this.agentCtrl?.answerCitationScorer ?? null,
     );
   }
 
   /** Resolve the AGENT path's per-sentence cites against its sources into the one `Citation` shape.
    *  Tempdoc 577 Phase 1 — body extracted to the shared {@link resolveAgentAnswerCitations} so the
-   *  Inspector's Answer tab resolves through the same authority (no fork of the mapping). */
+   *  Inspector's Answer tab resolves through the same authority (no fork of the mapping).
+   *  Tempdoc 859 §4 / amendment 6 — the producer stamp is threaded through EVERY call site: a site
+   *  that omitted it would be admitted by the pre-stamp allowance in perpetuity, i.e. permanently
+   *  ungated, which is the whole reason the stamp rides the controller. */
   private resolveAnswerCitations(
     sources: readonly AgentSource[],
     cites: readonly AgentSentenceCite[],
+    scorer: string | null,
   ): Citation[] {
-    return resolveAgentAnswerCitations(sources, cites);
+    return resolveAgentAnswerCitations(sources, cites, scorer);
   }
 
   /**
@@ -3882,11 +3895,20 @@ export class UnifiedChatView extends JfElement {
     // The reconciliation is computed here (the one merge authority), not at render time (621 Phase 4).
     const recordItems = projectUnifiedThread(this.unifiedEvents).map((it) => this.attachLiveMatch(it));
     const ctrl = this.agentCtrl;
+    // Tempdoc 859 §3c / amendment 7 — the run-id guard belongs HERE, at the read site, not inside
+    // `projectLiveAgentActivity` (which is pure and receives the grounding as a parameter). Evidence
+    // is written only by `onDone`, so a run that terminated without one — error, abort, watchdog,
+    // budget stop — leaves the previous run's sources standing; handing them to this projection
+    // would attach run N-1's grounding to run N's failed activity.
+    const evidenceIsThisRun =
+      ctrl !== null &&
+      ctrl.answerEvidenceRunId !== null &&
+      ctrl.answerEvidenceRunId === ctrl.sessionId;
     const liveItems =
       this.affordance === 'agent' && ctrl
         ? projectLiveAgentActivity(ctrl.conversation, ctrl.toolCalls, {
-            sources: ctrl.answerSources,
-            citations: ctrl.answerCitations,
+            sources: evidenceIsThisRun ? ctrl.answerSources : [],
+            citations: evidenceIsThisRun ? ctrl.answerCitations : [],
           })
         : [];
 
@@ -5157,7 +5179,14 @@ export class UnifiedChatView extends JfElement {
             ? (it.attributes.citations as AgentSentenceCite[])
             : [];
           const agentSources = it.attributes.sources as AgentSource[];
-          const marks = this.resolveAnswerCitations(agentSources, cites);
+          // Tempdoc 859 §4 — the RECORD's own producer stamp, so a reloaded delegate answer is gated
+          // by what actually scored it rather than by the pre-stamp allowance.
+          const recordScorer = it.attributes.citationScorer;
+          const marks = this.resolveAnswerCitations(
+            agentSources,
+            cites,
+            typeof recordScorer === 'string' ? recordScorer : null,
+          );
           // Tempdoc 577 Move 3 / 603 D-4 — even a sourced agent answer carries a frame: full coverage →
           // grounded (no banner); partial → partially-grounded; document-level (no chunk identity) →
           // `sourced` (provenance, no per-sentence verification). One authority decides.

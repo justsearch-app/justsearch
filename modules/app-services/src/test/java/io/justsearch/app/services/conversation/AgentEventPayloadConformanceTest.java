@@ -67,6 +67,9 @@ final class AgentEventPayloadConformanceTest {
               1,
               List.of(new AgentEvent.AgentSource("d", 0, "p", "ti", "ex", 1, 2, "h")),
               List.of(new AgentEvent.AgentSentenceCite("s", 0, 0.9)),
+              // Tempdoc 859 §4 — the producer stamp is a payload key like any other, so the
+              // conformance sweep must see a populated one.
+              "CROSS_ENCODER",
               NO_TRACE),
           // all error fields populated → errorClass/retryAction/retryAttempt/i18nKey emitted.
           new AgentEvent.AgentError("err", "CODE", "CLASS", "ACTION", 1, NO_TRACE),

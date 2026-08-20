@@ -55,12 +55,32 @@ final class AgentCitationResolver {
   }
 
   /**
-   * Match the answer's sentences back to the grounding sources. Returns the inline-citation links
-   * (sentence → source index), or an empty list when matching is unavailable/failed/empty.
+   * Tempdoc 859 §4 — the cites AND the producer that scored them.
+   *
+   * <p>Returning only the cites is the root defect this record removes: {@code
+   * DocumentService.CitationMatchResult} reports {@link DocumentService.ScorerKind}, this resolver
+   * dropped it at the return, and the FE's 836 §4 producer gate was therefore ungateable on the
+   * agent plane — a cosine-fallback similarity reached {@code Citation.similarity}, which every
+   * downstream tier reads as a cross-encoder probability. A gate's real boundary is the wire shape,
+   * not the function (859 Reach 2).
+   *
+   * @param cites the inline-citation links (sentence → source index); empty when nothing matched
+   * @param scorer which producer wrote the similarities; {@code NONE} whenever no matcher ran
    */
-  List<AgentEvent.AgentSentenceCite> resolve(String answer, List<AgentEvent.AgentSource> sources) {
+  record Resolved(List<AgentEvent.AgentSentenceCite> cites, DocumentService.ScorerKind scorer) {
+    static Resolved none() {
+      return new Resolved(List.of(), DocumentService.ScorerKind.NONE);
+    }
+  }
+
+  /**
+   * Match the answer's sentences back to the grounding sources. Returns the inline-citation links
+   * (sentence → source index) with the producer that scored them, or {@link Resolved#none()} when
+   * matching is unavailable/failed/empty.
+   */
+  Resolved resolve(String answer, List<AgentEvent.AgentSource> sources) {
     if (documentService == null || answer == null || answer.isBlank() || sources.isEmpty()) {
-      return List.of();
+      return Resolved.none();
     }
     List<DocumentService.ContextCitation> citations = new ArrayList<>(sources.size());
     for (AgentEvent.AgentSource s : sources) {
@@ -90,13 +110,16 @@ final class AgentCitationResolver {
           out.add(new AgentEvent.AgentSentenceCite(m.sentenceText(), sourceIndex, m.similarity()));
         }
       }
-      return List.copyOf(out);
+      // The scorer travels WITH the cites it scored, from the one matcher result. Reporting it
+      // separately (or defaulting it at the emitter) would let the two disagree about which
+      // producer wrote the similarities the marks are coloured by.
+      return new Resolved(List.copyOf(out), result.scorer());
     } catch (Exception e) {
       // 565 §10 guard: never silent-zero into a dead feature — log + degrade to source-only.
       LOG.warn(
           "Answer↔source citation match failed/timed out ({}); citing sources without inline marks",
           e.toString());
-      return List.of();
+      return Resolved.none();
     }
   }
 }

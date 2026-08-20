@@ -891,15 +891,21 @@ final class AgentStepRunner {
    */
   private AgentEvent.AgentDone groundedDone(AgentSession session, String response) {
     List<AgentEvent.AgentSource> sources = session.collectGroundingSources();
-    List<AgentEvent.AgentSentenceCite> cites =
-        citationResolver == null ? List.of() : citationResolver.resolve(response, sources);
+    // Tempdoc 859 §4 — the cites and the producer that scored them arrive together, so the emitted
+    // `done` declares which scale its similarities are on. No resolver ⇒ NONE, which fails the FE's
+    // producer gate closed to sources-without-marks (565 §10's documented degradation).
+    AgentCitationResolver.Resolved resolved =
+        citationResolver == null
+            ? AgentCitationResolver.Resolved.none()
+            : citationResolver.resolve(response, sources);
     return new AgentEvent.AgentDone(
         response,
         session.iterationsUsed(),
         session.toolCallsExecuted(),
         session.totalTokens(),
         sources,
-        cites);
+        resolved.cites(),
+        resolved.scorer().name());
   }
 
   /**

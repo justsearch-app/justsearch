@@ -139,6 +139,10 @@ public final class AgentEventPayloads {
                             "sourceIndex", c.sourceIndex(),
                             "similarity", c.similarity()))
                 .toList());
+        // Tempdoc 859 §4 — the producer stamp rides the same payload as the similarities it
+        // describes, so the FE's 836 §4 gate reads "which scale is this number on" from the event
+        // that carried the number rather than assuming.
+        donePayload.put("citationScorer", e.citationScorer());
         yield donePayload;
       }
       case AgentEvent.AgentError e -> {

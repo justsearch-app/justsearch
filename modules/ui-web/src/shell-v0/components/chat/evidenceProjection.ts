@@ -28,7 +28,7 @@
  * boundary-aware fields (startLine/endLine/headingText) verbatim for navigation.
  */
 import type {
-  RetrievalCitation,
+  AnswerEvidenceSource,
   CitationMatch,
   SourceCoverage,
   ContextInclusion,
@@ -209,15 +209,21 @@ export interface EvidenceLocation {
   readonly parentDocId: string;
   readonly startLine: number;
   readonly endLine: number;
-  readonly startChar: number;
-  readonly endChar: number;
+  /** Tempdoc 859 §5b — absent when the producer reports no character span (the delegate plane). */
+  readonly startChar?: number;
+  readonly endChar?: number;
 }
 
 /** The view-model the citation UI projects from a retrieval-evidence record. */
 export interface EvidenceItem {
   readonly docId: string;
   readonly filename: string;
-  readonly score: EvidenceScore;
+  /**
+   * Tempdoc 859 §5b — `null` when the producer reported no score. The delegate plane's
+   * `AgentSource` deliberately carries none (it is uncalibrated, 559), and `evidenceScore(0)` would
+   * project that absence as a real "low" tier — a grade over a number nobody produced.
+   */
+  readonly score: EvidenceScore | null;
   readonly excerpt: string;
   readonly headingText: string;
   readonly location: EvidenceLocation;
@@ -710,11 +716,11 @@ export function evidenceScore(value: number, label: string = RELEVANCE_METRIC): 
 }
 
 /** Project a retrieval-evidence record into the citation view-model. */
-export function toEvidenceItem(c: RetrievalCitation): EvidenceItem {
+export function toEvidenceItem(c: AnswerEvidenceSource): EvidenceItem {
   return {
     docId: c.parentDocId,
     filename: filenameOf(c.parentDocId),
-    score: evidenceScore(c.score),
+    score: typeof c.score === 'number' ? evidenceScore(c.score) : null,
     excerpt: c.excerpt ?? '',
     headingText: c.headingText ?? '',
     location: {
@@ -738,7 +744,7 @@ export function toEvidenceItem(c: RetrievalCitation): EvidenceItem {
  * meant is how a vocabulary drift becomes a false claim about evidence.
  */
 export function contextInclusionOf(
-  c: Pick<RetrievalCitation, 'contextInclusion'> | null | undefined,
+  c: Pick<AnswerEvidenceSource, 'contextInclusion'> | null | undefined,
 ): ContextInclusion | null {
   const raw = c?.contextInclusion;
   return raw === 'included' || raw === 'partial' || raw === 'dropped' ? raw : null;
@@ -933,7 +939,7 @@ export function suppressGroundingFor(inclusion: ContextInclusion | null): boolea
  * dropped passage is allowed to claim it grounded something.
  */
 export function citationHeader(input: {
-  readonly citation: RetrievalCitation | null;
+  readonly citation: AnswerEvidenceSource | null;
   readonly grounding: SourceGrounding | null;
   readonly question: string | null;
   readonly spanUnusable: boolean;
@@ -963,12 +969,17 @@ export function citationHeader(input: {
  * `Passage 4 of 9`, 1-based for the reader. Suppressed on the ABSENT sentinel and on a total that
  * cannot contain the index — a chunk ordinal the producer did not record is not passage zero.
  */
-function passageLabel(citation: RetrievalCitation | null): string | null {
+function passageLabel(citation: AnswerEvidenceSource | null): string | null {
   if (citation === null) return null;
   const { chunkIndex, chunkTotal } = citation;
   if (!Number.isInteger(chunkIndex) || chunkIndex === DOC_LEVEL_CHUNK_SENTINEL || chunkIndex < 0) {
     return null;
   }
-  if (!Number.isInteger(chunkTotal) || chunkTotal <= chunkIndex) return null;
+  // Tempdoc 859 §5b — an ABSENT total (the delegate plane reports none) says nothing about how many
+  // passages the document has, so there is no "of N" to write. Same answer the pre-existing
+  // non-integer check already gave, now reachable by absence too.
+  if (typeof chunkTotal !== 'number' || !Number.isInteger(chunkTotal) || chunkTotal <= chunkIndex) {
+    return null;
+  }
   return `Passage ${chunkIndex + 1} of ${chunkTotal}`;
 }

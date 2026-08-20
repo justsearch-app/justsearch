@@ -39,7 +39,7 @@
  *    session spends none of it and carries a coarse relative timestamp instead.
  */
 import type { Sv3RowStatus } from './fixtures.js';
-import type { CitationMatch, RetrievalCitation } from '../../components/chat/citationTypes.js';
+import type { AnswerEvidenceSource, CitationMatch } from '../../components/chat/citationTypes.js';
 import type { Citation } from '../../components/chat/MarkdownBlock.js';
 // Type-only, and deliberately the LIVE feed's own item type: a turn's record-projected activity and
 // a running turn's live feed are the same three shapes, so the content surface has ONE renderer for
@@ -54,8 +54,13 @@ import type { ReasoningBlock } from '../../controllers/ReasoningController.js';
  * answer's sources is read off this record — there is no second count to disagree with it.
  */
 export interface Sv3TurnEvidence {
-  /** The retrieval set the backend reported (`rag.citations`). */
-  readonly sources: readonly RetrievalCitation[];
+  /**
+   * The source set the answer stood on — `rag.citations` on the ask tier, the `done` event's
+   * `sources` on the delegate tier (tempdoc 859 §5b). The SUPERTYPE, because the two planes report
+   * different facts and casting one to the other is what made this window state a fabricated count
+   * for a delegate turn.
+   */
+  readonly sources: readonly AnswerEvidenceSource[];
   /** The per-sentence grounding matches (`rag.citation_matches`), for the shared citations panel. */
   readonly matches: readonly CitationMatch[];
   /** The inline `[n]` marks, resolved by the SHARED `claimsToCitations` — never authored here. */

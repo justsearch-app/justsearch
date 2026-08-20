@@ -79,7 +79,7 @@ describe('evidenceProjection — total projection of the evidence record', () =>
     expect(item.location.startLine).toBe(FULL.startLine);
     expect(item.location.endLine).toBe(FULL.endLine);
     // score → labeled metric; excerpt + headingText carried verbatim
-    expect(item.score.value).toBeCloseTo(0.83);
+    expect(item.score?.value).toBeCloseTo(0.83);
     expect(item.excerpt).toBe(FULL.excerpt);
     expect(item.headingText).toBe(FULL.headingText);
     // parentDocId tail → filename
@@ -151,8 +151,19 @@ describe('evidenceProjection — total projection of the evidence record', () =>
 
   it('the score carries a declared metric label — not a bare scalar', () => {
     const item = toEvidenceItem(FULL);
-    expect(item.score.label).toBe(RELEVANCE_METRIC);
-    expect(item.score.label).toBe('Relevance');
+    expect(item.score?.label).toBe(RELEVANCE_METRIC);
+    expect(item.score?.label).toBe('Relevance');
+  });
+
+  it('a source whose producer reported NO score projects a null score, not a zero one', () => {
+    // Tempdoc 859 §5b — the delegate plane's `AgentSource` carries no ranking score (uncalibrated,
+    // 559). `evidenceScore(0)` would project that silence as a real `low` tier: a grade over a
+    // number nobody produced, which is exactly the fabrication the optional field exists to remove.
+    const { score: _dropped, ...noScore } = FULL;
+    const item = toEvidenceItem(noScore);
+    expect(item.score).toBeNull();
+    // and the rest of the projection is unaffected — absence is contained to the field.
+    expect(item.excerpt).toBe(FULL.excerpt);
   });
 
   it('score projects to clamped value / percent / tier', () => {

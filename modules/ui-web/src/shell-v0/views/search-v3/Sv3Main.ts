@@ -223,6 +223,23 @@ const CITE_LEGEND =
   'Select a source to see the sentences it supports. A dotted underline marks a sentence the ' +
   'evidence supports weakly; amber marks one it does not support. A grey number is a weak reference.';
 
+/**
+ * Tempdoc 859 §6 (N1) — which feed item is the run's ANSWER: the LAST text item, or `null` when the
+ * run produced no prose.
+ *
+ * <p>Computed by the ITERATOR of the feed rather than inside `runItem`, which sees one item and so
+ * cannot know whether a later one exists. Both iterators — the live feed and the record's activity
+ * list — ask this one function, because the two must agree about which item wears the marks or a
+ * settled run would carry the marks on a different item than the one the reader watched.
+ */
+function terminalTextItemId(items: readonly Sv3RunFeedItem[]): string | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item?.kind === 'text') return item.id;
+  }
+  return null;
+}
+
 export class Sv3Main extends JfElement {
   static styles = [
     sv3Shared,
@@ -1591,7 +1608,7 @@ export class Sv3Main extends JfElement {
                       asymmetry the persistence work exists to remove. */ ''}
               ${this.reasoningBlocks(turn, streaming)}${run === null
                 ? this.recordedActivity(turn)
-                : this.runBody(run)}`
+                : this.runBody(run, turn)}`
           : html`
               ${this.rewriteNote(turn)}${this.reasoningBlocks(turn, streaming)}
               <div class="answer" data-testid="sv3-turn-answer" data-item-id=${`${turn.id}:a`}>
@@ -2158,8 +2175,9 @@ export class Sv3Main extends JfElement {
    */
   private recordedActivity(turn: Sv3Turn): TemplateResult | typeof nothing {
     if (turn.activity.length === 0) return nothing;
+    const terminalId = terminalTextItemId(turn.activity);
     return html`<div class="run-feed" data-testid="sv3-record-activity">
-      ${turn.activity.map((item) => this.runItem(item))}
+      ${turn.activity.map((item) => this.runItem(item, turn, item.id === terminalId))}
     </div>`;
   }
 
@@ -2260,14 +2278,15 @@ export class Sv3Main extends JfElement {
    * It is a distinct STATE, not an empty feed, so the window never has to imply progress it cannot
    * see (the handoff predicate in `sv3-run.ts` is what leaves it).
    */
-  private runBody(run: Sv3RunView): TemplateResult {
+  private runBody(run: Sv3RunView, turn: Sv3Turn): TemplateResult {
+    const terminalId = terminalTextItemId(run.feed.items);
     return html`
       <div class="run" data-testid="sv3-run" data-phase=${run.phase}>
         ${run.phase === 'dispatching'
           ? html`<p class="run-echo" data-testid="sv3-run-echo" role="status">${RUN_DISPATCHING}</p>`
           : html`
               <div class="run-feed" data-testid="sv3-run-feed">
-                ${run.feed.items.map((item) => this.runItem(item))}
+                ${run.feed.items.map((item) => this.runItem(item, turn, item.id === terminalId))}
               </div>
             `}
         ${run.prompts.map((prompt) => this.runPrompt(prompt))}
@@ -2281,13 +2300,29 @@ export class Sv3Main extends JfElement {
    * same landmarks in a live conversation and a reloaded one. The retiree reaches the same coverage
    * only by merging two projections.
    */
-  private runItem(item: Sv3RunFeedItem): TemplateResult {
+  private runItem(item: Sv3RunFeedItem, turn: Sv3Turn, terminal: boolean): TemplateResult {
     if (item.kind === 'text') {
-      // The agent's prose is the same kind of text as an answer and gets the same renderer: a feed
-      // that showed raw asterisks beside a settled turn that did not would be two markdown policies
-      // in one transcript. Never streaming — a feed entry arrives whole.
+      // Tempdoc 859 §6 (N1) — the agent turn's prose is where its inline `[n]` marks belong, and
+      // until now this was the ONLY text renderer in the agent branch that carried no `.citations`
+      // and no `@citation-select`. Computing marks for it and never passing them would have been
+      // `substrate-without-consumer` shipped: the Sources disclosure and the panel sit outside the
+      // kind branch and would have lit up, so the fix would have read as complete while the marks —
+      // the actual finding — stayed invisible.
+      //
+      // The marks go to the run's TERMINAL text item only. The grounding describes the answer, and
+      // the terminal item is the answer; handing the full set to every text item would let an
+      // earlier step's repeated sentence capture a mark that belongs to the answer. Same last-wins
+      // rule `Sv3Turn.evidence` and `assistantRecordId` already follow. The caller decides which
+      // item is terminal, because this function sees one item and cannot know.
       return html`<div class="answer" data-testid="sv3-run-text" data-item-id=${item.id}>
-        <jf-markdown-block class="sv3-markdown" prose .text=${item.text}></jf-markdown-block>
+        <jf-markdown-block
+          class="sv3-markdown"
+          prose
+          data-turn-id=${turn.id}
+          .text=${item.text}
+          .citations=${terminal ? [...(turn.evidence?.marks ?? [])] : []}
+          @citation-select=${this.onCitationSelect}
+        ></jf-markdown-block>
       </div>`;
     }
     if (item.kind === 'tool') {

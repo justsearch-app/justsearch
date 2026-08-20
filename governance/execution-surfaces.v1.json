@@ -41,7 +41,7 @@
       "modules"
     ],
     "javaInclude": "/src/main/java/",
-    "tsRefPattern": "(SearchTrace|RetrievalCitation)",
+    "tsRefPattern": "(SearchTrace|RetrievalCitation|AnswerEvidenceSource)",
     "tsRoots": [
       "modules/ui-web/src"
     ],
@@ -52,7 +52,7 @@
     "executionSpanNameRegex": "search/[a-z_]+",
     "executionSpanNameNote": "553 Phase B Check 5: any Java-main file emitting a search/* span-name literal must be a registered surface (catches the span-tree fork class that doesn't import the canonical type). String-literal heuristic \u2014 \u00a75 honest limit.",
     "expectedMinPopulation": 12,
-    "expectedMinPopulationNote": "tempdoc 576 \u00a75 vacuous-pass guard: the auto-scan must detect >= this many canonical-type-referencing files, else a renamed scan root would let every coverage check pass vacuously. Live count is 26 (2026-06-15); floor 12 is a conservative ~half-headroom \u2014 catches a renamed-root collapse toward zero, not normal churn. Lower this with any change that legitimately shrinks the population."
+    "expectedMinPopulationNote": "tempdoc 576 \u00a75 vacuous-pass guard: the auto-scan must detect >= this many canonical-type-referencing files, else a renamed scan root would let every coverage check pass vacuously. Live count restamped to 28 (2026-08-20, tempdoc 859 \u00a77 amendment 5 \u2014 the `AnswerEvidenceSource` supertype joined the pattern, so a consumer that references only the supertype is no longer invisible to the scan); floor 12 is a conservative ~half-headroom \u2014 catches a renamed-root collapse toward zero, not normal churn. Lower this with any change that legitimately shrinks the population."
   },
   "surfaces": [
     {
@@ -202,7 +202,7 @@
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/components/chat/citationTypes.ts",
       "guard": "exempt:opaque carrier \u2014 passes the record through, does not project it",
-      "note": "FE RetrievalCitation evidence type (sibling record; tempdoc 559 Authority IV). Extracted from CitationsPanel to break an import cycle; registered here during the 564 merge (was previously undeclared). Tempdoc 849: mirrors the inclusion component as OPTIONAL `contextInclusion` ('included' | 'partial' | 'dropped') + `contextIncludedChars`. The Java ABSENT member has no mirror on purpose — absence is the field being missing, never a fourth string a consumer would have to interpret."
+      "note": "FE RetrievalCitation evidence type (sibling record; tempdoc 559 Authority IV). Extracted from CitationsPanel to break an import cycle; registered here during the 564 merge (was previously undeclared). Tempdoc 859 §5b split it: the shared supertype `AnswerEvidenceSource` carries what BOTH answer planes report and leaves the five retrieval-only fields optional, and `RetrievalCitation extends` it re-requiring them — so the delegate plane is representable without zero-filling retrieval facts. Tempdoc 849: mirrors the inclusion component as OPTIONAL `contextInclusion` ('included' | 'partial' | 'dropped') + `contextIncludedChars`. The Java ABSENT member has no mirror on purpose — absence is the field being missing, never a fourth string a consumer would have to interpret."
     },
     {
       "id": "evidence-fe-claim-resolver",
@@ -237,11 +237,19 @@
     },
     {
       "id": "sv3-record-evidence",
-      "kind": "carrier",
+      "kind": "projection",
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.ts",
-      "guard": "exempt:opaque carrier — hands the record's persisted citation set to the turn unchanged, projects no field of it",
-      "note": "Tempdoc 847 §2.4 — the RESTORED counterpart of `sv3-ask-client`. A reloaded conversation's turns are projected from `GET /api/thread/{id}`, and the assistant event's persisted `citations` / `claimMatches` are carried onto the turn's evidence record verbatim: the claims come from the SHARED envelope reader (`recordEvidence`, which owns the 836 §4 producer gate) and the marks from the SHARED `claimsToCitations` (evidence-fe-claim-resolver). Nothing about a citation is derived here. Before 847 this module discarded the persisted evidence outright, which is why a restored search-v3 answer rendered sourceless."
+      "guard": "test:sv3-record.evidenceProjection",
+      "note": "Tempdoc 847 §2.4 — the RESTORED counterpart of `sv3-ask-client`: a reloaded conversation's turns are projected from `GET /api/thread/{id}`. Tempdoc 859 §5a RECLASSIFIED this from `carrier` to `projection`: it no longer hands one persisted citation set through unchanged, it DISCRIMINATES the record's PLANE on the presence of `attributes.sources` and branches. `attributes.citations` carries retrieval SOURCES on the answer plane and per-sentence CITES on the action plane, and reading it without the discriminator produced a confident wrong source count for every delegate turn. The action arm derives its sources/matches/marks through the shared `agentEvidence` projection; the answer arm still reads through the shared envelope reader (`recordEvidence`, which owns the 836 §4 producer gate) and `claimsToCitations`. Leaving the old `exempt:opaque carrier` claim in place would be the register asserting something the code stopped doing."
+    },
+    {
+      "id": "agent-evidence-projection",
+      "kind": "projection",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/components/chat/agentEvidence.ts",
+      "guard": "test:agentEvidence.projection",
+      "note": "Tempdoc 859 §3 — the ONE delegate-plane evidence projection, shared by the live Search v3 terminal, the Search v3 record reader and the legacy window. It DERIVES fields from `AgentEvent.AgentSource` / `AgentSentenceCite`: sources map onto `AnswerEvidenceSource` (retrieval-only fields left ABSENT, never zero-filled — §5b), matches are projected from the per-sentence cites with `textSource: CHUNK_LOOKUP` stated (§2/§3a), and marks resolve through the shared producer-gated `resolveAnswerCitations`. Registering it as a carrier would repeat the false claim §5a just removed from `sv3-record-evidence`."
     },
     {
       "id": "sv3-turn-evidence",
@@ -249,7 +257,7 @@
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/views/search-v3/sv3-sessions.ts",
       "guard": "exempt:opaque carrier — the turn stores the citation set verbatim; it projects no field of it",
-      "note": "Tempdoc 822 Phase F4 — the Search v3 window's in-memory turn list. A turn holds the RetrievalCitation evidence its answer stood on so the transcript keeps it; the only derivation is the SOURCE COUNT (`sv3TurnSourceCount`, length of the stored set), which exists precisely so no second count can disagree with the panel. Rendering happens in Sv3Main via the shared jf-citations-panel."
+      "note": "Tempdoc 822 Phase F4 — the Search v3 window's in-memory turn list. A turn holds the evidence its answer stood on so the transcript keeps it — typed `AnswerEvidenceSource` since tempdoc 859 §5b, because a delegate answer's sources carry no char span / chunk total / retrieval score and casting them to `RetrievalCitation` fabricated those facts; the only derivation is the SOURCE COUNT (`sv3TurnSourceCount`, length of the stored set), which exists precisely so no second count can disagree with the panel. Rendering happens in Sv3Main via the shared jf-citations-panel."
     },
     {
       "id": "eval-provenance",

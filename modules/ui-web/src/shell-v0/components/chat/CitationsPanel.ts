@@ -47,8 +47,8 @@ import {
   type InclusionBadge,
 } from './evidenceProjection.js';
 import type {
+  AnswerEvidenceSource,
   CitationMatch,
-  RetrievalCitation,
   CitationSelectDetail,
   SourceCoverage,
 } from './citationTypes.js';
@@ -57,6 +57,7 @@ import type {
 // tempdoc 530 UI-cycle gate). Re-exported here so existing importers of
 // `./CitationsPanel.js` keep working unchanged.
 export type {
+  AnswerEvidenceSource,
   CitationMatch,
   RetrievalCitation,
   CitationSelectDetail,
@@ -74,7 +75,7 @@ export class CitationsPanel extends JfElement {
   };
 
   declare citations: CitationMatch[];
-  declare sources: RetrievalCitation[];
+  declare sources: AnswerEvidenceSource[];
   /**
    * Tempdoc 836 S2S3-A.3 — the per-source examination facts, so a source the verification budget
    * never looked at is not filed under "retrieved · not cited". Empty (the default) keeps the
@@ -368,7 +369,7 @@ export class CitationsPanel extends JfElement {
     jf-control.weak-toggle::part(control):hover { color: var(--text-primary); }
   `;
 
-  private onSourceClick(source: RetrievalCitation, e: MouseEvent): void {
+  private onSourceClick(source: AnswerEvidenceSource, e: MouseEvent): void {
     // Tempdoc 526 §17 T1A — publish the citation button's bounding rect to
     // the F9 menu anchor register BEFORE dispatching the event. The menu
     // subscribes to both selectionState and selectionAnchor; the citation
@@ -442,7 +443,7 @@ export class CitationsPanel extends JfElement {
     >`;
   }
 
-  private renderSourceCard(s: RetrievalCitation, grounding?: SourceGrounding | null): TemplateResult {
+  private renderSourceCard(s: AnswerEvidenceSource, grounding?: SourceGrounding | null): TemplateResult {
     // 559 Authority IV — render the citation card as a typed projection of the
     // evidence record, not ad-hoc field reads.
     const item = toEvidenceItem(s);
@@ -587,13 +588,13 @@ export class CitationsPanel extends JfElement {
     // everything else in the citation system indexes by.
     const coverageAt = (i: number) =>
       this.sourceCoverage.find((c) => c.sourceIndex === i) ?? null;
-    const gOf = new Map<RetrievalCitation, SourceGrounding>(
+    const gOf = new Map<AnswerEvidenceSource, SourceGrounding>(
       this.sources.map((s, i) => [
         s,
         sourceGrounding(i, this.citations, s.parentDocId, coverageAt(i)),
       ]),
     );
-    const groups: Record<'high' | 'supporting' | 'weak', RetrievalCitation[]> = {
+    const groups: Record<'high' | 'supporting' | 'weak', AnswerEvidenceSource[]> = {
       high: [],
       supporting: [],
       weak: [],
@@ -601,7 +602,7 @@ export class CitationsPanel extends JfElement {
     // Tempdoc 836 S2S3-A.3 — an UNEXAMINED source leaves the uncited group entirely. Filing it
     // under "retrieved (not cited)" would state an evidence verdict about text no scorer read;
     // it is a budget fact, so it gets its own slot and never a tier.
-    const unexamined: RetrievalCitation[] = [];
+    const unexamined: AnswerEvidenceSource[] = [];
     for (const s of this.sources) {
       if (gOf.get(s)!.state === 'unexamined') {
         unexamined.push(s);
@@ -611,8 +612,8 @@ export class CitationsPanel extends JfElement {
     }
     const { high, supporting, weak } = groups;
 
-    const groupByDoc = (items: RetrievalCitation[]) => {
-      const groups = new Map<string, RetrievalCitation[]>();
+    const groupByDoc = (items: AnswerEvidenceSource[]) => {
+      const groups = new Map<string, AnswerEvidenceSource[]>();
       for (const s of items) {
         const key = s.parentDocId;
         const list = groups.get(key) ?? [];
@@ -622,7 +623,7 @@ export class CitationsPanel extends JfElement {
       return groups;
     };
 
-    const renderGroup = (items: RetrievalCitation[]) => {
+    const renderGroup = (items: AnswerEvidenceSource[]) => {
       const groups = groupByDoc(items);
       return html`${Array.from(groups.entries()).map(
         ([docId, sources]) => html`

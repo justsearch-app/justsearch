@@ -104,6 +104,7 @@ export interface CoreAgentRunDonePayload {
   totalTokensUsed: number;
   sources?: AgentSource[];
   citations?: AgentSentenceCite[];
+  citationScorer?: string;
   trace?: TracePayload;
 }
 

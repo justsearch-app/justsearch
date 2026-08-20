@@ -69,6 +69,13 @@ public final class AgentInteractionMapper {
         if (payload.get("citations") instanceof List<?> cites && !cites.isEmpty()) {
           attributes.put("citations", cites);
         }
+        // Tempdoc 859 §4 — the producer stamp travels onto the persisted assistant message beside
+        // the citations it describes. Without it a RELOADED delegate answer would be admitted by
+        // the pre-stamp allowance forever, so the gate would exist and never fire on the record
+        // path — the same read-site-only defect the stamp exists to close.
+        if (payload.get("citationScorer") instanceof String scorer && !scorer.isBlank()) {
+          attributes.put("citationScorer", scorer);
+        }
         yield Optional.of(
             new InteractionEvent(
                 conversationId + ":assistant:" + stamp,

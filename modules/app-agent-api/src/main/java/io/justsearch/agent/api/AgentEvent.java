@@ -180,16 +180,41 @@ public sealed interface AgentEvent {
       List<AgentSource> sources,
       /** Tempdoc 565 §3.A — the per-sentence source matches (inline citations); may be empty. */
       List<AgentSentenceCite> citations,
+      /**
+       * Tempdoc 859 §4 — WHICH producer wrote the {@code similarity} on every {@link
+       * AgentSentenceCite} above: the wire name of {@code DocumentService.ScorerKind}. The 836 §4
+       * producer gate is implemented at the FE read site, so a producer that drops this field
+       * defeats it (859 Reach 2) — the agent plane did exactly that. Carried here so the gate has
+       * its input on the agent plane too.
+       *
+       * <p>Never null: an emitter that ran no matcher stamps {@link #SCORER_NONE}, which fails the
+       * gate CLOSED (sources without inline marks — {@code AgentCitationResolver}'s documented
+       * degradation, 565 §10). Omission is reserved for the wire, where an ABSENT key means "a
+       * record persisted before this field existed" and keeps the pre-stamp allowance.
+       */
+      String citationScorer,
       TraceContext trace)
       implements AgentEvent {
+    /**
+     * The wire name of {@code DocumentService.ScorerKind.NONE} — "nothing scored these".
+     *
+     * <p>A literal rather than the enum because {@code app-agent-api} is annotation-light and does
+     * not depend on {@code app-api}; every emitter that CAN see the enum stamps {@code
+     * ScorerKind…name()} instead, and {@code DocumentService.ScorerKind.fromWire} maps anything
+     * unrecognized back to {@code NONE}, so the two cannot disagree in a way that admits a mark.
+     */
+    public static final String SCORER_NONE = "NONE";
+
     public AgentDone {
       sources = sources == null ? List.of() : List.copyOf(sources);
       citations = citations == null ? List.of() : List.copyOf(citations);
+      citationScorer =
+          citationScorer == null || citationScorer.isBlank() ? SCORER_NONE : citationScorer;
     }
 
     public AgentDone(
         String finalResponse, int iterationsUsed, int toolCallsExecuted, int totalTokensUsed) {
-      this(finalResponse, iterationsUsed, toolCallsExecuted, totalTokensUsed, List.of(), List.of(), TraceContext.none());
+      this(finalResponse, iterationsUsed, toolCallsExecuted, totalTokensUsed, List.of(), List.of(), SCORER_NONE, TraceContext.none());
     }
 
     public AgentDone(
@@ -198,7 +223,7 @@ public sealed interface AgentEvent {
         int toolCallsExecuted,
         int totalTokensUsed,
         TraceContext trace) {
-      this(finalResponse, iterationsUsed, toolCallsExecuted, totalTokensUsed, List.of(), List.of(), trace);
+      this(finalResponse, iterationsUsed, toolCallsExecuted, totalTokensUsed, List.of(), List.of(), SCORER_NONE, trace);
     }
 
     /** Tempdoc 565 §3.A — finished with grounding evidence attached. */
@@ -208,8 +233,9 @@ public sealed interface AgentEvent {
         int toolCallsExecuted,
         int totalTokensUsed,
         List<AgentSource> sources,
-        List<AgentSentenceCite> citations) {
-      this(finalResponse, iterationsUsed, toolCallsExecuted, totalTokensUsed, sources, citations, TraceContext.none());
+        List<AgentSentenceCite> citations,
+        String citationScorer) {
+      this(finalResponse, iterationsUsed, toolCallsExecuted, totalTokensUsed, sources, citations, citationScorer, TraceContext.none());
     }
   }
 

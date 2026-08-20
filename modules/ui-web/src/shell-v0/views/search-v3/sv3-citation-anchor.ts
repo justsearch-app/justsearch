@@ -22,26 +22,40 @@ import {
   sourceGrounding,
   type CitationHeader,
 } from '../../components/chat/evidenceProjection.js';
+// The ONE source-identity authority (tempdoc 822 §5.4) — the same import `MarkdownBlock.ts` and
+// `CitationsPanel.ts` take, because a second key function here would silently never agree with them.
+import { sourceKey } from '../../state/selectedSource.js';
 import type { Sv3Turn } from './sv3-sessions.js';
 
 /** The source is not part of this turn's retrieval set (or the turn is gone). */
 export const SV3_SOURCE_INDEX_ABSENT = -1;
 
 /**
- * Which source in `turn.evidence.sources` a followed citation is, matched on the identity the
- * producer minted it with — the document plus its character span. Position in the array IS the
+ * Which source in `turn.evidence.sources` a followed citation is, matched on the identity the whole
+ * citation system already keys by: `sourceKey(parentDocId, startLine)`. Position in the array IS the
  * `sourceIndex` a `CitationMatch` links by (`components/chat/citationTypes.ts`), so this lookup is
  * what joins the two events.
+ *
+ * <p>Tempdoc 859 §5c — this used to join on the char span, which is a fact only the RETRIEVAL plane
+ * reports. A delegate turn's sources carry none, so `undefined === 0` was `false` for every agent
+ * mark: the mark rendered, the reader clicked, and the source pane resolved nothing. TypeScript
+ * reported nothing, because comparing `number | undefined` to `number` is legal — the defect
+ * compiles clean, which is why the join moved rather than being patched.
+ *
+ * <p>The tempting repair is the trap, and is forbidden: zero-filling `startChar`/`endChar` on the
+ * delegate plane makes every one of a document's sources `(0, 0)`, so `findIndex` returns that
+ * document's FIRST source — resurrecting exactly the wrong-target deep link 822 §3b removed.
+ * `sourceKey` is instead the ONE identity `MarkdownBlock.makeMarker` keys its marks on and
+ * `CitationsPanel` keys its cards on, "so the card and the inline `[n]` resolve to one identity and
+ * the two surfaces cannot silently disagree" — it works on both planes, and it removes a third
+ * identity vocabulary from this window rather than adding one. Char spans remain what
+ * {@link sv3CitationAnchor} highlights with, which is a different question.
  */
 export function sv3SourceIndex(turn: Sv3Turn | null, detail: CitationSelectDetail): number {
   const sources = turn?.evidence?.sources;
   if (!sources) return SV3_SOURCE_INDEX_ABSENT;
-  return sources.findIndex(
-    (source) =>
-      source.parentDocId === detail.parentDocId &&
-      source.startChar === detail.startChar &&
-      source.endChar === detail.endChar,
-  );
+  const wanted = sourceKey(detail.parentDocId, detail.startLine);
+  return sources.findIndex((source) => sourceKey(source.parentDocId, source.startLine) === wanted);
 }
 
 /**
@@ -68,6 +82,11 @@ export function sv3CitationAnchor(
   sentenceText: string | null,
 ): DocumentCitationAnchor | null {
   const { startChar, endChar } = detail;
+  // Tempdoc 859 §5b — ABSENT joins the same refusal an unusable span already got: a followed
+  // delegate citation reports no char span, and `Number.isFinite(undefined)` is false, so the pane
+  // shows the document and highlights nothing. The `typeof` guards are what narrow the optional for
+  // the compiler; they add no case the predicate did not already answer.
+  if (typeof startChar !== 'number' || typeof endChar !== 'number') return null;
   if (!Number.isFinite(startChar) || !Number.isFinite(endChar) || endChar <= startChar) return null;
   return { startChar, endChar, excerpt: detail.excerpt ?? '', sentenceText };
 }

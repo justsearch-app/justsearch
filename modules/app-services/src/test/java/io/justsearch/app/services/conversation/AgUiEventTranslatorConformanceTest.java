@@ -145,7 +145,8 @@ class AgUiEventTranslatorConformanceTest {
     List<AgentEvent> traced =
         List.of(
             new AgentEvent.TextChunk("hello", trace),
-            new AgentEvent.AgentDone("the answer", 1, 0, 0, List.of(), List.of(), trace));
+            new AgentEvent.AgentDone(
+                "the answer", 1, 0, 0, List.of(), List.of(), AgentEvent.AgentDone.SCORER_NONE, trace));
 
     for (AgentEvent event : traced) {
       SseEvent typed = AgUiEventTranslator.translate(event);

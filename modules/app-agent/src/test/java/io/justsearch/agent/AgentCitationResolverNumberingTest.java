@@ -63,7 +63,9 @@ class AgentCitationResolverNumberingTest {
             List.of());
 
     var cites =
-        new AgentCitationResolver(docsReturning(result)).resolve("A sentence.", twoPassagesOfOneDoc());
+        new AgentCitationResolver(docsReturning(result))
+            .resolve("A sentence.", twoPassagesOfOneDoc())
+            .cites();
 
     assertEquals(1, cites.size());
     assertEquals(
@@ -88,7 +90,9 @@ class AgentCitationResolverNumberingTest {
             List.of());
 
     var cites =
-        new AgentCitationResolver(docsReturning(result)).resolve("A sentence.", twoPassagesOfOneDoc());
+        new AgentCitationResolver(docsReturning(result))
+            .resolve("A sentence.", twoPassagesOfOneDoc())
+            .cites();
 
     assertTrue(cites.isEmpty(), "59 addresses no source in a 2-source answer, so no mark is minted");
   }

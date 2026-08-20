@@ -351,6 +351,32 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   // and (when the matcher ran) the per-sentence inline citations. Read by the sources pane.
   answerSources: AgentSource[] = [];
   answerCitations: AgentSentenceCite[] = [];
+  /**
+   * Tempdoc 859 §3c — WHICH RUN the evidence above belongs to, so a surface can refuse to attach it
+   * to a different one.
+   *
+   * <p>The hazard is a run that terminates WITHOUT a `done` event — an error, an abort, a watchdog
+   * or a budget stop. `onDone` clears the fields unconditionally, so a done-terminated ungrounded
+   * run already forgets its predecessor's evidence; but nothing else does (`resetRunState` is
+   * reached only on replay exit), and a surface's terminal handler fires on EVERY terminal. Without
+   * this stamp run N-1's sources get written onto run N's failed turn: maximally confident, entirely
+   * fabricated.
+   *
+   * <p>`null` means "no run has reported evidence", which is not the same as "this run reported
+   * none" — the reader of this field must compare it against the run it owns, never truthiness.
+   */
+  answerEvidenceRunId: string | null = null;
+  /**
+   * Tempdoc 859 §4 / amendment 6 — which producer scored {@link answerCitations}
+   * (`DocumentService.ScorerKind`'s wire name), for the 836 §4 producer gate.
+   *
+   * <p>It rides the CONTROLLER rather than each call site because all three `resolveAnswerCitations`
+   * callers read their sources and cites from here; a surface that could not reach the stamp would
+   * pass `undefined` forever and be admitted by the pre-stamp allowance in perpetuity — the gate
+   * would exist and never fire there. `null` IS that pre-stamp allowance, and is correct for a run
+   * whose record predates the field.
+   */
+  answerCitationScorer: string | null = null;
   // Tempdoc 550 N1: the tool calls the agent proposed for the CURRENT turn, announced as one
   // batch (tool_batch_proposed) before any per-call gate — lets a surface preview the whole
   // turn's plan ("the agent wants to do X, Y, Z") ahead of the first approval. Per-call approval
@@ -686,6 +712,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.toolCallsExecuted = 0;
     this.answerSources = [];
     this.answerCitations = [];
+    this.answerEvidenceRunId = null;
+    this.answerCitationScorer = null;
     this.currentToolBatch = [];
     this.totalTokensUsed = null;
     this.budgetUpdates = [];
@@ -1038,6 +1066,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // loose-cast: an empty/absent list yields no grounding, a populated one drives the rail + chips.
     this.answerSources = payload.sources ?? [];
     this.answerCitations = payload.citations ?? [];
+    // Tempdoc 859 §3c/§4 — the evidence's OWNER and its PRODUCER, written from the same payload that
+    // carried the evidence, so neither can be read off a different run or a different scorer.
+    this.answerEvidenceRunId = this.sessionId;
+    this.answerCitationScorer = payload.citationScorer ?? null;
     this.isStreaming = false;
     this.runKind = null; // §33 — run terminal: idle again
     this.runPark = null; // Tempdoc 834 §6.2 — a run that ended is not parked.
@@ -1050,9 +1082,20 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * reload case, where the live SSE `onDone` never fired this session). The record is the authority;
    * subscribers (the Sources pane + the "Sources · N" affordance) re-render via notify.
    */
-  hydrateAnswerEvidence(sources: AgentSource[], citations: AgentSentenceCite[]): void {
+  hydrateAnswerEvidence(
+    sources: AgentSource[],
+    citations: AgentSentenceCite[],
+    // Tempdoc 859 §3c/§4 — the run this record's evidence belongs to, and the producer that scored
+    // it. Both are what the RECORD says; `runId` defaults to the controller's current run only
+    // because a rehydrate is always for the run being displayed, and `scorer` is `null` for a record
+    // written before the stamp existed (the pre-stamp allowance, which is the honest reading).
+    runId: string | null = null,
+    scorer: string | null = null,
+  ): void {
     this.answerSources = sources;
     this.answerCitations = citations;
+    this.answerEvidenceRunId = runId ?? this.sessionId;
+    this.answerCitationScorer = scorer;
     this.notify();
   }
 
