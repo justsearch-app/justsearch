@@ -173,16 +173,22 @@ export class Sv3Composer extends JfElement {
   static styles = [
     sv3Shared,
     css`
+      /* Tempdoc 859 §B — no 'flex-shrink' any more: the composer is no longer a flex item of the
+         window's column. Both states are out of the flow now (hero centres itself over the content
+         region; docked rides the floating '.dock' wrapper), so the declaration described a layout
+         that no longer exists. */
       :host {
         display: block;
-        flex-shrink: 0;
         padding: var(--floating-content-inset);
         font-family: var(--font-sans);
       }
 
-      /* HERO lifts the composer out of the band and centres it over the content region. Its
-         containing block is the window's column, so the top inset is the topbar's own token rather
-         than a repeated number, and the overlay stays click-through except on the composer itself. */
+      /* HERO and DOCKED are both overlays over the content region since 859 §B; what distinguishes
+         them is WHERE and HOW MUCH. Hero owns the whole region below the topbar and centres itself
+         in it — hence the flex centring and the topbar-token top inset, rather than a repeated
+         number. Docked is bottom-anchored and publishes its measured height as the transcript's
+         occluded band; its positioning lives on the window's '.dock', not here, because the context
+         bar rides with it and the pair has to be ONE observable box. */
       :host([state='hero']) {
         position: absolute;
         inset: var(--workspace-topbar-height) 0 0 0;
@@ -190,9 +196,6 @@ export class Sv3Composer extends JfElement {
         display: flex;
         align-items: center;
         pointer-events: none;
-      }
-      :host([state='hero']) .band {
-        pointer-events: auto;
       }
 
       /* The moving box of the morph is the composer, not the overlay around it. The name is set
@@ -205,11 +208,16 @@ export class Sv3Composer extends JfElement {
         view-transition-name: sv3-hero-headline;
       }
 
+      /* 859 §B — the band is the ONE part of the composer that takes pointer events, in BOTH states
+         now: everything around it (the host's own inset, and in docked the window's '.dock'
+         wrapper) is click-through so the transcript underneath stays wheel-scrollable right up to
+         the glass edge. Unconditional rather than hero-only, because docked is an overlay too. */
       .band {
         position: relative;
         width: 100%;
         max-inline-size: 48rem;
         margin-inline: auto;
+        pointer-events: auto;
       }
 
       /* The hero INTRO — headline plus the corpus line under it (tempdoc 822 Phase F7, inventory
@@ -265,7 +273,10 @@ export class Sv3Composer extends JfElement {
 
       /* The design spec stacks composer banners ABOVE the box, 8px clear of it, at the composer's
          own radius ('mx-auto mb-2 max-w-3xl', and the same
-         rounded value the composer box carries, which is --radius-3xl here).
+         rounded value the composer box carries, which is --radius-3xl here). Since 859 §B the
+         composer floats rather than sitting in the flow, so a banner appearing here grows the
+         FLOATING dock — which is measured, so the transcript's occluded band grows with it and the
+         banner covers nothing.
          This window's one banner is the availability reason: the local model cannot answer, said
          where the send would have happened. It is TEXT, not a disabled control's tooltip — the
          availability authority's whole point is that the reason stays reachable ('state/availability.ts:18-20'). */
@@ -397,13 +408,33 @@ export class Sv3Composer extends JfElement {
            backdrop-filter that would otherwise establish one is gone. */
         isolation: isolate;
         border-radius: var(--radius-3xl);
+        /* Tempdoc 859 §B (D2) — the fill's translucency is DERIVED from the same multiplier that
+           drives the blur, so the two can never disagree. '--glass-blur-scale' is the shipped
+           app's ONE blur knob ('styles/tokens.css'), reached two ways: '[data-surface-mode="solid"]'
+           and 'prefers-reduced-transparency: reduce'. At scale 1 this resolves to '--glass-opacity'
+           (80%, today's value, unchanged); at scale 0 it resolves to 100% — fully opaque, which is
+           the half the '@supports' companion below exists to enforce: a translucent surface with
+           nothing blurred behind it is unreadable, not subtle.
+
+           The derivation must be LOCAL, and the reason is worth writing down because the obvious
+           fix does not work: this sheet declares '--glass-opacity' on its own ':host'
+           (sv3-tokens.css.ts), and an element's own declaration always beats an inherited value
+           whatever the outer selector's specificity — so a ':root'-side override of it is
+           structurally unreachable. '--glass-blur-scale' is the one multiplier sv3 does NOT
+           re-declare, which is exactly why it can carry the escape in — and it is read WITHOUT a
+           var() fallback on purpose (strip-token-fallbacks): it is a real design token declared in
+           the shipped styles/tokens.css, so a hardcoded 1 here would be a dead second source of
+           the default and exactly the drift that gate exists to remove. */
         background: color-mix(
           in srgb,
-          var(--composer-glass-surface) var(--glass-opacity),
+          var(--composer-glass-surface)
+            calc(100% - (100% - var(--glass-opacity)) * var(--glass-blur-scale)),
           transparent
         );
-        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-        backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+        -webkit-backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)))
+          saturate(var(--glass-saturation));
+        backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)))
+          saturate(var(--glass-saturation));
         box-shadow: var(--composer-shadow);
       }
       /* Mandatory companion to any glass surface: where blur is unsupported the fill goes opaque,
@@ -501,7 +532,9 @@ export class Sv3Composer extends JfElement {
         padding: 0 var(--space-3) var(--space-2);
       }
       /* The control row is the ANCHOR for the control's menu, which is why it is positioned: the
-         menu opens upward from a composer that sits at the bottom of the window. */
+         menu opens upward from a composer that sits at the bottom of the window. Still true of the
+         composer's POSITION since 859 §B, no longer of its place in the flow — it is anchored
+         there by the floating dock rather than pushed there by the column. */
       .controls {
         position: relative;
         display: flex;
@@ -585,9 +618,11 @@ export class Sv3Composer extends JfElement {
          the dialog's), which is exactly the kind of thing the token layer is for. */
       .menu {
         position: absolute;
-        /* The spec's positioner: sideOffset = 4, align="start". The composer sits at the bottom of
-           the window, so the side that has room is the top — which is where the spec's positioner
-           flips to for the same reason. */
+        /* The spec's positioner: sideOffset = 4, align="start". The composer is anchored at the
+           bottom of the window (by the floating dock since 859 §B, by the flow before it), so the
+           side that has room is the top either way — which is where the spec's positioner flips to
+           for the same reason. An open menu grows the dock, and the dock is measured, so the
+           transcript's occluded band grows with it. */
         bottom: calc(100% + var(--space-1));
         inset-inline-start: 0;
         /* The composer glass ISOLATES, so this is intra-component stacking (the z-0/z-1/z-2
@@ -598,9 +633,11 @@ export class Sv3Composer extends JfElement {
         padding: var(--space-1);
         border: 1px solid var(--dropdown-border);
         border-radius: var(--radius-lg);
+        /* 859 §B (D2) — '--dropdown-surface' derives its own translucency from the same multiplier
+           in the token sheet, so this fill goes opaque with the blur. */
         background: var(--dropdown-surface);
-        -webkit-backdrop-filter: blur(var(--glass-blur));
-        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)));
+        backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)));
         box-shadow: var(--dropdown-shadow);
       }
       @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {

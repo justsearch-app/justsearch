@@ -886,6 +886,53 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.locator(S.CSS_TOAST).first.wait_for(state="visible", timeout=10_000)
         await asyncio.sleep(0.3)  # let the toast enter-animation settle before measuring
 
+    async def setup_sv3_composer_occlusion(page):
+        # Tempdoc 859 §B — the measured half of "the composer floats over the transcript".
+        #
+        # The two existing sv3 steps are live-stack-only because a v3 turn's evidence used to be
+        # reachable only through a real ask. This one is DETERMINISTIC: the `sv3-sources` fixtures
+        # variant serves a `/api/thread/{id}` record whose last assistant message carries populated
+        # `attributes.citations`, and seeds the per-tab lastViewedConversation pointer — which is
+        # what makes a cold Search v3 window restore that thread, land in the DOCKED composer state
+        # and render a turn whose Sources disclosure can actually be opened.
+        #
+        # 1280x800 pinned: the baseline's `maxBottomPx` on the dock is a statement about a known
+        # viewport, and the transcript must overflow it (hence the deliberately long fixture
+        # answers) or `minScrollableRegions: 1` witnesses nothing.
+        await page.set_viewport_size({"width": 1280, "height": 800})
+        await page.goto(demo, wait_until="domcontentloaded", timeout=timeout_ms)
+        # Hidden DEEPLINK surface, dev audience, no rail entry — the hash route is the only way in.
+        await page.evaluate(
+            "() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }"
+        )
+        await page.locator("jf-sv3-window").first.wait_for(state="visible", timeout=20_000)
+        # The restored transcript, not merely the window: an empty window would capture the HERO
+        # state, where the composer legitimately owns the whole column and there is no occlusion
+        # relation to measure at all.
+        await page.locator('[data-testid="sv3-turn-sources"]').first.wait_for(
+            state="visible", timeout=20_000
+        )
+        # Open the disclosure — §7's reported defect is about the panel BELOW the answer, so the
+        # capture has to contain it. Its mount also grows the transcript, which is what pushes the
+        # last rendered element into the band the dock occupies if the padding is wrong.
+        await page.locator('[data-testid="sv3-turn-sources"]').first.click(timeout=15_000)
+        await page.locator('[data-testid="sv3-turn-citations"]').first.wait_for(
+            state="visible", timeout=15_000
+        )
+        # Measure at MAX SCROLL. At rest the last element is nowhere near the dock and the overlap
+        # row would pass for a reason unrelated to the defect; the assertion only means something
+        # where "scrolled to the end" is claimed to mean "the last line is above the glass".
+        await page.evaluate(
+            """() => {
+                const w = document.querySelector('jf-sv3-window');
+                const m = w && w.shadowRoot && w.shadowRoot.querySelector('jf-sv3-main');
+                const s = m && m.shadowRoot && m.shadowRoot.querySelector('.scroller');
+                if (s) s.scrollTop = s.scrollHeight;
+            }"""
+        )
+        if cooldown_ms > 0:
+            await asyncio.sleep(cooldown_ms / 1000)
+
     async def setup_tasks_occlusion(page):
         # Tempdoc 813 Slice D — the capture that proves the redesigned Tasks panel cannot cover the
         # rail's bottom controls. Registered in governance/ui-proportion-baseline.v1.json with TWO
@@ -1890,6 +1937,17 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # accepts, which no other step's fixture does.
         Step("tasks-occlusion", setup=setup_tasks_occlusion, isolated=True,
              fixtures_variant="indexing"),
+
+        # --- Tempdoc 859 §B: the floating composer vs the transcript it covers ---
+        # Registered in governance/ui-proportion-baseline.v1.json with a mustNotOverlapSelector row
+        # between the transcript and the dock, measured at max scroll, plus the `minHeightPx`
+        # non-vacuity companions on BOTH selectors that the baseline's own occlusionNote demands
+        # (two 0x0 rects never intersect, so an overlap row passes perfectly on a capture where
+        # neither element rendered) and a `maxBottomPx` keeping the dock inside the pinned viewport.
+        # The first sv3 step that runs under `--fixtures`: the `sv3-sources` variant serves a thread
+        # record with populated `attributes.citations`, which is all the Sources panel ever needed.
+        Step("sv3-composer-occlusion", setup=setup_sv3_composer_occlusion, isolated=True,
+             fixtures_variant="sv3-sources"),
         # --- Tempdoc 813 §4/§5: the ENRICHING tier (folder rows + the aggregate card) ---
         # The one deterministic capture of the drained-but-enriching state: both folder arms (percent
         # caveat / "fully searchable") and the index-wide aggregate card, from the `enriching`

@@ -86,6 +86,18 @@ export interface NavigationOptions {
   readonly spineEl: () => HTMLElement | null;
   /** True while the spine/minimap is mounted (agent affordance + wide breakpoint). */
   readonly active: () => boolean;
+  /**
+   * Tempdoc 859 §B — the block-size a FLOATING overlay takes out of the BOTTOM of the scroller's
+   * client box (Search v3's docked composer sits over the transcript). Once an element floats over
+   * a scroller the client box stops being the visible region, so every consumer here that reasoned
+   * about `clientHeight` has to reason about `clientHeight - occludedEndPx()` instead.
+   *
+   * Optional with a `0` default ON PURPOSE: the other adopter ({@link UnifiedChatView}) has no
+   * overlay — its composer is a grid track — and passing nothing leaves it bit-identical. One
+   * instance is not a seam; if no second consumer appears (see 859 §B §5's retirement condition)
+   * this parameter is inlined into the sv3 call site and deleted.
+   */
+  readonly occludedEndPx?: () => number;
 }
 
 const raf =
@@ -172,6 +184,41 @@ export class NavigationController implements ReactiveController {
     this.teardown();
   }
 
+  /**
+   * Tempdoc 859 §B (D5) — remeasure on a signal that is NOT a render and NOT a scroller resize.
+   *
+   * {@link setupResize} observes the SCROLLER, and that used to cover the composer growing: a
+   * taller composer shrank the flex column, which resized the scroller, which fired. Under 859 §B's
+   * overlay the composer floats, so the scroller's box no longer changes when the composer grows —
+   * and the moment the occluded band changes is exactly the moment the reading window, the FOCUS
+   * ring and the minimap thumb go stale. The overlay's owner publishes the band and then calls
+   * this. Deliberately not `host.requestUpdate()`: a re-render requested for its measurement side
+   * effect is the implicit coupling {@link setupResize}'s own comment argues against.
+   */
+  remeasure(): void {
+    if (!this.opts.active()) return;
+    this.measureCoalesced();
+  }
+
+  /**
+   * §B — the height the reader can actually SEE: the client box minus the band a floating overlay
+   * takes out of its bottom.
+   *
+   * The `Math.max(1, …)` is load-bearing and applies ONLY once something is actually occluding: a
+   * composer taller than the window (a long draft plus a degradation banner) would otherwise pass
+   * zero or a negative height, {@link viewportWindow}'s `!(clientHeight > 0)` guard would return
+   * `null`, and {@link deriveFocus}'s `window === null` branch would silently send FOCUS to the
+   * TOPMOST item — the reader's ring jumping to the top of the transcript because they typed a
+   * long question. With no overlay the client box IS the visible region and is returned untouched,
+   * which is what keeps the no-argument adopter bit-identical down to the unmeasured `0` case.
+   */
+  private visibleHeight(conv: HTMLElement): number {
+    const client = conv.clientHeight || 0;
+    const occluded = this.opts.occludedEndPx?.() ?? 0;
+    if (!(occluded > 0)) return client;
+    return Math.max(1, client - occluded);
+  }
+
   /** §21 FOCUS — the item the reader is on (the spine's `.active` ring): the pinned target, else derived. */
   get activeId(): string {
     if (this.intent.mode === 'pinned' && this.intent.pinnedId) return this.intent.pinnedId;
@@ -235,9 +282,16 @@ export class NavigationController implements ReactiveController {
   }
 
   /**
-   * §21 AFFORDANCE — map the drag delta to a scroll offset: `Δscroll = (Δy / trackPx) · scrollHeight` —
-   * the EXACT inverse of {@link viewportWindow} (Spike A, §21.8). The scroll fires `scroll` → measure →
-   * re-render, which redraws the thumb at the new window, so the thumb follows the pointer 1:1.
+   * §21 AFFORDANCE — map the drag delta to a scroll offset: `Δscroll = (Δy / trackPx) · scrollHeight`.
+   * The scroll fires `scroll` → measure → re-render, which redraws the thumb at the new window, so
+   * the thumb follows the pointer 1:1.
+   *
+   * This used to call itself "the EXACT inverse of {@link viewportWindow}" (Spike A, §21.8). Tempdoc
+   * 859 §B made that false: {@link measure} now feeds `viewportWindow` the VISIBLE height
+   * ({@link visibleHeight}) rather than the client box, so under an overlay the two are off by the
+   * occluded band. The mapping here is deliberately left on the raw content height — a thumb drag is
+   * a gesture over the whole scroll range, not a statement about what is visible — but the claim of
+   * exactness is gone rather than left standing as false authority.
    */
   dragTo(clientY: number): void {
     const conv = this.opts.scrollEl();
@@ -247,11 +301,19 @@ export class NavigationController implements ReactiveController {
     conv.scrollTop = this.dragStartScroll + (dy / track) * conv.scrollHeight;
   }
 
-  /** §21 AFFORDANCE — keyboard scroll from the thumb: arrows = a line, Page = a page, Home/End = the ends. */
+  /**
+   * §21 AFFORDANCE — keyboard scroll from the thumb: arrows = a line, Page = a page, Home/End = the ends.
+   *
+   * Tempdoc 859 §B (D7) — a page is the VISIBLE height, not the client box. `scroll-padding` governs
+   * browser-driven scrolling (`scrollIntoView`, focus) and says nothing about a raw `scrollTop`
+   * assignment, so without this a page-down under an overlay overshoots by the band's height.
+   * `end` needs no subtraction of its own: the scroller's bottom padding already carries the band
+   * (859 §B §4.3), so `scrollHeight` includes it and the true end IS above the glass.
+   */
   nudge(kind: 'line-up' | 'line-down' | 'page-up' | 'page-down' | 'home' | 'end'): void {
     const conv = this.opts.scrollEl();
     if (!conv) return;
-    const page = conv.clientHeight || 0;
+    const page = this.visibleHeight(conv);
     const line = Math.max(40, page * 0.1);
     switch (kind) {
       case 'line-up':
@@ -331,7 +393,10 @@ export class NavigationController implements ReactiveController {
     if (!conv) return false;
     const spineEl = this.opts.spineEl();
     const trackPx = spineEl ? spineEl.clientHeight : 0;
-    const vp = viewportWindow(conv.scrollTop, conv.clientHeight, conv.scrollHeight);
+    // 859 §B — the reading window is derived from the VISIBLE region, not the client box: under a
+    // floating composer the bottom of the client box is behind glass. Extents and `fractions` are
+    // untouched — they are fractions of `scrollHeight`, which already grew by the band's padding.
+    const vp = viewportWindow(conv.scrollTop, this.visibleHeight(conv), conv.scrollHeight);
     const convTop = conv.getBoundingClientRect().top;
     const scrollH = conv.scrollHeight || 1;
     const clamp = (f: number): number => Math.min(1, Math.max(0, f));

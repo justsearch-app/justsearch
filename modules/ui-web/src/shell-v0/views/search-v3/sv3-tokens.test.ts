@@ -528,19 +528,42 @@ describe('the composer glass is token-fed material, so dark inverts without a co
     const end = composer.indexOf('}', start);
     const rule = composer.slice(start, end);
     expect(rule).toContain('border-radius: var(--radius-3xl)');
-    expect(rule).toContain('var(--composer-glass-surface) var(--glass-opacity)');
+    // Tempdoc 859 §B (D2/D14) — the fill and the blur are DERIVED from one multiplier now, and the
+    // assertions move with them ON PURPOSE. This is a change to the thing the test guards, not a
+    // test weakened to fit: `--glass-blur-scale` is the shipped app's single blur knob, reached by
+    // `[data-surface-mode="solid"]` AND (as of this slice) `prefers-reduced-transparency: reduce`,
+    // and search-v3 was deaf to both. Deriving the OPACITY from the same multiplier is what keeps
+    // the two halves inseparable — zeroing the blur alone would ship the unreadable half-state the
+    // `@supports` companion below was written to prevent. Pinning the derived forms is what stops a
+    // later edit from silently un-wiring the seam; the token DECLARATIONS (--glass-blur: 16px,
+    // --glass-opacity: 80%) are untouched and still pinned by the declaration list above.
+    expect(rule).toContain(
+      'var(--composer-glass-surface)\n            calc(100% - (100% - var(--glass-opacity)) * var(--glass-blur-scale))',
+    );
     expect(rule).toContain('box-shadow: var(--composer-shadow)');
-    expect(rule).toContain('backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation))');
+    expect(rule).toContain(
+      'backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)))',
+    );
+    expect(rule).toContain('saturate(var(--glass-saturation))');
     expect(rule).toContain('-webkit-backdrop-filter:');
 
     // ...and no blur declaration of the GLASS's own recipe lives anywhere else — a node split is
     // what put it out of reach. Phase F10 added a SECOND blurred surface, the control menu, which
     // is a different recipe on its own node; it is admitted by name and by rule bounds, so a blur
-    // that escaped either silhouette still fails here.
+    // that escaped either silhouette still fails here. The matcher pins the MULTIPLIED form (859
+    // §B), so a site that reverted to a bare `blur(var(--glass-blur))` would drop out of the count
+    // and fail rather than pass unnoticed.
     const menuStart = composer.indexOf('.menu {');
     const menuEnd = composer.indexOf('}', menuStart);
-    const declarations = [...composer.matchAll(/backdrop-filter: blur\(var\(--glass-blur\)\)/g)];
+    const declarations = [
+      ...composer.matchAll(
+        /backdrop-filter: blur\(calc\(var\(--glass-blur\) \* var\(--glass-blur-scale\)\)\)/g,
+      ),
+    ];
     expect(declarations).toHaveLength(4);
+    // Nothing anywhere in the component blurs WITHOUT the multiplier — the direct statement of
+    // "search-v3 is no longer deaf to the user's own solid-surfaces setting".
+    expect(composer).not.toMatch(/blur\(var\(--glass-blur\)\)/);
     for (const declaration of declarations) {
       const at = declaration.index ?? -1;
       const inGlass = at > start && at < end;
@@ -1018,16 +1041,30 @@ describe('the palette is built from the geometry tokens, not re-typed numbers', 
     const end = palette.indexOf('}', start);
     const rule = palette.slice(start, end);
     expect(rule).toContain('border-radius: var(--radius-2xl)');
-    expect(rule).toContain('var(--background) var(--glass-opacity)');
-    expect(rule).toContain('backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation))');
+    // Tempdoc 859 §B (D2) — the fill's translucency and the blur are now DERIVED from the same
+    // `--glass-blur-scale`, so the two escapes (`[data-surface-mode="solid"]` and
+    // `prefers-reduced-transparency`) can never leave this surface see-through with nothing blurred
+    // behind it. Pinning the derived forms, not the bare token, is the point: an edit that dropped
+    // the multiplier would silently un-wire both escapes and no other assertion would notice.
+    expect(rule).toContain(
+      'var(--background) calc(100% - (100% - var(--glass-opacity)) * var(--glass-blur-scale))',
+    );
+    expect(rule).toContain(
+      'backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)))',
+    );
+    expect(rule).toContain('saturate(var(--glass-saturation))');
     expect(rule).toContain('box-shadow: var(--dialog-shadow)');
     expect(rule).toContain('border: 1px solid var(--dialog-border)');
     const at = palette.indexOf('@supports not ((-webkit-backdrop-filter: blur(1px))');
     expect(at).toBeGreaterThan(-1);
     expect(palette.slice(at, at + 200)).toContain('background: var(--background)');
-    // The backdrop is the spec's own recipe, token-fed like every other material in the window.
+    // The backdrop is the spec's own recipe, token-fed like every other material in the window —
+    // and since 859 §B it honours the same multiplier. Its FILL is deliberately NOT derived: a
+    // scrim is a dimming layer, not a readable surface, and an opaque scrim would hide the window.
     expect(ruleFor('.backdrop {')).toContain('background: var(--dialog-backdrop)');
-    expect(ruleFor('.backdrop {')).toContain('blur(var(--dialog-backdrop-blur))');
+    expect(ruleFor('.backdrop {')).toContain(
+      'blur(calc(var(--dialog-backdrop-blur) * var(--glass-blur-scale)))',
+    );
   });
 
   it('inverts the dialog elevation in the token sheet, not in the component', () => {

@@ -130,7 +130,10 @@ describe('navigation — §21 CONTROL (the live/pinned intent)', () => {
 });
 
 describe('navigation — §21 AFFORDANCE (the minimap-as-scrollbar)', () => {
-  it('dragTo maps Δy to scrollTop as the exact inverse of the viewport window (Spike A)', () => {
+  // The title used to say "the exact inverse of the viewport window". Tempdoc 859 §B made that
+  // false — `measure()` feeds `viewportWindow` the VISIBLE height now, so under an overlay the two
+  // are off by the occluded band. The MAPPING is unchanged and still what this pins.
+  it('dragTo maps Δy to scrollTop over the content height (Spike A)', () => {
     const conv = { scrollTop: 0, clientHeight: 200, scrollHeight: 1000 } as unknown as HTMLElement;
     const nav = new NavigationController(fakeHost(), {
       scrollEl: () => conv,
@@ -279,3 +282,155 @@ describe('navigation — the scroll container is observed per NODE, not once per
     conv.remove();
   });
 });
+
+/**
+ * Tempdoc 859 §B — the occluded band.
+ *
+ * Once an element FLOATS over a scroller, the scroller's client box stops being its visible region,
+ * and every consumer that assumed those were the same thing is wrong. These are the cheapest,
+ * highest-value assertions in the slice: the arithmetic is pure, and the failure mode it prevents
+ * (D10) is a silent one.
+ */
+describe('navigation — the visible region under a floating overlay (859 §B)', () => {
+  /** A measurable scroll column: real element (the controller wires listeners to it), stubbed box. */
+  function column(clientHeight: number, scrollHeight: number, scrollTop: number): HTMLElement {
+    const conv = document.createElement('div');
+    document.body.appendChild(conv);
+    Object.defineProperty(conv, 'clientHeight', { configurable: true, value: clientHeight });
+    Object.defineProperty(conv, 'scrollHeight', { configurable: true, value: scrollHeight });
+    Object.defineProperty(conv, 'scrollTop', { configurable: true, writable: true, value: scrollTop });
+    return conv;
+  }
+
+  it('shrinks the reading WINDOW from the bottom by exactly the band', () => {
+    // 600px client, 120px of it behind the composer ⇒ 480px actually visible.
+    const conv = column(600, 2000, 200);
+    const nav = new NavigationController(fakeHost(), {
+      scrollEl: () => conv,
+      spineEl: () => null,
+      active: () => true,
+      occludedEndPx: () => 120,
+    });
+    nav.hostUpdated();
+    expect(nav.viewport).toEqual({ topFrac: 0.1, botFrac: (200 + 480) / 2000 });
+    conv.remove();
+  });
+
+  it('stops the window claiming content the reader cannot see', () => {
+    // The same scroll position, read two ways. An item lying entirely inside the occluded strip is
+    // claimed as the reading focus by the CLIENT box and is correctly not claimed by the VISIBLE
+    // region — which is the minimap thumb and the active-item ring both telling the truth.
+    const clientWindow = { topFrac: 0.7, botFrac: 1.0 };
+    const visibleWindow = { topFrac: 0.7, botFrac: 0.94 };
+    const behindGlass: Landmark[] = [{ id: 'last', extent: { topFrac: 0.95, botFrac: 0.99 } }];
+    expect(deriveFocus(behindGlass, clientWindow)).toBe('last');
+    expect(deriveFocus(behindGlass, visibleWindow)).toBeNull();
+  });
+
+  it('D10 — a band TALLER than the client box must not jump FOCUS to the top of the transcript', () => {
+    // A long draft plus a degradation banner in a short window. Without the Math.max(1, …) clamp
+    // the subtraction goes negative, `viewportWindow`'s `!(clientHeight > 0)` guard returns null,
+    // and `deriveFocus`'s null branch sends FOCUS to the TOPMOST item — the reader's ring jumping
+    // to the top of the transcript because they typed a long question.
+    const conv = column(300, 2000, 1500);
+    const items: Array<[string, number]> = [
+      ['u1', 0],
+      ['a1', 1600],
+    ];
+    for (const [id, y] of items) {
+      const el = document.createElement('div');
+      el.setAttribute('data-item-id', id);
+      el.getBoundingClientRect = () =>
+        ({ top: y, left: 0, right: 800, bottom: y + 200, width: 800, height: 200, x: 0, y, toJSON: () => ({}) }) as DOMRect;
+      conv.appendChild(el);
+    }
+    const nav = new NavigationController(fakeHost(), {
+      scrollEl: () => conv,
+      spineEl: () => null,
+      active: () => true,
+      occludedEndPx: () => 500,
+    });
+    nav.hostUpdated();
+    expect(nav.viewport).not.toBeNull();
+    expect(nav.activeId).not.toBe('u1');
+    conv.remove();
+  });
+
+  it('D7 — a page is the VISIBLE height, and `end` still reaches the true end', () => {
+    // `scroll-padding` governs BROWSER-driven scrolling and says nothing about a raw scrollTop
+    // assignment, so page-down would otherwise overshoot by the band. `end` needs no subtraction of
+    // its own: the scroller's bottom padding already carries the band, so scrollHeight includes it.
+    const conv = { scrollTop: 500, clientHeight: 200, scrollHeight: 1000 } as unknown as HTMLElement;
+    const nav = new NavigationController(fakeHost(), {
+      scrollEl: () => conv,
+      spineEl: () => null,
+      active: () => true,
+      occludedEndPx: () => 60,
+    });
+    nav.nudge('page-down'); // + (200 − 60) = 140, not 200
+    expect(conv.scrollTop).toBe(640);
+    nav.nudge('line-up'); // − max(40, 10% of 140 = 14) = 40
+    expect(conv.scrollTop).toBe(600);
+    nav.nudge('end');
+    expect(conv.scrollTop).toBe(1000);
+  });
+
+  it('is bit-identical for a consumer that passes no band (the other adopter)', () => {
+    // `views/UnifiedChatView.ts` passes exactly three options; its composer is a grid track, not an
+    // overlay. The `0` default is what keeps this slice off it entirely.
+    const withOut = { scrollTop: 500, clientHeight: 200, scrollHeight: 1000 } as unknown as HTMLElement;
+    const nav = new NavigationController(fakeHost(), {
+      scrollEl: () => withOut,
+      spineEl: () => null,
+      active: () => true,
+    });
+    nav.nudge('page-down');
+    expect(withOut.scrollTop).toBe(700); // the full client height, exactly as before
+
+    const conv = column(600, 2000, 200);
+    const nav2 = new NavigationController(fakeHost(), {
+      scrollEl: () => conv,
+      spineEl: () => null,
+      active: () => true,
+    });
+    nav2.hostUpdated();
+    expect(nav2.viewport).toEqual({ topFrac: 0.1, botFrac: 0.4 });
+    conv.remove();
+  });
+
+  it('D5 — remeasure() refreshes the window without a render, and stays inert when inactive', async () => {
+    // The ResizeObserver watches the SCROLLER, and under the overlay the scroller's box no longer
+    // changes when the composer grows. remeasure() is the replacement signal the band's publisher
+    // calls; it is deliberately NOT a requestUpdate.
+    const conv = column(600, 2000, 200);
+    let band = 0;
+    const nav = new NavigationController(fakeHost(), {
+      scrollEl: () => conv,
+      spineEl: () => null,
+      active: () => true,
+      occludedEndPx: () => band,
+    });
+    nav.hostUpdated();
+    expect(nav.viewport).toEqual({ topFrac: 0.1, botFrac: 0.4 });
+    band = 120; // the composer grew; nothing resized the scroller
+    nav.remeasure();
+    // 857 A9's coalescing owns WHEN, not WHETHER: this frame already measured (hostUpdated above),
+    // so the remeasure collapses into the trailing pass rather than measuring twice in one frame —
+    // which is the right economics for a band that changes on every draft keystroke.
+    for (let i = 0; i < 4 && nav.viewport?.botFrac === 0.4; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    expect(nav.viewport).toEqual({ topFrac: 0.1, botFrac: (200 + 480) / 2000 });
+
+    const inert = new NavigationController(fakeHost(), {
+      scrollEl: () => conv,
+      spineEl: () => null,
+      active: () => false,
+      occludedEndPx: () => 120,
+    });
+    inert.remeasure();
+    expect(inert.viewport).toBeNull();
+    conv.remove();
+  });
+});
+

@@ -20,10 +20,16 @@
   ],
   "shell-v0/components/chat/CitationsPanel.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/state/selectedSource.ts": ["sv3-citation-selected", "citation-highlight"],
-  "shell-v0/views/search-v3/Sv3Main.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
-  "shell-v0/views/search-v3/sv3-tokens.css.ts": ["sv3-citation-selected"],
+  "shell-v0/views/search-v3/Sv3Main.ts": [
+    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion"
+  ],
+  "shell-v0/views/search-v3/sv3-tokens.css.ts": ["sv3-citation-selected", "sv3-composer-occlusion"],
   "shell-v0/views/search-v3/Sv3Pane.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
-  "shell-v0/views/search-v3/SearchV3View.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
+  "shell-v0/views/search-v3/SearchV3View.ts": [
+    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion"
+  ],
+  "shell-v0/views/search-v3/Sv3Composer.ts": ["sv3-composer-occlusion"],
+  "shell-v0/views/search-v3/Sv3ContextBar.ts": ["sv3-composer-occlusion"],
   "shell-v0/components/chat/evidenceProjection.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/views/UnifiedChatView.ts": [
     "chat-mode", "qa-response", "chat-proportion",

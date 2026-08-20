@@ -241,6 +241,26 @@ export class Sv3Main extends JfElement {
         flex: 1 1 auto;
         min-height: 0;
         padding: var(--floating-content-inset);
+        /* ── The occluded band (tempdoc 859 §B) ──────────────────────────────
+           The composer FLOATS over this scroller now, so the client box is no longer the visible
+           region. Two declarations, two different jobs, and neither substitutes for the other:
+
+           'padding-block-end' makes the band REACHABLE — scrollHeight grows by it, so "scrolled to
+           the end" means "the last line is above the glass" rather than "behind it". The calc() is
+           deliberate: the shorthand above already sets a 12px inset on all four sides, and a bare
+           'padding-block-end' would REPLACE it rather than add to it, silently changing the
+           transcript's bottom rhythm.
+
+           'scroll-padding-block-end' makes every BROWSER-DRIVEN scroll respect it, by shrinking the
+           scrollport that scrolling reasons about: a scrollIntoView asking for CENTRE centres in
+           the VISIBLE region (857's landmark jumps land where the reader can see them) and one
+           asking for NEAREST stops counting an occluded target as "already in view". It governs
+           focus-driven scrolling too. One declaration on the one scroller covers every present and
+           future target — a 'scroll-margin' sprinkled on landmarks would be a list that is
+           incomplete the day someone adds a new item type. What it does NOT cover is raw scrollTop
+           arithmetic, which is why navigation.ts's nudge subtracts the band itself. */
+        padding-block-end: calc(var(--floating-content-inset) + var(--sv3-composer-occlusion));
+        scroll-padding-block-end: var(--sv3-composer-occlusion);
         display: flex;
         flex-direction: column;
         gap: var(--space-1);
@@ -309,8 +329,12 @@ export class Sv3Main extends JfElement {
         margin-inline: auto;
       }
       /* The design spec's turn rhythm: 16px under a message row ('pb-4', with 'pb-2' reserved for
-         the commentary rows this window has none of). Bottom
-         padding rather than a gap, so the LAST turn keeps its breathing room above the composer. */
+         the commentary rows this window has none of). Bottom padding rather than a gap, so every
+         turn is separated by the same measure regardless of what follows it.
+
+         (This used to say "so the LAST turn keeps its breathing room above the composer". Tempdoc
+         859 §B took the composer out of the flow: the last turn's clearance is now the scroller's
+         --sv3-composer-occlusion padding, not this 16px.) */
       .turn {
         padding-bottom: var(--space-4);
       }
@@ -1193,6 +1217,20 @@ export class Sv3Main extends JfElement {
    * the viewport until they return to the end, which RE-ARMS it).
    */
   private followEnd = true;
+  /**
+   * 859 §B (D1) — the content height at the last render, so the snap can ask whether the content
+   * GREW instead of firing on every render. Starts at 0 so a cold thread open (which grows from
+   * nothing) is followed and lands on the newest turn.
+   */
+  private lastScrollHeight = 0;
+  /**
+   * The node {@link lastScrollHeight} was measured on. This element emits `.scroller` from FOUR
+   * different render arms (857 PR-A / A2 found the same trap in the navigation controller), so a
+   * height carried across an arm swap would compare two different boxes: a shorter new arm would
+   * read as "did not grow" and the reader would land at the TOP of a transcript that just mounted.
+   * A fresh node starts at scrollTop 0 with nothing measured, so resetting is also exactly right.
+   */
+  private lastScrolledEl: HTMLElement | null = null;
   private copiedTimer: ReturnType<typeof setTimeout> | null = null;
   /** The summary text a save is waiting on, or null — how this region learns the write landed. */
   private pendingSummary: string | null = null;
@@ -1209,7 +1247,36 @@ export class Sv3Main extends JfElement {
     scrollEl: () => this.scroller,
     spineEl: () => null,
     active: () => this.transcriptArmRendered,
+    occludedEndPx: () => this.occludedEndPx(),
   });
+
+  /**
+   * Tempdoc 859 §B — how much of the scroller's client box the floating dock covers, read back off
+   * the ONE published variable rather than re-derived. The window measures the dock and writes
+   * `--sv3-composer-occlusion` on its own host; custom properties inherit through shadow roots, so
+   * the scroller resolves the same number the padding and scroll-padding above it resolve — one
+   * measurement, three readers, no way for them to disagree.
+   */
+  private occludedEndPx(): number {
+    const el = this.scroller;
+    if (el === null) return 0;
+    const px = Number.parseFloat(
+      getComputedStyle(el).getPropertyValue('--sv3-composer-occlusion'),
+    );
+    return Number.isFinite(px) && px > 0 ? px : 0;
+  }
+
+  /**
+   * 859 §B (D5) — the window calls this right after publishing a new band.
+   *
+   * The reading-position authority observes the SCROLLER, and a growing composer used to resize it
+   * (a flex sibling shrinking the column). Under the overlay it does not, so the one signal that
+   * used to keep the reading window honest through a growing draft is gone and has to be replaced
+   * by an explicit one.
+   */
+  remeasureReadingWindow(): void {
+    this.nav.remeasure();
+  }
 
   /**
    * True exactly when {@link render} takes the LOCKED arm: the store refuses to be read and there is
@@ -1361,9 +1428,26 @@ export class Sv3Main extends JfElement {
     this.settleFloorSummaryEditor(changed);
     this.settleQuestionEditor();
     const el = this.scroller;
-    if (el === null || !this.followEnd) return;
-    // Assigned unconditionally while armed, which is what makes a streaming answer stay in view:
-    // each delta grows the content and the end is followed in the same frame it grew.
+    if (el === null) return;
+    if (el !== this.lastScrolledEl) {
+      this.lastScrolledEl = el;
+      this.lastScrollHeight = 0;
+    }
+    const grew = el.scrollHeight > this.lastScrollHeight;
+    this.lastScrollHeight = el.scrollHeight;
+    // Tempdoc 859 §B (D1) — the snap is gated on CONTENT GROWTH, not on a render.
+    //
+    // It used to re-assert `scrollTop = scrollHeight` on EVERY render while armed, which is one of
+    // the two candidate causes of §7's "the Sources disclosure is unreachable": a render caused by
+    // something other than new content would drag the reader back to the end.
+    //
+    // Growth, deliberately, rather than a `streaming` flag: `streaming` is set at three sites, all
+    // inside the ask path, and the delegate/agent path never sets it — so a stream-gated snap would
+    // stop the transcript following agent runs entirely. It also mishandles mount (`followEnd`
+    // starts armed, so a freshly-opened thread would land at the TOP). Growth needs no source
+    // enumeration: an agent-run feed appending items grows and is followed, a cold thread open
+    // grows from zero and lands at the newest turn, and a render that added nothing moves nothing.
+    if (!this.followEnd || !grew) return;
     el.scrollTop = el.scrollHeight;
   }
 
@@ -2096,8 +2180,42 @@ export class Sv3Main extends JfElement {
   /** Per TURN, never global: opening turn 3's sources must not open turn 7's. */
   private toggleSources(id: string): void {
     const next = new Set(this.expandedSources);
-    if (!next.delete(id)) next.add(id);
+    const opening = !next.delete(id);
+    if (opening) next.add(id);
     this.expandedSources = next;
+    if (!opening) return;
+    // Tempdoc 859 §B — opening a disclosure GROWS the content, and the growth-gated snap (see
+    // `updated`) would otherwise read that as new material to follow and jump the reader to the end
+    // of the transcript instead of to the thing they just revealed. A reveal is a navigation
+    // INTENT: it disarms the follow and then says where the view should go itself.
+    this.followEnd = false;
+    void this.revealSources(id);
+  }
+
+  /**
+   * 859 §B (consumer #4) — put the revealed panel where the reader can see it.
+   *
+   * `block: 'nearest'` and not `'start'`: a panel already fully visible should not move the view at
+   * all. Under the scroller's `scroll-padding-block-end` (859 §B §4.3) "nearest" now means "nearest
+   * VISIBLE", so a panel that mounted behind the floating composer counts as off-screen and is
+   * brought up — which is the whole point. Revealing something the reader asked for and leaving it
+   * under the glass is the defect.
+   *
+   * Awaits the render that mounts it: the panel does not exist until `expandedSources` lands.
+   */
+  private async revealSources(id: string): Promise<void> {
+    await this.updateComplete;
+    // Matched on the ATTRIBUTE rather than interpolated into the selector: a turn id is a record id
+    // this element does not author, and a selector built from foreign text is a parse waiting to
+    // happen (a quote or a bracket throws out of querySelector, taking the reveal with it).
+    const panels = this.shadowRoot?.querySelectorAll<HTMLElement>(
+      '[data-testid="sv3-turn-citations"]',
+    );
+    for (const panel of panels ?? []) {
+      if (panel.getAttribute('data-turn-id') !== id) continue;
+      panel.scrollIntoView({ block: 'nearest' });
+      return;
+    }
   }
 
   /**

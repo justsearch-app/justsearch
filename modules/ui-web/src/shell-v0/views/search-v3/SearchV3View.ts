@@ -317,6 +317,13 @@ import './Sv3Pane.js';
 
 const COMPOSER_STATE_ATTR = 'composer-state';
 
+/**
+ * Tempdoc 859 §B — the occluded band: what the floating dock takes out of the bottom of the
+ * transcript scroller's client box. Declared with a non-zero default in `sv3-tokens.css.ts` and
+ * overwritten here with the dock's measured height.
+ */
+const OCCLUSION_VAR = '--sv3-composer-occlusion';
+
 /** The grip names all three of its gestures, because two of them are not discoverable by pointing. */
 const SIDEBAR_GRIP_LABEL =
   'Resize the sidebar — arrow keys resize, Home returns to automatic, double-click resets';
@@ -410,7 +417,13 @@ export class SearchV3View extends JfElement {
         border: 0;
         background: transparent;
         cursor: w-resize;
-        z-index: var(--z-sticky);
+        /* Tempdoc 859 §B (D11) — one rung ABOVE the floating dock, not level with it. Both grips
+           used to sit at --z-sticky, which is the dock's rung; at the same rung DOM order decides,
+           and this grip is rendered BEFORE .column while the pane's grip is rendered after — so the
+           dock would have painted over this one's bottom band while the pane's grip painted over
+           the dock. That asymmetry is not acceptable in either direction. A full-height boundary
+           control belongs above a bottom-anchored band, so both grips move to --z-overlay. */
+        z-index: var(--z-overlay);
         /* A drag must not be interpreted as a page scroll/pan gesture mid-gesture. */
         touch-action: none;
         transition: left var(--duration-sv3-layout) var(--ease-sv3-linear);
@@ -458,8 +471,72 @@ export class SearchV3View extends JfElement {
         min-height: 0;
         overflow: hidden;
         /* The containing block for the hero composer, which leaves the flow to centre itself over
-           the content region. */
+           the content region — and, since tempdoc 859 §B, for the DOCKED dock as well. */
         position: relative;
+      }
+
+      /* ── THE DOCK (tempdoc 859 §B) ─────────────────────────────────────────
+         The context bar and the composer, in ONE positioned wrapper, floating over the transcript.
+         §1-B's finding was that a composer in document flow cuts the transcript off hard at its top
+         edge; §3 already rejected "just CSS" because this is a viewport-ownership change. The
+         scroller now owns the full column and the dock floats above it, which is the construction
+         ':host([state='hero'])' has been shipping all along — extended to 'docked', not invented.
+
+         ONE wrapper, not two floating siblings: the dock's height has to be OBSERVABLE as a single
+         box (it is published as --sv3-composer-occlusion), and observing two boxes and summing them
+         re-introduces the enumeration this whole change exists to avoid. The context bar rides with
+         the composer because it IS composer chrome — leaving it in flow would leave a second
+         horizontal cut across the transcript, the exact defect being removed.
+
+         --z-sticky, deliberately BELOW --z-overlay: the hero composer, the overlaid citation pane
+         and the palette all share the overlay rung and must stay above a bottom band. .column has
+         z-index:auto so it opens no stacking context and the rungs compare globally.
+
+         The positioning is STATE-GATED, and that is load-bearing rather than tidy: the hero
+         composer is 'position:absolute' against the nearest positioned ancestor, so a dock that
+         were positioned in hero too would silently steal hero's containing block from .column and
+         collapse the centred landing into a bottom-anchored strip. In hero the dock is a plain flow
+         wrapper and hero resolves against .column exactly as before. */
+      .dock {
+        /* Click-through everywhere except the two centred content columns inside it (.band in the
+           composer, .bar in the context bar), so the transcript underneath stays wheel-scrollable
+           right up to the glass edge. */
+        pointer-events: none;
+      }
+      :host([composer-state='docked']) .dock {
+        position: absolute;
+        inset-inline: 0;
+        inset-block-end: 0;
+        z-index: var(--z-sticky);
+      }
+      /* THE VEIL (859 §B / D12). Below the glass box there is the composer host's own
+         --floating-content-inset of clear space, through which UNBLURRED transcript would slide
+         past the band's bottom edge. This strip is painted in the window's own background so
+         content simply disappears behind the glass's bottom edge — the design basis's own
+         behaviour, and it reads as the window edge rather than as a bar.
+
+         Strictly the strip BELOW the glass box, never behind it: 'backdrop-filter' samples whatever
+         is painted behind the element, so a veil under the glass would be what gets blurred and the
+         content-glides-beneath effect would vanish into a flat blurred colour.
+
+         The 0/1 pair is intra-component stacking inside the dock's own context, the same z-0/z-1
+         idiom the composer's glass uses — NOT a rung of the window's z-scale, which is why it is
+         typed rather than read from a token. It is needed because a POSITIONED pseudo-element at
+         z-index auto paints above static in-flow siblings whatever the source order, so the veil
+         would otherwise cover the composer's own bottom edge and clip its elevation in light mode.
+         The chrome takes rung 1, the veil rung 0, and the transcript stays below both. */
+      :host([composer-state='docked']) .dock::after {
+        content: '';
+        position: absolute;
+        z-index: 0;
+        inset-inline: 0;
+        inset-block-end: 0;
+        block-size: var(--floating-content-inset);
+        background: var(--background);
+      }
+      :host([composer-state='docked']) .dock > * {
+        position: relative;
+        z-index: 1;
       }
       /* ── THE CITATION PANE (tempdoc 822 Phase F8) ──────────────────────────
          The mirror image of the sidebar: a fixed track that does not flex, on the other side of the
@@ -491,7 +568,8 @@ export class SearchV3View extends JfElement {
         border: 0;
         background: transparent;
         cursor: col-resize;
-        z-index: var(--z-sticky);
+        /* 859 §B (D11) — the sidebar grip's rung, for the sidebar grip's reason. */
+        z-index: var(--z-overlay);
         touch-action: none;
       }
       button.pane-grip::after {
@@ -679,6 +757,9 @@ export class SearchV3View extends JfElement {
 
   /** Watches the window box so the pane's presentation follows it (Phase F8). */
   private boxObserver: ResizeObserver | null = null;
+  /** 859 §B — the dock's own box watcher, and the node it is currently bound to. */
+  private dockObserver: ResizeObserver | null = null;
+  private observedDock: HTMLElement | null = null;
   private searchUnsubscribe: (() => void) | null = null;
   private aiUnsubscribe: (() => void) | null = null;
   private uiModeUnsubscribe: (() => void) | null = null;
@@ -884,6 +965,9 @@ export class SearchV3View extends JfElement {
     this.askReasoning.destroy();
     this.boxObserver?.disconnect();
     this.boxObserver = null;
+    this.dockObserver?.disconnect();
+    this.dockObserver = null;
+    this.observedDock = null;
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('focusout', this.onHostFocusOut);
   }
@@ -902,6 +986,76 @@ export class SearchV3View extends JfElement {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
     });
     this.boxObserver.observe(this);
+  }
+
+  /**
+   * Tempdoc 859 §B — bind the dock's box watcher, once per NODE.
+   *
+   * The same `ResizeObserver`-to-custom-property mechanism as {@link observeWindowBox} above and
+   * {@link applySidebarWidth} below, for the same reason: the dock's height is a measured fact
+   * nothing else can tell us. It grows with everything 859 §4 names — a multiline draft, the
+   * availability notice, the degradation banner, an open tier/effort menu — and it is MEASURED
+   * rather than enumerated precisely so no future banner has to be added to a list.
+   *
+   * No feedback loop: the variable changes the SCROLLER's padding, never the dock's own height.
+   */
+  private syncDockObserver(): void {
+    const dock = this.shadowRoot?.querySelector<HTMLElement>('.dock') ?? null;
+    if (dock === null || this.observedDock === dock) return;
+    this.dockObserver?.disconnect();
+    this.observedDock = dock;
+    if (typeof ResizeObserver === 'function') {
+      this.dockObserver = new ResizeObserver(() => this.publishOcclusion());
+      this.dockObserver.observe(dock);
+    }
+    // Publish once at bind time as well: a DOM without the API still gets a correct band on the
+    // first render, and happy-dom defines a ResizeObserver that never fires.
+    this.publishOcclusion();
+  }
+
+  /**
+   * 859 §B — publish the occluded band, and tell the reading-position authority it moved.
+   *
+   * Two zeroes with opposite meanings, which is the whole subtlety here:
+   *
+   *  - In `hero` the composer's box IS the content region, so publishing its height would pad the
+   *    scroller by a column height. `0px` is written DELIBERATELY (the hero scroller renders no
+   *    transcript anyway).
+   *  - A `0` MEASUREMENT in `docked` means not-yet-laid-out, detached or hidden — never "no band".
+   *    An inline `setProperty` REPLACES the token sheet's `:host` default rather than flooring it,
+   *    so writing that zero would restore exactly the clipping this slice removes.
+   *
+   * Which is why the docked no-measurement branch is a REMOVE and not a plain skip: a bare skip
+   * would leave hero's deliberate `0px` standing across the morph into docked, and on a platform
+   * where the dock never measures (no `ResizeObserver`, or a first paint that beats layout) the
+   * transcript would be clipped by the whole band with nothing in the code saying so. Clearing the
+   * inline value hands the question back to the token sheet's non-zero default, which exists for
+   * exactly this case. A previous DOCKED height is kept rather than cleared — a slightly stale
+   * measurement of the real dock beats a generic estimate.
+   *
+   * The remeasure is not optional (859 §B / D5): the `ResizeObserver` inside `NavigationController`
+   * watches the SCROLLER, and under the overlay the scroller's box no longer changes when the
+   * composer grows — so without this the reading window and the FOCUS ring go stale on exactly the
+   * keystroke that changed the band.
+   */
+  private publishOcclusion(): void {
+    const current = this.style.getPropertyValue(OCCLUSION_VAR);
+    if (this.composerState !== 'hero') {
+      const px = this.observedDock?.getBoundingClientRect().height ?? 0;
+      if (!(px > 0)) {
+        if (current !== '0px') return;
+        this.style.removeProperty(OCCLUSION_VAR);
+        this.shadowRoot?.querySelector('jf-sv3-main')?.remeasureReadingWindow();
+        return;
+      }
+      const next = `${Math.round(px)}px`;
+      if (current === next) return;
+      this.style.setProperty(OCCLUSION_VAR, next);
+    } else {
+      if (current === '0px') return;
+      this.style.setProperty(OCCLUSION_VAR, '0px');
+    }
+    this.shadowRoot?.querySelector('jf-sv3-main')?.remeasureReadingWindow();
   }
 
   /**
@@ -925,6 +1079,10 @@ export class SearchV3View extends JfElement {
     }
     if (changed.has('sidebarWidthPx')) this.applySidebarWidth(this.sidebarWidthPx);
     if (changed.has('paneWidthPx')) this.applyPaneWidth(this.paneWidthPx);
+    // 859 §B — the dock exists only after a render, and the hero↔docked morph changes what the
+    // band MEANS, not just how tall it is (see publishOcclusion's two zeroes).
+    this.syncDockObserver();
+    if (changed.has('composerState')) this.publishOcclusion();
     // The restored draft reaches the composer on the first update that produced one. Once only: a
     // later re-application would clobber what the reader has typed since.
     if (this.draftSeedPending) {
@@ -2950,6 +3108,9 @@ export class SearchV3View extends JfElement {
           ?streaming=${this.streaming}
           data-testid="sv3-main"
         ></jf-sv3-main>
+        <!-- 859 §B — ONE positioned wrapper for the whole dock, so its height is one observable
+             box and the transcript scrolls beneath it rather than being cut off above it. -->
+        <div class="dock" data-testid="sv3-dock">
         <jf-sv3-context-bar
           .usage=${session?.contextUsage ?? null}
           .contextWindow=${this.aiSnapshot?.runtime.contextWindow ?? null}
@@ -2971,6 +3132,7 @@ export class SearchV3View extends JfElement {
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"
         ></jf-sv3-composer>
+        </div>
       </div>
       ${this.pane()}
       <!-- LAST in the shadow root on purpose: the palette and the hero composer share the overlay

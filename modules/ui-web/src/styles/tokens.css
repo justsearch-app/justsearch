@@ -731,6 +731,13 @@
 @layer core-theme {
 @media (prefers-reduced-transparency: reduce) {
   :root {
+    /* Tempdoc 859 §B (D3) — the ONE line that makes this preference mean what it says. This block
+       shipped lowering the tint alphas while leaving EVERY backdrop-filter running, i.e. it made
+       surfaces MORE transparent under a preference asking for less. Zeroing the shared multiplier
+       here (a) fixes DragOverlay / IndexingOverlay / ProvenanceBadge, which honour it but were
+       never reached by this preference, and (b) collapses reduced-transparency and
+       `[data-surface-mode="solid"]` into ONE downstream code path: both arrive as scale 0. */
+    --glass-blur-scale: 0;
     --glass-surface: rgba(var(--p-glass), 0.08);
     --glass-surface-hover: rgba(var(--p-glass), 0.12);
     --glass-surface-active: rgba(var(--p-glass), 0.16);

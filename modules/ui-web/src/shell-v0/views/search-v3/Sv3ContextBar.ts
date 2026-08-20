@@ -47,7 +47,12 @@ export class Sv3ContextBar extends JfElement {
         display: block;
         padding-inline: var(--space-4);
       }
+      /* Tempdoc 859 §B — the bar rides the window's floating '.dock', which is click-through so the
+         transcript stays wheel-scrollable beneath it. This row carries real controls (the context
+         meter, the hidden-turn act), so it takes pointer events back for exactly its own box — the
+         same division the composer's '.band' makes, at the same measure. */
       .bar {
+        pointer-events: auto;
         display: flex;
         flex-wrap: wrap;
         align-items: center;

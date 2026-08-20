@@ -66,12 +66,17 @@ export class Sv3Palette extends JfElement {
         font-family: var(--font-sans);
       }
 
+      /* Tempdoc 859 §B (D2/D3) — the scrim honours the shipped app's one blur multiplier like every
+         other glass site in this window. Its FILL is deliberately left alone: a dialog scrim is a
+         dimming layer, not a readable surface, and the "opaque or it is unreadable" rule is about
+         content sitting ON glass. Zeroing the blur is the whole of what the preference asks for
+         here; making the scrim opaque would hide the window behind it. */
       .backdrop {
         position: absolute;
         inset: 0;
         background: var(--dialog-backdrop);
-        -webkit-backdrop-filter: blur(var(--dialog-backdrop-blur));
-        backdrop-filter: blur(var(--dialog-backdrop-blur));
+        -webkit-backdrop-filter: blur(calc(var(--dialog-backdrop-blur) * var(--glass-blur-scale)));
+        backdrop-filter: blur(calc(var(--dialog-backdrop-blur) * var(--glass-blur-scale)));
       }
 
       /* Top-anchored, not centred: a palette that grows downward keeps its first row under the eye. */
@@ -100,9 +105,16 @@ export class Sv3Palette extends JfElement {
         border-radius: var(--radius-2xl);
         /* The dialog recipe, on ONE node (slice 3's lesson): a split silhouette reports no glass on
            whichever node carries the radius. */
-        background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
-        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-        backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+        /* 859 §B (D2) — blur and translucency off ONE multiplier; see Sv3Composer's '.glass'. */
+        background: color-mix(
+          in srgb,
+          var(--background) calc(100% - (100% - var(--glass-opacity)) * var(--glass-blur-scale)),
+          transparent
+        );
+        -webkit-backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)))
+          saturate(var(--glass-saturation));
+        backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale)))
+          saturate(var(--glass-saturation));
         box-shadow: var(--dialog-shadow);
         color: var(--foreground);
         outline: none;

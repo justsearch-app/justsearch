@@ -290,9 +290,20 @@ VARIANTS = ("default", "empty")
 # It is the only variant under which a fixture-driven agent RUN completes.
 _DEGRADED_VARIANTS = frozenset({"degraded", "degraded-detailed", "degraded-thread", "agent-run"})
 
+# `sv3-sources` (tempdoc 859 §B, the `sv3-composer-occlusion` step) is the record path WITHOUT the
+# degraded knobs: a thread whose last answer carries populated `attributes.citations`, which is what
+# the Search v3 window projects into a turn's evidence (`views/search-v3/sv3-record.ts`'s
+# `recordEvidenceOf`). `agent-run` already emits `citations: []` there, and `panelSpeaks`
+# (`Sv3Main`) gates on LENGTH — so the sv3 Sources panel was never fixture-unreachable, only one
+# populated array away. The answers are deliberately long so the transcript OVERFLOWS a pinned
+# viewport; a capture where nothing scrolls satisfies an occlusion assertion vacuously.
+#
+# It is a SEPARATE variant rather than a change to `agent-run` so that variant's bytes are
+# untouched and `chat-evidence-rail` / `chat-activity-rail-open` keep their baselines.
+
 # The variants that serve a `/api/thread/{id}` RECORD (and therefore seed the per-tab
 # lastViewedConversation pointer so a cold chat surface auto-restores it).
-_THREAD_RECORD_VARIANTS = frozenset({"degraded-thread", "agent-run"})
+_THREAD_RECORD_VARIANTS = frozenset({"degraded-thread", "agent-run", "sv3-sources"})
 
 # The per-tab pointer UnifiedChatView reads on connect (`readLastViewedConversation`,
 # controllers/lastViewedConversation.ts KEY) — seeding it is what makes a COLD chat surface
@@ -347,6 +358,72 @@ _AGENT_RUN_SOURCES: tuple[dict, ...] = (
     },
 )
 
+# Tempdoc 859 §B — the RETRIEVAL citations the `sv3-sources` variant hangs on its last assistant
+# message. Shape: `components/chat/citationTypes.ts`'s `RetrievalCitation` (the wire key is
+# `attributes.citations`, distinct from `attributes.sources` above, which is the AgentSource rail
+# feed). `sv3-record.ts`'s `recordEvidenceOf` reads exactly this array into a v3 turn's
+# `evidence.sources`, which is what mounts `jf-citations-panel` behind the turn's Sources
+# disclosure. THREE rows so the panel has real height to occlude with.
+_SV3_RETRIEVAL_CITATIONS: tuple[dict, ...] = (
+    {
+        "parentDocId": "doc-indexing-pipeline",
+        "chunkIndex": 3,
+        "chunkTotal": 12,
+        "startChar": 1180,
+        "endChar": 1460,
+        "score": 0.91,
+        "excerpt": "The worker enriches each document before the head projects the result set.",
+        "startLine": 41,
+        "endLine": 48,
+        "headingText": "Enrichment stages",
+        "headingLevel": 2,
+    },
+    {
+        "parentDocId": "doc-system-overview",
+        "chunkIndex": 7,
+        "chunkTotal": 20,
+        "startChar": 320,
+        "endChar": 610,
+        "score": 0.84,
+        "excerpt": "Head, Body and Brain are separate processes; only the Body owns the index.",
+        "startLine": 12,
+        "endLine": 19,
+        "headingText": "Process model",
+        "headingLevel": 2,
+    },
+    {
+        "parentDocId": "doc-retrieval-contract",
+        "chunkIndex": 1,
+        "chunkTotal": 9,
+        "startChar": 44,
+        "endChar": 300,
+        "score": 0.77,
+        "excerpt": "Retrieval results reach the head over gRPC and are projected onto the surface.",
+        "startLine": 88,
+        "endLine": 95,
+        "headingText": "Knowledge search",
+        "headingLevel": 3,
+    },
+)
+
+# Tempdoc 859 §B — long enough that the transcript overflows the step's pinned viewport, which is
+# what makes `minScrollableRegions: 1` and the max-scroll occlusion assertion non-vacuous.
+_SV3_LONG_ANSWER = (
+    "The worker enriches each document, then the head projects the result set. "
+    "Enrichment runs in stages: the extractor normalises the document body, the chunker splits it "
+    "on structural boundaries, and the encoder produces the dense and sparse representations the "
+    "index stores side by side. None of that work happens in the head process, which never touches "
+    "the index directly and reaches the worker over gRPC instead.\n\n"
+    "When a query arrives the head fans it out to both retrieval arms, fuses the two ranked lists, "
+    "and reranks the survivors before any of it reaches the surface. The passages that come back "
+    "carry their own provenance — the parent document, the chunk offsets and the heading they were "
+    "written under — which is what lets an answer point at the exact lines it was grounded in "
+    "rather than at a document as a whole.\n\n"
+    "Everything the reader sees below the answer is that provenance, rendered. Opening the Sources "
+    "disclosure mounts the shared citations panel for this turn, which is the same component every "
+    "other window in the product mounts on a landed answer."
+)
+
 # Tempdoc 814 §D8.1 — the typed loop object the rail's lifecycle row reads (`unifiedLifecycles`,
 # validated by `unifiedThreadClient.ts`'s `lifecycleSchema`). `state: "DONE"` is load-bearing
 # twice: it is the row's own text, and `runCompleted` (UnifiedChatView) reads it to render a
@@ -388,6 +465,14 @@ def _thread_body(variant: str = "degraded-thread") -> str:
     `.evidence-rail`) and a DONE `lifecycles[]` entry (which the activity rail's
     `.activity-lifecycle` row reads). Neither needs a stream; that is §D8.1's whole claim."""
     with_evidence = variant == "agent-run"
+    # Tempdoc 859 §B — the sv3 arm. Deliberately a SEPARATE branch from `with_evidence`: touching
+    # `agent-run`'s bytes would move the `chat-evidence-rail` / `chat-activity-rail-open` baselines.
+    with_citations = variant == "sv3-sources"
+    last_attributes = None
+    if with_evidence:
+        last_attributes = {"sources": list(_AGENT_RUN_SOURCES), "citations": []}
+    elif with_citations:
+        last_attributes = {"citations": list(_SV3_RETRIEVAL_CITATIONS)}
 
     def _event(idx: int, kind: str, originator: str, content: str,
                attributes: dict | None = None) -> dict:
@@ -406,11 +491,13 @@ def _thread_body(variant: str = "degraded-thread") -> str:
         "events": [
             _event(1, "USER_MESSAGE", "user", "What is this file about?"),
             _event(2, "ASSISTANT_MESSAGE", "assistant",
-                   "It describes how the indexing pipeline hands results to the head process."),
+                   _SV3_LONG_ANSWER if with_citations
+                   else "It describes how the indexing pipeline hands results to the head process."),
             _event(3, "USER_MESSAGE", "user", "And how does indexing reach it?"),
             _event(4, "ASSISTANT_MESSAGE", "assistant",
-                   "The worker enriches each document, then the head projects the result set.",
-                   {"sources": list(_AGENT_RUN_SOURCES), "citations": []} if with_evidence else None),
+                   _SV3_LONG_ANSWER if with_citations
+                   else "The worker enriches each document, then the head projects the result set.",
+                   last_attributes),
         ],
         "lifecycles": [_AGENT_RUN_LIFECYCLE] if with_evidence else [],
     })
