@@ -326,6 +326,53 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   arrives from the SQLite change feed, that an ingest-port submission produces a delta, and that
   close stops production. Without it A6/A7 were a substrate with no end-to-end consumer proof.
 
+- **A11 (landed BEFORE A10, owner-confirmed).** `WorkerSpawner` is constructed with a
+  `MainSignalBus` and calls `signalBus.*` 17 times, so group M cannot be deleted before group S.
+  §7's split assumed 17.4's compose-and-delete-as-one-checkpoint, where the branch was red across
+  A6-A13 and order did not matter; under green-after-every-item the dependency binds. Full reasoning
+  in §11.1; §3 carries the dated line.
+- **A11 (the item lists did not name `WindowsJobObject`, and it had to go).** Crash-safe Windows
+  process containment whose only caller was the spawner — `ExtractionSandboxChild` explicitly
+  declined the dependency and llama-server never took it — so it went unreferenced across the whole
+  program. `WholeProgramDeadCodeTest` caught the class and `SystemAccessFunnelTest` caught the
+  allowlist entry that outlived it (five stale `sysaccess-allowlist.txt` entries in total). Deleted
+  rather than parked in the accepted store: a containment helper with no child to contain is
+  residue, and stage B can restore it from history.
+- **A11 (keeping the health monitor is what kept the readiness vocabulary alive).** Q3's holding
+  action (an `awaitingRecut` allowlist) is **not needed** — `check-readiness-reason-codes` is green
+  because the boot-recovery arm still emits `WORKER_RECOVERING`/`WORKER_RESTART_EXHAUSTED` and the
+  bootstrap still emits `WORKER_STARTING`/`WORKER_SPAWN_FAILED`/`WORKER_LOST`. Deleting the monitor
+  (which §7 group S proposed) would have orphaned five codes and forced the allowlist. A17.1 is
+  therefore satisfied by a decision, not by a holding action.
+- **A11 (one half of the post-resume actuator is not channel-shaped).** The brief bundled "post-resume
+  eager revalidation" as one thing to delete. It was two: a channel reconnect (deleted — there is no
+  channel) and a watcher re-register + reconcile (**kept** — a watcher frozen through a machine
+  suspend missed every event in the window whatever the process count, and only a reconcile walk
+  catches up). The test's assertion was not dropped but **inverted**: it now asserts the reconcile
+  happens AND that nothing tries to reconnect, with `verifyNoMoreInteractions`, because a silent
+  no-op reconnect would satisfy a test that only checked the reconcile.
+- **A11 (`WorkerStartFailures` could not survive its subject).** Its transient/permanent classifier
+  was entirely spawn-shaped — worker jar missing, port-discovery timeout, PID mismatch. An
+  in-process composition fails for other reasons (a Lucene open, a jobs.db migration), so
+  `startWithRetry` retries every attempt within the budget, which is what the classifier did for the
+  transient class anyway; a permanent failure costs the remaining attempts before the same verdict.
+- **A11 (two things kept because they have a named, dated future producer, not out of caution).**
+  `ShutdownOutcome.FORCED` and `BootRecoveryDecision`'s `SUPERVISION_ENGAGED` veto both lose their
+  producer at A11 and both are kept, because design 7.1's supervisor lands at stage B with a real
+  kill path and a real restart budget. Deleting them now means re-adding them then. Everything else
+  that lost its producer was deleted.
+- **A11 (a manifest field now has no producer, flagged not decided).** `RuntimeManifestListenerWiring`
+  lost `readGrpcPort`, so `worker.grpcPort` is published as null on every path — while
+  `RuntimeManifestPublisherTest` and `RuntimeManifestControllerRedactionTest` still pin ports by
+  calling the publisher directly, so they stay green over a field nothing fills. Retiring it versus
+  keeping it as a stage-B placeholder is a runtime-manifest contract decision, not A11's.
+- **A11 (the supervision register is retired, not deleted, and the test pins the retirement).**
+  Deleting `SupervisionContractTest`'s live-policy equality assertion would have left the register
+  free to drift back into claiming a contract nothing enforces. Instead: a retired entry must
+  declare `status: "retired"` and name where the contract lands next, and a second new test asserts
+  every NON-retired process has a drift check in the class — so a third process cannot be added
+  without one. The Brain's check is untouched.
+
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
 Read from each module's `build.gradle.kts` `dependencies` block and `settings.gradle.kts:113-147`:
