@@ -2,9 +2,11 @@
  * Tempdoc 743 second wave, P-K — unit tests for run-gh.mjs's pure logic.
  *
  * Covers: the cli/cli#7866 bitwise exit decode, the cli/cli#7401 "not registered yet"
- * detection, and gh-binary resolution. Live smoke tests (real `gh pr checks` against a
- * merged/nonexistent PR) are run manually and reported separately — a unit test cannot
- * safely depend on live GitHub state or wall-clock polling.
+ * detection, the tempdoc 872 §6 "CI workflow itself must register, not just any check"
+ * gate (fixture-driven `checksWait` regression test with an injected fake `runCmd`), and
+ * gh-binary resolution. Live smoke tests (real `gh pr checks` against a merged/nonexistent
+ * PR) are run manually and reported separately — a unit test cannot safely depend on live
+ * GitHub state or wall-clock polling.
  *
  * Run with: `node scripts/dev/run-gh.test.mjs`
  */
@@ -18,6 +20,9 @@ import {
   isUnregistered,
   resolveGhBin,
   buildChecksArgs,
+  buildChecksJsonArgs,
+  hasWorkflowRegistered,
+  checksWait,
   classifyMergeSnapshot,
   classifyWorkflowRun,
   enqueuePullRequest,
@@ -147,6 +152,37 @@ run('parseRequiredOnly is false and rest is unchanged when flag absent', () => {
   const { requiredOnly, rest } = parseRequiredOnly(['443', '--timeout-sec', '60']);
   assert.equal(requiredOnly, false);
   assert.deepEqual(rest, ['443', '--timeout-sec', '60']);
+});
+
+// --- hasWorkflowRegistered / buildChecksJsonArgs: tempdoc 872 §6 — a lone non-CI check
+// (e.g. cla-assistant) resolving PASS is not "CI is green" ---
+run('buildChecksJsonArgs without requiredOnly requests the plain rollup', () => {
+  assert.deepEqual(buildChecksJsonArgs(571, false), ['pr', 'checks', '571', '--json', 'name,workflow,state']);
+});
+run('buildChecksJsonArgs with requiredOnly appends --required', () => {
+  assert.deepEqual(
+    buildChecksJsonArgs(571, true),
+    ['pr', 'checks', '571', '--json', 'name,workflow,state', '--required'],
+  );
+});
+run('a fixture rollup containing only cla-assistant has NOT registered the CI workflow', () => {
+  const rows = [{ name: 'cla-assistant', workflow: 'CLA Assistant', state: 'SUCCESS' }];
+  assert.equal(hasWorkflowRegistered(rows), false);
+});
+run('a fixture rollup with a CI-workflow row alongside cla-assistant HAS registered', () => {
+  const rows = [
+    { name: 'cla-assistant', workflow: 'CLA Assistant', state: 'SUCCESS' },
+    { name: 'Unit tests (search-worker)', workflow: 'CI', state: 'SUCCESS' },
+  ];
+  assert.equal(hasWorkflowRegistered(rows), true);
+});
+run('hasWorkflowRegistered treats a non-array (unparseable rollup) as not registered', () => {
+  assert.equal(hasWorkflowRegistered(null), false);
+  assert.equal(hasWorkflowRegistered(undefined), false);
+});
+run('hasWorkflowRegistered honors an explicit workflow name override', () => {
+  const rows = [{ name: 'cla-assistant', workflow: 'CLA Assistant', state: 'SUCCESS' }];
+  assert.equal(hasWorkflowRegistered(rows, 'CLA Assistant'), true);
 });
 
 // --- parseTimeoutSec: --timeout-sec with a missing/non-numeric value must not swallow the
@@ -292,6 +328,61 @@ for (const [label, results, expected] of [
     assert(!calls.some((call) => call.command === 'gh-bin'), JSON.stringify(calls));
   });
 }
+
+// --- checksWait: the tempdoc 872 §6 regression — a fixture-driven fake `runCmd` exercises the
+// exact control flow the bug lived in, not just the pure `hasWorkflowRegistered` helper ---
+await runAsync('checksWait does not report PASS on a CLA-only rollup before CI registers (tempdoc 872 §6 regression)', async () => {
+  let plainCall = 0;
+  let jsonCall = 0;
+  const fakeRunCmd = (_bin, args) => {
+    if (args.includes('--json')) {
+      jsonCall += 1;
+      const rows = jsonCall === 1
+        ? [{ name: 'cla-assistant', workflow: 'CLA Assistant', state: 'SUCCESS' }]
+        : [
+          { name: 'cla-assistant', workflow: 'CLA Assistant', state: 'SUCCESS' },
+          { name: 'Unit tests (search-worker)', workflow: 'CI', state: 'SUCCESS' },
+        ];
+      return { status: 0, stdout: JSON.stringify(rows), stderr: '' };
+    }
+    plainCall += 1;
+    // 1: only cla-assistant registered, and it's passing — bitwise exit 0 (the bug: this alone
+    //    used to read as "all checks green"). 2: CI has now registered and is still running
+    //    (pending bit). 3: CI finished green.
+    if (plainCall === 1) return { status: 0, stdout: 'X  cla-assistant  pass  1s\n', stderr: '' };
+    if (plainCall === 2) return { status: 8, stdout: 'X  cla-assistant  pass  1s\n*  build  pending  5s\n', stderr: '' };
+    return { status: 0, stdout: 'X  cla-assistant  pass  1s\n✓  build  pass  40s\n', stderr: '' };
+  };
+  const code = await checksWait('gh', 571, 120, false, {
+    runCmd: fakeRunCmd,
+    now: () => 0,
+    pause: async () => {},
+  });
+  assert.equal(code, 0);
+  assert.ok(plainCall >= 3, `expected checksWait to keep polling past the CLA-only rollup, got ${plainCall} plain calls`);
+});
+await runAsync('checksWait times out if the CI workflow never registers (only cla-assistant ever appears)', async () => {
+  let clock = 0;
+  const fakeRunCmd = (_bin, args) => (args.includes('--json')
+    ? { status: 0, stdout: JSON.stringify([{ name: 'cla-assistant', workflow: 'CLA Assistant', state: 'SUCCESS' }]), stderr: '' }
+    : { status: 0, stdout: 'X  cla-assistant  pass  1s\n', stderr: '' });
+  const code = await checksWait('gh', 571, 1, false, {
+    runCmd: fakeRunCmd,
+    now: () => clock,
+    pause: async () => { clock += 2000; },
+  });
+  assert.equal(code, 3);
+});
+await runAsync('checksWait surfaces a spawn failure immediately without polling', async () => {
+  let calls = 0;
+  const code = await checksWait('bogus-gh', 571, 60, false, {
+    runCmd: () => { calls += 1; return { error: new Error('ENOENT'), status: null, stdout: '', stderr: '' }; },
+    now: () => 0,
+    pause: async () => { throw new Error('should not pause on a spawn failure'); },
+  });
+  assert.equal(code, 2);
+  assert.equal(calls, 1);
+});
 
 // --- Report ---
 if (failures.length > 0) {

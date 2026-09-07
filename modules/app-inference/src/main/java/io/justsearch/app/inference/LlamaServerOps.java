@@ -110,6 +110,8 @@ final class LlamaServerOps {
   private static final long PROCESS_KILL_TIMEOUT_SECS = 5;
   private static final Duration ADOPTION_HEALTH_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(1);
+  /** Startup adoption retries a TIMED-OUT probe this many times (see isExistingServerHealthy). */
+  private static final int ADOPTION_PROBE_ATTEMPTS = 3;
   private static final Duration PROPS_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration PERIODIC_HEALTH_TIMEOUT = Duration.ofSeconds(5);
   private static final long CRASH_RECOVERY_DELAY_MS = SUPERVISION_POLICY.crashRecoveryDelayMs();
@@ -808,7 +810,7 @@ final class LlamaServerOps {
   // ==================== External Server Adoption ====================
 
   private boolean adoptExistingServerIfPresent() throws IOException, ModeTransitionException {
-    if (!isServerHealthy(HEALTH_PROBE_TIMEOUT)) {
+    if (!isExistingServerHealthy()) {
       return false;
     }
     if (policyDisallowExternalInferenceServers()) {
@@ -1075,8 +1077,31 @@ final class LlamaServerOps {
     }
   }
 
-  boolean isServerHealthy(Duration timeout) {
-    return probeHealth(timeout).ok();
+  /**
+   * Startup-adoption health probe: retries a probe that TIMED OUT (a listener exists but answered
+   * slowly) up to {@link #ADOPTION_PROBE_ATTEMPTS} times; a connection refusal (nobody listening)
+   * or any non-timeout error returns false on the first attempt, so the no-server path stays fast.
+   *
+   * <p>Tempdoc 932 item 3: a single 1 s probe against a real-but-busy server concluded "no server"
+   * and fell through to spawning a second llama-server on the same port — the restart-loop failure
+   * this class exists to avoid — and in tests surfaced as a misleading downstream exception.
+   */
+  boolean isExistingServerHealthy() {
+    for (int attempt = 1; attempt <= ADOPTION_PROBE_ATTEMPTS; attempt++) {
+      HealthProbe probe = probeHealth(HEALTH_PROBE_TIMEOUT);
+      if (probe.ok()) {
+        return true;
+      }
+      boolean timedOut = probe.error() != null && probe.error().startsWith("HttpTimeoutException");
+      if (!timedOut) {
+        return false;
+      }
+      LOG.debug(
+          "Startup health probe timed out (attempt {}/{}); retrying",
+          attempt,
+          ADOPTION_PROBE_ATTEMPTS);
+    }
+    return false;
   }
 
   PropsProbe probeServerProps(Duration timeout) {

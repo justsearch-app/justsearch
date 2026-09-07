@@ -32,8 +32,10 @@ export function parseUiWebGateCommands(register) {
       // One invocation per id. `--gate` is repeatable now, so a single call would work too; the
       // per-id loop is kept deliberately, because it attributes a failure to the gate that caused
       // it instead of to one combined run.
-      const m = line.match(/--gate\s+([a-z0-9,-]+)/);
-      for (const id of (m?.[1] ?? '').split(',').filter(Boolean)) {
+      // Accept both spellings — repeated `--gate <id>` (what run.mjs actually parses; the recipe
+      // uses it since tempdoc 932) and the older comma-joined list.
+      const ids = [...line.matchAll(/--gate\s+([a-z0-9,-]+)/g)].flatMap((m) => m[1].split(','));
+      for (const id of ids.filter(Boolean)) {
         cmds.push(['node', 'scripts/governance/run.mjs', '--gate', id, '--mode', 'gate']);
       }
       continue;

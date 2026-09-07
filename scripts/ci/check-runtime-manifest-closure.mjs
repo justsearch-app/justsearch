@@ -65,8 +65,9 @@ const SKIP_PATHS = [
   // The producer (HeadlessApp) intentionally writes runtime artifacts; the
   // publisher owns the canonical set.
   'modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java',
-  // HeadlessApp writes the deprecated api-port.txt mirror plus shutdown
-  // cleanup; the strings are tracked under the allowlist.
+  // HeadlessApp no longer writes api-port.txt at all (tempdoc 501 Phase 18
+  // removed the mirror outright); its comments merely document that removal,
+  // so the literal string still appears here for historical context only.
   'modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java',
   // The dev-runner writes nothing into <dataDir>/runtime/ — it observes —
   // but the path strings live there for cleanup. Permit by file name.

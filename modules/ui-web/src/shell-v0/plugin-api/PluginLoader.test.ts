@@ -29,6 +29,11 @@
 // Slice 477 H2.6 — loader code-splits SES; tests stay synchronous
 // by importing SES at the top.
 import 'ses';
+// Same reason, for the module-mode path: PluginLoader lazily `await import(
+// '@endo/module-source')` (PluginLoader.ts:354). Resolving that graph cold costs far more than the
+// 5s per-test budget under parallel load, and the cost would land inside whichever module-mode case
+// runs first. Importing it here moves it to file-collection time, which has no per-test timeout.
+import '@endo/module-source';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   loadPluginFromUrl,

@@ -17,7 +17,7 @@
  * `clearResourceRendererRegistry()` so test ordering is irrelevant.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CATEGORIES,
   type Category,
@@ -28,6 +28,19 @@ import {
   registerResourceRenderer,
   type ResourceRendererEntry,
 } from './resourceRegistry.js';
+// The defaults module is an import-time side effect: importing it registers the shipping renderers
+// into this file's `resourceRegistry` module instance. Importing it statically (rather than
+// dynamically inside a test after `vi.resetModules()`) is both more faithful to what production does
+// at bundle-import time AND keeps the renderer graph's transform out of a 5s per-test budget.
+import './resourceRegistryDefaults.js';
+
+/**
+ * Exactly what `resourceRegistryDefaults.js` registered at import time, captured before any test
+ * clears the process-singleton registry. The defaults test restores this instead of forcing a module
+ * re-evaluation.
+ */
+const DEFAULT_REGISTRATIONS: readonly ResourceRendererEntry[] =
+  getResourceRendererRegistry();
 
 describe('Resource-view renderer registry', () => {
   beforeEach(() => {
@@ -233,50 +246,52 @@ describe('Resource-view renderer registry', () => {
 });
 
 describe('Resource-view renderer registry — default registrations', () => {
-  // The defaults file is an ESM side-effect module evaluated once per
-  // bundle. The clear-and-reimport-per-test pattern doesn't work because
-  // the dynamic import returns the cached module (no re-evaluation).
-  // Instead: clear once, dynamically import the defaults file once (which
-  // re-fires side effects on the in-memory registry instance), then run
-  // all assertions inline. This is structurally honest about what the
-  // defaults file does at bundle-import time.
-  it('produces the four expected registrations and leaves HISTORY unsupported', async () => {
+  // The defaults file is an ESM side-effect module evaluated once per bundle, so its registrations
+  // cannot be re-fired by re-importing it. `DEFAULT_REGISTRATIONS` (captured at this file's import
+  // time, above) IS the product of that one evaluation; restoring it into the cleared
+  // process-singleton registry reproduces the bundle-import state exactly, with no module
+  // re-evaluation and therefore no dependence on how long a cold transform takes.
+  beforeEach(() => {
     clearResourceRendererRegistry();
-    vi.resetModules();
-    // Re-import the registry so the defaults module's `registerResourceRenderer`
-    // call lands in the same module instance our re-imports will read.
-    const registry = await import('./resourceRegistry.js');
-    await import('./resourceRegistryDefaults.js');
+    for (const entry of DEFAULT_REGISTRATIONS) {
+      registerResourceRenderer(entry);
+    }
+  });
 
-    expect(registry.isCategorySupported('STATE')).toBe(true);
-    expect(registry.dispatchResourceRenderer({ category: 'STATE' })).toBe(
+  afterEach(() => {
+    clearResourceRendererRegistry();
+  });
+
+  it('produces the four expected registrations and leaves HISTORY unsupported', () => {
+    // The defaults module registered something; an empty snapshot would make every
+    // assertion below vacuous in the "supported" direction and falsely green the HISTORY ones.
+    expect(DEFAULT_REGISTRATIONS.length).toBeGreaterThan(0);
+
+    expect(isCategorySupported('STATE')).toBe(true);
+    expect(dispatchResourceRenderer({ category: 'STATE' })).toBe(
       'jf-status-card',
     );
 
-    expect(registry.isCategorySupported('EVENT_STREAM')).toBe(true);
-    expect(
-      registry.dispatchResourceRenderer({ category: 'EVENT_STREAM' }),
-    ).toBe('jf-status-card');
-
-    expect(registry.isCategorySupported('TABULAR')).toBe(true);
-    expect(registry.dispatchResourceRenderer({ category: 'TABULAR' })).toBe(
-      'jf-table',
+    expect(isCategorySupported('EVENT_STREAM')).toBe(true);
+    expect(dispatchResourceRenderer({ category: 'EVENT_STREAM' })).toBe(
+      'jf-status-card',
     );
 
-    expect(registry.isCategorySupported('TIMESERIES')).toBe(true);
-    expect(
-      registry.dispatchResourceRenderer({ category: 'TIMESERIES' }),
-    ).toBe('jf-timeseries-sparkline');
+    expect(isCategorySupported('TABULAR')).toBe(true);
+    expect(dispatchResourceRenderer({ category: 'TABULAR' })).toBe('jf-table');
+
+    expect(isCategorySupported('TIMESERIES')).toBe(true);
+    expect(dispatchResourceRenderer({ category: 'TIMESERIES' })).toBe(
+      'jf-timeseries-sparkline',
+    );
 
     // HISTORY ships with slice 444c. (Slice 448 phase 6 retired LOG_TAIL —
     // operator-trace surfaces use the sibling DiagnosticChannel primitive.)
-    expect(registry.isCategorySupported('HISTORY')).toBe(false);
-    expect(registry.dispatchResourceRenderer({ category: 'HISTORY' })).toBeNull();
+    expect(isCategorySupported('HISTORY')).toBe(false);
+    expect(dispatchResourceRenderer({ category: 'HISTORY' })).toBeNull();
 
     // Exactly four of the five Categories supported by defaults.
-    const supportedCount = registry.CATEGORIES.filter(
-      registry.isCategorySupported,
-    ).length;
+    const supportedCount = CATEGORIES.filter(isCategorySupported).length;
     expect(supportedCount).toBe(4);
   });
 });

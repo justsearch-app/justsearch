@@ -34,6 +34,21 @@
  *     no-checks-yet case before it starts trusting the bitwise contract, which is the fix
  *     #7401 itself never shipped.
  *
+ *     A second, narrower registration gap (tempdoc 872 §6, observed twice on PR #571): the
+ *     rollup can be non-empty and fully green while the `CI` workflow (`.github/workflows/ci.yml`
+ *     `name: CI`) itself has not started — e.g. only `cla-assistant` (workflow `CLA Assistant`,
+ *     a separate GitHub App check) has registered so far. `isUnregistered` correctly calls that
+ *     "registered" (it is a real, non-empty rollup), so the bitwise contract resolves to PASS
+ *     over a rollup that just happens to contain nothing but a passing CLA check — reported as
+ *     "all checks green" while `gh run list` still shows the `CI` run `pending`. The pre-poll
+ *     therefore ALSO requires a `gh pr checks <pr> --json name,workflow,state` row whose
+ *     `workflow` field equals `CI` (verified live on gh 2.90.0, PR #571: CI job rows carry
+ *     `"workflow":"CI"`, cla-assistant carries `"workflow":"CLA Assistant"` — the JSON `workflow`
+ *     field, not `name`, is what distinguishes them) before it will leave phase 1, regardless of
+ *     how the plain-text bitwise exit reads. Once a `CI` row exists, phase 2's bitwise contract
+ *     is trusted as before — a real `pending` CI run flips the pending bit, so no separate
+ *     "is CI still running" check is needed past this point.
+ *
  *     `--required-only` (tempdoc 829 R1): passes `--required` through to every underlying
  *     `gh pr checks` call, so the bitwise verdict above is computed over ONLY the contexts
  *     registered in the branch protection rule's `required_status_checks.contexts` — verified
@@ -68,6 +83,10 @@ const DEFAULT_TIMEOUT_SEC = 1800;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PREVIEW_SCRIPT = path.resolve(SCRIPT_DIR, '..', 'ci', 'preview-squash-message.mjs');
 const REVIEW_RECORD_SCRIPT = path.resolve(SCRIPT_DIR, '..', 'ci', 'pr-review-record.mjs');
+// Matches the `name:` field in .github/workflows/ci.yml — verified live (gh pr checks --json
+// workflow, PR #571) that individual CI job rows carry exactly this value, distinct from other
+// rollup entries such as cla-assistant's `"workflow":"CLA Assistant"` (tempdoc 872 §6).
+const CI_WORKFLOW_NAME = 'CI';
 
 /** Resolve the `gh` binary: scoop's `current` symlink if present, else plain `gh` on PATH. */
 export function resolveGhBin(env = process.env) {
@@ -131,6 +150,44 @@ export function buildChecksArgs(prNumber, requiredOnly) {
   const args = ['pr', 'checks', String(prNumber)];
   if (requiredOnly) args.push('--required');
   return args;
+}
+
+/**
+ * Build the `gh pr checks <pr> --json name,workflow,state` argument vector used to confirm
+ * the CI workflow ITSELF (not just any check) has a row in the rollup (tempdoc 872 §6). Pure;
+ * unit-tested. Mirrors `buildChecksArgs`'s `--required` gating so the registration check is
+ * computed over the same filtered/unfiltered rollup the caller asked for.
+ */
+export function buildChecksJsonArgs(prNumber, requiredOnly) {
+  const args = ['pr', 'checks', String(prNumber), '--json', 'name,workflow,state'];
+  if (requiredOnly) args.push('--required');
+  return args;
+}
+
+/**
+ * True when at least one row of a `gh pr checks --json` rollup belongs to the given workflow
+ * (default: the `CI` workflow). Pure; unit-tested. This is the fix for tempdoc 872 §6: a
+ * non-empty, fully-passing rollup containing only a non-CI check (e.g. cla-assistant) is NOT
+ * "CI is green" — it means CI hasn't registered yet.
+ */
+export function hasWorkflowRegistered(rows, workflowName = CI_WORKFLOW_NAME) {
+  return Array.isArray(rows) && rows.some((row) => String(row?.workflow || '') === workflowName);
+}
+
+/**
+ * Parse a `gh pr checks --json` capture into rows, or null if the rollup was empty/unparseable.
+ * Verified live (gh 2.90.0): an unregistered rollup exits 1 with the SAME plain-text
+ * "no checks reported" error as the non-JSON invocation, even with `--json` set — there is no
+ * JSON error envelope to parse, so a `JSON.parse` failure here is the expected not-yet-registered
+ * case, not a surprise.
+ */
+function parseChecksJson(result) {
+  try {
+    const rows = JSON.parse(result.stdout);
+    return Array.isArray(rows) ? rows : null;
+  } catch {
+    return null;
+  }
 }
 
 export function classifyMergeSnapshot(snapshot) {
@@ -235,12 +292,31 @@ export async function runWaitSha(bin, sha, timeoutSec, { workflow = 'CI', branch
   }
 }
 
-async function checksWait(bin, prNumber, timeoutSec, requiredOnly) {
-  const deadline = Date.now() + timeoutSec * 1000;
+/**
+ * `checks-wait`'s core loop. Pure enough to test: `runCmd`/`now`/`pause` are injectable
+ * (default to the real `gh` spawn / wall clock / real sleep), matching the DI pattern already
+ * used by `mergeWait`/`runWaitSha` above. Exported so a fixture-driven test can exercise the
+ * exact control flow the tempdoc 872 §6 bug lived in, not just the pure helper it calls.
+ */
+export async function checksWait(bin, prNumber, timeoutSec, requiredOnly, {
+  runCmd = runGhCaptured,
+  now = () => Date.now(),
+  pause = sleep,
+} = {}) {
+  const deadline = now() + timeoutSec * 1000;
   const checksArgs = buildChecksArgs(prNumber, requiredOnly);
+  const checksJsonArgs = buildChecksJsonArgs(prNumber, requiredOnly);
 
-  // Phase 1: pre-poll until checks register (cli/cli#7401 mitigation).
-  let last = runGhCaptured(bin, checksArgs);
+  // True while phase 1 should keep pre-polling: either the plain-text rollup still looks
+  // unregistered (cli/cli#7401), OR it's non-empty but the `CI` workflow itself has no row in
+  // it yet (tempdoc 872 §6 — a lone non-CI check, e.g. cla-assistant, is not "CI is green").
+  const needsMoreRegistration = (result) => {
+    if (isUnregistered(result)) return true;
+    return !hasWorkflowRegistered(parseChecksJson(runCmd(bin, checksJsonArgs)));
+  };
+
+  // Phase 1: pre-poll until checks register AND the CI workflow itself has registered.
+  let last = runCmd(bin, checksArgs);
   if (last.error) {
     // Spawn failure (ENOENT etc.) must fail fast and legibly — never poll a binary that
     // isn't there until timeout and then report a wrong-cause TIMEOUT (refute-first review
@@ -248,15 +324,15 @@ async function checksWait(bin, prNumber, timeoutSec, requiredOnly) {
     process.stderr.write(`run-gh checks-wait: failed to spawn \`${bin}\`: ${last.error.message}\n`);
     return 2;
   }
-  while (isUnregistered(last)) {
-    if (Date.now() >= deadline) {
+  while (needsMoreRegistration(last)) {
+    if (now() >= deadline) {
       process.stderr.write(
-        `run-gh checks-wait: TIMEOUT waiting for PR #${prNumber} checks to register after ${timeoutSec}s\n`,
+        `run-gh checks-wait: TIMEOUT waiting for PR #${prNumber}'s ${CI_WORKFLOW_NAME} checks to register after ${timeoutSec}s\n`,
       );
       return 3;
     }
-    await sleep(POLL_INTERVAL_MS);
-    last = runGhCaptured(bin, checksArgs);
+    await pause(POLL_INTERVAL_MS);
+    last = runCmd(bin, checksArgs);
     if (last.error) {
       process.stderr.write(`run-gh checks-wait: failed to spawn \`${bin}\`: ${last.error.message}\n`);
       return 2;
@@ -275,14 +351,14 @@ async function checksWait(bin, prNumber, timeoutSec, requiredOnly) {
       return 1;
     }
     if (verdict === 'pending') {
-      if (Date.now() >= deadline) {
+      if (now() >= deadline) {
         process.stderr.write(
           `run-gh checks-wait: TIMEOUT — PR #${prNumber} still pending after ${timeoutSec}s\n`,
         );
         return 3;
       }
-      await sleep(POLL_INTERVAL_MS);
-      last = runGhCaptured(bin, checksArgs);
+      await pause(POLL_INTERVAL_MS);
+      last = runCmd(bin, checksArgs);
       continue;
     }
     // 'unknown': an unexpected gh error (auth, network, ...) — surface verbatim, don't loop forever.

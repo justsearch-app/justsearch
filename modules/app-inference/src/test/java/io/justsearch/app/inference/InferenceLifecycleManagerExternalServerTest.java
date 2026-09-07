@@ -5,11 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.sun.net.httpserver.HttpServer;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.nio.charset.StandardCharsets;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,6 +28,80 @@ import org.junit.jupiter.api.io.TempDir;
 class InferenceLifecycleManagerExternalServerTest {
 
   @TempDir Path tempDir;
+
+  // Tempdoc 932 item 3: the non-adoption path of startLlamaServer() reads ConfigStore.global()
+  // (LlamaServerOps launch config). This class used to rely on whichever sibling test in the same
+  // JVM had left a global behind, so under full-suite ordering a missed adoption surfaced as
+  // "ConfigStore not initialized" instead of the truthful assertion. The class owns its global now.
+  private ConfigStore prevStore;
+
+  @BeforeEach
+  void publishConfigStore() {
+    prevStore = ConfigStore.globalOrNull();
+    TestResolvedConfigHelper.storeWithDefaults();
+  }
+
+  @AfterEach
+  void restoreConfigStore() {
+    TestResolvedConfigHelper.restoreGlobal(prevStore);
+  }
+
+  @Test
+  void startLlamaServerAdoptsWhenTheFirstHealthProbeTimesOutButTheServerIsAlive() throws Exception {
+    // A live llama-server that answers its first /health slowly (busy box, cold JIT) must still be
+    // adopted rather than treated as absent — the 1 s single-shot probe used to conclude "no
+    // server" and fall through to spawning a second one on the same port.
+    AtomicInteger healthCalls = new AtomicInteger();
+    HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    server.createContext(
+        "/health",
+        exchange -> {
+          if (healthCalls.incrementAndGet() == 1) {
+            try {
+              Thread.sleep(1500); // beyond the 1 s probe timeout, only once
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+          exchange.sendResponseHeaders(200, -1);
+          exchange.close();
+        });
+    server.createContext(
+        "/props",
+        exchange -> {
+          byte[] body = "{\"model_alias\":\"external\",\"n_ctx\":4096}".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.close();
+        });
+    server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
+    server.start();
+
+    int port = server.getAddress().getPort();
+    InferenceConfig config =
+        new InferenceConfig(
+            Path.of("Z:\\definitely-not-a-real-path\\llama-server.exe"),
+            Path.of("Z:\\definitely-not-a-real-path\\model.gguf"),
+            null,
+            port,
+            4096,
+            0,
+            false);
+
+    InferenceLifecycleManager manager = new InferenceLifecycleManager(config);
+    try {
+      manager.startLlamaServer();
+      assertTrue(manager.isUsingExternalServer(), "A slow-but-alive server must be adopted");
+      assertTrue(healthCalls.get() >= 2, "The timed-out probe must have been retried");
+    } finally {
+      try {
+        manager.close();
+      } finally {
+        server.stop(0);
+      }
+    }
+  }
 
   @Test
   void startLlamaServerSkipsProcessStartWhenHealthAlreadyUp() throws Exception {

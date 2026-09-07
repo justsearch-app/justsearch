@@ -8,7 +8,7 @@
  * real network connection.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { EnvelopeStream } from './EnvelopeStream.js';
 import type { SseEnvelope } from './envelope-types.js';
 import {
@@ -48,9 +48,6 @@ class FakeEventSource extends EventTarget {
     this.readyState = 2;
   }
 }
-
-/** Resolve after `ms` of REAL time so a scheduled reconnect/watchdog timer can fire. */
-const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 interface CounterState {
   count: number;
@@ -420,6 +417,18 @@ describe('EnvelopeStream subscribers', () => {
 });
 
 describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
+  // The watchdog + reconnect backoff are pure `setTimeout` schedules (EnvelopeStream.ts armWatchdog /
+  // scheduleReconnect). Driving them with a fake clock makes "did the timer fire?" a property of the
+  // code under test rather than of wall-clock scheduling under parallel CI load — the real-timer form
+  // asserted "a 40ms watchdog fired within 70ms of real time", which a starved event loop breaks.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   /** A factory that hands out a fresh FakeEventSource per connect, recording each + the URL used. */
   function reconnectingStream(overrides?: { initialResumeToken?: string }) {
     const sources: FakeEventSource[] = [];
@@ -435,7 +444,7 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
         return fake as unknown as EventSource;
       },
       initialResumeToken: overrides?.initialResumeToken,
-      // Tiny windows so the test exercises real timers fast.
+      // Tiny windows, advanced on the fake clock (no wall-clock dependence).
       watchdogStaleMs: 40,
       reconnectBaseMs: 5,
       reconnectCapMs: 20,
@@ -460,9 +469,11 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
     sources[0]!.emitError(true);
     expect(stream.getSnapshot().isConnected).toBe(false);
 
-    await wait(40);
+    await vi.advanceTimersByTimeAsync(40);
     // The FE owned the recovery: a second EventSource was opened, carrying ?since=<freshest token>.
-    expect(sources.length).toBeGreaterThanOrEqual(2);
+    // Exactly two: the backoff (5ms base + <=2.5ms jitter) fires inside the window, and the
+    // reconnected source's own 40ms watchdog expires past it.
+    expect(sources).toHaveLength(2);
     expect(urls[1]!).toBe('http://test/api/x/stream?since=tok-3');
     stream.stop();
   });
@@ -474,7 +485,7 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
     sources[0]!.emitError(false); // transient drop — readyState CONNECTING
     // Wait under the 40ms watchdog window so this isolates the error path (a reconnect, if wrongly
     // scheduled, would fire within the 5–20ms backoff).
-    await wait(25);
+    await vi.advanceTimersByTimeAsync(25);
     expect(sources).toHaveLength(1); // no FE-owned reconnect
     stream.stop();
   });
@@ -484,8 +495,10 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
     stream.start();
     sources[0]!.emitOpen();
     // No frames at all — the channel is silently dead. The watchdog (40ms) must force a reconnect.
-    await wait(70);
-    expect(sources.length).toBeGreaterThanOrEqual(2);
+    await vi.advanceTimersByTimeAsync(70);
+    // Exactly two: watchdog at 40ms → backoff fires by ~47.5ms → the fresh source's own watchdog
+    // would not expire until ~87.5ms, past the advanced window.
+    expect(sources).toHaveLength(2);
     stream.stop();
   });
 
@@ -495,7 +508,7 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
     sources[0]!.emitOpen();
     // Beat every 25ms (< the 40ms window) five times — the watchdog must never trip.
     for (let i = 0; i < 5; i++) {
-      await wait(25);
+      await vi.advanceTimersByTimeAsync(25);
       sources[0]!.emitFrame({
         streamId: 'x/v1',
         frameKind: 'LIFECYCLE',
@@ -514,7 +527,7 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
     stream.start();
     sources[0]!.emitError(true); // schedule a reconnect…
     stream.stop(); // …then stop before it fires.
-    await wait(40);
+    await vi.advanceTimersByTimeAsync(40);
     expect(sources).toHaveLength(1);
   });
 });

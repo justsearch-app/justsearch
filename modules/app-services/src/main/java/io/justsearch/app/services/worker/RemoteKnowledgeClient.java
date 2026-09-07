@@ -157,6 +157,8 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
     private final AtomicReference<ManagedChannel> channelRef = new AtomicReference<>();
     private final AtomicInteger currentPort = new AtomicInteger(0);
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    /** How long {@link #close()} waits for the walk thread after interrupting it (932 item 7). */
+    private static final long WALK_QUIESCE_TIMEOUT_MS = 5_000L;
 
     // Persistent root tracking - survives restarts via JSON file
     /**
@@ -1790,6 +1792,36 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
         }
     }
 
+    /**
+     * Joins the walk thread after {@code shutdownNow()} so {@link #close()} does not return while a
+     * walk is still streaming a ScanRoot RPC or persisting watched-root state. Tempdoc 932 item 7:
+     * returning early left {@code watched_roots.json} mid-write under the caller's data dir — on
+     * Windows that open handle made JUnit's {@code @TempDir} cleanup fail ("Failed to delete temp
+     * directory") in every test that closed a client after an addWatchedRoot, and in production it
+     * let shutdown race the last state write. Bounded so a wedged RPC cannot hang shutdown; a close
+     * issued from the walk thread itself cannot join itself and just returns.
+     */
+    /** Test seam (932 item 7): whether the walk executor has fully terminated. */
+    @SuppressWarnings("unused") // RemoteKnowledgeClientCloseJoinsWalkTest; listed in UnreferencedCodeTest
+    boolean isWalkExecutorTerminated() {
+        return walkExecutor.isTerminated();
+    }
+
+    private void awaitWalkQuiescent() {
+        if ("walk-bg".equals(Thread.currentThread().getName())) {
+            return;
+        }
+        try {
+            if (!walkExecutor.awaitTermination(WALK_QUIESCE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                log.warn(
+                        "walk-bg thread did not stop within {} ms of close(); state writes may race shutdown",
+                        WALK_QUIESCE_TIMEOUT_MS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void closeChannel() {
         ManagedChannel channel = channelRef.getAndSet(null);
         if (channel != null) {
@@ -1816,6 +1848,7 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
             stopPeriodicSync();
 
             walkExecutor.shutdownNow();
+            awaitWalkQuiescent();
             closeChannel();
             log.info("RemoteKnowledgeClient closed");
         }

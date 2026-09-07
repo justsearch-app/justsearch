@@ -96,6 +96,7 @@ class UnreferencedCodeTest {
           Map.entry("ScanProgressRegistry.activeBufferCount", "ScanProgressRegistryTest (tempdoc 419 T4)"),
           Map.entry("ConsentCapsuleService.liveNonceCount", "ConsentCapsuleServiceTest (test-only nonce-eviction accessor)"),
           Map.entry("ConsentCapsuleService.liveGrantCount", "ConsentCapsuleServiceTest (test-only grant-eviction accessor, tempdoc 550)"),
+          Map.entry("RemoteKnowledgeClient.isWalkExecutorTerminated", "RemoteKnowledgeClientCloseJoinsWalkTest (test-only accessor: close() joins the walk thread, tempdoc 932 item 7)"),
           Map.entry("ScanProgressRegistry.pruneNow", "ScanProgressRegistryTest (tempdoc 419 T4)"),
           // Reflection / test contract (method signature verified via getDeclaredMethod)
           // Tempdoc 516 Slice 4d (W6): IndexingLoop.handle*EmbeddingFailure removed —
