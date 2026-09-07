@@ -221,6 +221,23 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   the change). `RemoteKnowledgeClient` did **not** become a new violation, because the bootstrap's
   legacy branch still constructs it — so A6 opens no accepted red at all; A11 does.
 
+- **A7.** The item says "a bounded buffer … drop-oldest or block, your call, justified". **Block,
+  never drop**, with a timeout that fails the flow — and the justification is a property of these
+  two streams, not a preference: both carry *ordered state deltas folded into a keyed cache*
+  (`RemoteIndexingJobsBridge` keys by `pathHash`; `ScanProgressRegistry` keeps the latest per scan),
+  so a dropped delta is not a lost update but a cache that is permanently wrong and cannot detect
+  it — a dropped Delete leaves a phantom Library row until restart. The mechanism is
+  `BoundedHandoff<T>` (`app-engine`), 256 frames, 5 s block, then fail-and-close; A8 reuses it.
+  **What the item's framing understates:** without the buffer the SSE fan-out runs *on the SQLite
+  update-hook thread* (`WorkerIngestService.subscribeIndexingJobs` emits deltas from the change
+  feed's own threads), so the missing bound is not a memory question, it is "a slow browser paces
+  indexing". **A defect A6 introduced and A7 fixed:** that method *returns while the stream is still
+  open*, so A6's `onCompleted` fired right after the snapshot and told the bridge the producer had
+  closed a live stream. `onCompleted` now has no in-process producer, deliberately.
+  `RemoteIndexingJobsBridge` was retyped at A6 onto a one-method `IndexingJobsSource` rather than
+  onto the whole client, which is why its 7 tests and the `ui` substrate integration test still
+  exercise real proto frames over a real in-process gRPC server after both changes.
+
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
 Read from each module's `build.gradle.kts` `dependencies` block and `settings.gradle.kts:113-147`:
