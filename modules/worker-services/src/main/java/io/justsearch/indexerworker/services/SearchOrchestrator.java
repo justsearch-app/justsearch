@@ -129,13 +129,48 @@ public final class SearchOrchestrator {
     this.spladeIdfQueryEncoder = encoder;
   }
 
-  /** The 4-line facade body. */
+  /**
+   * The 4-line facade body, with a cancellation poll on each seam between the phases (review B3).
+   *
+   * <p>The four phases are the natural boundaries: each is a bounded piece of work that hands a
+   * value to the next, so a cancel observed between them costs nothing and abandons everything
+   * downstream. Capture runs the analyzer and the encoders, execute runs retrieval and fusion, and
+   * respond runs faceting and the match count — on a large index each of those is measured in
+   * hundreds of milliseconds, which is exactly the granularity a deadline needs to be able to
+   * interrupt. Before this, a call whose budget had already elapsed ran all four to completion and
+   * then threw its result away.
+   *
+   * @param ctx the caller's context; {@link CallContext#none()} for a caller that cannot cancel
+   */
+  public SearchResponse execute(
+      SearchRequest request,
+      boolean allowQueryEmbeddings,
+      String compatReasonCode,
+      CallContext ctx) {
+    CallContext call = ctx == null ? CallContext.none() : ctx;
+    SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode);
+    abortIfCancelled(call, "capture");
+    SearchDecision decision = planner.plan(inputs);
+    abortIfCancelled(call, "plan");
+    SearchOutcome outcome = executor.execute(decision, inputs, call);
+    abortIfCancelled(call, "execute");
+    return responseBuilder.build(outcome, decision, inputs);
+  }
+
+  /**
+   * Uncancellable overload — {@link #warmUp()} and tests. Kept separate rather than defaulted so
+   * that a live caller which forgets the context is a compile-time choice, not a silent
+   * reinstatement of the un-cancellable search.
+   */
   public SearchResponse execute(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode) {
-    SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode);
-    SearchDecision decision = planner.plan(inputs);
-    SearchOutcome outcome = executor.execute(decision, inputs);
-    return responseBuilder.build(outcome, decision, inputs);
+    return execute(request, allowQueryEmbeddings, compatReasonCode, CallContext.none());
+  }
+
+  private static void abortIfCancelled(CallContext ctx, String stage) {
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("search cancelled by caller at stage: " + stage);
+    }
   }
 
   /**

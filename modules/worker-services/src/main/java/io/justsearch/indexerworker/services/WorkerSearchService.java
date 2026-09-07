@@ -433,7 +433,8 @@ public final class WorkerSearchService {
           // dense is serviceable only when the index is COMPATIBLE AND the embedder is available.
           boolean denseServiceable = compat.allowed() && embeddingProvider.isAvailable();
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
-          return searchOrchestrator.execute(effectiveRequest, compat.allowed(), compat.reasonCode());
+          return searchOrchestrator.execute(
+              effectiveRequest, compat.allowed(), compat.reasonCode(), ctx);
         } catch (IllegalArgumentException e) {
           metrics.recordSearchFailed();
           // The CALLER still gets the full message below — it is their own query. This LOG line does
@@ -443,6 +444,26 @@ public final class WorkerSearchService {
           log.warn("Invalid search request: {}", withoutQuotedQuery(e.getMessage()));
           log.trace("Invalid search request detail", e);
           throw WorkerServiceException.invalidArgument(e.getMessage());
+        } catch (WorkerServiceException e) {
+          // Review B3. The stage-boundary polls below the orchestrator raise CANCELLED, and
+          // CANCELLED is a RuntimeException — so without this arm the generic catch would have
+          // relabelled a normal, expected cancellation as INTERNAL, logged it at ERROR, and
+          // counted it as a search failure. That is three wrong answers from one missing arm: a
+          // 500 where the caller has already gone, an error log per abandoned search, and a
+          // failure metric that rises when users navigate away.
+          //
+          // The arm is not narrowed to CANCELLED, because re-wrapping ANY of this service's own
+          // statuses as INTERNAL is the same defect the review found at the client boundary (B1):
+          // a status that was chosen deliberately, discarded on the way out. The failure metric
+          // still counts every one of them except the cancellation, which is not a failure of the
+          // search.
+          if (e.status() != WorkerServiceException.Status.CANCELLED) {
+            metrics.recordSearchFailed();
+            log.error("Search failed", e);
+          } else {
+            log.debug("Search cancelled by caller: {}", e.getMessage());
+          }
+          throw e;
         } catch (RuntimeException e) {
           metrics.recordSearchFailed();
           log.error("Search failed", e);

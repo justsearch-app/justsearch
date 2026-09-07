@@ -666,6 +666,11 @@ public class HeadlessApp {
       System.setProperty("justsearch.worker.config_snapshot", snapshot.writtenSnapshot().toString());
     }
 
+    // Lane F item A6 left this half of the ORT setup behind, and the review (B2) caught it. See
+    // applyOrtNativePack: it must run here, after the rebuild, and it is the last boot step that
+    // may precede an ORT class-init.
+    applyOrtNativePack(snapshot.config());
+
     return new ConfigPhaseResult(settingsStore, settings, snapshot.config(), configStore, dataDir);
   }
 
@@ -699,6 +704,54 @@ public class HeadlessApp {
     } catch (Exception e) {
       log.debug("Failed to write worker config snapshot (best-effort)", e);
       return new SnapshotResult(effectiveConfig, null);
+    }
+  }
+
+  /**
+   * Points ONNX Runtime at the consent-gated CUDA native pack, if one is installed and
+   * version-matched (tempdoc 772 §J item 2).
+   *
+   * <p><b>Why this is here and not in the Worker any more.</b> This is the second half of
+   * {@link #maybeMirrorOrtNativePath()}. That method resolves <em>JustSearch's</em> config key
+   * {@code justsearch.onnxruntime.native_path}; this one converts it into <em>ORT's</em>
+   * {@code onnxruntime.native.path} system property, which ORT reads once, at class-init, and never
+   * again. In the split architecture the two halves lived in two processes: the Head mirrored the
+   * config key and wrote it into the Worker's config snapshot, and the Worker's {@code main}
+   * applied the ORT property in its own JVM before building the {@code KnowledgeServer}. Lane F
+   * item A6 moved the index half into this JVM without moving the apply, so from A6 until the
+   * review caught it the property was never set in the Engine: every ONNX encoder silently ran on
+   * CPU on a machine with a complete CUDA pack installed. Nothing failed — ORT falls back — which
+   * is why only a wiring test can see it.
+   *
+   * <p><b>Why after the rebuild.</b> {@link #maybeMirrorOrtNativePath()} writes a system property at
+   * config ordinal 500, and the {@code ResolvedConfig} built above it was built before that write.
+   * Reading {@code paths().ortNativePath()} off the pre-rebuild config would reproduce the tempdoc
+   * 883 §C.5c defect one field over — a boot-time pack detection that the reader never sees. The
+   * argument is deliberately {@code snapshot.config()}, the config
+   * {@link #snapshotAfterPostBuildWrites} rebuilt, so the ordering is in the signature rather than
+   * in a comment.
+   *
+   * <p><b>Why this is the last safe point.</b> Everything before it in {@code resolveConfig} is
+   * settings, config assembly and {@code GpuAutoDetection.probe}, none of which loads ORT; every
+   * ORT session in the Engine — the index half's encoders under {@code EngineRoot}, the
+   * application half's reranker and capability probes — is created later, in a phase that runs
+   * after this one. Moving the call later than the config phase would put it after the point where
+   * an ORT class-init becomes possible.
+   *
+   * @param effectiveConfig the config as rebuilt by {@link #snapshotAfterPostBuildWrites}
+   * @return the decision that was acted on (for tests and for the boot log)
+   */
+  static io.justsearch.ort.OrtCudaHelper.OrtNativePackDecision applyOrtNativePack(
+      ResolvedConfig effectiveConfig) {
+    try {
+      return io.justsearch.ort.OrtCudaHelper.applyOrtNativePackProperty(
+          effectiveConfig == null ? null : effectiveConfig.paths().ortNativePath());
+    } catch (Throwable t) {
+      // Same posture as the mirror half: a GPU acceleration that cannot be configured must not
+      // stop the Engine from booting onto the CPU path.
+      log.warn("ORT native pack apply failed (best-effort, non-fatal)", t);
+      return new io.justsearch.ort.OrtCudaHelper.OrtNativePackDecision(
+          io.justsearch.ort.OrtCudaHelper.OrtNativePackStatus.DIR_ABSENT, String.valueOf(t));
     }
   }
 

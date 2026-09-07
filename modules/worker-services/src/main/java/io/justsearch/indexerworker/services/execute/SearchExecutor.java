@@ -11,7 +11,9 @@ import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.adapters.lucene.runtime.TextQueryOps;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.SearchOutcome;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexerworker.services.SearchReasonCode;
 import io.justsearch.indexerworker.services.input.SearchInputs;
 import io.justsearch.indexerworker.services.plan.ChunkMergeDirective;
@@ -93,15 +95,54 @@ public final class SearchExecutor {
    * are read off the decision by the response builder — this method only records
    * runtime-derived state.
    */
-  public SearchOutcome execute(SearchDecision decision, SearchInputs inputs) {
+  /**
+   * Runs the decided search. The {@code ctx} overload is the live one; see
+   * {@link #execute(SearchDecision, SearchInputs)} for why the other exists.
+   */
+  public SearchOutcome execute(SearchDecision decision, SearchInputs inputs, CallContext ctx) {
     Objects.requireNonNull(decision, "decision");
     Objects.requireNonNull(inputs, "inputs");
+    CallContext call = ctx == null ? CallContext.none() : ctx;
+    abortIfCancelled(call, "dispatch");
     return switch (decision) {
       case SearchDecision.EmptyQueryDecision e -> handleEmpty();
       case SearchDecision.BlockedDecision b -> handleBlocked();
-      case SearchDecision.SparseShortcut s -> runSparseShortcut(s, inputs);
-      case SearchDecision.MultiLegDecision m -> runMultiLeg(m, inputs);
+      case SearchDecision.SparseShortcut s -> runSparseShortcut(s, inputs, call);
+      case SearchDecision.MultiLegDecision m -> runMultiLeg(m, inputs, call);
     };
+  }
+
+  /**
+   * Uncancellable overload, for the two callers that genuinely have no caller to abandon them: the
+   * boot-time warm-up pass and the tests. It is not a convenience — routing a real search through
+   * it would silently reinstate the pre-review behaviour, so the live path does not use it.
+   */
+  public SearchOutcome execute(SearchDecision decision, SearchInputs inputs) {
+    return execute(decision, inputs, CallContext.none());
+  }
+
+  /**
+   * Stops the search if the caller has gone (review B3).
+   *
+   * <p>On the wire a deadline or a client disconnect ended the server's work: gRPC cancelled the
+   * server call and the handler's next write failed. In process nothing has that authority — the
+   * client's budget releases the CALLER at the deadline, but the search itself runs on until it
+   * finishes, holding a call thread, an index searcher and (on a multi-leg query) a virtual-thread
+   * fan-out. Under load that is the difference between a slow search and a search that is still
+   * being paid for long after nobody wants it, which is precisely how a bounded thread pool starts
+   * rejecting calls that would have succeeded.
+   *
+   * <p>So the poll goes where the work is divisible: between the pipeline's four phases, and inside
+   * this class between retrieval and the fusion/merge phase that follows it. Not finer — a poll
+   * inside a Lucene collector would be a different mechanism (an interruptible collector), and not
+   * coarser, because the phases either side of retrieval are where the seconds are.
+   *
+   * @throws WorkerServiceException {@code CANCELLED} if the caller has abandoned the call
+   */
+  private static void abortIfCancelled(CallContext ctx, String stage) {
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("search cancelled by caller at stage: " + stage);
+    }
   }
 
   private SearchOutcome handleEmpty() {
@@ -125,7 +166,8 @@ public final class SearchExecutor {
    * the legs below run on executor pools and each sets this value as its explicit parent — which is
    * the same reason the interceptor version read it once.
    */
-  private SearchOutcome runSparseShortcut(SearchDecision.SparseShortcut decision, SearchInputs inputs) {
+  private SearchOutcome runSparseShortcut(
+      SearchDecision.SparseShortcut decision, SearchInputs inputs, CallContext ctx) {
     Context parentCtx = Context.current();
     var request = inputs.request();
     String queryString = request.getQuery();
@@ -249,6 +291,11 @@ public final class SearchExecutor {
     // Tempdoc 549 Slice 3c (U2): single BM25 text leg (no fusion); survives into/through chunk merge.
     result = HitProvenanceProjector.attachSingleLeg(result, HitProvenanceProjector.LegKind.BM25);
 
+    // Review B3: retrieval is done, and the chunk merge below is a second retrieval round of its
+    // own (its own bm25/knn/splade legs, its own fusion). If the caller left during the first, it
+    // must not pay for the second.
+    abortIfCancelled(ctx, "retrieval");
+
     var chunkOutcome = maybeApplyChunkMerge(decision.chunkMerge(), result, inputs, chunkQueryText);
     // Facet computation is deferred to SearchResponseBuilder (which owns FacetingEngine).
     // The decision carries the FacetCompute discriminator + arguments; the builder reads
@@ -274,7 +321,8 @@ public final class SearchExecutor {
         chunkOutcome.branchFusionNs());
   }
 
-  private SearchOutcome runMultiLeg(SearchDecision.MultiLegDecision decision, SearchInputs inputs) {
+  private SearchOutcome runMultiLeg(
+      SearchDecision.MultiLegDecision decision, SearchInputs inputs, CallContext ctx) {
     Context parentCtx = Context.current();
     var request = inputs.request();
     String queryString = request.getQuery();
@@ -391,6 +439,11 @@ public final class SearchExecutor {
     } finally {
       retrievalSpan.end();
     }
+
+    // Review B3: same seam as the sparse shortcut, and the one that matters most — a multi-leg
+    // retrieval has just fanned out across virtual threads, and the chunk branch below fans out
+    // again. This is the point where an abandoned search stops costing anything.
+    abortIfCancelled(ctx, "retrieval");
 
     // Facet computation deferred to SearchResponseBuilder (which owns FacetingEngine).
     var chunkOutcome =
