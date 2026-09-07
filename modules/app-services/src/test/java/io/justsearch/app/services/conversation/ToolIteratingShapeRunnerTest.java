@@ -3,6 +3,7 @@ package io.justsearch.app.services.conversation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.AgentRequest;
 import java.util.List;
@@ -126,5 +127,79 @@ final class ToolIteratingShapeRunnerTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("top_p", 1.5))));
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects an unknown key inside sampling")
+  void parseRequestRejectsUnknownSamplingKey() {
+    // The backend would silently ignore `topP`, leaving the run at the agent preset while the
+    // caller believes it pinned it — a capture that reports a pin it never applied.
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ToolIteratingShapeRunner.parseRequest(
+                    bodyWithSampling(Map.of("topP", 0.5))));
+    assertTrue(e.getMessage().contains("topP"), "the message must name the offending key");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("temp", 0.0))));
+  }
+
+  @Test
+  @DisplayName("parseRequest does not COERCE a numeric string — the contract is validated")
+  void parseRequestRejectsNumericStrings() {
+    for (Object bad :
+        List.of(Map.of("temperature", "0.0"), Map.of("top_p", "0.5"), Map.of("seed", "7"))) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(bad)),
+          () -> "a typed-wrong request must be refused, not coerced: " + bad);
+    }
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects NaN and infinite temperature / top_p")
+  void parseRequestRejectsNonFiniteSampling() {
+    // NaN compares FALSE against every bound, so a naive range check waves it through and it
+    // reaches llama-server as a nonsense sampler setting.
+    for (Double bad : List.of(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ToolIteratingShapeRunner.parseRequest(
+                  bodyWithSampling(Map.of("temperature", bad))),
+          () -> "temperature " + bad + " must be refused");
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("top_p", bad))),
+          () -> "top_p " + bad + " must be refused");
+    }
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects a non-integral or out-of-range seed rather than truncating it")
+  void parseRequestRejectsUnrepresentableSeed() {
+    // Truncating 1.5 to 1, or wrapping 1e30, pins the run to a seed the caller never asked for —
+    // the one failure mode a seed exists to prevent.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 1.5))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 1e30))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", Double.NaN))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", true))));
+    // An integral double IS representable and must still be accepted — a JSON parser is free to
+    // hand back 7 as 7.0, and refusing that would reject a well-formed request.
+    assertEquals(
+        7L,
+        ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 7.0)))
+            .sampling()
+            .seed());
   }
 }

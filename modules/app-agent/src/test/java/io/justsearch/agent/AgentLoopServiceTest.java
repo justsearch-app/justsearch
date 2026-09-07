@@ -2668,6 +2668,78 @@ class AgentLoopServiceTest {
     assertEquals("resumed", done.finalResponse());
   }
 
+  /**
+   * PR 0b — a RESUMED run must keep its sampling pin.
+   *
+   * <p>A resume rebuilds its {@code AgentRequest} from the persisted snapshot, so a field the
+   * snapshot does not carry is silently dropped — the omission shape 859 hit with {@code effort},
+   * where resuming a Thorough run quietly re-sized it to Standard because an absent rung IS
+   * Standard. An absent pin is likewise indistinguishable from "no pin": the resumed turn would
+   * sample at the agent preset's 0.7 with no seed while the capture reports a pinned run. This
+   * walks the whole path — {@code AgentRunStore.startRun} writes it, {@code
+   * AgentRunQueryService.resumedRequest} rebuilds it, and the LLM call is asserted on.
+   */
+  @Test
+  @DisplayName("PR 0b: a resumed run keeps the sampling pin from its snapshot")
+  void samplingOverride_survivesAResume() {
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("resumed")));
+    var searchTool = new StubTool("search", RiskTier.LOW, "r");
+    var runStore = new AgentRunStore(tempDir.resolve("agent-runs"));
+    var request =
+        requestWithSampling(
+            userMessage("resume"), 3, List.of(), null,
+            new AgentRequest.SamplingOverride(0.0, null, 31337L));
+    runStore.startRun("session_pinned", request, request.messages(), 1000);
+    runStore.updateCheckpoint(
+        "session_pinned", "READY_FOR_LLM", request.messages(), 0, 0, 0, "");
+
+    // The pin is on disk, under the wire key names, beside `effort`.
+    Map<String, Object> snapshot = runStore.readSnapshot("session_pinned");
+    assertInstanceOf(Map.class, snapshot.get("sampling"), "the run meta must persist the pin");
+
+    var service =
+        new AgentLoopService(
+            ai,
+            stubCatalog(searchTool),
+            stubExecutor(searchTool),
+            stubEmitter(),
+            null,
+            null,
+            runStore,
+            null);
+    var events = new CopyOnWriteArrayList<AgentEvent>();
+    service.resumeLastSession(events::add);
+
+    var done = lastEventOfType(events, AgentEvent.AgentDone.class);
+    assertNotNull(done, "the resume must actually run, or the assertion below proves nothing");
+    assertEquals(1, ai.recordedSampling.size());
+    assertEquals(31337L, ai.recordedSampling.get(0).seed(), "the resumed run must keep the seed");
+    assertEquals(
+        0.0, ai.recordedSampling.get(0).temperature(), 1e-9,
+        "and the pinned temperature");
+  }
+
+  @Test
+  @DisplayName("PR 0b: a run with no pin resumes with no pin (unchanged behaviour)")
+  void samplingOverride_absentSurvivesAResumeAsAbsent() {
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("resumed")));
+    var searchTool = new StubTool("search", RiskTier.LOW, "r");
+    var runStore = new AgentRunStore(tempDir.resolve("agent-runs"));
+    var request = new AgentRequest(userMessage("resume"), List.of(), 3);
+    runStore.startRun("session_unpinned", request, request.messages(), 1000);
+    runStore.updateCheckpoint(
+        "session_unpinned", "READY_FOR_LLM", request.messages(), 0, 0, 0, "");
+
+    var service =
+        new AgentLoopService(
+            ai, stubCatalog(searchTool), stubExecutor(searchTool), stubEmitter(),
+            null, null, runStore, null);
+    service.resumeLastSession(new CopyOnWriteArrayList<AgentEvent>()::add);
+
+    assertEquals(List.of(SamplingParams.AGENT), ai.recordedSampling,
+        "an unpinned run must resume byte-identical to the AGENT constant");
+  }
+
   // ---------------------------------------------------------------------------
   // resumeSession (by id) — tempdoc 415 follow-up (C20)
   // Mirrors resumeLastSession but addressed by sessionId. Inherits the same

@@ -266,9 +266,11 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
    * Thorough run resumed through the short constructor silently became Standard — 15x to 5x — and
    * nothing said so, because an absent rung IS Standard by design.
    *
-   * <p>The other four fields stay at the short constructor's values (no conversationId, no autonomy
-   * level, unscoped docIds): that is today's resume behaviour, unchanged and out of this slice's
-   * scope. Only the rung moves.
+   * <p>The other three fields stay at the short constructor's values (no conversationId, no
+   * autonomy level, unscoped docIds): that is today's resume behaviour, unchanged and out of this
+   * slice's scope. The rung moves, and so does the sampling pin (lane F PR 0b) — for the same
+   * reason and against the same omission: a resumed capture turn that silently reverted to the
+   * agent preset would report a pinned run while sampling freely.
    */
   private static AgentRequest resumedRequest(
       Map<String, Object> snapshot,
@@ -281,7 +283,40 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
     String effort = snapshot.get("effort") instanceof String s && !s.isBlank() ? s : null;
     return new AgentRequest(
         messages, selectedTools, maxIterations, agentProfiles, agentId, null, null, null,
-        List.of(), effort);
+        List.of(), effort, false, resumedSampling(snapshot));
+  }
+
+  /**
+   * Rebuilds the run's sampling pin from its snapshot (lane F PR 0b). Absent on a pre-PR-0b record,
+   * which reads as "no override" — the documented default.
+   *
+   * <p>Reads defensively: the snapshot is JSON that has round-tripped through a store, so a number
+   * may come back as any {@link Number} subtype, and a value the writer never wrote must not become
+   * a pin the caller did not ask for. Anything unreadable is dropped rather than guessed — the
+   * run then samples exactly as an unpinned run does, which is the honest fallback.
+   */
+  private static AgentRequest.SamplingOverride resumedSampling(Map<String, Object> snapshot) {
+    if (!(snapshot.get("sampling") instanceof Map<?, ?> map)) {
+      return null;
+    }
+    Double temperature = snapshotDouble(map.get("temperature"));
+    Double topP = snapshotDouble(map.get("top_p"));
+    Long seed =
+        map.get("seed") instanceof Number n && !(map.get("seed") instanceof Boolean)
+            ? n.longValue()
+            : null;
+    if (temperature == null && topP == null && seed == null) {
+      return null;
+    }
+    return new AgentRequest.SamplingOverride(temperature, topP, seed);
+  }
+
+  private static Double snapshotDouble(Object value) {
+    if (!(value instanceof Number n) || value instanceof Boolean) {
+      return null;
+    }
+    double d = n.doubleValue();
+    return Double.isFinite(d) ? d : null;
   }
 
   /**
