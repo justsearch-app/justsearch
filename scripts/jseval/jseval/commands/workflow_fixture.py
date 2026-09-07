@@ -112,11 +112,14 @@ def cmd_workflow_fixture_capture(ctx, base_url, fixture, out_path, session_token
               default=lambda: str(DEFAULT_FIXTURE),
               show_default="scripts/jseval/lane-f-workflow-fixture.v1.json",
               help="Fixture definition carrying the declared field classes.")
-@click.option("--baseline-noise", type=click.Path(exists=True, resolve_path=True), default=None,
-              help="Second SAME-BUILD capture of the baseline side. Fields its own side already "
-                   "moves are excluded from the verdict as noise.")
-@click.option("--candidate-noise", type=click.Path(exists=True, resolve_path=True), default=None,
-              help="Second SAME-BUILD capture of the candidate side (see --baseline-noise).")
+@click.option("--baseline-noise", type=click.Path(exists=True, resolve_path=True), multiple=True,
+              help="Another SAME-BUILD capture of the baseline side; repeatable. A field is "
+                   "noisy when ANY TWO of a side captures disagree, and it is then excluded "
+                   "from the verdict. Two captures under-sample; three is the default.")
+@click.option("--candidate-noise", type=click.Path(exists=True, resolve_path=True),
+              multiple=True,
+              help="Another SAME-BUILD capture of the candidate side; repeatable "
+                   "(see --baseline-noise).")
 @click.option("--report-out", type=click.Path(resolve_path=True), default=None,
               help="Write the full diff result JSON to this path.")
 @click.option("--json", "json_out", is_flag=True,
@@ -132,13 +135,15 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
     compare (an empty section on both sides, a non-200 request, a zero-hit query, or a
     declaration the capture never emits) — two identical failures are byte-equal, so
     without it a broken backend would read as "no semantic regression".
-    With --baseline-noise / --candidate-noise (each the SECOND fresh-corpus capture of that
-    same side, same build) the differ measures determinism instead of assuming it: a field a
-    side own noise pair already moves is reported noisy-<side>, counted separately, and
-    excluded from the verdict, because a difference the same build produces against itself
-    cannot evidence a difference between two builds. A noise pair louder than the fixture
-    maxNoisyFraction fails the run outright, so "almost nothing was compared" can never read
-    as "nothing regressed".
+    With --baseline-noise / --candidate-noise (repeatable; each another fresh-corpus capture of
+    that same side on the same build) the differ measures determinism instead of assuming it: a
+    field ANY TWO of a side captures disagree on is reported noisy-<side>, counted separately,
+    and excluded from the verdict, because a difference the same build produces against itself
+    cannot evidence a difference between two builds. Two captures under-sample -- a field can be
+    stable across one pair and unstable on the next draw -- so the default is three per side, and
+    a side that brings only one capture is refused rather than judged stable by default. Noise
+    louder than the fixture maxNoisyFraction fails the run outright, so "almost nothing was
+    compared" can never read as "nothing regressed".
 
     Exit 0 = pass, 1 = regression / missing field / unhealthy capture, 2 = usage error.
     """
@@ -146,8 +151,12 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
 
     try:
         definition = wf.load_fixture(fixture)
-        result = wf.diff(baseline, candidate, definition,
-                         baseline_noise=baseline_noise, candidate_noise=candidate_noise)
+        # `multiple=True` always yields a tuple; an EMPTY one means the flag was not passed at
+        # all, which must stay "no noise gating" rather than "a side with zero captures".
+        result = wf.diff(
+            baseline, candidate, definition,
+            baseline_noise=list(baseline_noise) or None,
+            candidate_noise=list(candidate_noise) or None)
     except (wf.WorkflowFixtureError, OSError, ValueError) as exc:
         click.echo(f"workflow-fixture diff: {exc}", err=True)
         sys.exit(2)
@@ -169,6 +178,12 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
             f"noisy={counts.get('noisy', 0)} "
             f"REGRESSION={counts['REGRESSION']} missing={counts['missing']}"
         )
+        per_side = result.get("captures_per_side") or {}
+        if per_side:
+            click.echo(
+                f"  captures per side: baseline={per_side.get('baseline')} "
+                f"candidate={per_side.get('candidate')}"
+            )
         by_side = result.get("noisy_by_side") or {}
         if any(by_side.values()):
             both = by_side.get("both", 0)

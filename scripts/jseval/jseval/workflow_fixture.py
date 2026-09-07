@@ -2298,8 +2298,7 @@ DEFAULT_MAX_NOISY_FRACTION = 0.10
 
 
 def _noise_side_status(
-    primary: dict,
-    noise: dict,
+    captures: list[dict],
     section: str,
     record_id: str,
     name: str,
@@ -2307,42 +2306,50 @@ def _noise_side_status(
     epsilon: float,
     limit: int | None,
 ) -> bool:
-    """True when this field DIFFERS between a side's primary and its same-build noise capture.
+    """True when ANY TWO of a side's same-build captures disagree on this field.
 
-    "Differs" is judged under the fixture's own declared relation, not by byte equality: a tie
+    Every pair is compared, not just each later capture against the primary. Two captures
+    UNDER-SAMPLE: the third gate run had q05 and q12 change their tie-group partition across
+    sides while being stable within BOTH sides' two-capture pairs, on one build -- the pair had
+    simply not drawn the unstable value yet. Comparing all pairs of N means a field counts as
+    stable only when every capture of that side agreed with every other.
+
+    "Disagree" is judged under the fixture's own declared relation, not by byte equality: a tie
     permutation the `equal-score-order` class already allows is not noise, it is the relation
     working. Only a verdict the relation would call a REGRESSION counts.
 
-    A field the noise capture does not carry is NOT called noisy. That is the conservative
-    direction: absent evidence of instability leaves the field in the verdict, so a truncated or
-    empty noise capture can only make the gate stricter, never laxer. (The pin/profile health
-    checks below are what catch a noise capture that is broken rather than merely short.)
+    A field a capture does not carry is skipped rather than called noisy. That is the
+    conservative direction: absent evidence of instability leaves the field in the verdict, so a
+    truncated capture can only make the gate stricter, never laxer.
     """
-    p_recs = _records(primary, section)
-    n_recs = _records(noise, section)
-    p_rec = p_recs.get(record_id)
-    n_rec = n_recs.get(record_id)
-    if not isinstance(p_rec, dict) or not isinstance(n_rec, dict):
-        return False
-    if name not in p_rec or name not in n_rec:
-        return False
-    cutoff = None
-    if section == "queries" and limit is not None:
-        cutoff = CutoffContext(
-            int(limit),
-            _observed_hits_captured(primary, record_id),
-            _observed_hits_captured(noise, record_id),
-        )
-    status, _ = compare_field(klass, p_rec[name], n_rec[name], epsilon, cutoff)
-    return status == STATUS_REGRESSION
+    present = []
+    for capture in captures:
+        rec = _records(capture, section).get(record_id)
+        if isinstance(rec, dict) and name in rec:
+            present.append((capture, rec[name]))
+    for a in range(len(present)):
+        for b in range(a + 1, len(present)):
+            cap_a, val_a = present[a]
+            cap_b, val_b = present[b]
+            cutoff = None
+            if section == "queries" and limit is not None:
+                cutoff = CutoffContext(
+                    int(limit),
+                    _observed_hits_captured(cap_a, record_id),
+                    _observed_hits_captured(cap_b, record_id),
+                )
+            status, _ = compare_field(klass, val_a, val_b, epsilon, cutoff)
+            if status == STATUS_REGRESSION:
+                return True
+    return False
 
 
 def _noise_problems(
     entries: list[dict],
     baseline: dict,
     candidate: dict,
-    baseline_noise: dict | None,
-    candidate_noise: dict | None,
+    baseline_noise: list,
+    candidate_noise: list,
     max_noisy_fraction: float,
 ) -> list[str]:
     """Refuse a gate whose noise pair is too loud, or whose noise capture is not comparable.
@@ -2363,7 +2370,16 @@ def _noise_problems(
     compared = [e for e in entries if e.get("class") is not None]
     total = len(compared) or 1
     for side, noise in (("baseline", baseline_noise), ("candidate", candidate_noise)):
-        if noise is None:
+        # Gating is engaged for the run as a whole, so a side that brought no second capture
+        # cannot be gated: nothing of it was measured for stability, and every one of its fields
+        # would count as stable by default. That is the direction that silently passes.
+        if not noise:
+            problems.append(
+                f"no noise captures on {side}: the gate was asked to exclude noise but this "
+                "side has only one capture, so nothing of it was measured for stability and "
+                "every one of its fields would count as stable by default. Capture this side "
+                "at least twice on the same build (fixture-pair.sh <outdir> <profile> <port> 3)."
+            )
             continue
         # A field noisy on BOTH sides is noisy on EACH side, so `noisy-both` counts towards both
         # fractions. Counting only a side exclusive noise (the first version of this) understated
@@ -2388,18 +2404,18 @@ def _noise_problems(
     for side, primary, noise in (
         ("baseline", baseline, baseline_noise), ("candidate", candidate, candidate_noise)
     ):
-        if noise is None:
-            continue
-        p_prov, n_prov = _provenance(primary), _provenance(noise)
-        for field in ("pins", "samplingApplied", "chatProfile"):
-            if p_prov.get(field) != n_prov.get(field):
-                problems.append(
-                    f"{side}: the noise capture's provenance.{field} differs from its own "
-                    f"primary capture's ({p_prov.get(field)!r} vs {n_prov.get(field)!r}). A "
-                    "noise pair has to be the SAME build under the SAME conditions — otherwise "
-                    "the 'noise' it measures is the condition change, and every field it "
-                    "excuses is excused for the wrong reason."
-                )
+        p_prov = _provenance(primary)
+        for index, capture in enumerate(noise, start=2):
+            n_prov = _provenance(capture)
+            for field in ("pins", "samplingApplied", "chatProfile"):
+                if p_prov.get(field) != n_prov.get(field):
+                    problems.append(
+                        f"{side} capture {index}: provenance.{field} differs from its own "
+                        f"primary capture's ({p_prov.get(field)!r} vs {n_prov.get(field)!r}). "
+                        "Every capture of a side has to be the SAME build under the SAME "
+                        "conditions — otherwise the 'noise' it measures is the condition "
+                        "change, and every field it excuses is excused for the wrong reason."
+                    )
     return problems
 
 
@@ -2524,12 +2540,26 @@ def _load_capture(value):
     return json.loads(Path(value).read_text(encoding="utf-8"))
 
 
+def _load_captures(value) -> list:
+    """Normalise a side's extra captures to a list.
+
+    Accepts a single capture (path or dict) or a sequence of them, so the earlier two-capture
+    call shape keeps working while N captures are the default. ``None`` is an empty list: the
+    side brought nothing, which `_noise_problems` refuses when gating is engaged.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (str, Path, dict)):
+        return [_load_capture(value)]
+    return [_load_capture(v) for v in value]
+
+
 def diff(
     baseline: str | Path | dict,
     candidate: str | Path | dict,
     fixture: dict,
-    baseline_noise: str | Path | dict | None = None,
-    candidate_noise: str | Path | dict | None = None,
+    baseline_noise=None,
+    candidate_noise=None,
 ) -> dict:
     """Diff two captures under the fixture-declared equality relation.
 
@@ -2537,10 +2567,12 @@ def diff(
     Returns a structured result; ``pass`` is True only when nothing is ``REGRESSION`` or
     ``missing``.
 
-    GATING WITH A NOISE PAIR (design 16 relation refinement). Pass ``baseline_noise`` and/or
-    ``candidate_noise`` -- each the SECOND fresh-corpus capture of that same side, same build --
-    and the differ first asks, per field, whether that field is stable WITHIN a side before
-    asking whether it differs BETWEEN sides. A field that a side own noise pair already moves is
+    GATING WITH N SAME-BUILD CAPTURES PER SIDE (design 16 relation refinement). Pass
+    ``baseline_noise`` / ``candidate_noise`` -- each the OTHER fresh-corpus captures of that same
+    side on the same build, as a list (a single capture is still accepted) -- and the differ
+    first asks, per field, whether that field is stable WITHIN a side before asking whether it
+    differs BETWEEN sides. A field is noisy on a side when ANY TWO of that side's captures
+    disagree; two captures under-sample, which is why the default is three. A field that a side own noise pair already moves is
     reported ``noisy-baseline`` / ``noisy-candidate`` / ``noisy-both``, counted under
     ``counts.noisy``, and excluded from the regression verdict: a difference it shows across
     sides cannot be attributed to the build, because the same build produces that difference
@@ -2560,8 +2592,11 @@ def diff(
     max_noisy_fraction = float(fixture.get("maxNoisyFraction", DEFAULT_MAX_NOISY_FRACTION))
     base = _load_capture(baseline)
     cand = _load_capture(candidate)
-    base_noise = _load_capture(baseline_noise)
-    cand_noise = _load_capture(candidate_noise)
+    base_noise = _load_captures(baseline_noise)
+    cand_noise = _load_captures(candidate_noise)
+    # Gating is on for the run when EITHER side brought extra captures. A side that brought none
+    # is then a health problem rather than a silent pass -- see `_noise_problems`.
+    noise_gating = baseline_noise is not None or candidate_noise is not None
 
     # K per query, so the differ can find the tie group straddling the rank-K cutoff. Threaded
     # exactly as `epsilon` is — `diff` already holds both the fixture and the record id.
@@ -2615,9 +2650,9 @@ def diff(
                             ("baseline", base, base_noise),
                             ("candidate", cand, cand_noise),
                         )
-                        if noise is not None
+                        if noise
                         and _noise_side_status(
-                            primary, noise, section, record_id, name, klass, epsilon, limit)
+                            [primary] + noise, section, record_id, name, klass, epsilon, limit)
                     ]
                     if noisy_sides:
                         # The cross-side verdict is kept for the reader -- it is what the gate
@@ -2667,7 +2702,7 @@ def diff(
 
     declared_not_captured = sorted(set(declarations) - captured_paths)
     health = capture_health(base, cand, declared_not_captured)
-    if base_noise is not None or cand_noise is not None:
+    if noise_gating:
         noise_problems = _noise_problems(
             entries, base, cand, base_noise, cand_noise, max_noisy_fraction)
         if noise_problems:
@@ -2686,6 +2721,12 @@ def diff(
         ),
         "counts": counts,
         "noisy_by_side": noisy_by_side,
+        # How many same-build captures each side actually brought (primary included). Two
+        # under-sample: printing it stops a reader inferring a stability claim the run never made.
+        "captures_per_side": {
+            "baseline": 1 + len(base_noise),
+            "candidate": 1 + len(cand_noise),
+        },
         "maxNoisyFraction": max_noisy_fraction,
         "allowed_by_class": by_class,
         "health": health,

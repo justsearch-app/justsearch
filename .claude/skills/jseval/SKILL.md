@@ -555,20 +555,31 @@ pair below.
 ## Gating with a noise pair
 
 **Determinism is measured, not assumed.** Five paired rounds established that some fields are
-simply not stable on this stack. The gate therefore captures each side **twice on one build**, on
-two fresh ingests of the same corpus, and the same-build pair *defines what "within noise" means
-for each field*:
+simply not stable on this stack. The gate therefore captures each side **N times on one build**
+(default three), each on a fresh ingest of the same corpus, and those captures *define what
+"within noise" means for each field*:
 
 ```bash
-bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/split  compact 33221 2   # capture-1 + capture-2
-bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/single compact 33221 2
+bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/split  compact 33221 3   # capture-1..3
+bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/single compact 33221 3
 bash scripts/jseval/lane-f/fixture-gate.sh tmp/gate/split tmp/gate/single report.json
 ```
 
-`diff` gains `--baseline-noise` / `--candidate-noise`. Per compared field it first asks whether the
-field is stable *within* a side, then whether it differs *between* sides. A field a side's own
-noise pair already moves is reported `noisy-baseline` / `noisy-candidate` / `noisy-both`, counted
-under `counts.noisy`, and **excluded from the regression verdict** — a difference the same build
+`fixture-gate.sh` uses **every** `capture-*.json` in each directory (`capture-1` is the primary),
+so adding a cycle deepens the gate with no other change.
+
+**Why three and not two.** Gate run 3 had `q05` and `q12` differ across sides while being *stable
+within both sides' two-capture pairs*, on one build. Two draws under-sample: a field can agree once
+and disagree on the next, so the pair reported a stability it had not established. A field is
+therefore noisy when **any two** of a side's captures disagree — every pair is compared, so a field
+counts as stable only when every capture agreed with every other. A side that brings only one
+capture is **refused** (`no noise captures on <side>`) rather than judged stable by default, which
+is the direction that silently passes.
+
+`diff` gains repeatable `--baseline-noise` / `--candidate-noise`. Per compared field it first asks
+whether the field is stable *within* a side, then whether it differs *between* sides. A field any
+two of a side's captures disagree on is reported `noisy-baseline` / `noisy-candidate` /
+`noisy-both`, counted under `counts.noisy`, and **excluded from the regression verdict** — a difference the same build
 produces against itself cannot evidence a difference between two builds. The verdict the gate
 *would* have returned is kept on the entry as `crossSideStatus`, so nothing is hidden. Without the
 two flags, `diff` behaves exactly as before.

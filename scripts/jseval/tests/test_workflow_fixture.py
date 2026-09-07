@@ -1117,7 +1117,7 @@ def test_a_field_its_own_side_moves_is_not_a_regression():
     verdict; field `b`, stable everywhere, keeps the run honest by staying `equal`.
     """
     result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
-                     baseline_noise=_q("z", "same"))
+                     baseline_noise=[_q("z", "same")], candidate_noise=[_q("y", "same")])
     assert _status(result, "queries.a") == "noisy-baseline"
     assert _status(result, "queries.b") == "equal"
     assert result["counts"]["noisy"] == 1
@@ -1157,7 +1157,7 @@ def test_a_noise_pair_louder_than_the_ceiling_fails_the_run():
     """
     fixture = _noise_fixture(max_noisy_fraction=0.10)
     result = wf.diff(_q("x", "y"), _q("x", "y"), fixture,
-                     baseline_noise=_q("p", "q"))
+                     baseline_noise=[_q("p", "q")], candidate_noise=[_q("x", "y")])
     assert result["counts"]["noisy"] == 2
     assert result["pass"] is False
     hit = _has(result["health"]["problems"], "same-build noise pair moved")
@@ -1169,7 +1169,8 @@ def test_a_noise_pair_louder_than_the_ceiling_fails_the_run():
 def test_the_ceiling_is_read_from_the_fixture():
     """Raising the declared ceiling admits the same run — the number is the fixture, not code."""
     fixture = _noise_fixture(max_noisy_fraction=1.0)
-    result = wf.diff(_q("x", "y"), _q("x", "y"), fixture, baseline_noise=_q("p", "q"))
+    result = wf.diff(_q("x", "y"), _q("x", "y"), fixture,
+                     baseline_noise=[_q("p", "q")], candidate_noise=[_q("x", "y")])
     assert result["counts"]["noisy"] == 2
     assert result["pass"] is True, result["health"]["problems"]
     assert result["maxNoisyFraction"] == 1.0
@@ -1185,7 +1186,8 @@ def test_a_noise_capture_under_different_pins_fails_health():
     other_pins = dict(_HEALTHY_PINS, **{"justsearch.llm.slots": "2"})
     noise = _capture({"q1": {"httpStatus": 200, "hitCount": 1, "a": "x", "b": "same"}},
                      provenance={"pins": other_pins})
-    result = wf.diff(primary, _q("x", "same"), _noise_fixture(), baseline_noise=noise)
+    result = wf.diff(primary, _q("x", "same"), _noise_fixture(),
+                     baseline_noise=[noise], candidate_noise=[_q("x", "same")])
     assert result["pass"] is False
     hit = _has(result["health"]["problems"], "provenance.pins differs from its own")
     assert hit, result["health"]["problems"]
@@ -1196,7 +1198,8 @@ def test_a_noise_capture_on_a_different_chat_profile_fails_health():
     primary = _q("x", "same")
     noise = _capture({"q1": {"httpStatus": 200, "hitCount": 1, "a": "x", "b": "same"}},
                      provenance={"chatProfile": "standard"})
-    result = wf.diff(primary, _q("x", "same"), _noise_fixture(), baseline_noise=noise)
+    result = wf.diff(primary, _q("x", "same"), _noise_fixture(),
+                     baseline_noise=[noise], candidate_noise=[_q("x", "same")])
     assert result["pass"] is False
     assert _has(result["health"]["problems"], "provenance.chatProfile differs from its own")
 
@@ -1216,7 +1219,8 @@ def test_a_noise_capture_missing_the_field_does_not_excuse_it():
     field stays in the verdict rather than being withdrawn on no evidence.
     """
     noise = _capture({"q1": {"httpStatus": 200, "hitCount": 1, "b": "same"}})
-    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(), baseline_noise=noise)
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=[noise], candidate_noise=[_q("y", "same")])
     assert _status(result, "queries.a") == "REGRESSION"
     assert result["counts"]["noisy"] == 0
 
@@ -1305,6 +1309,65 @@ def test_a_field_noisy_on_both_sides_counts_towards_each_side_fraction():
     assert hit, "baseline is 2 of 4 compared fields (50%) once `both` counts — the ceiling fires"
     # The candidate carries only the shared field, so it stays inside the same ceiling.
     assert not _has(result["health"]["problems"], "candidate: the same-build noise pair moved")
+
+
+def test_three_captures_where_only_the_later_two_disagree_marks_the_field_noisy():
+    """Two captures UNDER-SAMPLE, which is why the default is three.
+
+    Gate run 3 had q05 and q12 change their tie-group partition across sides while being stable
+    within BOTH sides' two-capture pairs, on one build: the pair had not drawn the unstable
+    value yet. So a field is noisy when ANY TWO of a side's captures disagree — here captures 2
+    and 3 differ while capture 1 agrees with capture 2, which a primary-vs-each comparison would
+    have missed entirely.
+    """
+    fixture = _noise_fixture()
+    # baseline captures: primary "x", then "x", then "y" — 1 vs 2 agree, 2 vs 3 do not.
+    result = wf.diff(_q("x", "same"), _q("x", "same"), fixture,
+                     baseline_noise=[_q("x", "same"), _q("y", "same")],
+                     candidate_noise=[_q("x", "same"), _q("x", "same")])
+    assert _status(result, "queries.a") == "noisy-baseline"
+    assert result["captures_per_side"] == {"baseline": 3, "candidate": 3}
+
+    # The falsifier: with only the first two baseline captures the field looks stable.
+    two_only = wf.diff(_q("x", "same"), _q("x", "same"), fixture,
+                       baseline_noise=[_q("x", "same")],
+                       candidate_noise=[_q("x", "same")])
+    assert _status(two_only, "queries.a") == "equal", \
+        "with two captures the instability is not sampled — the reason the default is three"
+
+
+def test_a_side_with_one_capture_refuses_to_gate():
+    """A side that brought no second capture cannot be gated.
+
+    Nothing of it was measured for stability, so every one of its fields would count as stable
+    by default — the direction that silently passes. Refusing is the only honest answer.
+    """
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=[_q("x", "same"), _q("x", "same")])
+    assert result["pass"] is False
+    hit = _has(result["health"]["problems"], "no noise captures on candidate")
+    assert hit, result["health"]["problems"]
+    assert "stable by default" in hit[0]
+    assert "fixture-pair.sh" in hit[0], "the message must name the remedy"
+    assert result["captures_per_side"] == {"baseline": 3, "candidate": 1}
+    # The baseline, which DID bring captures, is not accused of the same thing.
+    assert not _has(result["health"]["problems"], "no noise captures on baseline")
+
+
+def test_no_noise_arguments_at_all_still_behaves_as_before():
+    """Opt-in: a plain two-capture diff is not suddenly refused for lacking noise captures."""
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture())
+    assert not _has(result["health"]["problems"], "no noise captures")
+    assert _status(result, "queries.a") == "REGRESSION"
+    assert result["captures_per_side"] == {"baseline": 1, "candidate": 1}
+
+
+def test_a_single_capture_is_still_accepted_for_a_side():
+    """Back-compat: one capture, not wrapped in a list, is normalised rather than iterated."""
+    result = wf.diff(_q("x", "same"), _q("x", "same"), _noise_fixture(),
+                     baseline_noise=_q("y", "same"), candidate_noise=_q("x", "same"))
+    assert _status(result, "queries.a") == "noisy-baseline"
+    assert result["captures_per_side"] == {"baseline": 2, "candidate": 2}
 
 
 def test_candidate_pool_counts_are_observed_only():

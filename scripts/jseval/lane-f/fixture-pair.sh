@@ -11,16 +11,21 @@
 # Usage (repo root, dists installed, no dev stack running):
 #   bash scripts/jseval/lane-f/fixture-pair.sh <outdir> [profile] [api-port] [cycles]
 #
-# `cycles` defaults to 2. ONE invocation produces one SIDE of the gate: capture-1.json is that
-# side primary capture and capture-2.json is its same-build NOISE capture, taken on a second
-# fresh ingest of the same corpus under identical pins. Running them from one invocation is what
-# makes them comparable -- same tree, same stack settings, same profile. Feed the four captures
-# (two sides) to fixture-gate.sh.
+# `cycles` defaults to 3. ONE invocation produces one SIDE of the gate: capture-1.json is that
+# side primary capture and the rest are its same-build NOISE captures, each on a fresh ingest of
+# the same corpus under identical pins. Running them from one invocation is what makes them
+# comparable -- same tree, same stack settings, same profile. Feed both side directories to
+# fixture-gate.sh.
+#
+# THREE, NOT TWO: gate run 3 had q05 and q12 differ across sides while being stable within BOTH
+# sides two-capture pairs, on one build. Two captures under-sample -- a field can agree once and
+# disagree on the next draw -- so a field counts as noisy when ANY TWO of a side captures
+# disagree, and three draws is the floor at which that question is worth asking.
 set -u
 out=${1:?outdir}
 profile=${2:-compact}
 port=${3:-33221}
-cycles=${4:-2}
+cycles=${4:-3}
 mkdir -p "$out"
 out_abs=$(cd "$out" && pwd)
 base="http://127.0.0.1:$port"
@@ -155,7 +160,7 @@ log "tree=$(git rev-parse --short HEAD) profile=$profile"
 log "pins: exhaustive=$JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH slots=$JUSTSEARCH_LLM_SLOTS rerank_deadline_ms=$JUSTSEARCH_RERANK_DEADLINE_MS"
 log "pins: rerank_top_k=$JUSTSEARCH_RERANK_TOP_K rerank_gpu_mem_mb=$JUSTSEARCH_RERANK_GPU_MEM_MB candidate_limit_max=$JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX collapse_mult=$JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER"
 log "pins: leg_arbitration=$JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED recall_complete=$JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE"
-log "cycles=$cycles (capture-1 = primary, capture-2 = same-build noise)"
+log "cycles=$cycles (capture-1 = primary, the rest are same-build noise captures)"
 for ((c = 1; c <= cycles; c++)); do
   cycle_with_retry "$c" || exit 1
 done
