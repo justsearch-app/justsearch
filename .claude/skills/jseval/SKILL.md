@@ -392,6 +392,151 @@ Re-pin after a deliberate change: `perf-gate --update-baseline` (re-pins from th
 `scripts/jseval/{relevance,perf,llm-gen,utility-ratchet}-baselines.v1.json` + `leak-gate-baselines.v1.json`.
 Exit codes: 0 = within band, 1 = regression, 2 = data/projection missing.
 
+### Workflow fixture — semantic non-regression across two backend builds
+
+Ranking metrics say nothing about *what a client was handed*. `workflow-fixture` captures a fixed
+set of search queries and chat turns — returned evidence (doc/chunk ids, source identity,
+truncation points), citations, and cancellation behaviour — to a JSON artifact, and diffs two
+captures taken from two backend builds. It is **mode-agnostic**: it speaks HTTP to a running
+backend and knows nothing about how many processes are behind it.
+
+```bash
+# On each build, against a backend serving the same corpus:
+python -m jseval workflow-fixture capture --base-url <api-url> --corpus-root <abs-root> \
+    --out <dir>/workflow-fixture-capture.v1.json
+# Then compare:
+python -m jseval workflow-fixture diff --baseline <a>.json --candidate <b>.json
+```
+
+Exit codes: 0 = pass, 1 = regression / a field present in one capture and missing from the other /
+an unhealthy capture, 2 = usage or definition error. `--report-out` writes the full structured
+result. `--skip-chat` captures the search half only (AI offline) — that artifact is for
+*inspection*, not gating: the capture-health check below fails a diff whose chat section is empty
+on both sides.
+
+**The equality relation is declared before any run**, in `scripts/jseval/lane-f-workflow-fixture.v1.json`
+(`fields`): every captured field path maps to `exact` or to exactly one **allowed-difference
+class**, from a closed set of three.
+
+| class | means | how the differ compares |
+|---|---|---|
+| `new-reason-code` | a reason code that did not exist in the baseline | code **sets**: baseline ⊆ candidate. A code only the candidate has is allowed; one the baseline had and the candidate lost is a regression. For a dict-valued field the key is carried into the code (`"<key>=<code>"`), so a code that *relocates* to another stage is a regression, not an unchanged set |
+| `equal-score-order` | ordering of equal-score hits | the value is a score-tagged list; consecutive hits within the fixture's `scoreTieEpsilon` form a group, compared as an unordered multiset of **whole** values. A tie permutation is allowed; a changed member is a regression. A `None`/non-numeric score is a shape violation, not a universal tie |
+| `generative-text` | generative text, nominally under a fixed seed | any difference allowed |
+
+**One hit is one value.** `queries.hits[]` carries the entire per-hit projection — id, source
+identity, chunk span, excerpt spans, matched fields, stage ids — as a single dict per position,
+not one score-tagged list per attribute. Independent lists let the differ permute a hit's
+attributes independently of its identity, so a candidate whose chunk spans swapped inside a tie
+group while the ids stayed put read as an allowed reordering. One value per hit makes that a
+regression. The one sub-key that keeps `new-reason-code` semantics is `extractionReasonCode`
+(module constant `_HIT_REASON_CODE_KEYS`): tie-group members are paired on their exact keys first,
+and only then is the subset rule applied.
+
+**Scores are not byte-stable, so "equal" is instantiated as within-epsilon.** Design 16 names the
+class "ordering of equal-score hits"; the width of a tie is a mechanism detail (17.6). Measured on
+two consecutive captures of **one** build against **one** index: over 118 identity-matched hits the
+score delta was non-zero on 111, max 0.009442, mean 0.001658 — GPU float nondeterminism in the
+dense / cross-encoder legs. In the same data *no* adjacent score gap was zero, so exact-equality
+grouping yields all-singleton groups and permits nothing. The fixture declares
+`scoreTieEpsilon: 0.01` — just above the observed max jitter, below all but 3 of the 108 adjacent
+gaps (smallest 0.003652). Consequences: `queries.hits[].score` is **not** a declared field and is
+not in the diffed capture (observed values go to the capture's non-diffed `observed` block); the
+differ never compares scores, only the groups it derives from them; and the tie-group partition is
+consulted **only when the delivered order actually changed** — an unconditional partition
+comparison is itself jitter-sensitive (measured: one query's hits were identical in identity *and*
+order, but a gap moved 0.010470 → 0.009788 across the epsilon and the query read as a regression
+with nothing changed). Grouping is over *consecutive* hits and the delivered order is not
+score-sorted (`SearchResultMapper.java:133` applies freshness decay per hit without re-sorting), so
+the grouping is deliberately conservative: it under-permits, never over-permits.
+
+**One capture per fresh corpus.** The chat turns index their own agent history, so a second capture
+on the same stack sees a changed index (measured: `docCount` 91 → 102 across one capture's three
+turns; one query's `totalHits` moved 50 → 49 on the re-run). Inside a capture the search half runs
+before the chat half for exactly this reason. A stability check *of the fixture* therefore needs a
+re-ingested corpus, not a re-run. `provenance.docCountAtStart` / `docCountAtEnd` record the
+movement (non-diffed).
+
+**The two ordinary chat turns are meant to complete.** Both truncated at `disposition:
+MAX_ITERATIONS` with `maxIterations: 3` on the compact model, which makes their citations partial
+by construction; `maxIterations` is now 8, and capture-health raises `chat turn ended
+MAX_ITERATIONS` for any non-cancelled turn that still truncates, so a truncated baseline is refused
+rather than stored. The cancelled turn is exempt — it is supposed to end early.
+
+**Both captures of a paired diff must be on the same chat profile.** The profile decides which
+model answered the chat turns, so a split-vs-single pair taken on different profiles compares two
+models, not two builds. `capture` records `provenance.chatProfile` and `provenance.aiRuntimeState`
+from `GET /api/ai/runtime/status` (non-diffed, and printed in the capture summary), reading the
+same fields the dev-MCP does. The 2026-09-07 baseline was taken on **`compact`** — the dev default
+— because the standard model's ~11 GB resident set on the dev machine tripped the harness's
+low-memory guard twice; with the narrowed `c01`/`c02` questions both ordinary turns complete on
+compact (`c01` in 3 iterations, `c02` in 6), so the profile choice does not cost the fixture its
+completion property.
+
+**Generation is nondeterministic, and `citationTargets` is deliberately still `exact`.** Across two
+captures of one build, one turn's citation targets differed (`[]` vs two targets):
+`ConversationEngine.java:1154` hard-codes `new SamplingParams(0.8, 0.95, …)` — temperature 0.8,
+top_p 0.95 — and there is no settings key and no request field for temperature or seed. Design 16
+lists citation targets as deterministic, so reclassifying them is an owner decision, not the
+instrument's; the remedy is a backend sampling override (temperature 0 + a seed on the chat
+request). Until then, expect the chat `exact` fields to be the fixture's most fragile assumption
+and read a diff there as a finding, not as licence to reclassify. The **cancelled** turn was fully
+stable across both captures (terminal event, `CANCELLED` error code, session state, disposition and
+cancel trigger all identical), so the cancellation half of the row is sound as it stands.
+
+**Paths are relative to a declared corpus root.** Every path-bearing value the backend returns is
+the *absolute* indexed path (`IndexingDocumentOps` writes `DOC_ID = PATH = absolutePath`; a chunk's
+`PATH` is its parent's; the agent's `sources[]` carry the same string). The baseline and candidate
+captures come from two different worktrees, so unanchored **every** hit differs on `path` and the
+diff is all-REGRESSION for a reason that is not semantic — measured: 21 regressions across
+`queries.hits[]`, `chatTurns.sourcePaths`, `sourceRefs`, `citationTargets`; 0 once anchored.
+`capture` rewrites each one to a forward-slash, case-preserved path relative to `--corpus-root`
+(else `$JUSTSEARCH_FIXTURE_CORPUS_ROOT`, else the single registered watched root; zero or several
+roots is a refusal naming them, not a guess). Matching is case-insensitive because
+`PathNormalizer` lowercases on Windows. **Both captures must be taken with the corpus at the same
+relative layout under their respective roots** — this makes two worktrees comparable, not two
+different corpus arrangements. An absolute path outside the root becomes `<outside-corpus-root>`
+and is a capture-health problem; the raw value survives only in the non-diffed
+`provenance.rawRootExample` / `pathsOutsideCorpusRootExamples`, so a reader can see what was
+stripped. An already-relative value passes through untouched.
+
+**Hit `id` / `doc_id` are not captured at all.** They are the same string, and for a *chunk* hit it
+is `"chunk:" + UUID.randomUUID()`, minted fresh per indexing run (`ChunkIds`) — two builds of the
+same corpus never agree on it, and unlike an absolute path there is nothing to rewrite it to. For a
+whole-document hit it is the normalized absolute path, i.e. redundant with `path`. A chunk's stable
+identity is `parentDocId` (relative) + `chunkIndex` + `chunkSpan`, all captured.
+
+**Capture health is part of the verdict, not a warning.** Two identical *failures* are byte-equal,
+so an all-401 backend would otherwise diff clean and read as "no semantic regression". `diff` fails
+when a section is empty in both captures, when a declared field path was never captured, when any
+captured `httpStatus` is not 200, or when a query recorded `hitCount` 0; `capture` refuses (exit 2)
+when every fixture query was rejected. The mutation token (`--session-token`, else
+`$JUSTSEARCH_SESSION_TOKEN`) rides every request, not just the cancel `DELETE` —
+`ApiSecurityFilters.TOKEN_REQUIRED_METHODS` is `{POST, PUT, DELETE}`.
+
+Three rules make the table load-bearing rather than decorative: a field with **no** declared class
+must be byte-equal; a field captured but **absent from the table** is a regression by construction,
+so a newly captured field cannot slip through unclassified; and the differ **raises** on a class
+name outside the three. **No class is added after a diff is seen** — a changed citation is a
+regression unless its class was declared beforehand.
+
+Timing is **not captured at all** rather than given a class (`stages[].ms`, `tookMs`, the
+`latencyMs` figures, SSE `heartbeat` frames, the per-run session id), and the capture's
+`provenance` block is informational — the two builds are expected to differ there, so it is not
+diffed.
+
+Caveat, recorded rather than worked around: `POST /api/chat/agent` carries **no** `seed` request
+field (the only `seed` reaching llama-server is the vision/VDU agreement probe), so generative text
+is treated under `generative-text` unconditionally, not "under a fixed seed". The fixture's chat
+turns are deliberately narrow and factual so the chat fields declared `exact` (citation targets,
+source identity, tool names, terminal disposition) have the best chance of holding without one.
+`chatTurns.errorCode` / `toolErrorCodes` are deliberately `exact`, not `new-reason-code`: a run
+that did not fail in the baseline and fails in the candidate must not be waved through as "a code
+that did not exist before". And `cancel.httpStatus` carries no signal today —
+`AgentController.handleCancelSession` returns 200 unconditionally, so read
+`cancel.sessionState` / `sessionDisposition` / `sessionCancelTrigger` for whether the cancel took
+effect. Implementation: `jseval/workflow_fixture.py`.
+
 ### Chunk-completeness validity guard (tempdoc 718)
 
 A fresh `--clean` index build can silently ship with its chunk (RAG passage) sub-system absent

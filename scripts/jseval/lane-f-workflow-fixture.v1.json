@@ -1,0 +1,167 @@
+{
+  "schema": "jseval.lane-f-workflow-fixture.v1",
+  "version": 1,
+  "id": "lane-f-workflow-fixture",
+  "description": "Lane F semantic-non-regression workflow fixture (design.md section 16 'semantic non-regression', section 17.2 PR 0). A fixed set of search queries and chat turns whose returned evidence (doc/chunk ids, source identity, truncation points), citations and cancellation behaviour are captured to a JSON artifact and DIFFED between two backend builds ('split' = main, 'single' = the lane branch). The runner is mode-agnostic: it only speaks HTTP to a running backend.",
+  "corpus": "This repository's docs/explanation/** + docs/reference/** markdown, ingested as a watched root before capture. The fixture does NOT ingest — the caller prepares the index. ONE CAPTURE PER FRESH CORPUS: the chat turns index their own agent history, so a second capture on the same stack sees a changed index (measured: docCount 91 -> 102 across one capture's three turns; q09 totalHits 50 -> 49 on the re-run). Re-running the fixture is not a stability check of the fixture; that needs a re-ingested corpus.",
+  "scoreTieEpsilon": 0.01,
+  "notes": [
+    "The equality relation is declared HERE, before any run. `fields` maps every captured field path to `exact` or to exactly one of the three allowed-difference classes. A field with no entry is a REGRESSION by construction (the differ refuses undeclared fields), so a newly captured field cannot slip through.",
+    "The three classes are closed: new-reason-code, equal-score-order, generative-text. The differ raises on any other class name. No class is added after a diff is seen (design.md 17.7).",
+    "Timing is NOT captured at all rather than being given a class: SearchTrace.stages[].ms, KnowledgeSearchResponse.tookMs, QueryUnderstanding.latencyMs, FilterNormalization.latencyMs, the SSE `heartbeat` frames, and the per-run sessionId are dropped at capture time.",
+    "equal-score-order fields are captured as SCORE-TAGGED lists ([{score, value}, ...]). The differ groups consecutive hits whose score is within `scoreTieEpsilon` of the group's FIRST member and compares each group as an unordered multiset, so a tie permutation is allowed while a changed member is still a regression. A None or non-numeric score is a SHAPE VIOLATION (regression), not a tie — treating it as a tie would collapse the list into one freely-reorderable group.",
+    "SCORES ARE NOT BYTE-STABLE, so 'equal' is instantiated as within-epsilon (a mechanism detail, design 17.6; design 16 names the class 'ordering of equal-score hits' and that is unchanged). Measured on two consecutive captures of ONE build against ONE index (tmp/fixture-capture-{1,2}.json, 2026-09-07): over 118 identity-matched hits the score delta was NON-ZERO on 111, max 0.009442, mean 0.001658 — GPU float nondeterminism in the dense/cross-encoder legs. In the same data NO adjacent score gap was zero, so exact-equality grouping yields 120 singleton groups and permits nothing at all. scoreTieEpsilon = 0.01 sits just above the observed max jitter (1.06x) and below all but 3 of the 108 adjacent score gaps (smallest gap 0.003652), so it absorbs the jitter while merging almost no genuinely-distinct hits. Two consequences: `queries.hits[].score` is NOT a declared field and is not in the diffed capture (the observed values are recorded in the capture's non-diffed `observed` block); and the differ compares tie-group PARTITIONS (group sizes), never group scores — a differing partition means a hit crossed a boundary, which is a REGRESSION.",
+    "Tie grouping is over CONSECUTIVE hits, and the delivered order is NOT score-sorted: SearchResultMapper.java:133 applies applyFreshnessDecay per hit without re-sorting, so the emitted score is not the sort key (verified: the score list is non-monotone in all 12 queries of both live captures). Consecutive grouping is therefore deliberately CONSERVATIVE — two within-epsilon hits that are not adjacent land in different groups and swapping them is a REGRESSION. It under-permits, never over-permits.",
+    "PATHS ARE RELATIVE TO A DECLARED CORPUS ROOT. The backend returns ABSOLUTE indexed paths (IndexingDocumentOps.java:162,172,174 writes DOC_ID = PATH = absolutePath; ChunkDocumentWriter writes a chunk's PATH = parentDocId, QueryFilterBuilder.java:284-285; AgentEventPayloads.sourceMap:336-344 emits the same parentDocId/path on agent sources), and the two captures are taken from two different worktrees — so unanchored, every hit would differ on `path` and the diff would be all-REGRESSION for a reason that is not semantic. `capture` rewrites every path-bearing value to a forward-slash, case-preserved path relative to --corpus-root / $JUSTSEARCH_FIXTURE_CORPUS_ROOT / the single registered watched root (zero or several roots is a refusal, not a guess). Rewritten fields: queries.hits[].path, queries.hits[].parentDocId, chatTurns.sourcePaths, chatTurns.sourceRefs (path half), chatTurns.citationTargets (path half). BOTH CAPTURES MUST BE TAKEN WITH THE CORPUS AT THE SAME RELATIVE LAYOUT under their respective roots — this makes two worktrees comparable, not two different corpus arrangements. A path outside the root becomes '<outside-corpus-root>' and is a capture-health problem; the raw value is kept only in the non-diffed provenance (rawRootExample / pathsOutsideCorpusRootExamples).",
+    "hit `id` and `doc_id` are NOT captured. They are the same string (hit.id is the worker's SearchResult id, SearchResultMapper.java:136-138). For a whole-document hit it is the normalized absolute path — redundant with `path` once relative, and not a hash (IndexingService.java:145 calls it 'a normalized absolute path string'). For a CHUNK hit it is 'chunk:' + UUID.randomUUID(), minted fresh per indexing run and deliberately not derived from the parent or the index (ChunkIds.java:52-54) — two builds of the same corpus never agree on it, and unlike an absolute path there is nothing to rewrite it to. A chunk hit's stable identity is parentDocId (relative) + chunkIndex + chunkSpan, all of which ARE captured.",
+    "queries.hits[] is ONE field carrying the WHOLE per-hit projection (path, filename, isChunk, parentDocId, chunkIndex, chunkSpan, contentTruncated, excerptSpans, matchedFields, stageIds, extractionReasonCode) as a single dict per position. It is deliberately not one score-tagged list per attribute: independent lists let the differ permute a hit's attributes independently of its identity, so a candidate whose chunk spans swapped inside a tie group while the ids stayed put would read as an allowed reordering. Tie-group members are paired on their exact keys and compared whole.",
+    "extractionReasonCode is the one sub-key inside the hits[] projection that keeps new-reason-code semantics (module constant _HIT_REASON_CODE_KEYS); every other key is exact once members are paired. A hits[] diff can therefore report allowed:new-reason-code — still one of the three classes, no fourth is introduced. It is not a separate `fields` entry because the table maps captured field paths and a declaration the capture never emits now fails the capture-health check.",
+    "new-reason-code fields are compared as code SETS: baseline codes must be a subset of candidate codes. A code that appears only in the candidate is allowed (it did not exist in the baseline); a code present in the baseline and gone in the candidate is a REGRESSION. For a DICT-valued field the key is carried into the code ('<key>=<code>'), so a code relocating to a different stage is a regression rather than an unchanged set.",
+    "chatTurns.errorCode and chatTurns.toolErrorCodes are `exact`, NOT new-reason-code: a run that did not fail in the baseline and fails in the candidate would otherwise be waved through as 'a code that did not exist before'. new-reason-code is for a code re-cut on a path that already reported one. chatTurns.cancel.terminalReasonCode keeps the class deliberately — the migration re-cuts lifecycle reason codes (design.md 17.3 stage B), and the cancellation OUTCOME itself stays pinned by cancel.terminalEvent / cancel.sessionState / cancel.sessionDisposition / cancel.sessionCancelTrigger, all `exact`.",
+    "Capture health is part of the verdict, not a warning. Two identical FAILURES are byte-equal, so the differ refuses to pass when a section is empty on both sides, when a declared path was never captured, when any captured httpStatus is not 200, or when a query recorded hitCount 0. `capture` likewise refuses (exit 2) when every fixture query was rejected.",
+    "THE TWO ORDINARY CHAT TURNS ARE MEANT TO COMPLETE. Both ended `disposition: MAX_ITERATIONS` at maxIterations 3 on the compact model in the live captures, which makes their citations/sources partial BY CONSTRUCTION — storing such a run as a baseline bakes in an artefact of the iteration cap. maxIterations is 8 on c01/c02, and `capture_health` now raises `chat turn ended MAX_ITERATIONS` for any non-cancelled turn that still truncates, so a truncated baseline is refused rather than stored. The cancelled turn (c03) is supposed to end early and is exempt.",
+    "CITATION TARGETS DIFFERED BETWEEN TWO CAPTURES OF ONE BUILD (c01: [] vs two targets) because generation is nondeterministic: ConversationEngine.java:1154 hard-codes `new SamplingParams(0.8, 0.95, null, null, b)` — temperature 0.8, top_p 0.95 — and there is no settings key and no request field for temperature or seed. citationTargets is NOT reclassified: design 16 lists it as deterministic, and changing that is an owner decision, not the instrument's. The remedy is a backend sampling override (temperature 0 + a seed on the chat request), recorded for the owner in the design's section 0 by the orchestrator. Until then, expect chat `exact` fields to be the fixture's most fragile assumption and read a diff there as a finding, not as licence to reclassify. The CANCELLED turn's fields were fully stable across both captures — terminalEvent, errorCode CANCELLED, cancel.sessionState CANCELLED, cancel.sessionDisposition CANCELLED, cancel.sessionCancelTrigger USER all identical — so the cancellation half of the row is sound as it stands.",
+    "There is NO seed request field on the chat path (POST /api/chat/agent). `seed` exists only on the vision/VDU probe overload — OnlineModeOps.sendChatRequestDetailed(..., Long seed) at modules/app-inference/src/main/java/io/justsearch/app/inference/OnlineModeOps.java:957,966; sendChatRequest always passes null (same file, lines 947-950). Adding one is a backend change and out of scope for the fixture. Generative text is therefore treated under the generative-text class unconditionally, and the chat turns below are deliberately narrow and factual so that the fields declared `exact` (citation targets, source identity, tool names, disposition) have the best chance of holding without a seed.",
+    "The capture's `provenance` block (backend identity from /api/status) is informational and is NOT diffed — the two builds are expected to differ there. That is why it is not in `fields`.",
+    "chatTurns.cancel.httpStatus carries no signal today: AgentController.handleCancelSession (modules/ui/src/main/java/io/justsearch/ui/api/AgentController.java:705-709) calls cancelSession and returns 200 unconditionally, including for an unknown session id. It is captured and declared `exact` anyway so that a future status-bearing cancel contract is diffed from the moment it lands; do NOT read a green cancel.httpStatus as evidence the cancel took effect — cancel.sessionState / cancel.sessionDisposition / cancel.sessionCancelTrigger are the fields that carry that.",
+    "Chat turns c01 and c02 are narrow, single-document questions on purpose: open-ended questions (\"which module owns all Lucene I/O and how does the head reach it\") made the agent read documents window by window and exhaust maxIterations 8 on both the compact and the standard profile (2026-09-07 live captures), so the turn ended MAX_ITERATIONS with a partial answer. The suicide-pact question completed in 3 iterations with two tool calls on both profiles in the PR 0 measurement runs.",
+    "BOTH CAPTURES OF A PAIRED DIFF MUST BE TAKEN ON THE SAME CHAT PROFILE. The profile decides which model answered the chat turns, so a split-vs-single pair taken on different profiles compares two models, not two builds. `capture` records it in the non-diffed provenance.chatProfile (+ provenance.aiRuntimeState) from GET /api/ai/runtime/status, reading the same fields the dev-MCP does (scripts/dev/justsearch-dev-mcp/server.mjs:2376 takes active.chatProfile ?? chatProfile; :2373 reads activation.state), so a mismatched pair is legible after the fact instead of surfacing as unexplained chat regressions. The 2026-09-07 baseline was taken on `compact` (the dev default): the standard model's ~11 GB resident set on the dev machine tripped the harness's low-memory guard twice. With the narrowed c01/c02 questions both ordinary turns complete on compact (c01 in 3 iterations, c02 in 6), so the profile choice does not cost the fixture its completion property."
+  ],
+  "queries": [
+    {
+      "id": "q01",
+      "query": "how does the head process talk to the worker process",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q02",
+      "query": "lucene index schema fields and analyzers",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q03",
+      "query": "shell-v0 lit web components frontend stack",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q04",
+      "query": "cross-encoder reranking stage in the search pipeline",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q05",
+      "query": "splade sparse retrieval encoding",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q06",
+      "query": "desktop installer and sandbox setup",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q07",
+      "query": "api contract map endpoints",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q08",
+      "query": "agent tool approval gate and autonomy level",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q09",
+      "query": "chunk embedding coverage and enrichment readiness",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q10",
+      "query": "readiness envelope components and reason codes",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q11",
+      "query": "local api trust boundary loopback host allowlist",
+      "limit": 10,
+      "mode": "hybrid"
+    },
+    {
+      "id": "q12",
+      "query": "search trace stage vocabulary and hit stages",
+      "limit": 10,
+      "mode": "hybrid"
+    }
+  ],
+  "chatTurns": [
+    {
+      "id": "c01",
+      "content": "According to the docs, what is the suicide pact between the Head and the Worker, and which document describes it?",
+      "maxIterations": 8
+    },
+    {
+      "id": "c02",
+      "content": "According to the docs, what does the IndexingPacing duty cycle do, and which ADR introduced it?",
+      "maxIterations": 8
+    },
+    {
+      "id": "c03",
+      "content": "Summarise the desktop installer and sandbox setup in detail.",
+      "maxIterations": 3,
+      "cancelAfterEvent": "session_started"
+    }
+  ],
+  "fields": {
+    "queries.totalHits": "exact",
+    "queries.matchCount": "exact",
+    "queries.hitCount": "exact",
+    "queries.httpStatus": "exact",
+    "queries.hits[]": "equal-score-order",
+    "queries.trace.effectiveMode": "exact",
+    "queries.trace.decisionKind": "exact",
+    "queries.trace.stageIds": "exact",
+    "queries.trace.stageStatuses": "exact",
+    "queries.trace.stageCardinality": "exact",
+    "queries.trace.stageReasons": "new-reason-code",
+    "queries.trace.degradationFlags": "exact",
+    "queries.trace.degradationReasons": "new-reason-code",
+    "chatTurns.httpStatus": "exact",
+    "chatTurns.eventNames": "exact",
+    "chatTurns.terminalEvent": "exact",
+    "chatTurns.terminalPayloadParseError": "exact",
+    "chatTurns.iterationsUsed": "exact",
+    "chatTurns.toolCallsExecuted": "exact",
+    "chatTurns.toolNames": "exact",
+    "chatTurns.toolTruncatedForModel": "exact",
+    "chatTurns.disposition": "exact",
+    "chatTurns.citationScorer": "exact",
+    "chatTurns.citationTargets": "exact",
+    "chatTurns.sourceRefs": "exact",
+    "chatTurns.sourcePaths": "exact",
+    "chatTurns.sourceSpans": "exact",
+    "chatTurns.sourceContextInclusion": "exact",
+    "chatTurns.sourceContextIncludedChars": "exact",
+    "chatTurns.sourceExcerptDigests": "exact",
+    "chatTurns.errorCode": "exact",
+    "chatTurns.toolErrorCodes": "exact",
+    "chatTurns.finalResponse": "generative-text",
+    "chatTurns.reasoningText": "generative-text",
+    "chatTurns.toolArguments": "generative-text",
+    "chatTurns.citationSentences": "generative-text",
+    "chatTurns.cancel.requested": "exact",
+    "chatTurns.cancel.httpStatus": "exact",
+    "chatTurns.cancel.terminalEvent": "exact",
+    "chatTurns.cancel.sessionState": "exact",
+    "chatTurns.cancel.sessionDisposition": "exact",
+    "chatTurns.cancel.sessionCancelTrigger": "exact",
+    "chatTurns.cancel.terminalReasonCode": "new-reason-code"
+  }
+}
