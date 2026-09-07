@@ -122,9 +122,33 @@ cycle() { # n
   # `provenance.pins` is read from, so a 404 here silently costs the capture its pin proof.
   curl -s -m 5 -H "Host: 127.0.0.1:$port" "$base/api/debug/effective-config" > "$out_abs/effective-config-$n.json" 2>/dev/null || true
   bash scripts/jseval/lane-f/fixture-cycle.sh "$out_abs/capture-$n.json" "$profile" "$port" 2>&1 | tee -a "$out_abs/pair.log"
+  # PIPESTATUS[0], not $? -- the tee above would otherwise report success for a refused capture.
+  local cycle_rc=${PIPESTATUS[0]}
   node scripts/dev/dev-runner.cjs stop --active --json > "$out_abs/stop-$n.json" 2>&1 || true
   sleep 3
   node scripts/dev/dev-runner.cjs cleanup --active --force --clean hard --json > "$out_abs/cleanup-after-$n.json" 2>&1 || true
+  return "$cycle_rc"
+}
+
+# One retry from a hard clean, then give up. The failure this exists for is an enrichment wait
+# that times out (fixture-cycle.sh exit 3) -- observed once on side A cycle 1 of the four-capture
+# acceptance, where ingest at 19:18 was still not enriched at 19:33 while every other cycle of
+# that run finished in about two minutes. That looks like a stuck first ingest rather than a
+# corpus that genuinely needs 15 minutes, so a second attempt on a freshly cleaned data dir is
+# worth one try. It is NOT retried indefinitely: a corpus that reliably needs longer than the
+# wait is a real finding about the corpus, not a flake to paper over.
+cycle_with_retry() { # n
+  local n=$1
+  if cycle "$n"; then
+    return 0
+  fi
+  log "cycle $n FAILED (rc=$?) -- retrying once from a hard clean"
+  if cycle "$n"; then
+    log "cycle $n succeeded on the retry"
+    return 0
+  fi
+  log "cycle $n failed twice -- giving up; no capture was written for this cycle"
+  return 1
 }
 
 log "tree=$(git rev-parse --short HEAD) profile=$profile"
@@ -133,7 +157,7 @@ log "pins: rerank_top_k=$JUSTSEARCH_RERANK_TOP_K rerank_gpu_mem_mb=$JUSTSEARCH_R
 log "pins: leg_arbitration=$JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED recall_complete=$JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE"
 log "cycles=$cycles (capture-1 = primary, capture-2 = same-build noise)"
 for ((c = 1; c <= cycles; c++)); do
-  cycle "$c" || exit 1
+  cycle_with_retry "$c" || exit 1
 done
 
 # The within-side diff is a NOISE MEASUREMENT, not a verdict: it reports what this build does

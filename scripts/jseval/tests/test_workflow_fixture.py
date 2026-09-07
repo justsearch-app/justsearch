@@ -1227,6 +1227,86 @@ def test_the_shipped_fixture_declares_the_noise_ceiling():
     assert wf.load_fixture(DEFAULT_FIXTURE)["maxNoisyFraction"] == 0.05
 
 
+def test_a_partially_enriched_capture_is_refused():
+    """The gap that let the four-capture acceptance pass with 0 regressions.
+
+    Side A cycle 1's enrichment wait timed out and the capture was taken anyway. That side then
+    disagreed with ITSELF on 11 of 12 queries, every disagreement was classified noise and
+    withdrawn, and the run reported success having compared almost nothing. An unfinished index
+    is not a slower capture, it is a different index.
+    """
+    half = dict(_HEALTHY_ENRICHMENT,
+                embeddingCoveragePercent=38.0,
+                chunkEmbeddingPendingCount=1283,
+                incompleteReasons=["chunk_vectors_not_complete", "embedding_not_complete"])
+    bad = _capture(provenance={"enrichment": half})
+    result = wf.diff(bad, _capture(), _minimal_fixture({"queries.a": "exact"}))
+    assert result["pass"] is False
+    hit = _has(result["health"]["problems"], "was NOT fully enriched")
+    assert hit, result["health"]["problems"]
+    # The message has to carry the evidence, or a reader cannot act on it.
+    assert "embedding_not_complete" in hit[0]
+    assert "38.0" in hit[0] and "1283" in hit[0]
+
+
+def test_a_capture_with_no_enrichment_block_is_refused():
+    """Absent is refused too: a capture that cannot show the index was ready proves nothing."""
+    result = wf.diff(_capture(provenance={"enrichment": None}), _capture(),
+                     _minimal_fixture({"queries.a": "exact"}))
+    assert result["pass"] is False
+    assert _has(result["health"]["problems"], "provenance.enrichment is absent")
+
+
+def test_a_fully_enriched_capture_passes():
+    """Precision: the check must not fire on the healthy case it is meant to allow."""
+    healthy = _capture({"q1": {"a": 1}})
+    result = wf.diff(healthy, healthy, _minimal_fixture({"queries.a": "exact"}))
+    assert not _has(result["health"]["problems"], "enriched")
+    assert result["pass"] is True, result["health"]["problems"]
+
+
+def test_enrichment_uses_the_shared_readiness_predicate():
+    """`read_enrichment` must not restate the completeness rule — it imports it.
+
+    Two copies of "is the index ready" drift, and then a capture can satisfy the ingest wait
+    while failing the capture check (or worse, the reverse). Asserted by feeding the SAME
+    snapshot to both and requiring the same verdict.
+    """
+    from jseval.readiness import _check_pipeline_complete_conditions
+
+    snapshot = {"indexState": "INDEXING", "embeddingCoveragePercent": 38.0,
+                "spladeCoveragePercent": 100.0, "nerEnabled": False}
+    assert "index_not_idle" in _check_pipeline_complete_conditions(snapshot, 0)
+    assert "embedding_not_complete" in _check_pipeline_complete_conditions(snapshot, 0)
+    # A disabled stage is skipped rather than blocking forever — the behaviour the capture
+    # inherits for free by importing rather than restating.
+    assert "ner_not_complete" not in _check_pipeline_complete_conditions(snapshot, 0)
+
+
+def test_a_field_noisy_on_both_sides_counts_towards_each_side_fraction():
+    """The arithmetic bug that let the four-capture acceptance pass.
+
+    `noisy-both` means the field is unstable on the baseline AND on the candidate, so it counts
+    towards BOTH fractions. Counting only each side's exclusive noise understated every side
+    that shares an unstable field: the acceptance measured baseline 9 exclusive + 6 both and
+    scored 9/222 = 4%, under the 5% ceiling, when the honest figure is 15/222 = 6.8%.
+    """
+    # `a` is noisy on both sides, `b` on the baseline only. Five fields are compared (a, b, and
+    # the health floor httpStatus/hitCount/chatTurns.httpStatus), so the baseline is 2/5 = 40%
+    # once `both` counts and the candidate 1/5 = 20%. A 30% ceiling therefore fires for the
+    # baseline and only for the baseline — under the old arithmetic the baseline was 1/5 = 20%
+    # and nothing fired at all.
+    fixture = _noise_fixture(max_noisy_fraction=0.30)
+    result = wf.diff(_q("x", "m"), _q("x", "m"), fixture,
+                     baseline_noise=_q("p", "n"), candidate_noise=_q("r", "m"))
+    assert _status(result, "queries.a") == "noisy-both"
+    assert _status(result, "queries.b") == "noisy-baseline"
+    hit = _has(result["health"]["problems"], "baseline: the same-build noise pair moved")
+    assert hit, "baseline is 2 of 4 compared fields (50%) once `both` counts — the ceiling fires"
+    # The candidate carries only the shared field, so it stays inside the same ceiling.
+    assert not _has(result["health"]["problems"], "candidate: the same-build noise pair moved")
+
+
 def test_candidate_pool_counts_are_observed_only():
     """`totalHits` and `trace.stageCardinality` are pool sizes, not evidence.
 
@@ -2506,6 +2586,16 @@ _HEALTHY_PIN_VALUES = {
 }
 _HEALTHY_PINS = {k: _HEALTHY_PIN_VALUES[k] for k in wf.PINNED_CONFIG_KEYS}
 _HEALTHY_APPLIED = {"temperature": 0.0, "top_p": 0.8, "seed": 7}
+#: A fully-enriched index: no outstanding reasons from the shared completeness predicate. The
+#: coverage figures are carried too so a test that overrides one reads like a real capture.
+_HEALTHY_ENRICHMENT = {
+    "indexState": "IDLE",
+    "embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
+    "embeddingCoveragePercent": 100.0, "spladeCoveragePercent": 100.0,
+    "chunkVectorCoveragePercent": 100.0,
+    "chunkEmbeddingPendingCount": 0, "pendingNerCount": 0, "completedNerCount": 5,
+    "incompleteReasons": [],
+}
 
 
 def _capture(
@@ -2520,7 +2610,8 @@ def _capture(
     ``hitsCaptured``, ``hitsCompared``). Omitted entirely, the capture looks like one taken
     before that block carried the counts — which the cutoff rule must fail closed on.
 
-    ``provenance`` overrides the healthy precondition floor (pins + applied sampling); a key
+    ``provenance`` overrides the healthy precondition floor (pins + applied sampling +
+    enrichment); a key
     set to ``None`` there is DELETED, which is how a test says "this capture predates it".
     """
     q: dict[str, dict] = {}
@@ -2537,6 +2628,7 @@ def _capture(
         "available": True,
         "pins": dict(_HEALTHY_PINS),
         "samplingApplied": {rid: dict(_HEALTHY_APPLIED) for rid in c},
+        "enrichment": dict(_HEALTHY_ENRICHMENT),
     }
     for key, value in (provenance or {}).items():
         if value is None:
@@ -2588,6 +2680,7 @@ def _full_snapshot(fixture: dict) -> dict:
             "pins": dict(_HEALTHY_PINS),
             "samplingApplied": {t["id"]: dict(_HEALTHY_APPLIED)
                                 for t in fixture["chatTurns"]},
+            "enrichment": dict(_HEALTHY_ENRICHMENT),
         },
         "queries": {q["id"]: wf.capture_query_record(_SEARCH_RESPONSE)
                     for q in fixture["queries"]},
@@ -2634,8 +2727,24 @@ def _search_backend(response: dict, roots: list[str] | None = None, status: int 
             return httpx.Response(200, text=_APPLIED_SAMPLING_STREAM,
                                   headers={"Content-Type": "text/event-stream"})
         if path == "/api/status":
-            return httpx.Response(200, json={"service": "justsearch", "schema_version": 1,
-                                             "worker": {"buildStamp": "abc"}})
+            # A FULLY ENRICHED index. `read_enrichment` runs the same completeness predicate the
+            # ingest wait uses, so a mock that omitted these would make every capture test fail
+            # the enrichment health check for a reason that has nothing to do with the test.
+            return httpx.Response(200, json={
+                "service": "justsearch", "schema_version": 1,
+                "worker": {
+                    "buildStamp": "abc",
+                    "indexState": "IDLE",
+                    "pendingJobs": 0, "pendingJobsCount": 0, "processingJobsCount": 0,
+                    "embedding": {
+                        "embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
+                        "embeddingCoveragePercent": 100.0, "spladeCoveragePercent": 100.0,
+                        "chunkVectorCoveragePercent": 100.0,
+                        "chunkEmbeddingPendingCount": 0,
+                        "pendingNerCount": 0, "completedNerCount": 5,
+                        "docCount": 2, "chunkDocCount": 0,
+                    },
+                }})
         if path == "/api/ai/runtime/status":
             return httpx.Response(200, json={
                 "active": {"chatProfile": "compact", "activeVariantId": "v1"},

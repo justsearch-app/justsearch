@@ -37,11 +37,28 @@ curl -s -m 30 -X POST "${hdr[@]}" -d '{}' "$base/api/ai/runtime/deactivate" > /d
 
 body=$(node -e 'const p=require("path");const r=process.argv[1];console.log(JSON.stringify({paths:[p.join(r,"docs","explanation"),p.join(r,"docs","reference")]}))' "$root_win")
 log "ingest: $(curl -s -m 120 -X POST "${hdr[@]}" -d "$body" "$base/api/knowledge/ingest" | head -c 200)"
-(cd scripts/jseval && python -c "
+# The enrichment wait is a PRECONDITION, not a progress message. The four-capture acceptance
+# had side A cycle 1 return READY False after the full 900s and capture anyway, on a partially
+# enriched index: that side then marked 11 of 12 queries noisy (26 unmatched hits, max CE delta
+# 0.0982 against 0.0000 on the healthy side) and the whole verdict hid behind the noise mask.
+# A capture taken on a half-enriched index is not a slower capture, it is a different index --
+# so this aborts rather than recording one. `capture_health` refuses such a capture too (belt
+# and braces: this stops it being written, that stops it being trusted if it ever is).
+# NOTE the exit code is taken from the command, NOT through a pipe: `cmd | tail -1` reports
+# tail exit status, so piping here would have silently swallowed the very failure this guards.
+wait_out=$( (cd scripts/jseval && python -c "
+import sys
 from jseval.readiness import wait_pipeline_complete
 r = wait_pipeline_complete('$base', timeout_sec=900)
 print('READY', r.passed)
-") 2>&1 | tail -1
+sys.exit(0 if r.passed else 1)
+") 2>&1 )
+wait_rc=$?
+log "$(echo "$wait_out" | tail -1)"
+if [[ $wait_rc -ne 0 ]]; then
+  log "enrichment did not complete within 900s -- REFUSING to capture a partially enriched index"
+  exit 3
+fi
 
 log "activate $profile"
 curl -s -m 30 -X POST "${hdr[@]}" -d "{\"variantId\":\"cuda12\",\"chatProfile\":\"$profile\"}" "$base/api/ai/runtime/activate" > /dev/null

@@ -1271,6 +1271,57 @@ def read_ai_runtime(client: httpx.Client) -> tuple[Any, Any]:
     return profile, activation.get("state")
 
 
+#: The enrichment fields recorded verbatim into ``provenance.enrichment``. Chosen because they
+#: are what a reader needs to judge a capture after the fact: the index state, each enabled
+#: stage's coverage, and the pending counts that say whether work is still outstanding.
+ENRICHMENT_STATUS_FIELDS = (
+    "indexState",
+    "embeddingEnabled",
+    "spladeEnabled",
+    "nerEnabled",
+    "chunkSpladeEnabled",
+    "embeddingCoveragePercent",
+    "spladeCoveragePercent",
+    "chunkVectorCoveragePercent",
+    "chunkSpladeCoveragePercent",
+    "chunkEmbeddingPendingCount",
+    "pendingNerCount",
+    "completedNerCount",
+    "chunkDocCount",
+    "docCount",
+)
+
+
+def read_enrichment(client) -> dict:
+    """``provenance.enrichment`` — the index's enrichment state at CAPTURE START.
+
+    A capture taken on a partially enriched index is not a slower capture, it is a capture of a
+    DIFFERENT index. The four-capture acceptance proved how badly that hides: side A cycle 1's
+    enrichment wait timed out, the capture was taken anyway, and that side then reported 11 of 12
+    queries' hits as noisy (26 unmatched hits, max cross-encoder delta 0.0982 against 0.0000 on
+    the healthy side) — so the noise mask, which exists to excuse real jitter, silently excused an
+    unfinished index instead and the gate passed with 0 regressions.
+
+    ``incompleteReasons`` is the verdict of :func:`readiness._check_pipeline_complete_conditions`,
+    IMPORTED rather than restated: the capture must refuse on exactly the predicate the ingest
+    wait uses, or the two drift and a capture can satisfy one while failing the other.
+    ``expected_doc_count_min=0`` because the doc count is the fixture corpus's business (the
+    capture already records docCountAtStart/End), not this check's.
+    """
+    from .readiness import _check_pipeline_complete_conditions, flatten_status
+
+    try:
+        resp = client.get("/api/status", timeout=30.0)
+        raw = resp.json() if resp.status_code == 200 else {}
+    except Exception as exc:  # noqa: BLE001 - a status failure must not kill the capture
+        log.warning("enrichment: GET /api/status failed (%s)", exc)
+        return {"incompleteReasons": ["status_unavailable"]}
+    snapshot = flatten_status(raw) if isinstance(raw, dict) else {}
+    out = {k: snapshot.get(k) for k in ENRICHMENT_STATUS_FIELDS}
+    out["incompleteReasons"] = sorted(_check_pipeline_complete_conditions(snapshot, 0))
+    return out
+
+
 def read_config_pins(client: httpx.Client) -> tuple[dict, dict]:
     """``({key: value}, {key: winning source})`` for :data:`PINNED_CONFIG_KEYS`.
 
@@ -1538,6 +1589,11 @@ def capture(
         doc_count_start, doc_count_path = read_doc_count(client)
         # Initialised here so --skip-chat (which skips the end read below) still resolves.
         doc_count_end, doc_count_end_path = doc_count_start, doc_count_path
+        enrichment = read_enrichment(client)
+        if enrichment.get("incompleteReasons"):
+            log.warning(
+                "enrichment INCOMPLETE at capture start: %s — this capture will be refused by "
+                "capture_health", enrichment["incompleteReasons"])
         chat_profile, ai_runtime_state = read_ai_runtime(client)
         log.info("chat profile %s (ai runtime %s)", chat_profile, ai_runtime_state)
         # SEARCH BEFORE CHAT, and this order is load-bearing, not incidental: the chat turns
@@ -1600,6 +1656,10 @@ def capture(
         # Which model answered the chat turns. Both captures of a paired diff must be on
         # the SAME profile; recorded (never diffed) so a mismatched pair is legible instead
         # of surfacing as unexplained chat regressions.
+        # Recorded at capture START, before the chat turns move the index (they index their own
+        # agent history). A capture whose enabled stages are not complete is refused by
+        # `capture_health` — see `read_enrichment`.
+        "enrichment": enrichment,
         "chatProfile": chat_profile,
         "aiRuntimeState": ai_runtime_state,
         # The sampling override sent on every chat turn (PR 0b), recorded for the same
@@ -2305,10 +2365,14 @@ def _noise_problems(
     for side, noise in (("baseline", baseline_noise), ("candidate", candidate_noise)):
         if noise is None:
             continue
+        # A field noisy on BOTH sides is noisy on EACH side, so `noisy-both` counts towards both
+        # fractions. Counting only a side exclusive noise (the first version of this) understated
+        # every side that shares an unstable field with the other: the four-capture acceptance
+        # measured baseline 9 exclusive + 6 both and scored the baseline at 9/222 = 4%, under the
+        # ceiling, when the honest figure is 15/222 = 6.8% and should have failed.
         noisy = [
             e for e in compared
-            if str(e.get("status", "")).startswith(STATUS_NOISY_PREFIX)
-            and side in str(e.get("status", ""))
+            if str(e.get("status", "")) in (STATUS_NOISY_PREFIX + side, STATUS_NOISY_PREFIX + "both")
         ]
         fraction = len(noisy) / total
         if fraction > max_noisy_fraction:
@@ -2339,6 +2403,44 @@ def _noise_problems(
     return problems
 
 
+def _enrichment_problems(baseline: dict, candidate: dict) -> list[str]:
+    """Refuse a capture taken before its enabled enrichment stages finished.
+
+    This is the guard that was missing when the four-capture acceptance passed with 0
+    regressions on a side whose first cycle captured a half-enriched index. The failure mode is
+    specifically nasty in a noise-pair gate: an unfinished index makes a side disagree with
+    ITSELF, every disagreeing field is then classified noise and withdrawn from the verdict, and
+    the run reports success having compared almost nothing. So it is a health refusal, not a
+    warning, and it fires on the same predicate the ingest wait uses.
+    """
+    problems: list[str] = []
+    for label, doc in (("baseline", baseline), ("candidate", candidate)):
+        enrichment = _provenance(doc).get("enrichment")
+        if not isinstance(enrichment, dict):
+            problems.append(
+                f"{label}: provenance.enrichment is absent — this capture cannot show whether "
+                "the index had finished enriching when it was taken. A capture of a partially "
+                "enriched index disagrees with itself, and in a noise-pair gate those "
+                "disagreements are withdrawn as noise, so the run can report success having "
+                "compared almost nothing. Re-capture with a build that records it."
+            )
+            continue
+        reasons = enrichment.get("incompleteReasons")
+        if reasons:
+            problems.append(
+                f"{label}: the index was NOT fully enriched when this capture was taken "
+                f"({reasons}). Every enabled stage must be complete with nothing pending — "
+                "coverage "
+                f"embed={enrichment.get('embeddingCoveragePercent')} "
+                f"splade={enrichment.get('spladeCoveragePercent')} "
+                f"chunkVector={enrichment.get('chunkVectorCoveragePercent')}, pending "
+                f"chunkEmbedding={enrichment.get('chunkEmbeddingPendingCount')} "
+                f"ner={enrichment.get('pendingNerCount')}. Re-run the cycle; "
+                "fixture-cycle.sh now aborts rather than capturing this state."
+            )
+    return problems
+
+
 def capture_health(
     baseline: dict, candidate: dict, declared_not_captured: list[str]
 ) -> dict:
@@ -2359,6 +2461,7 @@ def capture_health(
     problems.extend(_pin_problems(baseline, candidate))
     problems.extend(_applied_sampling_problems(baseline, candidate))
     problems.extend(_cross_encoder_problems(baseline, candidate))
+    problems.extend(_enrichment_problems(baseline, candidate))
     for section in ("queries", "chatTurns"):
         if not _records(baseline, section) and not _records(candidate, section):
             problems.append(

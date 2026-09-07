@@ -544,6 +544,23 @@ the gate to real regressions in them forever — the class would swallow the sig
 Pinning the pipeline hard enough to silence them (CPU encoders) costs over an hour per cycle and
 stops measuring the shipping configuration.
 
+**A capture on a partially enriched index is refused.** `fixture-cycle.sh` exits non-zero without
+capturing when the enrichment wait fails, `fixture-pair.sh` retries that cycle once from a hard
+clean, the capture records `provenance.enrichment` (index state, per-stage enabled flags, coverage
+percentages, pending counts) read at capture *start*, and `capture_health` refuses a capture whose
+enabled stages are not complete. The verdict is
+`jseval.readiness._check_pipeline_complete_conditions` **imported**, not restated — two copies of
+"is the index ready" drift, and then a capture can satisfy the ingest wait while failing the
+capture check. This gap is why the first four-capture acceptance passed with 0 regressions: one
+side captured a half-enriched index, disagreed with *itself* on 11 of 12 queries, and every
+disagreement was withdrawn as noise.
+
+**Per-side noise fractions include `noisy-both`.** A field unstable on both sides is unstable on
+each, so it counts towards both fractions. Counting only a side's exclusive noise understated
+every side sharing an unstable field with the other — the same acceptance measured baseline 9
+exclusive + 6 both and scored 9/222 = 4%, under the ceiling, when the honest figure is 15/222 =
+6.8%.
+
 **The withdrawal is bounded.** `maxNoisyFraction` (fixture key, `0.05`) refuses the whole run when
 a side's noise pair moves more than that share of compared fields. That is about 10 of the shipped
 fixture's ~209 compared fields — roughly twice the 6 that pairs 4 and 5 actually measured. At

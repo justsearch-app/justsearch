@@ -171,11 +171,15 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
         )
         by_side = result.get("noisy_by_side") or {}
         if any(by_side.values()):
+            both = by_side.get("both", 0)
+            # Per-side totals INCLUDE `both`, because a field noisy on both sides is noisy on
+            # each — the same arithmetic the ceiling uses. Printing only the exclusive counts
+            # made a side look quieter than the gate itself judged it.
             click.echo(
                 "  noisy (excluded from the verdict): "
-                + f"baseline={by_side.get('baseline', 0)} "
-                + f"candidate={by_side.get('candidate', 0)} "
-                + f"both={by_side.get('both', 0)} "
+                + f"baseline={by_side.get('baseline', 0) + both} "
+                + f"candidate={by_side.get('candidate', 0) + both} "
+                + f"(of which both={both}) "
                 + f"(ceiling {result.get('maxNoisyFraction')})"
             )
             for entry in result["fields"]:
