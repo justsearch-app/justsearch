@@ -191,11 +191,6 @@ final class BoundedHandoff<T> implements AutoCloseable {
     }
   }
 
-  /** Whether the flow has been closed. Wired into the worker call's cancellation signal. */
-  boolean isClosed() {
-    return closed.get();
-  }
-
   /**
    * Registers the one handler to run when the flow closes — the producer-side unsubscribe. Runs
    * immediately if the flow is already closed, so a late registration cannot leak a subscription.

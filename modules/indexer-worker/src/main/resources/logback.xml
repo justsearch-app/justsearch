@@ -77,7 +77,6 @@
   </appender>
 
   <!-- Reduce noise from chatty libraries -->
-  <logger name="io.grpc" level="WARN" />
   <logger name="io.netty" level="WARN" />
   <logger name="org.apache.lucene" level="WARN" />
   <logger name="org.sqlite" level="WARN" />

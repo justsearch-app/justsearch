@@ -39,10 +39,10 @@ public final class AotTraining {
     touch("org.apache.lucene.codecs.lucene100.Lucene100Codec");
     touch("org.apache.lucene.util.hnsw.HnswGraphSearcher");
 
-    // --- gRPC (Worker hosts the server) ---
-    touch("io.grpc.ServerBuilder");
-    touch("io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder");
-    touch("io.grpc.stub.StreamObserver");
+    // Lane F stage A item A9: the three gRPC touches (ServerBuilder, NettyServerBuilder,
+    // StreamObserver) are gone with the server they warmed. Warming a class the process no longer
+    // loads costs AOT-cache space and buys nothing. Item A13 folds what is left of this list into
+    // the Head's AotTraining, which is the one cache the Engine has.
 
     // --- Protobuf ---
     touch("com.google.protobuf.GeneratedMessage");

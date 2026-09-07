@@ -91,7 +91,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Lane F stage A item A3: this is a plain service — it returns its response object and reports
  * failure by throwing {@link WorkerServiceException}. While the wire is still up (through A9) it is
- * reached through the {@code DelegatingIngestService} adapter, which does the transport framing and
+ * reached, until item A9 deleted it, through a wire adapter that did the transport framing and
  * maps each failure back onto the identical status code.
  *
  * <p><b>Security:</b> All paths are validated and sanitized before processing.

@@ -5,15 +5,16 @@ package io.justsearch.indexerworker.services;
  * The one failure type the worker services throw.
  *
  * <p>Lane F stage A item A3: before the conversion each service reported a failure by handing a
- * {@code io.grpc.Status.X.withDescription(...)} exception to a {@code StreamObserver}. That
+ * {@code Status.X.withDescription(...)} exception to a {@code StreamObserver}. That
  * vocabulary is a property of the <b>work</b>, not of the channel — "invalid argument", "the
  * index runtime is not up yet", "the queue is full" survive a transport deletion — so it is
  * re-homed here as {@link Status} rather than deleted with the wire (design §6: "none may vanish
  * with the channel").
  *
  * <p>{@link Status} enumerates exactly the codes the three services emit today; the
- * {@code Delegating*Service} adapters map each back onto the identical {@code io.grpc.Status}
- * constant, so every caller across the still-live wire observes what it observed before.
+ * {@code Delegating*Service} adapters mapped each back onto the identical gRPC status constant so
+ * that, while the wire was still up, every caller observed what it observed before; item A9 deleted
+ * both the adapters and the wire, and this enum is now the only vocabulary there is.
  * Codes with no producer in these services (for example {@code NOT_FOUND},
  * {@code DEADLINE_EXCEEDED}, {@code CANCELLED}) are deliberately absent: an unemitted member is
  * residue that reads as authority.

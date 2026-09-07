@@ -64,11 +64,11 @@ The Worker throttles indexing while the user is waiting on a foreground request.
 Head→Worker input signal** for this: the Worker observes its own load.
 
 *   **Signal:** `ForegroundLoad` (`modules/worker-services/.../loop/pacing/ForegroundLoad.java`) is a
-    counter of in-flight **search-family gRPC calls**. A single `ServerInterceptor`
-    (`ForegroundLoadInterceptor`, registered in `KnowledgeServerGrpcWiring`) increments it when one
-    of the nine user-waiting `SearchService` methods starts and decrements it on completion, error
-    or cancellation. `IngestService` calls — `IndexStatus` above all — never count, so polling
-    status cannot throttle indexing.
+    counter of in-flight **search-family port calls**. A single producer
+    (`ForegroundLoadGate` in the Engine composition root; before lane F stage A item A9 it was a
+    gRPC `ServerInterceptor`) increments it when one of the nine user-waiting search methods starts
+    and decrements it on completion, error or cancellation. Ingest calls — `IndexStatus` above all —
+    never count, so polling status cannot throttle indexing.
 *   **Policy:** `IndexingPacing` turns that gauge into a duty cycle. While a foreground call is in
     flight (plus a short cooldown after the last one completes), each unit of indexing or backfill
     work is followed by a proportional yield, so indexing keeps at most `foregroundDutyPct` of the

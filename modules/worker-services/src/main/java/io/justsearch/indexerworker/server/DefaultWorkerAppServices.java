@@ -161,7 +161,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     }
 
     // 2. Search service (null embedding — wired by deferred init). Lane F item A3 converted it
-    // off the generated ImplBase; the gRPC wire reaches it through DelegatingSearchService.
+    // off the generated ImplBase. Item A9 deleted the DelegatingSearchService adapter with the
+    // gRPC server it was registered in; callers reach this instance through appServices().
     // Works against DeferredRuntime (read ops only) or RunningRuntime.
     // W7.2: shares the encoderBindings instance with IndexingLoop.
     this.searchService =
@@ -198,7 +199,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.searchService.setActiveGenerationSupplier(
         this.ingestService.activeGenerationSupplier());
 
-    // 4. Health service (also converted off the ImplBase; reached through DelegatingHealthService).
+    // 4. Health service (also converted off the ImplBase; its wire adapter went at item A9).
     List<WorkerModelDiscovery.DiscoveredModel> discoveredModels =
         WorkerModelDiscovery.discoverAll();
     this.healthService =
@@ -210,7 +211,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             this::indexingLoopState,
             discoveredModels);
 
-    // 5. Cross-service wiring (previously in KnowledgeServerGrpcWiring)
+    // 5. Cross-service wiring (previously in the gRPC wiring, deleted at item A9)
     RerankerConfig.ChunkRerankerConfig chunkRerankerConfig =
         RerankerConfig.ChunkRerankerConfig.fromEnv();
     searchService.setChunkRerankerConfig(chunkRerankerConfig);

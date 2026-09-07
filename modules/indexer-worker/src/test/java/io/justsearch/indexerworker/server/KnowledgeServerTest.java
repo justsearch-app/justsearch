@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -207,8 +208,8 @@ class KnowledgeServerTest {
   class GetPortTests {
 
     @Test
-    @DisplayName("returns -1 when grpcServer is null")
-    void nullServer_returnsMinusOne() throws Exception {
+    @DisplayName("always returns -1: there is no socket to bind")
+    void noSocket_returnsMinusOne() throws Exception {
       KnowledgeServer server = createEmptyServer();
       assertEquals(-1, server.getPort());
     }
@@ -218,12 +219,30 @@ class KnowledgeServerTest {
   @DisplayName("isRunning()")
   class IsRunningTests {
 
+    /**
+     * The second conjunct of {@code isRunning()} used to be "a gRPC server object exists". With the
+     * wire gone it is "the shutdown latch has not been released", so the case this pins is the same
+     * one it always pinned: the {@code running} flag alone does not make a Worker running.
+     */
     @Test
-    @DisplayName("returns false when grpcServer is null")
-    void nullServer_returnsFalse() throws Exception {
+    @DisplayName("returns false once the shutdown latch has been released")
+    void shutdownLatchReleased_returnsFalse() throws Exception {
       KnowledgeServer server = createEmptyServer();
       setField(server, "running", true);
+      CountDownLatch alreadyShutDown = new CountDownLatch(1);
+      alreadyShutDown.countDown();
+      setField(server, "shutdownLatch", alreadyShutDown);
       assertFalse(server.isRunning());
+    }
+
+    @Test
+    @DisplayName("returns true while running with the shutdown latch still held")
+    void runningAndNotShutDown_returnsTrue() throws Exception {
+      KnowledgeServer server = createEmptyServer();
+      setField(server, "running", true);
+      assertTrue(
+          server.isRunning(),
+          "otherwise the assertion above would pass for any state at all");
     }
 
     @Test
@@ -611,8 +630,10 @@ class KnowledgeServerTest {
     return new EmbeddingCompatibilityController(java.util.Map::of, () -> 0L);
   }
 
-  /** Initializes final atomic fields that require non-null values. */
+  /** Initializes final fields that require non-null values. */
   private static void initializeAtomicFields(KnowledgeServer server) throws Exception {
+    // isRunning() dereferences this; a constructor-less instance would NPE instead of answering.
+    setField(server, "shutdownLatch", new CountDownLatch(1));
     setField(server, "migrationEnumeratorRunning", new AtomicBoolean(false));
     setField(server, "migrationEnumeratorRootsTotal", new AtomicLong(0L));
     setField(server, "migrationEnumeratorRootsDone", new AtomicLong(0L));

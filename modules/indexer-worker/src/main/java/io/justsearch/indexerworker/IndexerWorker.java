@@ -19,11 +19,14 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Lucene index (exclusive R/W access)</li>
  *   <li>SQLite job queue (exclusive R/W access)</li>
- *   <li>gRPC services for search and ingestion</li>
+ *   <li>the search and ingestion services (in-process since lane F stage A item A9)</li>
  * </ul>
  *
- * <p>The worker binds to an ephemeral port (port 0) and writes the actual
- * bound port to a memory-mapped file for discovery by the main process.
+ * <p>Item A9 deleted the gRPC server, so this entry point no longer binds an ephemeral port nor
+ * publishes one to the memory-mapped file for discovery. It survives only as the standalone
+ * escape hatch until item A13 collapses the two spawn paths; the live path is the Engine
+ * composition root ({@code io.justsearch.app.engine.EngineRoot}), which builds this same
+ * {@code KnowledgeServer} inside the Head JVM.
  */
 public final class IndexerWorker {
   private static final Logger log = LoggerFactory.getLogger(IndexerWorker.class);
@@ -115,7 +118,10 @@ public final class IndexerWorker {
 
       server.start();
 
-      log.info("Knowledge Server started on port {}", server.getPort());
+      // Lane F stage A item A9: there is no port. This standalone entry point survives only
+      // until item A13 collapses the two spawn paths into one; logging -1 would be a lie, so it
+      // says what is true instead.
+      log.info("Knowledge Server started (in-process services; no network listener)");
 
       // Add shutdown hook for graceful termination
       Runtime.getRuntime()

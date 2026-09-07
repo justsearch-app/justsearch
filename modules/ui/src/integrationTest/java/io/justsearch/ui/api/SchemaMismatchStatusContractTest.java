@@ -86,14 +86,22 @@ final class SchemaMismatchStatusContractTest {
     // Seed a legacy index with a mismatched stored schema fingerprint.
     seedLegacyIndexWithBogusSchemaFingerprint(dataDir);
 
-    // Start a real worker via KnowledgeServerBootstrap (required for /api/status schema fields).
+    // Start a real index half via KnowledgeServerBootstrap (required for /api/status schema
+    // fields). Lane F stage A item A9: it runs INSIDE this JVM now. Before A9 this spawned the
+    // indexer-worker distribution and waited for it to publish a gRPC port; A9 deleted that
+    // server, so the spawn path cannot come up at all. The property under test — a schema
+    // mismatch surfaces on /api/status as reindexRequired — is unchanged and is now exercised
+    // without a second process, which also removes this test's dependency on the
+    // indexer-worker installDist and its Windows file-lock teardown dance.
     KnowledgeServerConfig config = KnowledgeServerConfig.load();
     workerLogPath = config.dataDir().resolve("logs").resolve("worker.log");
-    assertTrue(
-        Files.isDirectory(config.workerLibDir()),
-        "❌ Worker distribution required for this test. Build with: ./gradlew :modules:indexer-worker:installDist");
 
-    bootstrap = new KnowledgeServerBootstrap(config);
+    bootstrap =
+        new KnowledgeServerBootstrap(
+            config,
+            null,
+            new io.justsearch.app.services.lifecycle.WorkerCapability(),
+            new io.justsearch.app.engine.EngineRoot(config.deadlineMs(), config.batchSize()));
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
       // timeout must not read as a schema-contract failure. (This test never runs in CI — see the

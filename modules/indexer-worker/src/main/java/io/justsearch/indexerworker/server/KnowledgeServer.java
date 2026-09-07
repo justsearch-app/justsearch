@@ -3,8 +3,6 @@ package io.justsearch.indexerworker.server;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import io.grpc.Server;
-import io.grpc.ServerInterceptor;
 import io.justsearch.adapters.lucene.runtime.IndexRecoveryMarker;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
@@ -36,15 +34,9 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.indexerworker.liveness.LivenessWindows;
 import io.justsearch.indexerworker.util.IndexRootLock;
-import io.justsearch.indexerworker.grpc.DelegatingHealthService;
-import io.justsearch.indexerworker.grpc.DelegatingIngestService;
-import io.justsearch.indexerworker.grpc.DelegatingSearchService;
-import io.justsearch.indexerworker.grpc.RequestMetadataInterceptor;
-import io.justsearch.indexerworker.grpc.TracingServerInterceptor;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
-import io.justsearch.indexerworker.server.ops.KnowledgeServerGrpcWiring;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerSafeMetrics;
 import io.justsearch.indexing.SchemaFields;
@@ -108,7 +100,6 @@ public final class KnowledgeServer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServer.class);
   private static final ObjectMapper JSON = new ObjectMapper();
 
-  private static final int SHUTDOWN_TIMEOUT_SECONDS = 5;
   private static final long MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD = 1_000L;
   private static final long MIGRATION_SWITCHING_MAX_DURATION_MS = 30L * 60_000L;
 
@@ -169,9 +160,6 @@ public final class KnowledgeServer implements Closeable {
 
   private volatile IndexingPacing indexingPacing =
       IndexingPacing.unthrottled();
-  DelegatingSearchService searchWrapper;
-  DelegatingIngestService ingestWrapper;
-  DelegatingHealthService healthWrapper;
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
   io.justsearch.indexerworker.ner.NerService nerServiceInstance;
   io.justsearch.indexerworker.splade.SpladeEncoder spladeEncoderInstance;
@@ -186,7 +174,16 @@ public final class KnowledgeServer implements Closeable {
   // Catalog instance is retained for lifetime; OTel async callbacks fire at flush time.
   @SuppressWarnings("unused")
   private io.justsearch.indexerworker.services.WorkerOpsMetricCatalog workerOpsCatalog;
-  private Server grpcServer;
+  /**
+   * Signalled by {@link #initiateShutdown()} and awaited by {@link #blockUntilShutdown()}.
+   *
+   * <p>Lane F stage A item A9: this used to be the gRPC {@code Server}'s own termination. With the
+   * server gone the standalone {@code IndexerWorker.main} still needs something to park on until
+   * the sentinel decides to stop, and "running" needed a definition that is not "a socket is
+   * bound". Under the Engine (the live path since A6) neither is used: the composition root owns
+   * the lifecycle and nothing blocks here.
+   */
+  private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
   volatile CompletableFuture<ModelContext> deferredModelInit; // package-private: DevReloadManager
   private DevReloadManager devReloadManager;
@@ -342,12 +339,11 @@ public final class KnowledgeServer implements Closeable {
    *
    * <p>Initialization order:
    * <ol>
-   *   <li>Open signal bus (MMF)</li>
+   *   <li>Open the signal bus (the in-process one under the Engine; the memory-mapped one on the
+   *       standalone path, until item A10 deletes it)</li>
    *   <li>Open job queue (SQLite)</li>
    *   <li>Initialize Lucene runtime</li>
    *   <li>Resolve the embedding compatibility controller — must precede any commit (tempdoc 819)</li>
-   *   <li>Start gRPC server on port 0</li>
-   *   <li>Write bound port to signal bus</li>
    *   <li>Start indexing loop</li>
    *   <li>Start sentinel thread (liveness monitor)</li>
    * </ol>
@@ -977,27 +973,12 @@ public final class KnowledgeServer implements Closeable {
       long initMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
-      // 4. Create and start gRPC server on ephemeral port (before model loading)
-      List<ServerInterceptor> interceptors = List.of(
-          new TracingServerInterceptor(),
-          new RequestMetadataInterceptor(),
-          // Tempdoc 885 item 3: the only producer of the foreground-load gauge the indexing duty
-          // cycle reads. Ingest RPCs (IndexStatus above all) deliberately do not count.
-          new io.justsearch.indexerworker.server.ops.ForegroundLoadInterceptor(foregroundLoad)
-      );
-
-      grpcServer = createGrpcServer(interceptors);
-      grpcServer.start();
-
-      int boundPort = grpcServer.getPort();
-      log.info("gRPC server started on port {}", boundPort);
-
-      // 5. Write port to signal bus — Head is unblocked from here
-      signalBus.writePort(boundPort);
-
-      tPhase = System.nanoTime();
-      long grpcMs = (tPhase - tPrev) / 1_000_000;
-      tPrev = tPhase;
+      // 4-5. The gRPC server, its three interceptors and the port publication used to be here.
+      // Item A9 deleted all of it: the ports are direct calls (item A6), so there is nothing to
+      // bind, no trace/request-id header to extract (the caller's OTel context and MDC are already
+      // current on this thread) and no port for a second process to discover. The foreground-load
+      // gauge kept its producer — ForegroundLoadGate in the composition root, wired at A6 —
+      // which is why the interceptor could go without the gauge going with it.
 
       // 6. Start indexing loop (runs immediately; null-gates embedding/SPLADE until wired)
       // ...unless the rebuild brake is exhausted. The loop's whole job is to write into
@@ -1022,13 +1003,13 @@ public final class KnowledgeServer implements Closeable {
       long loopMs = (System.nanoTime() - tPrev) / 1_000_000;
       long totalMs = (System.nanoTime() - t0) / 1_000_000;
       log.info(
-          "Startup phases (ms): telemetry={}, signalBus={}, jobQueue={}, lucene={}, init={}, grpc={}, loop={}, total={} [models loading in background]",
-          telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, grpcMs, loopMs, totalMs);
+          "Startup phases (ms): telemetry={}, signalBus={}, jobQueue={}, lucene={}, init={}, loop={}, total={} [models loading in background]",
+          telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, loopMs, totalMs);
 
-      log.info("KnowledgeServer started successfully on port {}", boundPort);
+      log.info("KnowledgeServer started successfully (in-process; no port)");
 
       // --- Deferred model initialization (background) ---
-      // Models load in a background thread while gRPC is already serving. Callers
+      // Models load in a background thread while the ports are already answering. Callers
       // are null-safe: search degrades to BM25, IndexingLoop skips embedding/SPLADE,
       // ingest queues jobs normally. Models become available via volatile setters.
       deferredModelInit = CompletableFuture.supplyAsync(this::initDeferredModels);
@@ -1205,24 +1186,19 @@ public final class KnowledgeServer implements Closeable {
    * runtime, the existing {@code appServices} captured ops from the now-closed
    * deferred runtime. Reconstruct from the current {@code infraCtx} (which sees
    * the post-upgrade {@code RunningRuntime} via supplier re-read), re-apply
-   * post-construction wiring, swap the {@link DelegatingSearchService} /
-   * {@link DelegatingIngestService} delegates, and start the new indexing loop.
-   * Mirrors {@code DevReloadManager.performReload}'s swap dance.
+   * post-construction wiring, publish the new instance and start its indexing loop.
+   *
+   * <p>Item A9: the three {@code Delegating*Service} wrappers this used to re-point are gone with
+   * the gRPC registration they existed for. Publishing {@code appServices} IS the swap now, because
+   * every caller reaches the services through {@link #appServices()} per call rather than through a
+   * registered wrapper — see {@code EngineKnowledgeClient}, which holds a supplier for exactly this
+   * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
   private void reconstructAppServicesAfterDeferredUpgrade() {
     log.info("Reconstructing appServices after DeferredRuntime.upgradeWriter()");
     WorkerAppServices oldServices = appServices;
     WorkerAppServices newServices = newAppServices();
     wireAppServicesPostConstruction(newServices);
-    if (searchWrapper != null) {
-      searchWrapper.setDelegate(newServices.searchService());
-    }
-    if (ingestWrapper != null) {
-      ingestWrapper.setDelegate(newServices.ingestService());
-    }
-    if (healthWrapper != null) {
-      healthWrapper.setDelegate(newServices.healthService());
-    }
     this.appServices = newServices;
     newServices.startIndexingLoop();
     if (oldServices != null) {
@@ -1232,15 +1208,6 @@ public final class KnowledgeServer implements Closeable {
         log.warn("Old appServices close after upgrade failed (best-effort): {}", e.getMessage());
       }
     }
-  }
-
-  private Server createGrpcServer(List<ServerInterceptor> interceptors) throws IOException {
-    KnowledgeServerGrpcWiring.GrpcWiringResult wiring =
-        KnowledgeServerGrpcWiring.createGrpcServer(config, interceptors, appServices);
-    this.searchWrapper = wiring.searchService();
-    this.ingestWrapper = wiring.ingestService();
-    this.healthWrapper = wiring.healthService();
-    return wiring.server();
   }
 
   /**
@@ -2117,9 +2084,7 @@ public final class KnowledgeServer implements Closeable {
 
   private void initiateShutdown() {
     running = false;
-    if (grpcServer != null) {
-      grpcServer.shutdown();
-    }
+    shutdownLatch.countDown();
   }
 
   /**
@@ -2128,21 +2093,14 @@ public final class KnowledgeServer implements Closeable {
    * @throws InterruptedException if interrupted while waiting
    */
   public void blockUntilShutdown() throws InterruptedException {
-    if (grpcServer != null) {
-      grpcServer.awaitTermination();
-    }
+    shutdownLatch.await();
   }
 
-  /**
-   * Returns the bound port, or -1 if not started.
-   *
-   * @return The bound gRPC port
-   */
   /**
    * The composed application services (lane F stage A item A6).
    *
    * <p>Public so the Engine composition root can bind the ports over the same instance the
-   * indexing loop and the (until A9) gRPC wiring use. Null before {@link #start()}, and REPLACED on
+   * indexing loop uses. Null before {@link #start()}, and REPLACED on
    * a deferred-runtime upgrade or a dev hot-reload — callers must re-read it rather than cache it.
    */
   public WorkerAppServices appServices() {
@@ -2162,8 +2120,15 @@ public final class KnowledgeServer implements Closeable {
     return foregroundLoad;
   }
 
+  /**
+   * Always {@code -1} since item A9: there is no socket. Kept for one item so the standalone
+   * {@code IndexerWorker.main} log line and the boot tests still compile; item A13 (one spawn path)
+   * removes the last caller.
+   *
+   * @return -1
+   */
   public int getPort() {
-    return grpcServer != null ? grpcServer.getPort() : -1;
+    return -1;
   }
 
   /**
@@ -2172,7 +2137,7 @@ public final class KnowledgeServer implements Closeable {
    * @return true if the server is running
    */
   public boolean isRunning() {
-    return running && grpcServer != null && !grpcServer.isShutdown();
+    return running && shutdownLatch.getCount() > 0;
   }
 
   /**
@@ -2311,18 +2276,9 @@ public final class KnowledgeServer implements Closeable {
       }
     }
 
-    // Stop gRPC server
-    if (grpcServer != null) {
-      grpcServer.shutdown();
-      try {
-        if (!grpcServer.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          grpcServer.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        grpcServer.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
-    }
+    // Item A9: releasing the shutdown latch replaces stopping the gRPC server. Anything parked in
+    // blockUntilShutdown() (the standalone entry point) resumes here.
+    shutdownLatch.countDown();
 
     // Stop migration enumerator thread (best-effort)
     if (migrationEnumeratorThread != null) {

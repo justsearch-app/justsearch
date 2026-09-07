@@ -74,7 +74,7 @@ final class PreOpenSchemaMismatchBootTest {
         "an index whose shape changed must start migrating at boot — this is the whole point of"
             + " making BLUE_GREEN_MIGRATE the production default");
     assertNotNull(after.building_generation(), "a Green generation was allocated");
-    assertTrue(server.getPort() > 0, "and Blue keeps serving while it rebuilds");
+    assertTrue(server.isRunning(), "and Blue keeps serving while it rebuilds");
   }
 
   /** (a) The same index under the refusing policy. */
@@ -146,7 +146,7 @@ final class PreOpenSchemaMismatchBootTest {
 
     server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
-    assertTrue(server.getPort() > 0, "the Worker comes up on the rebuilt index");
+    assertTrue(server.isRunning(), "the Worker comes up on the rebuilt index");
 
     Path backup = soleSiblingWithSuffix(layout.activePath(), ".bak-");
     assertNotNull(
@@ -176,7 +176,8 @@ final class PreOpenSchemaMismatchBootTest {
     server.start();
 
     assertTrue(server.isRunning(), "a misspelled policy is a typo, not a reason to refuse to boot");
-    assertTrue(server.getPort() > 0);
+    assertNotNull(
+        server.appServices(), "and start() ran to completion: the service surface is built");
   }
 
   /**
@@ -211,7 +212,8 @@ final class PreOpenSchemaMismatchBootTest {
       server.start();
 
       assertTrue(server.isRunning(), "auto-recovery must still get its chance to run");
-      assertTrue(server.getPort() > 0, "a Worker with no port is a Worker gone");
+      assertNotNull(
+          server.appServices(), "a Worker with no service surface is a Worker gone");
       var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
       assertEquals(
           1,
@@ -294,7 +296,7 @@ final class PreOpenSchemaMismatchBootTest {
           stateAfterBoot(layout).migration_state(),
           "a matching index must not be migrated — a detector that fires on everything is not a"
               + " detector");
-      assertTrue(server.getPort() > 0);
+      assertTrue(server.isRunning());
       assertFalse(
           appender.list.stream()
               .map(ILoggingEvent::getFormattedMessage)

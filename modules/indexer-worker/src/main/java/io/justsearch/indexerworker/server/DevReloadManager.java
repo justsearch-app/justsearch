@@ -72,12 +72,15 @@ final class DevReloadManager {
       // 5. Re-wire models from ModelContext (typed, no scattered field reads)
       rewireModels(newServices, modelCtx);
 
-      // 6. Swap gRPC delegates (volatile write — atomic for new requests)
-      server.searchWrapper.setDelegate(newServices.searchService());
-      server.ingestWrapper.setDelegate(newServices.ingestService());
-      server.healthWrapper.setDelegate(newServices.healthService());
-
-      // 7. Update KnowledgeServer's appServices reference
+      // 6-7. Publish the new services (volatile write — atomic for calls that arrive after it).
+      //
+      // Lane F stage A item A9: this used to be two steps. The gRPC registration held three
+      // `Delegating*Service` wrappers whose delegates had to be re-pointed, and only then was
+      // `appServices` updated. Those wrappers existed for nothing else, and they went with the
+      // server. The volatile write IS the swap now, because every caller reads the services per
+      // call through `KnowledgeServer.appServices()` rather than through a registered object —
+      // `EngineKnowledgeClient` holds a supplier for exactly this reason, so a reload it did not
+      // know about still reaches the new instance on the next call.
       server.appServices = newServices;
 
       // 8. Start new indexing loop

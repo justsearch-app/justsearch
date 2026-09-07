@@ -105,7 +105,7 @@
       "recipe": [
         "Define the method + messages in the .proto (e.g. indexing.proto).",
         "Implement the service method in modules/worker-services/.",
-        "Add the forward in DelegatingIngestService.java (modules/indexer-worker/.../grpc/) — the server registers this wrapper, not the impl; without it the RPC returns UNIMPLEMENTED at runtime.",
+        "NO LONGER A STEP: lane F stage A item A9 deleted the gRPC server and its three Delegating*Service wrappers, so there is no forward to add — callers reach WorkerIngestService directly through KnowledgeServer.appServices().",
         "Add the client call in modules/app-services/ (RemoteKnowledgeClient or the relevant client).",
         "Add a contract test.",
         "Verify: ./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test",

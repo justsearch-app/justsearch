@@ -5,8 +5,8 @@ package io.justsearch.indexerworker.services;
  * Per-call context a caller supplies to a worker service method.
  *
  * <p>Lane F stage A item A3 ("converted, not deleted"): the three worker services no longer
- * extend a generated gRPC {@code ImplBase}, so the call-scoped facts they used to read out of
- * {@code io.grpc.Context} statics are now passed in explicitly. Design §6: "cancellation,
+ * extend a generated gRPC {@code ImplBase}, so the call-scoped facts they used to read out of the
+ * transport's own thread-local context statics are now passed in explicitly. Design §6: "cancellation,
  * deadlines, bounded work, per-batch memory limits and backpressure are requirements of the
  * work, not of the network ... none may vanish with the channel."
  *
@@ -14,9 +14,9 @@ package io.justsearch.indexerworker.services;
  *
  * <ul>
  *   <li>{@code traceId} — the W3C trace id the caller propagated, used to open the logging MDC
- *       scope (previously {@code TracingServerInterceptor.currentOtelContext()}).
+ *       scope (previously read from the tracing server interceptor, deleted at item A9).
  *   <li>{@code requestId} — the caller's request id, same MDC scope (previously
- *       {@code RequestMetadataInterceptor.currentRequestId()}).
+ *       read from the request-metadata server interceptor, deleted at item A9).
  *   <li>{@code cancel} — the call's cancellation signal, read by the two streaming methods
  *       (previously {@code ServerCallStreamObserver#isCancelled()} and
  *       {@code #setOnCancelHandler(Runnable)}).

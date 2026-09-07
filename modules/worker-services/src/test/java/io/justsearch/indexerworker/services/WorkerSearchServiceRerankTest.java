@@ -32,7 +32,8 @@ import org.junit.jupiter.api.io.TempDir;
  * Contract tests for the Rerank RPC (360: migrated to Worker).
  *
  * <p>Verifies the service method and the MODEL_NOT_LOADED fallback when no reranker is wired.
- * (The gRPC adapter's own framing/status mapping is covered by {@code WorkerServiceCallsTest};
+ * (The gRPC adapter's own framing/status mapping was covered by {@code WorkerServiceCallsTest},
+ * deleted with the adapter at item A9;
  * every case here drives {@link WorkerSearchService} directly, as it always did.)
  */
 @DisplayName("WorkerSearchService Rerank RPC")

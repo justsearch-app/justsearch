@@ -17,7 +17,7 @@ file is the full reference behind those recipes.
 ## Add a gRPC method
 1. Define in `modules/ipc-common/src/main/proto/indexing.proto`
 2. Implement service method in `modules/worker-services/`
-3. **Add forward in `DelegatingIngestService.java`** (`modules/indexer-worker/.../grpc/`) — the gRPC server registers this wrapper, not the impl directly. Without the forward, the RPC returns UNIMPLEMENTED at runtime.
+3. ~~Add forward in `DelegatingIngestService.java`~~ — **no longer a step.** Lane F stage A item A9 deleted the gRPC server and its three `Delegating*Service` wrappers; callers reach the impl directly through `KnowledgeServer.appServices()`, so adding a method to `WorkerIngestService` is all there is.
 4. Add client call in `modules/app-services/` (`RemoteKnowledgeClient` or relevant client)
 5. Add contract test
 6. Verify: `./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test`

@@ -11,7 +11,6 @@ import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.adapters.lucene.runtime.TextQueryOps;
 import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.indexerworker.grpc.TracingServerInterceptor;
 import io.justsearch.indexerworker.services.SearchOutcome;
 import io.justsearch.indexerworker.services.SearchReasonCode;
 import io.justsearch.indexerworker.services.input.SearchInputs;
@@ -113,8 +112,21 @@ public final class SearchExecutor {
     return SearchOutcome.empty(new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0));
   }
 
+  /**
+   * The parent span every leg of this search hangs off.
+   *
+   * <p>Lane F stage A item A9: this used to read
+   * {@code TracingServerInterceptor.currentOtelContext()}, a gRPC {@code Context} key the server
+   * interceptor stashed the extracted W3C context under. The interceptor existed because the
+   * transport delivered the trace headers on a thread that had no OTel context of its own. In
+   * process the caller IS the caller: {@code WorkerSearchService.search} runs the orchestrator
+   * synchronously on the thread that called the port, so the Head's span is already current here
+   * and the extraction step has nothing left to do. It is read ONCE per search, at the top, because
+   * the legs below run on executor pools and each sets this value as its explicit parent — which is
+   * the same reason the interceptor version read it once.
+   */
   private SearchOutcome runSparseShortcut(SearchDecision.SparseShortcut decision, SearchInputs inputs) {
-    Context parentCtx = TracingServerInterceptor.currentOtelContext();
+    Context parentCtx = Context.current();
     var request = inputs.request();
     String queryString = request.getQuery();
     var runtimeFilters = inputs.runtimeFilters();
@@ -263,7 +275,7 @@ public final class SearchExecutor {
   }
 
   private SearchOutcome runMultiLeg(SearchDecision.MultiLegDecision decision, SearchInputs inputs) {
-    Context parentCtx = TracingServerInterceptor.currentOtelContext();
+    Context parentCtx = Context.current();
     var request = inputs.request();
     String queryString = request.getQuery();
     var runtimeFilters = inputs.runtimeFilters();
@@ -565,7 +577,7 @@ public final class SearchExecutor {
           0L);
     }
 
-    Context parentCtx = TracingServerInterceptor.currentOtelContext();
+    Context parentCtx = Context.current();
     Span chunkSpan = tracer().spanBuilder("search/chunk_merge").setParent(parentCtx).startSpan();
     // Tempdoc 553 Phase A: structural (CHAIN) span — its retriever/reranker children carry documents.
     chunkSpan.setAllAttributes(OpenInferenceSpanProjection.chain());

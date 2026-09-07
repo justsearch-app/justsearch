@@ -138,8 +138,10 @@ final class BoundedHandoffTest {
     assertTrue(refused, "publish must eventually refuse rather than block forever");
     assertTrue(reported.await(10, TimeUnit.SECONDS), "the stall must be reported to the consumer");
     assertNotNull(failure.get());
-    assertTrue(flow.isClosed(), "a failed flow is a closed flow");
-    assertFalse(flow.publish(99), "a closed flow refuses immediately");
+    // "A failed flow is a closed flow" is observable exactly here: the next publish is refused.
+    // Asserting it through a boolean accessor as well would need a method main code never reads,
+    // which is the dead-code shape UnreferencedCodeTest exists to catch.
+    assertFalse(flow.publish(99), "a failed flow is a closed flow: it refuses immediately");
     stalled.countDown();
   }
 

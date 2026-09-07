@@ -680,7 +680,10 @@ Application-level gating (`maybeSpan()` returning `Span.getInvalid()`) provides 
 
 Tempdoc 518 Appendix G W4.2 activated head-side tracing (via
 `JUSTSEARCH_HEAD_TRACING_LEVEL`); cross-process tracing was already
-wired (`TraceClientInterceptor` / `TracingServerInterceptor`).
+wired through a client/server interceptor pair. Lane F stage A item A9
+deleted the server half with the gRPC server: inside one JVM the caller's
+OTel context is already current on the callee's thread, so there is
+nothing to extract.
 Combined with the existing OTLP fan-out support in
 `TracingBootstrap.buildOptionalOtlpExporter` (reads
 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`),

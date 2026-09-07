@@ -73,7 +73,9 @@ final class ResumedMigrationMismatchBootTest {
 
     assertTrue(server.isRunning(), "the Worker must come up: a mismatched Green is a rebuild to"
         + " redo, not a reason to exit");
-    assertTrue(server.getPort() > 0, "gRPC must be bound");
+    assertNotNull(
+        server.appServices(),
+        "and it finished starting: a Worker with no service surface is a Worker gone");
     assertFalse(
         server.rebuildBrakeExhaustedForTest(),
         "and it must not have short-circuited to the braked path — that would pass this test for"

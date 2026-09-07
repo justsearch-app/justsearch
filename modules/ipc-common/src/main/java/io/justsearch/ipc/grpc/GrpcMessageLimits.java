@@ -5,7 +5,7 @@ package io.justsearch.ipc.grpc;
  * Shared gRPC inbound message-size limit for the Head-to-Worker channel.
  *
  * <p>Single value read by BOTH ends of the channel - the Worker's gRPC server
- * ({@code KnowledgeServerGrpcWiring}) and the Head's client
+ * (deleted at lane F stage A item A9 with the rest of the server) and the Head's client
  * ({@code RemoteKnowledgeClient}). Before tempdoc 882 item 5 the two ends had drifted since the
  * first commit: the server advertised 32 MiB while the client never called
  * {@code maxInboundMessageSize}, so grpc-java's 4 MiB default silently capped replies (e.g.
