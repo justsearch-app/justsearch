@@ -142,7 +142,11 @@ class LayeringEnforcementTest {
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("io.justsearch.ui..")
-          .as("indexer-worker must not depend on ui (runs in separate process)");
+          // Lane F stage A item A2: predicate unchanged, wording re-cut. This used to read
+          // "(runs in separate process)", which stops being the reason once the Head and the
+          // Worker share one JVM. The direction of the edge is the reason, and it survives the
+          // merge: the index half is below the API front and never reaches up into it.
+          .as("indexer-worker must not depend on ui (the index half never reaches the API front)");
 
   // =========================================================================
   // Rule 5: Prevent circular dependencies between key modules
@@ -178,7 +182,7 @@ class LayeringEnforcementTest {
           .as("ipc-common must not depend on higher layers (shared IPC contract)");
 
   // =========================================================================
-  // Rule 6: Worker modules must not depend on app-services (isolated workers)
+  // Rule 6: Worker modules must not depend on app-services (the port points one way)
   // =========================================================================
 
   @ArchTest
@@ -190,7 +194,56 @@ class LayeringEnforcementTest {
           .dependOnClassesThat()
           .resideInAnyPackage("io.justsearch.app.services..")
           .allowEmptyShould(true)
-          .as("indexer-worker must not depend on app-services (isolated worker)");
+          // Lane F stage A item A2: predicate unchanged, wording re-cut. "(isolated worker)"
+          // was a process claim; after the merge the two halves share a JVM and the rule's
+          // reason is the port's direction, which the merge does not change.
+          .as("indexer-worker must not depend on app-services (the port is called inward only)");
+
+  // =========================================================================
+  // Rule 6b: only the Engine composition root, the worker itself and the Lucene
+  // adapters may reach the worker's internals
+  // =========================================================================
+
+  /**
+   * Lane F design 3.3, added at stage A item A2. The merge puts the Head and the Worker in one
+   * JVM, which removes the process boundary that used to make this unreachable by construction —
+   * so it becomes an ArchUnit pin instead. {@code io.justsearch.app.engine..} is the composition
+   * root (it binds the ports and must see both halves), {@code io.justsearch.indexerworker..} is
+   * the worker's own code, and {@code io.justsearch.adapters..} is the Lucene layer the worker is
+   * built on. Everything else — the API front, orchestration, the launcher — reaches the index
+   * through a port.
+   *
+   * <p>The class-level half of hard invariant 1 stays where it is
+   * ({@code IndexWriterOwnershipTest#onlyLuceneOwnersMayDependOnLuceneClasses}); this rule is the
+   * module-level half that replaces the process boundary. Both are pinned by ADR-0049, stage A
+   * item A15, which supersedes ADR-0001 and ADR-0002.
+   *
+   * <p>Scope note: {@code @AnalyzeClasses} above sets {@link
+   * com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests}, so this rule reads
+   * production bytecode only. Test code that constructs a worker service directly is out of
+   * scope by construction, not by exemption.
+   */
+  @ArchTest
+  static final ArchRule onlyEngineAndWorkerMayDependOnWorkerInternals =
+      noClasses()
+          .that()
+          .resideInAnyPackage("io.justsearch..")
+          .and()
+          .resideOutsideOfPackages(
+              "io.justsearch.app.engine..",
+              "io.justsearch.indexerworker..",
+              "io.justsearch.adapters..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "io.justsearch.indexerworker.server..",
+              "io.justsearch.indexerworker.services..",
+              "io.justsearch.indexerworker.loop..")
+          .as(
+              "sharing a JVM does not license application code to reach past a port into Lucene"
+                  + " (ADR-0049): only io.justsearch.app.engine.., io.justsearch.indexerworker.."
+                  + " and io.justsearch.adapters.. may depend on"
+                  + " io.justsearch.indexerworker.{server,services,loop}..");
 
   // =========================================================================
   // Rule 7: UI must use GPL contracts from app-api, not concrete implementations
