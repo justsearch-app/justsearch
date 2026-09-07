@@ -1044,6 +1044,42 @@ class McpProtocolHandlerTest {
   }
 
   @Test
+  void toolsCall_validatorCannotRun_failsClosedWithoutDispatch() {
+    // Tempdoc 949: the boundary validator's own failure (schema/args serialization throws, or
+    // the validator throws) must NOT be read as "validated OK". Pre-fix, validateArgsOrNull
+    // caught the exception and returned null — the caller's success value — so an unvalidated
+    // argument map reached dispatch and the unchecked casts the validation exists to guard.
+    // A self-referencing map makes MAPPER.writeValueAsString throw inside the validator's try,
+    // which is the only way to exercise that catch from a real callTool entry.
+    KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
+    KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
+    when(ctrl.getAdapter()).thenReturn(adapter);
+    var surface =
+        new McpToolSurface(
+            List.of(OperationCatalog.of("core", List.of())),
+            dispatcher,
+            () -> ctrl,
+            () -> null,
+            FIXED_CLOCK);
+    var cyclic = new java.util.HashMap<String, Object>();
+    cyclic.put("query", "x");
+    cyclic.put("self", cyclic);
+
+    Map<String, Object> result = surface.callTool("justsearch_search", cyclic, "s1", null);
+
+    assertEquals(Boolean.TRUE, result.get("isError"), "must fail closed: " + result);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> content = (List<Map<String, Object>>) result.get("content");
+    String text = (String) content.get(0).get("text");
+    assertTrue(
+        text.contains("validation could not run") && text.contains("not dispatched"),
+        "must be the validator-unavailable error, not a downstream failure: " + text);
+    assertTrue(text.contains("INTERNAL_ERROR"), "typed as a substrate error: " + text);
+    verify(adapter, never()).search(any());
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   void toolsCall_malformedNestedFilter_rejectedAtBoundaryBeforeDispatch() throws Exception {
     // Tempdoc 655 fix pass: `filters` was previously an opaque "object" in the schema, so a
     // malformed NESTED field (path_prefix as a number instead of a string) fell through the
