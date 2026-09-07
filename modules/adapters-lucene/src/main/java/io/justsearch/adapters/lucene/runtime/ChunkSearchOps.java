@@ -67,6 +67,31 @@ public final class ChunkSearchOps {
   }
 
   /**
+   * Runs a bare (non-kNN) chunk or full-document search with the SAME deterministic order the
+   * whole-document read path already uses: score DESC, then the stable id ASC as the tie-break
+   * ({@code LuceneRuntimeUtils.buildRuntimeSort(RELEVANCE, idField)} →
+   * {@code new Sort(FIELD_SCORE, new SortField(idField, STRING, false))}).
+   *
+   * <p>Before this existed these legs called {@code searcher.search(query, n)}, whose only
+   * tie-break is Lucene's INTERNAL docId — a number a different segment layout renumbers. Two
+   * index builds of the same documents therefore returned different members of a BM25/SPLADE tie
+   * group, and because {@code SearchExecutor#collapseChunkHitsToParents} is first-seen-wins and
+   * the fused {@code totalHits} is the candidate-union size, one swapped chunk moved both the
+   * evidence selection and the reported hit count (lane F PR 0b; the whole-document leg was
+   * already sorted this way, which is why only the chunk legs drifted).
+   *
+   * <p>{@code doDocScores = true} keeps every returned score exactly what the bare overload
+   * produced; the {@code totalHitsThreshold} is Lucene's same default for both collector
+   * managers, so only the order of equal-scoring hits changes.
+   */
+  private org.apache.lucene.search.TopDocs searchWithStableTieBreak(
+      org.apache.lucene.search.IndexSearcher searcher, Query query, int limit)
+      throws IOException {
+    return searcher.search(
+        query, limit, LuceneRuntimeUtils.buildRuntimeSort(RuntimeSearchSort.RELEVANCE, idField), true);
+  }
+
+  /**
    * Finds parent document IDs that match a filter query.
    *
    * <p>Used for two-stage RAG retrieval: first find matching parent docs via document-level
@@ -132,7 +157,7 @@ public final class ChunkSearchOps {
                 BooleanClause.Occur.FILTER);
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             return buildChunkHits(searcher, topDocs, startTime);
           });
@@ -199,7 +224,7 @@ public final class ChunkSearchOps {
             }
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
             return buildChunkHits(searcher, topDocs, startTime);
           });
     } catch (IOException e) {
@@ -264,7 +289,7 @@ public final class ChunkSearchOps {
             }
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             return buildChunkHits(searcher, topDocs, startTime);
           });
@@ -316,7 +341,7 @@ public final class ChunkSearchOps {
             }
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             return buildChunkHits(searcher, topDocs, startTime);
           });
@@ -483,7 +508,7 @@ public final class ChunkSearchOps {
                 BooleanClause.Occur.MUST_NOT);
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             org.apache.lucene.index.StoredFields storedFields = searcher.storedFields();
 

@@ -2,6 +2,7 @@ package io.justsearch.adapters.lucene.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -904,6 +905,151 @@ class ChunkSearchIntegrationTest {
     assertNotNull(result);
     assertEquals(1, result.hits().size());
     assertEquals("agent-run.md", result.hits().get(0).docId());
+  }
+
+  // ========== Chunk-leg tie-break (lane F PR 0b) ==========
+
+  /**
+   * Lane F PR 0b — the chunk BM25 leg must break equal scores on the STABLE id, not on Lucene's
+   * internal docId.
+   *
+   * <p>Three chunks with byte-identical content tie exactly on BM25. Each is committed on its own,
+   * so each lands in its own segment and its internal docId follows the COMMIT order. Before the
+   * fix, {@code searchChunksText} called {@code searcher.search(query, n)}, whose only tie-break is
+   * that internal docId — so the first build below returned {@code chunk_2, chunk_0, chunk_1} and
+   * the second returned {@code chunk_0, chunk_1, chunk_2}, and a downstream first-seen-wins parent
+   * collapse turned that into different evidence for the same corpus. The test asserts BOTH halves
+   * of the property: the order is the stable-id order, and it does not depend on insertion order.
+   *
+   * <p>{@code assertNotEquals} on the raw unsorted order is the precision guard: it proves the
+   * fixture actually produced the discriminating segment layout, so a green here cannot mean "the
+   * two orders happened to coincide".
+   */
+  @Test
+  @DisplayName("chunk BM25 ties break on the stable id, not the internal docId")
+  void chunkBm25TiesBreakOnStableIdAcrossSegmentLayouts() throws Exception {
+    // Each probe opens its OWN index; the @BeforeEach one holds the ephemeral write lock, and the
+    // two probes must not overlap either, so they are opened and closed strictly in sequence.
+    runtime.close();
+    runtime = null;
+
+    List<String> expected = List.of("tie#chunk_0", "tie#chunk_1", "tie#chunk_2");
+
+    // Build A: the discriminating layout — the HIGHEST id is committed first, so the internal
+    // docId order (chunk_2, chunk_0, chunk_1) disagrees with the stable-id order.
+    TieBreakProbe buildA = probeTiedChunkOrder(List.of(2, 0, 1));
+    assertNotEquals(
+        expected,
+        buildA.rawInternalDocIdOrder(),
+        "fixture precondition: the unsorted (internal-docId) order must differ from the stable-id "
+            + "order, otherwise this test would pass for the wrong reason");
+    assertEquals(expected, buildA.sortedOrder(), "chunk BM25 ties must break on the stable id");
+
+    // Build B: the same three chunks over an index built in the opposite insertion order.
+    TieBreakProbe buildB = probeTiedChunkOrder(List.of(0, 1, 2));
+    assertEquals(
+        expected, buildB.sortedOrder(), "chunk BM25 ties must break on the stable id");
+    assertEquals(
+        buildA.sortedOrder(),
+        buildB.sortedOrder(),
+        "two index builds of the same documents must return the same chunk order");
+  }
+
+  /**
+   * The two orders one tie-break probe build produces (see {@link #probeTiedChunkOrder}). The
+   * chunk SPLADE leg ({@code searchChunksSplade}) and the three other bare chunk/full-doc searches
+   * share the one {@code searchWithStableTieBreak} helper this asserts, and the testing field
+   * catalog carries no {@code splade} FeatureField, so BM25 is where the property is exercised.
+   */
+  private record TieBreakProbe(List<String> sortedOrder, List<String> rawInternalDocIdOrder) {}
+
+  /** Content shared by every tie-break chunk — identical text ⇒ identical BM25 score. */
+  private static final String TIE_CHUNK_TEXT = "tiebreakalpha tiebreakbeta";
+
+  /**
+   * Opens a FRESH ephemeral index, writes one parent plus three byte-identical chunks committing
+   * each chunk on its own (one segment each, in {@code commitOrder}), and returns the chunk id
+   * order the BM25 leg, the SPLADE leg, and a deliberately unsorted raw search each produce.
+   */
+  private TieBreakProbe probeTiedChunkOrder(List<Integer> commitOrder) throws Exception {
+    String parentDocId = "tie";
+    String parentContent =
+        TIE_CHUNK_TEXT + "\n" + TIE_CHUNK_TEXT + "\n" + TIE_CHUNK_TEXT;
+    int span = TIE_CHUNK_TEXT.length();
+    String parentSha = ChunkParentRevision.sha256Hex(parentContent);
+
+    RunningRuntime probe =
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    try {
+      Map<String, Object> parent = new LinkedHashMap<>();
+      parent.put(SchemaFields.DOC_ID, parentDocId);
+      parent.put(SchemaFields.DOC_UID, parentDocId + "#0");
+      parent.put(SchemaFields.CONTENT, parentContent);
+      parent.put(SchemaFields.PATH, parentDocId);
+      parent.put(SchemaFields.CONTENT_SHA256, parentSha);
+      probe.indexingCoordinator().indexSingle(new IndexDocument(parent));
+      probe.commitOps().commitAndTrack();
+
+      for (int index : commitOrder) {
+        String chunkId = parentDocId + "#chunk_" + index;
+        int start = index * (span + 1);
+        Map<String, Object> chunk = new LinkedHashMap<>();
+        chunk.put(SchemaFields.DOC_ID, chunkId);
+        chunk.put(SchemaFields.DOC_UID, chunkId + "#0");
+        chunk.put(SchemaFields.IS_CHUNK, "true");
+        chunk.put(SchemaFields.PARENT_DOC_ID, parentDocId);
+        chunk.put(SchemaFields.CHUNK_INDEX, String.valueOf(index));
+        chunk.put(SchemaFields.CHUNK_TOTAL, "3");
+        chunk.put(SchemaFields.CHUNK_CONTENT, TIE_CHUNK_TEXT);
+        chunk.put(SchemaFields.CHUNK_START_CHAR, String.valueOf(start));
+        chunk.put(SchemaFields.CHUNK_END_CHAR, String.valueOf(start + span));
+        chunk.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, parentSha);
+        chunk.put(SchemaFields.PATH, parentDocId);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(chunk));
+        // One commit per chunk: each lands in its own segment, so the internal docId order is the
+        // commit order and diverges from the stable-id order for a non-ascending commitOrder.
+        probe.commitOps().commitAndTrack();
+      }
+      probe.commitOps().maybeRefreshBlocking();
+
+      List<String> sorted =
+          probe.chunkSearchOps().searchChunksText("tiebreakalpha", 10, null).hits().stream()
+              .map(LuceneRuntimeTypes.SearchHit::docId)
+              .toList();
+      List<String> raw =
+          probe
+              .readPathOps()
+              .withSearcher(
+                  searcher -> {
+                    assertTrue(
+                        searcher.getIndexReader().leaves().size() >= 2,
+                        "fixture precondition: the chunks must span at least two segments, got "
+                            + searcher.getIndexReader().leaves().size());
+                    var q =
+                        new org.apache.lucene.search.BooleanQuery.Builder()
+                            .add(
+                                new org.apache.lucene.search.TermQuery(
+                                    new org.apache.lucene.index.Term(
+                                        SchemaFields.CHUNK_CONTENT, "tiebreakalpha")),
+                                org.apache.lucene.search.BooleanClause.Occur.MUST)
+                            .add(
+                                new org.apache.lucene.search.TermQuery(
+                                    new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
+                                org.apache.lucene.search.BooleanClause.Occur.FILTER)
+                            .build();
+                    var top = searcher.search(q, 10);
+                    List<String> ids = new java.util.ArrayList<>();
+                    for (var sd : top.scoreDocs) {
+                      ids.add(
+                          searcher.storedFields().document(sd.doc).get(SchemaFields.DOC_ID));
+                    }
+                    return List.copyOf(ids);
+                  });
+
+      return new TieBreakProbe(sorted, raw);
+    } finally {
+      probe.close();
+    }
   }
 
   // ========== Helper Methods ==========
