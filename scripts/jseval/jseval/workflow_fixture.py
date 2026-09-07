@@ -271,16 +271,50 @@ APPLIED_SAMPLING_KEYS = {
     "samplingSeed": "seed",
 }
 
-#: The four BOOT-TIME settings both sides of a paired diff must have run under, recorded from
+#: The BOOT-TIME settings both sides of a paired diff must have run under, recorded from
 #: ``GET /api/debug/effective-config`` into ``provenance.pins``. They are not request
 #: parameters — the orchestrator sets them at stack launch — so the capture cannot pin them,
 #: only OBSERVE them, which is why a mismatch is a capture-health failure rather than a field
 #: diff. See the ``THE CAPTURE RUN IS PINNED`` fixture note for what each one does.
+#:
+#: The last five were added after the second pair round, where four queries differed on
+#: candidate-pool counts and three on which chunk held the rank-10 slot. Every leg hands fusion
+#: a BOUNDED candidate list, and a chunk missing from a leg scores 0.0 for it with the leg's
+#: weight still in the denominator (``index.hybrid.chunk_cc_zero_exclude`` inherits
+#: ``cc_zero_exclude``, default false), so falling out of one leg costs a chunk that leg's whole
+#: weighted share at once. Two of the gates are also STEP FUNCTIONS on a one-document change:
+#: leg arbitration flips alpha 0.5 -> 0.7 when the two legs' top-10 doc ids share at most ONE
+#: document (Jaccard i/(20-i) < 0.1 reduces to i < 1.82), and the recall-complete splice protects
+#: each leg's rank<=10 and EVICTS a fused hit to make room. Both are ON by default.
 PINNED_CONFIG_KEYS = (
     "index.vector.exhaustive_search",
     "justsearch.llm.slots",
     "justsearch.rerank.deadline_ms",
     "justsearch.rerank.chunks.deadline_ms",
+    # Candidate budgets and the two step functions (PR 0b, second pair round).
+    "justsearch.rerank.top_k",
+    "index.hybrid.candidate_limit_max",
+    "index.hybrid.chunk_collapse_limit_multiplier",
+    "index.hybrid.leg_arbitration_enabled",
+    "index.hybrid.leg_recall_complete_enabled",
+)
+
+#: Cutoffs that are HARD-CODED and therefore cannot be pinned by any env setting. Recorded here
+#: so a reader does not conclude the capture is fully non-truncating: it is not, and cannot be
+#: without a product change.
+#:
+#: * ``SearchExecutor.CHUNK_INITIAL_CANDIDATE_MULTIPLIER = 10`` and ``CHUNK_RETRY_MULTIPLIER = 2``
+#:   (SearchExecutor.java:63-64) — at the pinned wire limit of 100 the chunk legs see 1000 chunks,
+#:   which is AT this corpus's chunk count rather than above it.
+#: * ``SearchPlanner.MAX_LIMIT = 100`` (SearchPlanner.java:37) — caps the wire limit, so branch
+#:   fusion emits at most 100 documents, BELOW a 102-document corpus. This is a hard ceiling.
+#: * ``HybridSearchOps.ARBITRATION_TOP_K`` / ``ARBITRATION_OVERLAP_MAX`` /
+#:   ``ARBITRATION_DENSE_CONFIDENT_MIN`` (HybridSearchOps.java:58, 74, 72) — the arbitration's
+#:   shape can only be turned OFF (which the pins above do), never widened.
+UNPINNABLE_CUTOFFS = (
+    "SearchExecutor.CHUNK_INITIAL_CANDIDATE_MULTIPLIER",
+    "SearchExecutor.CHUNK_RETRY_MULTIPLIER",
+    "SearchPlanner.MAX_LIMIT",
 )
 
 _SESSION_TOKEN_ENV = "JUSTSEARCH_SESSION_TOKEN"
@@ -808,7 +842,18 @@ def capture_query_record(
 
     return {
         "httpStatus": http_status,
-        "totalHits": response.get("totalHits"),
+        # NO "totalHits" and NO "trace.stageCardinality" — both are CANDIDATE-POOL SIZES, not
+        # evidence, and both moved between two fresh ingests of one corpus on one build (q02,
+        # q03, q07, q09 in the 2026-09-07 pair). Design 16 names evidence selection, truncation
+        # points, citation targets and cancellation as the byte-equal fields; it never names
+        # either of these. A count of how many candidates a stage happened to consider is a
+        # property of the candidate budget and of which chunks sat at a per-leg cutoff, so
+        # diffing it reports pool churn as a semantic regression. Both are recorded in the
+        # capture's non-diffed `observed` block, where a reader can still see them.
+        #
+        # `matchCount` STAYS exact: it is an IndexSearcher.count over the query, i.e. how many
+        # documents match at all, which is a property of the corpus and the query rather than
+        # of any budget.
         "matchCount": response.get("matchCount"),
         # The TOP-K count, NOT the compared-slice length. `hitCount` is a declared, exactly
         # diffed field: making it the slice length would turn a legitimate cutoff-group size
@@ -826,9 +871,6 @@ def capture_query_record(
         "trace.decisionKind": trace.get("decisionKind"),
         "trace.stageIds": [s.get("id") for s in stages],
         "trace.stageStatuses": {stage_key(s, i): s.get("status") for i, s in enumerate(stages)},
-        "trace.stageCardinality": {
-            stage_key(s, i): s.get("cardinality") for i, s in enumerate(stages)
-        },
         "trace.stageReasons": {stage_key(s, i): s.get("reason") for i, s in enumerate(stages)},
         "trace.degradationFlags": {
             k: degradation.get(k)
@@ -1007,9 +1049,18 @@ def observed_query_counts(response: dict, record: dict) -> dict:
     the end of a full 2K response may continue past what was observed, and that is the case
     the cutoff rule fails closed on.
     """
+    trace = response.get("searchTrace") or {}
+    stages = list(trace.get("stages") or [])
     return {
         "hitsCaptured": len(response.get("results") or []),
         "hitsCompared": len(record.get("hits[]") or []),
+        # Candidate-pool sizes, recorded but NEVER compared (see `capture_query_record`): a
+        # reader diagnosing a hit-set difference wants them, and diffing them reports pool
+        # churn as a semantic regression.
+        "totalHits": response.get("totalHits"),
+        "stageCardinality": {
+            f"{i}:{s.get('id')}": s.get("cardinality") for i, s in enumerate(stages)
+        },
     }
 
 

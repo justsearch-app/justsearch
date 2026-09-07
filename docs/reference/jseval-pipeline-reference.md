@@ -440,6 +440,38 @@ guaranteed identical to the top-K set at limit K. Both sides of a pair use the s
 diff itself stays sound — but a pair mixing a pre-change capture with a post-change one compares two
 request shapes, not two builds. Re-capture both sides.
 
+**The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four boot-time pins
+above, a capture sets `JUSTSEARCH_RERANK_TOP_K=100`,
+`JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000`,
+`JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50`,
+`JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false` and
+`JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE=false`. Two mechanisms motivate them. *Candidate
+truncation*: every leg hands fusion a bounded list, and a chunk missing from a leg scores `0.0`
+for it with the leg's weight still in the denominator (`index.hybrid.chunk_cc_zero_exclude`
+inherits `cc_zero_exclude`, default `false`), so falling out of one leg costs a chunk that leg's
+whole weighted share at once — and per-leg min-max normalisation then shifts its neighbours too.
+*Step functions*: leg arbitration flips alpha `0.5 → 0.7` when the two legs' top-10 doc ids share
+at most **one** document (Jaccard `i/(20-i) < 0.1` reduces to `i < 1.82`), and the recall-complete
+splice protects each leg's `rank ≤ 10` and **evicts** a fused hit to make room. Both are on by
+default, and both change behaviour discontinuously on a one-document difference.
+
+Three cutoffs stay hard-coded and the capture does not pretend otherwise:
+`SearchExecutor.CHUNK_INITIAL_CANDIDATE_MULTIPLIER = 10` and `CHUNK_RETRY_MULTIPLIER = 2`
+(`SearchExecutor.java:63-64`), and `SearchPlanner.MAX_LIMIT = 100` (`SearchPlanner.java:37`). The
+last is a hard ceiling: it caps the wire limit, so branch fusion emits at most 100 documents —
+below a 102-document corpus. No env setting lifts it; closing it needs a product change.
+
+**Candidate-pool sizes are not compared.** `queries.totalHits` and `queries.trace.stageCardinality`
+were dropped from the captured set. Both count how many candidates a *stage* happened to consider,
+which follows the candidate budget and which chunks sat at a per-leg cutoff — not what the search
+found. Both moved between two fresh ingests of one corpus on one build (q02, q03, q07, q09 of the
+2026-09-07 pair) while the evidence was otherwise equal, so diffing them reported pool churn as a
+semantic regression. Design 16 names evidence selection, truncation points, citation targets and
+cancellation as the byte-equal fields and never names either of these. They are recorded in the
+non-diffed `observed` block, where a reader diagnosing a hit-set difference still has them.
+`queries.matchCount` stays `exact`: it is an `IndexSearcher.count` over the query, a property of
+the corpus and the query rather than of any budget.
+
 **One capture per fresh corpus.** The chat turns index their own agent history, so a second capture
 on the same stack sees a changed index (measured: `docCount` 91 → 102 across one capture's three
 turns; one query's `totalHits` moved 50 → 49 on the re-run). Inside a capture the search half runs

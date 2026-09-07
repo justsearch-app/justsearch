@@ -805,8 +805,13 @@ def test_hits_captured_and_compared_are_observed_only_and_never_diffed():
     response = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])
     record = wf.capture_query_record(response, limit=3, epsilon=0.01)
     counts = wf.observed_query_counts(response, record)
-    assert counts == {"hitsCaptured": 6, "hitsCompared": 5}
+    assert counts["hitsCaptured"] == 6
+    assert counts["hitsCompared"] == 5
     assert "hitsCaptured" not in record and "hitsCompared" not in record
+    # The two candidate-pool counts share this block for the same reason and must not be in
+    # the record either (see test_candidate_pool_counts_are_observed_only).
+    assert "totalHits" in counts and "stageCardinality" in counts
+    assert "totalHits" not in record and "trace.stageCardinality" not in record
 
     # And the differ does not walk them: two captures whose counts differ, with identical
     # query records, still diff clean and produce no entry for either name.
@@ -821,6 +826,35 @@ def test_hits_captured_and_compared_are_observed_only_and_never_diffed():
     # …and the pass is for the right reason: the hits[] field was byte-equal, not waved
     # through under an allowed class.
     assert _status(result, "queries.hits[]") == "equal"
+
+
+def test_candidate_pool_counts_are_observed_only():
+    """`totalHits` and `trace.stageCardinality` are pool sizes, not evidence.
+
+    Both moved between two fresh ingests of ONE corpus on ONE build (q02/q03/q07/q09 of the
+    2026-09-07 pair) because they count how many candidates a stage happened to consider,
+    which follows the candidate budget and which chunks sat at a per-leg cutoff. Design 16
+    names evidence selection, truncation points, citation targets and cancellation as the
+    byte-equal fields and never these. `matchCount` is different and stays exact: it is an
+    IndexSearcher.count over the query, a property of the corpus and the query.
+    """
+    response = _response_with_scores([0.9, 0.8, 0.5])
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    assert "totalHits" not in record
+    assert "trace.stageCardinality" not in record
+    assert "matchCount" in record, "matchCount is NOT a pool size and must survive"
+
+    # The shipped fixture no longer declares either, and still declares matchCount.
+    fields = wf.load_fixture(DEFAULT_FIXTURE)["fields"]
+    assert "queries.totalHits" not in fields
+    assert "queries.trace.stageCardinality" not in fields
+    assert fields["queries.matchCount"] == "exact"
+
+    # An undeclared field is a regression by construction, so the removal only works because
+    # the capture stopped emitting them. Prove the differ sees neither name.
+    counts = wf.observed_query_counts(response, record)
+    assert counts["totalHits"] == 3
+    assert "stageCardinality" in counts
 
 
 def test_capture_records_the_counts_in_the_observed_block(tmp_path: Path):
@@ -1054,10 +1088,11 @@ def test_capture_records_the_pins_and_the_applied_sampling(tmp_path: Path):
         _search_backend(_absolute_search_response(), roots=[_ROOT], chat=True))}
     doc = _capture_with_transport(fixture, tmp_path / "out.json", client_kwargs)
     prov = doc["provenance"]
-    assert prov["pins"] == {"index.vector.exhaustive_search": "true",
-                            "justsearch.llm.slots": "1",
-                            "justsearch.rerank.deadline_ms": "5000",
-                            "justsearch.rerank.chunks.deadline_ms": "5000"}
+    # Compared against the shared healthy set, which is itself derived from PINNED_CONFIG_KEYS —
+    # a hard-coded literal here would have to be edited every time a pin is added, and the
+    # editing is exactly where it would silently fall short of the code.
+    assert prov["pins"] == _HEALTHY_PINS
+    assert set(prov["pins"]) == set(wf.PINNED_CONFIG_KEYS)
     assert prov["pinSources"]["index.vector.exhaustive_search"] == "env_var"
     assert prov["samplingApplied"] == {"c1": {"temperature": 0.0, "top_p": 0.8, "seed": 7}}
     # The REQUESTED pin is still recorded separately — the two must be able to disagree.
@@ -2049,12 +2084,21 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
 #: `/api/debug/effective-config` reports them (string values, as the real endpoint emits) and
 #: the applied sampling `session_started` echoes. Part of the health FLOOR, like httpStatus
 #: 200 — a test that is not about preconditions should not have to think about them.
-_HEALTHY_PINS = {
+#: Derived from PINNED_CONFIG_KEYS rather than listed, so adding a pin cannot leave this helper
+#: silently short and turn every health assertion in this file into a "missing pin" failure that
+#: has nothing to do with the property under test.
+_HEALTHY_PIN_VALUES = {
     "index.vector.exhaustive_search": "true",
     "justsearch.llm.slots": "1",
     "justsearch.rerank.deadline_ms": "5000",
     "justsearch.rerank.chunks.deadline_ms": "5000",
+    "justsearch.rerank.top_k": "100",
+    "index.hybrid.candidate_limit_max": "5000",
+    "index.hybrid.chunk_collapse_limit_multiplier": "50",
+    "index.hybrid.leg_arbitration_enabled": "false",
+    "index.hybrid.leg_recall_complete_enabled": "false",
 }
+_HEALTHY_PINS = {k: _HEALTHY_PIN_VALUES[k] for k in wf.PINNED_CONFIG_KEYS}
 _HEALTHY_APPLIED = {"temperature": 0.0, "top_p": 0.8, "seed": 7}
 
 
