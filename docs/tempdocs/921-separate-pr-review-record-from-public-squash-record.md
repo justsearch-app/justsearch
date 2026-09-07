@@ -1,7 +1,7 @@
 ---
 title: "Separate the PR review record from the public squash record"
 type: tempdocs
-status: "PUBLISHED VIA PR #632 (2026-09-04) — commit-safe PR body plus one managed review-record comment; 30-merge audit remains time-gated"
+status: "PUBLISHED VIA PR #632 (2026-09-04) — commit-safe PR body plus one managed review-record comment; 30-merge audit run in tempdoc 948"
 created: 2026-09-03
 updated: 2026-09-04
 charter: "make rich agent PR evidence compatible with concise, durable public main history"

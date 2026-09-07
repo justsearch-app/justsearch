@@ -114,15 +114,14 @@ No-hooks consequences: never delegate destructive git; no repeat-guard/build-cou
 **Model routing (delegation economics).** Binds the ORCHESTRATOR — whatever model runs the main loop.
 
 - **Fits a subagent:** open-ended research, parallel exploration, second-opinion review, batch read-only audits, bounded verifiable implementation chunks. **Risky:** shared state, migrations, `.gitignore`/CI edits, anything that could leave the worktree inconsistent.
-- **Default is delegate.** Orchestrator tokens are the scarcest resource: prefer even inefficient delegation over inline execution, and when unsure, delegate anyway. Orchestration — decomposition, briefs, design, judging returned evidence — is the main loop's job. Chunk long refactors into bounded delegations.
-- **Delegate mechanical work once it is enumerable** — when diagnosis ends and the rest is a known list, bundle it into a worker brief with self-verifying acceptance criteria; don't pull worker-grade loops inline out of quality doubt. Exception: a chunk clearly below the spawn cost (brief + re-orientation + round-trip exceeds the task) is done directly — estimate first; when unsure, still delegate.
+- **Delegate when the work fits the list above.** Orchestration — decomposition, briefs, design, judging returned evidence — is the main loop's job. Chunk long refactors into bounded delegations.
+- **Delegate mechanical work once it is enumerable** — when diagnosis ends and the rest is a known list, bundle it into a worker brief with self-verifying acceptance criteria. Exception: a chunk clearly below the spawn cost (brief + re-orientation + round-trip exceeds the task) is done directly — estimate first.
 - **Set an explicit `model` on every subagent** — unset inherits the parent, silently billing orchestrator-tier. Sonnet is the floor for findings you'll rely on; `opus` where sonnet quality is in doubt; haiku only where wrong output is self-evident. If output misses the bar, redo it with a stronger model — judge the output, not the price tag.
 - **Never delegate:** brief-writing, evidence judgment, main-checkout writes, merge/publish, irreversible actions, trivial edits (single-command scale — an edit+test+doc bundle is already delegable).
 - **Dev-stack:** lease acquisition/takeover/teardown and contention decisions stay main-loop; stack-driving MAY be delegated inside a window you have leased and actively supervise, with the contention rules inlined in the brief. **Fire-and-forget stack delegation is never allowed** — that is the predictable evasion, not a variant.
 - **Precedence:** a harness or system instruction restricting the Agent tool overrides this default for that session. Follow it and say so — never resolve the conflict silently.
-- **Contested, and due for judgment.** Anthropic reports multi-agent runs at ~15x single-agent tokens and that *coding* has fewer truly parallelizable tasks than research, so this paragraph generalizes research-shaped economics onto a coding repo. Falsifier (window opened 2026-07-14, judge by ~2026-09-14, instrument `scripts/agent-analytics/baseline-economics.mjs`): cost-per-shipped-merge should improve without rework rising — flat → delete this paragraph; rework up → raise the floor.
 
-Provenance for the above: owner decisions 2026-07-07 / 2026-07-14, pilot P-C 2026-07-17; tempdoc 743.
+Provenance for the above: owner decisions 2026-07-07 / 2026-07-14, pilot P-C 2026-07-17; tempdoc 743. The "default is delegate" economic claim was judged FLAT on its own falsifier and removed 2026-09-07 (tempdoc 948).
 
 ## Architecture
 
@@ -175,7 +174,7 @@ Pre-merge script checks — run the check whose **subject** you edited. Commands
 | guard-string register (`execution-surfaces`/`operation-surfaces`) | `--gate register-guard-resolution` |
 | `LifecycleReasonCode.java` / `readinessNotice.ts` | `check-readiness-reason-codes` |
 | `justsearch-dev-mcp/**` | `check-dev-mcp-doc-sync` |
-| `StoreCatalog.java` · store construction sites | `check-store-recoverability` |
+| `StoreCatalog.java` · store construction sites · `governance/store-{recoverability,corruption-policies}.v1.json` | `check-store-recoverability` |
 | **`modules/ui-web/src/**`** (ui-web gate set) | `node scripts/ci/run-ui-web-gates.mjs` — authority: the `ui-web-gates` recipe in `governance/consult-register.v1.json` |
 | ui-shot harness · new RAIL surface | `check-ui-step-coverage` |
 | `scripts/agent-analytics/**` | `node scripts/agent-analytics/run-all-tests.mjs` |
