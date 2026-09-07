@@ -6,6 +6,7 @@
 
 - **Canonical (must not drift):** `docs/explanation/`, `docs/reference/`, `docs/how-to/`, `docs/decisions/`
 - **Noncanonical (allowed to drift):** `docs/tempdocs/`, `docs/future-features/`, `docs/ui-explorations/` (and background folders like `docs/Hardware/`, `docs/Economy/`)
+- **Design contracts (dated, per lane):** `docs/design/<lane>/` holds a locked design plus its verified code facts, evidence and stage checklists (for example `docs/design/lane-f-engine-jvm/`). Not a tempdoc (no size cap, no append-only convention) and not canonical (`docs-validate` does not cover it); its status line and section 0 say what is decided.
 
 If docs disagree, treat **canonical** docs as truth. If canonical docs are unclear, verify against code + contract tests.
 

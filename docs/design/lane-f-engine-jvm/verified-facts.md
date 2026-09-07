@@ -1,0 +1,179 @@
+# Lane F evidence: facts verified against the code while designing
+
+Base `b96cd999` (#687). Each fact was read in the source by the orchestrator or an independent
+reviewer and spot-checked; the implementation checklist written after the lock inherits them.
+Section numbers refer to `design.md` beside this file.
+
+## Wire and launch
+
+- `indexing.proto` has **49** RPCs on this base (10 Search + 38 Ingest + 1 Health): #664 added
+  `SettleIndex` after 917 counted 48.
+- Tauri has no crash or hang supervision today (brief v2 assumed one); the supervisor contract
+  (7.1) is new work, seeded from `WorkerSpawner`'s policy constants (627: 3 restarts, 1 s to
+  30 s cooldown, 300 s stability window, 3 unhealthy polls), which the sweep deletes.
+- Both launch sites (`lib.rs`, `dev-runner.cjs`) carry `UseSerialGC` and `TieredStopAtLevel=1`;
+  neither sets `MaxDirectMemorySize` or `ExitOnOutOfMemoryError` (8).
+- `RuntimeManifest` carries Head, Worker, AI, mode and chat info and the Head's PID; no child
+  inventory (7.2). `check-runtime-manifest-closure` validates sibling filenames and writers, not
+  manifest fields, and exempts `lib.rs` and `dev-runner.cjs` (6).
+- `ArchUnitEgressTest` covers `io.justsearch.aibackend.{local,backend}..` only (9).
+
+## Pacing, sessions, extraction
+
+- `ForegroundLoad` is fed only by the gRPC `ForegroundLoadInterceptor`
+  (`KnowledgeServer.java:166,1825`) (8).
+- `IndexingPacing` is a duty cycle with `MAX_DEBT_MS = 2_000`, not a pause; `pace()` sleeps
+  before a batch is submitted (`EmbeddingBackfillOps` `checkInterrupt()`) and bounds nothing
+  already queued (4).
+- One thread produces encoder batches per stage: `IndexingLoop` runs on the single
+  `indexing-loop` thread (`IndexingLoop.java:570-579`) and `BackfillScheduler.runIdleCycle`
+  processes backfill batches sequentially (`BackfillScheduler.java:200-260`).
+- `NativeSessionHandle` serializes GPU `session.run()` with `new Semaphore(1)`
+  (`NativeSessionHandle.java:120`, acquired at `:230-260`, also taken by `releaseGpu()` at
+  `:264-300`); it is **unfair**, so a waiting caller can lose the race to the next submit. CPU
+  sessions take no semaphore. `EmbeddingService` is documented thread-safe for concurrent
+  `embed()` calls; serialization happens one layer down (4).
+- `RoutingExtractionSandbox.PROCESS_KINDS = {pdf, office, archive, image, binary}`; text,
+  markdown, code and CSV/JSON parse in-process; `ExtractionSandboxFactory` has an in-process
+  fallback (6).
+
+## Shutdown, updater, stores
+
+- `HeadShutdownCoordinator` already owns the Head's ordered close; `POST /api/lifecycle/shutdown`
+  is its route (`LifecycleApiModule.java:25,36`), called by the shell (`lib.rs:218,235`) (7.3).
+- The updater's `run_install_now` (`updater.rs:369-388`) stages the download, then
+  `prepare_head` (`:445`, `:965-967`) posts to `/api/upgrade/prepare` through `post_head`
+  (`:1127-1151`), which fails with "Backend is unavailable" when no port or session token is
+  bound. A missing child witness (`child_pid()` `None`, `lib.rs:202-208`) ends in `Cancelled` or
+  `RepairRequired` (`updater.rs:488-505`); receipt validation failures do the same (`:506-556`);
+  `launch_installer` (`:581-586`) is reached only after `HeadStopped`, which needs both receipts.
+  There is no no-child or timeout branch that launches the installer (7.3).
+- Update state is shell-owned: `appUpdateState.ts:1-7` goes through Tauri `invoke`, and
+  `app_update_status` (`updater.rs:303-306`) returns in-memory coordinator state, so the Settings
+  action is reachable with the backend down (7.3).
+- `SqliteSchema.java:56-59`: the `jobs` table is `PRIMARY KEY (path)` with a per-path
+  `attempts` counter and no operation row (7.5).
+- `core.head-log` and `core.worker-log` are registered diagnostic channels
+  (`CoreSurfaceCatalog.java:148-149,703`) and a surface altitude derives from the former (10).
+- `TracingBootstrap.java:151` reads `OTEL_EXPORTER_OTLP_ENDPOINT` (9). `lib.rs:968-974` emits
+  `justsearch://backend-restart` on an instance-id change; `backendRestart.ts` consumes it (7.1).
+
+## Trust boundary and product claims (review five)
+
+- ADR-0046 (`docs/decisions/0046-*.md:5,42-52,72,100-104`): the trust boundary is the
+  same-user native process; the per-boot token is handed to external MCP clients through the
+  bootstrap route and "any same-user native process could" read it from the runtime manifest.
+  So the token distinguishes no role inside the boundary (3.4, 7.1, 8).
+- `README.md:26,93,202`: "your files stay on your device; only the model's answer leaves",
+  "Your documents never leave the machine - only the agent's", "Nothing leaves your machine";
+  the MCP reference's primary tool returns assembled passages to an external agent (9, 18).
+
+## Docs the sweep must correct
+
+- `docs/explanation/19-module-architecture.md` lists `app-search` and `app-indexing` modules that
+  do not exist and places the gRPC services in `indexer-worker` when they live in
+  `worker-services`; the sweep rewrites it with section 3.2's rings.
+- `WorkerSignalBus` lives in `worker-core/.../coordination/`, not `ipc-common`.
+- `dead-code-audit` enumerates modules in its `build.gradle.kts`; `app-engine` and the platform
+  module are added there or rules pass vacuously.
+- "Head never touches Lucene" appears in `CLAUDE.md`, `AGENTS.md`, the subagent baseline brief,
+  skills and postmortems; the superseding ADR keeps ADR-0001/0002's probes.
+
+## Sequencing (2026-09-07, section 17)
+
+- `WholeProgramDeadCodeTest` (`modules/dead-code-audit/src/test/java/io/justsearch/deadcode/WholeProgramDeadCodeTest.java:27-50,109`)
+  is a closed-world dead-class ratchet whose committed baseline is
+  `modules/dead-code-audit/archunit_store/`; a new unreferenced class fails it. So a wire left
+  compiled but unused after the composition swap is red (17.4).
+- `adr-0002-grpc-present` (`governance/adr-probes.v1.json:37-45`) is `kind: grep-present` on
+  `libs\.grpc|io\.grpc` under `modules`; 102 Java files import `io.grpc` today. Deleting the
+  wire without retiring the probe in the same change is red (17.4).
+- A model change today is a parity refusal, not a generation transition:
+  `IndexMetadataParityGuard` (`adapters-lucene/.../runtime/IndexMetadataParityGuard.java:150-167`)
+  throws `schemaMismatch()` when `ParityDiagnostics.requiresRebuild(diffs)`; the user's remedy
+  is `core.bulk-reindex` (`CoreOperationCatalog.java:73`), which is
+  `IndexingService.reindexWatchedRoots(force)` (`app-api/.../IndexingService.java:177-201`), an
+  in-place rescan through the normal pipeline. `IndexFingerprint`
+  (`adapters-lucene/.../commit/IndexFingerprint.java:219-247`) already records embedding, SPLADE
+  and NER model identity plus chunking, so it is the seed of the representation-generation
+  identity (17.4). Generational directories and an atomic activation swap already exist (next
+  section); no journal, no live activation and no cursor pinning do. (The first version of
+  this bullet said none existed; corrected 2026-09-07.)
+
+## Derisk B to D2 (2026-09-07, section 17.9)
+
+Three read-only audits; every citation below was re-read by the orchestrator.
+
+### Stage B: lifecycle
+
+- Tauri signals backend death only before the port is bound (`lib.rs:863-877`: the stdout
+  reader sets `spawn_error` when the pipe closes with no port) and has no crash or hang
+  supervision; `restart_headless_backend` (`lib.rs:921`) is the requested restart. The
+  supervisor contract and the restart loop are new (7.1).
+- `InferenceLifecycleManager.close()` (`app-inference/.../InferenceLifecycleManager.java:1339-1342`)
+  calls `serverOps.stopLlamaServer()` unconditionally; the by-reason branch of 7.3 step 6 is new.
+  Adoption today is by port and HTTP shape only, with no process handle and no identity or
+  config comparison (7.2).
+- `check-runtime-manifest-closure.mjs:64-80` lists `scripts/dev/dev-runner.cjs` (`:73`) and
+  `modules/shell/src-tauri/src/lib.rs` (`:80`) in `SKIP_PATHS`, so the supervisor file's
+  writers are exempt from the check as it stands (7.1).
+- The only `wal_checkpoint` is `checkpointForUpgrade()`
+  (`indexer-worker/.../queue/SqliteJobQueue.java:2179-2184`); the ordinary close does not
+  checkpoint (7.3 step 7).
+- `scripts/dev/test-dev-runner-death-observability.mjs` exists but no runner invokes it, and it
+  asserts nothing about the lease or run id (17.3 row B).
+- `WorkerSpawner.java:550` adds `-XX:+UseCompactObjectHeaders` to the Worker; the dev-runner
+  (`dev-runner.cjs:731,1728`) drops `TieredStopAtLevel=1` when an AOT cache is present. Three
+  spawn sites today, not two (8).
+- Child identity by PID plus start instant is an existing pattern (`AppInstanceLock`,
+  `RuntimeManifestPublisher`); the extraction child already watches its parent (7.2).
+
+### Stage C: context, resources, operations
+
+- The provenance seed is `ActionEvent.originator()` and `.transport()`
+  (`app-observability/.../ledger/ActionEvent.java:41-44`); `DurableGrantStore` is the only
+  existing slot. The ingestion ledger and request logging carry no provenance field (3.4).
+- The `IndexingService` port (`app-api/.../IndexingService.java`) has 33 methods and no
+  context argument; `Query.context` is an occupied map. The engine context is a new parameter
+  (17.3 row C1).
+- Bare `CompletableFuture.supplyAsync`/`runAsync` on the common pool: `KnowledgeServer.java:1009`,
+  `HeadlessApp.java:862`, `DocumentService.java:74`, `GplJobCoordinator.java:208`,
+  `LlamaServerOps.java:1039`, `OnlineModeOps.java:214,251,395,706` and one more, ten in all;
+  58 executor construction sites (`Executors.new*` / `new ThreadPoolExecutor`) with no registry
+  and no queue bound (8).
+- `ModelSessionPolicy.java:104` sizes the ORT arena from GPU VRAM; it bounds device memory,
+  not commit charge (8). NVML is read only in `gpu-bridge` (`GpuCapabilitiesService`), which
+  `indexer-worker` does not depend on today (7.4).
+- `OperationInvocationRequest.idempotencyKey` (`OperationInvocationRequest.java:15-17`) is on
+  the wire and read by nothing (7.5).
+- `IndexingLoop.java:705-722`: commit, then `journal.drainPending()`; the journal's commit
+  sequence number is the precedent for the completion-order stamp (7.5).
+- `governance/store-recoverability.v1.json:575` classifies `jobs.db` as `DERIVED`; the
+  operations table makes that wrong (17.3 row C2).
+
+### Stage D: reconfigure, generations, readiness, request paths
+
+- `IndexGenerationManager.java:86-99`: generational index directories under `state.json` with
+  promote and rollback. `KnowledgeServerBootstrap.java:764`: `BLUE_GREEN_MIGRATE` is the
+  default strategy. `ops/KnowledgeServerMigrationOps.java:258-266`: the cutover promotes the
+  building generation, then restarts the Worker ("Restarting worker to open new active
+  generation"). No journal, no replay, no live activation (7.4, 17.4).
+- `EnvRegistry.java:278-280` and `ResolvedConfigBuilder.java:1561`:
+  `index.migration.cutover.max_failed_jobs` defaults to -1 (unlimited) (7.4, 17.7).
+- `KnowledgeServer.java:645-651`: a second runtime over the same directory leaked a
+  `Directory` plus `SearcherManager` holding Windows handles for the Worker's lifetime
+  (tempdoc 915 B5); `swapRuntime` (`KnowledgeServer.java:1236`) is close-then-open. Beside-mode
+  compose for the index runtime means a second generation, never a second reader (7.4).
+- `SearcherManager` is acquired and released per call and `searchAfter` (`ReadPathOps.java:343`)
+  is stateless; no reader outlives a request, so cursor pinning is new (7.4, 4).
+- Two readiness representations: `LifecycleSnapshotV1` (`app-api/.../lifecycle/LifecycleSnapshotV1.java:13`,
+  three slots) and `ReadinessEnvelopeView` (`app-api/.../status/ReadinessEnvelopeView.java:12`,
+  ten dimensions). No per-component start deadline exists (7.6, 17.7).
+- `InferenceLifecycleManager.applyConfig` restarts with rollback; the `InferenceSurface` is
+  `AutoCloseable` and has `releaseGpu` (7.4, 5).
+- `IndexSchema.ephemeral()` (`IndexSchema.java:100-101`) builds at an auto-temp path that
+  `RuntimeSession.java:646-688` deletes on close; the three SQLite stores
+  (`SqliteJobQueue.java:244`, `SqliteDocumentIdentityStore.java:50`,
+  `SqlitePathResolutionStore.java:68`) open a file path only (10, 17.3 row D2).
+- `/api/debug/state`, `/infra/capabilities` and `RegistrySnapshotExporter` each carry a slice
+  of runtime state; none lists components (10).
