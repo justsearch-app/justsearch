@@ -778,7 +778,7 @@ export const API_CALL_ALLOWLIST = [
   },
   // Debug & telemetry
   { path: '/api/debug/events', methods: ['GET'] },
-  { path: '/api/debug/worker-log', methods: ['GET'] },
+  { path: '/api/debug/engine-log', methods: ['GET'] },
   { path: '/api/telemetry/health', methods: ['GET'] },
   // Action ledger — read-only activity/change feed (tempdoc 618 §8)
   { path: '/api/action-ledger', methods: ['GET'] },

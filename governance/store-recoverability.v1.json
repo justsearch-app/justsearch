@@ -1,7 +1,7 @@
 {
   "version": 2,
   "tempdoc": 617,
-  "note": "The StoreCatalog mirror remains the cipher-selection authority for its six stores. durableStores is the broader in-place-upgrade compatibility register: every process-owned durable authority names its owner, recovery class, format, write behavior, reconciliation, implementation, and evidence. HARDENING_REQUIRED rows are an explicit tempdoc-617 ratchet; the gate forbids adding an unnamed gap. Tempdoc 879 added two required per-row answers. pathVerification: LITERAL means ONE implementationSources file contains the string literal of every segment of the declared path - a union across several files does not count, because that made LITERAL satisfiable by adding an unrelated file that merely mentions the missing word; COMPOSED means the path is assembled at runtime, and pathVerificationNote must say by what. encryption: SEALED_BY_STORE_CIPHER = the StoreCatalog cipher seals it; UNSEALED_KEY_ROOT = it IS the key root and cannot be sealed by the key it holds; UNSEALED_EXTERNAL_AUTHORITY = the bytes belong to the user or an operator, not the app; UNSEALED_NO_JVM_CIPHER = Shell-owned, written by Rust with no reach to the JVM StoreCipher; UNSEALED_DERIVED_OS_DISK_ENCRYPTION = StoreCatalog's Framing.OPAQUE position, a derived/rebuildable store that does hold user-derived content in the clear and is covered by OS disk encryption only; UNSEALED_GAP = no structural reason, simply not sealed yet; NOT_APPLICABLE = there is nothing here worth sealing. UNSEALED_GAP, UNSEALED_DERIVED_OS_DISK_ENCRYPTION and NOT_APPLICABLE are all claims about what the bytes hold, so the gate requires an encryptionNote on each saying what the file actually contains - before 879 NOT_APPLICABLE was the one value nobody had to justify, and it was standing in for both 'nothing sensitive' and 'the user's own document text'. Known limit of the LITERAL check: it matches string literals, so it cannot tell a path constant from a same-named error-message label - a few rows (agent-runs, memories, conversations) are LITERAL-green via a CorruptDurableStoreException store label rather than a path constant, which means a rename of those directories could pass. Closing that needs the gate to recognise resolve(...)-shaped occurrences specifically; tracked in tempdoc 879. nonDurableWriteSites is the OTHER answer the coverage check accepts: a production source the write-site scanner flags that holds no durable state at all, so there is no recovery, upgrade or encryption policy to state for it. The bar is that every path it writes is scratch - process-scoped, regenerated on demand, and outside the data dir - so losing or deleting the file costs a recomputation and nothing else. It is not an escape hatch for a durable store whose row is inconvenient to write: if deleting the file would lose user-visible state, it belongs in durableStores. TempFileManager and WorkerProcessManager are JVM/OS temp scratch; ExtractionSandboxFactory writes one JVM temp file for the extraction child's startup probe and deletes it in the same method (tempdoc 885 item 14). THIS REGISTER IS A WIRE CONTRACT, NOT DOCUMENTATION. Two consumers read durableStores at RUNTIME, and a row is a commitment to both. (1) modules/shell/src-tauri/src/updater.rs embeds it with include_str! (:31-32) and deserialises every row into LocalDurableStore, whose current_version is a u32 with NO serde default - so ONE row missing currentVersion makes the whole register unparseable and validate_store_compatibility rejects EVERY release descriptor. (2) modules/ui UpgradeReconciliationProbe.loadOwnerRegister (:196-225) builds the closed owner set for /api/upgrade/reconcile and returns an EMPTY register with a configuration error if ANY row has status != READY, which makes reconcile answer 409 and blocks in-place upgrades outright. Both were discovered the hard way in PR #604, which added six HARDENING_REQUIRED rows and broke both consumers at once. (3) A THIRD consumer, named in tempdoc 909: scripts/release/app-release-assets.mjs:77-80 GENERATES every release descriptor's compatibility table from durableStores and throws on any row that is not READY, so a non-READY row does not merely fail a gate - it makes the release assets unbuildable. Its test is scripts/release/app-release-assets.test.mjs. Consequences for an author: a row change is a wire change; HARDENING_REQUIRED is not a documentation tier but a refusal signal, and knownCompatibilityGaps is empty because the tempdoc-617 conversion finished - re-populating it turns upgrades off. Add a row only when it can be READY. DISCOVERY (wave-1 residue R1): the write-site scanner keys on write CALLS in code (scripts/governance/lib/persistence-write-scan.mjs strips comments, keeps literals), not on a \"durable anchor\" word appearing anywhere in the file text. The retired rule decided by reading English prose, which discovered ExtractionSandboxFactory via a javadoc sentence and missed ExtractionSandboxCommand's real argfile write. It over-discovers by design -- benchmarks, SSOT generators and the agent file tools all write to disk -- and each costs one honest nonDurableWriteSites line. nonDurableWriteSites entries are now { path, reason }: the classification is a claim, and every other row here justifies its claims. The broadened scan also found EIGHT files writing durable state no row owns. They were parked in pendingDurableClassification, not forced into durableStores: each needed a settled corruption policy and a recovery/preservation test before it could be READY, and a non-READY row would disable in-place upgrade outright (see the wire-contract paragraph above). Tempdoc 909 (wave-1 residue R4) did that work and drained the list to empty; the block and its cap of 8 remain as the ratchet for the next one. ROOTS (tempdoc 909): a fourth storage root, USER_INDEXED_ROOTS, joins DATA_DIR / AI_HOME / PROGRAM_DATA_OR_DATA_DIR. It exists for exactly one row - the user's own documents, which the agent's file-operations tool moves, copies and deletes in place. That authority is real and durable, but it lives under none of the app-owned roots, so before 909 it could not be written down at all: the register named the undo JOURNAL and not the thing the journal is about.",
+  "note": "The StoreCatalog mirror remains the cipher-selection authority for its six stores. durableStores is the broader in-place-upgrade compatibility register: every process-owned durable authority names its owner, recovery class, format, write behavior, reconciliation, implementation, and evidence. HARDENING_REQUIRED rows are an explicit tempdoc-617 ratchet; the gate forbids adding an unnamed gap. Tempdoc 879 added two required per-row answers. pathVerification: LITERAL means ONE implementationSources file contains the string literal of every segment of the declared path - a union across several files does not count, because that made LITERAL satisfiable by adding an unrelated file that merely mentions the missing word; COMPOSED means the path is assembled at runtime, and pathVerificationNote must say by what. encryption: SEALED_BY_STORE_CIPHER = the StoreCatalog cipher seals it; UNSEALED_KEY_ROOT = it IS the key root and cannot be sealed by the key it holds; UNSEALED_EXTERNAL_AUTHORITY = the bytes belong to the user or an operator, not the app; UNSEALED_NO_JVM_CIPHER = Shell-owned, written by Rust with no reach to the JVM StoreCipher; UNSEALED_DERIVED_OS_DISK_ENCRYPTION = StoreCatalog's Framing.OPAQUE position, a derived/rebuildable store that does hold user-derived content in the clear and is covered by OS disk encryption only; UNSEALED_GAP = no structural reason, simply not sealed yet; NOT_APPLICABLE = there is nothing here worth sealing. UNSEALED_GAP, UNSEALED_DERIVED_OS_DISK_ENCRYPTION and NOT_APPLICABLE are all claims about what the bytes hold, so the gate requires an encryptionNote on each saying what the file actually contains - before 879 NOT_APPLICABLE was the one value nobody had to justify, and it was standing in for both 'nothing sensitive' and 'the user's own document text'. Known limit of the LITERAL check: it matches string literals, so it cannot tell a path constant from a same-named error-message label - a few rows (agent-runs, memories, conversations) are LITERAL-green via a CorruptDurableStoreException store label rather than a path constant, which means a rename of those directories could pass. Closing that needs the gate to recognise resolve(...)-shaped occurrences specifically; tracked in tempdoc 879. nonDurableWriteSites is the OTHER answer the coverage check accepts: a production source the write-site scanner flags that holds no durable state at all, so there is no recovery, upgrade or encryption policy to state for it. The bar is that every path it writes is scratch - process-scoped, regenerated on demand, and outside the data dir - so losing or deleting the file costs a recomputation and nothing else. It is not an escape hatch for a durable store whose row is inconvenient to write: if deleting the file would lose user-visible state, it belongs in durableStores. TempFileManager is JVM/OS temp scratch; ExtractionSandboxFactory writes one JVM temp file for the extraction child's startup probe and deletes it in the same method (tempdoc 885 item 14). THIS REGISTER IS A WIRE CONTRACT, NOT DOCUMENTATION. Two consumers read durableStores at RUNTIME, and a row is a commitment to both. (1) modules/shell/src-tauri/src/updater.rs embeds it with include_str! (:31-32) and deserialises every row into LocalDurableStore, whose current_version is a u32 with NO serde default - so ONE row missing currentVersion makes the whole register unparseable and validate_store_compatibility rejects EVERY release descriptor. (2) modules/ui UpgradeReconciliationProbe.loadOwnerRegister (:196-225) builds the closed owner set for /api/upgrade/reconcile and returns an EMPTY register with a configuration error if ANY row has status != READY, which makes reconcile answer 409 and blocks in-place upgrades outright. Both were discovered the hard way in PR #604, which added six HARDENING_REQUIRED rows and broke both consumers at once. (3) A THIRD consumer, named in tempdoc 909: scripts/release/app-release-assets.mjs:77-80 GENERATES every release descriptor's compatibility table from durableStores and throws on any row that is not READY, so a non-READY row does not merely fail a gate - it makes the release assets unbuildable. Its test is scripts/release/app-release-assets.test.mjs. Consequences for an author: a row change is a wire change; HARDENING_REQUIRED is not a documentation tier but a refusal signal, and knownCompatibilityGaps is empty because the tempdoc-617 conversion finished - re-populating it turns upgrades off. Add a row only when it can be READY. DISCOVERY (wave-1 residue R1): the write-site scanner keys on write CALLS in code (scripts/governance/lib/persistence-write-scan.mjs strips comments, keeps literals), not on a \"durable anchor\" word appearing anywhere in the file text. The retired rule decided by reading English prose, which discovered ExtractionSandboxFactory via a javadoc sentence and missed ExtractionSandboxCommand's real argfile write. It over-discovers by design -- benchmarks, SSOT generators and the agent file tools all write to disk -- and each costs one honest nonDurableWriteSites line. nonDurableWriteSites entries are now { path, reason }: the classification is a claim, and every other row here justifies its claims. The broadened scan also found EIGHT files writing durable state no row owns. They were parked in pendingDurableClassification, not forced into durableStores: each needed a settled corruption policy and a recovery/preservation test before it could be READY, and a non-READY row would disable in-place upgrade outright (see the wire-contract paragraph above). Tempdoc 909 (wave-1 residue R4) did that work and drained the list to empty; the block and its cap of 8 remain as the ratchet for the next one. ROOTS (tempdoc 909): a fourth storage root, USER_INDEXED_ROOTS, joins DATA_DIR / AI_HOME / PROGRAM_DATA_OR_DATA_DIR. It exists for exactly one row - the user's own documents, which the agent's file-operations tool moves, copies and deletes in place. That authority is real and durable, but it lives under none of the app-owned roots, so before 909 it could not be written down at all: the register named the undo JOURNAL and not the thing the journal is about.",
   "catalog": {
     "file": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/encryption/StoreCatalog.java"
   },
@@ -597,40 +597,6 @@
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStoreTest.java"
       ],
       "fixtures": []
-    },
-    {
-      "id": "worker-config-snapshot",
-      "pathVerification": "LITERAL",
-      "encryption": "NOT_APPLICABLE",
-      "encryptionNote": "The resolved justsearch.* configuration map handed to the Worker at spawn, plus the app's own directories - data dir, AI home, models dir, model/runtime executable paths (ResolvedConfig.java:127-141). App-install layout and settings only: no user document content and none of the user's chosen index roots, which live in watched_roots.json instead.",
-      "owner": "HEAD",
-      "root": "DATA_DIR",
-      "ownedPaths": [
-        "runtime/worker-config-snapshot.json"
-      ],
-      "recoverability": "DERIVED",
-      "upgradeHandling": "REBUILD",
-      "format": "JSON configuration map, currently unversioned",
-      "currentVersion": 0,
-      "readableLegacyVersions": [],
-      "writeMode": "FULL_REWRITE",
-      "atomicity": "ATOMIC_REPLACE",
-      "corruptionPolicy": "REGENERATE_BEFORE_CONSUMPTION",
-      "reconciliation": "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START",
-      "status": "READY",
-      "implementationSources": [
-        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfig.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
-      ],
-      "tests": [
-        "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWorkerSnapshotOrderingTest.java"
-      ],
-      "fixtures": [],
-      "note": "Lane F stage A item A11 deleted WorkerSpawner (the forwarder that carried this snapshot to the Worker process) and its config-forwarding test; both were removed from the lists above. The store itself is retired at item A19 — there is no second process to hand a config snapshot to."
     },
     {
       "id": "jobs-db",
@@ -1382,7 +1348,7 @@
       "writeMode": "APPEND_ONLY",
       "atomicity": "BEST_EFFORT",
       "corruptionPolicy": "ROTATE_OR_PRUNE_DIAGNOSTIC_ARTIFACT",
-      "corruptionNote": "Nothing recovers this file: each launch rotates it to .1 (and .1 to .2, deleting .2) and starts a fresh one, so an unreadable, truncated or interleaved log is aged out by the next start rather than repaired. Before tempdoc 909 it had NO retention at all - appendTo across every launch for the life of the install. Retention is a constant (RETAINED_LOG_GENERATIONS = 3), not a config key, and matched WorkerSpawner's worker.log policy, which is where the app's one retention story for supervised-process logs came from; lane F stage A item A11 deleted that spawner, so llama-server.log is now the only log this policy governs (RETAINED_LOG_GENERATIONS = 3 is unchanged). Ordering is load-bearing: the live file is renamed aside FIRST and nothing is pruned until that succeeds, because on Windows the rename fails while a handle is open (a llama-server past the 5s kill timeout, an orphan, a handle not yet released) - pruning first would delete the oldest generation and shift the rest before discovering it cannot move the live file, leaving FEWER retained logs and a still-growing live file in exactly the crash-restart loop where retention matters. A .rotating file left by a failure between the two renames is bounded (the next launch replaces it) and is covered by the ownedPaths glob.",
+      "corruptionNote": "Nothing recovers this file: each launch rotates it to .1 (and .1 to .2, deleting .2) and starts a fresh one, so an unreadable, truncated or interleaved log is aged out by the next start rather than repaired. Before tempdoc 909 it had NO retention at all - appendTo across every launch for the life of the install. Retention is a constant (RETAINED_LOG_GENERATIONS = 3), not a config key, and matched WorkerSpawner's worker.log policy, which is where the app's one retention story for supervised-process logs came from; lane F stage A item A11 deleted that spawner and item A16 folded the Head's own log into <dataDir>/logs/engine.log (rolled by Logback's SizeAndTimeBasedRollingPolicy, a different policy entirely), so llama-server.log is now the only log THIS policy governs (RETAINED_LOG_GENERATIONS = 3 is unchanged). No worker.log is written any more, and it never had a row here. Ordering is load-bearing: the live file is renamed aside FIRST and nothing is pruned until that succeeds, because on Windows the rename fails while a handle is open (a llama-server past the 5s kill timeout, an orphan, a handle not yet released) - pruning first would delete the oldest generation and shift the rest before discovering it cannot move the live file, leaving FEWER retained logs and a still-growing live file in exactly the crash-restart loop where retention matters. A .rotating file left by a failure between the two renames is bounded (the next launch replaces it) and is covered by the ownedPaths glob.",
       "reconciliation": "START_NEW_LOG_AND_RETAIN_BOUNDED_GENERATIONS",
       "status": "READY",
       "implementationSources": [
@@ -1426,6 +1392,35 @@
         "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationExecutorTest.java"
       ],
       "fixtures": []
+    },
+    {
+      "id": "help-ingested-version",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "A single version token (\"v2\") recording which generation of the app's own bundled help documents has been ingested. App-distributed content only: no user document content, no user-chosen path, no credential.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        ".help-ingested-version"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "A bare version token, unversioned by construction",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "NON_ATOMIC",
+      "corruptionPolicy": "REGENERATE_BEFORE_CONSUMPTION",
+      "reconciliation": "UNCONDITIONALLY_REINGEST_HELP_ON_MISMATCH",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java"
+      ],
+      "tests": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java"
+      ],
+      "fixtures": [],
+      "note": "Added at lane F item A19, and the reason it did not exist before is worth recording rather than quietly fixing: this write site was only ever COVERED by accident. KnowledgeServerBootstrap.java appeared in the retired worker-config-snapshot row's implementationSources (it was one of the files that handled the snapshot), so the coverage check saw the file as classified and never asked what ELSE it wrote. Removing that row exposed a genuine, unrelated durable artifact at KnowledgeServerBootstrap.java:867,901. The gate was right both times; the register was carrying a false negative. Deliberately NON_ATOMIC and untested: it is a one-token marker whose worst failure is re-ingesting a handful of bundled help files, so hardening it would cost more than the outcome it prevents — but that is now a stated judgement rather than an unexamined gap."
     }
   ],
   "nonDurableWriteSites": [
@@ -1436,10 +1431,6 @@
     {
       "path": "modules/app-util/src/main/java/io/justsearch/app/util/TempFileManager.java",
       "reason": "JVM/OS temp scratch: allocates and reaps files under java.io.tmpdir for in-flight work."
-    },
-    {
-      "path": "modules/system-tests/src/main/java/io/justsearch/systemtests/chaos/WorkerProcessManager.java",
-      "reason": "JVM/OS temp scratch: per-test data dirs the chaos harness creates and discards."
     },
     {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactory.java",
@@ -1516,10 +1507,6 @@
     {
       "path": "modules/ssot-tools/src/main/java/io/justsearch/ssot/tools/SsotValidator.java",
       "reason": "Repo build artifact: SSOT/manifests/repro/repro.v1.json (:202-204), regenerated by rerunning validation. Every other path it touches is a read."
-    },
-    {
-      "path": "modules/system-tests/src/main/java/io/justsearch/systemtests/chaos/MmfTestHarness.java",
-      "reason": "Test-harness peer of the worker signal MMF, opened against a per-test temp data dir that WorkerProcessManager (already classified here) owns and discards."
     },
     {
       "path": "modules/system-tests/src/main/java/io/justsearch/systemtests/corpus/CorpusVectorGenerator.java",

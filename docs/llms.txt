@@ -68,7 +68,7 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 - [Writing a JustSearch plugin](how-to/write-a-plugin.md): Author a V1.5 plugin that runs in a SES Compartment, contributes a Surface, and integrates with the host's trust + capability model.
 
 ### Reference (Standards)
-- [API Contract Map](reference/api-contract-map.md): HTTP and gRPC contract sources, error sanitization.
+- [API Contract Map](reference/api-contract-map.md): HTTP and in-process port contract sources, error sanitization.
 - [Architectural Risk Register](reference/architectural-risks.md): Living registry of consciously accepted trade-offs, monitored risks, and design tensions, each naming one instrument that can be checked.
 - [Module Dependencies (Gradle)](reference/architecture/module-deps.md): Generated Gradle dependency graph across all modules.
 - [Benchmark Methodology](reference/benchmarks/methodology.md): How JustSearch measures retrieval quality: the reproducible single-config release, honest comparison classes, and how to reproduce it.
@@ -76,16 +76,15 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 - [Runtime Configuration Lifecycle Policy](reference/configuration/config-lifecycle-policy.md): Source-declared lifecycle stages and review metadata for permanent, experimental, and deprecated runtime configuration.
 - [Environment Variables & System Properties](reference/configuration/environment-variables.md): Canonical runtime knobs (ports, paths, AI toggles).
 - [Runtime Config Ownership Matrix](reference/configuration/runtime-config-ownership-matrix.md): Canonical YAML/env/sysprop ownership and precedence map.
-- [API Evolution Strategy](reference/contracts/api-evolution.md): Backward-compatible evolution policy for HTTP and gRPC APIs.
+- [API Evolution Strategy](reference/contracts/api-evolution.md): Backward-compatible evolution policy for HTTP APIs and protobuf messages.
 - [Health Readiness Contract v1](reference/contracts/health-readiness-contract.v1.md): Additive typed readiness envelope for /api/status with legacy boolean aliases.
-- [RPC Retry Ownership Policy v1](reference/contracts/rpc-retry-ownership-policy.v1.md): Method-level idempotency and retry ownership policy for runtime resilience.
-- [Search & RAG Reason Codes (Degradation)](reference/contracts/search-and-rag-reason-codes.md): Degradation signaling contract for gRPC and `rag_meta`.
+- [Search & RAG Reason Codes (Degradation)](reference/contracts/search-and-rag-reason-codes.md): Degradation signaling contract for the search/RAG port responses and `rag_meta`.
 - [Search Execution OTel Span Attribute Contract](reference/contracts/search-execution-spans.md): Closed set of OpenTelemetry span attribute keys emitted by SearchExecutor and per-LegSet handlers, with value types and emission preconditions.
 - [Search Pipeline Invariants](reference/contracts/search-pipeline-invariants.md): Invariants and blocked feature combinations enforced by the search pipeline, with contract test references.
 - [Workflow Telemetry Contract v1](reference/contracts/workflow-telemetry-contract.v1.md): Run-centric workflow evidence, join rules, derived metrics, and comparison constraints.
 - [Agent Postmortems — Named Reference Cases](reference/contributing/agent-postmortems.md): Indexed reference cases (handle → paragraph) that lessons in CLAUDE.md and .claude/rules/agent-lessons.md cite. Principles live in those files; narratives live here so they don't bloat session context.
 - [Agent Prompt Surface Governance](reference/contributing/agent-prompt-surface-governance.md): Ownership rules for repo-agent instructions, harness-specific skills, runtime prompts, hooks, and sandbox prompt surfaces.
-- [Common Workflows](reference/contributing/common-workflows.md): Step-by-step recipes for recurring JustSearch contribution tasks — add a gRPC method / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits. Relocated out of the always-loaded layer (tempdoc 620 Phase 2); the path-triggerable recipes are also delivered just-in-time via governance/consult-register.v1.json.
+- [Common Workflows](reference/contributing/common-workflows.md): Step-by-step recipes for recurring JustSearch contribution tasks — add a proto message field / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits. Relocated out of the always-loaded layer (tempdoc 620 Phase 2); the path-triggerable recipes are also delivered just-in-time via governance/consult-register.v1.json.
 - [Conflict Ledger](reference/contributing/conflict-ledger.md): The going-forward register for design conflicts, intentional reframes, and unresolved authority questions — plus the implementer≠resolver closure protocol that governs how they are resolved.
 - [Cross-Component Checklist](reference/contributing/cross-component-checklist.md): Checklist for features spanning build, shell, backend, and frontend.
 - [Development Philosophy](reference/contributing/development-philosophy.md): Issue tracking tiers, observation workflow, and documentation update rules.
@@ -128,8 +127,6 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 
 ### Decisions (Architecture Decision Records)
 - [Architecture Decision Records](decisions/README.md): Index of architectural decisions with MADR-lite template.
-- [ADR-0001: Use Three Separate OS Processes](decisions/0001-three-process-architecture.md): Split into Head (UI), Body (indexing), and Brain (inference) processes.
-- [ADR-0002: Use gRPC + MMF Hybrid for IPC](decisions/0002-grpc-mmf-hybrid-ipc.md): gRPC for structured data transfer, MMF for sub-millisecond signaling.
 - [ADR-0003: Use Lucene Directly Without Search Platform](decisions/0003-direct-lucene-no-elasticsearch.md): Interact with Lucene API directly instead of Elasticsearch or Solr.
 - [ADR-0006: Two-Pronged Citation Strategy](decisions/0006-two-pronged-citation-strategy.md): LLM-generated citations backed by RAG metadata, supplemented by CPU cross-encoder post-hoc matching.
 - [ADR-0007: Entity Faceting Over Full Knowledge Graph](decisions/0007-entity-faceting-over-knowledge-graph.md): Selective adoption of NER entity extraction for Lucene keyword facets with SQLite sidecar disambiguation, deferring full knowledge graph.
@@ -151,6 +148,7 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 - [ADR-0046: Local API trust boundary](decisions/0046-local-api-trust-boundary.md): The local HTTP API's trust boundary is the same-user native process: loopback bind, Host allowlist, MCP Origin validation, CORS pinned to the shell origin, and a per-boot session token on mutating routes. Same-user native processes are inside the boundary by construction.
 - [ADR-0047: Context window is a derived resource](decisions/0047-context-window-is-a-derived-resource.md): The LLM context window is derived at activation from a ladder of explicit rungs (32k on GPU, 8k on CPU, stepped down on a launch abort) rather than configured as a user preference, and every prompt-side budget is a fraction of the live window rather than a constant.
 - [ADR-0048: Extraction isolation and indexing pacing](decisions/0048-extraction-isolation-and-indexing-pacing.md): Untrusted parsing runs in a persistent child process pool rather than in the Worker JVM; foreground contention is answered with a duty cycle rather than a pause; Worker health is sampled internally rather than on the request thread; ingestion failures walk a bounded retry ladder to a visible terminal state; and NRT/commit cadence is decided by measurement, which rejected the first candidate.
+- [ADR-0049: One Engine JVM, and the process boundaries that survive](decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md): The application half and the index half share one JVM and meet at catalogued ports; the boundaries that remain are llama-server and the extraction child pool, each justified by a differing runtime, failure domain or scarce resource.
 
 <!-- generated:end -->
 

@@ -932,13 +932,6 @@ public enum EnvRegistry {
     INDEXER_MAX_INFLIGHT_BYTES(
         "justsearch.indexer.maxInFlightBytes", "JUSTSEARCH_INDEXER_MAX_INFLIGHT_BYTES", LifecycleStage.PERMANENT),
 
-    // ==================== Infra Health (tempdoc 314 Phase F) ====================
-
-    /** Infra health gRPC server host. */
-    INFRA_HEALTH_HOST("justsearch.infra.health.host", "JUSTSEARCH_INFRA_HEALTH_HOST", LifecycleStage.PERMANENT),
-    /** Infra health gRPC server port. */
-    INFRA_HEALTH_PORT("justsearch.infra.health.port", "JUSTSEARCH_INFRA_HEALTH_PORT", LifecycleStage.PERMANENT),
-
     // ==================== Indexing Tracing (tempdoc 312 Phase 0) ====================
 
     /** Indexing pipeline tracing level: none (default), sample (1%), detailed (100%). */
@@ -983,8 +976,6 @@ public enum EnvRegistry {
     // ==================== Worker Bootstrap (tempdoc 329) ====================
 
     /** Path to worker config snapshot JSON (set by HeadlessApp at runtime). */
-    WORKER_CONFIG_SNAPSHOT(
-        "justsearch.worker.config_snapshot", "JUSTSEARCH_WORKER_CONFIG_SNAPSHOT", LifecycleStage.PERMANENT),
 
     /**
      * Dev/test override for the OS energy-intent poll (tempdoc 630): {@code reduced} or {@code full}

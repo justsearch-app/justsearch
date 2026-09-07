@@ -203,6 +203,9 @@ jobs:
       - name: Test evidence policy guard
         run: node scripts/ci/verify-test-evidence-policy.mjs
 
+      - name: Stress suite policy guard
+        run: node scripts/ci/verify-stress-suite-policy.mjs
+
       - name: Root README entrypoint guard
         run: node scripts/ci/check-root-readme.mjs
 

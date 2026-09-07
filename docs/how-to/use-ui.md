@@ -117,7 +117,7 @@ The app includes built-in introspection tools reachable via browser.
 | **Dashboard** | `http://localhost:33221/api/debug/dashboard` | Visual status of Worker, Index, and Memory. |
 | **State JSON** | `http://localhost:33221/api/debug/state` | Raw JSON dump of the entire internal state. |
 | **Event Log** | `http://localhost:33221/api/debug/events` | Ring buffer of the last 50 system events. |
-| **Worker Log Tail** | `http://localhost:33221/api/debug/worker-log` | Quick peek at recent worker logs (best-effort). |
+| **Engine Log Tail** | `http://localhost:33221/api/debug/engine-log` | Quick peek at recent engine logs (best-effort). |
 | **Health** | `http://localhost:33221/api/health` | Lightweight backend health check. |
 | **Inference Status** | `http://localhost:33221/api/inference/status` | Current AI mode + queues + effective runtime model/context (best-effort); includes external server adoption diagnostics when applicable. |
 

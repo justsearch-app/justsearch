@@ -114,21 +114,11 @@ class HeadAssemblyTest {
   void defaultConstructorBootsSearchRuntime() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
 
-    String prevPort = System.getProperty("justsearch.infra.health.port");
-    try {
-      System.setProperty("justsearch.infra.health.port", "0");
-      try (HeadAssembly bootstrap = new HeadAssembly(telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
-        SearchRequest request = new SearchRequest(5, 0, true, null, List.of(), List.of(), null);
-        SearchResponse response = bootstrap.workers().search().search(request);
-        assertNotNull(response);
-        assertNotNull(response.hits());
-      }
-    } finally {
-      if (prevPort == null) {
-        System.clearProperty("justsearch.infra.health.port");
-      } else {
-        System.setProperty("justsearch.infra.health.port", prevPort);
-      }
+    try (HeadAssembly bootstrap = new HeadAssembly(telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+      SearchRequest request = new SearchRequest(5, 0, true, null, List.of(), List.of(), null);
+      SearchResponse response = bootstrap.workers().search().search(request);
+      assertNotNull(response);
+      assertNotNull(response.hits());
     }
   }
 
@@ -144,41 +134,31 @@ class HeadAssemblyTest {
   @Test
   void connectKnowledgeServerRegistersAgentToolsWithoutBootNpe() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
-    String prevPort = System.getProperty("justsearch.infra.health.port");
-    try {
-      System.setProperty("justsearch.infra.health.port", "0");
-      // Tempdoc 627 Deliverable 10: share the capability the mocked KS reports, so the HeadAssembly's
-      // localCap IS ks.workerCapability() (the production invariant) and no mirror is needed.
-      var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-      try (HeadAssembly bootstrap =
-          new HeadAssembly(
-              telemetry,
-              new ConfigManagerBootstrap(),
-              null,
-              new io.justsearch.app.services.settings.UiSettingsStore(
-                  io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), cap)) {
-        var ks =
-            org.mockito.Mockito.mock(
-                io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-        var client =
-            org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
-        cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
-        org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
-        org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
-        org.mockito.Mockito.when(ks.client()).thenReturn(client);
+    // Tempdoc 627 Deliverable 10: share the capability the mocked KS reports, so the HeadAssembly's
+    // localCap IS ks.workerCapability() (the production invariant) and no mirror is needed.
+    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
+    try (HeadAssembly bootstrap =
+        new HeadAssembly(
+            telemetry,
+            new ConfigManagerBootstrap(),
+            null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), cap)) {
+      var ks =
+          org.mockito.Mockito.mock(
+              io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      var client =
+          org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
+      org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
+      org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
+      org.mockito.Mockito.when(ks.client()).thenReturn(client);
 
-        // Must NOT throw the boot NPE, and the agent-tool handlers must register.
-        bootstrap.connectKnowledgeServer(ks);
-        assertTrue(
-            bootstrap.agentToolsRegistration().get(),
-            "agent-tool handlers must register on worker connect");
-      }
-    } finally {
-      if (prevPort == null) {
-        System.clearProperty("justsearch.infra.health.port");
-      } else {
-        System.setProperty("justsearch.infra.health.port", prevPort);
-      }
+      // Must NOT throw the boot NPE, and the agent-tool handlers must register.
+      bootstrap.connectKnowledgeServer(ks);
+      assertTrue(
+          bootstrap.agentToolsRegistration().get(),
+          "agent-tool handlers must register on worker connect");
     }
   }
 
@@ -197,62 +177,52 @@ class HeadAssemblyTest {
   @Test
   void offlineCoordinatorBuildsAtBootstrapAndResolvesClientAfterConnect() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
-    String prevPort = System.getProperty("justsearch.infra.health.port");
-    try {
-      System.setProperty("justsearch.infra.health.port", "0");
-      var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-      try (HeadAssembly bootstrap =
-          new HeadAssembly(
-              telemetry,
-              new ConfigManagerBootstrap(),
-              null,
-              new io.justsearch.app.services.settings.UiSettingsStore(
-                  io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-              cap)) {
+    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
+    try (HeadAssembly bootstrap =
+        new HeadAssembly(
+            telemetry,
+            new ConfigManagerBootstrap(),
+            null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            cap)) {
 
-        // Core regression: the coordinator must be non-null at bootstrap, before any Worker
-        // connects — it must not have value-captured the (null) client.
-        var coordinatorAtBootstrap = bootstrap.headInfraRegistry().offlineCoordinator();
-        assertNotNull(
-            coordinatorAtBootstrap,
-            "OfflineCoordinator must build at bootstrap despite the Worker not being connected yet"
-                + " (client is threaded as a live supplier, not a captured value)");
+      // Core regression: the coordinator must be non-null at bootstrap, before any Worker
+      // connects — it must not have value-captured the (null) client.
+      var coordinatorAtBootstrap = bootstrap.headInfraRegistry().offlineCoordinator();
+      assertNotNull(
+          coordinatorAtBootstrap,
+          "OfflineCoordinator must build at bootstrap despite the Worker not being connected yet"
+              + " (client is threaded as a live supplier, not a captured value)");
 
-        var ks =
-            org.mockito.Mockito.mock(
-                io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-        var client =
-            org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
-        org.mockito.Mockito.when(client.recoverVduProcessing()).thenReturn(0);
-        org.mockito.Mockito.when(client.countPendingVdu()).thenReturn(0);
-        org.mockito.Mockito.when(client.countPendingEmbeddings()).thenReturn(0);
-        cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
-        org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
-        org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
-        org.mockito.Mockito.when(ks.client()).thenReturn(client);
+      var ks =
+          org.mockito.Mockito.mock(
+              io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      var client =
+          org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      org.mockito.Mockito.when(client.recoverVduProcessing()).thenReturn(0);
+      org.mockito.Mockito.when(client.countPendingVdu()).thenReturn(0);
+      org.mockito.Mockito.when(client.countPendingEmbeddings()).thenReturn(0);
+      cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
+      org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
+      org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
+      org.mockito.Mockito.when(ks.client()).thenReturn(client);
 
-        bootstrap.connectKnowledgeServer(ks);
+      bootstrap.connectKnowledgeServer(ks);
 
-        // Same coordinator instance both API entry points read (HeadInfraRegistry / ServicePhase
-        // Output both derive from HeadAssembly.this.offlineCoordinator).
-        var coordinatorAfterConnect = bootstrap.headInfraRegistry().offlineCoordinator();
-        assertTrue(
-            coordinatorAtBootstrap == coordinatorAfterConnect,
-            "connectKnowledgeServer must not replace the coordinator instance (no rebuild needed;"
-                + " the live supplier resolves the client itself)");
+      // Same coordinator instance both API entry points read (HeadInfraRegistry / ServicePhase
+      // Output both derive from HeadAssembly.this.offlineCoordinator).
+      var coordinatorAfterConnect = bootstrap.headInfraRegistry().offlineCoordinator();
+      assertTrue(
+          coordinatorAtBootstrap == coordinatorAfterConnect,
+          "connectKnowledgeServer must not replace the coordinator instance (no rebuild needed;"
+              + " the live supplier resolves the client itself)");
 
-        // Drive synchronously (no virtual-thread indirection) — proves the supplier resolved the
-        // POST-connect client, not a value frozen at bootstrap.
-        coordinatorAfterConnect.startOfflineProcessing();
-        org.mockito.Mockito.verify(client).recoverVduProcessing();
-        org.mockito.Mockito.verify(client).countPendingVdu();
-      }
-    } finally {
-      if (prevPort == null) {
-        System.clearProperty("justsearch.infra.health.port");
-      } else {
-        System.setProperty("justsearch.infra.health.port", prevPort);
-      }
+      // Drive synchronously (no virtual-thread indirection) — proves the supplier resolved the
+      // POST-connect client, not a value frozen at bootstrap.
+      coordinatorAfterConnect.startOfflineProcessing();
+      org.mockito.Mockito.verify(client).recoverVduProcessing();
+      org.mockito.Mockito.verify(client).countPendingVdu();
     }
   }
 
@@ -297,11 +267,9 @@ class HeadAssemblyTest {
     Files.writeString(fileOps.resolve("batch-913-d5.json"), batchJson, StandardCharsets.UTF_8);
 
     String prevDataDir = System.getProperty("justsearch.data.dir");
-    String prevPort = System.getProperty("justsearch.infra.health.port");
     ConfigStore storeBefore = ConfigStore.globalOrNull();
     try {
       System.setProperty("justsearch.data.dir", dataDir.toAbsolutePath().toString());
-      System.setProperty("justsearch.infra.health.port", "0");
       // Rebuild the global store so HeadAssembly's rc.paths().dataDir() resolves to the seeded dir
       // rather than the developer's real data directory.
       TestResolvedConfigHelper.storeFromEnvironment();
@@ -343,11 +311,6 @@ class HeadAssemblyTest {
         System.clearProperty("justsearch.data.dir");
       } else {
         System.setProperty("justsearch.data.dir", prevDataDir);
-      }
-      if (prevPort == null) {
-        System.clearProperty("justsearch.infra.health.port");
-      } else {
-        System.setProperty("justsearch.infra.health.port", prevPort);
       }
       TestResolvedConfigHelper.restoreGlobal(storeBefore);
     }
@@ -429,25 +392,14 @@ class HeadAssemblyTest {
    */
   @Test
   void connectKnowledgeServerLateBindDoesNotThrowOnNullCtor() throws Exception {
-    String prevPort = System.getProperty("justsearch.infra.health.port");
-    try {
-      System.setProperty("justsearch.infra.health.port", "0");
+    // Construct with knowledgeServer=null (the round-15 cold-start sequence).
+    try (HeadAssembly bootstrap =
+        new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
 
-      // Construct with knowledgeServer=null (the round-15 cold-start sequence).
-      try (HeadAssembly bootstrap =
-          new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
-
-        // connectKnowledgeServer(null) is documented as a no-op (early return on ks == null).
-        // Post-merge, this is the entire contract — the 429 substrate dispatches via
-        // defaultFacade.lateBindWorkerServices when ks != null, no reflective field probe.
-        bootstrap.connectKnowledgeServer(null);
-      }
-    } finally {
-      if (prevPort == null) {
-        System.clearProperty("justsearch.infra.health.port");
-      } else {
-        System.setProperty("justsearch.infra.health.port", prevPort);
-      }
+      // connectKnowledgeServer(null) is documented as a no-op (early return on ks == null).
+      // Post-merge, this is the entire contract — the 429 substrate dispatches via
+      // defaultFacade.lateBindWorkerServices when ks != null, no reflective field probe.
+      bootstrap.connectKnowledgeServer(null);
     }
   }
 

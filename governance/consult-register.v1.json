@@ -98,18 +98,17 @@
       ]
     },
     {
-      "id": "workflow-grpc-method",
+      "id": "workflow-proto-message",
       "pathIncludes": ["modules/ipc-common/src/main/proto/"],
-      "region": "the gRPC contract (proto)",
+      "region": "the proto DTOs at the Engine's in-process ports",
       "docs": [],
       "recipe": [
-        "Define the method + messages in the .proto (e.g. indexing.proto).",
-        "Implement the service method in modules/worker-services/.",
-        "NO LONGER A STEP: lane F stage A item A9 deleted the gRPC server and its three Delegating*Service wrappers, so there is no forward to add — callers reach WorkerIngestService directly through KnowledgeServer.appServices().",
-        "Add the client call in modules/app-services/ (KnowledgeClient, or the relevant client).",
+        "THERE IS NO gRPC METHOD TO ADD. Lane F stage A item A14 removed the last `service` block from this directory and dropped the protoc gRPC codegen plugin from modules/ipc-common/build.gradle.kts, so protoc generates messages and nothing else. Adding a `service` block back is not a way to add an API; it is a way to resurrect a deleted transport.",
+        "What these messages ARE now: the data-transfer objects at the Engine's in-process ports — KnowledgeClient's signatures still carry SearchResponse, StatusResponse and friends. Lane F's design (§6) calls that transitional, so do not build new API surface on it; a new capability belongs on the REST API (see workflow-rest-endpoint) or on a port interface.",
+        "To add a FIELD: declare it in the .proto with the next free field number, produce it in modules/worker-services/, consume it in modules/app-services/ (KnowledgeClient or the relevant port).",
         "Add a contract test.",
-        "Verify: ./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test",
-        "Full reference: docs/reference/contributing/common-workflows.md (Add a gRPC method)."
+        "Verify: ./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test, plus `node scripts/governance/run.mjs --gate wire --mode gate` (buf breaking-change detection over this directory — contracts/registry.v1.json row `ipc-grpc-buf-breaking`, whose id keeps a name the file no longer earns).",
+        "Full reference: docs/reference/contributing/common-workflows.md."
       ]
     },
     {

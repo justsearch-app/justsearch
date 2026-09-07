@@ -12,7 +12,6 @@ import io.justsearch.app.services.observability.metrics.GpuMemoryUtilizationMetr
 import io.justsearch.app.services.observability.metrics.GpuUtilizationMetricProducer;
 import io.justsearch.app.services.observability.metrics.JobQueueDepthMetricProducer;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
-import io.grpc.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ public final class OrchestrationAssembly {
       DocumentsIndexedRateMetricProducer dirProducer,
       GpuUtilizationMetricProducer guProducer,
       GpuMemoryUtilizationMetricProducer gmProducer,
-      Server grpcServer,
       InferenceLifecycleManager manager,
       io.justsearch.app.api.ModeChangeListener gpuListener,
       io.justsearch.app.services.runtimestate.RuntimeReconciler runtimeReconciler,
@@ -59,7 +57,6 @@ public final class OrchestrationAssembly {
         dirProducer == null ? null : (AutoCloseable) dirProducer::stop,
         guProducer == null ? null : (AutoCloseable) guProducer::stop,
         gmProducer == null ? null : (AutoCloseable) gmProducer::stop,
-        grpcServer == null ? null : (AutoCloseable) () -> stopGrpc(grpcServer),
         manager == null
             ? null
             : (AutoCloseable) () -> stopManager(manager, gpuListener, runtimeReconciler),
@@ -81,18 +78,6 @@ public final class OrchestrationAssembly {
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-    }
-  }
-
-  private static void stopGrpc(Server s) {
-    s.shutdown();
-    try {
-      if (!s.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
-        s.shutdownNow();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      s.shutdownNow();
     }
   }
 

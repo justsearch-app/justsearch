@@ -348,9 +348,6 @@ public class HeadlessApp {
    */
 
   private static InfraPhaseResult setupInfra(ConfigPhaseResult configPhase) {
-    System.setProperty("justsearch.infra.health.grpc.disable", "true");
-    System.setProperty("justsearch.infra.health.port", "0");
-
     Path dataDir = configPhase.dataDir();
     harmonizeDataDirProperties(dataDir);
     log.info("Using data directory: {}", dataDir);
@@ -659,52 +656,42 @@ public class HeadlessApp {
     maybeMirrorOrtNativePath(configStore);
 
     Path dataDir = PlatformPaths.resolveDataDir();
-    SnapshotResult snapshot =
-        snapshotAfterPostBuildWrites(
-            configStore, settings, dataDir.resolve("runtime").resolve("worker-config-snapshot.json"));
-    if (snapshot.writtenSnapshot() != null) {
-      System.setProperty("justsearch.worker.config_snapshot", snapshot.writtenSnapshot().toString());
-    }
+    ResolvedConfig effectiveConfig = rebuildAfterPostBuildWrites(configStore, settings);
 
     // Lane F item A6 left this half of the ORT setup behind, and the review (B2) caught it. See
     // applyOrtNativePack: it must run here, after the rebuild, and it is the last boot step that
     // may precede an ORT class-init.
-    applyOrtNativePack(snapshot.config());
+    applyOrtNativePack(effectiveConfig);
 
-    return new ConfigPhaseResult(settingsStore, settings, snapshot.config(), configStore, dataDir);
+    return new ConfigPhaseResult(settingsStore, settings, effectiveConfig, configStore, dataDir);
   }
 
   /**
-   * The config the Worker snapshot was written from, and the snapshot path when the write actually
-   * succeeded ({@code null} otherwise — the sysprop must not name a file that is not there).
-   */
-  record SnapshotResult(ResolvedConfig config, Path writtenSnapshot) {}
-
-  /**
-   * Writes the Worker's config snapshot AFTER the two boot steps that write system properties the
-   * resolver has already read past — {@code maybeAutoSelectCuda12Variant} (the cuda12
-   * {@code server.exe}) and {@code maybeMirrorOrtNativePath}.
+   * Rebuilds the resolved config AFTER the two boot steps that write system properties the resolver
+   * has already read past — {@code maybeAutoSelectCuda12Variant} (the cuda12 {@code server.exe})
+   * and {@code maybeMirrorOrtNativePath} — and returns the config the rest of boot will see.
    *
-   * <p>Tempdoc 883 §C.5c residue: the snapshot used to be written from the {@code ResolvedConfig}
-   * built BEFORE those writes, so a boot-time cuda12 auto-select never reached the Worker — the
-   * Head switched variants and the Worker's snapshot still named the old exe. Rebuilding through
+   * <p><b>Lane F item A19 took the snapshot out of this method, and deliberately not the rebuild.</b>
+   * It used to do two things: rebuild, then serialise the result to
+   * {@code <dataDir>/runtime/worker-config-snapshot.json} for a second process to load at config
+   * ordinal 450. There is no second process, so the write and the whole ordinal-450 tier are gone.
+   * The REBUILD is not part of that tier and must survive it: it is what makes the two sysprop
+   * writes above visible to every later reader, and the ORT native-pack detection immediately below
+   * depends on it (review B2 — reading the pre-rebuild config there finds no pack and silently
+   * leaves the Engine on CPU, which is the tempdoc 883 §C.5c defect one field over). Deleting this
+   * method along with the snapshot would have looked like tidy residue removal and would have
+   * reintroduced that defect, which is why the name no longer says "snapshot".
+   *
+   * <p>Tempdoc 883 §C.5c, still the reason for the ordering: rebuilding through
    * {@link io.justsearch.app.services.config.ConfigStoreRebuilder} rather than re-reading the
-   * sysprops by hand keeps ONE assembly path: the same ordinal-150 probe, ordinal-300 settings and
-   * base sources the initial build used, plus whatever the two steps just wrote at 500. The
-   * rebuilt config is also what the rest of boot sees, so the Head and the Worker cannot disagree
-   * about the exe the Head just selected.
+   * sysprops by hand keeps ONE assembly path — the same ordinal-150 probe, ordinal-300 settings and
+   * base sources the initial build used, plus whatever the two steps just wrote at 500.
+   *
+   * @return the rebuilt config, which is also what {@link ConfigStore#get()} now returns
    */
-  static SnapshotResult snapshotAfterPostBuildWrites(
-      ConfigStore configStore, UiSettings settings, Path snapshotPath) {
+  static ResolvedConfig rebuildAfterPostBuildWrites(ConfigStore configStore, UiSettings settings) {
     io.justsearch.app.services.config.ConfigStoreRebuilder.rebuild(configStore, settings);
-    ResolvedConfig effectiveConfig = configStore.get();
-    try {
-      effectiveConfig.toWorkerSnapshot(snapshotPath);
-      return new SnapshotResult(effectiveConfig, snapshotPath);
-    } catch (Exception e) {
-      log.debug("Failed to write worker config snapshot (best-effort)", e);
-      return new SnapshotResult(effectiveConfig, null);
-    }
+    return configStore.get();
   }
 
   /**
@@ -728,7 +715,7 @@ public class HeadlessApp {
    * Reading {@code paths().ortNativePath()} off the pre-rebuild config would reproduce the tempdoc
    * 883 §C.5c defect one field over — a boot-time pack detection that the reader never sees. The
    * argument is deliberately {@code snapshot.config()}, the config
-   * {@link #snapshotAfterPostBuildWrites} rebuilt, so the ordering is in the signature rather than
+   * {@link #rebuildAfterPostBuildWrites} produced, so the ordering is in the signature rather than
    * in a comment.
    *
    * <p><b>Why this is the last safe point.</b> Everything before it in {@code resolveConfig} is
@@ -738,7 +725,7 @@ public class HeadlessApp {
    * after this one. Moving the call later than the config phase would put it after the point where
    * an ORT class-init becomes possible.
    *
-   * @param effectiveConfig the config as rebuilt by {@link #snapshotAfterPostBuildWrites}
+   * @param effectiveConfig the config as rebuilt by {@link #rebuildAfterPostBuildWrites}
    * @return the decision that was acted on (for tests and for the boot log)
    */
   static io.justsearch.ort.OrtCudaHelper.OrtNativePackDecision applyOrtNativePack(
@@ -919,9 +906,6 @@ public class HeadlessApp {
     long tPrev;
     log.info("Starting JustSearch HeadlessApp...");
 
-    // Avoid infra health port conflicts; allow ephemeral bind.
-    System.setProperty("justsearch.infra.health.port", "0");
-    System.setProperty("justsearch.infra.health.host", "127.0.0.1");
     Telemetry telemetry = null;
     HeadAssembly bootstrap = null;
     LocalApiServer apiServer = null;

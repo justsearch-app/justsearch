@@ -75,28 +75,25 @@ Structured JSON logs include MDC (Mapped Diagnostic Context) keys for cross-proc
 
 | Key | Set by | Where | Purpose |
 |-----|--------|-------|---------|
-| `trace_id` | `MdcContext.request()` | Worker gRPC services, AI Worker services | W3C trace correlation across Head→Worker |
+| `trace_id` | `MdcContext.request()` | Index-half services (`WorkerIngestService`, `WorkerSearchService`) | W3C trace correlation across the Head→index-half port calls |
 | `request_id` | `MdcContext.request()` | Same | Per-request correlation |
 | `span_id` | Not yet populated | — | Reserved for OTel MDC bridge (future) |
 | `stage_id` | `MdcContext.stage()` | Not yet adopted | Pipeline stage identification (future) |
 
-### Using MdcContext in gRPC services
+### Using MdcContext in index-half services
 
-Wrap the method body in a try-with-resources:
+Wrap the method body in a try-with-resources. The `CallContext` argument carries the trace and
+request ids (it replaced the gRPC `Context` at lane F stage A):
 
 ```java
-@Override
-public void myRpc(Request request, StreamObserver<Response> responseObserver) {
-  try (var ignored = openRequestMdc()) {
-    try {
-      // ... method body ...
-    } catch (RuntimeException e) {
-      log.error("RPC failed", e);  // MDC is active here
-      responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asException());
-    }
+public MigrationStartResponse startMigration(MigrationStartRequest request, CallContext ctx) {
+  try (var ignored = openRequestMdc(ctx)) {
+    return migrationOps.startMigration(request);
   }
 }
 ```
+
+(Verbatim shape: `modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java:431`.)
 
 **Important**: catch blocks must be INSIDE the MdcContext scope. In Java try-with-resources, the resource closes BEFORE catch clauses on the same try. Use a nested try/catch to ensure MDC is active during error logging.
 

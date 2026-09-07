@@ -507,9 +507,9 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
 
 #### Worker-side OperationalMetrics (dual-system rationale)
 
-The Worker maintains a separate `OperationalMetrics` LongAdder-based singleton alongside OpenTelemetry. This is architecturally intentional: OTel counters are write-only by design (no `get()` or `value()` method), but the gRPC status response path needs readable counter values. `ObservableLongCounter` callbacks bridge the two — LongAdder fields are the source of truth for gRPC reads, and registered OTel callbacks pull from those same fields during each periodic flush (5s) for NDJSON export.
+The Worker maintains a separate `OperationalMetrics` LongAdder-based singleton alongside OpenTelemetry. This is architecturally intentional: OTel counters are write-only by design (no `get()` or `value()` method), but the status response path needs readable counter values. `ObservableLongCounter` callbacks bridge the two — LongAdder fields are the source of truth for the status read, and registered OTel callbacks pull from those same fields during each periodic flush (5s) for NDJSON export.
 
-Key OperationalMetrics fields exposed via gRPC → `/api/status`:
+Key OperationalMetrics fields exposed via the `indexStatus` port call → `/api/status`:
 - Counters: `documentsIndexed`, `searchesTotal`, `searchesZeroResultTotal`, `searchesFailedTotal`, `batchesSubmitted`, `batchesRejected`
 - Maps: `failedByFileKind` (per-MIME-type failure counts, ~10 buckets: pdf, office, code, text, etc.)
 - Gauges: `queueDepth`, `lastSearchLatencyMs`, `lastIndexLatencyMs`
@@ -558,7 +558,7 @@ A single user action (e.g., "Search for 'Invoice'") traverses multiple boundarie
 1.  **Frontend:** User clicks button.
 2.  **API:** `LocalApiServer` receives request.
 3.  **AppFacade:** Business logic.
-4.  **IPC:** gRPC call to Worker (metadata: `x-trace-id`).
+4.  **Port call:** direct in-process call into the index half — since lane F stage A there is no IPC hop and no `x-trace-id` metadata to propagate: the caller's OTel context is already current on the callee's thread (except across a thread hand-off, which must wrap its tasks).
 5.  **Worker:** Lucene query.
 
 We use a `TraceId` to link these disconnected events together in the logs.
@@ -1009,7 +1009,7 @@ For quick "what's running?" introspection, the backend also exposes:
   - `use_thinking`: `boolean` (from `JUSTSEARCH_USE_THINKING` env var, default `true`)
   - Model paths, context size, GPU layers
   - Runtime mode and availability
-* **`GET /api/debug/worker-log`**: last worker log tail (best-effort)
+* **`GET /api/debug/engine-log`**: last Engine log tail (best-effort)
 * **`GET /api/inference/status`**: inference mode + effective runtime model/context when available (plus external server adoption diagnostics when applicable)
 
 ### Telemetry health monitoring (`/api/telemetry/health`)
@@ -1194,7 +1194,7 @@ For dashboard trend visualization, `RrdMetricStore` provides fixed-size time-ser
 - Head: `httpInflightRequests`
 - JVM: `heapUsedBytes`, `threadsLive`, `gcCollectionCount` (per-process)
 - AI/LLM: `intentSuccessTotal`, `summarySuccessTotal`, `llmQueueDepth`
-- IPC: `grpcReconnect`, `circuitBreakerRejected`
+- IPC: *(none — `grpcReconnect` / `circuitBreakerRejected` went with the wire client stack at lane F items A9-A11; see the IPC metrics note above)*
 - GPU: `gpu.utilization.percent`, `gpu.memory.utilization.percent`
 
 **Archives** (3-tier consolidation, fixed total size ~50KB):

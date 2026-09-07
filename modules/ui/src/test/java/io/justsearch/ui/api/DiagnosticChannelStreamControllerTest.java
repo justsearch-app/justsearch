@@ -6,7 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import io.justsearch.agent.api.registry.DiagnosticChannelRef;
 import io.justsearch.app.observability.diagnostic.DiagnosticChannelStreamRegistry;
-import io.justsearch.app.observability.diagnostic.HeadLogDiagnosticChannelCatalog;
+import io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog;
 import io.justsearch.telemetry.Telemetry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ final class DiagnosticChannelStreamControllerTest {
   @DisplayName("constructs cleanly with a single-channel registry")
   void constructs() {
     DiagnosticChannelStreamRegistry registry =
-        new DiagnosticChannelStreamRegistry(new HeadLogDiagnosticChannelCatalog());
+        new DiagnosticChannelStreamRegistry(new EngineLogDiagnosticChannelCatalog());
     DiagnosticChannelStreamController controller =
         new DiagnosticChannelStreamController(registry, mock(Telemetry.class));
     assertNotNull(controller);
@@ -29,7 +29,7 @@ final class DiagnosticChannelStreamControllerTest {
   @DisplayName("handle(unknown channel id) propagates the registry's IllegalArgumentException")
   void handleUnknownChannel() {
     DiagnosticChannelStreamRegistry registry =
-        new DiagnosticChannelStreamRegistry(new HeadLogDiagnosticChannelCatalog());
+        new DiagnosticChannelStreamRegistry(new EngineLogDiagnosticChannelCatalog());
     DiagnosticChannelStreamController controller =
         new DiagnosticChannelStreamController(registry, mock(Telemetry.class));
     try {

@@ -8,7 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.KnowledgeClientException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;

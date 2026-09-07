@@ -336,6 +336,35 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   `verify-installer-nsis-win.ps1` and nowhere else, because nothing else in stage A touches
   packaging.
 
+- **A14 (the retry-ownership contract set is retired, not labelled).** Four data files under
+  `scripts/resilience/contracts/` (`rpc-retry-ownership-matrix`, `grpc-retry-policy-profiles`,
+  both with schemas) plus their canonical doc `docs/reference/contracts/rpc-retry-ownership-policy.v1.md`.
+  Their whole subject — per-RPC idempotency classification, retry ownership between transport and
+  caller, and circuit-breaker ownership — is gone: there is no transport to own a retry, and A10
+  deleted the breakers. **Deleted rather than labelled**, and the doc went WITH the data in the same
+  change: a canonical doc left standing over deleted machine-readable companions is the exact shape
+  `retire-with-a-sweep` calls false authority, and labelling it would have preserved a contract
+  nothing can honour. Verified first that no gate, script or test reads them — the only remaining
+  references are dated tempdoc history (219, 325, 367) and this lane's own fixture captures, both
+  of which are records of their date and correctly keep naming what existed then.
+- **A14 (one residue item ROUTED rather than fixed, with the reason).**
+  `docs/explanation/23-search-pipeline-overview.svg` still renders "gRPC Request" and "gRPC to
+  Worker". It is a committed Graphviz artifact with **no `.dot` source and no generator in the
+  repo**, and its text is indexed by the workflow-fixture corpus baselines under
+  `evidence/baseline/fixture/`, so hand-editing two labels would silently shift a measurement
+  baseline. It therefore joins the canonical-doc sweep this stage already owes (§0.1, the A9
+  residue bullet and A15's banners) rather than being edited blind here. This is a routing, not a
+  note: the sweep is a named, scheduled piece of work with an owner, which is the difference the
+  `log-pre-existing-issues` rule turns on.
+- **A16 (a per-record log FIELD changed, flagged because a dashboard will notice).** The Logstash
+  encoder stamped `{"service":"head"}` on every line, and the file's own comment enshrined that as
+  the alpha.24 invariant "every entry is JSON with service:head". Both are now `engine`. Consumers
+  were checked BEFORE the edit, not after: nothing in `modules/` or `scripts/` greps the field,
+  and the `"service"` key that IS read (`StatusRecordSchemaTest.java:216`, `workflow_fixture.py:801`)
+  is a different field on the `/api/status` payload. The one thing that breaks is an operator's
+  saved `service:head` grep — which is the POINT rather than the cost, since it should stop
+  matching a process that does not exist.
+
 - **A7.** The item says "a bounded buffer … drop-oldest or block, your call, justified". **Block,
   never drop**, with a timeout that fails the flow — and the justification is a property of these
   two streams, not a preference: both carry *ordered state deltas folded into a keyed cache*

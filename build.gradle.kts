@@ -67,13 +67,6 @@ dependencyAnalysis {
         exclude("org.junit.jupiter:junit-jupiter-api")
         // ArchUnit aggregator includes junit5 extension
         exclude("com.tngtech.archunit:archunit-junit5")
-        // worker-core used io.grpc.Context/Metadata/ServerInterceptor from grpc-api (transitive of
-        // grpc-stub) for its three interceptors. Lane F stage A item A9 deleted them, so nothing
-        // under worker-core imports io.grpc any more and this exclusion is now suppressing a
-        // genuinely unused dependency rather than a false positive. Both the exclusion and the
-        // declarations in modules/{worker-core,indexer-worker}/build.gradle.kts retire together at
-        // item A13, which collapses the standalone worker distribution that still packages them.
-        exclude("io.grpc:grpc-stub")
         // RecordBuilder annotation processor generates *Builder classes from @RecordBuilder
         // annotations on app-api records. The plugin's bytecode analysis cannot detect
         // annotation-processor usage (the processor generates code at compile time but
@@ -82,8 +75,6 @@ dependencyAnalysis {
       }
       onUsedTransitiveDependencies {
         severity("fail")
-        // gRPC-api comes through grpc-stub intentionally
-        exclude("io.grpc:grpc-api")
         // Jackson annotations come through jackson-databind
         exclude("com.fasterxml.jackson.core:jackson-annotations")
         exclude("com.fasterxml.jackson.core:jackson-core")
@@ -92,13 +83,13 @@ dependencyAnalysis {
         // ArchUnit internals come through archunit-junit5
         exclude("com.tngtech.archunit:archunit-junit5-api")
         exclude("com.tngtech.archunit:archunit")
-        // Protobuf comes through grpc-protobuf
+        // Protobuf-java reaches consumers through ipc-common, which declares it `api` because the
+        // generated message classes are part of its outward surface (lane F stage A item A14 left
+        // the messages and removed the services).
         exclude("com.google.protobuf:protobuf-java")
       }
       onIncorrectConfiguration {
         severity("fail")
-        // gRPC netty uses NettyServerBuilder/NettyChannelBuilder at compile time
-        exclude("io.grpc:grpc-netty-shaded")
       }
       onUnusedAnnotationProcessors {
         severity("fail")

@@ -857,7 +857,6 @@ final class StatusRecordSchemaTest {
         .migrationEnumerator(
             new DebugMigrationEnumeratorView(
                 false, true, 1, 1, 10, 10, 1700000000000L, 1700000001000L, ""))
-        .signalBus(new SignalBusView(0, 0))
         .uptimeMs(60000)
         .healthCheck(new HealthNodeView(true, "1.0.0", 12345, "RUNNING", true, true))
         .effectiveConfig(Map.of("ort.version", "1.20.0"))

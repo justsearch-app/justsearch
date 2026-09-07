@@ -87,7 +87,7 @@
       "file": "modules/ui-web/src/shell-v0/views/LogSurface.ts",
       "openerId": "envelope-stream-direct",
       "class": "lazy",
-      "note": "Opens only when the Log surface mounts (the diagnostic-channels/head-log stream)."
+      "note": "Opens only when the Log surface mounts (the diagnostic-channels/engine-log stream)."
     },
     {
       "file": "modules/ui-web/src/shell-v0/components/ResourceView.ts",

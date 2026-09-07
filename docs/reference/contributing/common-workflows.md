@@ -2,25 +2,36 @@
 title: Common Workflows
 type: reference
 status: stable
-description: "Step-by-step recipes for recurring JustSearch contribution tasks — add a gRPC method / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits. Relocated out of the always-loaded layer (tempdoc 620 Phase 2); the path-triggerable recipes are also delivered just-in-time via governance/consult-register.v1.json."
+description: "Step-by-step recipes for recurring JustSearch contribution tasks — add a proto message field / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits. Relocated out of the always-loaded layer (tempdoc 620 Phase 2); the path-triggerable recipes are also delivered just-in-time via governance/consult-register.v1.json."
 ---
 
 # Common Workflows
 
 On-demand recipes for recurring contribution tasks. This file is **not** loaded
 every session (tempdoc 620 residence relocation) — load it when you start one of
-these tasks. The four path-triggerable recipes (gRPC, REST, config key, agent
+these tasks. The four path-triggerable recipes (proto message, REST, config key, agent
 tool) are *also* registered for just-in-time consultation in
 `governance/consult-register.v1.json` when you edit the relevant region; this
 file is the full reference behind those recipes.
 
-## Add a gRPC method
-1. Define in `modules/ipc-common/src/main/proto/indexing.proto`
-2. Implement service method in `modules/worker-services/`
-3. ~~Add forward in `DelegatingIngestService.java`~~ — **no longer a step.** Lane F stage A item A9 deleted the gRPC server and its three `Delegating*Service` wrappers; callers reach the impl directly through `KnowledgeServer.appServices()`, so adding a method to `WorkerIngestService` is all there is.
-4. Add client call in `modules/app-services/` (`KnowledgeClient`, or relevant client)
-5. Add contract test
-6. Verify: `./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test`
+## Add a proto message field (there is no gRPC method to add)
+
+**There is no gRPC method to add.** Lane F stage A item A14 removed the last `service` block from
+`modules/ipc-common/src/main/proto/` and dropped `protoc-gen-grpc-java` from
+`modules/ipc-common/build.gradle.kts`, so `protoc` generates messages and nothing else. Adding a
+`service` block back is not a way to add an API; it is a way to resurrect a deleted transport.
+
+What these messages **are** now: the DTOs at the Engine's in-process ports — `SearchServiceCalls` /
+`IngestServiceCalls` signatures still carry `SearchResponse`, `StatusResponse` and friends. Lane F's
+design §6 calls that transitional, so do not build new API surface on it; a new capability belongs
+on the REST API (below) or on a port interface (`governance/engine-ports.v1.json`).
+
+To add a **field**:
+1. Declare it in `modules/ipc-common/src/main/proto/indexing.proto` with the next free field number
+2. Produce it in `modules/worker-services/`
+3. Consume it in `modules/app-services/` (`KnowledgeClient` or the relevant port)
+4. Add a contract test
+5. Verify: `./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test`, plus `node scripts/governance/run.mjs --gate wire --mode gate` (buf breaking-change detection over this directory)
 
 ## Add a REST endpoint
 1. Add handler/controller in `modules/ui/src/main/java/.../api/`

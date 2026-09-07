@@ -2,7 +2,7 @@
 title: Search & RAG Reason Codes (Degradation)
 type: reference
 status: stable
-description: 'Degradation signaling contract for gRPC and `rag_meta`.'
+description: 'Degradation signaling contract for the search/RAG port responses and `rag_meta`.'
 ---
 
 # Search & RAG Reason Codes (Degradation)
@@ -11,7 +11,7 @@ JustSearch surfaces explicit mode + reason metadata so clients can distinguish �
 
 Worker-emitted reason codes are treated as a contract: they are allowlisted by `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java`. Head-side fallback reasons are Head-owned (not emitted by the Worker).
 
-## Interactive search (`SearchService.Search`)
+## Interactive search (`SearchServiceCalls#search`)
 
 Degradation fields on `SearchResponse` (`modules/ipc-common/src/main/proto/indexing.proto`):
 
@@ -79,7 +79,7 @@ The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its 
 - `INFERENCE_FAILED`: inference was attempted and ONNX Runtime threw — memory-arena exhaustion, a dead session, a bad output shape. Register F-054 split this out of `DEADLINE_EXCEEDED`, which the Worker used to stamp on *any* reranker skip: a measured campaign found 199/200 "deadline misses" were BFCArena OOM, unfixable by any deadline value and fixed instantly by `JUSTSEARCH_RERANK_GPU_MEM_MB`. The Worker log names that remedy at the failure site.
 - `UNKNOWN`: fall-through for an unrecognised **or unstated** Worker skip reason (a blank `skip_reason` is `UNKNOWN`, not a guessed deadline)
 
-## RAG retrieval (`SearchService.retrieveContext`)
+## RAG retrieval (`SearchServiceCalls#retrieveContext`)
 
 Degradation fields on `RetrieveContextResponse` (`modules/ipc-common/src/main/proto/indexing.proto`):
 
@@ -104,10 +104,10 @@ Allowlisted `retrieval_mode_reason` values:
 
 ## Head-side fallback reasons (REST/SSE callers)
 
-The Head may fall back to a full-document fetch when gRPC retrieval fails (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`):
+The Head may fall back to a full-document fetch when the `retrieveContext` port call fails (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`):
 
-- `GRPC_FAILED`: gRPC retrieval failed; Head used full-document fallback with a character budget
-- `FALLBACK_FAILED`: both gRPC and fallback failed (context is empty)
+- `GRPC_FAILED`: the retrieval call failed; Head used full-document fallback with a character budget. **The ID keeps its historical spelling** — it is a wire-visible string emitted verbatim at `RemoteDocumentService.java:535` and consumed by FE/MCP surfaces, so it outlived the gRPC channel it was named for. Renaming it is a breaking change, not a cleanup.
+- `FALLBACK_FAILED`: both the retrieval call and the fallback failed (context is empty)
 
 ## SSE: `rag_meta` (UI streaming endpoints)
 

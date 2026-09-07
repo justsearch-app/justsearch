@@ -215,8 +215,8 @@ public final class SearchExecutor {
         // is unwrapped inside Worker. Drop to TRACE so the failure-diagnosis affordance survives
         // for ad-hoc debugging while staying out of any reasonable production log level. The
         // diagnostics export DOES bundle this Logback-written log file — DiagnosticsServiceImpl's
-        // addDirectoryRedacted(zos, logsDir, "logs") zips worker.log with path-only redaction, no
-        // query/content redaction — so staying at TRACE (below the Worker's default INFO level) is
+        // addDirectoryRedacted(zos, logsDir, "logs") zips engine.log with path-only redaction, no
+        // query/content redaction — so staying at TRACE (below the Engine's default INFO level) is
         // what keeps this text out of exported diagnostics, not any exemption of logs from the ZIP.
         // Observations.md item #205 follow-up: typed in-process SafeQueryString wrapper deferred.
         log.trace("Failed query text: {}", queryString);

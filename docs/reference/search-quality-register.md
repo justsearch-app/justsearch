@@ -2975,7 +2975,7 @@ above)*
 
 - **Answer:** Deterministic tier (prefix/contains matching) handles 80%+ of filter mismatches at 0 ms. LLM grammar-constrained enum handles semantic gaps (~400–1200 ms GPU). Filter mismatch complaints dropped from 19 (Phase 4) to 1 (Phase 5+).
 - **Evidence:** tempdoc 366 Phase 5 (5a–5j). Hybrid validation: 6/8 cases at 0 ms. 50q eval: accuracy maintained (91.8% vs 92% baseline), cost -4%, turns -4%, duration -25%.
-- **Conditions/caveats:** Requires facet vocabulary snapshot (gRPC facet query). Empty vocabulary degrades to LLM-only (still works, just slower). CBS Sports semantic gap needs a more capable model.
+- **Conditions/caveats:** Requires facet vocabulary snapshot (facet query through the search port). Empty vocabulary degrades to LLM-only (still works, just slower). CBS Sports semantic gap needs a more capable model.
 
 ### F-021: GPL-trained LambdaMART reranking HURTS / is non-viable without real user-feedback labels
 

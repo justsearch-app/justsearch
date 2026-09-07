@@ -1,21 +1,30 @@
 ---
 title: "ADR-0002: Use gRPC + MMF Hybrid for IPC"
 type: decision
-status: stable
-description: "gRPC for structured data transfer, MMF for sub-millisecond signaling."
+status: superseded
+description: "gRPC for structured data transfer, MMF for sub-millisecond signaling. SUPERSEDED by ADR-0049: the channel this IPC design served no longer exists."
 date: 2026-02-03
-probes:
-  - adr-0002-mmf-layout-pinned
-  - adr-0002-mmf-constants-pinned
-  - adr-0002-grpc-present
-last_reviewed: 2026-09-02
+superseded_by: "ADR-0049 (0049-one-engine-jvm-and-the-boundaries-that-survive.md)"
+probes: []
+last_reviewed: 2026-09-07
 ---
 
 # ADR-0002: Use gRPC + MMF Hybrid for IPC
 
-> **Under re-examination (decision-review lane F, engine merge, 2026-09).** The three-process
-> split this IPC design serves is being re-derived; this ADR is the record of the original
-> decision and may be superseded. Do not treat its Consequences as settled while lane F is open.
+> **SUPERSEDED by [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) (2026-09-07).**
+> This ADR designed an IPC channel between the Head and the Worker. There is no such channel: the
+> two share a JVM and meet at direct calls behind catalogued ports. The gRPC services, the
+> memory-mapped signal bus, the port handoff and the circuit breaker are deleted. **Read this
+> document as history** — and specifically as the record of what the channel was doing, because the
+> four properties it provided (deadlines, per-call result-size bounds, streaming flow control,
+> cancellation) were requirements of the work rather than of the network and had to be re-homed
+> onto the port calls, not deleted with it. All three of its probes retired with their subjects;
+> ADR-0049 carries an absence probe in their place, scoped to the index-half module build files.
+> Item A14 then removed what was left of gRPC anywhere in the product — the `service` blocks in
+> `indexing.proto`, the separate infra-health gRPC service and its Netty server, and the
+> `protoc-gen-grpc-java` generator — so no module declares a gRPC dependency and nothing serves a
+> gRPC method. What survives of this ADR's mechanism is the message half of `indexing.proto`, now
+> used only as in-process DTOs.
 
 ## Status
 

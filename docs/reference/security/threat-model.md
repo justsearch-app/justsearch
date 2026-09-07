@@ -30,7 +30,7 @@ basis for the README's **"nothing leaves your machine"** claim. It is an NLnet-M
 |---|---|
 | **Webview ↔ Head** | The Tauri webview talks to the loopback HTTP API. Confined by CSP + Host/Origin/token checks. |
 | **Other local processes ↔ Head** | Any process (or a malicious web page the user visits) can attempt to reach `127.0.0.1:<port>`. The key inbound boundary. The decision of *where* that boundary is drawn — and what is deliberately inside it — is [ADR-0046: Local API trust boundary](../../decisions/0046-local-api-trust-boundary.md); this document is its threat analysis. |
-| **Head ↔ Worker / Inference** | In-process/loopback IPC (gRPC + MMF, `llama-server` on loopback). Not network-exposed. |
+| **Head ↔ index half / Inference** | The Head and the index half share one Engine JVM and meet at direct in-process calls — no socket, no listener, no IPC (ADR-0049; the gRPC channel and the MMF bus are deleted). `llama-server` remains a separate process on loopback. Not network-exposed. |
 | **Device ↔ Internet** | The only intended egress is the one-time model download. Everything else stays local. |
 
 ## The privacy guarantee and its mechanical anchors
@@ -185,5 +185,5 @@ First run downloads models once. Integrity + availability considerations:
 
 ## See also
 - [`mcp-production-server.md`](../mcp-production-server.md) — the MCP endpoint surface.
-- [`api-contract-map.md`](../api-contract-map.md) — the HTTP/gRPC contract sources.
+- [`api-contract-map.md`](../api-contract-map.md) — the HTTP and in-process port contract sources.
 - `ApiSecurityFilters.java` — the request-filter security plumbing (CORS / Host / token / capability gates).

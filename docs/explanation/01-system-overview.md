@@ -18,7 +18,7 @@ The application is split into three distinct OS processes to ensure that a crash
 ```mermaid
 graph TD
     User[User] --> UI[Main Process\n(UI Host + Orchestrator)]
-    UI -- gRPC + MMF --> Worker[Knowledge Server\n(Indexer + Search Engine)]
+    UI -- in-process port calls --> Worker[Knowledge Server\n(Indexer + Search Engine)]
     UI -- HTTP --> AI[Inference Server\n(llama-server.exe)]
     
     subgraph "Main Process (Head)"
@@ -47,7 +47,7 @@ graph TD
     *   **Sidecar Host:** Runs as a child process of the Tauri shell.
     *   **Configuration Owner:** Loads `SSOT` configs and injects them into child processes.
     *   **Watchdog:** Monitors the health of `KnowledgeServer` and `llama-server`.
-    *   **API Gateway:** Exposes the REST surface used by the UI (e.g. `/api/status`, `/api/health`, `/api/knowledge/*`, `/api/summarize/*`, `/api/inference/*`) and bridges to gRPC calls into the Knowledge Server when present.
+    *   **API Gateway:** Exposes the REST surface used by the UI (e.g. `/api/status`, `/api/health`, `/api/knowledge/*`, `/api/summarize/*`, `/api/inference/*`) and bridges to in-process port calls into the Knowledge Server when present.
     *   **Zero IO (index):** Crucially, it **never** touches Lucene index files, preventing `LockObtainFailedException` and preserving the “Worker owns Lucene” invariant.
     *   **Deterministic failure surfacing:** Knowledge Server startup failures are captured and surfaced via `/api/status` (so the UI can show “backend up, worker failed” instead of guessing).
 
@@ -63,21 +63,33 @@ graph TD
 *   **Index ownership:** Owns Lucene + generation layout (`state.json`, `indices/<gen>/`) and orchestrates schema migrations (blue/green) when configured.
 *   **Resilience:**
     *   **Auto-Restart:** If the process crashes (e.g., Tika parses a "poison pill" PDF), the Main process detects exit code != 0 and restarts it (up to 3 times).
-    *   **Log Redirection:** `stdout/stderr` are redirected to `%DATA_DIR%/logs/worker.log`.
+    *   **Log Redirection:** `stdout/stderr` are redirected to the one Engine log, `%DATA_DIR%/logs/engine.log` (item A13 deleted the Worker's own logback config, so there is no separate `worker.log`).
 
 ### Head→Worker Config Propagation
 
 Configuration reaches the Worker subprocess through three channels:
 
-1. **Config snapshot** (primary): `HeadlessApp` serializes the fully resolved config to `worker-config-snapshot.json` and passes the path via `-Djustsearch.worker.config_snapshot`. The Worker loads this at ordinal 450 during `ResolvedConfigBuilder.loadWorkerSnapshotFromSysprop()`. This carries the vast majority of config values.
+**There is one `ResolvedConfig`, and both halves read it.** The application half and the index
+half share a JVM (lane F stage A), so config does not travel: `ConfigStore.global()` is the same
+object for both, and a key resolved once is resolved for everything.
 
-2. **Blanket env var forwarding**: `WorkerSpawner` forwards all `JUSTSEARCH_*` environment variables from the Head process to the Worker via `ProcessBuilder.environment()`. Any env var the user sets reaches the Worker automatically.
+**Adding a new config key:** add it to `EnvRegistry`. That is the whole procedure.
 
-3. **Explicit system property forwarding**: A declared set of properties (`WorkerSpawner.WORKER_FORWARDED_PROPS`) are forwarded as `-D` JVM args. These are properties consumed before the config snapshot loads (e.g., `data.dir`, `config`, `repo.root`) or by non-application code (ORT JNI native library loading).
+**What this replaced, and why the replacement is smaller.** Until lane F stage A the Worker was a
+second process, and getting config into it took three mechanisms plus a detector:
 
-**Adding a new config key:** Add it to `EnvRegistry`. If it must be visible as a JVM system property in the Worker (not just via `ConfigStore`), add it to `WorkerSpawner.WORKER_FORWARDED_PROPS`. Most keys do NOT need this — the config snapshot handles them.
+1. a **config snapshot** — `HeadlessApp` serialised the resolved config to
+   `worker-config-snapshot.json` and passed its path as `-Djustsearch.worker.config_snapshot`,
+   which the Worker loaded at config ordinal 450;
+2. **blanket env forwarding** of every `JUSTSEARCH_*` variable through `ProcessBuilder`;
+3. **explicit `-D` forwarding** of a declared set (`WorkerSpawner.WORKER_FORWARDED_PROPS`) for keys
+   read before the snapshot loaded, or read by native code;
 
-**Divergence detection:** After gRPC handshake, the Head compares its config values against the Worker's effective values (reported via `HealthCheckResponse.effective_config`). Mismatches produce WARN logs. The curated comparison set is `EnvRegistry.CONFIG_DIVERGENCE_CHECK_KEYS`.
+plus **divergence detection**: after the gRPC handshake the Head compared its values against the
+Worker's effective values and logged WARNs on mismatch — a mechanism whose entire purpose was to
+notice when the other three had failed to agree. Items A11, A13 and A19 deleted all four. Two
+processes could disagree about their configuration; one cannot, so the detector had nothing left to
+detect and the ordinal-450 tier had nothing left to cross.
 
 ### 3. The Inference Server ("The Brain")
 *   **Executable:** `llama-server.exe` (Native Binary, no JVM).
@@ -99,12 +111,12 @@ are generated into `docs/reference/architecture/module-deps.md` by
 
 | Module | Process | Role |
 |---|---|---|
-| `modules/ui` | Head | UI Host backend — Javalin REST API, gateway to Worker gRPC, watchdogs the other processes |
+| `modules/ui` | Head | UI Host backend — Javalin REST API, gateway to the index half's in-process ports, watchdogs the other processes |
 | `modules/ui-web` | Head | Frontend — TypeScript, Lit web components, Vite |
 | `modules/app-services` | Head | Head-side service layer — bootstrap/assembly, conversation, operation registry, worker client |
 | `modules/shell` | Head | Tauri desktop shell |
 | `modules/indexer-worker` | Body | Knowledge Server entry point — sole owner of the Lucene index |
-| `modules/worker-services` | Body | Worker service layer — gRPC ingest, indexing loop, RAG context, search execution |
+| `modules/worker-services` | Body | Worker service layer — ingest, indexing loop, RAG context, search execution |
 | `modules/worker-core` | Body | Worker encoders and index primitives — SPLADE, ONNX embedding |
 | `modules/adapters-lucene` | Body | Lucene search integration — the only module that depends on Lucene itself |
 | `modules/indexing` | Body | Index document model and field definitions |
@@ -116,14 +128,14 @@ are generated into `docs/reference/architecture/module-deps.md` by
 | `modules/prompt-support` | shared | Prompt templates and reasoning-support utilities |
 | `modules/configuration` | shared | `EnvRegistry`, `ConfigKey`, resolved-config assembly — the single configuration authority |
 | `modules/app-api` | shared | Wire DTOs and API contract records |
-| `modules/ipc-common` | shared | gRPC protobuf definitions and MMF signalling |
+| `modules/ipc-common` | shared | Protobuf **message** definitions, used as the in-process port DTOs (`indexing.proto`; no `service` block, no gRPC codegen, no MMF classes — lane F items A10/A14) |
 | `modules/telemetry` | shared | Tracing and metrics emission |
 
 ## Design Philosophy
 
 ### "Verify, Don't Guess"
 The system is built to be deterministic.
-*   **Port Discovery (gRPC):** We don't guess ports. The Knowledge Server gRPC listener binds to port `0` (ephemeral) and writes the *actual* assigned port to a shared **Memory-Mapped File (MMF)**.
+*   **Port Discovery (gRPC):** *Retired.* The Knowledge Server's gRPC listener used to bind port `0` (ephemeral) and write the assigned port to a shared **Memory-Mapped File (MMF)**. Lane F stage A merged the two halves into one JVM, so there is no second port to discover and no handoff to verify — the gRPC channel, the MMF bus and (at item A14) gRPC itself are deleted. See [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md).
 *   **Port Discovery (HTTP):** The UI-facing HTTP API is usually configured (default `33221`), but can also be ephemeral. The backend prints `JUSTSEARCH_API_PORT=<port>` to stdout and the desktop shell injects it (Tauri `api_port` command / bridge). In browser dev mode, if no explicit port is provided, the UI auto-discovers by scanning a small loopback range (currently `33221..33250`) and validating the `/api/status` payload.
 *   **State Polling:** The frontend polls `/api/status` to determine if the backend is ready, rather than assuming it is after X seconds.
 *   **Lifecycle Gate:** Automation uses `GET /api/health` as a **contract-tested gate** (schema v1). It returns HTTP `200` for `READY|DEGRADED` and `503` otherwise; `/api/status` remains the richer “what’s running?” payload.

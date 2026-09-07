@@ -13,6 +13,15 @@ last_reviewed: 2026-09-02
 ## Status
 Accepted
 
+> **Current state (2026-09, lane F stage A).** The decision holds; the boundary it names does not.
+> Where this ADR says "the gRPC boundary" or "the internal gRPC contract", read "the Engine's
+> in-process port boundary": items A9-A11 deleted the Head↔Worker channel and item A14 deleted the
+> remaining gRPC (the `service` blocks, the infra-health service, the code generator), so no gRPC
+> exists anywhere in the product. Two type families, proto-aligned `core` DTOs on the inside and
+> JSON-aligned `app-api` records on the outside, with field-by-field translation in
+> `DefaultAppFacade` and `KnowledgeClient` — that is unchanged, and the reasoning below is still
+> the reasoning. See [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md).
+
 ## Context
 
 The `core` module contains DTOs (`Query`, `Result`, `Result.Hit`) that are near-duplicates of `app-api` records (`SearchRequest`, `KnowledgeSearchResponse`). Both type families have the same fields, the same nested records (Filters, TimeRange, Clause, Cursor), and the same defensive-copy patterns. Translation code in `DefaultAppFacade` (Head-to-index-half) and `KnowledgeClient` (index-half-to-Head) maps between them field-by-field.

@@ -645,12 +645,15 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return cachedOperationalView.get();
     }
 
-    /**
-     * Returns a UI-friendly snapshot of Worker status as a plain Map.
-     *
-     * @deprecated Use {@link #getWorkerOperationalView()} and serialize via Jackson.
-     */
     // 341: getStatusMapForUi() removed — use getWorkerOperationalView() with Jackson serialization.
+    // Its javadoc block (carrying an `@deprecated` tag) was left behind above this note when the
+    // method went. Nothing had recompiled this source set from scratch since, so the orphan was
+    // invisible until lane F stage A item A16 changed WorkerDebugView and forced a full
+    // app-services compile: javac associated the dangling `@deprecated` with the NEXT declaration,
+    // getDebugWorkerState(), and `dep-ann` failed the build on a live method that is not
+    // deprecated. Removed rather than suppressed or annotated — the tag documented a method that
+    // does not exist, and marking getDebugWorkerState() @Deprecated to silence it would have made
+    // the error invisible by telling a lie.
 
     /**
      * Returns a JSON-friendly snapshot of Worker status + health check for debug surfaces.
@@ -1592,13 +1595,51 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return vduOps.recoverVduProcessing();
     }
 
+    /**
+     * Stops the background root-walk and WAITS for it, rather than only asking it to stop.
+     *
+     * <p>{@code close()} used to call {@code walkExecutor.shutdownNow()} and return. That
+     * interrupts the walker, but {@code Files.walkFileTree} does not check the interrupt flag
+     * between entries, so the thread keeps traversing the filesystem for as long as the remaining
+     * directory takes — after {@code close()} has returned and the caller believes the client is
+     * finished with the disk. An asymmetric lifecycle: a start with no matching stop.
+     *
+     * <p>It surfaced as a test failure with every assertion passing —
+     * {@code WatchedRootScanCollectionTest} could not delete its {@code @TempDir}
+     * ({@code DirectoryNotEmptyException}) because the walker still held it — and it was tempting
+     * to read that as a Windows handle flake and quarantine the test. It is not: the same race at
+     * shutdown has a walker touching roots while the runtime beneath it is being torn down, and the
+     * reason it shows up on Windows first is only that Windows refuses to delete a directory that
+     * is open, where POSIX would have unlinked it and hidden the defect.
+     *
+     * <p>The wait is bounded because a shutdown must terminate: if the walk has not drained in
+     * {@value #WALK_SHUTDOWN_TIMEOUT_MS} ms the close proceeds and says so, which is strictly more
+     * information than the silent version gave.
+     */
+    private void awaitWalkExecutorTermination() {
+        walkExecutor.shutdownNow();
+        try {
+            if (!walkExecutor.awaitTermination(WALK_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                log.warn(
+                    "Background root walk did not stop within {}ms; closing anyway. Files under the"
+                        + " watched roots may still be read briefly after this returns.",
+                    WALK_SHUTDOWN_TIMEOUT_MS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Bound on how long {@link #close()} waits for the background walk to stop. */
+    private static final long WALK_SHUTDOWN_TIMEOUT_MS = 5_000L;
+
     @Override
     public final void close() {
         if (closed.compareAndSet(false, true)) {
             // Stop periodic sync first
             stopPeriodicSync();
 
-            walkExecutor.shutdownNow();
+            awaitWalkExecutorTermination();
             closeTransport();
             log.info("{} closed", getClass().getSimpleName());
         }

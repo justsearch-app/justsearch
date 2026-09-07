@@ -1,11 +1,20 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-package io.justsearch.app.services.worker;
+package io.justsearch.app.api.knowledge;
 
 import java.util.Locale;
 
 /**
- * The one failure type a {@link KnowledgeClient} call throws, and the type the Head translates into
- * an HTTP response.
+ * The one failure type a knowledge-port call throws, and the type the Head translates into an HTTP
+ * response.
+ *
+ * <p><b>Why it lives in app-api and not next to the client (lane F review, blocker 3).</b> It was
+ * in {@code app-services} beside {@code KnowledgeClient}, which put the port's failure vocabulary
+ * inside one consumer of that port. {@code app-agent} classifies worker-unreachable failures too
+ * and does NOT depend on {@code app-services}, so it had been matching
+ * {@code StatusRuntimeException} BY CLASS NAME — a string comparison that silently stopped matching
+ * anything at item A6 and could not be fixed without a type it could see. The ports themselves live
+ * in contract modules ({@code SearchPort} in core, {@code IndexingService} here); their failure type
+ * belongs in one too. Moving it is what lets every consumer catch by type instead of by spelling.
  *
  * <p><b>Why this exists (lane F stage A, A6-A9 review B1).</b> The worker services report failures
  * as {@code io.justsearch.indexerworker.services.WorkerServiceException} — the right home for the

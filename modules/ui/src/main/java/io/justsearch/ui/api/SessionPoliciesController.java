@@ -10,11 +10,13 @@ import java.util.TreeMap;
 /**
  * Implements {@code GET /api/debug/session-policies} — diagnostic endpoint for tempdoc 397 §7.3.
  *
- * <p>Post-§14.28 U4: reads Worker's authoritative {@code PolicySnapshot} via the
- * {@code GetSessionPolicies} gRPC rpc. Worker built the snapshot at boot via
- * {@code InferenceCompositionRoot.compose} — the endpoint reports what Worker actually
- * observed when constructing ORT sessions, not what Head's re-resolve would produce from its
- * own {@code ConfigStore} + detected hardware.
+ * <p>Post-§14.28 U4: reads the index half's authoritative {@code PolicySnapshot} via the
+ * {@code getSessionPolicies} port call (a gRPC rpc until lane F stage A item A14 deleted the wire;
+ * the call and its proto response message are unchanged). The index half built the snapshot at
+ * boot via
+ * {@code InferenceCompositionRoot.compose} — the endpoint reports what the index half actually
+ * observed when constructing ORT sessions, not what a re-resolve at the API front would produce
+ * from its own {@code ConfigStore} + detected hardware.
  *
  * <p>Proto-type handling lives in {@link KnowledgeClient#getSessionPolicies} per
  * {@code UiApiGuardrailsTest} (ui.api must not depend on ipc proto types). This controller

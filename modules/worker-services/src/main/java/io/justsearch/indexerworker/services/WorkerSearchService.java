@@ -439,7 +439,7 @@ public final class WorkerSearchService {
         } catch (IllegalArgumentException e) {
           metrics.recordSearchFailed();
           // The CALLER still gets the full message below — it is their own query. This LOG line does
-          // not: a Lucene ParseException quotes the query verbatim, and worker.log is bundled into
+          // not: a Lucene ParseException quotes the query verbatim, and engine.log is bundled into
           // the diagnostics export (path-only redaction), which is exactly why the sibling
           // parse-failure site keeps query text at TRACE (SearchExecutor:160-168). Same split here.
           log.warn("Invalid search request: {}", withoutQuotedQuery(e.getMessage()));
@@ -1053,7 +1053,7 @@ public final class WorkerSearchService {
    * Strips the quoted user query out of an error message before it reaches a server-side log.
    *
    * <p>Lucene's {@code ParseException} renders as {@code Cannot parse '<query>': Encountered ...},
-   * so logging the raw message writes the user's search text into worker.log — which the
+   * so logging the raw message writes the user's search text into engine.log — which the
    * diagnostics export bundles with path-only redaction. Everything between the first and last
    * quote is replaced (over-redacting is the safe direction) and the result is length-capped; the
    * diagnostic shape — which parser rejected it, and where — survives.

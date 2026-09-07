@@ -41,7 +41,7 @@ struct JustSearchPaths {
     llama_server_dir: String,
     logs_dir: String,
     llama_log: String,
-    headless_backend_log: String,
+    engine_log: String,
 }
 
 #[derive(Default)]
@@ -496,46 +496,53 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .map_err(|e| format!("Failed to create logs dir {}: {e}", logs_dir.display()))?;
 
     // Persist backend stdout/stderr to a log file for release builds (no console).
-    let headless_log_path = logs_dir.join("headless-backend.log");
+    //
+    // Lane F stage A item A16: this is the SAME path the Engine's own Logback FILE appender
+    // writes (modules/ui/src/main/resources/logback.xml) — the shell opens it before spawning
+    // Java so a JVM that dies before Logback configures itself still leaves evidence. It was
+    // `headless-backend.log`; A16 renamed it to `engine.log` on both sides, because there is one
+    // process and one log now. Rename BOTH or the merged process grows a second log file, which
+    // is the exact thing A16 exists to remove.
+    let engine_log_path = logs_dir.join("engine.log");
 
     // Rotate the previous boot's log on every launch so post-mortem evidence
     // survives a single restart (tempdoc 374 sandbox round 4 issue F: install
     // crash lines were unrecoverable after the next boot under the previous
-    // size-based rotation policy). Move headless-backend.log → .log.1, then
+    // size-based rotation policy). Move engine.log → .log.1, then
     // .log.1 → .log.2 for one extra generation before discarding.
-    if headless_log_path.exists() {
-        let log1 = logs_dir.join("headless-backend.log.1");
-        let log2 = logs_dir.join("headless-backend.log.2");
+    if engine_log_path.exists() {
+        let log1 = logs_dir.join("engine.log.1");
+        let log2 = logs_dir.join("engine.log.2");
         if log1.exists() {
             let _ = std::fs::remove_file(&log2);
             let _ = std::fs::rename(&log1, &log2);
         }
-        let _ = std::fs::rename(&headless_log_path, &log1);
+        let _ = std::fs::rename(&engine_log_path, &log1);
     }
 
-    let headless_log_file = OpenOptions::new()
+    let engine_log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&headless_log_path)
+        .open(&engine_log_path)
         .map_err(|e| {
             format!(
-                "Failed to open headless log {}: {e}",
-                headless_log_path.display()
+                "Failed to open engine log {}: {e}",
+                engine_log_path.display()
             )
         })?;
-    let headless_log = Arc::new(Mutex::new(headless_log_file));
+    let engine_log = Arc::new(Mutex::new(engine_log_file));
 
     let headless_dir = match resolve_headless_dir(app) {
         Ok(p) => p,
         Err(err) => {
-            if let Ok(mut f) = headless_log.lock() {
+            if let Ok(mut f) = engine_log.lock() {
                 let _ = writeln!(f, "[shell] Failed to resolve headless bundle dir: {err}");
             }
             return Err(err);
         }
     };
     if !headless_dir.is_dir() {
-        if let Ok(mut f) = headless_log.lock() {
+        if let Ok(mut f) = engine_log.lock() {
             let _ = writeln!(
                 f,
                 "[shell] headless dir not found or not a directory: {}",
@@ -603,7 +610,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             .filter(|s| !s.is_empty());
         let force_update = bundled_version.is_some() && bundled_version != installed_version;
         if force_update {
-            if let Ok(mut f) = headless_log.lock() {
+            if let Ok(mut f) = engine_log.lock() {
                 let _ = writeln!(
                     f,
                     "[shell] llama-server runtime version changed (installed={:?}, bundled={:?}); overwriting AI Home payload",
@@ -627,7 +634,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
                     match copy_dir_recursive(&p, &dest, force_update) {
                         Ok(n) => copied += n,
                         Err(e) => {
-                            if let Ok(mut f) = headless_log.lock() {
+                            if let Ok(mut f) = engine_log.lock() {
                                 let _ = writeln!(
                                     f,
                                     "[shell] Failed to restore llama-server subdirectory ({} -> {}): {e}",
@@ -648,7 +655,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
                         continue;
                     }
                     if let Err(e) = std::fs::copy(&p, &dest) {
-                        if let Ok(mut f) = headless_log.lock() {
+                        if let Ok(mut f) = engine_log.lock() {
                             let _ = writeln!(
                                 f,
                                 "[shell] Failed to restore llama-server payload file ({} -> {}): {e}",
@@ -663,7 +670,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             }
         }
         if copied > 0 {
-            if let Ok(mut f) = headless_log.lock() {
+            if let Ok(mut f) = engine_log.lock() {
                 let _ = writeln!(
                     f,
                     "[shell] Restored llama-server payload into AI Home (copied {copied} file(s)) to {}",
@@ -672,7 +679,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             }
         }
     } else {
-        if let Ok(mut f) = headless_log.lock() {
+        if let Ok(mut f) = engine_log.lock() {
             let _ = writeln!(
                 f,
                 "[shell] Bundled llama-server dir not found at {} (AI runtime restore skipped)",
@@ -699,7 +706,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         let force_update = bundled_version.is_some() && bundled_version != installed_version;
         match copy_dir_recursive(&bundled_tesseract_dir, &native_tesseract_dir, force_update) {
             Ok(copied) if copied > 0 => {
-                if let Ok(mut f) = headless_log.lock() {
+                if let Ok(mut f) = engine_log.lock() {
                     let _ = writeln!(
                         f,
                         "[shell] Restored Tesseract OCR payload into AI Home (copied {copied} file(s)) to {}",
@@ -709,7 +716,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             }
             Ok(_) => {}
             Err(e) => {
-                if let Ok(mut f) = headless_log.lock() {
+                if let Ok(mut f) = engine_log.lock() {
                     let _ = writeln!(
                         f,
                         "[shell] Failed to restore Tesseract OCR payload ({} -> {}): {e}",
@@ -735,19 +742,45 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
     cmd.current_dir(&headless_dir)
-        // Cap Head heap — the UI host is lightweight (REST API + SSE + static files).
-        // Without this, the JVM defaults to 1/4 physical RAM which is excessive.
-        .arg("-Xmx512m")
+        // ==== The packaged Engine flag set (lane F stage A item A13 follow-up) ====
+        //
+        // This block spawns ONE process that is now both halves of the product. Item A13 deleted
+        // the Worker distribution and its spawner but never revisited these flags, so until this
+        // change the packaged Engine ran on the Head-only set: a 512 MiB heap sized for "REST API
+        // + SSE + static files" while Lucene, the job queue, the indexing loop and the ONNX
+        // session cache lived in the same heap, and no -Dfile.encoding, which WorkerSpawner used
+        // to set for the index half (WorkerSpawner.java:457 before A11).
+        //
+        // -Xmx2g: the old Head 512m plus the Worker's 1g, with headroom, because there is one
+        // heap now instead of two. The Worker's larger working set was OFF-heap (ORT arenas and
+        // Lucene mmap), which -Xmx does not govern, so this is not 512m + 4g. The gate run at
+        // stage E re-sizes this against measurement; 2g is the safe interim, not a tuned value.
+        //
+        // -XX:+UseCompactObjectHeaders: one heap holding the index half's object population wants
+        // it, and it was absent here.
+        //
+        // -Dfile.encoding=UTF-8: carried over from the deleted spawner. Document extraction reads
+        // untrusted bytes, and on Windows the platform default is not UTF-8, so losing this
+        // changes how text is decoded — silently, and only for non-ASCII content.
+        //
         // SerialGC: small heap, no throughput need (the Head heap is >= 85 % empty at every
         // phase, 917 Derisk 1). Lane F PR 0: TieredStopAtLevel=1 dropped and MetaspaceSize=128m
         // added, because every full GC in the measured run was a Metaspace or CodeCache
         // threshold (the C1-only 48 MiB code cache), not heap pressure, and C1-only also
-        // conflicted with the AOT cache below. Both spawn sites (this and dev-runner.cjs) carry
-        // the same set; the test in scripts/dev/test-dev-runner-head-java-opts.mjs pins it.
+        // conflicted with the AOT cache below.
         // -XX:-UsePerfData: skip hsperfdata temp file (avoids Defender scan on Windows).
+        //
+        // This set is pinned from BOTH sides: scripts/dev/test-dev-runner-head-java-opts.mjs
+        // asserts the dev-runner's set exactly (deepEqual, so an addition fails), and reads THIS
+        // FILE's source to assert each shared flag appears here exactly once. The dev-runner
+        // deliberately carries no default -Xmx (tempdoc 730) — that is the one documented
+        // divergence, because a dev machine's JVM default is fine and a packaged one's is not.
+        .arg("-Xmx2g")
         .arg("-XX:+UseSerialGC")
         .arg("-XX:MetaspaceSize=128m")
+        .arg("-XX:+UseCompactObjectHeaders")
         .arg("-XX:-UsePerfData")
+        .arg("-Dfile.encoding=UTF-8")
         .arg("--sun-misc-unsafe-memory-access=warn")
         // FFM downcalls (NVML, the Windows job object, the GPU driver probe); JDK 25 warns without this, a later JDK (JEP 472) refuses.
         .arg("--enable-native-access=ALL-UNNAMED");
@@ -838,7 +871,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     // Drain stdout/stderr to avoid pipe backpressure.
     if let Some(stdout) = child.stdout.take() {
         let state_clone = state.clone();
-        let log_clone = headless_log.clone();
+        let log_clone = engine_log.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().flatten() {
@@ -887,7 +920,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     }
 
     if let Some(stderr) = child.stderr.take() {
-        let log_clone = headless_log.clone();
+        let log_clone = engine_log.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().flatten() {
@@ -1189,8 +1222,8 @@ async fn justsearch_paths(app: tauri::AppHandle) -> Result<JustSearchPaths, Stri
             .join("llama-server.log")
             .to_string_lossy()
             .to_string(),
-        headless_backend_log: logs_dir
-            .join("headless-backend.log")
+        engine_log: logs_dir
+            .join("engine.log")
             .to_string_lossy()
             .to_string(),
     })

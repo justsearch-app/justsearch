@@ -80,7 +80,6 @@ io.justsearch.app.services.ai.runtime.RuntimeActivationService#runDeactivate
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#getJustSearchHome
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#initialRuntimeContext
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#resolveOccurrenceBufferSize
-io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#startInfraHealthGrpcServer
 io.justsearch.app.services.bootstrap.phases.ExamplePlugin#enabled
 io.justsearch.app.services.bootstrap.phases.InferenceDecision#createInferenceManager
 io.justsearch.app.services.bootstrap.phases.InferenceDecision#decideInferenceConfigured
@@ -134,10 +133,7 @@ io.justsearch.telemetry.TracingBootstrap#<init>
 io.justsearch.ui.HeadlessApp#buildApi
 io.justsearch.ui.HeadlessApp#harmonizeDataDirProperties
 io.justsearch.ui.HeadlessApp#hasCudaRuntime
-io.justsearch.ui.HeadlessApp#main
 io.justsearch.ui.HeadlessApp#maybeAutoSelectCuda12Variant
-io.justsearch.ui.HeadlessApp#resolveConfig
-io.justsearch.ui.HeadlessApp#setupInfra
 io.justsearch.ui.api.DebugConditionController#handleClear
 io.justsearch.ui.api.DebugConditionController#handleTrip
 io.justsearch.ui.api.LocalApiServer#handleResetIndex

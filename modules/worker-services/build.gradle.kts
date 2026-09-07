@@ -1,5 +1,3 @@
-import java.io.RandomAccessFile
-
 plugins {
   `java-library`
   `java-test-fixtures`
@@ -25,7 +23,6 @@ dependencies {
   // module (no Lucene), so the Worker reuses the four substrates instead of re-deriving them.
   implementation(project(":modules:extension-substrate"))
 
-  api(libs.grpc.stub)
   implementation(libs.jackson.databind)
   implementation(libs.commonmark)
   // Tempdoc 847 §2.2 — GFM tables and task lists are structure in the rendered answer (marked
@@ -71,6 +68,10 @@ dependencies {
   testFixturesImplementation("org.apache.poi:poi:5.4.1") {
     isTransitive = false
   }
+  // Lane F stage A item A12 closure: ChaosExtractionSandboxChild speaks the sandbox's own
+  // length-prefixed JSON frame format. Jackson is `implementation` on the main source set, which
+  // test fixtures do not inherit, so the fixture declares it for itself.
+  testFixturesImplementation(libs.jackson.databind)
 
   testImplementation("io.opentelemetry:opentelemetry-sdk-common:1.60.1")
   testRuntimeOnly(libs.opentelemetry.sdk.testing)
@@ -80,10 +81,6 @@ dependencies {
   // app-services already uses for its log-assertion tests.
   testImplementation(libs.logback.classic)
   testImplementation(libs.logback.core)
-  // Lane F stage A item A9 deleted the wire tests (WorkerSearchServiceDocumentSliceWireTest and
-  // friends) that needed a real Netty server; no test source here imports io.grpc any more.
-  // Retire with the standalone distribution at item A13.
-  testImplementation(libs.grpc.netty.shaded)
 }
 
 configurations.configureEach {
@@ -152,23 +149,37 @@ tasks.named<JavaCompile>("compileJava") {
       logger.warn("HotSwapPush.java not found at ${hotSwapScript.absolutePath}, skipping bytecode push")
     }
 
-    // Step 2: Write MMF reload signal to trigger service reconstruction.
-    val signalPath = System.getenv("JUSTSEARCH_SIGNAL_PATH")
-      ?: (System.getenv("LOCALAPPDATA")?.let { "$it/JustSearch/worker_signal.lock" })
-    if (signalPath == null) {
-      logger.warn("Cannot determine signal file path (LOCALAPPDATA not set)")
+    // Step 2: Ask the Engine to reconstruct its services.
+    //
+    // Lane F stage A item A14: this used to seek to byte 29 of the memory-mapped worker signal
+    // file (MmfWorkerSignalLayoutV1.OFFSET_RELOAD_SIGNAL) and write a 1. Item A10 deleted that
+    // region along with the rest of the memory-mapped bus, so the write went to a file nothing
+    // maps and the reload silently did nothing. The trigger is a request FILE now --
+    // InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME under <dataDir>/runtime/ -- whose EXISTENCE
+    // is the signal and whose contents are ignored; the Engine's sentinel deletes it when it picks
+    // it up (InProcessWorkerSignalBus#isReloadRequested).
+    val dataDir = System.getenv("JUSTSEARCH_DATA_DIR")
+      ?: (System.getenv("LOCALAPPDATA")?.let { "$it/JustSearch" })
+    if (dataDir == null) {
+      logger.warn("Cannot determine data dir (set JUSTSEARCH_DATA_DIR, or LOCALAPPDATA)")
       return@doLast
     }
-    val signalFile = File(signalPath)
-    if (!signalFile.exists()) {
-      logger.warn("Signal file not found: $signalPath (Worker not running?)")
+    val runtimeDir = File(dataDir, "runtime")
+    if (!runtimeDir.isDirectory) {
+      logger.warn("Runtime dir not found: ${runtimeDir.absolutePath} (Engine not running?)")
       return@doLast
     }
-    RandomAccessFile(signalFile, "rw").use {
-      it.seek(29) // MmfWorkerSignalLayoutV1.OFFSET_RELOAD_SIGNAL
-      it.writeByte(1)
+    // Written to a sibling then renamed: the sentinel treats existence as the whole signal, so a
+    // half-created file would be a half-true signal.
+    val request = File(runtimeDir, "dev-reload.request")
+    val staging = File(runtimeDir, "dev-reload.request.tmp")
+    staging.writeText("")
+    if (!staging.renameTo(request)) {
+      staging.delete()
+      logger.warn("Could not place ${request.absolutePath}")
+      return@doLast
     }
-    logger.lifecycle("Hot-reload: bytecode pushed + reload signal written")
+    logger.lifecycle("Hot-reload: bytecode pushed + ${request.name} placed")
   }
 }
 

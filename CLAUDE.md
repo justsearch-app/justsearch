@@ -10,7 +10,7 @@ Canonical entry points: `docs/llms.txt` (docs index), `docs/tempdocs/` (active w
 ## Hard Invariants (Do Not Violate)
 
 <!-- generated:agent-invariants:start — source: AGENTS.md; run: node scripts/docs/agent-instructions-sync.mjs -->
-1. **Head never touches Lucene.** All index I/O belongs to the Worker and is reached through gRPC. <!-- rule:head-never-touches-lucene -->
+1. **Application code never touches Lucene.** Index I/O belongs to the index half, via a port (ADR-0049). <!-- rule:head-never-touches-lucene -->
 2. **Preserve the local API trust boundary.** Bind to loopback, enforce the Host allowlist, validate MCP Origin, and require the per-boot mutation token where ADR-0046 requires it. <!-- rule:loopback-only-network -->
 3. **Do not resurrect legacy endpoints.** `/api/search` and `/api/settings` are removed contracts. <!-- rule:no-legacy-endpoints -->
 4. **Verify, do not guess.** Use `/api/debug/state` and `/api/health` for lifecycle state and `/infra/capabilities` for `host.*` contract versions. <!-- rule:verify-dont-guess -->
@@ -126,11 +126,10 @@ Provenance for the above: owner decisions 2026-07-07 / 2026-07-14, pilot P-C 202
 
 ## Architecture
 
-| Process | Module | Entry Point |
-|---------|--------|-------------|
-| **Head** (UI Host) | `modules/ui` | `HeadlessApp.java` |
-| **Body** (index half) | `modules/indexer-worker` | composed in-process by `EngineRoot.java` (lane F A6/A13 — no separate process) |
-| **Brain** (Inference) | `modules/app-inference` | Manages `llama-server.exe` |
+| Process | Module | Entry point |
+|---|---|---|
+| **Engine** — API + index, one JVM | `modules/ui`, `modules/indexer-worker` | `HeadlessApp.java`; index half bound by `EngineRoot` |
+| **Brain** (inference) | `modules/app-inference` | manages `llama-server.exe` |
 
 Full architecture: `docs/explanation/01-system-overview.md`. Key API endpoints: `docs/reference/api-contract-map.md`.
 

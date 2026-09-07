@@ -2,7 +2,7 @@
 title: API Contract Map
 type: reference
 status: stable
-description: "HTTP and gRPC contract sources, error sanitization."
+description: "HTTP and in-process port contract sources, error sanitization."
 ---
 
 # API Contract Map
@@ -506,7 +506,8 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `querySyntax` (or `query_syntax` alias) — since tempdoc 821 §P / register F-046, `lucene` is
   honoured on **every** retrieval path (previously only the sparse-only one; multi-leg legs escaped
   the operators and retrieved a SIMPLE parse), so a malformed `lucene` query now fails the request
-  with HTTP `400` / `INVALID_REQUEST` (Worker gRPC `INVALID_ARGUMENT`) instead of being silently
+  with HTTP `400` / `INVALID_REQUEST` (`KnowledgeClientException.Status.INVALID_ARGUMENT` from the
+  index half) instead of being silently
   parsed as plain text.
 - `projection[]`
 - `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`)
@@ -588,7 +589,7 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 `GET /api/knowledge/status`:
 
 - Returns readiness/liveness for the Knowledge Server bridge.
-- Always returns a full `KnowledgeStatusView` record (consistent shape regardless of Worker state). When Worker gRPC is unreachable, serves the last-known-good cached view with `statusStale: true` and `statusStaleMs: <elapsed>` (120s cap, then falls back to defaults).
+- Always returns a full `KnowledgeStatusView` record (consistent shape regardless of Worker state). When the index half is unreachable, serves the last-known-good cached view with `statusStale: true` and `statusStaleMs: <elapsed>` (120s cap, then falls back to defaults).
 - Key fields: `state`, `ready`, `indexState`, `healthy`, `indexedDocuments`, `embeddingCoveragePercent`, `spladeCoveragePercent`, `chunkEmbeddingReady` (chunk-level vector queryability, independent from parent-doc `embeddingCoveragePercent`), `statusStale`, `statusStaleMs`.
 - When `statusStale: true`, `healthy` is overridden to `false` and `indexState` to `"UNKNOWN"` — other enrichment fields reflect the last-known-good state.
 
@@ -602,7 +603,7 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 `DELETE /api/indexing/collections`:
 
 - Request body: `collection` (required string). Removal route for collection-tagged ad-hoc ingests — `removeWatchedRoot` and `PruneOps.pruneByPathPrefix` are both watched-root-prefix driven, so before 811 an out-of-root ingest had no removal route at all.
-- Deletes every parent and chunk document carrying the collection term (Worker RPC `IngestService.DeleteByCollection`), then commits.
+- Deletes every parent and chunk document carrying the collection term (port call `IngestServiceCalls#deleteByCollection`), then commits.
 - Refuses (`400`) the reserved app-internal collections (`justsearch-help`, `agent-history`) and the untagged `default` bucket — the latter would be a whole-index wipe wearing a collection's clothes.
 - Response: `status: "ok"`, `collection`, `deletedDocs` (documents matched and submitted for deletion).
 
@@ -612,14 +613,14 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 + `modules/app-services/src/main/java/io/justsearch/app/services/worker/ScanProgressRegistry.java`
 + `modules/app-api/src/main/java/io/justsearch/app/api/scan/ScanProgressEvent.java`
 
-`GET /api/scans/{scanId}/progress` — Server-Sent Events stream backed by an in-memory `ScanProgressRegistry`. Bridges the synchronous gRPC scan progress consumer to UI subscribers.
+`GET /api/scans/{scanId}/progress` — Server-Sent Events stream backed by an in-memory `ScanProgressRegistry`. Bridges the synchronous in-process scan-progress consumer to UI subscribers.
 
 - Path param: `scanId` — the value returned in `KnowledgeIngestResponse.scanId`.
 - Response: `text/event-stream`. Events:
   - `event: progress` payload `{scanId, filesWalked, filesAdmitted, filesSkipped, bytesWalked, currentDirectory, complete: false}` per `ScanRootProgress` from the worker. `currentDirectory` is privacy-hashed (matches the tempdoc 410 / 418 path-hash contract — never a raw path).
   - `event: complete` payload `{scanId, ..., complete: true, terminalReasonCode}` once when the scan ends. `terminalReasonCode` is empty on clean completion or one of `CLIENT_CANCELLED`, `IO_ERROR`, `RPC_FAILED`, `ROOT_NOT_DIRECTORY`, `UNKNOWN_SCAN_OR_RETENTION_EXPIRED`.
   - `event: error` payload `{message}` on RPC-level failure during streaming.
-- **Cancel:** closing the SSE connection (`EventSource.close()`) propagates a gRPC cancel to the worker via the `CancelToken` substrate (T3); the worker scan terminates with `CLIENT_CANCELLED` within the next batch.
+- **Cancel:** closing the SSE connection (`EventSource.close()`) propagates a cancel to the index half via the `CancelToken` substrate (T3 — a plain observable boolean since lane F item A10 re-homed it off `io.grpc.Context`); the scan terminates with `CLIENT_CANCELLED` within the next batch.
 - **Replay window:** subscribers that connect after the scan completes still see the full event sequence as long as the buffer is in memory (default retention `30s`, controlled by the registry — not env-configurable yet).
 
 ### Health Event Stream API (tempdoc 430)
@@ -739,8 +740,8 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 
 **Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java` (`handleSettleIndex`)
 
-`POST /api/indexing/settle` purges deleted-but-unmerged documents from the ACTIVE index (Worker RPC
-`IngestService.SettleIndex`). Tempdoc 931 section E item 10: a tombstone still counts in the BM25
+`POST /api/indexing/settle` purges deleted-but-unmerged documents from the ACTIVE index (port call
+`IngestServiceCalls#settleIndex`). Tempdoc 931 section E item 10: a tombstone still counts in the BM25
 collection statistics, so two indexes of the same corpus carrying different tombstone counts answer
 the same query differently. A paired evaluation calls this between the indexing phase and the query
 phase so both arms compare with equal merge state.
@@ -784,21 +785,26 @@ JustSearch's loopback HTTP server exposes a minimal OpenAI-compatible surface th
 - `/v1/embeddings` — JustSearch's embedding encoder is in-process in the Worker; no HTTP server hosts it.
 - Loopback-only. The proxy does not apply rate limiting, billing, or quota checks; those would belong on a Javalin `before` handler if needed.
 
-## gRPC (Head <-> Worker IPC)
+## Protobuf messages (in-process port DTOs)
 
-**Source of truth:** `.proto` files in `modules/ipc-common/src/main/proto/`
+**Source of truth:** `modules/ipc-common/src/main/proto/indexing.proto` — the one remaining
+`.proto` file, and the request/response vocabulary of the Engine's in-process ports.
 
-Start with:
+It declares **messages only**. Lane F stage A deleted the Head↔index gRPC channel (items A9-A11)
+and then, at item A14, the last `service` blocks (`SearchService`, `IngestService`,
+`HealthService`), the separate `io/justsearch/ipc/v1/infra_diagnostics.proto` with its
+`InfraDiagnosticsService`, and the `protoc-gen-grpc-java` generator in
+`modules/ipc-common/build.gradle.kts`. `protoc` still runs, so the generated message classes
+remain; nothing generates or serves a stub. See [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md).
+These proto DTOs at the port signatures are transitional
+(`modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchServiceCalls.java`
+records the follow-up that replaces them with `app-api` records).
 
-- `modules/ipc-common/src/main/proto/indexing.proto` (SearchService, indexing/control messages)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/health.proto` (liveness/readiness probes)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/ai.proto` (AI-related RPCs)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/pipeline_indexing_types.proto` (shared envelope/types)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/infra_diagnostics.proto` (infrastructure health snapshots)
+### Port-call TCK coverage gaps
 
-### gRPC TCK coverage gaps
-
-`GET /api/preview` delegates paged stored-text reads to `SearchService.FetchDocumentSlice`.
+`GET /api/preview` delegates paged stored-text reads to the index half's `fetchDocumentSlice`
+port call (`SearchServiceCalls#fetchDocumentSlice`, bound in-process by
+`modules/app-engine/src/main/java/io/justsearch/app/engine/WorkerSearchCalls.java`).
 The Worker reads content and extraction provenance through one searcher. Its metadata map carries
 the canonical `content_sha256`, projected by Head as nullable `contentSha256`; this identifies the
 complete stored UTF-8 text, including VDU replacements. `sourceSha256` identifies the extracted source
@@ -806,20 +812,18 @@ bytes and has a separate meaning. Pages use UTF-16 character offsets, preserve U
 and include `totalChars`. Strict measurement clients require an unchanged content revision across pages
 and verify the assembled text against it. `SUCCESS_EMPTY` remains a found document with empty content.
 
-The following RPCs are covered by integration tests but lack isolated TCK-style contract tests in `app-api-tck`. Highest-value additions are marked.
+The following port calls are covered by integration tests but lack isolated TCK-style contract tests in `app-api-tck`. Highest-value additions are marked. (They were gRPC RPCs until lane F stage A item A6 re-homed the same call surface onto `SearchServiceCalls`; the names and signatures are unchanged.)
 
-| Service | RPC | Priority |
+| Port | Call | Priority |
 |---------|-----|----------|
-| `SearchService` | `Suggest` | **High** â€” user-facing autocomplete hot path |
-| `SearchService` | `RetrieveContext` | **High** â€” RAG context retrieval hot path |
-| `SearchService` | `FetchDocuments` | Medium |
-| `SearchService` | `FetchDocumentSlice` | Medium |
-| `SearchService` | `Rerank` | Medium — cross-encoder reranking via Worker GPU (360) |
-| `SearchService` | `MatchCitations` | Low |
-| `SearchService` | `ListFolders` | Low |
-| `SearchService` | `ListFolderFiles` | Low |
-| `AiService` | `TranslateIntent`, `Embed`, `Classify` | Low |
-| `InfraDiagnosticsService` | `CurrentSnapshot`, `StreamSnapshots` | Low |
+| `SearchServiceCalls` | `suggest` | **High** — user-facing autocomplete hot path |
+| `SearchServiceCalls` | `retrieveContext` | **High** — RAG context retrieval hot path |
+| `SearchServiceCalls` | `fetchDocuments` | Medium |
+| `SearchServiceCalls` | `fetchDocumentSlice` | Medium |
+| `SearchServiceCalls` | `rerank` | Medium — cross-encoder reranking on the index half's GPU (360) |
+| `SearchServiceCalls` | `matchCitations` | Low |
+| `SearchServiceCalls` | `listFolders` | Low |
+| `SearchServiceCalls` | `listFolderFiles` | Low |
 
 ### Why not Pact / consumer-driven contracts
 
@@ -928,8 +932,8 @@ All cross-language contract tests use `ORDER_MAP_ENTRIES_BY_KEYS` for determinis
 
 `POST /api/debug/reset-index` — wipes all index state for pipeline profiling
 (tempdoc 355). Gated on `justsearch.eval.mode=true` (set by
-`runHeadlessEval`); returns 404 in production. Sequence: Worker reset via
-gRPC (stop loop → delete all docs → commit + refresh → clear queue +
+`runHeadlessEval`); returns 404 in production. Sequence: index-half reset via
+the `resetIndex` port call (stop loop → delete all docs → commit + refresh → clear queue +
 clusters + metrics → restart loop), then Head clears watched roots +
 persists empty state. Response: `{"reset": true}` on success, 500 on
 failure.
@@ -937,16 +941,16 @@ failure.
 `GET /api/debug/session-policies` — resolved `RuntimePolicy` + per-encoder
 `ModelSessionPolicy` snapshots as JSON. **Not gated on eval mode** —
 available in production (unlike `/api/debug/reset-index`). Proxied from
-the Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC
-rpc (tempdoc 397 §14.28 U4); Head does not re-resolve. Response shape:
+the index half's live `InferenceSurface` via the `getSessionPolicies` port
+call (tempdoc 397 §14.28 U4); Head does not re-resolve. Response shape:
 `{configStatus, runtime, models}` where `configStatus ∈ {ok,
 config-unavailable, surface-unavailable, worker-unreachable}`
 (`config-unavailable` = no `ResolvedConfig` on Head; `surface-unavailable`
-= Worker hasn't composed yet; `worker-unreachable` = gRPC failed or no
-client). Controller: `modules/ui/src/main/java/io/justsearch/ui/api/SessionPoliciesController.java`.
+= Worker hasn't composed yet; `worker-unreachable` = the port call failed or
+there is no client). Controller: `modules/ui/src/main/java/io/justsearch/ui/api/SessionPoliciesController.java`.
 
 Other debug endpoints: `/api/debug/commit-metadata`, `/api/debug/effective-config`,
-`/api/debug/events`, `/api/debug/worker-log`, `/api/debug/dashboard`,
+`/api/debug/events`, `/api/debug/engine-log`, `/api/debug/dashboard`,
 `/api/debug/chunks`, `/api/debug/logging` (GET/POST),
 `/api/debug/metrics/timeseries`, `/api/debug/metrics/timeseries/available`.
 

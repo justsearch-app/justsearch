@@ -584,9 +584,9 @@ On an 8GB GPU, loading both simultaneously (or leaving both GPU-enabled) can cau
 
 ## The Solution: Mutual Exclusion
 
-JustSearch enforces a strict **Single-tenant GPU Policy** across processes:
-* The **Main Process** owns Online inference (`llama-server.exe`) via `modules/app-inference` and `InferenceLifecycleManager`.
-* The **Worker Process** owns indexing + Worker-side ONNX Runtime encoders, and cooperates via the MMF `main_gpu_active` flag (offset `24`, `MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE`).
+JustSearch enforces a strict **Single-tenant GPU Policy** between the two GPU-consuming halves of the single Engine JVM (lane F stage A — the Head and the index half are composed in-process, not separate processes):
+* Online inference (`llama-server.exe`) is driven via `modules/app-inference` and `InferenceLifecycleManager`.
+* Indexing + the index half's ONNX Runtime encoders cooperate via the in-process `mainGpuActive` field on `GpuSchedulingGauge` (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), read through `WorkerSignalBus.isMainGpuActive()`.
 
 ### The Runtime Authority (desired state, status, procedures)
 
@@ -630,7 +630,7 @@ ever sees the one-bit GPU lease (`main_gpu_active`).
 
 When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687 — there is no separate Chat tab):
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
-2.  **Main:** Signals Worker via MMF (`main_gpu_active = 1`).
+2.  **Main:** Sets the in-process `GpuSchedulingGauge.mainGpuActive = true` (lane F stage A — an in-JVM field write, not a cross-process signal).
 3.  **Worker:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
 4.  **Main:** Starts `llama-server.exe` (or **adopts** an already-running instance on the configured port).
 5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait — tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
@@ -638,7 +638,7 @@ When the user escalates to an Ask/agent turn in the unified "Search" window (tem
 
 When the user closes Chat or minimizes the app:
 1.  **Main:** Kills `llama-server.exe`.
-2.  **Main:** Signals Worker (`OFFSET_GPU_ACTIVE = 0`).
+2.  **Main:** Sets `GpuSchedulingGauge.mainGpuActive = false`.
 3.  **Worker:** Reloads Worker-side ORT encoders as needed and resumes backfill.
 
 ## Components
@@ -779,8 +779,8 @@ Model file verification: `./gradlew.bat :modules:worker-core:verifyModel -Pmodel
 
 ### 4. Reranker GPU Coordination (Worker-side, default enabled)
 
-The cross-encoder reranker runs in the **Worker process** (360), sharing
-GPU arbitration with embedding, SPLADE, and NER via the signal bus.
+The cross-encoder reranker runs in the index half (360), sharing
+GPU arbitration with embedding, SPLADE, and NER via the (now in-process) signal bus.
 GPU is enabled by default (`JUSTSEARCH_RERANK_GPU_ENABLED=true`).
 
 GPU arbitration:

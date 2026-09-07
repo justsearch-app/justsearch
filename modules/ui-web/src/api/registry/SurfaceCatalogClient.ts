@@ -486,7 +486,7 @@ export function mergePluginSurfaceContributions(
     // OR DIAGNOSTIC claim to PRODUCT — the runtime completion of the gate's `TRUST ⟹ CORE` and
     // `DIAGNOSTIC ⟹ CORE` foreclosures (tempdoc 571 §4d): a plugin cannot forge a trust surface, and a
     // diagnostic surface is plugin-ineligible until 560 §4a (backend capability-attenuation) ships —
-    // streaming the raw head-log to attenuated plugin code needs an attenuation substrate that does not
+    // streaming the raw engine-log to attenuated plugin code needs an attenuation substrate that does not
     // yet exist, so a "no for now" enforced here, not a per-surface judgment. (This forecloses a plugin
     // claiming diagnostic ALTITUDE / Diagnostics-band homing; the deeper channel-DATA attenuation is the
     // 560 §4a concern.) isFirstPartyProvenance treats both Java's Provenance.core (CORE) and the FE's

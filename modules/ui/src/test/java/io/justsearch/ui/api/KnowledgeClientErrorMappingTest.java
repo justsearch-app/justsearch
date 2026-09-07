@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.ApiErrorCode;
-import io.justsearch.app.services.worker.KnowledgeClientException;
-import io.justsearch.app.services.worker.KnowledgeClientException.Status;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException.Status;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

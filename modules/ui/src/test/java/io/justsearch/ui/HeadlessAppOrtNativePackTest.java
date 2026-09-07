@@ -112,7 +112,7 @@ final class HeadlessAppOrtNativePackTest {
    * property at ordinal 500 — <em>after</em> {@code resolveConfig} has already built its
    * {@code ResolvedConfig}. Applying the ORT property from that pre-write config would find nothing
    * and silently leave the Engine on CPU, which is exactly the tempdoc 883 §C.5c shape one field
-   * over. Only the config {@code snapshotAfterPostBuildWrites} rebuilds carries the late write.
+   * over. Only the config {@code rebuildAfterPostBuildWrites} produces carries the late write.
    */
   @Test
   @DisplayName("a pack detected after the initial build still reaches ORT")
@@ -130,10 +130,8 @@ final class HeadlessAppOrtNativePackTest {
     // What maybeMirrorOrtNativePath does: writes the sysprop, does NOT rebuild.
     System.setProperty(CONFIG_KEY, pack.toAbsolutePath().toString());
 
-    HeadlessApp.SnapshotResult snapshot =
-        HeadlessApp.snapshotAfterPostBuildWrites(
-            store, new UiSettings(), tempDir.resolve("worker-config-snapshot.json"));
-    var decision = HeadlessApp.applyOrtNativePack(snapshot.config());
+    ResolvedConfig effective = HeadlessApp.rebuildAfterPostBuildWrites(store, new UiSettings());
+    var decision = HeadlessApp.applyOrtNativePack(effective);
 
     assertEquals(
         OrtNativePackStatus.SET,

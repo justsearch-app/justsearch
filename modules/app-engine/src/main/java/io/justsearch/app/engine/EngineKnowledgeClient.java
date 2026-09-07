@@ -4,7 +4,7 @@ package io.justsearch.app.engine;
 import io.justsearch.app.services.worker.CancelToken;
 import io.justsearch.app.services.worker.HealthServiceCalls;
 import io.justsearch.app.services.worker.IngestServiceCalls;
-import io.justsearch.app.services.worker.KnowledgeClientException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.SearchServiceCalls;

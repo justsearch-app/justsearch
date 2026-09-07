@@ -5,7 +5,27 @@ package io.justsearch.ipc;
 option java_multiple_files = true;
 option java_package = "io.justsearch.ipc";
 
-// --- Search Service ---
+// THIS FILE DECLARES NO SERVICES, AND THAT IS DELIBERATE.
+//
+// Lane F stage A item A14 removed `SearchService` (10 rpc), `IngestService` (38 rpc) and
+// `HealthService` (1 rpc) from this file. The Head and the Worker are one Engine JVM: item A9
+// deleted the gRPC server, A10 the gRPC client, and A11 the Worker process itself, so nothing
+// generated or called those stubs any more and the rpc list was a description of a wire that no
+// longer exists.
+//
+// The MESSAGES stay. Lane F's design (§6) keeps the proto types as the data-transfer objects at
+// the in-process ports for now — transitional, and explicitly so: `KnowledgeClient`'s signatures
+// still carry `SearchResponse`, `StatusResponse` and friends. Adding a `service` block back here
+// is not a way to add an API; it is a way to resurrect a deleted transport.
+//
+// Infra-health gRPC is a DIFFERENT contract and is still live: it is declared in
+// io/justsearch/ipc/v1/infra_diagnostics.proto in this same module, and
+// `protoc-gen-grpc-java` still runs over this source set for its sake. The Gradle protobuf plugin
+// has no per-file plugin selector, so the grpc generator is configured for the whole task
+// (modules/ipc-common/build.gradle.kts) — but it emits a `*Grpc.java` only for a file that
+// declares a service, so this file now yields messages and nothing else.
+
+// --- Search messages (formerly SearchService's request/response types) ---
 
 // Search mode determines which algorithm is used
 enum SearchMode {
@@ -294,26 +314,6 @@ message SuggestRequest {
 
 message SuggestResponse {
   repeated string suggestions = 1;
-}
-
-service SearchService {
-  rpc Search(SearchRequest) returns (SearchResponse);
-  rpc Suggest(SuggestRequest) returns (SuggestResponse);
-  // Fetch document content via Worker (avoids index locking issues in Main process)
-  rpc FetchDocuments(FetchDocumentsRequest) returns (FetchDocumentsResponse);
-  // Fetch a slice of a document's extracted text (paged; avoids hard caps in Head)
-  rpc FetchDocumentSlice(FetchDocumentSliceRequest) returns (FetchDocumentSliceResponse);
-  // RAG context retrieval - searches chunks with BM25, falls back to full docs
-  rpc RetrieveContext(RetrieveContextRequest) returns (RetrieveContextResponse);
-  // Post-hoc citation matching: embed answer sentences, compare against chunk embeddings
-  rpc MatchCitations(MatchCitationsRequest) returns (MatchCitationsResponse);
-  // Browse indexed content by folder structure
-  rpc ListFolders(ListFoldersRequest) returns (ListFoldersResponse);
-  rpc ListFolderFiles(ListFolderFilesRequest) returns (ListFolderFilesResponse);
-  // Paginated iteration over all indexed document IDs (used by GPL job)
-  rpc ListAllDocumentIds(ListAllDocumentIdsRequest) returns (ListAllDocumentIdsResponse);
-  // Cross-encoder reranking (360: migrated from Head to Worker for GPU access)
-  rpc Rerank(RerankRequest) returns (RerankResponse);
 }
 
 // === Fetch Documents ===
@@ -1287,145 +1287,6 @@ message UpdatePathsResponse {
   repeated string failed_paths = 2;  // old_paths where the document was not found
 }
 
-service IngestService {
-  // NOT idempotent: may re-enqueue files, side effects on queue state
-  rpc SubmitBatch(BatchRequest) returns (BatchResponse);
-
-  // Idempotent: read-only status query - safe to retry on UNAVAILABLE
-  rpc IndexStatus(StatusRequest) returns (StatusResponse);
-
-  // NOT strictly idempotent: deletes are one-shot, but retry-safe (no harm if already deleted)
-  rpc DeleteByPath(DeleteByPathRequest) returns (DeleteByPathResponse);
-  // Delete single document by exact ID (for file watcher DELETE events)
-  // NOT strictly idempotent: deletes are one-shot, but retry-safe
-  rpc DeleteById(DeleteByIdRequest) returns (DeleteByIdResponse);
-
-  // Tempdoc 811 (C-2a): the removal route for collection-tagged ad-hoc ingests, which no
-  // path-prefix prune can reach. NOT strictly idempotent (one-shot delete), but retry-safe:
-  // a second call matches nothing and reports 0.
-  rpc DeleteByCollection(DeleteByCollectionRequest) returns (DeleteByCollectionResponse);
-
-  // Idempotent: best-effort deletion, files either exist or don't - safe to retry on UNAVAILABLE
-  // DEPRECATED: use SyncDirectory
-  rpc PruneMissing(PruneRequest) returns (PruneResponse) {
-    option deprecated = true;
-  }
-
-  // Idempotent: bidirectional sync is safe to re-run - safe to retry on UNAVAILABLE
-  rpc SyncDirectory(SyncDirectoryRequest) returns (SyncDirectoryResponse);
-
-  // NOT idempotent: updates document state, may cause duplicate writes on retry
-  rpc UpdateVduResult(UpdateVduResultRequest) returns (UpdateVduResultResponse);
-
-  // Idempotent: read-only query - safe to retry on UNAVAILABLE
-  rpc QueryPendingVdu(QueryPendingVduRequest) returns (QueryPendingVduResponse);
-
-  // NOT idempotent: increments retry counter atomically, retry can cause premature exhaustion
-  rpc MarkVduProcessing(MarkVduProcessingRequest) returns (MarkVduProcessingResponse);
-
-  // Idempotent: resets stuck PROCESSING docs to PENDING - safe to retry on UNAVAILABLE
-  rpc RecoverVduProcessing(RecoverVduProcessingRequest) returns (RecoverVduProcessingResponse);
-
-  // Phase H: migration lifecycle controls
-  rpc StartMigration(MigrationStartRequest) returns (MigrationStartResponse);
-  rpc RequestCutover(MigrationCutoverRequest) returns (MigrationCutoverResponse);
-  rpc PauseMigration(MigrationPauseRequest) returns (MigrationPauseResponse);
-  rpc ResumeMigration(MigrationResumeRequest) returns (MigrationResumeResponse);
-  rpc RunIndexGc(IndexGcRequest) returns (IndexGcResponse);
-
-  // Tempdoc 931 §E item 10: purge deleted-but-unmerged documents from the ACTIVE index.
-  // Idempotent: a second call on an already-settled index finds nothing to expunge and reports
-  // equal before/after counts — safe to retry on UNAVAILABLE. Refused (accepted=false) when the
-  // index runtime is unavailable, a blue/green migration is in flight, or an upgrade quiescence
-  // preparation owns the Worker barrier.
-  rpc SettleIndex(SettleIndexRequest) returns (SettleIndexResponse);
-  rpc RollbackMigration(MigrationRollbackRequest) returns (MigrationRollbackResponse);
-  rpc PrepareUpgrade(UpgradeQuiescenceRequest) returns (UpgradeQuiescenceResponse);
-  rpc UpgradeStatus(UpgradeQuiescenceRequest) returns (UpgradeQuiescenceResponse);
-  rpc CancelUpgrade(UpgradeQuiescenceRequest) returns (UpgradeQuiescenceResponse);
-
-  // NOT idempotent: updates document paths (DOC_ID, PATH, FILENAME) and chunk PARENT_DOC_ID.
-  // Used by agent file operations tool after MOVE/RENAME to keep index consistent.
-  rpc UpdateDocumentPaths(UpdatePathsRequest) returns (UpdatePathsResponse);
-
-  // Idempotent: read-only query - safe to retry on UNAVAILABLE
-  rpc ListFailedJobs(ListFailedJobsRequest) returns (ListFailedJobsResponse);
-
-  // Tempdoc 599 §9.2 — per-folder job counts under a path prefix. Idempotent (read-only).
-  // Backs the per-folder indexing-status projection: Head folds in-flight (PENDING+PROCESSING)
-  // and FAILED counts under a watched root's prefix onto the folder row.
-  rpc CountJobsByPathPrefix(CountJobsByPathPrefixRequest) returns (CountJobsByPathPrefixResponse);
-
-  // Tempdoc 599 §16/B1 — FAILED jobs under a path prefix (the per-folder twin of ListFailedJobs).
-  // Idempotent (read-only). Backs the per-folder "failed files" drill-down; reuses ListFailedJobsResponse.
-  rpc ListFailedJobsByPathPrefix(ListFailedJobsByPathPrefixRequest) returns (ListFailedJobsResponse);
-
-  // NOT idempotent: deletes FAILED rows from queue
-  rpc ClearFailedJobs(ClearFailedJobsRequest) returns (ClearFailedJobsResponse);
-
-  // Slice 445: subscribe to per-row changes on the jobs queue. First frame is a
-  // SUBSCRIBE-time snapshot carrying all current jobs; subsequent frames are deltas
-  // (Insert / Update / Delete) per row mutation observed via the SQLite update_hook.
-  // The seq field is monotonic across snapshot+deltas — Head-side bridge uses it for
-  // resume support. Privacy: paths are SHA-256 hashed at the worker boundary; raw paths
-  // never appear on this stream. Caller resolves path_hash via core.resolve-path-hash
-  // Operation when a user gesture demands it.
-  rpc SubscribeIndexingJobs(SubscribeIndexingJobsRequest) returns (stream IndexingJobsFrame);
-
-  // Slice 445: cancel an in-flight job by its path_hash. Marks the job as a
-  // terminal-state CANCELLED via the existing markDone pathway with an
-  // outcome_class=CANCELLED ledger annotation. Idempotent on already-cancelled jobs.
-  rpc CancelIndexingJob(CancelIndexingJobRequest) returns (CancelIndexingJobResponse);
-
-  // Slice 445: retry a failed or stuck job by its path_hash. Sets state PENDING
-  // and clears retry_after so the next pollPending cycle picks it up.
-  rpc RetryIndexingJob(RetryIndexingJobRequest) returns (RetryIndexingJobResponse);
-
-  // NOT idempotent: wipes all documents, queue, and metrics for profiling reset
-  rpc ResetIndex(ResetIndexRequest) returns (ResetIndexResponse);
-
-  // Idempotent: Worker-side diagnostic — returns the PolicySnapshot from the InferenceSurface
-  // built at boot. Read by /api/debug/session-policies in Head (tempdoc 397 §14.28 U4).
-  // Replaces Head's re-resolve path, which could diverge from Worker's actual snapshot if
-  // Head and Worker observed different hardware state at boot.
-  rpc GetSessionPolicies(SessionPoliciesRequest) returns (SessionPoliciesResponse);
-
-  // Tempdoc 406 — admin-triggered runtime swap. Drains current ingest runtime,
-  // opens a fresh one on the same path, and atomically replaces holder fields.
-  // NOT idempotent (each call performs a real swap); safe to retry only at the
-  // operator level. Returns swap duration in ms.
-  rpc ReloadRuntime(ReloadRuntimeRequest) returns (ReloadRuntimeResponse);
-
-  // Tempdoc 410 §12 — privacy-safe ingestion ledger read APIs.
-  // Both rpc methods are idempotent (read-only) and return path-hash-only rows; raw paths
-  // never leave the Worker process boundary. Used by Head /api/diagnostics/ingestion endpoints.
-  rpc RecentIngestionEvents(RecentIngestionEventsRequest) returns (RecentIngestionEventsResponse);
-  rpc IngestionOutcomeSummary(IngestionOutcomeSummaryRequest) returns (IngestionOutcomeSummaryResponse);
-
-  // ADR-0028 / tempdoc 419 T5.3 — scoped reverse path-hash lookup.
-  // Returns the resolved path for a given pathHash IF the file is still under a watched root
-  // and within retention; returns found=false otherwise. Reachable from exactly one HTTP
-  // endpoint (POST /api/library/resolve-hash); the diagnostic export endpoints MUST NOT call
-  // this RPC. The ArchUnit pin LibraryResolveHashOnlyCallerPin enforces the separation.
-  rpc LookupPathByHash(LookupPathByHashRequest) returns (LookupPathByHashResponse);
-
-  // Tempdoc 418 Phase A — Worker-owned filesystem traversal (additive scaffolding).
-  //
-  // ScanRoot: server-streaming. Worker walks the root and admits each discovered path through
-  // WorkerIngestionAuthority. Streams ScanRootProgress so Head sees walk progress without
-  // polling. Cancellation is gRPC-native (gRPC Context.cancel on the client side terminates
-  // the walk). Replaces the Head-side directory-walk pattern in handleIngest /
-  // RootLifecycleOps.walkAndSubmit when callers migrate (Phase B).
-  rpc ScanRoot(ScanRootRequest) returns (stream ScanRootProgress);
-
-  // WatchRoot: subscribes the Worker-side watcher registry to filesystem events under the root.
-  // Idempotent: calling twice for the same root replaces the prior subscription. Phase A places
-  // the subscription in the registry; Phase B migrates the actual Methvin watcher events from
-  // Head to Worker.
-  rpc WatchRoot(WatchRootRequest) returns (WatchRootResponse);
-  rpc UnwatchRoot(UnwatchRootRequest) returns (UnwatchRootResponse);
-}
-
 // --- Failed Jobs ---
 
 message ListFailedJobsRequest {
@@ -1755,8 +1616,4 @@ message HealthCheckResponse {
   // Effective config values for Head→Worker divergence detection (tempdoc 329).
   // Populated with a curated set of critical keys from ConfigStore.
   map<string, string> effective_config = 8;
-}
-
-service HealthService {
-  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 }

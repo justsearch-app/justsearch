@@ -28,7 +28,7 @@ The indexer failed to start. The Engine was unable to bring the index half (the 
 2. Read the most recent Knowledge Server bootstrap attempt in the Engine log. Item A13 deleted the Worker's own logback config, so there is no `worker.log`; the index half logs into the one Engine log:
 
    ```powershell
-   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\headless-backend.log') -Tail 200
+   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\engine.log') -Tail 200
    ```
 
 3. Verify the Engine distribution exists and carries the index half:

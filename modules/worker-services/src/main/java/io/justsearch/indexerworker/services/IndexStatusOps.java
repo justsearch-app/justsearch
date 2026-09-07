@@ -451,8 +451,13 @@ final class IndexStatusOps {
             // heartbeat no longer exists. It was the Head process writing "I am still alive" into
             // the memory-mapped region; inside one JVM there is no second process to have written
             // it, and reporting System.currentTimeMillis() here would have been a liveness claim
-            // manufactured by its own reader. Both proto fields stay declared (removing one is a
-            // wire break) and both stay at their zero default.
+            // manufactured by its own reader. Both proto fields stay declared (they are the other
+            // half of a message this JVM now passes to itself) and both stay at their zero default.
+            //
+            // Lane F item A16 removed their last PROJECTION: WorkerStatusMapper used to copy both
+            // into a SignalBusView on /api/debug/state, so the endpoint published two permanent
+            // zeros as if they were readings. The sub-object is gone from the response, the record
+            // and its schema; the fields end here.
             .setUptimeMs(System.currentTimeMillis() - signalBus.startupTime())
             .setIndexSizeBytes(cachedIndexSizeIfFreshOrRefresh())
             .setPendingEmbeddingCount(

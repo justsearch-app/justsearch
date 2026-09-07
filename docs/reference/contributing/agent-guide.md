@@ -35,17 +35,13 @@ All path resolution follows this priority:
 
 ### 2.2. Testing IPC
 
-Use `WorkerProcessManager` to spawn the worker and `MmfTestHarness` to discover the ephemeral port.
-
-```java
-// Standard pattern for system tests
-WorkerProcessManager worker = new WorkerProcessManager(workerJar, tempDir);
-worker.spawnWorker();
-MmfTestHarness mmf = new MmfTestHarness(worker.getSignalFilePath());
-mmf.open();
-int port = mmf.awaitPort(30_000, 100); // Wait for startup
-GrpcTestClient client = new GrpcTestClient(port);
-```
+**This pattern is gone.** `WorkerProcessManager`, `MmfTestHarness` and `GrpcTestClient` were deleted
+at lane F stage A (items A11-A14): there is no worker process to spawn, no memory-mapped port to
+discover and no gRPC client to build. Tests that need a working index compose the Engine in-process
+through `EngineRoot` and run in `modules/app-engine/src/test/java/io/justsearch/app/engine/` on every
+build; see [Testing Strategy](../../explanation/09-testing-strategy.md). The process boundaries that
+survive — `llama-server` and the extraction sandbox child pool — are still exercised from
+`modules/system-tests`.
 
 ### 2.3. Test Tiers in Practice
 

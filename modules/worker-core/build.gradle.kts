@@ -23,9 +23,6 @@ dependencies {
   implementation(libs.commons.text)
   implementation(libs.commons.codec)
   api(libs.opentelemetry.api)
-  // Lane F stage A item A9 deleted this module's three gRPC interceptors, so nothing under
-  // worker-core imports io.grpc any more. Retire with the standalone distribution at item A13.
-  implementation(libs.grpc.stub)
   implementation(libs.hdrhistogram)
 
   // SQLite for EntityClusterStore (disambiguation) and queue DB health

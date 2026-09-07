@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
 import java.util.Map;
@@ -113,17 +114,32 @@ public final class AgentToolErrors {
   }
 
   /**
-   * gRPC's {@code StatusRuntimeException} is matched by NAME rather than by type: {@code app-agent}
-   * does not depend on the gRPC runtime (the Head's Worker client lives in {@code app-services}), so
-   * an {@code instanceof} here would not compile. Matching the class name keeps the classification
-   * in one place without dragging a transport dependency into the tool module.
+   * Whether the failure means "the index half is unreachable", as opposed to "this call was wrong".
+   *
+   * <p><b>Matched by TYPE now, not by class name (lane F review, blocker 3).</b> This used to test
+   * {@code name.endsWith("StatusRuntimeException")}, because {@code app-agent} could not see gRPC
+   * and a string comparison was the only way to name the transport's exception from here. That
+   * worked until item A6 replaced the transport: nothing throws a {@code StatusRuntimeException}
+   * any more, so the arm stopped matching and every unreachable index half was classified
+   * INTERNAL_ERROR — an agent tool telling the model "internal error, do not retry" for a condition
+   * whose whole point is that retrying is correct. Nothing failed, because a name-match that
+   * matches nothing is indistinguishable from a name-match that never fires.
+   *
+   * <p>The type is reachable now: {@link KnowledgeClientException} moved to {@code app-api}, which
+   * this module already depends on, precisely so that this classification could stop being a
+   * spelling. {@code UnavailableException} and {@code ConnectException} stay name-matched — they are
+   * genuinely open sets (any library may contribute one) rather than one type we chose not to
+   * depend on.
    */
   private static boolean isWorkerUnreachable(Throwable cause) {
     for (Throwable t = cause; t != null; t = t.getCause()) {
+      if (t instanceof KnowledgeClientException kce
+          && (kce.status() == KnowledgeClientException.Status.UNAVAILABLE
+              || kce.status() == KnowledgeClientException.Status.DEADLINE_EXCEEDED)) {
+        return true;
+      }
       String name = t.getClass().getName();
-      if (name.endsWith("StatusRuntimeException")
-          || name.endsWith("UnavailableException")
-          || name.endsWith("ConnectException")) {
+      if (name.endsWith("UnavailableException") || name.endsWith("ConnectException")) {
         return true;
       }
       if (t.getCause() == t) {

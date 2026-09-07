@@ -54,7 +54,9 @@ document with these fields:
 - `head` — `apiPort`, `apiBaseUrl`, `sessionToken` (filesystem only;
   see below), `readyAt`. Always present.
 - `worker` — `state` (`"pending"` | `"ready"` | `"failed"`),
-  `grpcPort`, `indexBasePath`, `readyAt`, `spawnError`. Null until
+  `grpcPort` (always `null` since lane F item A11 — the field is retained
+  for schema stability but has no producer, `RuntimeManifestListenerWiring`),
+  `indexBasePath`, `readyAt`, `spawnError`. Null until
   the first worker-state publish; the `state` discriminator is the
   authoritative tri-state surface (state=`failed` carries
   `spawnError` with the upstream reason). Updates on every
@@ -174,8 +176,13 @@ with a structured diagnostic and code 2.
 
 ## What stays unchanged
 
-- **MMF** (`MmfWorkerSignalLayoutV1`) — intra-JVM Head ↔ Worker IPC.
-  Different domain. The manifest does not replace it.
+- **MMF** (`MmfWorkerSignalLayoutV1`) — this no longer exists. Lane F stage A
+  (item A10) deleted the memory-mapped Head ↔ Worker signal bus along with
+  the Worker process itself (item A11); the scheduling signals it carried
+  now live in the in-process `GpuSchedulingGauge`
+  (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`).
+  Different domain from this manifest either way — this bullet is retained
+  only to record that the mechanism it once named is gone, not replaced.
 - **`/api/status`** — cheap readiness probe. Kept for sandboxes and
   remote callers where PID inspection is awkward.
 - **`JUSTSEARCH_API_PORT` env var as configuration** — "try to bind

@@ -59,7 +59,7 @@ public final class SubstratePhase {
       // Tempdoc 560 §10.4: the composed plugin-contributed DiagnosticChannels (snapshot of the shared
       // ContributionRegistry's diagnosticChannels axis after all installs). Empty in the common case;
       // the example plugin (dev-gated) is the first contributor. Threaded to the ChannelSubstrate so
-      // RegistryController serves plugin channels alongside core.head-log.
+      // RegistryController serves plugin channels alongside core.engine-log.
       List<DiagnosticChannel> pluginDiagnosticChannels,
       // Tempdoc 560 §10.4: likewise the composed plugin Surfaces + ConversationShapes — served alongside
       // the core catalogs at /api/registry/{surfaces,shapes} (a plugin RAIL surface renders in the rail).

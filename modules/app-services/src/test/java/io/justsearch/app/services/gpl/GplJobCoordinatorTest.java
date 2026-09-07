@@ -26,6 +26,7 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.ipc.RerankResponse;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -871,11 +872,16 @@ class GplJobCoordinatorTest {
         .when(onlineAiService)
         .streamChat(any(), anyInt(), any(), any(), any(), any(SamplingParams.class));
 
+    // Lane F stage A item A14: this used to inject an io.grpc StatusRuntimeException, which the
+    // in-process KnowledgeClient has been unable to throw since item A6 -- so the test was green
+    // against a failure shape production could not produce. KnowledgeClientException.Status is the
+    // 1:1 successor vocabulary (KnowledgeClientException.java:37-58) and is what
+    // EngineKnowledgeClient actually raises, so the abort branch is now exercised for the real
+    // reason.
     when(knowledgeClient.search(any(SearchRequest.class)))
         .thenThrow(
-            io.grpc.Status.DEADLINE_EXCEEDED
-                .withDescription("worker restarting")
-                .asRuntimeException());
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.DEADLINE_EXCEEDED, "worker restarting"));
 
     coordinator.runAsync();
 

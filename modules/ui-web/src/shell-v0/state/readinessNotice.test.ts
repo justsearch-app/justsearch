@@ -472,10 +472,31 @@ describe('remedy targets resolve to the surface that owns the capability', () =>
  */
 describe('readinessNotice — tempdoc 837 worker + inference rows', () => {
   it('worker.lost words the state it is actually emitted in (it was serving, then stopped)', () => {
-    expect(reasonFor('worker.lost').wording).toBe('The knowledge server stopped responding');
+    expect(reasonFor('worker.lost').wording).toBe(
+      'The knowledge server stopped responding and does not restart itself — restart JustSearch to recover it',
+    );
     // The collapsed code claimed a start failure for a worker that had started fine.
     expect(reasonFor('worker.spawn.failed').wording).toContain('failed to start');
-    expect(reasonFor('worker.lost').wording).not.toContain('start');
+    // 837 S3's bar, restated at its own intent rather than by substring. This assertion used to be
+    // `not.toContain('start')`, which lane F stage A item A11 turned into a false negative: the row
+    // now has to say "restart JustSearch" (A11 deleted the supervisor that used to restart it), and
+    // "restart" contains "start". The PROPERTY 837 set — never claim a START FAILURE for a server
+    // that started fine and then died — is unchanged and is what is asserted here. Tightened, not
+    // weakened: a bare substring also passed on "the server did not start", which this rejects.
+    expect(reasonFor('worker.lost').wording).not.toMatch(
+      /failed to start|could not start|did not start|never started/i,
+    );
+  });
+
+  it('worker.lost tells the user to restart, because nothing restarts it for them (A11)', () => {
+    // The load-bearing half of the row after lane F stage A item A11 deleted crash detection and
+    // the restart budget: a stopped Engine stays stopped. If this ever reverts to a bare "stopped
+    // responding", the notice silently reads as "wait, it is coming back" — which it is not, until
+    // stage B restores supervision. Then this assertion should be deleted WITH that restoration,
+    // not before it.
+    expect(reasonFor('worker.lost').wording).toMatch(/restart JustSearch/);
+    const n = readinessNotice(degraded('error', ['worker.lost']));
+    expect(n!.causes).toContain(reasonFor('worker.lost').wording);
   });
 
   it('worker.index_corrupt carries no fake one-click remedy — Open Health, like its precedent', () => {

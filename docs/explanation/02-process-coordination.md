@@ -12,7 +12,11 @@ description: 'MMF signaling, the "Suicide Pact", and the indexing duty cycle.'
 > The Head and the Worker are one Engine JVM. Item A9 deleted the gRPC server and its
 > interceptors, item A10 deleted the wire client stack (`RemoteKnowledgeClient`) and BOTH ends of
 > the memory-mapped signal bus (`MainSignalBus`, `MmfWorkerSignalBus`), and item A11 deleted the
-> Worker process and its spawner. Concretely, everything below about port discovery, the suicide
+> Worker process and its spawner, and item A14 deleted the rest of gRPC — the `service` blocks in
+> `indexing.proto`, `io/justsearch/ipc/v1/infra_diagnostics.proto` and its infra-health service, and
+> the `protoc-gen-grpc-java` generator. No module declares a gRPC dependency now and nothing serves
+> a gRPC method; what survives of `indexing.proto` is its messages, used as in-process port DTOs.
+> Concretely, everything below about port discovery, the suicide
 > pact, the heartbeat, the shutdown byte and `MmfSignalBusCompatibilityTest` describes a shape that
 > no longer exists in the product. The two signals that survived — `main_gpu_active` and
 > `energy_reduced` — are fields on the in-process `GpuSchedulingGauge`
@@ -23,8 +27,9 @@ description: 'MMF signaling, the "Suicide Pact", and the indexing duty cycle.'
 > The page is kept, not deleted, because it is the readable record of why the coordination was
 > built this way and what the merge gave up; it is rewritten when lane F stage A closes and the
 > single spawn path (item A13) settles what the process story actually is. The MMF layout classes
-> in `ipc-common` still exist and still have a test, but only the system-test harness reads them
-> (item A12 owns that).
+> in `ipc-common` (`MmfWorkerSignalLayoutV1`, `MmfWorkerSignalHeaderV1`) and their test are gone
+> too — item A12 converted the system tests off the Worker process, which was their last reader, so
+> every path in the offset table below is dead code as well as dead prose.
 
 In a multi-process architecture, coordination is the hardest problem. JustSearch uses a custom "Nervous System" built on **Memory-Mapped Files (MMF)** and **gRPC** to ensure sub-millisecond coordination between the Main Process ("Head") and the Knowledge Server ("Body").
 
@@ -334,7 +339,15 @@ Aligned 4/8-byte fields are "effectively atomic" on 64-bit x86/ARM platforms. Th
 | Fallback search on Worker failure | NOT PLANNED | Existing circuit breaker + auto-restart is correct. |
 | Multi-worker support | NOT PLANNED | Desktop app with single data directory; complexity not justified. |
 
-## Appendix: gRPC Service Reference
+## Appendix: gRPC Service Reference (historical — the services no longer exist)
+
+None of the services below is declared any more. Item A14 removed the last three `service` blocks
+(`SearchService`, `IngestService`, `HealthService`) from `indexing.proto` and deleted
+`io/justsearch/ipc/v1/infra_diagnostics.proto` outright; `protoc-gen-grpc-java` was dropped from
+`modules/ipc-common/build.gradle.kts` at the same time, so nothing generates a stub. The method
+names and their deadline categories survive as the in-process port calls on
+`SearchServiceCalls` / `IngestServiceCalls` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/`),
+which is why this table is still worth reading.
 
 ### SearchService Methods
 | Method | Deadline | Description |
@@ -369,9 +382,13 @@ Aligned 4/8-byte fields are "effectively atomic" on 64-bit x86/ARM platforms. Th
 ### HealthService
 | Namespace | Methods | Notes |
 | :--- | :--- | :--- |
-| `io.justsearch.ipc` | `Check` (returns `worker_state` enum) | The only health RPC (`indexing.proto`, `service HealthService`) |
+| `io.justsearch.ipc` | `Check` (returned a `worker_state` enum) | Was the only health RPC (`indexing.proto`, `service HealthService`) |
 
-**Note:** `io.justsearch.ipc.v1` carries no health RPCs — its one service is `InfraDiagnosticsService`
-(`infra_diagnostics.proto`, two diagnostics RPCs). An earlier revision of this table listed
-`Liveness` / `Readiness` / `Version` under that namespace; they never existed in either proto file
-(verified 2026-09-06, tempdoc 917 brief correction 4).
+**Note:** `io.justsearch.ipc.v1` never carried a health RPC — its one service was
+`InfraDiagnosticsService` (`infra_diagnostics.proto`, two diagnostics RPCs: `CurrentSnapshot`,
+`StreamSnapshots`). An earlier revision of this table listed `Liveness` / `Readiness` / `Version`
+under that namespace; they never existed in either proto file (verified 2026-09-06, tempdoc 917
+brief correction 4). Item A14 deleted that proto file and its service: nothing dialled either RPC,
+and an HTTP handler over the same `InfraDiagnosticsService` payload already existed
+(`modules/app-observability/src/main/java/io/justsearch/app/observability/InfraHealthController.java`),
+so it was removed rather than migrated.

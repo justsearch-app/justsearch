@@ -126,10 +126,10 @@ final class ResourceApiModule implements ApiModule {
                 // contributed one — the example plugin is dev-gated). handleResources flat-maps the list.
                 headAssembly.substrate().resources().pluginResources()),
             // Slice 448 phase 2: DiagnosticChannel — the fourth registry primitive. Tempdoc 560 §10.4:
-            // core head-log + the composed plugin-contributed channels (empty unless a plugin
+            // core engine-log + the composed plugin-contributed channels (empty unless a plugin
             // contributed one — the example plugin is dev-gated).
             List.of(
-                headAssembly.substrate().channels().headLogCatalog(),
+                headAssembly.substrate().channels().engineLogCatalog(),
                 headAssembly.substrate().channels().pluginChannelCatalog()),
             // Slice 449 phase 4: Surface Manifest catalogs. Tempdoc 560 §10.4: core surfaces +
             // the composed plugin-contributed surfaces (empty unless a plugin contributed one —
@@ -403,14 +403,14 @@ final class ResourceApiModule implements ApiModule {
     // Slice 487 §4.3: always-on intent envelope SSE stream.
     app.sse("/api/intent/stream", intentStreamController::handle);
 
-    // Slice 448 phase 3: DiagnosticChannel SSE — V1 ships a single channel (core.head-log).
+    // Slice 448 phase 3: DiagnosticChannel SSE — V1 ships a single channel (core.engine-log).
     app.sse(
-        "/api/diagnostic-channels/head-log/stream",
+        "/api/diagnostic-channels/engine-log/stream",
         sseClient ->
             diagnosticChannelStreamController.handle(
                 sseClient,
-                io.justsearch.app.observability.diagnostic.HeadLogDiagnosticChannelCatalog
-                    .HEAD_LOG_ID));
+                io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog
+                    .ENGINE_LOG_ID));
 
     // Slice 445: indexing-jobs TABULAR SSE stream.
     app.sse("/api/indexing-jobs/stream", indexingJobsStreamController::handle);

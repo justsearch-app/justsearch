@@ -127,15 +127,14 @@ Representative leaf modules that other modules depend on:
 |--------|---------|
 | `app-api` | Application facade interfaces (`AppFacade`, `IndexingService`, `DocumentService`, `OnlineAiService`) |
 | `app-agent-api` | Operation/registry substrate (Operation, OperationHandler, OperationCatalog, the `AgentToolEmitter` SPI) plus agent-facing request/response contracts |
-| `ipc-common` | gRPC proto definitions and generated stubs |
+| `ipc-common` | Protobuf **message** definitions (`indexing.proto`) and the classes generated from them, used as the in-process port DTOs. No `service` block and no gRPC stub generation since lane F item A14 |
 
 ### Application Services Layer
 
 | Module | Purpose |
 |--------|---------|
 | `app-services` | `HeadAssembly` composition root + typed bootstrap graphs, orchestration hub |
-| `app-search` | Search clients (gRPC, Lucene) |
-| `app-indexing` | Indexing service, file watchers |
+| `app-engine` | The Engine composition root (`EngineRoot`) — the only module that binds the in-process port implementations and depends on both halves |
 | `app-agent` | Agent runtime/service orchestration; also owns the built-in agent tools and their `AgentToolsOperationCatalog` |
 | `app-inference` | Online inference lifecycle management, including llama-server start/adopt/health/reload/stop |
 
@@ -143,7 +142,7 @@ Representative leaf modules that other modules depend on:
 
 | Module | Purpose |
 |--------|---------|
-| `indexer-worker` | gRPC services, indexing loop, embeddings (Body process) |
+| `indexer-worker` | Index-half services, indexing loop, embeddings. Composed in-process by `EngineRoot`; not a separate process since lane F item A11 |
 
 ### Entry Points
 
@@ -154,21 +153,31 @@ Representative leaf modules that other modules depend on:
 | `ui-web` | Lit web-components frontend (non-Gradle project) |
 | `shell` | Tauri desktop shell (non-Gradle project) |
 
-## Process Boundary
+## Engine boundary
 
-The Head and Body run in separate OS processes with gRPC IPC:
+The Head and Body are one **Engine** JVM ([ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)). They meet at
+catalogued in-process **ports** — plain Java interfaces in contract modules — bound by the single
+composition root `EngineRoot` (`modules/app-engine`). The catalogue is
+`governance/engine-ports.v1.json`; ArchUnit rule 6b plus the `engine-port` gate pin it, so only the
+composition root binds an implementation:
 
 ```text
-HEAD PROCESS                      | WORKER PROCESS
-----------------------------------|---------------------------------
-ui                                | indexer-worker
-app-services                      |   - WorkerSearchService
-                                  |   - WorkerIngestService
-app-search (gRPC client)          |   - WorkerHealthService
-app-indexing (gRPC client)        |   - EmbeddingService
-                                  |   - LuceneIndexRuntime
-    v                             |
-ipc-common (proto) <--- gRPC ---> ipc-common (proto)
+ENGINE JVM
+------------------------------------------------------------------
+ui  ──────────────► app-services (SearchServiceCalls,
+                                  IngestServiceCalls)      [ports]
+                          │
+                    app-engine (EngineRoot binds the ports)
+                          │
+                    indexer-worker / worker-services
+                      - WorkerSearchService
+                      - WorkerIngestService
+                      - WorkerHealthService
+                      - EmbeddingService
+                      - LuceneIndexRuntime
+
+ipc-common (indexing.proto messages) supplies the DTOs at the port
+signatures — no service block, no stubs, no wire (item A14).
 ```
 
 ## Architectural Enforcement
@@ -225,7 +234,7 @@ AI modules (`ai-backend`, `gpu-bridge`, `prompt-support`) cannot use HTTP/networ
 - No `java.net.*`, `javax.net.*`
 - No `okhttp3.*`, `org.apache.http.*`, `retrofit2.*`
 
-Exception: gRPC service classes in workers are allowed for IPC.
+(The enforcing rule is `ArchUnitEgressTest.translatorLayersMustStayOffline` in `modules/ai-backend`; it is scoped to `io.justsearch.aibackend.local..` / `.backend..` and carries no exceptions.)
 
 ## Gradle Build Governance
 
@@ -261,13 +270,17 @@ Located in `build-logic/`:
 - Subsystems are organized in dedicated packages (for example `vdu/` and `worker/`)
 - Dependency direction remains acyclic
 
-## gRPC Service Contracts
+## Port Contracts
 
-| Service | Proto | Implementation | Module |
+Item A14 deleted the three `service` blocks these used to be (`SearchService`, `IngestService`,
+`HealthService` in `indexing.proto`). The same call surface — same method names, same request and
+response messages — is now a set of plain Java interfaces bound in-process:
+
+| Port interface | Module | Implementation | Module |
 |---------|-------|----------------|--------|
-| SearchService | indexing.proto | `WorkerSearchService` | indexer-worker |
-| IngestService | indexing.proto | `WorkerIngestService` | indexer-worker |
-| HealthService | indexing.proto | `WorkerHealthService` | indexer-worker |
+| `SearchServiceCalls` | app-services | `WorkerSearchService` (via `WorkerSearchCalls`) | worker-services / app-engine |
+| `IngestServiceCalls` | app-services | `WorkerIngestService` (via `WorkerIngestCalls`) | worker-services / app-engine |
+| — (health folded into the status surface) | — | `WorkerHealthService` | worker-services |
 
 ## Port/Adapter Pattern
 
@@ -298,7 +311,7 @@ A ServiceLoader-based plugin system for extensibility (egress control, artifact 
 
 **`ui` -> `core` direct dependency:** The `ui` module imports `DocumentTypeDetector`, `TokenEstimation`, and two other types directly from `core` (4 imports total). This is a direct dependency, not a violation — `core` is a foundation module intended for cross-cutting use.
 
-**Near-duplication between `core` and `app-api` DTOs:** The `core` module defines `Query`, `Result.Hit`, `Facet`, and `Cursor` as internal DTOs for the gRPC contract boundary. The `app-api` module defines `SearchRequest`, `KnowledgeSearchResponse`, and related types as external REST contract DTOs. This near-duplication is intentional layering — internal gRPC contract vs external REST contract — with field-by-field translation occurring in `DefaultAppFacade` and `KnowledgeClient`. Not a code quality issue. See [ADR-0025](../decisions/0025-core-dto-dual-type-layering.md) for the full decision record.
+**Near-duplication between `core` and `app-api` DTOs:** The `core` module defines `Query`, `Result.Hit`, `Facet`, and `Cursor` as internal DTOs for the port contract boundary (the gRPC boundary it was drawn for, until lane F stage A). The `app-api` module defines `SearchRequest`, `KnowledgeSearchResponse`, and related types as external REST contract DTOs. This near-duplication is intentional layering — internal port contract vs external REST contract — with field-by-field translation occurring in `DefaultAppFacade` and `KnowledgeClient`. Not a code quality issue. See [ADR-0025](../decisions/0025-core-dto-dual-type-layering.md) for the full decision record.
 
 **ai-bridge decomposition (ADR-0017):** The former `ai-bridge` monolith was split into focused modules. Current ownership is: `ai-backend` for backend abstractions/local translator support, `gpu-bridge` for GPU/VRAM detection, `prompt-support` for prompt support, and `app-inference` for llama-server lifecycle. The hollow `app-ai` gRPC translator module and the unused `ai-worker` process were deleted entirely. See [ADR-0017](../decisions/0017-ai-bridge-module-decomposition.md) for rationale and historical context.
 

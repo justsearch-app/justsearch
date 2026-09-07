@@ -30,10 +30,10 @@ final class DiagnosticChannelAppenderTest {
 
   @BeforeEach
   void setUp() {
-    HeadLogDiagnosticChannelCatalog catalog = new HeadLogDiagnosticChannelCatalog();
+    EngineLogDiagnosticChannelCatalog catalog = new EngineLogDiagnosticChannelCatalog();
     registry = new DiagnosticChannelStreamRegistry(catalog);
     captured = new ArrayList<>();
-    registry.channel(HeadLogDiagnosticChannelCatalog.HEAD_LOG_ID).subscribe(captured::add);
+    registry.channel(EngineLogDiagnosticChannelCatalog.ENGINE_LOG_ID).subscribe(captured::add);
     appender = new DiagnosticChannelAppender(registry, catalog);
     // Use the SLF4J-bound LoggerContext so MDC.put() in tests is visible to
     // event.getMDCPropertyMap() (the §B.A.G1 verification path). A fresh
@@ -128,7 +128,7 @@ final class DiagnosticChannelAppenderTest {
   void dataClassesFromChannel() {
     appender.doAppend(makeEvent("io.justsearch.example.X", "x"));
     DiagnosticEventEnvelope env = (DiagnosticEventEnvelope) captured.get(0).payload();
-    // HeadLogDiagnosticChannelCatalog declares USER_PATHS / CONFIG_VALUES / EXCEPTION_BODIES
+    // EngineLogDiagnosticChannelCatalog declares USER_PATHS / CONFIG_VALUES / EXCEPTION_BODIES
     assertTrue(env.event().dataClasses().contains(io.justsearch.agent.api.registry.DataClass.USER_PATHS));
     assertTrue(env.event().dataClasses().contains(io.justsearch.agent.api.registry.DataClass.CONFIG_VALUES));
     assertTrue(env.event().dataClasses().contains(io.justsearch.agent.api.registry.DataClass.EXCEPTION_BODIES));

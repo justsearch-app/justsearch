@@ -139,11 +139,14 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
       }
     }
 
-    // Worker log path (best-effort): <dataDir>/logs/worker.log. Item A11 deleted WorkerSpawner,
-    // which is what used to redirect the child process's stdio here; the reported path is
-    // unchanged, so this stays a path advertisement rather than a claim about a writer.
+    // Engine log path (best-effort): <dataDir>/logs/engine.log. Item A11 deleted WorkerSpawner,
+    // which is what used to redirect the Worker child's stdio to <dataDir>/logs/worker.log, and
+    // item A16 renamed the surviving log: there is one process, so there is one log, and it is
+    // the one this JVM's Logback FILE appender writes
+    // (modules/ui/src/main/resources/logback.xml). Between A11 and A16 this key advertised a path
+    // nothing wrote; it now names a real file again.
     try {
-      Path logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("worker.log");
+      Path logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("engine.log");
       worker.put("log_path", logPath.toString());
     } catch (Exception e) {
       worker.put("log_path", "");
@@ -252,16 +255,23 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
   }
 
   /**
-   * GET /api/debug/worker-log
-   * Returns the last N bytes of the worker log file.
+   * GET /api/debug/engine-log
+   * Returns the last N bytes of the Engine's log file (<dataDir>/logs/engine.log).
+   *
+   * <p>Lane F stage A item A17.2: this was {@code GET /api/debug/worker-log} over
+   * {@code <dataDir>/logs/worker.log}. It was RENAMED rather than retired because its subject
+   * survived the merge and only changed name — the on-disk log tail is a capability the live
+   * {@code core.engine-log} SSE channel cannot supply (an SSE subscriber only sees events emitted
+   * after it subscribes; this reads what was already written, including a boot that failed before
+   * anyone could subscribe).
    *
    * Query params:
    * - bytes: max bytes to return (default 100000)
    */
-  public void handleGetWorkerLog(Context ctx) {
+  public void handleGetEngineLog(Context ctx) {
     Path logPath;
     try {
-      logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("worker.log");
+      logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("engine.log");
     } catch (Exception e) {
       Map<String, Object> logErr = ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND, "Log path not available", telemetry, ApiErrorHandler.routeOf(ctx));
       logErr.put("details", e.getMessage());
@@ -308,7 +318,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
       ctx.contentType("text/plain");
       ctx.result(content);
     } catch (Exception e) {
-      log.error("Failed to read worker log", e);
+      log.error("Failed to read engine log", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(ApiErrorCode.IO_ERROR, "Failed to read log: " + e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
     }
   }

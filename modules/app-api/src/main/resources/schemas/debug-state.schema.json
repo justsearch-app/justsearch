@@ -114,17 +114,6 @@
     "serving_search_generation_id" : {
       "type" : [ "string", "null" ]
     },
-    "signal_bus" : {
-      "type" : [ "object", "null" ],
-      "properties" : {
-        "last_activity_ts" : {
-          "type" : "integer"
-        },
-        "last_heartbeat_ts" : {
-          "type" : "integer"
-        }
-      }
-    },
     "status" : {
       "type" : [ "string", "null" ]
     },

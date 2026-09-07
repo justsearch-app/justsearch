@@ -63,7 +63,6 @@ public record ResolvedConfig(
     Collections collections,
     WorkerIndexer workerIndexer,
     InfraHealth infraHealth,
-    InfraGrpc infraGrpc,
     Map<String, ConfigResolution> resolutions) {
 
   public ResolvedConfig {
@@ -85,7 +84,6 @@ public record ResolvedConfig(
     Objects.requireNonNull(collections, "collections");
     Objects.requireNonNull(workerIndexer, "workerIndexer");
     Objects.requireNonNull(infraHealth, "infraHealth");
-    Objects.requireNonNull(infraGrpc, "infraGrpc");
     resolutions = Map.copyOf(resolutions);
   }
 
@@ -97,67 +95,6 @@ public record ResolvedConfig(
   /** Creates a new builder for constructing a {@link ResolvedConfig}. */
   public static ResolvedConfigBuilder builder() {
     return new ResolvedConfigBuilder();
-  }
-
-  private static final ObjectMapper SNAPSHOT_MAPPER =
-      JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
-
-  private static final TypeReference<LinkedHashMap<String, String>> MAP_TYPE =
-      new TypeReference<>() {};
-
-  /**
-   * Writes resolved config values to a JSON file for Head→Worker propagation.
-   *
-   * <p>The snapshot contains all resolved (non-null) key-value pairs as a flat JSON object. The
-   * Worker process loads this file at ordinal 450 via {@link
-   * ResolvedConfigBuilder#contributeWorkerSnapshot(Path)}.
-   *
-   * @param snapshotPath path to write the snapshot file
-   * @throws UncheckedIOException if writing fails
-   */
-  public void toWorkerSnapshot(Path snapshotPath) {
-    Map<String, String> snapshot = new LinkedHashMap<>();
-    for (Map.Entry<String, ConfigResolution> entry : resolutions.entrySet()) {
-      if (entry.getValue().value() != null) {
-        snapshot.put(entry.getKey(), entry.getValue().value());
-      }
-    }
-    putPath(snapshot, "justsearch.data.dir", paths.dataDir());
-    putPath(snapshot, "justsearch.index.base_path", paths.indexBasePath());
-    putPath(snapshot, "justsearch.home", paths.home());
-    putPath(snapshot, "justsearch.models.dir", paths.modelsDir());
-    putPath(snapshot, "justsearch.ssot.path", paths.ssotPath());
-    putPath(snapshot, "justsearch.repo.root", paths.repoRoot());
-    putPath(snapshot, "justsearch.onnxruntime.native_path", paths.ortNativePath());
-    putPath(snapshot, "justsearch.server.exe", ai.serverExe());
-    putPath(snapshot, "justsearch.llm.model_path", ai.llmModelPath());
-    putPath(snapshot, "justsearch.rerank.model_path", ai.reranker().modelPath());
-    putPath(snapshot, "justsearch.ner.model_path", ai.ner().modelPath());
-    putPath(snapshot, "justsearch.splade.model_path", ai.splade().modelPath());
-    putPath(snapshot, "justsearch.splade.evidence_path", ai.splade().evidencePath());
-    putPath(snapshot, "justsearch.rerank.chunks.model_path", ai.reranker().chunks().modelPath());
-    putPath(snapshot, "justsearch.citation.scorer.model_path", ai.citationScorer().modelPath());
-    try {
-      AtomicFileWrites.replace(snapshotPath, SNAPSHOT_MAPPER.writeValueAsBytes(snapshot));
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to write worker config snapshot", e);
-    }
-  }
-
-  /**
-   * Loads a worker config snapshot from a JSON file.
-   *
-   * @param snapshotPath path to the snapshot file
-   * @return key-value pairs from the snapshot, or empty map if file doesn't exist
-   */
-  static Map<String, String> loadWorkerSnapshot(Path snapshotPath) {
-    if (!Files.exists(snapshotPath)) return new LinkedHashMap<>();
-    try {
-      return SNAPSHOT_MAPPER.readValue(snapshotPath.toFile(), MAP_TYPE);
-    } catch (Exception e) {
-      // Best-effort; return empty map on read failure
-      return new LinkedHashMap<>();
-    }
   }
 
   // ==================== Sub-records ====================
@@ -180,11 +117,6 @@ public record ResolvedConfig(
       Path ssotPath,
       Path repoRoot,
       Path ortNativePath) {}
-
-  private static void putPath(Map<String, String> snapshot, String key, Path value) {
-    if (value == null) return;
-    snapshot.put(key, value.toAbsolutePath().normalize().toString());
-  }
 
   /**
    * Network ports for API and inference services.
@@ -785,9 +717,6 @@ public record ResolvedConfig(
   public record InfraHealth(
       long pollIntervalMs, long nrtStaleMs, long translatorHandshakeStaleMs,
       int annCacheReadyPercent) {}
-
-  /** Infrastructure health gRPC server binding from YAML {@code infra.health.grpc.*}. */
-  public record InfraGrpc(String host, int port) {}
 
   /**
    * RAG (Retrieval-Augmented Generation) retrieval configuration.

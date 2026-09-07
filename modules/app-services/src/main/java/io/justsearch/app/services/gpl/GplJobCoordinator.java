@@ -6,6 +6,7 @@ import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import java.util.Objects;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -773,16 +774,28 @@ public final class GplJobCoordinator implements GplStatusProvider {
     }
   }
 
-  private static boolean isTransientWorkerUnavailable(Throwable t) {
+  /**
+   * Whether a failed re-query means "the index half is busy or gone", as opposed to "this query is
+   * bad". The distinction is load-bearing: a transient failure aborts the GPL pass
+   * (:464-467) so the run is retried later, while any other failure writes the positive triple with
+   * zero features — which would poison the training set if it were really a transient outage.
+   *
+   * <p><b>Retargeted at lane F stage A item A14.</b> This used to walk the cause chain for
+   * {@code io.grpc.StatusRuntimeException} / {@code io.grpc.StatusException} and match
+   * {@code UNAVAILABLE} / {@code DEADLINE_EXCEEDED}. Since item A6 the client boundary is
+   * in-process and {@code EngineKnowledgeClient} translates every worker failure into
+   * {@link KnowledgeClientException} (see that class's javadoc), so no gRPC status type can reach
+   * this chain any more and the method could only ever return false — the abort branch was
+   * unreachable and every transient outage silently wrote a zero-feature triple. The two status
+   * constants are 1:1 copies of the gRPC codes this replaced
+   * ({@code KnowledgeClientException.Status.UNAVAILABLE} / {@code DEADLINE_EXCEEDED}), so the
+   * classification is the same one, reached through the type that actually arrives.
+   */
+  static boolean isTransientWorkerUnavailable(Throwable t) {
     for (Throwable cur = t; cur != null; cur = cur.getCause()) {
-      io.grpc.Status.Code code = null;
-      if (cur instanceof io.grpc.StatusRuntimeException sre) {
-        code = sre.getStatus().getCode();
-      } else if (cur instanceof io.grpc.StatusException se) {
-        code = se.getStatus().getCode();
-      }
-      if (code == io.grpc.Status.Code.UNAVAILABLE
-          || code == io.grpc.Status.Code.DEADLINE_EXCEEDED) {
+      if (cur instanceof KnowledgeClientException kce
+          && (kce.status() == KnowledgeClientException.Status.UNAVAILABLE
+              || kce.status() == KnowledgeClientException.Status.DEADLINE_EXCEEDED)) {
         return true;
       }
     }

@@ -219,7 +219,7 @@ Both `fetch_api_json` and `api_call` accept `jsonPath`, sharing one implementati
 | `/api/knowledge/status` | GET |
 | `/api/schemas/{name}` | GET |
 | `/api/debug/events` | GET |
-| `/api/debug/worker-log` | GET |
+| `/api/debug/engine-log` | GET |
 | `/api/telemetry/health` | GET |
 | `/api/action-ledger` | GET |
 

@@ -24,10 +24,10 @@ import type {
 } from '../../api/types/diagnostic.js';
 
 const HEAD_LOG_CHANNEL: DiagnosticChannel = {
-  id: 'core.head-log',
+  id: 'core.engine-log',
   presentation: {
-    labelKey: 'diagnostic-channel.core.head-log.label',
-    descriptionKey: 'diagnostic-channel.core.head-log.description',
+    labelKey: 'diagnostic-channel.core.engine-log.label',
+    descriptionKey: 'diagnostic-channel.core.engine-log.description',
   },
   dataClasses: [],
   producer: 'IN_PROCESS_LOGBACK',
@@ -37,7 +37,7 @@ const HEAD_LOG_CHANNEL: DiagnosticChannel = {
     overrides: {},
     defaultSubCategory: 'CORE_DIAGNOSTIC',
   },
-  endpoint: '/api/diagnostic-channels/head-log/stream',
+  endpoint: '/api/diagnostic-channels/engine-log/stream',
   consumerPermission: 'OPERATOR_OVERRIDE',
   provenance: {
     tier: 'CORE',
@@ -114,7 +114,7 @@ describe('LogSurface — catalog-boot race', () => {
 
   it('errors out when catalog is populated but channel id is missing (true not-found)', async () => {
     // Seed a catalog with a DIFFERENT channel — boot is resolved
-    // (length > 0 distinguishes from boot-race) but core.head-log
+    // (length > 0 distinguishes from boot-race) but core.engine-log
     // isn't there. The catalog-boot race pattern this surface
     // shares with ResourceView (slice 3a.2 §B.B.E.1) uses
     // length-based heuristic; an empty seeded catalog can't be
@@ -135,7 +135,7 @@ describe('LogSurface — catalog-boot race', () => {
     const root = el.shadowRoot!;
     expect(root.querySelector('.error')).not.toBeNull();
     expect(root.querySelector('.error')!.textContent).toContain(
-      'core.head-log',
+      'core.engine-log',
     );
   });
 });

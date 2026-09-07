@@ -15,7 +15,7 @@ import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.server.KnowledgeServer;
-import io.justsearch.app.services.worker.KnowledgeClientException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.SearchResponse;
 import java.nio.file.Files;

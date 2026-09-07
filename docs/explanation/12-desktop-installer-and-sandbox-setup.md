@@ -11,7 +11,7 @@ This document is a **purely descriptive** explanation of the current Windows des
 
 - how the **NSIS installer** is produced and what it installs,
 - how the **Tauri shell** boots the app,
-- how the **Java headless backend** and **Worker** are started,
+- how the **Java headless backend** starts and composes the index half in-process,
 - how the **UI discovers and connects** to the local API,
 - what the **Windows Sandbox harness scripts** do during Phase 3 verification,
 - where to find the **artifacts and logs**.
@@ -116,11 +116,11 @@ See: `modules/shell/src-tauri/src/lib.rs` (the “Contract A: AI Home” section
 
 The most useful runtime logs in desktop mode are written under:
 
-- `<JUSTSEARCH_HOME>/logs/headless-backend.log`
-- `<JUSTSEARCH_HOME>/logs/worker.log`
+- `<JUSTSEARCH_HOME>/logs/engine.log` — the one JVM log (item A13 deleted the Worker's own
+  logback config, so there is no separate `worker.log`)
 - `<JUSTSEARCH_HOME>/logs/llama-server.log` (when Online inference is in use)
 
-The shell opens `headless-backend.log` **before** spawning Java so startup failures are recorded.
+The shell opens `engine.log` **before** spawning Java so startup failures are recorded.
 
 ## 4. Desktop boot sequence (what happens when you launch JustSearch)
 

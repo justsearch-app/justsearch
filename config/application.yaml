@@ -16,9 +16,6 @@ infra:
       nrt_stale_ms: 30000
       translator_handshake_stale_ms: 120000
       ann_cache_ready_percent: 75
-    grpc:
-      host: 127.0.0.1
-      port: 7443
 
 search:
   pipeline:

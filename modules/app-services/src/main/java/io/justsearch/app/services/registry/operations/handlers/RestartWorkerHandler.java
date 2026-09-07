@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.app.services.worker.RestartRequiredException;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.WorkerService;
@@ -57,6 +58,20 @@ public final class RestartWorkerHandler implements OperationHandler {
       int port = worker.restart();
       return OperationResult.success(
           "Worker restarted on port " + port, Map.of("port", port));
+    } catch (RestartRequiredException e) {
+      // Not a failure of this operation — it is the operation's ANSWER since item A11 deleted the
+      // spawner. Restarting the index half means restarting the Engine, which only the user can do.
+      //
+      // It was landing in the generic catch below, which logged at ERROR with a stack trace and
+      // returned "Worker restart failed: Restarting the index half". Three things wrong with that,
+      // none of them cosmetic: an agent reading the result cannot tell "this is impossible, do
+      // something else" from "this broke, retry"; every invocation wrote a stack trace for an
+      // expected, correct outcome; and the HTTP path already answers 409 with the restart_required
+      // code for the same condition, so the two surfaces disagreed about one event. Carrying the
+      // code makes them agree, and retryable=false says the thing the caller needs to know —
+      // retrying will not help, restarting will.
+      return OperationResult.failure(
+          e.getMessage(), RestartRequiredException.CODE, Map.of(), Boolean.FALSE);
     } catch (Exception e) {
       log.error("RestartWorkerHandler: worker restart threw", e);
       return OperationResult.failure(

@@ -571,102 +571,49 @@ function isPidAlive(pid) {
   try { process.kill(n, 0); return true; } catch { return false; }
 }
 
-// Tempdoc 730 B1 (history): worker.log lives under the (persistent, cross-run) dataDir and, at
-// the time this was written, was rotated by WorkerSpawner.java on the NEXT worker spawn — a fixed
-// 2-generation rotation that a death run's log can fall out of before anyone reads it (the
-// reproduced incident: the death run's log was already gone by the time it was inspected). Copy
-// THIS run's current worker.log into the run's OWN directory at stop time, while stopRun still
-// knows unambiguously which run it belongs to — this converts every future death from
-// "inconclusive" (log overwritten) to "diagnosable".
+// Tempdoc 730 B1, re-homed by lane F stage A item A16.
 //
-// Tempdoc 730 Increment-4 review findings (2026-07-14): the naive guard "current file's mtime >=
-// the readiness-time stamp's mtime => it's still ours" is WRONG — a worker.log legitimately grows
-// during a run (mtime keeps advancing), but so does a LATER run's overwrite of the same shared
-// path, and that later mtime is *also* >= the earlier run's stamp. That guard would silently file
-// run B's content as run A's "verified" log (the reap-after-restart mislabel case).
+// HISTORY. B1 preserved <dataDir>/logs/worker.log per run because that path was rotated by
+// WorkerSpawner.java on the NEXT worker spawn — a fixed 2-generation RENAME rotation
+// (worker.log -> .log.1 -> .log.2) that a death run's log could fall out of before anyone read
+// it. Around that copy sat an ownership guard: a size+mtime stamp taken at readiness, a
+// size-monotonicity check at stop time, and a fallback that looked for this run's content at
+// worker.log.1 / worker.log.2. All of that existed to answer one question the rename-rotation
+// posed: 'is the file at this path still the one THIS run wrote, or did a later spawn replace
+// it?'
 //
-// The reviewed plan's first choice of guard was file-identity via birthtime (WorkerSpawner used to
-// rotate by RENAMING worker.log -> worker.log.1 -> worker.log.2 on the next spawn, and a rename
-// preserves birthtime while a fresh spawn's newly-created file gets a new one) — but a live probe
-// on this Windows/NTFS checkout disproved that assumption: NTFS file-system tunneling (the OS
-// caching a short-lived deleted/renamed-away file's metadata, incl. creation time, and handing it
-// back to a file recreated at the SAME path within ~15s) makes a brand-new worker.log inherit the
-// OLD file's birthtimeMs — exactly the case this guard needed to tell apart. `git status` isn't
-// relevant here; this was reproduced directly: create -> rename-away -> recreate-at-same-path ->
-// the recreated file's birthtimeMs matched the original's, indistinguishable from true identity.
-// So this substitutes the plan's named fallback: SIZE-MONOTONICITY (a worker.log is append-only —
-// it only grows while a run owns it; a value smaller than what was stamped at readiness proves
-// the path was rotated/replaced under us) combined with rotation-NAME matching (worker.log.1/.2
-// were exactly where WorkerSpawner put what it rotated away).
+// WHAT A16 CHANGED. Item A11 deleted WorkerSpawner and the Worker child process; item A16
+// renamed the surviving log to <dataDir>/logs/engine.log, written by the Engine JVM's own
+// Logback FILE appender (modules/ui/src/main/resources/logback.xml). So:
 //
-// Open question for lane F item A13: item A11 deleted WorkerSpawner along with the Worker child
-// process, which was the thing that wrote and rotated worker.log in the first place. Nothing
-// currently known to this comment's author writes or rotates that path anymore, so this
-// preservation step may now have no subject to preserve. This has NOT been verified either way —
-// flagged for A13 to resolve, not answered here — and this function's behavior is left unchanged.
-async function preserveWorkerLog(run, runPath) {
+//   * The SUBJECT survived and is re-homed: there is a real, growing engine.log to snapshot,
+//     and a self-exit is still exactly the death-run scenario B1 exists for.
+//   * The HAZARD did not survive, and neither did the machinery built for it. Logback appends
+//     to engine.log and rolls by date/size into engine.%d{yyyy-MM-dd}.%i.log.gz — it never
+//     renames the live file aside on the next boot. Nothing replaces the path under us, so the
+//     stamp, the size-monotonicity check and the .log.1/.log.2 fallback could never fire again:
+//     a guard that is structurally incapable of failing is a vacuous green, not a safety net.
+//     Deleted with the hazard rather than left pointing at engine.log, where it would have
+//     reported 'ownership: verified' unconditionally.
+//
+// HONEST LIMIT of what remains: because Logback APPENDS across runs, engine.log is cross-run,
+// so the preserved copy is 'the engine log as it stood when this run stopped' — it can contain
+// earlier runs' lines too. That is a widening, not a loss (B1's failure mode was a MISSING log,
+// not an over-full one), and it is why the result no longer claims a per-run ownership verdict.
+async function preserveEngineLog(run, runPath) {
   const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   if (!dataDirAbs) return { preserved: false, reason: 'no_data_dir' };
-  const logsDirAbs = path.join(dataDirAbs, 'logs');
-  const srcWorkerLog = path.join(logsDirAbs, 'worker.log');
+  const srcEngineLog = path.join(dataDirAbs, 'logs', 'engine.log');
   const destLogsDir = path.join(path.dirname(runPath), 'logs');
-  const destWorkerLog = path.join(destLogsDir, 'worker.log');
-  const stamp = run?.workerLogStamp || null;
+  const destEngineLog = path.join(destLogsDir, 'engine.log');
 
-  const copyFrom = async (sourcePath, extra) => {
-    try {
-      await mkdirp(destLogsDir);
-      await fsp.copyFile(sourcePath, destWorkerLog);
-      return { preserved: true, path: toPosix(path.relative(repoRoot, destWorkerLog)), ...extra };
-    } catch (err) {
-      return { preserved: false, reason: 'copy_failed', error: err?.message || String(err) };
-    }
-  };
-
-  if (!stamp) {
-    // Older run.json predates the ownership stamp (B1's original behavior) — best-effort copy,
-    // but the result says so explicitly rather than silently claiming verified ownership.
-    if (!fs.existsSync(srcWorkerLog)) return { preserved: false, reason: 'no_worker_log' };
-    return copyFrom(srcWorkerLog, { ownership: 'unstamped' });
-  }
-
-  const statOrNull = (filePath) => {
-    try { return fs.statSync(filePath); } catch { return null; }
-  };
-  // "Still consistent with THIS run's file": never shrunk below what was stamped at readiness,
-  // and never moved backward in time. A rotated-away path is replaced by a fresh, small file, so
-  // a size drop below the stamp is the tell that the path under us stopped being ours.
-  const isMonotonicWith = (st) => !!st && st.size >= stamp.size && st.mtimeMs >= stamp.mtimeMs;
-
-  const currentStat = statOrNull(srcWorkerLog);
-  if (isMonotonicWith(currentStat)) {
-    return copyFrom(srcWorkerLog, { ownership: 'verified' });
-  }
-
-  for (const rotatedName of ['worker.log.1', 'worker.log.2']) {
-    const rotatedPath = path.join(logsDirAbs, rotatedName);
-    const rotatedStat = statOrNull(rotatedPath);
-    if (isMonotonicWith(rotatedStat)) {
-      return copyFrom(rotatedPath, { ownership: 'heuristic', source: 'rotated' });
-    }
-  }
-
-  return { preserved: false, reason: 'ownership_unverified' };
-}
-
-// Tempdoc 730 Increment-4 review: capture the ownership-stamp identity of THIS run's worker.log
-// at the point cmdStart confirms backend HTTP-readiness — i.e., at the time this was written,
-// after WorkerSpawner's own startup (and any rotation it performed on spawn) had settled, so the
-// stamp names the log file this run actually owns rather than one still mid-rotation. Null when
-// the log doesn't exist yet (e.g. the worker hasn't logged anything by the time HTTP readiness is
-// confirmed). Item A11 later deleted WorkerSpawner and the Worker child process it started; see
-// the "Open question for lane F item A13" note above preserveWorkerLog for the open consequence.
-function captureWorkerLogStamp(dataDirAbs) {
+  if (!fs.existsSync(srcEngineLog)) return { preserved: false, reason: 'no_engine_log' };
   try {
-    const st = fs.statSync(path.join(dataDirAbs, 'logs', 'worker.log'));
-    return { size: st.size, mtimeMs: st.mtimeMs };
-  } catch {
-    return null;
+    await mkdirp(destLogsDir);
+    await fsp.copyFile(srcEngineLog, destEngineLog);
+    return { preserved: true, path: toPosix(path.relative(repoRoot, destEngineLog)) };
+  } catch (err) {
+    return { preserved: false, reason: 'copy_failed', error: err?.message || String(err) };
   }
 }
 
@@ -688,7 +635,7 @@ function buildStopReport({
   ports = null,
   portsClosed = null,
   errors = [],
-  workerLog = null,
+  engineLog = null,
   criticalOpsInterrupted = null,
   interruptibleWithLossInterrupted = null,
   gracefulBackendShutdown = null,
@@ -714,8 +661,11 @@ function buildStopReport({
     ports,
     portsClosed,
     errors,
-    // Tempdoc 730 B1: where this run's worker.log ended up (or why it didn't).
-    ...(workerLog ? { workerLog } : {}),
+    // Tempdoc 730 B1 (re-homed, item A16): where this run's engine.log ended up (or why it
+    // didn't). Renamed from `workerLog` with the file it names; schemaVersion stays 2 because the
+    // only reader of this key is scripts/dev/test-dev-runner-death-observability.mjs — no consumer
+    // outside this repo's dev harness reads stop-report.json.
+    ...(engineLog ? { engineLog } : {}),
     ...(criticalOpsInterrupted ? { criticalOpsInterrupted } : {}),
     ...(interruptibleWithLossInterrupted ? { interruptibleWithLossInterrupted } : {}),
     // Tempdoc 819 §D: outcome of the graceful POST /api/lifecycle/shutdown attempt made before
@@ -740,9 +690,23 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     // Lane F PR 0 (design 17.2): one flag set with or without the AOT cache. TieredStopAtLevel=1
     // is gone (its 48 MiB C1-only code cache caused the CodeCache-threshold full GCs 917 Derisk 1
     // measured, and it conflicted with the AOT cache); MetaspaceSize=128m stops the
-    // Metaspace-threshold full GCs at start. lib.rs carries the same set; the pairing is pinned by
-    // scripts/dev/test-dev-runner-head-java-opts.mjs.
-    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:-UsePerfData',
+    // Metaspace-threshold full GCs at start.
+    //
+    // Lane F item A13 follow-up: UseCompactObjectHeaders and file.encoding join the set. This
+    // process is BOTH halves now — Lucene, the job queue and the ONNX session cache share this
+    // JVM — and -Dfile.encoding=UTF-8 was previously set by WorkerSpawner for the index half
+    // (WorkerSpawner.java:457 before item A11 deleted it). Document extraction decodes untrusted
+    // bytes, and the Windows platform default is not UTF-8, so losing it changes decoding
+    // silently and only for non-ASCII content.
+    //
+    // modules/shell/src-tauri/src/lib.rs carries the same shared set for the PACKAGED spawn, and
+    // scripts/dev/test-dev-runner-head-java-opts.mjs pins both sides: the list below exactly
+    // (deepEqual, so an addition fails the test), and lib.rs by reading its source. The one
+    // deliberate divergence is -Xmx: lib.rs pins 2g because a packaged JVM's default (1/4 of
+    // physical RAM) is wrong in both directions, while the dev-runner keeps NO default heap
+    // (tempdoc 730 Increment-4) and honours JUSTSEARCH_HEAD_HEAP when set.
+    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:+UseCompactObjectHeaders -XX:-UsePerfData'
+      + ' -Dfile.encoding=UTF-8',
     headAotOpts,
     // Tempdoc 606 Piece 2b: the Head echoes this on /api/runtime/manifest so a
     // stale old Head answering on a reused port is detectable (build mismatch).
@@ -770,10 +734,10 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
 // stopRun() — i.e. the supervisor's backend.on('exit') fired on its own (crash/OOM) or in
 // response to an interactive Ctrl+C, not a `stop`/reap taskkill. Before this, that path wrote
 // NO stop-report at all (only onExit() closing the log streams), so a silent death left zero
-// exit-code artifact — the exact gap §THEORIZE B names. Also preserves worker.log (B1), since a
-// self-exit is precisely the "death run" scenario B1 exists for.
+// exit-code artifact — the exact gap §THEORIZE B names. Also preserves engine.log (B1, re-homed
+// at item A16), since a self-exit is precisely the "death run" scenario B1 exists for.
 async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, interactive }) {
-  const workerLog = await preserveWorkerLog(run, runPath);
+  const engineLog = await preserveEngineLog(run, runPath);
   const stopReport = buildStopReport({
     runId,
     stoppedAt: nowIso(),
@@ -784,7 +748,7 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
     ports: null,
     portsClosed: null,
     errors: [],
-    workerLog,
+    engineLog,
   });
   const stopReportPath = path.join(path.dirname(runPath), 'stop-report.json');
   await writeJsonAtomic(stopReportPath, stopReport);
@@ -1909,13 +1873,6 @@ async function cmdStart(opts) {
     throw new Error(`Backend did not become ready at ${apiBaseUrl}/api/status within ${seconds}s`);
   }
 
-  // Tempdoc 730 Increment-4 review: stamp worker.log's identity now that HTTP-readiness confirms
-  // that, at the time this was written, WorkerSpawner's own startup (and any rotation-on-spawn)
-  // had settled — see preserveWorkerLog / captureWorkerLogStamp above for why this feeds the
-  // stop-time ownership guard, and for the open question item A11 (WorkerSpawner's deletion)
-  // raises for that guard.
-  const workerLogStamp = captureWorkerLogStamp(dataDir);
-
   // indexBasePath capture (271 stage 4)
   const expectedIbp = resolveExpectedIndexBasePath(dataDir);
   let confirmedIbp = null;
@@ -1958,9 +1915,6 @@ async function cmdStart(opts) {
     // Tempdoc 842 §2.4: the profile this stack's backend was spawned with, so MCP-side
     // auto-activation follows the stack's choice instead of assuming a default.
     chatProfile: effectiveChatProfile,
-    // Tempdoc 730 Increment-4 review: identity stamp of THIS run's worker.log at readiness, used
-    // by preserveWorkerLog's stop-time ownership guard (null if the file didn't exist yet).
-    workerLogStamp,
     // Tempdoc 844 §4.2 R3: what `reload` needs to push into THIS run — never re-derived from the
     // caller's cwd. `enabled:false` is a recorded fact ("this stack has no JDWP listener"), which
     // is why `reload` can refuse instead of attaching to a stranger's port.
@@ -2231,7 +2185,7 @@ async function cmdStart(opts) {
       process.exit(0);
       return;
     }
-    // Tempdoc 730 B2: capture the exit code + preserve worker.log (B1) even though no
+    // Tempdoc 730 B2: capture the exit code + preserve engine.log (B1) even though no
     // stopRun() ran for this exit. Best-effort/fire-and-forget: a signal-driven exit can't
     // await, so the write races the process.exit() below but is fast (fs-local, ms-scale).
     writeSelfExitStopReport({
@@ -2441,10 +2395,10 @@ async function stopRun(opts) {
   if (!apiInfo.closed) errors.push(`API port ${apiPort} still listening after stop timeout`);
   if (!uiInfo.closed) errors.push(`UI port ${uiPort} still listening after stop timeout`);
 
-  // Tempdoc 730 B1: snapshot this run's worker.log into its own run dir before the next
-  // start's WorkerSpawner rotation can carry it away — at the time this was written; item A11
-  // later deleted WorkerSpawner, see the open question recorded above preserveWorkerLog.
-  const workerLog = await preserveWorkerLog(run, runPath);
+  // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
+  // death run's evidence survives alongside its stop-report instead of only in the shared,
+  // cross-run <dataDir>/logs/engine.log.
+  const engineLog = await preserveEngineLog(run, runPath);
 
   const stopReport = buildStopReport({
     runId,
@@ -2459,7 +2413,7 @@ async function stopRun(opts) {
     ports: { api: apiInfo, ui: uiInfo },
     portsClosed: apiInfo.closed && uiInfo.closed,
     errors,
-    workerLog,
+    engineLog,
     // Tempdoc 542 §B Layer 4 — make interrupted critical/loss op-leases part of the
     // permanent audit record. Tells the operator what was lost on a `force` takeover.
     criticalOpsInterrupted,
@@ -2649,11 +2603,10 @@ if (require.main === module) {
       resolveCuda12ServerExe,
       stageSharedCuda12,
       // Tempdoc 730 Increment 4 (B1/B2/B3)
-      preserveWorkerLog,
+      preserveEngineLog,
       buildStopReport,
       buildHeadJavaOpts,
       writeSelfExitStopReport,
-      captureWorkerLogStamp,
       // Tempdoc 819 §D: graceful ordered-shutdown-before-taskkill helpers.
       postLifecycleShutdown,
       maybeGracefulBackendShutdown,

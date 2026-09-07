@@ -247,7 +247,7 @@ Sections in render order:
 
 7. **AI Home** _(Tauri only)_ — File system paths:
    - Home directory path with "Open folder" button
-   - Reveal buttons: logs dir, llama-server.log, headless-backend.log
+   - Reveal buttons: logs dir, llama-server.log, engine.log
    - Export diagnostics button
 
 8. **Runtime** — Inference mode control:

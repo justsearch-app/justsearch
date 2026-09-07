@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
  * primitives, each backed by a typed catalog of entries. The MCP-precedented split
  * (Operation = Tool, Resource = readable/subscribable data, Prompt = template) was
  * extended in slice 448 to add DiagnosticChannel as a fourth primitive (operator-trace
- * surfaces — head-log, worker-log, brain-log, OTel spans, audit log) per CONFLICT-LEDGER
+ * surfaces — engine-log, brain-log, OTel spans, audit log) per CONFLICT-LEDGER
  * C-012 path-b chosen 2026-05-07. See slice 446 §A for the truth-class conflation reasoning
  * that motivated separating operator-trace from Resource.
  *

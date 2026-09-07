@@ -261,18 +261,19 @@ the decision to an operator (`IndexGenerationManager`, tempdoc 915 §C):
 
 **On exhaustion the Worker finishes starting.** Refusing to open would be the same dead-end the old
 `FAIL_CLOSED` default produced, three boots later and with no explanation. So the brake sets a state
-and `start()` continues through the rest of its sequence rather than returning: the gRPC server is
-created and bound, the port is written to the signal bus, `appServices` (and with it the status
-surface) is constructed, and the sentinel thread runs. Concretely, in that state:
+and `start()` continues through the rest of its sequence rather than returning: `appServices` (and
+with it the status surface) is constructed, and the sentinel thread runs. Concretely, in that state:
 
 | Startup step | Behaviour with the brake exhausted |
 |---|---|
 | Lucene runtimes | the active generation opens **read-only**; ingest and search share it, and no Green is allocated |
 | switch-buffer drain | skipped — there is no writer to drain into |
-| `createGrpcServer` + `start` | runs; the Worker binds a real port |
-| `signalBus.writePort` | runs; the Head discovers the Worker normally |
 | indexing loop | **not started**, and the reason is logged at ERROR — its only job is to write into a read-only runtime |
 | sentinel thread | runs |
+
+(Two rows are gone from this table rather than corrected: `createGrpcServer` + `start` and
+`signalBus.writePort`. Lane F stage A deleted the gRPC server, the memory-mapped port handoff and
+finally gRPC itself, so there is no second port to bind and nothing for the Head to discover.)
 
 Search therefore keeps serving everything already indexed, ingestion stops, and the status surface
 says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →
@@ -468,7 +469,7 @@ The Worker uses a cutover fence:
 - While in `SWITCHING`, mutating ingest RPCs are **durably buffered** into `jobs.db.switch_buffer`.
 - After restart on the new active generation, the Worker replays buffered ops before resuming normal processing.
 
-**Fail-closed semantics:** Buffering is part of the write path—if `putSwitchBuffer()` fails (SQL error), gRPC handlers return `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. The `worker.switch_buffer.write_failures` telemetry counter tracks such failures.
+**Fail-closed semantics:** Buffering is part of the write path—if `putSwitchBuffer()` fails (SQL error), the ingest port calls fail with `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. The `worker.switch_buffer.write_failures` telemetry counter tracks such failures.
 
 Buffered operations include (current):
 
@@ -495,7 +496,7 @@ If configured, the Worker blocks cutover and marks the migration `FAILED` when `
 
 To avoid hanging forever in `SWITCHING`, the Worker enforces a maximum switching duration and transitions to `FAILED` if it cannot drain in time (no pointer swap).
 
-## Operator surface (Head REST → Worker gRPC)
+## Operator surface (Head REST → index-half port call)
 
 The Head exposes operator endpoints (Head never touches Lucene or `state.json` directly):
 

@@ -29,15 +29,15 @@ combination). The pipeline executes across two processes:
 
 1. **Head** (Main process, `KnowledgeHttpApiAdapter`) resolves the
    `PipelineConfig` from a named preset or explicit flags, and optionally
-   starts an async LLM expansion call. It then sends a gRPC request to the
-   Worker.
+   starts an async LLM expansion call. It then makes the `search` port call
+   into the index half.
 
 2. **Worker** (Body process, `SearchOrchestrator`) runs retrieval. The
    enabled legs (BM25, Dense KNN, SPLADE) execute in parallel via virtual
    threads. Their results are fused (RRF by default). If the query yields
    zero hits, fuzzy correction retries. If chunks exist, a parallel chunk
    search is fused and collapsed by parent document. Match spans, excerpt
-   regions, and facets are computed. The response flows back over gRPC.
+   regions, and facets are computed. The response returns from the port call.
 
 3. **Head** (post-retrieval) merges any completed LLM expansion, then runs
    a reranking cascade: LambdaMART (fast, ~5 ms) followed by cross-encoder
@@ -45,8 +45,8 @@ combination). The pipeline executes across two processes:
    per-hit provenance metadata is assembled.
 
 The diagram below shows the complete flow. The three retrieval legs fan out
-in parallel from the dispatch stage. Dashed lines indicate the cross-process
-gRPC boundary.
+in parallel from the dispatch stage. Dashed lines indicate what used to be the
+cross-process gRPC boundary and is now the in-process port boundary (ADR-0049).
 
 ![Search Pipeline Overview](23-search-pipeline-overview.svg)
 
@@ -130,7 +130,7 @@ via virtual threads, then converge at the fusion stage.
 | #   | Stage                                 | What It Does                                                                                                                                                        |
 | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3   | **QPP Computation**                   | `maxIdf`, `avgIctf`, `queryScope`, field-local document count, and minimum analyzed-term document-frequency fraction; O(1) via IndexReader; the planner uses the field-local values for dense-skip routing |
-| 4   | **Filter Parsing + Entity Expansion** | gRPC filters → Lucene queries; entity facet filters expanded via disambiguation cluster snapshot                                                                    |
+| 4   | **Filter Parsing + Entity Expansion** | request-message filters → Lucene queries; entity facet filters expanded via disambiguation cluster snapshot                                                                    |
 | 5   | **Staged Retrieval Dispatch**         | Dispatches to enabled legs; standard combos use optimized methods (`searchHybrid`, `searchHybridSplade`); novel combos use pairwise RRF fusion via `fuseLegs()`     |
 | 6   | **BM25 Search** ‖                     | Lucene `Query`-based retrieval; fetches 10× limit for over-retrieval (capped at `candidate_limit_max`, default 100)                                                  |
 | 7   | **Dense KNN Search** ‖                | `KnnFloatVectorQuery`; fetches 10× limit (capped at 100); pre-filtered by runtime filters                                                                           |
@@ -162,7 +162,7 @@ RRF chunk merge.
 | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | 15  | **Expansion Merge**                   | If LLM expansion completed in budget, re-searches with expanded query (LUCENE syntax); otherwise uses base results |
 | 16  | **LambdaMART Reranking**              | 2 features (sparse + vector debug scores); fast (~5 ms); runs first in cascade. **Off by default** (requires a GPL-trained model). ⚠️ **GPL-trained LambdaMART is measured non-viable on real queries** (synthetic GPL training queries don't transfer) — see register **F-021**. Treat as present-but-inert substrate pending real user-feedback labels, *not* a current quality lever |
-| 17  | **Cross-Encoder Reranking**           | gte-multilingual-reranker-base (FP16 GPU, 306M params); Head sends `Rerank` gRPC RPC to Worker with query-focused snippets; deadline-budgeted; runs on LambdaMART's output (360) |
+| 17  | **Cross-Encoder Reranking**           | gte-multilingual-reranker-base (FP16 GPU, 306M params); Head makes the `rerank` port call into the index half with query-focused snippets; deadline-budgeted; runs on LambdaMART's output (360) |
 | 18  | **Result Trim + Provenance Assembly** | Trim to requested limit; structured provenance per hit (which legs contributed, fusion scores, CE scores)          |
 
 ---

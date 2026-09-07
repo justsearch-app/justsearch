@@ -44,10 +44,6 @@ dependencies {
   runtimeOnly(project(":modules:adapters-lucene"))
   api(project(":modules:ai-backend"))
 
-  // gRPC for IPC
-  implementation(libs.grpc.stub)
-  runtimeOnly(libs.grpc.netty.shaded)
-
   // Jackson for JSON manifests
   api(libs.jackson.databind)
   implementation(libs.jackson.core)
@@ -153,6 +149,12 @@ dependencies {
   // JVM's own java.class.path, so the Head must be ON that classpath. Without this the whole
   // fixture-based tier dies at @BeforeAll with ClassNotFoundException: HeadlessApp.
   add("integrationTestRuntimeOnly", project(":modules:ui"))
+  // Lane F stage A item A12 closure: ExtractionSandboxOrphanE2ETest points the production
+  // JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND override at ChaosExtractionSandboxChild, which has to be
+  // on THIS JVM's classpath because that is the classpath IsolatedBackendFixture hands the Head it
+  // spawns. The fixture moved into worker-services' test fixtures so both it and the in-process
+  // sibling (:modules:app-engine's EngineExtractionSandboxChaosTest) can reach one copy.
+  add("integrationTestImplementation", testFixtures(project(":modules:worker-services")))
   add("integrationTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
   add("systemTestImplementation", project(":modules:indexing"))
   add("systemTestImplementation", project(":modules:gpu-bridge"))

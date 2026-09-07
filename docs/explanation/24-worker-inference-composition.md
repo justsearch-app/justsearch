@@ -270,7 +270,7 @@ consumes without reshaping the pipeline.
 
 `GET /api/debug/session-policies` returns the resolved `RuntimePolicy`
 and every `ModelSessionPolicy` as JSON. The Head proxies to the
-Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC rpc
+index half's live `InferenceSurface` via the `getSessionPolicies` port call
 (tempdoc 397 §14.28 U4) — Head does not re-resolve. Response shape:
 
 ```json
@@ -283,7 +283,7 @@ Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC rpc
 
 `config-unavailable` = Head has no `ResolvedConfig` (e.g., boot hasn't
 loaded settings yet); `surface-unavailable` = Worker hasn't composed yet;
-`worker-unreachable` = gRPC failed or Head has no client.
+`worker-unreachable` = the port call failed or Head has no client.
 
 Because the applier reads the same record the endpoint serialises,
 diffing two runs' snapshots is equivalent to diffing the applied

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -68,37 +69,54 @@ class AgentToolErrorsTest {
   @Test
   @DisplayName("an unreachable Worker is SERVICE_UNAVAILABLE, matched by class name across modules")
   void workerUnreachableIsServiceUnavailable() {
-    // app-agent does not depend on the gRPC runtime, so the classifier matches the class NAME.
-    // This stand-in proves the name-matching arm without dragging that dependency into the module.
-    class StatusRuntimeException extends RuntimeException {
-      private static final long serialVersionUID = 1L;
-
-      StatusRuntimeException(String m) {
-        super(m);
-      }
-    }
+    // The REAL type the port throws. This test used to declare a local class NAMED
+    // StatusRuntimeException to satisfy the classifier's string match — so it kept passing after
+    // item A6 deleted the transport, while production classified every unreachable index half as
+    // INTERNAL_ERROR. A test that constructs its own subject to match a string is not testing the
+    // production path; it is testing the string.
     OperationResult r =
         AgentToolErrors.classify(
-            "core_browse_folders", "Browse error", new StatusRuntimeException("UNAVAILABLE: io"));
+            "core_browse_folders",
+            "Browse error",
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.UNAVAILABLE, "index half not up"));
     assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
     assertEquals(Boolean.TRUE, r.retryable().orElseThrow());
   }
 
   @Test
-  @DisplayName("an unreachable Worker gets the same actionable sentence, not a transport dump")
-  void workerUnreachableMessageIsActionable() {
-    class StatusRuntimeException extends RuntimeException {
-      private static final long serialVersionUID = 1L;
-
-      StatusRuntimeException(String m) {
-        super(m);
-      }
-    }
+  @DisplayName("a deadline from the port is also retryable-unavailable, not an internal error")
+  void deadlineFromThePortIsServiceUnavailable() {
     OperationResult r =
         AgentToolErrors.classify(
             "core_browse_folders",
             "Browse error",
-            new StatusRuntimeException("UNAVAILABLE: io exception"));
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.DEADLINE_EXCEEDED, "too slow"));
+    assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
+  }
+
+  @Test
+  @DisplayName("a port failure that is NOT an outage stays an internal error")
+  void nonOutagePortFailureIsNotServiceUnavailable() {
+    // The negative half: without it, widening the arm to "any KnowledgeClientException" would pass.
+    OperationResult r =
+        AgentToolErrors.classify(
+            "core_browse_folders",
+            "Browse error",
+            new KnowledgeClientException(KnowledgeClientException.Status.INTERNAL, "boom"));
+    assertEquals(ApiErrorCode.INTERNAL_ERROR, codeOf(r));
+  }
+
+  @Test
+  @DisplayName("an unreachable Worker gets the same actionable sentence, not a transport dump")
+  void workerUnreachableMessageIsActionable() {
+    OperationResult r =
+        AgentToolErrors.classify(
+            "core_browse_folders",
+            "Browse error",
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.UNAVAILABLE, "UNAVAILABLE: io exception"));
 
     assertFalse(r.message().contains("UNAVAILABLE: io exception"), r.message());
     assertTrue(r.message().contains("retry shortly"), r.message());

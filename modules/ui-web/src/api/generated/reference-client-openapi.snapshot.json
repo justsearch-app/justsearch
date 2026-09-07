@@ -1613,6 +1613,19 @@
         ]
       }
     },
+    "/api/debug/engine-log": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/debug/engine-log",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
     "/api/debug/events": {
       "get": {
         "responses": {
@@ -1729,27 +1742,14 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
-    "/api/debug/worker-log": {
+    "/api/diagnostic-channels/engine-log/stream": {
       "get": {
         "responses": {
           "200": {
             "description": "Successful response."
           }
         },
-        "summary": "GET /api/debug/worker-log",
-        "tags": [
-          "debug"
-        ]
-      }
-    },
-    "/api/diagnostic-channels/head-log/stream": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/diagnostic-channels/head-log/stream",
+        "summary": "GET /api/diagnostic-channels/engine-log/stream",
         "tags": [
           "resource"
         ],
@@ -3881,7 +3881,7 @@
   },
   "x-justsearch-route-source": {
     "routeCount": 243,
-    "routeDigest": "sha256:d282c68bf759eccfa48d472b5fcd6dfde1fca4be6dbcb00606213985fd1dcde8"
+    "routeDigest": "sha256:2b2e3ec3b79c74a06157b861152c91e1277be9d6d0e1823106d811af8e9ae0df"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

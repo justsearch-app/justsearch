@@ -609,7 +609,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /**
      * The remedy sentence for a refused schema mismatch. Tempdoc 915, live validation: the Head used
      * to report this as "Worker process crashed (exit code 1)" with the real cause visible only in
-     * worker.log, because nothing wrote the fatal-reason marker on the refusal path.
+     * the (then separate) worker.log, because nothing wrote the fatal-reason marker on the refusal
+     * path. There is one process and one log (engine.log) since lane F stage A items A11/A16, but
+     * the remedy sentence is still what the user reads instead of a log.
      */
     private static final String INDEX_SCHEMA_MISMATCH_DETAIL =
             "The search index was built with a different index shape than this version writes, and"

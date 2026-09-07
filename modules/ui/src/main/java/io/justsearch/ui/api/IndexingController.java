@@ -15,7 +15,7 @@ import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.ipc.KnowledgeServerNotConnectedException;
-import io.justsearch.app.services.worker.KnowledgeClientException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.telemetry.Telemetry;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;

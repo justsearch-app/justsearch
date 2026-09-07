@@ -1739,7 +1739,9 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * The server exe the config layer resolved, or null before {@code ConfigStore.setGlobal} has run
    * (unit tests, very early boot). Read through the store rather than {@code System.getenv} — a
    * direct env read of {@code JUSTSEARCH_SERVER_EXE} is what {@code EnvRegistryDirectReadTest}
-   * forbids, and the store is also where a JVM-arg or worker-snapshot override outranks the env.
+   * forbids, and the store is also where a JVM-arg override outranks the env. (There was a
+   * worker-snapshot tier at ordinal 450 between the two until lane F item A19; it existed to carry
+   * the Head's resolved config across a process boundary that no longer exists.)
    */
   private static Path resolvedServerExeOrNull() {
     try {

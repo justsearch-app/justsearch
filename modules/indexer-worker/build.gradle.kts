@@ -35,11 +35,11 @@ dependencies {
   implementation(libs.djl.tokenizers)
   // DJL API for DefaultVocabulary (SPLADE output → token mapping)
   implementation(libs.djl.api)
-  // Lane F stage A item A9 deleted this module's gRPC server; item A13 dropped the two gRPC
-  // dependencies that outlived it (`libs.grpc.netty.shaded`, `libs.grpc.stub`). They had no source
-  // consumer here (`git grep io.grpc -- modules/indexer-worker/src` is empty) and only survived
-  // because the standalone distribution packaged them. app-services and app-observability still
-  // declare their own gRPC deps, so the Engine classpath is unaffected.
+  // Item A9 deleted this module's gRPC server and item A13 dropped the two gRPC dependencies that
+  // outlived it; item A14 finished the job across the repo, so no module declares one now and the
+  // note that used to name them here has been removed with them. Naming a retired coordinate in
+  // prose is not free: `adr-0049-no-grpc-in-module-builds` is a grep-absent probe over this file,
+  // and a comment counts.
   implementation(libs.jackson.databind)
   implementation(libs.slf4j.api)
 

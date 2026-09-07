@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services;
 
-import io.grpc.Server;
 import io.justsearch.agent.AgentRunStore;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.tools.FileOperationLog;
@@ -27,7 +26,6 @@ import io.justsearch.app.observability.CapabilitiesController;
 import io.justsearch.app.observability.CapabilitiesService;
 import io.justsearch.app.observability.InfraDiagnosticsService;
 import io.justsearch.app.observability.InfraHealthBootstrap;
-import io.justsearch.app.observability.InfraHealthGrpcService;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -76,7 +74,8 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.api.ModeChangeListener gpuBroadcastListener;
   // Tempdoc 737 Phase 1 — the single-writer runtime authority; closed on teardown with the manager.
   private final io.justsearch.app.services.runtimestate.RuntimeReconciler runtimeReconciler;
-  // §10 Phase A: InfraPhase.Output holds the gRPC server + capabilities handler.
+  // §10 Phase A: InfraPhase.Output holds the capabilities handler. Item A14 removed the second
+  // Netty server it used to hold alongside it (the infra-health gRPC endpoint).
   private io.justsearch.app.services.bootstrap.phases.InfraPhase.Output infraOut;
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final io.justsearch.app.services.vdu.OfflineCoordinator offlineCoordinator;
@@ -689,7 +688,6 @@ public final class HeadAssembly implements AutoCloseable {
                         this.gpuBroadcastListener,
                         this.substrateOut,
                         this.capabilities,
-                        this.infraOut == null ? null : this.infraOut.infraHealthGrpcServer(),
                         this.operationMessageResolver,
                         fileOperationLogFinal,
                         agentRunStore,
@@ -860,7 +858,6 @@ public final class HeadAssembly implements AutoCloseable {
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().documentsIndexedRateMetricProducer(),
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().gpuUtilizationMetricProducer(),
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().gpuMemoryUtilizationMetricProducer(),
-        this.infraOut == null ? null : this.infraOut.infraHealthGrpcServer(),
         this.inferenceManager,
         this.gpuBroadcastListener,
         this.runtimeReconciler,

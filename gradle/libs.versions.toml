@@ -15,7 +15,6 @@ slf4j = "2.0.17"
 logback = "1.5.32"
 logstashLogback = "9.0"
 log4j = "2.24.3"
-grpc = "1.79.0"
 errorprone = "2.47.0"
 errorpronePlugin = "4.0.1"
 protobuf = "4.33.5"
@@ -97,12 +96,6 @@ logback-core = { module = "ch.qos.logback:logback-core", version.ref = "logback"
 logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstashLogback" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 log4j-to-slf4j = { module = "org.apache.logging.log4j:log4j-to-slf4j", version.ref = "log4j" }
-grpc-core = { module = "io.grpc:grpc-core", version.ref = "grpc" }
-grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
-grpc-inprocess = { module = "io.grpc:grpc-inprocess", version.ref = "grpc" }
-grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
-grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded", version.ref = "grpc" }
-grpc-protoc-gen = { module = "io.grpc:protoc-gen-grpc-java", version.ref = "grpc" }
 json-schema-validator = { module = "com.networknt:json-schema-validator", version = "3.0.1" }
 protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
 protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }

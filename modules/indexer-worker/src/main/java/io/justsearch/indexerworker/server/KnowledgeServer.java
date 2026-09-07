@@ -1047,7 +1047,8 @@ public final class KnowledgeServer implements Closeable {
       //
       // A FAIL_CLOSED schema mismatch is the same kind of fact and was missing (tempdoc 915, live
       // validation): the refusal reached the Head only as "Worker process crashed (exit code 1)",
-      // with the actual cause visible nowhere but worker.log. It is a deliberate refusal, not a
+      // with the actual cause visible nowhere but the (then separate) worker.log. It is a
+      // deliberate refusal, not a
       // crash, and it has its own remedy. Other fatal causes stay generic.
       if (isCorruptIndexCause(e)) {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(

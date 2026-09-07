@@ -45,7 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
 // 120s, not 60s: setUp uses the Head's own bounded worker-start retry, whose worst case is three
 // spawn+validate rounds. A budget that a legal slow path can exceed turns a diagnosable failure
-// (with the worker log tail) into a bare timeout.
+// (with the engine log tail) into a bare timeout.
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 final class SchemaMismatchStatusContractTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -58,7 +58,7 @@ final class SchemaMismatchStatusContractTest {
   private ConfigStore prevConfigStore;
   private KnowledgeServerBootstrap bootstrap;
   private LocalApiServer server;
-  private Path workerLogPath;
+  private Path engineLogPath;
 
   @BeforeEach
   void setup() throws Exception {
@@ -94,7 +94,9 @@ final class SchemaMismatchStatusContractTest {
     // without a second process, which also removes this test's dependency on the
     // indexer-worker installDist and its Windows file-lock teardown dance.
     KnowledgeServerConfig config = KnowledgeServerConfig.load();
-    workerLogPath = config.dataDir().resolve("logs").resolve("worker.log");
+    // Item A16: one process, one log. This was <dataDir>/logs/worker.log, which nothing has
+    // written since A11 deleted the Worker child — a failure tail read from it was empty.
+    engineLogPath = config.dataDir().resolve("logs").resolve("engine.log");
 
     bootstrap =
         new KnowledgeServerBootstrap(
@@ -108,9 +110,9 @@ final class SchemaMismatchStatusContractTest {
       // @DisabledIfEnvironmentVariable above — so the budget below covers local load only.)
       bootstrap.startWithRetry();
     } catch (Exception e) {
-      String tail = readTailBestEffort(workerLogPath, 12_000);
+      String tail = readTailBestEffort(engineLogPath, 12_000);
       throw new IllegalStateException(
-          "Failed to start KnowledgeServerBootstrap. Worker log tail:\n" + tail, e);
+          "Failed to start KnowledgeServerBootstrap. Engine log tail:\n" + tail, e);
     }
 
     UiSettingsStore settingsStore =
@@ -143,9 +145,9 @@ final class SchemaMismatchStatusContractTest {
       }
     }
 
-    // Windows: Worker subprocess holds file locks on jobs.db/worker.log that the OS
-    // releases lazily (100–2000ms after process exit). Poll-delete regular files so
-    // JUnit @TempDir cleanup only needs to remove empty directories.
+    // Windows: the index half holds file locks on jobs.db (and, before item A11, the Worker
+    // subprocess held one on worker.log) that the OS releases lazily (100-2000ms after close).
+    // Poll-delete regular files so JUnit @TempDir cleanup only needs to remove empty directories.
     if (tmp != null) {
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
       while (System.nanoTime() < deadline) {
@@ -159,7 +161,7 @@ final class SchemaMismatchStatusContractTest {
       }
     }
 
-    workerLogPath = null;
+    engineLogPath = null;
 
     restoreProp("justsearch.data.dir", prevDataDir);
     restoreProp("justsearch.api.port", prevApiPort);
@@ -242,7 +244,7 @@ final class SchemaMismatchStatusContractTest {
       Thread.sleep(pollMs);
     }
 
-    String workerTail = readTailBestEffort(workerLogPath, 12_000);
+    String engineTail = readTailBestEffort(engineLogPath, 12_000);
     fail(
         "Timed out waiting for /api/status readiness after "
             + timeout.toSeconds()
@@ -252,8 +254,8 @@ final class SchemaMismatchStatusContractTest {
             + (lastError == null ? "<none>" : lastError)
             + ", lastBody="
             + (lastBody == null ? "<none>" : lastBody)
-            + "\nWorker log tail:\n"
-            + workerTail);
+            + "\nEngine log tail:\n"
+            + engineTail);
     throw new IllegalStateException("unreachable");
   }
 

@@ -2,7 +2,7 @@
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
   "count": 243,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:d282c68bf759eccfa48d472b5fcd6dfde1fca4be6dbcb00606213985fd1dcde8",
+  "routeDigest": "sha256:2b2e3ec3b79c74a06157b861152c91e1277be9d6d0e1823106d811af8e9ae0df",
   "routes": [
     {
       "method": "GET",
@@ -1273,7 +1273,7 @@
     },
     {
       "method": "GET",
-      "path": "/api/debug/worker-log",
+      "path": "/api/debug/engine-log",
       "cohort": "debug",
       "owningModule": null,
       "requiredCapabilities": [],
@@ -3160,7 +3160,7 @@
     },
     {
       "method": "GET",
-      "path": "/api/diagnostic-channels/head-log/stream",
+      "path": "/api/diagnostic-channels/engine-log/stream",
       "cohort": "resource",
       "owningModule": "ResourceApiModule",
       "requiredCapabilities": [],

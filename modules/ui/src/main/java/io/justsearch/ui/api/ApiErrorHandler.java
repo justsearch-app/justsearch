@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
-import io.justsearch.app.services.worker.KnowledgeClientException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.inference.LlmServerException;

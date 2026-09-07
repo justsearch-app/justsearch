@@ -49,12 +49,15 @@ public final class AotTraining {
     touch("io.opentelemetry.api.GlobalOpenTelemetry");
     touch("io.opentelemetry.sdk.trace.SdkTracerProvider");
 
-    // --- gRPC ---
-    // Item A10 deleted the Head's gRPC client, so ManagedChannelBuilder is no longer loaded and
-    // its touch went with item A13. StatusRuntimeException stays: GplJobCoordinator still
-    // classifies it (app-services/gpl/GplJobCoordinator.java), and app-observability's
-    // InfraHealthGrpcService keeps io.grpc on this classpath.
-    touch("io.grpc.StatusRuntimeException");
+    // --- gRPC: none, because there is none. ---
+    // Item A10 deleted the Head's gRPC client (ManagedChannelBuilder went at item A13) and item
+    // A14 deleted the rest: the three services in indexing.proto, the infra-health service and its
+    // Netty server, the protoc-gen-grpc-java codegen, and every libs.grpc line in every module
+    // build file. io.grpc is not on the Engine's classpath at all, so there is nothing here to
+    // warm -- and the io.grpc.StatusRuntimeException touch that used to sit here would now fail to
+    // resolve. Its stated justification, GplJobCoordinator's classifier, was retargeted onto
+    // KnowledgeClientException in the same item (GplJobCoordinator.java:776-802) because no gRPC
+    // status type could reach it after A6.
 
     // --- Protobuf ---
     touch("com.google.protobuf.GeneratedMessage");

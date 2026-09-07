@@ -33,7 +33,7 @@ MCP server on?" is exactly "which port is the API on?":
 - **Discover the actual port:** the backend writes it as `head.apiPort` in the runtime manifest,
   `<data dir>\runtime\manifest.json` — for the installed desktop app that is
   `%APPDATA%\io.justsearch.shell\runtime\manifest.json`. It also prints
-  `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\headless-backend.log`) and serves
+  `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\engine.log`) and serves
   `GET /api/health` once up. (Gradle dev tasks like `runHeadless`/`devAll` default to `33221`,
   which is why older docs and scripts mention that number — the installed app does not use it.)
 

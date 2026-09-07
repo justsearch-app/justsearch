@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-05.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-07.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -190,8 +190,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.INDEXER_QUEUE_SIZE | permanent | justsearch.indexer.queueSize | JUSTSEARCH_INDEXER_QUEUE_SIZE | justsearch.indexer.queueSize | INDEXER_QUEUE_SIZE | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_COOLDOWN_MS | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_COOLDOWN_MS | justsearch.indexing.foreground_cooldown_ms | INDEXING_FOREGROUND_COOLDOWN_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_DUTY_PCT | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_DUTY_PCT | justsearch.indexing.foreground_duty_pct | INDEXING_FOREGROUND_DUTY_PCT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.INFRA_HEALTH_HOST | permanent | - | JUSTSEARCH_INFRA_HEALTH_HOST | justsearch.infra.health.host | INFRA_HEALTH_HOST | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.INFRA_HEALTH_PORT | permanent | - | JUSTSEARCH_INFRA_HEALTH_PORT | justsearch.infra.health.port | INFRA_HEALTH_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_DIRECTORY_NAMES | permanent | - | JUSTSEARCH_INGESTION_SKIP_DIRECTORY_NAMES | justsearch.ingestion.skip.directory_names | INGESTION_SKIP_DIRECTORY_NAMES | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_EXTENSIONS | permanent | - | JUSTSEARCH_INGESTION_SKIP_EXTENSIONS | justsearch.ingestion.skip.extensions | INGESTION_SKIP_EXTENSIONS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_PATTERNS | permanent | - | JUSTSEARCH_INGESTION_SKIP_PATTERNS | justsearch.ingestion.skip.patterns | INGESTION_SKIP_PATTERNS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -285,7 +283,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.VRAM_THRESHOLD_12GB | permanent | - | JUSTSEARCH_VRAM_THRESHOLD_12GB | justsearch.vram.threshold.12gb | VRAM_THRESHOLD_12GB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.VRAM_THRESHOLD_4GB | permanent | - | JUSTSEARCH_VRAM_THRESHOLD_4GB | justsearch.vram.threshold.4gb | VRAM_THRESHOLD_4GB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.VRAM_THRESHOLD_8GB | permanent | - | JUSTSEARCH_VRAM_THRESHOLD_8GB | justsearch.vram.threshold.8gb | VRAM_THRESHOLD_8GB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.WORKER_CONFIG_SNAPSHOT | permanent | - | JUSTSEARCH_WORKER_CONFIG_SNAPSHOT | justsearch.worker.config_snapshot | WORKER_CONFIG_SNAPSHOT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED | permanent | - | JUSTSEARCH_POLICY_GPU_ACCELERATION_ENABLED | policy.gpu_acceleration_enabled | POLICY_GPU_ACCELERATION_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.RAG_CHUNK_SPLADE_ENABLED | permanent | rag.chunk_splade.enabled | JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED | rag.chunk_splade.enabled | RAG_CHUNK_SPLADE_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.RAG_CHUNK_VECTORS_ENABLED | permanent | rag.chunk_vectors.enabled | JUSTSEARCH_RAG_CHUNK_VECTORS_ENABLED | rag.chunk_vectors.enabled | RAG_CHUNK_VECTORS_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |

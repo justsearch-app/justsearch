@@ -16,7 +16,7 @@ import java.util.Objects;
  *
  * <p>The {@link #defaultSubCategory()} applies when no prefix or override matches; in
  * practice this is a safety net (the empirical scan in §0 found 100% of logger names
- * matched a prefix in the head-log channel's default mapping).
+ * matched a prefix in the engine-log channel's default mapping).
  *
  * <p>Wire shape is a structured record so plugin authors registering their own
  * DiagnosticChannel can declare a selector inline without imperative configuration code.
@@ -52,14 +52,14 @@ public record LoggerNamespaceSelector(
   }
 
   /**
-   * The default head-log channel's selector, codifying the empirical scan results in
+   * The default engine-log channel's selector, codifying the empirical scan results in
    * slice 448 §0 finding 5. Plugin DiagnosticChannels may declare a different mapping.
    *
    * <p>Per phase-1 review C1: defaultSubCategory is LIBRARY_TRACE (privacy-conservative).
    * The empirical scan found 100% prefix-match in one corpus; this default catches the
    * unknown-unknown case where a future logger emerges without a declared prefix.
    */
-  public static LoggerNamespaceSelector defaultHeadLog() {
+  public static LoggerNamespaceSelector defaultEngineLog() {
     return new LoggerNamespaceSelector(
         Map.ofEntries(
             Map.entry("io.justsearch.", SubCategory.CORE_DIAGNOSTIC),

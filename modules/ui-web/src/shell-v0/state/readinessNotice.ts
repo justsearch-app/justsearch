@@ -257,10 +257,23 @@ const CAUSE_ROWS: ReadonlyArray<{
   },
   // Tempdoc 837 S3 — the worker WAS serving and stopped answering. `worker.spawn.failed` told these
   // users their knowledge server "failed to start", which is false: it started fine and then died.
-  // No remedy operation — a supervised restart is already in flight, so there is nothing to click.
+  //
+  // Lane F stage A item A11 made the SECOND sentence of this row load-bearing. This row used to
+  // carry no remedy on the grounds that "a supervised restart is already in flight, so there is
+  // nothing to click" — that supervisor is deleted. A11 removed crash detection, the restart budget
+  // and the cooldown along with the Worker child process (stage A §10.1 lists the loss as
+  // deliberate until stage B restores supervision), so a stopped Engine now STAYS stopped. Leaving
+  // the old wording would have left the user waiting for a recovery that is never coming — the
+  // worst failure mode a readiness notice has, because it reads as reassuring.
+  //
+  // The remedy has to ride in the wording: `NoticeRemedy` can only be an operation id or a surface
+  // navigation, and "restart the application" is neither. `core.restart-worker` still exists but
+  // its handler answers `restart required` (stage A §5), so pointing at it would be a button that
+  // tells you to do the thing it was supposed to do. Open Health stays the fallback remedy.
   {
     code: 'worker.lost',
-    wording: 'The knowledge server stopped responding',
+    wording:
+      'The knowledge server stopped responding and does not restart itself — restart JustSearch to recover it',
     severity: 'error',
   },
   // Tempdoc 837 S3 — the highest-value row in the batch: this cause is DETECTED today (the dying

@@ -53,7 +53,6 @@ dependencies {
   // Runtime-scope: HeadlessApp.main calls BootContractRunner.validateAll() (tempdoc 402 P3),
   // so core-contracts classes must be on the installed-distribution runtime classpath.
   implementation(project(":modules:core-contracts"))
-  implementation("io.grpc:grpc-api:1.79.0")  // Provides io.grpc.Status / StatusRuntimeException APIs
   implementation("org.eclipse.jetty.toolchain:jetty-jakarta-servlet-api:5.0.2")
   implementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
   implementation(libs.jackson.databind)
@@ -77,7 +76,6 @@ dependencies {
 // Must live in a top-level dependencies block (these configurations do not
 // exist inside a JvmTestSuite dependencies {} block).
 dependencies {
-  testImplementation(libs.grpc.stub)
 }
 
 configurations.configureEach {
@@ -102,9 +100,6 @@ testing {
         implementation(libs.archunit.junit5)
         implementation(libs.mockito.core)
         implementation(libs.assertj.core)
-        // Slice 445: integration test for the indexing-jobs SSE substrate uses
-        // an in-process gRPC server (no live worker dep). Scoped to test only.
-        implementation(libs.grpc.inprocess)
         // Tempdoc 911 (885 UL.9): the failed-jobs wire-contract test validates the ACTUAL endpoint
         // body against SSOT/schemas/failed-indexing-jobs-response.v1.json. The record→schema link is
         // pinned in app-api; this pins the other end — that the handler emits what the schema says.

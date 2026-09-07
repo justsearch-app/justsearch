@@ -959,7 +959,7 @@ public final class McpToolSurface {
     } catch (Exception e) {
       // The AGENT-facing message (below) keeps the query — the agent sent it. This SERVER log does
       // not: a rejected LUCENE-syntax search surfaces a Lucene ParseException whose message quotes
-      // the query verbatim, and the Head log is bundled into the diagnostics export. Full detail
+      // the query verbatim, and the Engine log is bundled into the diagnostics export. Full detail
       // stays available at TRACE, matching SearchExecutor:160-168's deliberate split.
       log.warn("MCP search failed: {}: {}", e.getClass().getSimpleName(), withoutQuotedQuery(e.getMessage()));
       log.trace("MCP search failure detail", e);

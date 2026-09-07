@@ -9,7 +9,7 @@ import java.util.Set;
  * {@link Operation}, {@link Resource}, and {@link Prompt}.
  *
  * <p>Per slice 448 + CONFLICT-LEDGER C-012 (path b chosen 2026-05-07): operator-trace
- * surfaces (head-log, worker-log, brain-log, OTel spans, audit log) are structurally
+ * surfaces (engine-log, brain-log, OTel spans, audit log) are structurally
  * different from {@link Resource} along five axes (origin, schema, audience, privacy
  * class, self-observability). Modeling them as a sibling primitive avoids per-Resource
  * compensation across all five axes; see slice 446 §A for the canonical reasoning record.
@@ -31,7 +31,7 @@ import java.util.Set;
  *   <li>{@link #deliveryMode}: V1 ships {@link DeliveryMode#SSE_STREAM} only. Reserved
  *       for substrate amendment.
  *   <li>{@link #selector}: per-channel resolver mapping logger namespace prefixes to
- *       {@link SubCategory}. See {@link LoggerNamespaceSelector#defaultHeadLog()}.
+ *       {@link SubCategory}. See {@link LoggerNamespaceSelector#defaultEngineLog()}.
  *   <li>{@link #endpoint}: where consumers subscribe. For SSE_STREAM channels this is
  *       the SSE URL.
  *   <li>{@link #consumerPermission}: forward-compat slot per phase-1 review C2 — declares

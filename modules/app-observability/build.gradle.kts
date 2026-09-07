@@ -40,8 +40,6 @@ dependencies {
   api(libs.jackson.databind)
 
   // gRPC
-  api(libs.grpc.stub)
-  runtimeOnly(libs.grpc.netty.shaded)
 
 }
 

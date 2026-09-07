@@ -32,13 +32,20 @@ import org.slf4j.LoggerFactory;
  *   <li>{@link #stop} — cancels the gRPC stream + clears listeners.</li>
  * </ul>
  *
- * <p>Reconnect handling: if the worker stream errors (worker restarted, network
- * blip), the bridge re-issues the subscribe call; the new stream begins with a
- * fresh snapshot which replaces {@link #latestSnapshot} and emits a
- * {@link Delta.SnapshotReplaced} event so listeners can rebuild their keyed
- * state. Reconnect is currently bounded by the gRPC channel's keepalive +
- * retry policy at the {@code KnowledgeClient} layer; this class does not
- * own its own backoff schedule for V1.
+ * <p>Reconnect handling: if the flow fails, the bridge re-issues the subscribe call on a bounded
+ * backoff; the new stream begins with a fresh snapshot which replaces {@link #latestSnapshot} and
+ * emits a {@link Delta.SnapshotReplaced} event so listeners can rebuild their keyed state.
+ *
+ * <p><b>This paragraph used to describe behaviour the class did not have</b> (lane F review,
+ * blocker 2). The error path logged "will rely on caller-driven reconnect" and returned; the
+ * backoff was deferred to a "Phase 4" and the reconnect to "higher layers". Two later changes made
+ * that lethal. There is exactly ONE caller of {@link #start} — {@code HeadAssembly}, once at boot —
+ * so no higher layer ever re-called it. And review item B4 gave the indexing-jobs flow a FAIL_FAST
+ * policy, because its producer runs inside the SQLite commit hook holding the job-queue write lock:
+ * a consumer that stops draining now FAILS the flow rather than blocking it, and closing the flow
+ * cancels the worker's change-feed subscription. So one wedged SSE consumer took the indexing-jobs
+ * feed down process-wide, for every client, until restart. The bounded reconnect is what makes
+ * FAIL_FAST a degradation instead of an outage.
  *
  * <p>Per slice 445 lean scope (verification commit {@code 044b21ab3}): concrete
  * to {@link IndexingJobView}; not parameterized. A second TABULAR Resource
@@ -90,6 +97,34 @@ public final class RemoteIndexingJobsBridge {
       new AtomicReference<>(new CachedSnapshot(0L, List.of()));
   private final AtomicBoolean started = new AtomicBoolean(false);
   private volatile boolean stopped = false;
+
+  /**
+   * Re-subscribe backoff. The first retry is immediate-ish and they lengthen to
+   * {@value #RECONNECT_MAX_DELAY_MS}; {@value #RECONNECT_MAX_PER_MINUTE} attempts per rolling
+   * minute is the cap. The cap exists because the failure this recovers from can be permanent — a
+   * consumer that never drains fails the flow again the moment it is re-created — and an
+   * unbounded retry against a permanently-failing producer is a busy loop that also re-issues a
+   * full snapshot each time.
+   */
+  static final long RECONNECT_BASE_DELAY_MS = 250L;
+
+  static final long RECONNECT_MAX_DELAY_MS = 30_000L;
+
+  static final int RECONNECT_MAX_PER_MINUTE = 6;
+
+  private final java.util.concurrent.ScheduledExecutorService reconnects =
+      java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+          r -> {
+            Thread t = new Thread(r, "indexing-jobs-bridge-reconnect");
+            t.setDaemon(true);
+            return t;
+          });
+
+  private final java.util.concurrent.atomic.AtomicInteger consecutiveFailures =
+      new java.util.concurrent.atomic.AtomicInteger();
+
+  /** Attempt timestamps within the current rolling minute, for the cap. */
+  private final java.util.Deque<Long> recentAttempts = new java.util.concurrent.ConcurrentLinkedDeque<>();
 
   /**
    * Constructs the bridge against a supplier of the knowledge client.
@@ -169,6 +204,7 @@ public final class RemoteIndexingJobsBridge {
    */
   public void stop() {
     stopped = true;
+    reconnects.shutdownNow();
     listeners.clear();
     KnowledgeClient.IndexingJobsStream open = stream;
     stream = null;
@@ -178,6 +214,74 @@ public final class RemoteIndexingJobsBridge {
       } catch (RuntimeException e) {
         log.warn("RemoteIndexingJobsBridge: closing the indexing-jobs flow failed", e);
       }
+    }
+  }
+
+  /**
+   * Re-opens the flow after a failure, on a bounded backoff.
+   *
+   * <p>Resetting {@link #started} is the load-bearing line: {@link #start} is a
+   * compare-and-set on it, so without the reset a re-subscribe would take the
+   * "already started" branch and complete immediately without opening anything —
+   * a reconnect that reports success and reconnects nothing.
+   *
+   * <p>The re-subscribe issues a FRESH SNAPSHOT by construction: the worker's
+   * {@code subscribeIndexingJobs} always emits a snapshot frame first, and the frame handler
+   * publishes {@link Delta.SnapshotReplaced} for it, so listeners rebuild their keyed state rather
+   * than carrying rows from the dead stream. That is why a dropped delta cannot leave a permanently
+   * wrong cache here, which is the property the flow's never-drop policy exists to protect.
+   */
+  private void scheduleResubscribe(Throwable cause) {
+    long now = System.currentTimeMillis();
+    recentAttempts.addLast(now);
+    while (!recentAttempts.isEmpty() && now - recentAttempts.peekFirst() > 60_000L) {
+      recentAttempts.pollFirst();
+    }
+    int attemptsThisMinute = recentAttempts.size();
+    int failures = consecutiveFailures.incrementAndGet();
+
+    if (attemptsThisMinute > RECONNECT_MAX_PER_MINUTE) {
+      log.warn(
+          "RemoteIndexingJobsBridge: indexing-jobs flow failed {} times in the last minute"
+              + " (cap {}); giving up until something calls start() again. The Library surface will"
+              + " stop receiving job updates.",
+          attemptsThisMinute,
+          RECONNECT_MAX_PER_MINUTE,
+          cause);
+      started.set(false);
+      return;
+    }
+
+    long delay = Math.min(RECONNECT_MAX_DELAY_MS, RECONNECT_BASE_DELAY_MS * (1L << Math.min(failures - 1, 16)));
+    log.warn(
+        "RemoteIndexingJobsBridge: indexing-jobs flow failed (attempt {} this minute); re-subscribing"
+            + " in {}ms. A fresh snapshot will replace the listeners' state.",
+        attemptsThisMinute,
+        delay,
+        cause);
+
+    KnowledgeClient.IndexingJobsStream dead = stream;
+    stream = null;
+    if (dead != null) {
+      try {
+        dead.close();
+      } catch (RuntimeException e) {
+        log.debug("RemoteIndexingJobsBridge: closing the failed flow threw", e);
+      }
+    }
+    // The reset that makes start() actually re-open. See this method's javadoc.
+    started.set(false);
+
+    try {
+      reconnects.schedule(
+          () -> {
+            if (stopped) return;
+            start();
+          },
+          delay,
+          java.util.concurrent.TimeUnit.MILLISECONDS);
+    } catch (java.util.concurrent.RejectedExecutionException shuttingDown) {
+      log.debug("RemoteIndexingJobsBridge: reconnect scheduler is shut down; not re-subscribing");
     }
   }
 
@@ -259,13 +363,10 @@ public final class RemoteIndexingJobsBridge {
     Consumer<Throwable> onError =
         t -> {
           if (stopped) return;
-          log.warn("RemoteIndexingJobsBridge stream error; will rely on caller-driven reconnect", t);
           if (!snapshotDelivered.isDone()) {
             snapshotDelivered.completeExceptionally(t);
           }
-          // V1 lean scope: do not auto-reconnect from the bridge. Higher layers
-          // (the client on reconnect, controller subscribe-on-demand) re-call start().
-          // The bounded reconnect schedule is a Phase 4 concern.
+          scheduleResubscribe(t);
         };
 
     stream =

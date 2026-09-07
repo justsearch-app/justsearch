@@ -7,7 +7,7 @@ description: "Formatting logic, JobQueue, and Tika usage."
 
 # Knowledge Server
 
-The **Knowledge Server** (`modules/indexer-worker`) is the heavy-lifting "Body" of JustSearch. It runs as a headless Java process, spawned and managed by the Main Process.
+The **Knowledge Server** (`modules/indexer-worker`) is the heavy-lifting "Body" of JustSearch. It is composed in-process by the merged Engine JVM (lane F stage A) — there is no separate Worker process, so nothing spawns or manages it as a child.
 
 Their primary responsibility is to convert a chaotic filesystem into a structured Lucene index.
 
@@ -82,7 +82,7 @@ Which terminal state a job reaches is decided by its **failure class**, not by i
 
 ### Ingest guardrails (backpressure)
 
-The gRPC ingest surface enforces caps before the queue even sees data:
+The ingest port surface (`IngestServiceCalls`) enforces caps before the queue even sees data:
 
 *   `submitBatch` rejects batches larger than **10,000** paths (`MAX_BATCH_SIZE`).
 *   `submitBatch` rejects submissions when `queueDepth >= 100,000` (`MAX_QUEUE_DEPTH`) with `RESOURCE_EXHAUSTED`. Callers should retry later.
@@ -214,8 +214,8 @@ and compare to the event's `pathHash` field. **There is no reverse lookup *in an
 The local UI's "show filename" affordance in the Library Indexing Activity panel needs to answer "which file is this hash?" for files still under a watched root. ADR-0028 refines the contract to permit exactly that — and only that — via a single, deliberately-narrow surface:
 
 - **One backing table.** `path_resolution(path_hash, normalized_path, last_seen_at, removed_at)` lives in `jobs.db` alongside the ingestion ledger. It is populated on every successful or partial admission via the `IndexingLoop.pathResolutionStore` recorder seam.
-- **One gRPC RPC.** `LookupPathByHash(pathHash) → Optional<Path>` returns the resolution if the file is still under a watched root and within retention; returns `found=false` otherwise (path was removed and retention expired, root was unwatched, or hash was never seen).
-- **One HTTP endpoint.** `POST /api/library/resolve-hash` is the only HTTP caller of the resolver RPC. The diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, and any future `/api/diagnostics/export`) **must not** call it.
+- **One port call.** `lookupPathByHash(pathHash) → Optional<Path>` returns the resolution if the file is still under a watched root and within retention; returns `found=false` otherwise (path was removed and retention expired, root was unwatched, or hash was never seen).
+- **One HTTP endpoint.** `POST /api/library/resolve-hash` is the only HTTP caller of the resolver port call. The diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, and any future `/api/diagnostics/export`) **must not** call it.
 - **Mechanical enforcement.** The ArchUnit pin `LibraryResolveHashOnlyCallerPin` (in `modules/app-launcher`) asserts that no class in the diagnostic export call tree depends on `PathResolutionStore`. Adding a new caller requires adding it to the pin's `APPROVED_CALLERS` set with a written reason — the pin's job is to make every expansion a deliberate, reviewed action.
 - **Lifecycle.** Observed file deletions mark `removed_at = now`; rows are pruned after `JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS` (default 90). Unwatching a watched root prunes everything under that prefix immediately. Existing ledger entries from before V7 migration return `found=false` until they are re-resolved by a future scan.
 
@@ -227,7 +227,7 @@ During schema migration cutover (`SWITCHING` state), the Worker durably buffers 
 
 This is the core correctness mechanism that prevents lost updates during blue/green pointer swaps.
 
-**Fail-closed semantics:** Buffering is part of the write path. If `putSwitchBuffer()` fails (SQL error), gRPC handlers return `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. Switch buffer SQL operations are implemented in `SqliteQueueSwitchBufferOps`.
+**Fail-closed semantics:** Buffering is part of the write path. If `putSwitchBuffer()` fails (SQL error), the ingest port calls fail with `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. Switch buffer SQL operations are implemented in `SqliteQueueSwitchBufferOps`.
 
 ## Index generations & schema migration (Blue/Green)
 
@@ -238,7 +238,7 @@ JustSearch uses a generation-scoped index layout and a migration state machine s
   - `searchRuntime` serves queries (Blue during migration; read-only for rollback safety)
   - `ingestRuntime` performs all writes (Green during migration; Active when not migrating)
 - **Schema mismatch policy**: when the active generation’s schema is incompatible, behavior is driven by `index.schema_mismatch.policy` (see `docs/explanation/04-storage-engine.md`).
-- **Operator controls**: migration start/cutover/rollback/pause/resume are exposed via gRPC and surfaced via REST (see `docs/explanation/07-ui-host-architecture.md`).
+- **Operator controls**: migration start/cutover/rollback/pause/resume are exposed on the ingest port and surfaced via REST (see `docs/explanation/07-ui-host-architecture.md`).
 
 Stable migration architecture is described in `docs/explanation/11-index-schema-migration.md`.
 
@@ -342,6 +342,6 @@ Chunk regeneration is centralized in `ChunkDocumentWriter` so index-time chunkin
 
 ## Search and Retrieval
 
-The Worker handles both interactive search and RAG retrieval via the gRPC `SearchService`. The search pipeline includes BM25, dense vector (KNN), and SPLADE retrieval legs with multi-stage fusion and reranking.
+The Worker handles both interactive search and RAG retrieval behind the `SearchServiceCalls` port. The search pipeline includes BM25, dense vector (KNN), and SPLADE retrieval legs with multi-stage fusion and reranking.
 
 For the full query pipeline (fusion algorithms, reranking cascade, degradation signals), see `docs/explanation/23-search-pipeline-overview.md`.

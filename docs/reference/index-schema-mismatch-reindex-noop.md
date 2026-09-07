@@ -38,7 +38,7 @@ In the browser UI (and via `POST /api/indexing/reindex`), a reindex can appear t
 
 The reindex request *does* enqueue jobs. The worker then attempts to index the files but fails each job at write time because the **on-disk Lucene index was created with an older field schema** and is no longer compatible with the current code’s field mapping.
 
-The “tell” is in the worker log (dev: `modules/ui-web/.dev-data/logs/worker.log`, desktop: `%LOCALAPPDATA%/JustSearch/logs/worker.log`):
+The “tell” is in the Engine log — since lane F stage A there is no separate `worker.log`; the index half logs into the one Engine log (dev: `modules/ui-web/.dev-data/logs/engine.log`, desktop: `%LOCALAPPDATA%/JustSearch/logs/engine.log`):
 
 - Example failure:
   - `IllegalArgumentException: cannot change field "mime" from index options=NONE to inconsistent index options=DOCS`

@@ -138,7 +138,7 @@ See `scripts/models/bake_presparse_fp16.py` for the low-level bake script and
 | Process | **Worker** (migrated from Head in tempdoc 360) |
 | GPU default | `true` (mem=2048MB, seq=512) |
 | Latency | ~175ms for 20 docs on GPU (12x faster than previous INT8 CPU model at 2400ms) |
-| Status | **Active** — Worker-side via `Rerank` gRPC RPC (tempdocs 205, 248, 317, 360, 343) |
+| Status | **Active** — index-half side via the `rerank` port call (tempdocs 205, 248, 317, 360, 343) |
 
 The checked-in `build-crossencoder.py` command is not a builder for this current package: it emits
 one pre-built INT8 CPU variant, while the registry requires FP32 CPU and FP16 CUDA variants. A new

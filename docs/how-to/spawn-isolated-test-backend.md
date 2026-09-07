@@ -52,9 +52,10 @@ For now, the two flags are functionally identical for the Head process.
 
 ## What lite mode does NOT skip
 
-- **Worker initialization.** The Worker subprocess still spawns and
-  loads embedding/SPLADE models. For ingestion-only tests this is
-  acceptable (~3-5s additional startup).
+- **Worker initialization.** The index half (composed in-process by
+  `EngineRoot` since lane F stage A — there is no separate Worker
+  subprocess) still loads embedding/SPLADE models. For ingestion-only
+  tests this is acceptable (~3-5s additional startup).
 - **Lucene index opening.** Required for indexing endpoints to work.
 - **Diagnostic endpoints.** Privacy-safe ledger reads and the scoped
   resolver (ADR-0028) are always available.
@@ -104,19 +105,21 @@ tests can place corpora under it so the same cleanup tear-down nukes
 them in one shot.
 
 `start()` blocks until `components.worker.state=READY` in
-`/api/health`. Plain `200` means Javalin bound but the worker subprocess
-may still be connecting; the fixture's stricter gate avoids that race.
+`/api/health`. Plain `200` means Javalin bound but the index half
+may still be initializing; the fixture's stricter gate avoids that race.
 
 For tests that ingest a corpus and then need to know it landed, prefer
 polling `/api/diagnostics/ingestion/recent` for a `SUCCESS_FULL` event
 with the matching `sourceSizeBytes` over polling
 `/api/knowledge/search`. The first search after backend boot loads the
-embedding ONNX session; the load reliably exceeds the 5 s gRPC search
-deadline and trips `GrpcCircuitBreaker`. The ledger read does not depend
-on the model being warm.
+embedding ONNX session, and that load reliably exceeds the search
+call's deadline (`KnowledgeClient.RpcDeadlineCategory`) — lane F stage A
+deleted the gRPC channel and its circuit breaker (`GrpcCircuitBreaker`
+no longer exists), but a slow first call still fails the call. The
+ledger read does not depend on the model being warm.
 
 Pass `-DisolatedBackend.preserveLogs=true` to keep `backend.log` and the
-worker's `app.log` / `worker.log` plus any crash reports under
+`app.log` / `engine.log` plus any crash reports under
 `%TEMP%/isolated-backend-*` after the fixture stops; without the flag,
 logs are dumped to stderr only on startup failure.
 

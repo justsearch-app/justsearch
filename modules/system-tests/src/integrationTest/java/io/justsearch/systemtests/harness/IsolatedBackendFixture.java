@@ -119,6 +119,16 @@ public final class IsolatedBackendFixture {
    */
   private final Map<String, String> extraSystemProperties = new LinkedHashMap<>();
 
+  /**
+   * Extra environment variables for the spawned Head (lane F stage A item A12 closure). A system
+   * property would do for most settings, but not for
+   * {@code JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND}: its value is a quoted argv
+   * ({@code "…\java.exe" "@…\args.txt"}), and putting embedded double quotes through a Windows
+   * {@code -Dkey=value} command-line argument is exactly the quoting hazard the argfile exists to
+   * avoid. The environment block has no such rule, so it is the honest channel.
+   */
+  private final Map<String, String> extraEnv = new LinkedHashMap<>();
+
   private Path dataDir;
   private Path runtimeDir;
   private Path backendLog;
@@ -132,6 +142,16 @@ public final class IsolatedBackendFixture {
    */
   public IsolatedBackendFixture withSystemProperty(String key, String value) {
     extraSystemProperties.put(key, value);
+    return this;
+  }
+
+  /**
+   * Adds an environment variable to the spawned Head. Must be called before {@link #start()}.
+   * Applied LAST in {@link #buildEnv}, so a test can deliberately override a fixture default; the
+   * test owns the consequences of doing so.
+   */
+  public IsolatedBackendFixture withEnv(String key, String value) {
+    extraEnv.put(key, value);
     return this;
   }
 
@@ -213,6 +233,38 @@ public final class IsolatedBackendFixture {
     return dataDir;
   }
 
+  /**
+   * The spawned Head's PID. Lane F stage A item A12 closure needs it to enumerate the Head's
+   * descendants: the extraction sandbox child is spawned by this process, and its parent-PID gate
+   * is keyed on this number.
+   */
+  public long pid() {
+    if (process == null) {
+      throw new IllegalStateException("pid() called before start()");
+    }
+    return process.pid();
+  }
+
+  /**
+   * Force-kills the backend WITHOUT deleting the tempdir, and blocks until it is gone.
+   *
+   * <p>Separate from {@link #stop()} because a test that asserts on what happens <em>after</em> the
+   * Head dies (orphaned children, files left on disk) has to be able to kill it and then keep
+   * looking. Returns true if the process terminated within the grace period.
+   */
+  public boolean kill() {
+    if (process == null) {
+      return true;
+    }
+    process.destroyForcibly();
+    try {
+      return process.waitFor(STOP_GRACE_MS, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
   /** Force-kills the backend and removes the tempdir. Safe to call even if start() failed. */
   public void stop() {
     if (process != null && process.isAlive()) {
@@ -265,6 +317,7 @@ public final class IsolatedBackendFixture {
     // KnowledgeServerConfig.resolveWorkerLibDir could not find it by relative walk. There is one
     // process now: the child JVM launched below runs the index half off the classpath in
     // writeArgfile(), and both the resolver and the distribution are deleted.
+    env.putAll(extraEnv);
     return env;
   }
 
@@ -496,15 +549,20 @@ public final class IsolatedBackendFixture {
   /**
    * Copies the evidence a boot failure leaves behind into {@link #resolveFailureLogDir()}.
    *
-   * <p>{@code backend.log} is only the child JVM's redirected stdout/stderr — the Head's actual
-   * application log is {@code <dataDir>/logs/headless-backend.log}
-   * ({@code modules/ui/src/main/resources/logback.xml}), and the Worker's is
-   * {@code <dataDir>/logs/worker.log}
-   * ({@code modules/indexer-worker/src/main/resources/logback.xml}). Both roll to
-   * {@code <name>.%d{yyyy-MM-dd}.%i.log.gz} / {@code <name>-%d{yyyy-MM-dd}.%i.log.gz} at 10&nbsp;MB,
-   * so the whole {@code logs/} directory is swept rather than a fixed filename list. The previous
-   * {@code app.log} copy could never fire: that file is written by the app-launcher process, which
-   * this fixture never spawns.
+   * <p>{@code backend.log} is only the child JVM's redirected stdout/stderr — the Engine's actual
+   * application log is {@code <dataDir>/logs/engine.log}
+   * ({@code modules/ui/src/main/resources/logback.xml}), rolling to
+   * {@code engine.%d{yyyy-MM-dd}.%i.log.gz} at 10&nbsp;MB, so the whole {@code logs/} directory is
+   * swept rather than a fixed filename list.
+   *
+   * <p>There is one application log now, not two. This javadoc named {@code headless-backend.log}
+   * for the Head and {@code worker.log} for the Worker; lane F items A13 and A16 deleted the second
+   * process, its {@code logback.xml} and the file itself, then renamed the survivor. Sweeping the
+   * directory rather than a filename list is what kept this method WORKING through all of that —
+   * only its explanation was wrong, which is the failure mode a directory sweep is prone to: the
+   * code keeps collecting the right evidence while the comment describes a layout that no longer
+   * exists. The previous {@code app.log} copy could never fire: that file is written by the
+   * app-launcher process, which this fixture never spawns.
    */
   private void preserveLogOnFailure() {
     logsPreserved = true;

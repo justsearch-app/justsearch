@@ -13,6 +13,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -121,6 +122,7 @@ final class EnergyStatePollerTest {
   }
 
   @Test
+  @Tag("load-sensitive")
   @DisplayName("start() polls immediately, is idempotent, and is restartable after close()")
   void startPollsImmediatelyAndRestarts() throws InterruptedException {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();

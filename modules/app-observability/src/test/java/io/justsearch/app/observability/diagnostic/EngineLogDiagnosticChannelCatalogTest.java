@@ -15,36 +15,36 @@ import io.justsearch.agent.api.registry.SubCategory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("HeadLogDiagnosticChannelCatalog")
-final class HeadLogDiagnosticChannelCatalogTest {
+@DisplayName("EngineLogDiagnosticChannelCatalog")
+final class EngineLogDiagnosticChannelCatalogTest {
 
   @Test
   @DisplayName("catalog ships exactly one DiagnosticChannel entry")
   void exactlyOneEntry() {
-    DiagnosticChannelCatalog catalog = new HeadLogDiagnosticChannelCatalog();
+    DiagnosticChannelCatalog catalog = new EngineLogDiagnosticChannelCatalog();
     assertEquals(1, catalog.definitions().size());
   }
 
   @Test
   @DisplayName("namespace is core")
   void namespaceIsCore() {
-    assertEquals("core", new HeadLogDiagnosticChannelCatalog().namespace());
+    assertEquals("core", new EngineLogDiagnosticChannelCatalog().namespace());
   }
 
   @Test
-  @DisplayName("entry id is core.head-log; producer + delivery mode V1 declared")
+  @DisplayName("entry id is core.engine-log; producer + delivery mode V1 declared")
   void entryShape() {
-    DiagnosticChannel entry = new HeadLogDiagnosticChannelCatalog().definitions().get(0);
-    assertEquals(new DiagnosticChannelRef("core.head-log"), entry.id());
+    DiagnosticChannel entry = new EngineLogDiagnosticChannelCatalog().definitions().get(0);
+    assertEquals(new DiagnosticChannelRef("core.engine-log"), entry.id());
     assertEquals(ProducerKind.IN_PROCESS_LOGBACK, entry.producer());
     assertEquals(DeliveryMode.SSE_STREAM, entry.deliveryMode());
-    assertEquals("/api/diagnostic-channels/head-log/stream", entry.endpoint());
+    assertEquals("/api/diagnostic-channels/engine-log/stream", entry.endpoint());
   }
 
   @Test
   @DisplayName("dataClasses default set carries USER_PATHS, CONFIG_VALUES, EXCEPTION_BODIES")
   void dataClassesDeclared() {
-    DiagnosticChannel entry = new HeadLogDiagnosticChannelCatalog().definitions().get(0);
+    DiagnosticChannel entry = new EngineLogDiagnosticChannelCatalog().definitions().get(0);
     assertTrue(entry.dataClasses().contains(DataClass.USER_PATHS));
     assertTrue(entry.dataClasses().contains(DataClass.CONFIG_VALUES));
     assertTrue(entry.dataClasses().contains(DataClass.EXCEPTION_BODIES));
@@ -53,7 +53,7 @@ final class HeadLogDiagnosticChannelCatalogTest {
   @Test
   @DisplayName("selector resolves io.justsearch.* → CORE_DIAGNOSTIC by prefix")
   void selectorPrefixDispatch() {
-    DiagnosticChannel entry = new HeadLogDiagnosticChannelCatalog().definitions().get(0);
+    DiagnosticChannel entry = new EngineLogDiagnosticChannelCatalog().definitions().get(0);
     assertSame(
         SubCategory.CORE_DIAGNOSTIC,
         entry.selector().resolve("io.justsearch.indexerworker.IndexerWorker"));
@@ -70,7 +70,7 @@ final class HeadLogDiagnosticChannelCatalogTest {
   @Test
   @DisplayName("phase-1 review C1: unmapped logger resolves to LIBRARY_TRACE (off-by-default)")
   void unmappedLoggerDefaultsToLibraryTrace() {
-    DiagnosticChannel entry = new HeadLogDiagnosticChannelCatalog().definitions().get(0);
+    DiagnosticChannel entry = new EngineLogDiagnosticChannelCatalog().definitions().get(0);
     assertSame(
         SubCategory.LIBRARY_TRACE,
         entry.selector().resolve("com.unknown.future.SomeLogger"),
@@ -79,32 +79,32 @@ final class HeadLogDiagnosticChannelCatalogTest {
   }
 
   @Test
-  @DisplayName("phase-1 review C2: head-log declares OPERATOR_OVERRIDE consumer permission")
+  @DisplayName("phase-1 review C2: engine-log declares OPERATOR_OVERRIDE consumer permission")
   void consumerPermissionOperatorOverride() {
-    DiagnosticChannel entry = new HeadLogDiagnosticChannelCatalog().definitions().get(0);
+    DiagnosticChannel entry = new EngineLogDiagnosticChannelCatalog().definitions().get(0);
     assertSame(
         ConsumerPermission.OPERATOR_OVERRIDE,
         entry.consumerPermission(),
-        "core.head-log emissions are operator-driven; default consumers must opt in");
+        "core.engine-log emissions are operator-driven; default consumers must opt in");
   }
 
   @Test
-  @DisplayName("findById resolves the head-log entry")
+  @DisplayName("findById resolves the engine-log entry")
   void findByIdResolves() {
-    DiagnosticChannelCatalog catalog = new HeadLogDiagnosticChannelCatalog();
+    DiagnosticChannelCatalog catalog = new EngineLogDiagnosticChannelCatalog();
     assertTrue(
-        catalog.findById(new DiagnosticChannelRef("core.head-log")).isPresent(),
+        catalog.findById(new DiagnosticChannelRef("core.engine-log")).isPresent(),
         "Catalog must resolve its own entry by id");
   }
 
   @Test
-  @DisplayName("presentation labels resolve registry-diagnostic.head-log.{label,description}")
+  @DisplayName("presentation labels resolve registry-diagnostic.engine-log.{label,description}")
   void presentationKeysDeclared() {
-    DiagnosticChannel entry = new HeadLogDiagnosticChannelCatalog().definitions().get(0);
+    DiagnosticChannel entry = new EngineLogDiagnosticChannelCatalog().definitions().get(0);
     assertEquals(
-        "registry-diagnostic.head-log.label", entry.presentation().labelKey().value());
+        "registry-diagnostic.engine-log.label", entry.presentation().labelKey().value());
     assertEquals(
-        "registry-diagnostic.head-log.description",
+        "registry-diagnostic.engine-log.description",
         entry.presentation().descriptionKey().value());
   }
 }

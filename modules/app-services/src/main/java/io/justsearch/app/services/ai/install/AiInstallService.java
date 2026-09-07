@@ -1836,9 +1836,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // No sysprop write here (883 §C.5c residue, #605 review S1). The save above plus the rebuild
     // below already deliver this path at ordinal 300 (settings.json) through
     // ConfigStoreRebuilder.contributeUiSettings, and every reader takes it from ResolvedConfig —
-    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH was not in
-    // WorkerSpawner.WORKER_FORWARDED_PROPS, so no process boundary depended on the sysprop even
-    // before lane F stage A item A11 deleted that spawner and the boundary with it.
+    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH was not in the spawner's
+    // forwarded-property set, so no process boundary depended on the sysprop even before lane F
+    // stage A item A11 deleted that spawner and the boundary with it.
     // Writing it as well put a GUI/installer value at ordinal 500, which is the precedence lie
     // tempdoc 842 (S2) then needed a companion `.source` marker to un-tell: with the write gone the
     // marker has nothing to correct, and the installer's path classifies as STORED_SETTINGS —
@@ -1910,12 +1910,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       // A the route was longer and the reason was the same — the Worker was respawned right after
       // this step (ConfigurationStage's restart gate) and WorkerSpawner forwarded the five keys as
       // `-D` args. Item A11 deleted the respawn and the forwarding; the read is now direct, so this
-      // write matters more, not less. The ordinal-450 worker snapshot cannot carry them instead, because
-      // ResolvedConfig.toWorkerSnapshot is called exactly once, at boot (HeadlessApp.resolveConfig),
-      // so the file on disk predates this install and knows nothing about the models it just
-      // landed. Deleting this line would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker
-      // silently disabled after Install AI because the Worker saw modelPath=null. The real fix is
-      // to make the snapshot re-writable at runtime, which is a separate change; until then this is
+      // write matters more, not less. (Item A19 has since deleted the ordinal-450 worker snapshot
+      // that used to be the alternative here. It was never a usable one: it was written exactly
+      // once, at boot, so the file always predated an install and knew nothing about the models it
+      // had just landed. The "real fix" this comment used to name — making the snapshot re-writable
+      // at runtime — is not needed and will not happen; there is one ResolvedConfig now.) Deleting
+      // this line would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker silently disabled
+      // after Install AI because the index half saw modelPath=null. Until the five keys are read
+      // from ResolvedConfig rather than from sysprops, this is
       // a knowingly-kept ordinal-500 write, not a forgotten one.
       SystemPropertyUtils.setSysPropIfBlank(feature.sysProp(), absolute);
       dirty = true;

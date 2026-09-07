@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-package io.justsearch.systemtests.chaos;
+package io.justsearch.indexerworker.fixtures;
 
 import io.justsearch.indexerworker.extract.ExtractionArtifact;
 import io.justsearch.indexerworker.extract.ExtractionSandboxChild;
@@ -45,6 +45,19 @@ import tools.jackson.databind.json.JsonMapper;
  * ({@link ExtractionSandboxChild#startParentWatchdog}) and the response records. The frame codec is
  * re-implemented here on purpose — an independent implementation of the wire format is stronger
  * evidence that the format is real than reusing the same codec on both ends would be.
+ *
+ * <p><b>Why it lives in worker-services' test fixtures</b> (lane F stage A item A12 closure): it
+ * substitutes a parser inside {@code PersistentExtractionSandbox}, which is worker-services' own
+ * code, and it now has two consumers in two different modules — the in-process containment test
+ * ({@code io.justsearch.app.engine.EngineExtractionSandboxChaosTest}, {@code @Tag("stress")}) and
+ * the orphan-reaping test ({@code io.justsearch.systemtests.chaos.ExtractionSandboxOrphanE2ETest},
+ * which needs a killable parent and so keeps a spawned Head). A published test-fixtures artifact is
+ * the only home both can reach; its previous home was {@code system-tests}' {@code systemTest}
+ * source set, which neither could.
+ *
+ * <p>Both consumers point {@code JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND} at
+ * {@code java @argfile <thisClass>} using their own JVM's {@code java.class.path}, so this class has
+ * to be on the <em>runtime</em> classpath of whichever JVM spawns the sandbox.
  */
 public final class ChaosExtractionSandboxChild {
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();

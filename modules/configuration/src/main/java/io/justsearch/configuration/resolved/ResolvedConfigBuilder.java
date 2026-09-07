@@ -55,8 +55,6 @@ public final class ResolvedConfigBuilder {
   /** {@code -D} JVM argument — operator override, always wins. */
   public static final int ORDINAL_JVM_ARG = 500;
 
-  /** Worker config snapshot — Head→Worker propagation. */
-  public static final int ORDINAL_WORKER_SNAPSHOT = 450;
 
   /** Environment variable — scripting/CI override (12-factor). */
   public static final int ORDINAL_ENV_VAR = 400;
@@ -107,59 +105,11 @@ public final class ResolvedConfigBuilder {
    */
   public static final int ENGINE_DEFAULT_MAX_TOKENS = 1024;
 
-  // ==================== Static Factories ====================
-
-  /**
-   * Builds a worker-side {@link ResolvedConfig} from the Head→Worker config snapshot sysprop.
-   *
-   * <p>Reads the {@code justsearch.worker.config_snapshot} system property. If set, loads the
-   * snapshot at ordinal 450 and contributes EnvRegistry entries. Returns null if the sysprop is
-   * not set or blank.
-   *
-   * <p>This method centralizes the sysprop read in {@code modules/configuration}, keeping
-   * {@code modules/indexer-worker} free of direct {@code System.getProperty} calls.
-   *
-   * @return a resolved config from the worker snapshot, or null if no snapshot path is configured
-   */
-  public static ResolvedConfig loadWorkerSnapshotFromSysprop() {
-    return loadWorkerSnapshotFromSysprop(Map.of());
-  }
-
-  /**
-   * Builds a worker-side {@link ResolvedConfig} with optional auto-detected values.
-   *
-   * @param autoDetected auto-detected hardware values (ordinal 150), or empty map to skip
-   * @return a resolved config from the worker snapshot, or null if no snapshot path is configured
-   */
-  public static ResolvedConfig loadWorkerSnapshotFromSysprop(Map<String, String> autoDetected) {
-    String snapshotProp = System.getProperty("justsearch.worker.config_snapshot"); // SYS-PROP-LEGACY-COMPAT
-    if (snapshotProp == null || snapshotProp.isBlank()) return null;
-    ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-    builder.contributeAutoDetected(autoDetected);  // 347: ordinal 150
-    builder.contributeWorkerSnapshot(Path.of(snapshotProp));  // ordinal 450 (wins over 150)
-    builder.contributeEnvRegistry();
-    LOG.info("Worker config snapshot loaded from {}", snapshotProp);
-    return builder.build();
-  }
-
-  /**
-   * Loads the raw Head→Worker config snapshot as a flat key→value map.
-   *
-   * <p>Reads the {@code justsearch.worker.config_snapshot} system property. If set, loads the
-   * JSON snapshot file and returns its contents. Returns an empty map if the sysprop is unset,
-   * blank, or the file cannot be read.
-   *
-   * <p>This is used for startup validation (item 4 of tempdoc 331) to compare the raw snapshot
-   * values against the Worker's fully resolved {@link ResolvedConfig}, detecting any divergence
-   * caused by JVM arg overrides at ordinal 500.
-   *
-   * @return raw snapshot key-value map, or empty map if no snapshot is available
-   */
-  public static Map<String, String> loadRawWorkerSnapshotFromSysprop() {
-    String snapshotProp = System.getProperty("justsearch.worker.config_snapshot"); // SYS-PROP-LEGACY-COMPAT
-    if (snapshotProp == null || snapshotProp.isBlank()) return Map.of();
-    return ResolvedConfig.loadWorkerSnapshot(Path.of(snapshotProp));
-  }
+  // Lane F item A19 emptied the "Static Factories" section. It held only the worker-snapshot
+  // loaders — loadWorkerSnapshotFromSysprop (twice) and loadRawWorkerSnapshotFromSysprop — which
+  // read `justsearch.worker.config_snapshot` so a second JVM could inherit the Head's resolved
+  // config at ordinal 450. There is no second JVM, so the tier, the ordinal and the sysprop are
+  // gone; the banner goes with them rather than standing over nothing.
 
   // ==================== Internal State ====================
 
@@ -264,30 +214,12 @@ public final class ResolvedConfigBuilder {
   }
 
   /**
-   * Contributes values from a Head→Worker config snapshot at ordinal 450.
-   *
-   * <p>The snapshot is a JSON file written by {@link ResolvedConfig#toWorkerSnapshot(Path)} on the
-   * Head process. The Worker loads it during startup to inherit the Head's resolved configuration
-   * without relying on env var forwarding.
-   *
-   * @param snapshotPath path to the snapshot file (null or nonexistent files are ignored)
-   * @return this builder for chaining
-   */
-  public ResolvedConfigBuilder contributeWorkerSnapshot(Path snapshotPath) {
-    if (snapshotPath == null) return this;
-    Map<String, String> snapshot = ResolvedConfig.loadWorkerSnapshot(snapshotPath);
-    for (Map.Entry<String, String> entry : snapshot.entrySet()) {
-      put(entry.getKey(), ORDINAL_WORKER_SNAPSHOT, "worker_snapshot", snapshotPath.toString(),
-          entry.getValue());
-    }
-    return this;
-  }
-
-  /**
    * Contributes auto-detected hardware values at ordinal 150.
    *
    * <p>Auto-detected values have the lowest explicit-override priority. They are overridden by
-   * YAML (200), settings.json (300), env vars (400), worker snapshots (450), and sysprops (500).
+   * YAML (200), settings.json (300), env vars (400) and sysprops (500). (Lane F item A19 removed
+   * the ordinal-450 worker-snapshot tier: it existed to carry the Head's resolved config across a
+   * process boundary that no longer exists.)
    * This is the intended slot for GPU auto-detection: when CUDA DLLs are found on the filesystem,
    * the caller probes and feeds the result here so the master GPU switch defaults to {@code true}
    * without requiring explicit env var configuration.
@@ -692,8 +624,6 @@ public final class ResolvedConfigBuilder {
         "infra.health.thresholds.translator_handshake_stale_ms");
     putYamlInt("infra.health.thresholds.ann_cache_ready_percent", root,
         "infra.health.thresholds.ann_cache_ready_percent");
-    putYaml(EnvRegistry.INFRA_HEALTH_HOST.sysProp(), root, "infra.health.grpc.host");
-    putYaml(EnvRegistry.INFRA_HEALTH_PORT.sysProp(), root, "infra.health.grpc.port");
   }
 
   // ==================== YAML Read Helpers ====================
@@ -951,7 +881,6 @@ public final class ResolvedConfigBuilder {
     ResolvedConfig.Collections collections = buildCollections();
     ResolvedConfig.WorkerIndexer workerIndexer = buildWorkerIndexer();
     ResolvedConfig.InfraHealth infraHealth = buildInfraHealth();
-    ResolvedConfig.InfraGrpc infraGrpc = buildInfraGrpc();
 
     ResolvedConfig config =
         new ResolvedConfig(
@@ -959,7 +888,7 @@ public final class ResolvedConfigBuilder {
             search, telemetry, policy, ui,
             watcher, ocr, index, rag, hybridSearch, worker,
             collections, workerIndexer,
-            infraHealth, infraGrpc,
+            infraHealth,
             allResolutions);
 
     buildPhaseActive = false;
@@ -1635,13 +1564,6 @@ public final class ResolvedConfigBuilder {
         resolveLong("infra.health.thresholds.translator_handshake_stale_ms", 120_000L),
         Math.max(0, Math.min(100, resolveInt(
             "infra.health.thresholds.ann_cache_ready_percent", 75))));
-  }
-
-  private ResolvedConfig.InfraGrpc buildInfraGrpc() {
-    return new ResolvedConfig.InfraGrpc(
-        resolveString(EnvRegistry.INFRA_HEALTH_HOST.sysProp(), "127.0.0.1"),
-        Math.max(0, Math.min(65535, resolveInt(
-            EnvRegistry.INFRA_HEALTH_PORT.sysProp(), 7443))));
   }
 
   private static List<ResolvedConfig.Index.IndexSortItem> parseIndexSort(String json) {

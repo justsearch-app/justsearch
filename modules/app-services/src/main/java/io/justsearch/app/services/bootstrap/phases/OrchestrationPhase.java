@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import io.grpc.Server;
 
 /**
  * Tempdoc 519 §4 Phase 5 — orchestration. Composes AgentLoopWiring + GplOrchestration +
@@ -57,7 +56,6 @@ public final class OrchestrationPhase {
       io.justsearch.app.api.ModeChangeListener gpuBroadcastListener,
       SubstratePhase.Output substrateOut,
       CapabilityGraph capabilities,
-      Server infraHealthGrpcServer,
       Function<String, String> operationMessageResolver,
       FileOperationLog fileOperationLog,
       AgentRunStore agentRunStore,
@@ -223,7 +221,6 @@ public final class OrchestrationPhase {
             in.substrateOut().metricsOut() == null
                 ? null
                 : in.substrateOut().metricsOut().gpuMemoryUtilizationMetricProducer(),
-            in.infraHealthGrpcServer(),
             in.inferenceManager(),
             in.gpuBroadcastListener(),
             in.runtimeReconciler(),
