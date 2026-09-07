@@ -171,6 +171,29 @@ clean on every `exact` field; the baseline capture is retaken under the pins, an
 lands the capture in `evidence/baseline/` stands as taken (compact profile; the standard model's
 11 GB resident set tripped the dev machine's memory guard), with its stability diff beside it.
 
+**PR 0b outcome and the gating reference (orchestrator, 2026-09-07 evening).** Six paired
+runs on one build (`evidence/baseline/fixture/` after PR 0b lands) took the fixture from 37
+cross-build regressions to a residual of 2 to 5, and established what is and is not
+deterministic in split mode: the chat trajectory is byte-stable once sampling is pinned and its
+retrieved context is identical (both ordinary turns identical in four consecutive pairs); the
+cross-encoder score is bit-stable across index builds (117 identity-matched hits, delta 0.0000);
+the residual is index-time GPU embedding jitter moving fusion candidates at the rerank-window
+boundary, which no budget pin removes (the window was widened to 4K; the per-leg budgets, the
+Jaccard arbitration and the recall-complete splice were pinned; one pin, `rerank.top_k=100`,
+silently dropped the reranker with an ORT arena failure, now refused by the capture-health check).
+CPU encoders would make the vectors bit-stable but measured 38 percent of document embeddings in
+15 minutes at four threads on the 91-document corpus, outside the run budget; the keys stay as a
+documented instrument. **Decided:** 16's "byte-equal for deterministic fields" is instantiated with
+determinism measured, not assumed: each side of the paired diff captures twice on two fresh
+ingests of the corpus (GPU encoders, the pins on); a field that differs within a side's own pair
+is noise on that side and cannot count as a regression across sides; the declared relation applies
+to every field stable within both sides' pairs; a side whose noise pair exceeds a declared
+fraction of noisy fields (0.10) is refused as too noisy to gate; the raw counts are reported
+beside the verdict. No allowed-difference class is added; the three classes and the byte-equal
+rule are unchanged for stable fields. Captures taken before PR 0b are not comparable to captures
+after it (the request breadth and the pins changed) and the split-side baseline capture is
+retaken under PR 0b.
+
 **Decision authority (owner, 2026-09-07).** After PR 0 the owner delegated every remaining
 decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
 and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the
@@ -1752,7 +1775,7 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 | failed-unit default at activation: `index.migration.cutover.max_failed_jobs` moves from -1 (unlimited, today) to 0, or the owner names another value | 7.4, 17.9 | **0**: today's value activates with documents missing and nobody told; with gaps reported and replay cheap, refusing is right and the row above is the escape hatch | D1 |
 | which readiness representation survives as the authority's name (`LifecycleSnapshotV1` or `ReadinessEnvelopeView`) and which becomes its projection | 7.6, 17.9 | **the envelope**, whose ten dimensions are already component-shaped; the lifecycle snapshot becomes its projection | D1 |
 | `UseCompactObjectHeaders` in the Engine's flag set (the Worker carries it today, the Head does not) | 8, 17.9 | gate run, with the collector | E |
-| deterministic capture for the workflow fixture | 16, 0 (PR 0 findings) | **decided 2026-09-07 (orchestrator, owner agreed)**: a retrieval pin (exhaustive dense leg for the capture) and a `sampling` request override (temperature 0 plus seed), both on `main` as PR 0b before stage A merges; both sides captured under them | PR 0b, before the baseline is retaken |
+| deterministic capture for the workflow fixture | 16, 0 | **decided 2026-09-07**: PR 0b lands the chunk-leg stable tie-break (unconditional), an exhaustive-kNN switch, a `sampling` request override with seed, candidate-budget pins and an applied-sampling echo; the gating reference is a same-build noise pair per side (section 0); CPU encoders measured too slow and stay an instrument | PR 0b; the baseline is retaken under it |
 
 ### 17.8 What would re-cut this sequencing
 
