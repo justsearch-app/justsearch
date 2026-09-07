@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   adoptTransitionPromises,
-  isBenignTransitionAbort,
   surfaceTransitionsEnabled,
   startSurfaceTransition,
 } from './viewTransition.js';
@@ -96,14 +95,30 @@ describe('viewTransition rejection adoption (tempdoc 859)', () => {
     await new Promise<void>((r) => setTimeout(r, 0));
   };
 
-  it('classifies the two skip reasons as benign and everything else as not', () => {
-    expect(isBenignTransitionAbort(domError('TimeoutError', 'timeout in DOM update'))).toBe(true);
-    expect(isBenignTransitionAbort(domError('AbortError', 'superseded'))).toBe(true);
-    expect(isBenignTransitionAbort(domError('TypeError', 'x is not a function'))).toBe(false);
-    // A blanket catch would call these benign too; the classifier is what keeps it from becoming one.
-    expect(isBenignTransitionAbort('a string')).toBe(false);
-    expect(isBenignTransitionAbort(null)).toBe(false);
-    expect(isBenignTransitionAbort(undefined)).toBe(false);
+  /** Adopt one rejected face and report whether the app's diagnostic channel heard about it. */
+  const reportsThrough = async (reason: unknown): Promise<boolean> => {
+    const logged = vi.spyOn(appLog, 'error').mockImplementation(() => {});
+    try {
+      adoptTransitionPromises({ ready: rejecting(reason) });
+      await settle();
+      return logged.mock.calls.length > 0;
+    } finally {
+      logged.mockRestore();
+    }
+  };
+
+  it('treats the two skip reasons as benign and everything else as reportable', async () => {
+    // Asserted through the public adopter rather than against the module-private classifier: the
+    // behaviour that matters is silent-vs-reported, and reaching in for the predicate would make
+    // this test the only cross-module consumer of a symbol production does not need (the
+    // export-for-testing shape the `dead-code` gate keeps out).
+    expect(await reportsThrough(domError('TimeoutError', 'timeout in DOM update'))).toBe(false);
+    expect(await reportsThrough(domError('AbortError', 'superseded'))).toBe(false);
+    expect(await reportsThrough(domError('TypeError', 'x is not a function'))).toBe(true);
+    // A blanket `.catch(() => {})` would swallow these too. They are what proves it is not one.
+    expect(await reportsThrough('a string')).toBe(true);
+    expect(await reportsThrough(null)).toBe(true);
+    expect(await reportsThrough(undefined)).toBe(true);
   });
 
   it('an ABORTED transition produces no unhandled rejection and no diagnostic', async () => {

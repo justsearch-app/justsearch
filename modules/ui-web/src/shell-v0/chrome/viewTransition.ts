@@ -40,8 +40,14 @@ interface ViewTransitionHandle {
  */
 const BENIGN_TRANSITION_ABORTS = new Set(['AbortError', 'TimeoutError']);
 
-/** Exported for the regression test: the classifier, not just its effect. */
-export function isBenignTransitionAbort(reason: unknown): boolean {
+/**
+ * Module-private on purpose. It was briefly exported so the regression test could assert the
+ * classifier directly, which made this module's only cross-module consumer of the symbol its own
+ * test — the export-for-testing shape the `dead-code` gate exists to keep out. The test reaches the
+ * same classification through {@link adoptTransitionPromises}, which is the behaviour that actually
+ * matters (silent vs reported), so nothing was lost by narrowing it.
+ */
+function isBenignTransitionAbort(reason: unknown): boolean {
   const name = (reason as { name?: unknown } | null | undefined)?.name;
   return typeof name === 'string' && BENIGN_TRANSITION_ABORTS.has(name);
 }
