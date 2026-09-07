@@ -2081,6 +2081,30 @@ export class UnifiedChatView extends JfElement {
     await this.loadConversation(sessionId, shapeId);
   }
 
+  /**
+   * Tempdoc 577 Goal 3 (§3.13 / A2), widened by tempdoc 859 (live, 2026-08-25) — A LOADED
+   * CONVERSATION LEAVES THE RETRIEVE BASE TIER, whichever door the reader came through.
+   *
+   * <p>The renderer gates the whole thread branch behind `affordance !== 'retrieve'` and renders the
+   * hit-list in its place, while {@link renderResumePrompt} hides itself once `thread` has content.
+   * So a session loaded while the tier is still `retrieve` showed NEITHER: the session id was set and
+   * the activity rail showed the run, and the stage was BLANK — measured on ask and delegate records
+   * alike, with no cue that an escalation was what stood in the way.
+   *
+   * <p>The exit existed, but it lived on `restoreRecentConversation` — the resume card's handler — so
+   * only one of the doors into a conversation had it, and the History dropdown
+   * ({@link onConversationSelect}), the prev/next walk, the branch fork and the last-viewed restore on
+   * mount all walked straight into the blank stage. It belongs to the LOAD, so there is one act
+   * ("show me this conversation") and one place that answers it, and a future entry point cannot
+   * reintroduce the gap by omission.
+   *
+   * <p>It costs the reader nothing: viewing a restored thread needs no model — only sending a new
+   * turn does — and the escalation affordances put the search floor one click away.
+   */
+  private leaveRetrieveTier(): void {
+    if (this.affordance === 'retrieve') this.affordance = 'none';
+  }
+
   private async loadConversation(sessionId: string, shapeId: string): Promise<void> {
     // Slice 516 FIX-T1 — cancel any in-flight stream so its onDone doesn't
     // write into the new conversation's thread. AbortError is caught in
@@ -2108,6 +2132,8 @@ export class UnifiedChatView extends JfElement {
     if (this.historyLocked) {
       this.thread = [];
       this.showResumePrompt = false;
+      // A locked notice is content too, and it renders in the same gated branch the thread does.
+      this.leaveRetrieveTier();
       void loadConversations();
       return;
     }
@@ -2155,6 +2181,10 @@ export class UnifiedChatView extends JfElement {
         ...(m.standaloneQuestion ? { standaloneQuestion: m.standaloneQuestion } : {}),
       };
     });
+    // The load produced something to read, so the stage has to be able to show it (see
+    // `leaveRetrieveTier`). Keyed on the RESULT, not on the act: an empty restore has nothing to
+    // render, and yanking a reader off the search floor for it would be chrome moving on its own.
+    if (this.thread.length > 0) this.leaveRetrieveTier();
     // Slice 515 FIX-8 — capture parent preview for the branch banner.
     this.parentFirstMessagePreview = resumed.parentFirstUserMessage ?? null;
     // Tempdoc 610 Phase B — record this conversation's fork pointers so the
@@ -2194,12 +2224,8 @@ export class UnifiedChatView extends JfElement {
   // the dispatchRunControl seam; the rename keeps the `.resumeSession(` channel pattern unambiguous).
   private restoreRecentConversation(sessionId: string): void {
     this.showResumePrompt = false;
-    // Tempdoc 577 Goal 3 (§3.13 / A2) — leave the retrieve base tier when restoring a past chat, else
-    // the loaded thread renders BEHIND the still-showing hit-list. The restored conversation is a
-    // free-chat thread; viewing it needs no model (only sending a new turn does).
-    if (this.affordance === 'retrieve') {
-      this.affordance = 'none';
-    }
+    // Tempdoc 859 — the retrieve-tier exit used to live HERE, which is why it only ever covered the
+    // resume card. It is `loadConversation`'s job now (one authority, every entry point).
     void this.loadConversation(sessionId, 'core.free-chat');
   }
 
@@ -3599,6 +3625,15 @@ export class UnifiedChatView extends JfElement {
     this.unifiedEvents = res.events;
     this.unifiedLifecycles = res.lifecycles;
     this.hydrateAnswerEvidenceFromRecord(res.events);
+    // Tempdoc 859 review F4 — the SECOND arrival of content, and the one `loadConversation`'s own
+    // gate cannot see. That gate reads `thread`, but `renderResumePrompt` counts `unifiedEvents` as
+    // content too, and this refresh is fired `void` BEFORE the resume awaits, so its events land
+    // after the gate has already run. A record whose content lives only here — a delegate run with
+    // no chat messages of its own — would still have shown the blank stage. Same predicate, second
+    // arrival point: the exit is keyed on there being something to read, wherever it turned up.
+    // Inert on every other caller by construction (`leaveRetrieveTier` returns unless the tier IS
+    // retrieve, and a run dispatch or a stream terminal cannot happen from the retrieve tier).
+    if (this.unifiedEvents.length > 0) this.leaveRetrieveTier();
     this.requestUpdate();
   }
 

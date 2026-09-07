@@ -20,6 +20,10 @@ import { Sv3Composer } from './Sv3Composer.js';
 import { Sv3ContextBar } from './Sv3ContextBar.js';
 import { Sv3Palette } from './Sv3Palette.js';
 import { Sv3Empty } from './Sv3Empty.js';
+// Tempdoc 859 — the contrast assertions below compute ratios with the product's own authority
+// (the same `contrastRatio` conformanceGate and the palette tests use), never by eye.
+import { contrastRatio, type Rgb } from '../../themes/contrast.js';
+import { ReasoningBlock } from '../../components/chat/ReasoningBlock.js';
 import {
   SV3_HEADLINE_EXIT_MS,
   SV3_MORPH_DURATION_MS,
@@ -642,14 +646,17 @@ describe('the composer glass is token-fed material, so dark inverts without a co
     expect(dark).toContain(
       '--composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white))',
     );
+    // Tempdoc 859 — 5% → 35%: the ENGAGED edge's WCAG 1.4.11 floor, pinned as a value here and as a
+    // computed ratio in the contrast block below (this line would happily accept a value that still
+    // failed). The RESTING edge remains open — see the "KNOWN OPEN" case in that block.
     expect(dark).toContain(
-      '--composer-outline: color-mix(in srgb, var(--color-white) 5%, transparent)',
+      '--composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent)',
     );
     // Light casts a tight contact shadow down and catches nothing.
     expect(light).toContain('--composer-shadow: 0 12px 28px -18px rgb(0 0 0 / 40%)');
     expect(light).toContain('--composer-highlight: none');
     expect(light).toContain('--composer-glass-surface: var(--card)');
-    expect(light).toContain('--composer-outline: rgb(0 0 0 / 8%)');
+    expect(light).toContain('--composer-outline: rgb(0 0 0 / 45%)'); // 859 — 8% → 45%, same floor
   });
 
   it('reads focus and validity off the wrapper, so ONE mark shows at a time', () => {
@@ -1352,4 +1359,284 @@ describe('the chat column caps on one token, not three literals', () => {
     // a reader who never chose a preset gets, and what a detached/preview render falls back to.
     expect(tokens).toContain('--measure-prose: 48rem');
   });
+});
+
+/* ── Tempdoc 859 (live audit 2026-08-25/26): the two measured token defects ──────────────────── */
+
+/**
+ * Two findings from the live audits of the shipped window, pinned as MATHS rather than as values so
+ * a later re-tune of the token cannot pass the letter of the fix and fail its point. (Contrast here
+ * came from canvas-resolved colour sampling, not from axe: axe's colour rules cover TEXT, and 1.4.11
+ * is about a non-text boundary.)
+ *
+ * The ratios are computed with the product's own contrast authority (`themes/contrast.ts` —
+ * `contrastRatio`, the same function `conformanceGate` and the palette tests use), never by eye.
+ * `parseColor` deliberately does not implement `oklch()` (its own doc says: resolve those in a
+ * browser and pass the `rgb()`), and happy-dom computes no cascade here, so the two `oklch()` page
+ * bases are pinned at the values the LIVE audit measured on the running window:
+ * dark `--background` = rgb(10,10,10), light `--background` = rgb(252,252,252). The pin is guarded —
+ * the first case re-checks that the sheet still derives those bases from the same primitives, so a
+ * palette change cannot leave this arithmetic quietly describing a window that no longer exists.
+ *
+ * SCOPE, stated up front (review F1, corrected by the measured audit 2026-09-07): the two ratio
+ * cases below assert the TOKEN AT FULL ALPHA, which is a property of the token and NOT a state the
+ * composer paints. `.glass::after` paints three arms — resting (45% of the token), focused (the
+ * border re-points to `--ring`), and invalid (`--destructive`) — and full alpha would need
+ * `--composer-rest: 0` without `:focus-visible`, which the shipped Chromium engine never produces
+ * (a focused textarea always matches `:focus-visible` there, measured). So the only PAINTED state
+ * this token governs is the resting edge, and it is still below the floor: see the KNOWN-OPEN case
+ * at the bottom of this block. 1.4.11 is not closed for this component.
+ */
+describe('859: the composer outline token meets WCAG 1.4.11 at full alpha in both themes', () => {
+  const WCAG_NON_TEXT = 3;
+
+  /** Live-measured sRGB of the two page bases (see the block comment for why they are pinned). */
+  const DARK_PAGE: Rgb = [10, 10, 10];
+  const LIGHT_PAGE: Rgb = [252, 252, 252];
+  const WHITE: Rgb = [255, 255, 255];
+  const BLACK: Rgb = [0, 0, 0];
+
+  /** Source-over compositing of `fg` at `alpha` onto an opaque `bg` — what a 1px translucent border does. */
+  const over = (fg: Rgb, alpha: number, bg: Rgb): Rgb =>
+    [0, 1, 2].map((i) =>
+      Math.round((fg[i] as number) * alpha + (bg[i] as number) * (1 - alpha)),
+    ) as unknown as Rgb;
+
+  /** `color-mix(in srgb, A p%, B)` on two opaque colours. */
+  const mix = (a: Rgb, b: Rgb, pa: number): Rgb =>
+    [0, 1, 2].map((i) =>
+      Math.round((a[i] as number) * pa + (b[i] as number) * (1 - pa)),
+    ) as unknown as Rgb;
+
+  const themeSplit = tokens.indexOf(":host([theme='light'])");
+  const darkBlock = tokens.slice(0, themeSplit);
+  const lightBlock = tokens.slice(themeSplit);
+
+  const alphaOf = (block: string): number => {
+    const m =
+      /--composer-outline: color-mix\(in srgb, var\(--color-white\) (\d+)%/.exec(block) ??
+      /--composer-outline: rgb\(0 0 0 \/ (\d+)%\)/.exec(block);
+    if (m === null) throw new Error('the --composer-outline declaration changed shape');
+    return Number(m[1]) / 100;
+  };
+
+  it('the page bases this arithmetic assumes are still the ones the sheet declares', () => {
+    expect(darkBlock).toContain('--background: var(--color-neutral-950)');
+    expect(tokens).toContain('--color-neutral-950: oklch(14.5% 0 0)');
+    expect(lightBlock).toContain('--background: var(--color-zinc-25)');
+    expect(tokens).toContain('--color-zinc-25: oklch(99.2% 0 0)');
+    // …and the surface the edge is drawn OVER, in each theme.
+    expect(darkBlock).toContain(
+      '--composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white))',
+    );
+    expect(lightBlock).toContain('--composer-glass-surface: var(--card)');
+    expect(lightBlock).toContain('--card: var(--color-white)');
+  });
+
+  it('dark: the token at FULL ALPHA clears 3:1 against BOTH adjacent colours (5% white was 1.21:1)', () => {
+    const glass = mix(DARK_PAGE, WHITE, 0.96); // --composer-glass-surface
+    const edge = over(WHITE, alphaOf(darkBlock), glass);
+    // The OUTSIDE — the failure the audit reported, at 1.21:1.
+    expect(contrastRatio(edge, DARK_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // The INSIDE. A boundary that only cleared the floor on one side would have moved the failure,
+    // not closed it — 1.4.11 is about the adjacent colours, plural.
+    expect(contrastRatio(edge, glass)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // The old value recomputed: it lands on the audit's measured 1.21:1, which is what validates this
+    // arithmetic against the running window rather than against itself.
+    expect(contrastRatio(over(WHITE, 0.05, glass), DARK_PAGE)).toBeCloseTo(1.215, 3);
+  });
+
+  it('light: the token at FULL ALPHA clears 3:1 against both, which 8% black did not either', () => {
+    const card = WHITE; // --composer-glass-surface: var(--card) → --color-white
+    const edge = over(BLACK, alphaOf(lightBlock), card);
+    expect(contrastRatio(edge, LIGHT_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    expect(contrastRatio(edge, card)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // "The light theme's 8% black edge is the stronger half" was true AND still nowhere near 3:1 —
+    // pinned so the audit's wording is never read as "light was fine".
+    expect(contrastRatio(over(BLACK, 0.08, card), LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+  });
+
+  /**
+   * THE KNOWN-OPEN HALF, and the only state this token actually paints (review F1; numbers corrected
+   * by the measured audit 2026-09-07). The two cases above read the raw token, so the suite would
+   * have stayed green over a resting edge nobody can see. The failure is therefore pinned AS a
+   * failure — measured, attributed, and impossible to fix by accident.
+   *
+   * TWO surfaces, named because the first cut conflated them: the resting border composites over the
+   * RESTING glass, not the engaged one. `--composer-rest-surface` mixes the glass 35% back toward the
+   * page while `--composer-rest` is 1, so the backdrop is rgb(14,14,14) dark / rgb(253,253,253)
+   * light, not the rgb(20,20,20) / rgb(255,255,255) the full-alpha cases use. Compositing over the
+   * engaged glass is what produced the earlier 1.71 dark figure.
+   *
+   * The mechanism is `.glass::after`'s `border-color: color-mix(… var(--composer-outline)
+   * calc(100% - 55% * var(--composer-rest)) …)` — tempdoc 864 Layer 1(d)'s RESTING KNOB, which
+   * spends 55% of the token's alpha back while the field does not hold focus. That was an OWNER
+   * DECISION about the resting affordance, not an oversight, so it is not something a token sheet
+   * gets to overturn on its own: 864 chose the surface lift as the de-emphasis precisely because it
+   * "spends no TEXT contrast", and the outline fade it added alongside is the half that does spend
+   * NON-text contrast. Closing it means either dropping the fade from the border (leaving the
+   * de-emphasis entirely on the surface, as 864's own rationale would suggest) or clamping the spend
+   * at the 3:1 floor — both design calls, both owner's.
+   */
+  it('KNOWN OPEN: the RESTING edge — the one painted state — is still below 3:1 (864 knob)', () => {
+    // `--composer-rest: 1` while the field is unfocused: the border keeps 45% of the token alpha…
+    const restSpend = 1 - 0.55;
+    expect(
+      styleTextOf(Sv3Composer).replace(/\s+/g, ' '),
+      'the resting knob moved — re-measure before trusting the numbers below',
+    ).toContain('var(--composer-outline) calc(100% - 55% * var(--composer-rest))');
+    // …and it sits on the RESTING glass, which is mixed 35% back toward the page by the same knob.
+    expect(styleTextOf(Sv3Composer).replace(/\s+/g, ' ')).toContain(
+      'var(--composer-glass-surface) calc(100% - 65% * var(--composer-rest))',
+    );
+
+    const restGlassDark = mix(mix(DARK_PAGE, WHITE, 0.96), DARK_PAGE, 0.35);
+    const restGlassLight = mix(WHITE, LIGHT_PAGE, 0.35);
+    const restingDark = over(WHITE, alphaOf(darkBlock) * restSpend, restGlassDark);
+    const restingLight = over(BLACK, alphaOf(lightBlock) * restSpend, restGlassLight);
+
+    // Against the PAGE — the "can a reader find the box on the screen" question. Live canvas-resolved
+    // measurement reported 1.57 dark / 1.61 light; this arithmetic gives 1.59 / 1.60, the ~0.02 gap
+    // being `--glass-opacity` and the backdrop blur, which this model does not simulate. Both sit far
+    // enough under the floor that the conclusion does not depend on which number you take.
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeCloseTo(1.59, 2);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeCloseTo(1.6, 2);
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+    // Against the RESTING GLASS — the inside half of the same boundary, also short.
+    expect(contrastRatio(restingDark, restGlassDark)).toBeLessThan(WCAG_NON_TEXT);
+    expect(contrastRatio(restingLight, restGlassLight)).toBeLessThan(WCAG_NON_TEXT);
+
+    // The token change was not a no-op on this state: it is the one painted arm it moved.
+    expect(contrastRatio(over(WHITE, 0.05 * restSpend, restGlassDark), DARK_PAGE)).toBeLessThan(1.1);
+    expect(contrastRatio(over(BLACK, 0.08 * restSpend, restGlassLight), LIGHT_PAGE)).toBeLessThan(
+      1.1,
+    );
+  });
+
+  it('the FOCUSED edge is --ring, so this token never governs it (measured audit)', () => {
+    // Why the full-alpha cases above are a token property and not a screen state: the focus arm
+    // re-points the border away from `--composer-outline` entirely, and in the shipped Chromium a
+    // focused textarea always matches `:focus-visible` — so `--composer-rest: 0` (full alpha) and
+    // "not focus-visible" cannot both hold. The focused edge measured 9.69:1 dark / 5.84:1 light,
+    // unchanged by this PR.
+    const composer = styleTextOf(Sv3Composer);
+    const focusRule = /\.glass:has\(textarea:focus-visible\)::after\s*\{([^}]*)\}/.exec(composer);
+    expect(focusRule, 'the focus arm moved — re-check which token paints the focused edge').not.toBeNull();
+    expect(focusRule?.[1]).toContain('border-color: var(--ring)');
+    // …and the knob that would restore full alpha is spent by the plain `:focus` sibling, so the two
+    // conditions are entangled by construction rather than by coincidence.
+    expect(composer).toContain('.glass:has(textarea:focus) {');
+  });
+});
+
+/**
+ * Tempdoc 859 (2026-08-26) — the `jf-reasoning-block` bridge pointed `--text-primary` AND
+ * `--text-secondary` at `--foreground`, so `ReasoningBlock`'s `.disclosure:hover` colour shift
+ * resolved to the value it was already showing: a hover state that changed nothing, in the one
+ * window that renders the model's thinking most.
+ */
+describe('859: the reasoning-block bridge gives the hover somewhere to go', () => {
+  const bridge = (): string => {
+    const m = /jf-reasoning-block\s*\{([^}]*)\}/.exec(styleTextOf(Sv3Main));
+    if (m === null) throw new Error('Sv3Main.styles has no `jf-reasoning-block` bridge');
+    return m[1] as string;
+  };
+
+  const valueOf = (block: string, prop: string): string => {
+    const m = new RegExp(`${prop}:\\s*([^;]+);`).exec(block);
+    if (m === null) throw new Error(`the bridge declares no \`${prop}\``);
+    return (m[1] as string).trim();
+  };
+
+  it('resting and hover rungs resolve to DIFFERENT tokens', () => {
+    const block = bridge();
+    const resting = valueOf(block, '--text-secondary'); // ReasoningBlock `.container`
+    const hover = valueOf(block, '--text-primary'); // ReasoningBlock `.disclosure:hover`
+    expect(resting).not.toBe(hover);
+    // Named, not merely different: the hover takes the window's full ink, and the resting rung takes
+    // its aside grade lifted the smallest step toward that ink — the lift is what keeps the copy
+    // control (which reads the same rung) above AA on the block's doubled wash, measured by the
+    // window's contrast oracle in `Sv3Main.imports.test.ts`. A bridge that made the two differ by
+    // pointing at two EQUAL aliases would satisfy `not.toBe` while still painting one colour, so
+    // both ends are pinned by name and the case below pins that the names are not the same value.
+    expect(resting).toBe('color-mix(in srgb, var(--secondary-label) 90%, var(--foreground))');
+    expect(hover).toBe('var(--foreground)');
+    // …and the resting rung is genuinely DERIVED from the quiet grade, not a second hand-picked one.
+    expect(resting).toContain('var(--secondary-label)');
+  });
+
+  it('reads the rungs the component actually uses, not the ones the bridge used to name', () => {
+    // The bridge's original comment claimed `--text-muted` was ReasoningBlock's resting body. It is
+    // not — the component reads that token nowhere, which is how the two live rungs came to be
+    // aliased together unnoticed. Pinned against the component's own sheet so the mapping cannot
+    // drift back to a name-based guess.
+    // ReasoningBlock's `static styles` is ONE CSSResult, not the array `styleTextOf` walks.
+    const block = (ReasoningBlock.styles as unknown as { cssText: string }).cssText;
+    expect(block, 'the component sheet moved').toContain('.container {');
+    expect(/\.container\s*\{[^}]*color:\s*var\(--text-secondary\)/.test(block)).toBe(true);
+    expect(/\.disclosure:hover\s*\{[^}]*color:\s*var\(--text-primary\)/.test(block)).toBe(true);
+    // …and it reads --text-muted nowhere, which is the claim the old bridge comment got wrong.
+    expect(block.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('--text-muted');
+  });
+
+  it('the two tokens the bridge names really are different values in both themes', () => {
+    // The alias check above is about the bridge; this is about the palette behind it. If a theme ever
+    // pointed --secondary-label at --foreground the hover would be a no-op again with the bridge
+    // still reading correctly, so the sheet is asserted too.
+    const themeSplit = tokens.indexOf(":host([theme='light'])");
+    for (const [name, block] of [
+      ['dark', tokens.slice(0, themeSplit)],
+      ['light', tokens.slice(themeSplit)],
+    ] as const) {
+      const secondary = /--secondary-label: ([^;]+);/.exec(block)?.[1]?.trim();
+      const foreground = /--foreground: ([^;]+);/.exec(block)?.[1]?.trim();
+      expect(secondary, `${name}: --secondary-label`).toBeDefined();
+      expect(foreground, `${name}: --foreground`).toBeDefined();
+      expect(secondary, `${name}: the two rungs collapsed onto one token`).not.toBe(foreground);
+    }
+  });
+});
+
+/* ── Tempdoc 859: the resize grips' WCAG 2.2 2.5.8 floor ─────────────────────────────────────── */
+
+/**
+ * WCAG 2.2 2.5.8 (Target Size, Minimum): `button.sidebar-grip` measured 16 CSS px wide against the
+ * 24 px floor, and the pane grip is the same anatomy on the other edge, deliberately ("one window may
+ * not have two differently-sized grips"), so both carry the floor or the anatomy forks.
+ *
+ * THIS TEST IS THE ENFORCEMENT, and the measured audit (2026-09-07) is why that sentence is here
+ * rather than "axe caught it". The repo's `ui_measure.py` runs axe without the `wcag22aa` tag, so
+ * target-size is never evaluated in the normal run; and adding the tag makes the 16px grip PASS,
+ * because 2.5.8's spacing exception covers an undersized target with enough clear space around it.
+ * Neither of those makes the floor uninteresting — the exception depends on neighbouring layout a
+ * later change can remove without touching this rule — but it does mean no live tool is watching it.
+ * These assertions are.
+ *
+ * Asserted on the declaration rather than on a measured box: happy-dom computes no cascade and no
+ * layout, so a `getBoundingClientRect` here would report 0 for a passing AND a failing grip.
+ */
+describe('859: both resize grips clear the 24px target floor', () => {
+  const ruleBodyOf = (styles: string, selector: string): string => {
+    const m = new RegExp(`${selector}\\s*\\{([^}]*)\\}`).exec(styles);
+    if (m === null) throw new Error(`SearchV3View.styles has no \`${selector}\` rule`);
+    return m[1] as string;
+  };
+
+  for (const grip of ['sidebar-grip', 'pane-grip'] as const) {
+    it(`button.${grip} pins a 24px inline floor without resizing its visible line`, () => {
+      const body = ruleBodyOf(styleTextOf(SearchV3View), `button\\.${grip}`);
+      expect(body).toMatch(/min-inline-size:\s*24px/);
+      // The block axis is already full-height; the target grows in ONE axis only.
+      expect(body).toMatch(/inset-block:\s*0/);
+      // The VISUAL is unchanged: the 16px anatomy stays the declared size, the box paints nothing,
+      // and the 2px line is drawn by `::after` positioned against the box's centre. A "fix" that
+      // widened the drawn line instead would pass a size assertion and change the design.
+      expect(body).toMatch(/inline-size:\s*var\(--space-4\)/);
+      expect(body).toMatch(/background:\s*transparent/);
+      const after = ruleBodyOf(styleTextOf(SearchV3View), `button\\.${grip}::after`);
+      expect(after).toMatch(/inline-size:\s*2px/);
+      expect(after).toMatch(/left:\s*50%/);
+    });
+  }
 });

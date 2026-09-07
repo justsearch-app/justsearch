@@ -31,7 +31,7 @@
  * window's host-scoped token sheet deliberately declares nothing. `sv3-tokens.test.ts` pins each
  * literal against the token of the same name so the two cannot drift apart.
  */
-import { surfaceTransitionsEnabled } from '../../chrome/viewTransition.js';
+import { adoptTransitionPromises, surfaceTransitionsEnabled } from '../../chrome/viewTransition.js';
 
 /** Set on `<html>` for the duration of one morph; every rule in the sheet is gated on it. */
 export const SV3_MORPH_ROOT_ATTR = 'data-sv3-composer-morph';
@@ -163,6 +163,7 @@ export function sv3MorphSheetAdopted(): boolean {
 
 interface ViewTransition {
   readonly finished: Promise<unknown>;
+  readonly ready?: Promise<unknown>;
 }
 interface ViewTransitionDocument {
   startViewTransition?: (cb: () => Promise<void> | void) => ViewTransition;
@@ -194,8 +195,15 @@ export async function runSv3ComposerMorph(
   try {
     let finished: Promise<unknown> | undefined;
     try {
-      finished = (document as ViewTransitionDocument).startViewTransition?.(() => applyOnce())
-        ?.finished;
+      const transition = (document as ViewTransitionDocument).startViewTransition?.(() =>
+        applyOnce(),
+      );
+      // Tempdoc 859 — `finished` is awaited below, but `ready` and `updateCallbackDone` were dropped,
+      // and `ready` is the face the API rejects with `TimeoutError` when the DOM update outruns its
+      // budget. Adopting the whole handle is what keeps a SKIPPED morph out of the unhandled-rejection
+      // channel; the local `await finished?.catch(...)` stays because this function also has to WAIT.
+      adoptTransitionPromises(transition);
+      finished = transition?.finished;
     } catch {
       // A browser that refuses to start one (a transition already running, a hidden document)
       // must not cost the state change; the plain apply below still commits it.

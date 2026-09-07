@@ -35,6 +35,10 @@ import { __resetConversationListForTest } from '../../state/conversationListStor
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { deepActiveElement } from '../../utils/keyboardHandler.js';
+// Tempdoc 859 — the app-global focus ring the composer's local reset has to take the field back FROM,
+// and the base class that carries it into every shadow root.
+import { ambientStyles } from '../../primitives/ambientStyles.js';
+import { JfElement } from '../../primitives/JfElement.js';
 
 type Mounted = SearchV3View & { updateComplete: Promise<unknown> };
 type Updatable = HTMLElement & { updateComplete: Promise<unknown> };
@@ -472,6 +476,98 @@ describe('tempdoc 864 — the focus ring stays the platform’s own', () => {
         ':focus-visible',
       );
     }
+  });
+});
+
+/**
+ * Tempdoc 859 (live audit 2026-08-25) — the composer painted TWO rings on a keyboard focus: the
+ * wrapper's own teal `--ring` frame, and an amber 2px/offset-2px outline on the `<textarea>` itself,
+ * from the app-global `:focus-visible` rule in `primitives/ambientStyles.ts`. That rule is a
+ * CLASS-B ambient facet adopted into every shadow root by `JfElement`, so it reaches inside this
+ * component — and at (0,1,0) it out-specifies the bare-type `textarea { outline: none }` reset. Two
+ * competing outlines is the exact thing `Sv3Composer`'s own contract says it does not do: "the field
+ * itself stays unstyled and every state is read off the wrapper … one ring rather than two".
+ *
+ * The fix (870 item 2) restates the reset ON the pseudo-class — (0,1,1), and later in the cascade —
+ * so it takes the field back HERE without touching the ambient rule, which every other focusable
+ * surface in the app still needs. These cases pin both halves: this composer paints one ring, and
+ * the ambient rule is still there for everything else.
+ *
+ * The measured half is the live audit. happy-dom applies no stylesheets and computes no cascade, so
+ * `getComputedStyle(textarea).outlineStyle` reads the same '' whether the reset is present or
+ * deleted — an assertion on it would pass on the two-ring window too. What IS decidable here is the
+ * rendered structure plus the cascade inputs, so that is what is asserted, on a really-focused field.
+ */
+describe('859: the focused composer paints ONE ring, and the ambient rule survives for everyone else', () => {
+  const specificityOfFocusVisible = (selector: string): [number, number, number] => {
+    // Enough for these two selectors: pseudo-classes count as classes, type selectors as types.
+    const classes = (selector.match(/:[a-z-]+(?:\([^)]*\))?/g) ?? []).length;
+    const types = (selector.match(/(^|\s|>|\+|~)[a-z][a-z0-9-]*/gi) ?? []).length;
+    return [0, classes, types];
+  };
+
+  /** Every non-`none` `outline` this declaration block sets. */
+  const outlinesPaintedBy = (block: string): string[] =>
+    [...block.matchAll(/outline:\s*([^;]+)/g)]
+      .map((m) => (m[1] as string).trim())
+      .filter((value) => value !== 'none');
+
+  it('the ambient ring really is in scope inside the composer (the precondition of the bug)', () => {
+    // Anti-vacuity, and the reason the local reset has to exist at all: `JfElement.finalizeStyles`
+    // prepends the ambient sheet to EVERY component's styles, so the rule is inside this shadow root
+    // and applies to the shadow `<textarea>`. If the composer ever stopped composing that base, the
+    // reset below would become dead code rather than a fix.
+    expect(Sv3Composer.prototype instanceof JfElement).toBe(true);
+    // …and the ambient rule is UNTOUCHED. The composer may not close its own double ring by deleting
+    // the app-global one — every other focusable surface in the app is the reason that rule exists.
+    expect(ambientStyles.cssText.replace(/\s+/g, ' ')).toContain(
+      ':focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }',
+    );
+  });
+
+  it('the composer’s own reset out-specifies the ambient rule AND comes later', () => {
+    const reset = rulesOf(composerSheet()).find(([s]) => s === 'textarea:focus-visible');
+    expect(
+      reset,
+      'the local reset is gone — the field would paint the ambient ring again',
+    ).toBeDefined();
+    expect(reset?.[1]).toContain('outline: none');
+    // Specificity: (0,1,1) beats the ambient (0,1,0)…
+    expect(specificityOfFocusVisible('textarea:focus-visible')).toEqual([0, 1, 1]);
+    expect(specificityOfFocusVisible(':focus-visible')).toEqual([0, 1, 0]);
+    // …and it does NOT rely on order alone: the bare-type reset that lost this fight is still in the
+    // sheet, later than the ambient rule, and it lost anyway — which is the whole reason a
+    // pseudo-class restatement was needed. So the specificity is the load-bearing half.
+    expect(rulesOf(composerSheet()).find(([s]) => s === 'textarea')?.[1]).toContain('outline: none');
+    expect(specificityOfFocusVisible('textarea')).toEqual([0, 0, 1]);
+  });
+
+  it('a really-focused field carries exactly one ring authority, and it is the wrapper’s', async () => {
+    const el = await mount();
+    const composer = await region(el, 'jf-sv3-composer');
+    const field = composer.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement;
+    expect(field, 'the composer rendered no field to focus').not.toBeNull();
+    field.focus();
+    await settle(el);
+    expect(deepActiveElement(), 'the fixture never actually focused the field').toBe(field);
+
+    // ONE ring, on the rendered element that is actually focused: the only rules in this component
+    // that PAINT a focus mark reachable from a focused field are the wrapper's frame; every rule
+    // keyed on the field itself only ever removes an outline. A second painter here is the two-ring
+    // regression, whatever colour it used.
+    const fieldPainters = rulesOf(composerSheet()).filter(
+      ([selector, block]) =>
+        /^textarea(:|\s|$)/.test(selector) && outlinesPaintedBy(block).length > 0,
+    );
+    expect(fieldPainters.map(([selector]) => selector)).toEqual([]);
+    // …and the wrapper still carries one, so this is not "no indication".
+    expect(
+      rulesOf(composerSheet()).filter(
+        ([selector, block]) =>
+          selector.includes(':focus-visible') && /border-color:\s*var\(--ring\)/.test(block),
+      ),
+    ).toHaveLength(1);
+    el.remove();
   });
 });
 
