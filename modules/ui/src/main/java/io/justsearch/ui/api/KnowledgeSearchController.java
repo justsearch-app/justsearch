@@ -5,7 +5,7 @@ import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
+import io.justsearch.app.services.worker.KnowledgeClientException;
 import io.justsearch.app.api.knowledge.FolderBrowseRequest;
 import io.justsearch.app.api.knowledge.FolderBrowseResponse;
 import io.justsearch.app.api.knowledge.FolderFilesRequest;
@@ -471,9 +471,9 @@ public class KnowledgeSearchController {
       }
       ctx.json(out);
 
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
-      if (isInvalidCursor(e)) {
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
+      if (e.isInvalidCursor()) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.CURSOR_INVALID, "Invalid cursor", telemetry, ApiErrorHandler.routeOf(ctx)));
         return;
       }
@@ -564,14 +564,9 @@ public class KnowledgeSearchController {
 
 
 
-  static boolean isInvalidCursor(StatusRuntimeException e) {
-    if (e == null) return false;
-    Status status = e.getStatus();
-    if (status == null || status.getCode() != Status.Code.INVALID_ARGUMENT) return false;
-    String msg = status.getDescription();
-    if (msg == null) msg = e.getMessage();
-    return msg != null && msg.toLowerCase(java.util.Locale.ROOT).contains("cursor");
-  }
+  // Lane F review B1: isInvalidCursor moved onto KnowledgeClientException. It was typed on the
+  // transport's exception, so it became unreachable at item A6 and an expired cursor silently
+  // stopped being the 4xx the pagination contract promises. The predicate is unchanged.
 
   private static List<String> extractStringList(Object raw) {
     if (!(raw instanceof List<?> list)) {
@@ -938,8 +933,8 @@ public class KnowledgeSearchController {
       List<String> suggestions = adapter.suggest(query, limit);
       ctx.json(Map.of("suggestions", suggestions));
 
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ApiErrorCode code = ApiErrorHandler.resolve(e);
       ctx.status(http).json(ApiErrorHandler.toResponse(code, e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
@@ -980,8 +975,8 @@ public class KnowledgeSearchController {
       FolderBrowseResponse response = adapter.listFolders(req);
       ctx.json(response);
 
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Knowledge listFolders failed", e);
@@ -1024,8 +1019,8 @@ public class KnowledgeSearchController {
       FolderFilesResponse response = adapter.listFolderFiles(req);
       ctx.json(response);
 
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Knowledge listFolderFiles failed", e);

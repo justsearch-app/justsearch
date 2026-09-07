@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.app.services.worker.KnowledgeClientException;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.inference.LlmServerException;
@@ -236,13 +237,14 @@ public final class ApiErrorHandler {
             };
         }
 
-        // gRPC StatusRuntimeException: map status codes
-        if (e instanceof io.grpc.StatusRuntimeException sre) {
-            io.grpc.Status.Code code = sre.getStatus().getCode();
-            return switch (code) {
+        // Port failure: map the client status. Lane F review B1 — this replaced the
+        // io.grpc.StatusRuntimeException branch, which became unreachable at item A6 (the client
+        // stopped being a gRPC stub) and silently sent every worker error to INTERNAL_ERROR/500.
+        // The mapping is carried across unchanged, minus NOT_FOUND, which no worker service emits.
+        if (e instanceof KnowledgeClientException kce) {
+            return switch (kce.status()) {
                 case DEADLINE_EXCEEDED -> ApiErrorCode.TIMEOUT;
                 case UNAVAILABLE -> ApiErrorCode.SERVICE_UNAVAILABLE;
-                case NOT_FOUND -> ApiErrorCode.NOT_FOUND;
                 case INVALID_ARGUMENT -> ApiErrorCode.INVALID_REQUEST;
                 case RESOURCE_EXHAUSTED -> ApiErrorCode.SERVICE_UNAVAILABLE;
                 default -> ApiErrorCode.INTERNAL_ERROR;
@@ -374,9 +376,20 @@ public final class ApiErrorHandler {
      * @param code the gRPC status code (nullable — returns 500 if null)
      * @return the corresponding HTTP status code
      */
-    public static int mapGrpcToHttp(io.grpc.Status.Code code) {
-        if (code == null) return 500;
-        return switch (code) {
+    /**
+     * Maps a port failure onto its HTTP status.
+     *
+     * <p>Lane F review B1: this replaces {@code mapGrpcToHttp(io.grpc.Status.Code)}, which the
+     * controllers called from catch blocks that stopped being reachable at item A6. The mapping is
+     * <b>identical</b>, deliberately — the point of the fix is that the same failures get the same
+     * answers again, not that the answers improve. So {@code ABORTED}, {@code UNIMPLEMENTED} and
+     * {@code CANCELLED} fall to 500 exactly as they fell through the old {@code default} arm; if any
+     * of them deserves a better status, that is a contract change with its own reasoning, not a
+     * side effect of deleting a transport.
+     */
+    public static int mapClientStatusToHttp(KnowledgeClientException.Status status) {
+        if (status == null) return 500;
+        return switch (status) {
             case INVALID_ARGUMENT -> 400;
             case FAILED_PRECONDITION -> 409;
             case RESOURCE_EXHAUSTED -> 429;

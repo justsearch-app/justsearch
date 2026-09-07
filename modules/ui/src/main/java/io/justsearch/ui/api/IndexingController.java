@@ -15,7 +15,7 @@ import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.ipc.KnowledgeServerNotConnectedException;
-import io.grpc.StatusRuntimeException;
+import io.justsearch.app.services.worker.KnowledgeClientException;
 import io.justsearch.telemetry.Telemetry;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -320,8 +320,8 @@ public class IndexingController {
       }
       int deleted = indexingService().deleteDocsByCollection(trimmed);
       ctx.status(200).json(Map.of("status", "ok", "collection", trimmed, "deletedDocs", deleted));
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (KnowledgeServerNotConnectedException | UnsupportedOperationException e) {
       ctx.status(503)
@@ -341,9 +341,9 @@ public class IndexingController {
 
       String status = force ? "force reindex triggered" : "reindex triggered";
       ctx.status(200).json(Map.of("status", status, "force", force));
-    } catch (StatusRuntimeException e) {
+    } catch (KnowledgeClientException e) {
       // Fail closed: don't return 200 when the Worker rejected the request (queue full, unavailable, etc.)
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (KnowledgeServerNotConnectedException e) {
       ctx.status(503)
@@ -436,9 +436,9 @@ public class IndexingController {
         handle.release(OpLeaseOutcome.FAILURE);
         ctx.status(409).json(Map.of("status", "migration start rejected by worker"));
       }
-    } catch (StatusRuntimeException e) {
+    } catch (KnowledgeClientException e) {
       handle.release(OpLeaseOutcome.FAILURE);
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       handle.release(OpLeaseOutcome.FAILURE);
@@ -457,8 +457,8 @@ public class IndexingController {
       } else {
         ctx.status(409).json(Map.of("status", "cutover rejected by worker"));
       }
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Failed to request cutover", e);
@@ -474,8 +474,8 @@ public class IndexingController {
       } else {
         ctx.status(409).json(Map.of("status", "rollback rejected by worker"));
       }
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Failed to request rollback", e);
@@ -493,8 +493,8 @@ public class IndexingController {
       } else {
         ctx.status(409).json(Map.of("status", "migration pause rejected by worker"));
       }
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Failed to pause migration", e);
@@ -510,8 +510,8 @@ public class IndexingController {
       } else {
         ctx.status(409).json(Map.of("status", "migration resume rejected by worker"));
       }
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Failed to resume migration", e);
@@ -552,8 +552,8 @@ public class IndexingController {
         ctx.status(409)
             .json(Map.of("status", "gc rejected by worker", "error", outcome.error()));
       }
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Failed to run index GC", e);
@@ -602,8 +602,8 @@ public class IndexingController {
         ctx.status(409)
             .json(Map.of("status", "settle rejected by worker", "error", outcome.error()));
       }
-    } catch (StatusRuntimeException e) {
-      int http = ApiErrorHandler.mapGrpcToHttp(e.getStatus().getCode());
+    } catch (KnowledgeClientException e) {
+      int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
       log.error("Failed to settle index", e);

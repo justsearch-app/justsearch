@@ -221,6 +221,39 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   the change). `RemoteKnowledgeClient` did **not** become a new violation, because the bootstrap's
   legacy branch still constructs it — so A6 opens no accepted red at all; A11 does.
 
+- **A4/A6 CORRECTION (2026-09-07, raised by the independent A6-A9 review as S10): the foreground
+  gauge had no producer between A6 and this fix.** The A4 bullet above says the gate "mirrors
+  [the interceptor's method names] as bare method names". It does, and that is the bug.
+  `ForegroundLoadInterceptor` sat on the transport and saw **gRPC method names** (`Search`,
+  `FetchDocuments`). `ForegroundLoadGate` sits on the **executor seam**, where `SearchRpcOps`
+  passes its own lower-camel **operation labels** (`"search"`, `"fetchDocuments"` —
+  `SearchRpcOps.java:84-435`). `isForeground` compared PascalCase against lowerCamel, so it never
+  matched once: from A6 (gate wired) through A9 (interceptor deleted) to now, `ForegroundLoad`
+  stayed at zero and `IndexingPacing` never yielded to a user waiting on a search. A4's stated
+  purpose — the gauge and the pacing policy it feeds survive the collapse — was not met, and A6's
+  claim to have replaced the interceptor was false. Fixed by declaring the ten **ops labels**.
+  This is the `wrong-gate` reference case verbatim: the class existed, the wiring existed, the
+  drift pin existed, and nobody grepped the set-site.
+
+- **A4/A6 CORRECTION, second half: ten operations, not nine.** The interceptor's list was nine
+  because nine is the number of *RPCs*. The seam is entered ten times: `searchVector` is its own
+  ops-layer entry point that issues the same `SearchService/Search` RPC
+  (`SearchRpcOps.java:95-105`), so the interceptor counted it under `Search` and a one-to-one
+  rename of the nine would have silently stopped counting every vector search — a *narrower* bug
+  than the one above and much harder to see, since eight of ten operations would still have worked.
+  The two exclusions are unchanged (`indexStatus`, `listAllDocumentIds`).
+
+- **A4/A6 CORRECTION, third half: why the tests were all green while this was broken.**
+  `ForegroundLoadGateTest` fed the gate the names the gate itself declared; A6's
+  `EngineRootInProcessPortsTest` constructed its **own** gate and did the same. Both suites were
+  self-consistent and both were wrong about production, because neither crossed the seam. What
+  caught it is the assertion the review asked for — drive a real `client.search(...)` through
+  `EngineRoot` and assert `ForegroundLoad.startedTotal` moved — which failed
+  `expected: <1> but was: <0>` on its first run. That assertion is now the pin; the name-list
+  comparison is kept only as a cheap first signal. Generalisation for the rest of stage A: when an
+  item re-homes a cross-cutting concern from the transport onto a seam, the acceptance test has to
+  enter through the **seam's real caller**, because the vocabulary is exactly what changed.
+
 - **A7.** The item says "a bounded buffer … drop-oldest or block, your call, justified". **Block,
   never drop**, with a timeout that fails the flow — and the justification is a property of these
   two streams, not a preference: both carry *ordered state deltas folded into a keyed cache*

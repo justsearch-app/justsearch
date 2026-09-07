@@ -15,7 +15,7 @@ import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.server.KnowledgeServer;
-import io.justsearch.indexerworker.services.WorkerServiceException;
+import io.justsearch.app.services.worker.KnowledgeClientException;
 import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.SearchResponse;
 import java.nio.file.Files;
@@ -123,13 +123,23 @@ final class EngineRootInProcessPortsTest {
             .anyMatch(r -> r.getId().contains("engine-root-probe")),
         "the found result must be the document we submitted: " + found.getResultsList());
 
-    // (3b) The gauge moved during a search and came back to rest afterwards.
-    int[] observedInFlight = {0};
-    ForegroundLoadGate probe = new ForegroundLoadGate(built[0].foregroundLoad());
-    probe.run("Search", () -> observedInFlight[0] = built[0].foregroundLoad().inFlight());
-    assertEquals(1, observedInFlight[0], "a foreground call must be counted while it runs");
+    // (3b) The gauge moves across a REAL search through the client, and balances afterwards.
+    //
+    // Review S10: the first cut built a fresh ForegroundLoadGate and ran a lambda through it, which
+    // proved the gate works and said nothing about whether the production search path goes through
+    // one. startedTotal is the assertion that distinguishes the two — it can only advance if the
+    // client's own executor gated the call.
+    long startedBefore = built[0].foregroundLoad().startedTotal();
+    client.search("quokka", 10);
     assertEquals(
-        0, built[0].foregroundLoad().inFlight(), "the gauge must balance after the call returns");
+        startedBefore + 1,
+        built[0].foregroundLoad().startedTotal(),
+        "a search through the port must pass the foreground gate exactly once — if this is +0 the"
+            + " production path is not gated at all; if it is +2 a nested call is double-counting");
+    assertEquals(
+        0,
+        built[0].foregroundLoad().inFlight(),
+        "and the gauge must be back at rest once the call returns");
   }
 
   @Test
@@ -143,21 +153,49 @@ final class EngineRootInProcessPortsTest {
     // A one-millisecond base deadline: every category multiplies it, and every category is still
     // shorter than the work. The point is not the number — it is that SOMETHING enforces it now
     // that no transport does.
+    KnowledgeServer[] built = new KnowledgeServer[1];
     root =
         new EngineRoot(
-            g -> new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g)),
+            g -> {
+              built[0] = new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g));
+              return built[0];
+            },
             1L,
             5_000);
     KnowledgeClient client = root.start(gauge, IpcTelemetry.noop());
 
-    WorkerServiceException raised =
+    long startedAtMs = System.currentTimeMillis();
+    KnowledgeClientException raised =
         assertThrows(
-            WorkerServiceException.class,
+            KnowledgeClientException.class,
             () -> client.search("anything at all", 10),
             "an elapsed budget must be reported");
+    long elapsedMs = System.currentTimeMillis() - startedAtMs;
+
     assertEquals(
-        WorkerServiceException.Status.DEADLINE_EXCEEDED,
+        KnowledgeClientException.Status.DEADLINE_EXCEEDED,
         raised.status(),
         "the failure must carry the deadline status, not be re-labelled INTERNAL");
+
+    // Review B3: the caller must be released AT the budget, not after the work finishes. The first
+    // cut armed a cancel and then checked after the fact, so a slow search ran to completion and
+    // only THEN reported the deadline — which is not what the deadline meant on the wire. A search
+    // takes far longer than the 1 ms budget here, so returning quickly is the property; the bound
+    // is generous because it is measuring "released early", not measuring latency.
+    assertTrue(
+        elapsedMs < 5_000,
+        "the caller must be released at its budget, not when the work finishes; took "
+            + elapsedMs + "ms");
+
+    // And the gauge must come back to rest once the worker unwinds — a timed-out search that left
+    // the gate held would un-throttle indexing at exactly the wrong moment (review B3).
+    long deadline = System.currentTimeMillis() + 60_000;
+    while (built[0].foregroundLoad().inFlight() > 0 && System.currentTimeMillis() < deadline) {
+      Thread.sleep(50);
+    }
+    assertEquals(
+        0,
+        built[0].foregroundLoad().inFlight(),
+        "the foreground gauge must return to zero once the timed-out call unwinds");
   }
 }

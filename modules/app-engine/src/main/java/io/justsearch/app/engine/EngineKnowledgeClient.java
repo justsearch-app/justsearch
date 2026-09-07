@@ -4,6 +4,7 @@ package io.justsearch.app.engine;
 import io.justsearch.app.services.worker.CancelToken;
 import io.justsearch.app.services.worker.HealthServiceCalls;
 import io.justsearch.app.services.worker.IngestServiceCalls;
+import io.justsearch.app.services.worker.KnowledgeClientException;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.SearchServiceCalls;
@@ -67,7 +68,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private final java.util.function.Supplier<WorkerAppServices> services;
   private final ForegroundLoadGate foregroundLoad;
+  /**
+   * How many port calls may be in flight at once. Sized above any plausible concurrent-request
+   * count for a local engine and well below "unbounded": the point is that saturation is an
+   * answerable condition (RESOURCE_EXHAUSTED) rather than an unbounded thread population.
+   */
+  static final int CALL_THREAD_CAP = 64;
+
   private final ScheduledExecutorService deadlines;
+  private final java.util.concurrent.ExecutorService callThreads;
   private final java.util.concurrent.ExecutorService streamThreads;
 
   /**
@@ -92,6 +101,18 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         Executors.newSingleThreadScheduledExecutor(
             r -> {
               Thread t = new Thread(r, "engine-call-deadlines");
+              t.setDaemon(true);
+              return t;
+            });
+    this.callThreads =
+        new java.util.concurrent.ThreadPoolExecutor(
+            0,
+            CALL_THREAD_CAP,
+            60L,
+            TimeUnit.SECONDS,
+            new java.util.concurrent.SynchronousQueue<>(),
+            r -> {
+              Thread t = new Thread(r, "engine-call");
               t.setDaemon(true);
               return t;
             });
@@ -125,26 +146,45 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
    * means to tell afterwards whether it did. The streaming calls do not use this — their deadline
    * is a cancel with no retro-thrown status, wired through {@link FlowCancelSignal}.
    */
+  /**
+   * One call's outcome, decided exactly once (review B3).
+   *
+   * <p>The first cut had a race that turned successes into failures: the alarm could fire between
+   * {@code body.apply(...)} returning and {@code expired()} being read, so a call that finished
+   * inside its budget was reported as DEADLINE_EXCEEDED. The states are now a single CAS —
+   * whichever of "the body completed" and "the budget elapsed" gets there first wins, and the other
+   * is a no-op.
+   */
+  private enum Outcome {
+    RUNNING,
+    COMPLETED,
+    EXPIRED
+  }
+
   private final class Budget implements AutoCloseable {
-    private final AtomicBoolean expired = new AtomicBoolean(false);
+    private final AtomicReference<Outcome> outcome = new AtomicReference<>(Outcome.RUNNING);
     private volatile Runnable cancelHandler;
     private final ScheduledFuture<?> alarm;
     private final long budgetMs;
 
     Budget(long budgetMs) {
       this.budgetMs = budgetMs;
-      this.alarm =
-          deadlines.schedule(
-              () -> {
-                if (expired.compareAndSet(false, true)) {
-                  Runnable handler = cancelHandler;
-                  if (handler != null) {
-                    handler.run();
-                  }
-                }
-              },
-              budgetMs,
-              TimeUnit.MILLISECONDS);
+      this.alarm = deadlines.schedule(this::expire, budgetMs, TimeUnit.MILLISECONDS);
+    }
+
+    /** Flips the budget to EXPIRED and signals the worker to unwind. Idempotent. */
+    void expire() {
+      if (outcome.compareAndSet(Outcome.RUNNING, Outcome.EXPIRED)) {
+        Runnable handler = cancelHandler;
+        if (handler != null) {
+          handler.run();
+        }
+      }
+    }
+
+    /** @return true if this call completed before the budget elapsed. */
+    boolean complete() {
+      return outcome.compareAndSet(Outcome.RUNNING, Outcome.COMPLETED);
     }
 
     CallContext context() {
@@ -154,7 +194,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           new CallContext.CancelSignal() {
             @Override
             public boolean isCancelled() {
-              return expired.get();
+              return outcome.get() == Outcome.EXPIRED;
             }
 
             @Override
@@ -167,10 +207,6 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           });
     }
 
-    boolean expired() {
-      return expired.get();
-    }
-
     long budgetMs() {
       return budgetMs;
     }
@@ -181,28 +217,102 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
+  /**
+   * Translates the index half's failure vocabulary into the port's (review B1).
+   *
+   * <p>{@code WorkerServiceException} is the right home for the vocabulary — it is a property of
+   * the work — but it lives behind an {@code implementation} edge that {@code ui} cannot name, and
+   * {@code ui} is where the status has to arrive to become an HTTP code. Before this, every worker
+   * error reached the API front as a bare {@code RuntimeException} and fell through to a 500: an
+   * invalid cursor stopped being a 400, a deadline a 504, an unavailable index a 503. Nothing
+   * failed; the answers silently got worse.
+   *
+   * <p>Anything that is NOT a {@code WorkerServiceException} is left alone: a bug in the index half
+   * is not a client-facing status, and dressing it as one would hide it.
+   */
+  private static RuntimeException translate(RuntimeException e) {
+    if (e instanceof WorkerServiceException w) {
+      return new KnowledgeClientException(
+          KnowledgeClientException.Status.valueOf(w.status().name()), w.getMessage(), w);
+    }
+    return e;
+  }
+
+  /**
+   * Runs one unary call under its budget, and <b>returns at the budget</b> (review B3).
+   *
+   * <p>The first cut armed a cancel and then checked, after the fact, whether the budget had
+   * elapsed — so the CALLER was never released early: a slow search ran to completion and only then
+   * reported DEADLINE_EXCEEDED. That is not what the deadline meant on the wire, where gRPC
+   * completed the caller's call at the deadline while the server unwound on its own. So the body
+   * runs on a call thread and the caller waits with the budget as its timeout; on timeout the
+   * caller is released immediately and the budget's cancel signal tells the worker to stop, which
+   * {@code CallContext.cancelled()} is polled for at every stage boundary.
+   *
+   * <p>The thread hop is the cost of the property. It is bounded ({@link #CALL_THREAD_CAP}) rather
+   * than a cached pool, because an unbounded pool under load is how a bounded queue becomes an
+   * unbounded one somewhere else (design 8); saturation is reported as RESOURCE_EXHAUSTED, which is
+   * the honest answer and the one an admission layer will later own.
+   */
   private <T> T withBudget(String operation, long budgetMs, Function<Budget, T> body) {
-    try (Budget budget = new Budget(budgetMs)) {
-      T result = body.apply(budget);
-      if (budget.expired()) {
-        throw WorkerServiceException.deadlineExceeded(
-            operation + " exceeded its " + budget.budgetMs() + "ms budget");
-      }
+    Budget budget = new Budget(budgetMs);
+    java.util.concurrent.Future<T> pending;
+    try {
+      pending = callThreads.submit(() -> body.apply(budget));
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      budget.close();
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.RESOURCE_EXHAUSTED,
+          operation + " rejected: the engine is already running " + CALL_THREAD_CAP + " calls", e);
+    }
+    try {
+      T result = pending.get(budgetMs, TimeUnit.MILLISECONDS);
+      budget.complete();
       return result;
+    } catch (java.util.concurrent.TimeoutException e) {
+      // Release the caller now; the worker unwinds on the cancel signal in its own time.
+      budget.expire();
+      pending.cancel(true);
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+          operation + " exceeded its " + budgetMs + "ms budget", e);
+    } catch (java.util.concurrent.ExecutionException e) {
+      budget.complete();
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException re) {
+        throw translate(re);
+      }
+      if (cause instanceof Error err) {
+        throw err;
+      }
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.INTERNAL, operation + " failed: " + cause, cause);
+    } catch (InterruptedException e) {
+      budget.expire();
+      pending.cancel(true);
+      Thread.currentThread().interrupt();
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.CANCELLED, operation + " interrupted", e);
+    } finally {
+      budget.close();
     }
   }
 
   @Override
   protected <T> T executeSearchRpc(
       String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc) {
-    // The one gate layer: a Search that internally reranks must count once, not twice.
-    return foregroundLoad.call(
+    // The gate wraps the WORKER's work, not the caller's wait (review B3): when a call times out
+    // the caller is released immediately, and the gauge must not drop until the worker actually
+    // unwinds — otherwise a timed-out search would read as "no foreground load" while it is still
+    // burning CPU, and indexing would un-throttle at exactly the wrong moment. One layer still: a
+    // Search that internally reranks counts once.
+    return withBudget(
         operation,
-        () ->
-            withBudget(
+        deadline(category),
+        budget ->
+            foregroundLoad.call(
                 operation,
-                deadline(category),
-                budget -> rpc.apply(new WorkerSearchCalls(services.get().searchService(), budget.context()))));
+                () -> rpc.apply(new WorkerSearchCalls(services.get().searchService(), budget.context()))));
   }
 
   @Override
@@ -217,8 +327,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected <T> T executeHealthRpc(
       String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc) {
+    // Review B3: the health call was the one that passed no context at all. WorkerHealthService
+    // does not read one today, but a call that cannot be cancelled is a call the budget cannot
+    // bound, and the health poll is exactly the call a wedged index half hangs.
     return withBudget(
-        operation, callDeadlineMs, budget -> rpc.apply(new WorkerHealthCalls(services.get().healthService())));
+        operation,
+        callDeadlineMs,
+        budget -> rpc.apply(new WorkerHealthCalls(services.get().healthService(), budget.context())));
   }
 
   @Override
@@ -343,6 +458,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected void closeTransport() {
     deadlines.shutdownNow();
+    callThreads.shutdownNow();
     streamThreads.shutdownNow();
     log.debug("Engine knowledge client call scheduler stopped");
   }

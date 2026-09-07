@@ -39,21 +39,21 @@ import org.junit.jupiter.api.Test;
  */
 final class ForegroundLoadGateTest {
 
-  private static final String NOT_FOREGROUND_INDEX_STATUS = "IndexStatus";
-  private static final String NOT_FOREGROUND_LIST_ALL = "ListAllDocumentIds";
+  private static final String NOT_FOREGROUND_INDEX_STATUS = "indexStatus";
+  private static final String NOT_FOREGROUND_LIST_ALL = "listAllDocumentIds";
 
   @Test
-  @DisplayName("the gate covers exactly nine operations, and the two exclusions are excluded")
+  @DisplayName("the gate covers exactly ten operation labels, and the two exclusions are excluded")
   void theOperationSetIsTheNineTheUserWaitsOn() {
     // The population, not a ratchet: adding a tenth foreground operation is a decision about what
     // a user waits on, and it should have to be made here rather than arrive by accident.
-    assertEquals(9, ForegroundLoadGate.foregroundOperations().size());
+    assertEquals(10, ForegroundLoadGate.foregroundOperations().size());
     assertFalse(ForegroundLoadGate.isForeground(NOT_FOREGROUND_INDEX_STATUS));
     assertFalse(ForegroundLoadGate.isForeground(NOT_FOREGROUND_LIST_ALL));
   }
 
   @Test
-  @DisplayName("each of the nine operations increments during the call and decrements after it")
+  @DisplayName("each of the ten operation labels increments during the call and decrements after it")
   void eachForegroundOperationIncrementsAndDecrements() {
     ForegroundLoad load = new ForegroundLoad();
     ForegroundLoadGate gate = new ForegroundLoadGate(load);
@@ -66,11 +66,11 @@ final class ForegroundLoadGateTest {
       expectedTotal++;
       assertEquals(expectedTotal, load.startedTotal());
     }
-    assertEquals(9, expectedTotal);
+    assertEquals(10, expectedTotal);
   }
 
   @Test
-  @DisplayName("the Runnable form counts the same nine operations")
+  @DisplayName("the Runnable form counts the same ten operation labels")
   void runnableFormCountsTheSameOperations() {
     ForegroundLoad load = new ForegroundLoad();
     ForegroundLoadGate gate = new ForegroundLoadGate(load);
@@ -81,7 +81,7 @@ final class ForegroundLoadGateTest {
       assertEquals(1, observed.get(), operation + " must be counted while it executes");
       assertEquals(0, load.inFlight());
     }
-    assertEquals(9, load.startedTotal());
+    assertEquals(10, load.startedTotal());
   }
 
   @Test
@@ -111,7 +111,7 @@ final class ForegroundLoadGateTest {
                   }));
       assertEquals(0, load.inFlight());
     }
-    assertEquals(18, load.startedTotal());
+    assertEquals(20, load.startedTotal(), "ten labels x two forms");
   }
 
   @Test
@@ -131,7 +131,7 @@ final class ForegroundLoadGateTest {
                   }));
       assertEquals(0, load.inFlight(), operation + " must not leak on cancellation");
     }
-    assertEquals(9, load.startedTotal());
+    assertEquals(10, load.startedTotal());
   }
 
   @Test
@@ -144,7 +144,7 @@ final class ForegroundLoadGateTest {
         StackOverflowError.class,
         () ->
             gate.call(
-                "Search",
+                "search",
                 () -> {
                   throw new StackOverflowError("deep");
                 }));

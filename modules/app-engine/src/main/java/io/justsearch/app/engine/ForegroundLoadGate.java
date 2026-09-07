@@ -54,26 +54,45 @@ import java.util.function.Supplier;
 public final class ForegroundLoadGate {
 
   /**
-   * The nine foreground operations, mirrored from {@code ForegroundLoadInterceptor} as bare RPC
-   * method names (the interceptor keys on full gRPC method names, which do not survive the wire
-   * deletion).
+   * The foreground operations, as the <b>operation labels the ops layer actually passes</b> to
+   * {@code SearchRpcExecutor.execute(operation, category, call)} — not as RPC method names.
    *
-   * <p>The two deliberate exclusions carry over unchanged: {@code IndexStatus} (an
-   * {@code IngestService} poll the Head runs on a timer — counting an observer as foreground is the
-   * defect tempdoc 885 item 3 removed) and {@code SearchService/ListAllDocumentIds} (paged by the
-   * background GPL job coordinator, not by a person waiting for an answer).
+   * <p><b>This was wrong from A6 until the A6-A9 review, and the gauge was dead the whole time.</b>
+   * The set was mirrored from {@code ForegroundLoadInterceptor}, which keyed on gRPC method names
+   * ({@code SearchService/Search} -> {@code "Search"}). But the interceptor sat on the transport,
+   * where the method name is what it saw; the gate sits on the executor seam, where the label is
+   * {@code SearchRpcOps}'s own lower-camel string ({@code "search"}). {@code isForeground} compared
+   * PascalCase against lowerCamel, never matched, and every call went through ungated — so from A6
+   * (gate wired) through A9 (interceptor deleted) nothing produced the gauge at all and indexing
+   * never yielded to a user waiting on a search.
+   *
+   * <p>Neither the unit test nor the A6 acceptance test could see it: both called the gate directly
+   * with the names the gate itself declared. What catches it is asserting that a real
+   * {@code client.search(...)} moves {@code ForegroundLoad.startedTotal}, which
+   * {@code EngineRootInProcessPortsTest} now does. Reference case: {@code wrong-gate}.
+   *
+   * <p><b>Ten labels for nine RPCs.</b> {@code searchVector} is a separate ops-layer entry point
+   * that issues the same {@code SearchService/Search} RPC ({@code SearchRpcOps.java:95-105}), so
+   * the interceptor counted it and the gate must too — mapping it to nothing would have quietly
+   * un-counted every vector search.
+   *
+   * <p>The two deliberate exclusions carry over unchanged: {@code indexStatus} (an ingest poll the
+   * Head runs on a timer — counting an observer as foreground is the defect tempdoc 885 item 3
+   * removed) and {@code listAllDocumentIds} (paged by the background GPL job coordinator, not by a
+   * person waiting for an answer).
    */
   private static final Set<String> FOREGROUND_OPERATIONS =
       Set.of(
-          "Search",
-          "Suggest",
-          "FetchDocuments",
-          "FetchDocumentSlice",
-          "RetrieveContext",
-          "MatchCitations",
-          "ListFolders",
-          "ListFolderFiles",
-          "Rerank");
+          "search",
+          "searchVector",
+          "suggest",
+          "fetchDocuments",
+          "fetchDocumentSlice",
+          "retrieveContext",
+          "matchCitations",
+          "listFolders",
+          "listFolderFiles",
+          "rerank");
 
   private final ForegroundLoad load;
 
@@ -85,7 +104,7 @@ public final class ForegroundLoadGate {
     this.load = Objects.requireNonNull(load, "load");
   }
 
-  /** The exact set of operation names that count as foreground. */
+  /** The exact set of operation labels that count as foreground. */
   public static Set<String> foregroundOperations() {
     return FOREGROUND_OPERATIONS;
   }
