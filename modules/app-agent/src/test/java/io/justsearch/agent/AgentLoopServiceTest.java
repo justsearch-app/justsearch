@@ -180,6 +180,36 @@ class AgentLoopServiceTest {
   }
 
   /**
+   * PR 0b — the step-ceiling finalize is the turn that produces the run's VISIBLE answer, and the
+   * one place sampling is deliberately NOT resolved from the session (878 review B2: resolving it
+   * there let a no-tools call inherit {@code tool_choice=required} plus the tool-call grammar and
+   * stream a raw {@code <tool_call>} blob out as the answer). It must still honour the run's
+   * sampling override, and must still not become tool-forced — both halves asserted here, because
+   * a fix for either one that broke the other would look green in the other's test.
+   */
+  @Test
+  @DisplayName("PR 0b: the ceiling finalize carries the override but stays unconstrained")
+  void samplingOverride_appliedToTheStepCeilingFinalize() {
+    var session = new AgentSession(new ArrayList<>(userMessage("q")), 8000);
+    session.recordHandoff("primary", "organizer", "delegating the ingest");
+    assertTrue(
+        AgentTurnPolicy.shouldForceToolCall(session),
+        "precondition: this session IS in the forced-tool state, or the test proves nothing");
+    session.setSamplingOverride(new AgentRequest.SamplingOverride(0.0, null, 555L));
+
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("Partial answer.")));
+    new AgentLlmCaller(ai, AgentTelemetry.noop(), new AgentContextCompressor(true, 200, 1))
+        .attemptStepCeilingFinalize(session, event -> {});
+
+    assertEquals(1, ai.recordedSampling.size(), "the finalize made exactly one call");
+    var used = ai.recordedSampling.get(0);
+    assertEquals(555L, used.seed(), "the finalize must carry the run's override seed");
+    assertEquals(0.0, used.temperature(), 1e-9, "and the run's override temperature");
+    assertNull(used.grammar(), "878 B2 must still hold: the finalize is never grammar-constrained");
+    assertNull(used.toolChoice(), "878 B2 must still hold: the finalize is never tool-forced");
+  }
+
+  /**
    * PR 0b — the other inline {@code AgentStepRunner} site: the DECIDING commit turn. Same scenario
    * as {@code budgetExhausted_decidingBypassesFinalizeAndProceedsToLlmCall}, which is the one setup
    * in this file that reaches {@code AgentState.DECIDING}.

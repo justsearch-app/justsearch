@@ -200,8 +200,13 @@ final class AgentLlmCaller {
       // must not grow one: at a hard ceiling the run is over either way, and a synthesis attempt is
       // still the right thing. Fixing it HERE makes the invariant structural — a no-tools call is
       // never tool-forced — instead of a guard every future call site has to remember.
+      //
+      // Lane F PR 0b: `agentBaseSampling`, not the bare constant. It applies only the run's
+      // temperature / top_p / seed override and NEVER tool_choice or grammar, so B2's invariant is
+      // untouched while the finalize — which produces the run's visible answer — stops being the
+      // one turn a pinned capture leaves unpinned.
       LlmCallResult result =
-          callLlmWithTools(session, List.of(), sink, SamplingParams.AGENT);
+          callLlmWithTools(session, List.of(), sink, agentBaseSampling(session));
       String text = result.textContent();
       return text != null && !text.isBlank() ? text : null;
     } catch (Exception e) {
