@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "dataset": "scifact",
+  "mode": null,
+  "checks": {
+    "baseline-pinned": "skip"
+  }
+}

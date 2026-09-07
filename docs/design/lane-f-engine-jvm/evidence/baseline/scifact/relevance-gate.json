@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "dataset": "beir/scifact",
+  "current": 0.7545603895118036,
+  "baseline": 0.7571906055995299,
+  "floor": 0.7371906055995299,
+  "checks": {
+    "ndcg10-no-regression": "ok"
+  }
+}

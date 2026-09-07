@@ -32,7 +32,7 @@ function gcReport(file, title) {
   }
   const young = pauses.filter((p) => p.kind === 'Young').map((p) => p.ms);
   const full = pauses.filter((p) => p.kind === 'Full');
-  console.log(`\n# GC (${file}, ${title})`);
+  console.log(`\n## GC (${file}, ${title})`);
   console.log(`- uptime covered: ${fmt(pauses.length ? pauses[pauses.length - 1].up : 0, 0)} s; pauses: ${pauses.length} (young ${young.length}, full ${full.length})`);
   console.log(`- young pause ms: p50 ${fmt(pct(young, 0.5))} · p95 ${fmt(pct(young, 0.95))} · max ${fmt(Math.max(0, ...young))} · total ${fmt(young.reduce((a, b) => a + b, 0), 0)}`);
   console.log(`- full pauses: ${full.map((p) => `${p.cause} ${p.before}M->${p.after}M ${fmt(p.ms)}ms @${fmt(p.up, 0)}s`).join('; ') || 'none'}`);
@@ -56,7 +56,7 @@ gcReport('head-gc-2.log', 'warm restart');
 // ---- RSS samples ----
 const csv = fs.readFileSync(path.join(dir, 'head-rss.csv'), 'utf8').trim().split('\n').slice(1).map((l) => l.split(','));
 const rows = csv.map(([ts, role, pid, ws, pm, cpu, thr]) => ({ t: new Date(ts).getTime(), role, ws: +ws, pm: +pm, cpu: +cpu, thr: +thr }));
-console.log('\n# Working set (MB) per role');
+console.log('\n## Working set (MB) per role');
 function summar(role, from, to) {
   const r = rows.filter((x) => x.role === role && (!from || x.t >= from) && (!to || x.t <= to)).map((x) => x.ws);
   if (!r.length) return '-';
@@ -75,7 +75,7 @@ const first = rows.find((x) => x.role === 'head'), last = [...rows].reverse().fi
 if (first && last) console.log(`- head threads first/last: ${first.thr}/${last.thr}; head CPU seconds consumed over window: ${fmt(last.cpu - first.cpu, 0)}`);
 
 // ---- search latency ----
-console.log('\n# Search latency (POST /api/knowledge/search, sequential, ms; grouped by effectiveMode when recorded)');
+console.log('\n## Search latency (POST /api/knowledge/search, sequential, ms; grouped by effectiveMode when recorded)');
 for (const f of fs.readdirSync(dir).filter((f) => /^search-load.*\.csv$/.test(f))) {
   const rows = fs.readFileSync(path.join(dir, f), 'utf8').trim().split('\n').slice(1).map((l) => l.split(',')).filter((c) => c[2] === '200');
   const groups = {};

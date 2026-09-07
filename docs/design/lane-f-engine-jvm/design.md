@@ -114,6 +114,40 @@ appears in a Javadoc example and FE test fixtures), and 91 Java files under `mod
 renamed plus the worker log stream folded into it. The 917 Derisk 1 procedure is now
 `scripts/jseval/lane-f/head-flag-run.sh` (analysed by `analyze-head-run.cjs` beside it), and PR 0's
 before/after record lives under `evidence/pr0/`.
+The stage A checklist was drafted at the same time (`stages/A.md`, DRAFT until stage start
+re-verifies it) and corrected two more citations inside decided lines: `adr-0002-grpc-present`
+is `.kts`-scoped, so 17.4's "red the moment the wire is deleted" holds once the grpc dependency
+declarations leave the build files (its item A14), and `check-readiness-reason-codes` has a
+producer direction that the deleted Worker classes satisfy today, so stage A carries a holding
+allowlist for the orphaned `WORKER_*` codes until D1 re-cuts the vocabulary (its item A17).
+
+**Owner items from the first live fixture captures (2026-09-07, PR 0).** Four captures on one
+build (`evidence/baseline/fixture/`): two on one index, then two on two fresh ingests of the same
+91 documents. Every capture agreed on the cancelled turn's outcome and on the rank order of the
+hits both sides returned; they disagreed on three things 16 calls deterministic, none of them
+caused by the merge and all of them present in split mode today. (a) Scores jitter (GPU float
+nondeterminism in the dense and cross-encoder legs; max delta 0.0094 over 118 identity-matched
+hits), so the fixture instantiates "equal-score" as within a declared epsilon (0.01) and does
+not diff the score: a mechanism detail inside the class. (b) Evidence selection at the top-10
+margin differs between two fresh index builds of the same documents: `totalHits` moved on four
+of twelve queries and one tie-group member was replaced on two, which is the dense leg's
+approximate nearest-neighbour search (Lucene HNSW, `index.vector.hnsw.*`; no exact mode exists)
+plus the fusion cutoff. (c) The chat trajectory is not pinned: the same narrow question
+completed in 3 iterations in one capture and hit the iteration cap in the next, because
+`ConversationEngine.java:1154` hard-codes `new SamplingParams(0.8, 0.95, ...)` and no settings
+key or request field carries a temperature or seed; citation targets, sources, tool counts and
+disposition all follow from it. 16 lists evidence selection and citation targets among the
+byte-equal fields and 17.7 names "generative text under a fixed seed" as a class, on the premise
+that both are deterministic across two runs. Neither is. The fixture keeps those fields `exact`
+and records the instability; the choices are the owner's (17.6, a gate row), before the first
+paired capture at stage E: for (b) a fixture-only retrieval pin (raise `hnsw.ef_search` to the
+chunk count for both captures, or an exact-scan flag added for the fixture) versus a margin
+rule on the last ranks; for (c) a backend sampling override for the fixture (temperature 0 plus
+a seed on the chat request, small, in stage D2's request-time paths or a PR 0 follow-up) versus
+moving the chat `exact` fields under `generative-text`. The orchestrator recommends the two
+pins, since they keep 16's relation and the class list unchanged. Until then the split-side
+baseline capture stands as taken (compact profile; the standard model's 11 GB resident set
+tripped the dev machine's memory guard), with its stability diff beside it.
 
 ## 0.1 Forces that shaped the design
 
@@ -1688,6 +1722,7 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 | failed-unit default at activation: `index.migration.cutover.max_failed_jobs` moves from -1 (unlimited, today) to 0, or the owner names another value | 7.4, 17.9 | **0**: today's value activates with documents missing and nobody told; with gaps reported and replay cheap, refusing is right and the row above is the escape hatch | D1 |
 | which readiness representation survives as the authority's name (`LifecycleSnapshotV1` or `ReadinessEnvelopeView`) and which becomes its projection | 7.6, 17.9 | **the envelope**, whose ten dimensions are already component-shaped; the lifecycle snapshot becomes its projection | D1 |
 | `UseCompactObjectHeaders` in the Engine's flag set (the Worker carries it today, the Head does not) | 8, 17.9 | gate run, with the collector | E |
+| deterministic capture for the workflow fixture: a retrieval pin for the dense leg (`hnsw.ef_search` at the chunk count, or an exact-scan flag) and a sampling override (temperature 0 plus seed on the chat request), or the affected fields move under a margin rule / `generative-text` | 16, 0 (PR 0 owner items) | **open**: orchestrator recommends the two pins; neither control exists today (`ChunkSearchOps.java:546`, `ConversationEngine.java:1154`) | E, before the first paired capture |
 
 ### 17.8 What would re-cut this sequencing
 

@@ -214,3 +214,21 @@ load-bearing rows the orchestrator spot-checked. Facts hold unless listed here.
 **Not re-derived** (no line citation; stage C1/D1 re-verify at their start): the 33-method count of
 `IndexingService`, the ten bare common-pool sites and 58 executor construction sites, the ten
 dimensions of `ReadinessEnvelopeView`.
+
+**Found while drafting the stage A checklist (`stages/A.md`, 2026-09-07):**
+
+- `adr-0002-grpc-present` (`governance/adr-probes.v1.json:37-48`) carries `"include": [".kts"]`: it greps
+  `libs.grpc|io.grpc` in build files only, so it reds when the grpc dependency declarations
+  leave `modules/*/build.gradle.kts` (checklist item A14), not when Java imports go. 17.4 holds
+  under that condition.
+- The `RemoteKnowledgeClient` construction site is `KnowledgeServerBootstrap.java:291` (`MainSignalBus`
+  at `:253`, `WorkerSpawner` at `:256`, inside `start()` at `:213`); 917 cited `:261`.
+- `WorkerProcessManager` has 21 test consumers, not 20: 917 omitted
+  `system-tests/src/systemTest/.../process/FormatCapabilityMatrixE2ETest.java`.
+- Two distinct `GrpcCircuitBreaker` classes exist, `ipc-common/.../ipc/grpc/GrpcCircuitBreaker.java`
+  and `app-services/.../worker/GrpcCircuitBreaker.java`, each with its own test.
+- `check-readiness-reason-codes` (`scripts/ci/check-readiness-reason-codes.mjs:22-25`) also checks the
+  producer direction: every `LifecycleReasonCode` member needs a `src/main` referencer outside the
+  enum. Several `WORKER_*` members are referenced only from classes stage A deletes, so stage A owes
+  a holding action (A17) until the D1 re-cut.
+- `main_gpu_active` / `energy_reduced` have 7 read sites, not 6 (`BgeM3BackfillOps.java:346` added).
