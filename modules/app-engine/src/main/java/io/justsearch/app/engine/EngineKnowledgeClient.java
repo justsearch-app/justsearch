@@ -75,6 +75,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
    */
   static final int CALL_THREAD_CAP = 64;
 
+  /**
+   * How many streaming flows may be open at once.
+   *
+   * <p>Each open flow costs two threads for its lifetime: one delivery loop, and (for the job feed)
+   * one producer. A cached pool here was the same unbounded-population defect the call pool already
+   * fixed, one layer over — and worse, because a stream's lifetime is the CONSUMER's, so a client
+   * that opens SSE streams and abandons them grows the pool with no upper bound and no error. The
+   * cap is per flow-pair, so it admits {@value #STREAM_THREAD_CAP}/2 concurrent streams; refusal is
+   * reported as RESOURCE_EXHAUSTED rather than silently queued, because a queued stream is a stream
+   * that never starts and never says why.
+   */
+  static final int STREAM_THREAD_CAP = 64;
+
   private final ScheduledExecutorService deadlines;
   private final java.util.concurrent.ExecutorService callThreads;
   private final java.util.concurrent.ExecutorService streamThreads;
@@ -117,7 +130,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               return t;
             });
     this.streamThreads =
-        Executors.newCachedThreadPool(
+        new java.util.concurrent.ThreadPoolExecutor(
+            0,
+            STREAM_THREAD_CAP,
+            60L,
+            TimeUnit.SECONDS,
+            new java.util.concurrent.SynchronousQueue<>(),
             r -> {
               Thread t = new Thread(r, "engine-stream");
               t.setDaemon(true);
@@ -336,6 +354,48 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         budget -> rpc.apply(new WorkerHealthCalls(services.get().healthService(), budget.context())));
   }
 
+  /**
+   * Turns a saturated {@link #streamThreads} pool into an answer.
+   *
+   * <p>Bounding the pool (S4) is only half the change: a {@code RejectedExecutionException} escaping
+   * as itself would reach the API front as a bare runtime failure and become a 500 with a stack
+   * trace about thread pools. RESOURCE_EXHAUSTED is the same status the call pool already reports
+   * for the same condition, it maps to 429, and it tells the caller the true thing — try again,
+   * this engine is already carrying as many streams as it will carry.
+   */
+  private static <T> T refuseIfSaturated(String operation, java.util.function.Supplier<T> body) {
+    try {
+      return body.get();
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.RESOURCE_EXHAUSTED,
+          operation
+              + " refused: the engine is already running "
+              + STREAM_THREAD_CAP
+              + " stream threads",
+          e);
+    }
+  }
+
+  /**
+   * Submits a stream's producer, closing the flow if the pool has no room for it. Separate from
+   * {@link #refuseIfSaturated} because the failure has a side effect to undo, not just a status to
+   * report.
+   */
+  private void submitProducerOrClose(BoundedHandoff<?> flow, Runnable producer) {
+    try {
+      streamThreads.execute(producer);
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      flow.close();
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.RESOURCE_EXHAUSTED,
+          "subscribeIndexingJobs refused: the engine is already running "
+              + STREAM_THREAD_CAP
+              + " stream threads",
+          e);
+    }
+  }
+
   @Override
   protected ScanRootProgress executeScanRoot(
       ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer) {
@@ -346,14 +406,22 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     AtomicReference<ScanRootProgress> last = new AtomicReference<>();
     AtomicReference<Throwable> deliveryFailure = new AtomicReference<>();
     BoundedHandoff<ScanRootProgress> flow =
-        new BoundedHandoff<>(
-            "scan-root-flow",
-            event -> {
-              last.set(event);
-              progressConsumer.accept(event);
-            },
-            deliveryFailure::set,
-            streamThreads);
+        refuseIfSaturated(
+            "scanRoot",
+            () ->
+                new BoundedHandoff<>(
+                    "scan-root-flow",
+                    event -> {
+                      last.set(event);
+                      progressConsumer.accept(event);
+                    },
+                    deliveryFailure::set,
+                    streamThreads,
+                    // BLOCK: the producer is the walker thread, which holds a directory iterator
+                    // and nothing else. Pausing it pauses this scan and nothing else — the
+                    // backpressure the wire used to apply. Compare subscribeIndexingJobs, whose
+                    // producer holds a lock somebody else needs.
+                    BoundedHandoff.Backpressure.BLOCK));
 
     // Cancellation, in the shape WorkerScanOps already polls: it checks `ctx.cancelled()` per file
     // and per directory, so a cancel lands within a file — well inside the 100-file progress tick
@@ -390,7 +458,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       alarm.cancel(false);
       // The walk has ended; let the frames it already handed over reach the consumer before the
       // flow closes, or the terminal event is exactly what gets dropped.
-      flow.drainAndClose(SCAN_DRAIN_TIMEOUT_MS);
+      if (!flow.drainAndClose(SCAN_DRAIN_TIMEOUT_MS)) {
+        // Review S3: the return value was being discarded, so a scan whose tail was dropped
+        // reported the same success as one that delivered everything — and the frames most likely
+        // to be in that tail are the terminal event and the final counts, i.e. exactly the ones the
+        // caller reasons about. Recorded as a delivery failure, which the check below raises.
+        deliveryFailure.compareAndSet(
+            null,
+            new IllegalStateException(
+                "scan progress did not drain within " + SCAN_DRAIN_TIMEOUT_MS + "ms"));
+      }
     }
 
     Throwable failed = deliveryFailure.get();
@@ -415,12 +492,31 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // Item A7: a bounded hand-off between the change feed's dispatch thread and the SSE fan-out.
     // Without it the fan-out would run ON the SQLite update-hook thread, so a slow HTTP client
     // would pace the indexing loop — the backpressure the Netty send buffer used to absorb.
+    // FAIL_FAST, and this is the review's B4 finding rather than a tuning choice. The producer
+    // that ends up inside publish() is not a thread of ours: IndexingJobsChangeStream dispatches
+    // deltas from SQLite's commit hook, so it is whichever thread just mutated the jobs table, and
+    // it is holding SqliteJobQueue's single write lock for the whole call. A blocking offer there
+    // stops the job queue outright — no enqueue, no dequeue, no markDone — so one browser tab that
+    // stopped reading its SSE stream would halt indexing for the entire machine for five seconds
+    // per frame. The flow fails instead; the bridge re-subscribes and gets a fresh snapshot.
     BoundedHandoff<IndexingJobsFrame> flow =
-        new BoundedHandoff<>("indexing-jobs-flow", onFrame, onError, streamThreads);
+        refuseIfSaturated(
+            "subscribeIndexingJobs",
+            () ->
+                new BoundedHandoff<>(
+                    "indexing-jobs-flow",
+                    onFrame,
+                    onError,
+                    streamThreads,
+                    BoundedHandoff.Backpressure.FAIL_FAST));
     FlowCancelSignal cancel = new FlowCancelSignal();
     flow.onClose(cancel::cancel);
     CallContext ctx = new CallContext(null, null, cancel);
-    streamThreads.execute(
+    // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow
+    // must be closed on the way out: leaving it open would leak a delivery thread that polls an
+    // empty queue for the life of the process, for a subscription that never started.
+    submitProducerOrClose(
+        flow,
         () -> {
           try {
             services
