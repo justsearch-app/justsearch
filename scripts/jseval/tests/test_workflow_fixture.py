@@ -828,6 +828,109 @@ def test_hits_captured_and_compared_are_observed_only_and_never_diffed():
     assert _status(result, "queries.hits[]") == "equal"
 
 
+def _response_with_ce(pairs: list[tuple[float, float]], ids: list[str] | None = None) -> dict:
+    """A response carrying BOTH scores per hit: (delivered/fusion, cross-encoder).
+
+    The delivered order is the CROSS-ENCODER's (`KnowledgeSearchEngine` applies
+    `applyRerankOrder`), so `results` here is already in CE order while `score` is the
+    pre-rerank fusion value — the real shape, which is why it is worth building in a helper.
+    """
+    names = ids or [f"h{i}" for i in range(len(pairs))]
+    return {
+        "totalHits": len(pairs),
+        "matchCount": len(pairs),
+        "results": [
+            {
+                "id": name,
+                "score": delivered,
+                "fields": {"doc_id": name, "path": f"docs/{name}.md",
+                           "filename": f"{name}.md", "is_chunk": "true",
+                           "parent_doc_id": name, "chunk_index": "0"},
+                "matchedFields": [], "excerptRegions": [],
+                "trace": ([{"id": "fusion", "score": delivered}]
+                          + ([{"id": "cross-encoder", "score": ce}] if ce is not None else [])),
+            }
+            for name, (delivered, ce) in zip(names, pairs)
+        ],
+        "searchTrace": {"stages": [], "degradation": {}},
+    }
+
+
+def test_equal_score_is_grouped_on_the_cross_encoder_score_not_the_delivered_one():
+    """The delivered ORDER is the CE's, so the CE score is the only key whose ties mean
+    "these two could legitimately swap".
+
+    Two hits tie on the CE score (0.700 / 0.7005) while their delivered scores are 0.9 and
+    0.2 — far outside epsilon. Grouping on the delivered score makes them singletons and a
+    swap a REGRESSION; grouping on the CE score makes them one tie group and the swap
+    allowed. This is the case that fails if the basis reverts.
+    """
+    response = _response_with_ce([(0.9, 0.700), (0.2, 0.7005), (0.1, 0.100)])
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    tags = record["hits[]"]
+    assert [t["score"] for t in tags] == [0.700, 0.7005, 0.100],         "the stored tag must be the CROSS-ENCODER score, not the delivered one"
+
+    ok, groups = wf._tie_groups(tags, 0.01)
+    assert ok
+    assert [len(members) for _, members in groups] == [2, 1],         "the two CE-tied hits must land in ONE group despite delivered scores 0.9 vs 0.2"
+
+    # And end to end: swapping the two CE-tied hits is allowed, not a regression.
+    swapped = _response_with_ce([(0.2, 0.7005), (0.9, 0.700), (0.1, 0.100)],
+                                ids=["h1", "h0", "h2"])
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    base = _capture({"q1": record})
+    cand = _capture({"q1": wf.capture_query_record(swapped, limit=10, epsilon=0.01)})
+    result = wf.diff(base, cand, fixture)
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order", result["fields"]
+
+
+def test_score_basis_falls_back_to_delivered_when_the_cross_encoder_did_not_score():
+    """A lexical/TEXT fallback never runs the CE, so there is no sort key to group on."""
+    response = _response_with_ce([(0.9, None), (0.2, None)])
+    basis, scores = wf.resolve_score_basis(response["results"])
+    assert basis == wf.SCORE_BASIS_DELIVERED
+    assert scores == [0.9, 0.2]
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    assert [t["score"] for t in record["hits[]"]] == [0.9, 0.2]
+
+
+def test_a_partially_scored_query_falls_back_WHOLE_rather_than_mixing_two_bases():
+    """All-or-nothing per query.
+
+    A list mixing CE scores and delivered scores would have epsilon comparing numbers from
+    two different scales — precisely the defect this replaces. Falling back for the whole
+    query is merely conservative.
+    """
+    response = _response_with_ce([(0.9, 0.70), (0.2, None), (0.1, 0.10)])
+    basis, scores = wf.resolve_score_basis(response["results"])
+    assert basis == wf.SCORE_BASIS_DELIVERED
+    assert scores == [0.9, 0.2, 0.1], "no CE score may leak into a delivered-basis list"
+
+
+def test_the_score_basis_and_both_other_scores_are_observed_never_diffed():
+    """`scoreBasis` tells a reader which number grouped; the other two are for diagnosis."""
+    response = _response_with_ce([(0.9, 0.70), (0.2, 0.60)])
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    observed = wf.observed_query_counts(response, record)
+    assert observed["scoreBasis"] == wf.SCORE_BASIS_CROSS_ENCODER
+    assert observed["crossEncoderScores"] == [0.70, 0.60]
+    assert observed["fusionScores"] == [0.9, 0.2]
+    assert observed["scores"] if "scores" in observed else True
+    # None of the three may be a diffed field.
+    for name in ("scoreBasis", "crossEncoderScores", "fusionScores"):
+        assert name not in record
+
+
+def test_the_cutoff_slice_uses_the_cross_encoder_basis_too():
+    """The slice and the stored tags must mean the same number, or they disagree on where
+    the cutoff group ends — the disagreement the cutoff rule exists to remove."""
+    # CE scores tie at the rank-2 boundary (limit 2); delivered scores do not.
+    pairs = [(0.9, 0.90), (0.8, 0.50), (0.1, 0.5005), (0.05, 0.20)]
+    record = wf.capture_query_record(_response_with_ce(pairs), limit=2, epsilon=0.01)
+    assert record["hitCount"] == 2, "hitCount stays the TOP-K count"
+    assert len(record["hits[]"]) == 3,         "the slice must extend to the whole CE tie group holding rank 2"
+
+
 def test_candidate_pool_counts_are_observed_only():
     """`totalHits` and `trace.stageCardinality` are pool sizes, not evidence.
 

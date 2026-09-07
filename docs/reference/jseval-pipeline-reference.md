@@ -412,9 +412,32 @@ differ never compares scores, only the groups it derives from them; and the tie-
 consulted **only when the delivered order actually changed** — an unconditional partition
 comparison is itself jitter-sensitive (measured: one query's hits were identical in identity *and*
 order, but a gap moved 0.010470 → 0.009788 across the epsilon and the query read as a regression
-with nothing changed). Grouping is over *consecutive* hits and the delivered order is not
-score-sorted (`SearchResultMapper.java:133` applies freshness decay per hit without re-sorting), so
-the grouping is deliberately conservative: it under-permits, never over-permits.
+with nothing changed). Grouping is over *consecutive* hits, so it is deliberately conservative: it
+under-permits, never over-permits.
+
+**Which score is grouped on: the cross-encoder's, because that is the delivered sort key.** The
+list arrives in the cross-encoder's order — `KnowledgeSearchEngine.java:1077` applies
+`applyRerankOrder(…)` — while the score carried *on* the hit is the pre-rerank fusion score,
+freshness-decayed afterwards without re-sorting (`SearchResultMapper.java:129-134`, on for `hybrid`
+via `SearchPipelinePresets.java:53-54`). Grouping on that number grouped a CE-ordered list by an
+unrelated key: measured non-monotone in **all 12 queries of both** 2026-09-07 captures, 7–11
+inversions per 20 hits. The CE's own per-hit score is on the wire as a `CROSS_ENCODER` `HitStage`
+(`SearchTraceMapper.java:44-51`, `contracts/wire/knowledge.proto:289-294`) and is not gated by
+`include_detail`, so the capture reads it as the score-tagged `score`. The delivered and fusion
+scores stay in the non-diffed `observed` block (`scores`, `fusionScores`), with `scoreBasis`
+recording per query which number grouped. A query the CE did not score every hit for (a
+lexical/TEXT fallback, or hits outside the rerank window) falls back to the delivered score for the
+**whole** query — a list mixing two bases would have epsilon comparing different scales.
+
+**`scoreTieEpsilon` is not yet calibrated for this basis (open item).** The `0.01` above was
+measured against the *delivered* score, a roughly 0–1 normalised value. The cross-encoder emits
+**raw logits** (`CrossEncoderReranker.java:369-379` returns them unsigmoided), a scale spanning
+roughly −11…+11, so `0.01` is proportionally far tighter here — it will group *less*, which is the
+conservative direction, but may leave the class close to inert. The measurement could not be taken
+from the 2026-09-07 captures because CE scores were not recorded then. Take it from the next pair:
+for each identity-matched hit present in both captures, the delta between
+`observed.crossEncoderScores`; set `scoreTieEpsilon` just above the max, exactly as `0.01` was
+derived.
 
 **`equal-score-order` covers the tie group straddling the rank-K cutoff, because equal-score hits
 beyond K are unobserved at K** (K = the query spec's `limit`, 10 in the shipped fixture). Measured

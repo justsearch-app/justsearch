@@ -736,7 +736,60 @@ def _tie_index_groups(scores: list[Any], epsilon: float) -> list[list[int]]:
     return groups
 
 
-def compared_slice(hits: list[dict], limit: int, epsilon: float) -> list[dict]:
+#: The trace stage whose per-hit score DECIDES the delivered order. `KnowledgeSearchEngine`
+#: applies `applyRerankOrder(results, orderToApply, topK)` (:1077), so the list arrives in the
+#: cross-encoder's order, while the score ON the hit is the pre-rerank fusion score, freshness-
+#: decayed afterwards without re-sorting (`SearchResultMapper.java:129-134`). The CE's own score
+#: is appended as this stage by `SearchTraceMapper.mapHitStages` (:44-51) and is NOT gated by
+#: `include_detail` (that gates `detail`, not `score`).
+CROSS_ENCODER_STAGE = "cross-encoder"
+
+#: The fusion stage's per-hit score, kept in `observed` for diagnosis only.
+FUSION_STAGE = "fusion"
+
+#: What `equal-score-order` grouped on. `cross-encoder` is the delivered sort key; `delivered`
+#: is the fallback for a query the CE did not score (a lexical/TEXT fallback, or a hit outside
+#: the rerank window).
+SCORE_BASIS_CROSS_ENCODER = "cross-encoder"
+SCORE_BASIS_DELIVERED = "delivered"
+
+
+def stage_score(hit: dict, stage_id: str) -> Any:
+    """The per-hit score of one trace stage, or None when that stage is absent for this hit."""
+    for stage in hit.get("trace") or []:
+        if isinstance(stage, dict) and stage.get("id") == stage_id:
+            return stage.get("score")
+    return None
+
+
+def resolve_score_basis(hits: list[dict]) -> tuple[str, list[Any]]:
+    """``(basis, scores)`` — the scores `equal-score-order` must group on.
+
+    THE DELIVERED ORDER IS THE CROSS-ENCODER'S, so the cross-encoder's per-hit score is the
+    only number whose ties mean "these two could legitimately swap". Grouping on the score
+    carried on the hit — the pre-rerank fusion score, freshness-decayed after reranking without
+    re-sorting — grouped a CE-ordered list by an unrelated key: measured non-monotone in all 12
+    queries of both 2026-09-07 captures, 7-11 inversions per 20 hits, so roughly half of every
+    "consecutive tie group" was an artefact.
+
+    ALL-OR-NOTHING per query, deliberately. If any hit lacks a CE score the whole query falls
+    back to the delivered score. A list mixing two score bases would have epsilon comparing
+    numbers from different scales, which is precisely the defect this replaces; a uniform
+    fallback is merely conservative (it under-permits, as consecutive grouping already does).
+    A query the CE never ran for — a lexical fallback, `trace.effectiveMode` TEXT — is the
+    ordinary case for this branch, and `observed.scoreBasis` records it per query.
+    """
+    if not hits:
+        return SCORE_BASIS_CROSS_ENCODER, []
+    ce = [stage_score(h, CROSS_ENCODER_STAGE) for h in hits]
+    if all(_is_number(v) for v in ce):
+        return SCORE_BASIS_CROSS_ENCODER, ce
+    return SCORE_BASIS_DELIVERED, [h.get("score") for h in hits]
+
+
+def compared_slice(
+    hits: list[dict], limit: int, epsilon: float, scores: list[Any] | None = None
+) -> list[dict]:
     """The top ``limit`` hits PLUS the remainder of the tie group holding rank ``limit``.
 
     The capture asks the backend for ``2 * limit`` so that this group can be observed WHOLE;
@@ -750,19 +803,32 @@ def compared_slice(hits: list[dict], limit: int, epsilon: float) -> list[dict]:
     """
     if limit <= 0 or len(hits) <= limit:
         return list(hits)
-    for group in _tie_index_groups([h.get("score") for h in hits], epsilon):
+    basis_scores = scores if scores is not None else resolve_score_basis(hits)[1]
+    for group in _tie_index_groups(basis_scores, epsilon):
         if group[0] <= limit - 1 <= group[-1]:
             return list(hits[: group[-1] + 1])
     return list(hits[:limit])  # pragma: no cover - every index lands in some group
 
 
-def score_tagged(hits: Iterable[dict], project) -> list[dict]:
+def score_tagged(
+    hits: Iterable[dict], project, scores: list[Any] | None = None
+) -> list[dict]:
     """Build the ``equal-score-order`` representation: ``[{score, value}, ...]``.
 
     Self-contained on purpose — the differ never has to look up a sibling field to know
     which items tie.
+
+    ``scores`` is the basis :func:`resolve_score_basis` chose (the cross-encoder score, the
+    delivered sort key). It is passed in rather than re-derived so the capture's slice and the
+    stored tags cannot disagree about which number they mean. Omitted, it falls back to the
+    score carried on the hit — the pre-cutoff behaviour, kept for the synthetic responses in
+    the tests, which have no trace.
     """
-    return [{"score": h.get("score"), "value": project(h)} for h in hits]
+    hit_list = list(hits)
+    basis = scores if scores is not None else [h.get("score") for h in hit_list]
+    return [
+        {"score": basis[i], "value": project(h)} for i, h in enumerate(hit_list)
+    ]
 
 
 def hit_projection(hit: dict, paths: CorpusRootRewriter | None = None) -> dict:
@@ -832,7 +898,11 @@ def capture_query_record(
     before.
     """
     all_hits = list(response.get("results") or [])
-    hits = compared_slice(all_hits, limit, epsilon)
+    # Resolve the grouping basis ONCE, over the full returned list, and thread it into both the
+    # slice and the stored tags — deriving it twice would let them disagree about which number
+    # "equal score" means, the exact disagreement the cutoff rule exists to remove.
+    basis, basis_scores = resolve_score_basis(all_hits)
+    hits = compared_slice(all_hits, limit, epsilon, basis_scores)
     trace = response.get("searchTrace") or {}
     stages = list(trace.get("stages") or [])
     degradation = trace.get("degradation") or {}
@@ -866,7 +936,12 @@ def capture_query_record(
         # every query. The score survives only inside the score-tagged wrapper below, where
         # the differ uses it to derive tie groups and never compares it; the observed values
         # are recorded for the reader in the capture's non-diffed `observed` block.
-        "hits[]": score_tagged(hits, lambda h: hit_projection(h, paths)),
+        # Score-tagged on the CROSS-ENCODER score when the CE scored every hit — the number
+        # that decides the delivered order — falling back to the hit's delivered score
+        # otherwise. `observed.scoreBasis` records which, per query.
+        "hits[]": score_tagged(
+            hits, lambda h: hit_projection(h, paths), basis_scores[: len(hits)]
+        ),
         "trace.effectiveMode": trace.get("effectiveMode"),
         "trace.decisionKind": trace.get("decisionKind"),
         "trace.stageIds": [s.get("id") for s in stages],
@@ -1023,7 +1098,12 @@ def _build_search_body(spec: dict) -> dict:
 
 
 def observed_query_scores(response: dict) -> list:
-    """The raw hit scores, for the capture's non-diffed ``observed`` block.
+    """The DELIVERED per-hit scores — the freshness-decayed fusion score, not the sort key.
+
+    Named ``scores`` for continuity; it is the number carried on the hit. The number that
+    actually orders the list is the cross-encoder's, recorded beside this as
+    ``crossEncoderScores`` (see :func:`resolve_score_basis`), and the pre-decay fusion stage
+    score as ``fusionScores``. All three are observation only.
 
     Kept OUT of the query record on purpose: ``diff`` walks ``queries``/``chatTurns`` and
     treats every field there as declared-or-regression, so a jittering score placed among
@@ -1035,7 +1115,7 @@ def observed_query_scores(response: dict) -> list:
 
 
 def observed_query_counts(response: dict, record: dict) -> dict:
-    """``hitsCaptured`` / ``hitsCompared``, for the same non-diffed ``observed`` block.
+    """The per-query numbers the differ never compares, for the same ``observed`` block.
 
     ``hitsCaptured`` is how many hits the backend returned for the ``2 * K`` request;
     ``hitsCompared`` is how many landed in the compared slice (top K plus the rest of the
@@ -1051,9 +1131,20 @@ def observed_query_counts(response: dict, record: dict) -> dict:
     """
     trace = response.get("searchTrace") or {}
     stages = list(trace.get("stages") or [])
+    all_hits = list(response.get("results") or [])
+    basis, _ = resolve_score_basis(all_hits)
     return {
-        "hitsCaptured": len(response.get("results") or []),
+        "hitsCaptured": len(all_hits),
         "hitsCompared": len(record.get("hits[]") or []),
+        # WHICH number `equal-score-order` grouped on for this query, and the two it did not.
+        # `cross-encoder` is the delivered sort key; `delivered` means the CE did not score
+        # every hit (a lexical/TEXT fallback, or hits outside the rerank window) and the whole
+        # query fell back — recorded per query because the answer is per query.
+        "scoreBasis": basis,
+        "crossEncoderScores": [
+            stage_score(h, CROSS_ENCODER_STAGE) for h in all_hits
+        ],
+        "fusionScores": [stage_score(h, FUSION_STAGE) for h in all_hits],
         # Candidate-pool sizes, recorded but NEVER compared (see `capture_query_record`): a
         # reader diagnosing a hit-set difference wants them, and diffing them reports pool
         # churn as a semantic regression.
