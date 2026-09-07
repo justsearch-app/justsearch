@@ -1,0 +1,13 @@
+Stage A item A13 live check (orchestrator, 2026-09-07 23:19, tree 80d070df7, dev machine).
+
+Launch: node scripts/dev/dev-runner.cjs start --api-port 33221 --clean hard --skip-build
+  worker component LIFECYCLE_STATE_READY at 4,674 ms from launch; lifecycle DEGRADED with
+  reason inference.offline until the AI runtime autostarts (expected).
+JVMs under the run's tree before ingest: 1 (HeadlessApp). No IndexerWorker process exists;
+  :modules:indexer-worker:installDist no longer exists; install/ui/lib holds 225 jars.
+Ingest: POST /api/knowledge/ingest docs/explanation -> accepted 30; wait_pipeline_complete
+  -> True (every enabled stage at 100 percent). JVMs after ingest: 2 (HeadlessApp plus the
+  extraction child pool, which the design keeps out of process, 3.1).
+Search: POST /api/knowledge/search {"query":"suicide pact heartbeat worker","limit":5}
+  -> totalHits 35, effectiveMode HYBRID, top hit docs/explanation/02-process-coordination.md.
+Status: docCount 35. Stop: dev-runner stop -> ok, ports closed.
