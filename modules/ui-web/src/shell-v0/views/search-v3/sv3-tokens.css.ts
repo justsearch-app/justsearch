@@ -191,12 +191,16 @@ export const sv3Tokens = css`
        what a boundary has to do; clearing only the outside would move the failure rather than close
        it. Still a color-mix off '--color-white' rather than a literal, so the one primitive keeps
        driving both themes' edges.
-       Residual, recorded rather than silently inherited: '.glass::after' spends 55% of this alpha
-       back while '--composer-rest' is 1 (864 Layer 1(d)), so the UNFOCUSED edge is still below the
-       floor. Closing that is a design call on 864's resting knob — 864 chose the surface lift as the
+       SCOPE — 1.4.11 IS NOT CLOSED FOR THIS COMPONENT, and the ratios above are the ENGAGED edge
+       only (the composer while the field holds focus). '.glass::after' spends 55% of this alpha back
+       while '--composer-rest' is 1 (864 Layer 1(d)), so the edge a reader sees BEFORE clicking in
+       computes 1.71:1 dark / 1.58:1 light — still well under the floor. That is pinned as a failing
+       assertion in 'sv3-tokens.test.ts' ("KNOWN OPEN: the RESTING edge…") rather than left to prose,
+       so a future fix has to flip it deliberately. It is not closed here because 864's resting knob
+       was an OWNER DECISION about the resting affordance: 864 chose the surface lift as the
        de-emphasis precisely because it "spends no TEXT contrast", and the outline fade it added
-       alongside is the half that does spend non-text contrast — so it is named here for the measured
-       audit rather than decided from a token sheet. */
+       alongside is the half that does spend non-text contrast. Dropping that fade, or clamping the
+       spend at the floor, is a design call — not one a token sheet gets to make on its own. */
     --composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent);
     --composer-shadow: none;
     --composer-highlight: inset 0 1px rgb(255 255 255 / 3%);
@@ -454,8 +458,9 @@ export const sv3Tokens = css`
        and still only 1.16:1 over the page; 45% is the smallest 5% step clearing 3:1 against both
        adjacent colours here (page rgb(252,252,252) → 3.28:1, card rgb(255,255,255) → 3.36:1). Light
        needs a HIGHER alpha than dark because its edge darkens toward a near-white page instead of
-       lightening away from a near-black one, so the same nominal step buys less separation. The
-       resting-knob residual noted on the dark declaration applies to this theme identically. */
+       lightening away from a near-black one, so the same nominal step buys less separation. These
+       are the ENGAGED ratios; the resting-knob gap noted on the dark declaration applies here
+       identically and measures 1.58:1, so 1.4.11 is open in this theme too. */
     --composer-outline: rgb(0 0 0 / 45%);
     --composer-shadow: 0 12px 28px -18px rgb(0 0 0 / 40%);
     --composer-highlight: none;

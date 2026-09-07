@@ -646,8 +646,9 @@ describe('the composer glass is token-fed material, so dark inverts without a co
     expect(dark).toContain(
       '--composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white))',
     );
-    // Tempdoc 859 — 5% → 35%: the WCAG 1.4.11 floor, pinned as a value here and as a computed ratio
-    // in the contrast block below (this line would happily accept a value that still failed).
+    // Tempdoc 859 — 5% → 35%: the ENGAGED edge's WCAG 1.4.11 floor, pinned as a value here and as a
+    // computed ratio in the contrast block below (this line would happily accept a value that still
+    // failed). The RESTING edge remains open — see the "KNOWN OPEN" case in that block.
     expect(dark).toContain(
       '--composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent)',
     );
@@ -1375,8 +1376,12 @@ describe('the chat column caps on one token, not three literals', () => {
  * dark `--background` = rgb(10,10,10), light `--background` = rgb(252,252,252). The pin is guarded —
  * the first case re-checks that the sheet still derives those bases from the same primitives, so a
  * palette change cannot leave this arithmetic quietly describing a window that no longer exists.
+ *
+ * SCOPE, stated up front (review F1): what is CLOSED here is the ENGAGED edge — the composer while
+ * the field holds focus. The RESTING edge is still below the floor and has its own case at the
+ * bottom of this block, asserting that it fails. 1.4.11 is not closed for this component.
  */
-describe('859: the composer boundary meets WCAG 1.4.11 in both themes', () => {
+describe('859: the ENGAGED composer boundary meets WCAG 1.4.11 in both themes', () => {
   const WCAG_NON_TEXT = 3;
 
   /** Live-measured sRGB of the two page bases (see the block comment for why they are pinned). */
@@ -1422,7 +1427,7 @@ describe('859: the composer boundary meets WCAG 1.4.11 in both themes', () => {
     expect(lightBlock).toContain('--card: var(--color-white)');
   });
 
-  it('dark: the edge clears 3:1 against BOTH adjacent colours (it was 1.21:1 at 5% white)', () => {
+  it('dark: the ENGAGED edge clears 3:1 against BOTH adjacent colours (it was 1.21:1 at 5% white)', () => {
     const glass = mix(DARK_PAGE, WHITE, 0.96); // --composer-glass-surface
     const edge = over(WHITE, alphaOf(darkBlock), glass);
     // The OUTSIDE — the failure the audit reported, at 1.21:1.
@@ -1435,7 +1440,7 @@ describe('859: the composer boundary meets WCAG 1.4.11 in both themes', () => {
     expect(contrastRatio(over(WHITE, 0.05, glass), DARK_PAGE)).toBeCloseTo(1.215, 3);
   });
 
-  it('light: the edge clears 3:1 against both, which 8% black did not either', () => {
+  it('light: the ENGAGED edge clears 3:1 against both, which 8% black did not either', () => {
     const card = WHITE; // --composer-glass-surface: var(--card) → --color-white
     const edge = over(BLACK, alphaOf(lightBlock), card);
     expect(contrastRatio(edge, LIGHT_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
@@ -1443,6 +1448,48 @@ describe('859: the composer boundary meets WCAG 1.4.11 in both themes', () => {
     // "The light theme's 8% black edge is the stronger half" was true AND still nowhere near 3:1 —
     // pinned so the audit's wording is never read as "light was fine".
     expect(contrastRatio(over(BLACK, 0.08, card), LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+  });
+
+  /**
+   * THE KNOWN-OPEN HALF (review F1). Raising the token fixed the edge a reader sees while TYPING and
+   * did not fix the one they see before they click in — and the two cases above, asserting only the
+   * raw token, would have stayed green while that stayed broken. So the failure is pinned as a
+   * failure: it is measured, it is attributed, and a future fix has to come here and flip it
+   * deliberately rather than discovering it by accident.
+   *
+   * The mechanism is `.glass::after`'s `border-color: color-mix(… var(--composer-outline)
+   * calc(100% - 55% * var(--composer-rest)) …)` — tempdoc 864 Layer 1(d)'s RESTING KNOB, which
+   * spends 55% of the token's alpha back while the field does not hold focus. That was an OWNER
+   * DECISION about the resting affordance, not an oversight, so it is not something a token sheet
+   * gets to overturn on its own: 864 chose the surface lift as the de-emphasis precisely because it
+   * "spends no TEXT contrast", and the outline fade it added alongside is the half that does spend
+   * NON-text contrast. Closing it means either dropping the fade from the border (leaving the
+   * de-emphasis entirely on the surface, as 864's own rationale would suggest) or clamping the spend
+   * at the 3:1 floor — both design calls, both owner's.
+   */
+  it('KNOWN OPEN: the RESTING edge is still below 3:1 in both themes (864 resting knob)', () => {
+    // `--composer-rest: 1` while the field is unfocused, so the border keeps 45% of the token alpha.
+    const restSpend = 1 - 0.55;
+    expect(
+      styleTextOf(Sv3Composer).replace(/\s+/g, ' '),
+      'the resting knob moved — re-measure before trusting the numbers below',
+    ).toContain('var(--composer-outline) calc(100% - 55% * var(--composer-rest))');
+
+    const glass = mix(DARK_PAGE, WHITE, 0.96);
+    const restingDark = over(WHITE, alphaOf(darkBlock) * restSpend, glass);
+    const restingLight = over(BLACK, alphaOf(lightBlock) * restSpend, WHITE);
+
+    // Measured, not asserted-away: these are the numbers, and they are under the floor.
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeCloseTo(1.71, 2);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeCloseTo(1.58, 2);
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+
+    // The engaged edge, by contrast, IS closed — which is what makes this a scoped gap rather than
+    // "the fix did nothing".
+    expect(contrastRatio(over(WHITE, alphaOf(darkBlock), glass), DARK_PAGE)).toBeGreaterThanOrEqual(
+      WCAG_NON_TEXT,
+    );
   });
 });
 

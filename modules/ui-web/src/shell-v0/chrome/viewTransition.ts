@@ -65,14 +65,24 @@ function isBenignTransitionAbort(reason: unknown): boolean {
  * swallowed (the transition is progressive enhancement — worst case, no animation), and anything else
  * still reaches the app's own diagnostic channel rather than being silently eaten. That distinction is
  * the point: this handler must not become a blanket `.catch(() => {})`.
+ *
+ * <p>ONE REPORT PER TRANSITION (859 review F2). All three faces have to be ADOPTED — an unadopted
+ * rejected promise is the unhandled rejection this function exists to stop — but they are three views
+ * of one transition, not three failures. A throwing update callback rejects `updateCallbackDone` and
+ * takes `ready` and `finished` down with it, all carrying the same reason, so a per-face log would
+ * put the same fault in the reader's console three times and make one broken transition look like a
+ * storm. The latch is per CALL, so a second, genuinely separate transition still reports.
  */
 export function adoptTransitionPromises(transition: unknown): void {
   const handle = transition as ViewTransitionHandle | null | undefined;
   if (handle === null || typeof handle !== 'object') return;
+  let reported = false;
   for (const face of [handle.ready, handle.finished, handle.updateCallbackDone] as const) {
     if (typeof face?.catch !== 'function') continue;
     void face.catch((reason: unknown) => {
       if (isBenignTransitionAbort(reason)) return;
+      if (reported) return; // the sibling faces are the same failure, seen from another side
+      reported = true;
       appLog.error('View transition failed', {
         reason:
           reason instanceof Error ? { name: reason.name, message: reason.message } : String(reason),

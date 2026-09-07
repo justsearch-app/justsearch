@@ -3585,6 +3585,15 @@ export class UnifiedChatView extends JfElement {
     this.unifiedEvents = res.events;
     this.unifiedLifecycles = res.lifecycles;
     this.hydrateAnswerEvidenceFromRecord(res.events);
+    // Tempdoc 859 review F4 — the SECOND arrival of content, and the one `loadConversation`'s own
+    // gate cannot see. That gate reads `thread`, but `renderResumePrompt` counts `unifiedEvents` as
+    // content too, and this refresh is fired `void` BEFORE the resume awaits, so its events land
+    // after the gate has already run. A record whose content lives only here — a delegate run with
+    // no chat messages of its own — would still have shown the blank stage. Same predicate, second
+    // arrival point: the exit is keyed on there being something to read, wherever it turned up.
+    // Inert on every other caller by construction (`leaveRetrieveTier` returns unless the tier IS
+    // retrieve, and a run dispatch or a stream terminal cannot happen from the retrieve tier).
+    if (this.unifiedEvents.length > 0) this.leaveRetrieveTier();
     this.requestUpdate();
   }
 

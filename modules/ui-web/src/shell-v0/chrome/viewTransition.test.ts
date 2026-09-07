@@ -169,6 +169,48 @@ describe('viewTransition rejection adoption (tempdoc 859)', () => {
     }
   });
 
+  it('reports ONE failure once, even though all three faces reject with it (review F2)', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    const logged = vi.spyOn(appLog, 'error').mockImplementation(() => {});
+    try {
+      // The real shape of a throwing update callback: `updateCallbackDone` rejects and takes `ready`
+      // and `finished` down with it, all carrying the SAME reason. Three faces, one fault — a
+      // per-face log would triple it in the reader's console and make one broken transition read as
+      // a storm. All three are still adopted, which is why `unhandled` stays empty.
+      const reason = domError('TypeError', 'the update callback threw');
+      adoptTransitionPromises({
+        ready: rejecting(reason),
+        finished: rejecting(reason),
+        updateCallbackDone: rejecting(reason),
+      });
+      await settle();
+      expect(unhandled, 'a face was left unadopted to make the count come out').toEqual([]);
+      expect(logged).toHaveBeenCalledTimes(1);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      logged.mockRestore();
+    }
+  });
+
+  it('the once-latch is per transition, so a SECOND failure still reports', async () => {
+    // The latch must not become "report the first fault this session and go quiet". Two separate
+    // adoptions are two transitions and two reports.
+    const logged = vi.spyOn(appLog, 'error').mockImplementation(() => {});
+    try {
+      adoptTransitionPromises({ ready: rejecting(domError('TypeError', 'first')) });
+      await settle();
+      adoptTransitionPromises({ ready: rejecting(domError('TypeError', 'second')) });
+      await settle();
+      expect(logged).toHaveBeenCalledTimes(2);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   it('tolerates the handle shapes a browser may hand back', () => {
     // Progressive enhancement: an older/partial implementation, or a stub returning nothing at all,
     // must not turn adoption itself into the fault.
