@@ -53,6 +53,27 @@ function main() {
   assert.ok(withHeap.includes('-XX:HeapDumpPath=C:/logs'));
   assert.ok(!flags(base).some((f) => f.startsWith('-Xmx')), 'no default -Xmx (tempdoc 730 Increment-4)');
 
+  // 5. The JDWP listener (lane F stage A item A11 follow-up). It moved here from
+  // WorkerSpawner.addDevHotReloadFlags, which built the deleted Worker child's command line —
+  // between A11 and this change nothing emitted it, so HotSwapPush had nothing to attach to and
+  // `reload` silently degraded to a warm restart. Pinned as an exact string because a malformed
+  // -agentlib:jdwp does not degrade: the JVM refuses to start, and the failure surfaces as a dev
+  // stack that will not come up rather than as a hot reload that does not work.
+  assert.ok(
+    !flags(base).some((f) => f.startsWith('-agentlib:jdwp')),
+    'no JDWP listener unless hot reload asked for one: an open debug port is remote code execution',
+  );
+  const withJdwp = flags({ ...base, debugPort: 5011 });
+  assert.ok(
+    withJdwp.includes('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:5011'),
+    'JDWP is emitted on the Engine line, non-suspending and bound to loopback',
+  );
+  assert.deepEqual(
+    withJdwp.filter((f) => !f.startsWith('-agentlib:jdwp')),
+    flags(base),
+    'enabling hot reload adds the listener and changes nothing else about the flag set',
+  );
+
   console.log('test-dev-runner-head-java-opts: OK');
 }
 

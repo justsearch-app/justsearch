@@ -959,12 +959,15 @@ public enum EnvRegistry {
     /** Enables dev hot-reload service restart on recompile (default false). */
     DEV_HOTRELOAD("justsearch.dev.hotreload", "JUSTSEARCH_DEV_HOTRELOAD", LifecycleStage.PERMANENT),
 
-    /** Path to worker-services classes directory (dev only). */
-    DEV_HOTRELOAD_CLASSES_DIR(
-        "justsearch.dev.hotreload.classesDir", "JUSTSEARCH_DEV_HOTRELOAD_CLASSES_DIR", LifecycleStage.PERMANENT),
-
-    /** JDWP debug port for HotSwapPush bytecode updates (default 5005). */
-    DEV_DEBUG_PORT("justsearch.dev.debug.port", "JUSTSEARCH_DEV_DEBUG_PORT", LifecycleStage.PERMANENT),
+    // Lane F stage A item A11 deleted DEV_HOTRELOAD_CLASSES_DIR and DEV_DEBUG_PORT from here.
+    // Both were read by exactly one place, WorkerSpawner.addDevHotReloadFlags, which built the
+    // Worker CHILD's command line — the classes dir onto its classpath, the port into its
+    // -agentlib:jdwp. There is no child, so there is no Java reader, and the config-surface gate
+    // caught them as dead keys. They are not deleted as *settings*: JUSTSEARCH_DEV_DEBUG_PORT is
+    // still an operator override, read by the dev-runner from its own environment and applied to
+    // the Engine's launch flags (scripts/dev/dev-runner.cjs buildHeadJavaOpts). A launch flag is
+    // the launcher's input, and declaring it here said the running JVM could read it back, which
+    // was never true and is now not even nearly true.
 
     /** 371: Content hash of the Worker distribution (stale-JVM detection). */
     BUILD_STAMP("justsearch.build.stamp", "JUSTSEARCH_BUILD_STAMP", LifecycleStage.PERMANENT),

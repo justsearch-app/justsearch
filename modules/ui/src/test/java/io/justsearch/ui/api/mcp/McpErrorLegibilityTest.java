@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.justsearch.app.services.worker.KnowledgeClientException;
 import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -224,9 +225,20 @@ final class McpErrorLegibilityTest {
     return java.util.stream.Stream.of(
         Arguments.of(new UnsupportedOperationException("unsupported operation"), ApiErrorCode.NOT_SUPPORTED),
         Arguments.of(new IllegalArgumentException("invalid query"), ApiErrorCode.INVALID_REQUEST),
-        Arguments.of(io.grpc.Status.UNAVAILABLE.withDescription("worker restarting").asRuntimeException(),
+        // Lane F review B1: these two cases used to construct io.grpc.StatusRuntimeException. They
+        // were the transport's vocabulary, and item A6 stopped the client from speaking it — the
+        // MCP surface can no longer be handed one of these by anything, so a test that keeps
+        // producing them is asserting a classification of an exception that cannot arrive. The
+        // port's own failure type carries the same statuses, and it is what reaches this surface
+        // now, so the two rows move onto it rather than being deleted: the property is that a
+        // worker failure keeps its API policy through the MCP serialization, which is unchanged.
+        Arguments.of(
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.UNAVAILABLE, "worker restarting"),
             ApiErrorCode.SERVICE_UNAVAILABLE),
-        Arguments.of(io.grpc.Status.DEADLINE_EXCEEDED.asRuntimeException(), ApiErrorCode.TIMEOUT),
+        Arguments.of(
+            new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED, "slow"),
+            ApiErrorCode.TIMEOUT),
         Arguments.of(new RuntimeException("unclassified exception"), ApiErrorCode.INTERNAL_ERROR));
   }
 

@@ -156,9 +156,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.CONFIG_PATH | permanent | - | JUSTSEARCH_CONFIG | justsearch.config | CONFIG_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.CONTEXT_SIZE | permanent | - | JUSTSEARCH_CONTEXT_SIZE | justsearch.context.size | CONTEXT_SIZE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.DATA_DIR | permanent | - | JUSTSEARCH_DATA_DIR | justsearch.data.dir | DATA_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.DEV_DEBUG_PORT | permanent | - | JUSTSEARCH_DEV_DEBUG_PORT | justsearch.dev.debug.port | DEV_DEBUG_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.DEV_HOTRELOAD | permanent | - | JUSTSEARCH_DEV_HOTRELOAD | justsearch.dev.hotreload | DEV_HOTRELOAD | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.DEV_HOTRELOAD_CLASSES_DIR | permanent | - | JUSTSEARCH_DEV_HOTRELOAD_CLASSES_DIR | justsearch.dev.hotreload.classesDir | DEV_HOTRELOAD_CLASSES_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_BACKEND | permanent | - | JUSTSEARCH_EMBED_BACKEND | justsearch.embed.backend | EMBED_BACKEND | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_CONTEXT_LENGTH | permanent | - | JUSTSEARCH_EMBED_CONTEXT_LENGTH | justsearch.embed.context_length | EMBED_CONTEXT_LENGTH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_DIMENSION_OVERRIDE | permanent | - | JUSTSEARCH_EMBED_DIM | justsearch.embed.dimension | EMBED_DIMENSION_OVERRIDE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

@@ -656,7 +656,7 @@ public class HeadlessApp {
     ConfigStore.setGlobal(configStore);
 
     maybeAutoSelectCuda12Variant(settings, configStore);
-    maybeMirrorOrtNativePath();
+    maybeMirrorOrtNativePath(configStore);
 
     Path dataDir = PlatformPaths.resolveDataDir();
     SnapshotResult snapshot =
@@ -712,7 +712,7 @@ public class HeadlessApp {
    * version-matched (tempdoc 772 §J item 2).
    *
    * <p><b>Why this is here and not in the Worker any more.</b> This is the second half of
-   * {@link #maybeMirrorOrtNativePath()}. That method resolves <em>JustSearch's</em> config key
+   * {@link #maybeMirrorOrtNativePath(ConfigStore)}. That method resolves <em>JustSearch's</em> config key
    * {@code justsearch.onnxruntime.native_path}; this one converts it into <em>ORT's</em>
    * {@code onnxruntime.native.path} system property, which ORT reads once, at class-init, and never
    * again. In the split architecture the two halves lived in two processes: the Head mirrored the
@@ -723,7 +723,7 @@ public class HeadlessApp {
    * CPU on a machine with a complete CUDA pack installed. Nothing failed — ORT falls back — which
    * is why only a wiring test can see it.
    *
-   * <p><b>Why after the rebuild.</b> {@link #maybeMirrorOrtNativePath()} writes a system property at
+   * <p><b>Why after the rebuild.</b> {@link #maybeMirrorOrtNativePath(ConfigStore)} writes a system property at
    * config ordinal 500, and the {@code ResolvedConfig} built above it was built before that write.
    * Reading {@code paths().ortNativePath()} off the pre-rebuild config would reproduce the tempdoc
    * 883 §C.5c defect one field over — a boot-time pack detection that the reader never sees. The
@@ -755,7 +755,70 @@ public class HeadlessApp {
     }
   }
 
-  private static void maybeMirrorOrtNativePath() {
+  /**
+   * The ONNX Runtime native directory named by the {@code justsearch.ai.onnxruntime_variant_id}
+   * override, or by the variant the active llama-server exe sits under.
+   *
+   * <p>Carried over from {@code WorkerSpawner} at the lane F review, unchanged in behaviour: an
+   * explicit variant id wins, otherwise the id is parsed out of the llama-server exe path
+   * ({@code .../native-bin/llama-server/variants/<id>/...}), and the result is only used if the
+   * corresponding {@code .../native-bin/onnxruntime/variants/<id>} directory actually exists.
+   *
+   * @return the directory, or {@code null} if no variant is configured or the directory is absent
+   */
+  private static Path variantOrtNativeDir(Path dataDir, ConfigStore configStore) {
+    if (dataDir == null || configStore == null) {
+      return null;
+    }
+    ResolvedConfig rc = configStore.get();
+    if (rc == null) {
+      return null;
+    }
+    String variantId = rc.ai().onnxruntimeVariantId();
+    if (variantId == null || variantId.isBlank()) {
+      variantId =
+          variantIdFromLlamaServerExe(
+              rc.ai().serverExe() != null ? rc.ai().serverExe().toString() : null);
+    }
+    if (variantId == null || variantId.isBlank()) {
+      return null;
+    }
+    Path dir =
+        dataDir
+            .resolve("native-bin")
+            .resolve("onnxruntime")
+            .resolve("variants")
+            .resolve(variantId.trim());
+    return Files.isDirectory(dir) ? dir : null;
+  }
+
+  /**
+   * Parses the variant id out of a llama-server exe path — the segment after
+   * {@code native-bin/llama-server/variants}. Returns {@code null} for anything else, including a
+   * path that does not contain the marker at all.
+   */
+  static String variantIdFromLlamaServerExe(String exePath) {
+    if (exePath == null || exePath.isBlank()) {
+      return null;
+    }
+    try {
+      Path p = Path.of(exePath).toAbsolutePath().normalize();
+      int n = p.getNameCount();
+      for (int i = 0; i + 2 < n; i++) {
+        if ("llama-server".equalsIgnoreCase(p.getName(i).toString())
+            && "variants".equalsIgnoreCase(p.getName(i + 1).toString())) {
+          String variantId = p.getName(i + 2).toString();
+          return variantId.isBlank() ? null : variantId;
+        }
+      }
+      return null;
+    } catch (RuntimeException expected) {
+      // InvalidPathException and friends: a malformed exe path is "no variant", not a boot failure.
+      return null;
+    }
+  }
+
+  private static void maybeMirrorOrtNativePath(ConfigStore configStore) {
     try {
       Path home = PlatformPaths.resolveDataDir();
       if (home == null) {
@@ -786,6 +849,27 @@ public class HeadlessApp {
                 + " (source: env or sysprop); respecting user override");
         return;
       }
+
+      // The variant-derived candidate, ahead of the cuda12 default.
+      //
+      // Lane F item A11 deleted this without noticing: it lived in
+      // WorkerSpawner.resolveOnnxRuntimeNativePathBestEffort, which set the same key on the Worker
+      // CHILD's command line under the same "only if unset" guard. Deleting the spawner deleted
+      // the only reader of ResolvedConfig.ai().onnxruntimeVariantId, which is how the
+      // config-surface gate found it — an operator override that resolved, was reachable, and
+      // changed nothing. Re-homed rather than deleted, because a machine with a
+      // native-bin/onnxruntime/variants/<id> pack silently stopped using it at A11 and would go on
+      // silently not using it.
+      Path variantDir = variantOrtNativeDir(home, configStore);
+      if (variantDir != null) {
+        SystemPropertyUtils.setSysPropIfBlank(
+            "justsearch.onnxruntime.native_path", variantDir.toAbsolutePath().toString());
+        log.info(
+            "ORT native path set to {} (derived from the ONNX Runtime variant id)",
+            variantDir.toAbsolutePath());
+        return;
+      }
+
       String absPath = cuda12Dir.toAbsolutePath().toString();
       SystemPropertyUtils.setSysPropIfBlank("justsearch.onnxruntime.native_path", absPath);
       log.info("alpha.16 fix B: ORT native path set to {} (boot-time mirror)", absPath);

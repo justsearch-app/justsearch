@@ -169,6 +169,45 @@ final class HeadlessAppOrtNativePackTest {
     assertNull(System.getProperty(ORT_PROP));
   }
 
+  // ============================================================
+  // The variant-derived candidate (config-surface follow-up to item A11)
+  // ============================================================
+
+  /**
+   * {@code WorkerSpawner.resolveOnnxRuntimeNativePathBestEffort} derived the ORT native path from
+   * the ONNX Runtime variant id and set it on the Worker child's command line. Item A11 deleted the
+   * spawner, and with it the only reader of {@code ResolvedConfig.ai().onnxruntimeVariantId} — an
+   * operator override that still resolved, was still reachable, and changed nothing. The
+   * config-surface gate is what found it, which is the point of that gate; these are the assertions
+   * that make the re-homing real rather than a moved comment.
+   */
+  @Test
+  @DisplayName("the variant id names an ONNX Runtime directory, and it is parsed from the exe path")
+  void variantIdIsParsedFromTheLlamaServerExePath() {
+    assertEquals(
+        "cuda12",
+        HeadlessApp.variantIdFromLlamaServerExe(
+            "C:/data/native-bin/llama-server/variants/cuda12/llama-server.exe"));
+    assertEquals(
+        "cuda12",
+        HeadlessApp.variantIdFromLlamaServerExe(
+            "C:\\data\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe"),
+        "the separator is the platform's; the parse must not depend on which one the config used");
+    assertNull(
+        HeadlessApp.variantIdFromLlamaServerExe("C:/data/native-bin/llama-server/llama-server.exe"),
+        "no variants segment means no variant, not a guess at the parent directory's name");
+    assertNull(HeadlessApp.variantIdFromLlamaServerExe(""));
+    assertNull(HeadlessApp.variantIdFromLlamaServerExe(null));
+  }
+
+  @Test
+  @DisplayName("a malformed exe path is 'no variant', not a boot failure")
+  void aMalformedExePathIsSurvivable() {
+    // This runs during config resolution, before anything is serving. An InvalidPathException here
+    // would take the Engine down over a GPU convenience.
+    assertNull(HeadlessApp.variantIdFromLlamaServerExe("C:/data/\u0000/llama-server/variants/x/a.exe"));
+  }
+
   @Test
   @DisplayName("a boot with no config at all does not take the Engine down")
   void nullConfigIsSurvivable() {

@@ -571,12 +571,13 @@ function isPidAlive(pid) {
   try { process.kill(n, 0); return true; } catch { return false; }
 }
 
-// Tempdoc 730 B1: worker.log lives under the (persistent, cross-run) dataDir and is rotated by
-// WorkerSpawner.java on the NEXT worker spawn — a fixed 2-generation rotation that a death run's
-// log can fall out of before anyone reads it (the reproduced incident: the death run's log was
-// already gone by the time it was inspected). Copy THIS run's current worker.log into the run's
-// OWN directory at stop time, while stopRun still knows unambiguously which run it belongs to —
-// this converts every future death from "inconclusive" (log overwritten) to "diagnosable".
+// Tempdoc 730 B1 (history): worker.log lives under the (persistent, cross-run) dataDir and, at
+// the time this was written, was rotated by WorkerSpawner.java on the NEXT worker spawn — a fixed
+// 2-generation rotation that a death run's log can fall out of before anyone reads it (the
+// reproduced incident: the death run's log was already gone by the time it was inspected). Copy
+// THIS run's current worker.log into the run's OWN directory at stop time, while stopRun still
+// knows unambiguously which run it belongs to — this converts every future death from
+// "inconclusive" (log overwritten) to "diagnosable".
 //
 // Tempdoc 730 Increment-4 review findings (2026-07-14): the naive guard "current file's mtime >=
 // the readiness-time stamp's mtime => it's still ours" is WRONG — a worker.log legitimately grows
@@ -584,8 +585,8 @@ function isPidAlive(pid) {
 // path, and that later mtime is *also* >= the earlier run's stamp. That guard would silently file
 // run B's content as run A's "verified" log (the reap-after-restart mislabel case).
 //
-// The reviewed plan's first choice of guard was file-identity via birthtime (WorkerSpawner
-// rotates by RENAMING worker.log -> worker.log.1 -> worker.log.2 on the next spawn, and a rename
+// The reviewed plan's first choice of guard was file-identity via birthtime (WorkerSpawner used to
+// rotate by RENAMING worker.log -> worker.log.1 -> worker.log.2 on the next spawn, and a rename
 // preserves birthtime while a fresh spawn's newly-created file gets a new one) — but a live probe
 // on this Windows/NTFS checkout disproved that assumption: NTFS file-system tunneling (the OS
 // caching a short-lived deleted/renamed-away file's metadata, incl. creation time, and handing it
@@ -596,7 +597,13 @@ function isPidAlive(pid) {
 // So this substitutes the plan's named fallback: SIZE-MONOTONICITY (a worker.log is append-only —
 // it only grows while a run owns it; a value smaller than what was stamped at readiness proves
 // the path was rotated/replaced under us) combined with rotation-NAME matching (worker.log.1/.2
-// are exactly where WorkerSpawner puts what it rotated away).
+// were exactly where WorkerSpawner put what it rotated away).
+//
+// Open question for lane F item A13: item A11 deleted WorkerSpawner along with the Worker child
+// process, which was the thing that wrote and rotated worker.log in the first place. Nothing
+// currently known to this comment's author writes or rotates that path anymore, so this
+// preservation step may now have no subject to preserve. This has NOT been verified either way —
+// flagged for A13 to resolve, not answered here — and this function's behavior is left unchanged.
 async function preserveWorkerLog(run, runPath) {
   const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   if (!dataDirAbs) return { preserved: false, reason: 'no_data_dir' };
@@ -648,10 +655,12 @@ async function preserveWorkerLog(run, runPath) {
 }
 
 // Tempdoc 730 Increment-4 review: capture the ownership-stamp identity of THIS run's worker.log
-// at the point cmdStart confirms backend HTTP-readiness — i.e. after WorkerSpawner's own startup
-// (and any rotation it performs on spawn) has settled, so the stamp names the log file this run
-// actually owns rather than one still mid-rotation. Null when the log doesn't exist yet (e.g. the
-// worker hasn't logged anything by the time HTTP readiness is confirmed).
+// at the point cmdStart confirms backend HTTP-readiness — i.e., at the time this was written,
+// after WorkerSpawner's own startup (and any rotation it performed on spawn) had settled, so the
+// stamp names the log file this run actually owns rather than one still mid-rotation. Null when
+// the log doesn't exist yet (e.g. the worker hasn't logged anything by the time HTTP readiness is
+// confirmed). Item A11 later deleted WorkerSpawner and the Worker child process it started; see
+// the "Open question for lane F item A13" note above preserveWorkerLog for the open consequence.
 function captureWorkerLogStamp(dataDirAbs) {
   try {
     const st = fs.statSync(path.join(dataDirAbs, 'logs', 'worker.log'));
@@ -724,7 +733,7 @@ function buildStopReport({
 // diagnosed (tempdoc 730 Increment-4 review findings, 2026-07-14), so no default bound is emitted.
 // Pure function (no process/env access beyond the passed-in values) so the generated flags are
 // unit-testable without spawning a JVM.
-function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, headHeap }) {
+function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, headHeap, debugPort }) {
   const heapBound = headHeap && String(headHeap).trim() ? String(headHeap).trim() : null;
   return [
     existingJavaOpts,
@@ -741,6 +750,19 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     heapBound ? `-Xmx${heapBound}` : null,
     '-XX:+HeapDumpOnOutOfMemoryError',
     logsDir ? `-XX:HeapDumpPath=${logsDir}` : null,
+    // Hot reload's JDWP listener. Lane F item A11: this flag was built by
+    // WorkerSpawner.addDevHotReloadFlags for the Worker CHILD's command line. Deleting the
+    // spawner deleted the listener, so from A11 until here HotSwapPush had nothing to connect
+    // to — `reload` compiled, failed to attach, and the dev loop was a warm restart. There is
+    // one JVM now, so the flag belongs on the Engine's own line.
+    //
+    // suspend=n, and bound to loopback: this is a local dev affordance, and a JDWP port is
+    // remote code execution by design. The caller only passes a port once it has confirmed the
+    // port is free (the DEBUG_PORT_UNAVAILABLE verdict), because a JDWP address already in use
+    // does not degrade — the JVM refuses to start.
+    debugPort
+      ? `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:${debugPort}`
+      : null,
   ].filter(Boolean).join(' ');
 }
 
@@ -821,13 +843,14 @@ function resolveProvenance(distFromRoot = null) {
  * Tempdoc 844 §4.2 R3 — the per-run hot-reload record.
  *
  * The JDWP port was a hardcoded 5005 in three independent places (this file, the MCP `reload`
- * handler's default, and WorkerSpawner's fallback), so `reload` attached to "whatever listens on
- * 5005" with no way to tell whose VM that was. The port is chosen HERE, once, forwarded to the
+ * handler's default, and WorkerSpawner's fallback, back when WorkerSpawner existed — item A11
+ * later deleted it along with the Worker child process), so `reload` attached to "whatever listens
+ * on 5005" with no way to tell whose VM that was. The port is chosen HERE, once, forwarded to the
  * Worker via JUSTSEARCH_DEV_DEBUG_PORT and written into run.json; `reload` reads it from there.
  *
- * `classesDir` is the identity token: WorkerSpawner puts the same absolute path first on the
- * Worker's classpath (R4), so a pusher can confirm over JDI that the VM it attached to is the one
- * this run launched — instead of trusting a port number.
+ * `classesDir` is the identity token: WorkerSpawner used to put the same absolute path first on
+ * the Worker's classpath (R4), so a pusher could confirm over JDI that the VM it attached to was
+ * the one this run launched — instead of trusting a port number.
  *
  * An explicit JUSTSEARCH_DEV_DEBUG_PORT still wins (operator override); otherwise the first free
  * port from 5005 upward is taken, so a second stack cannot silently share the first one's port.
@@ -841,10 +864,13 @@ const HOTRELOAD_STAMP_SKEW_MS = 2000;
 /**
  * `<root>/modules/<module>/build/classes/java/main` — the identity-token layout.
  *
- * Three sides agree on this shape: this file writes it into run.json, WorkerSpawner puts the same
- * absolute path first on the Worker classpath (`devHotReloadClassesDir`), and the reload tool
- * parses the module back out of it (`reloadModuleFromClassesDir`). A function rather than an inline
- * join so a test can pin it against the parser instead of restating it.
+ * Three sides used to agree on this shape: this file writes it into run.json, WorkerSpawner put
+ * the same absolute path first on the Worker classpath (`devHotReloadClassesDir`), and the reload
+ * tool parses the module back out of it (`reloadModuleFromClassesDir`). Item A11 deleted
+ * WorkerSpawner along with the Worker child process, so that middle side no longer exists as
+ * described here; what (if anything) re-establishes classpath identity on the current, merged
+ * process has not been verified and is not asserted by this comment. A function rather than an
+ * inline join so a test can pin it against the parser instead of restating it.
  */
 function hotReloadClassesDir(root, module = HOTRELOAD_MODULE) {
   return toPosix(path.join(root, 'modules', module, 'build', 'classes', 'java', 'main'));
@@ -1593,9 +1619,11 @@ async function cmdStart(opts) {
   // Tempdoc 844 F4: this step said "Ensuring distribution is up-to-date" and ran `assemble`, which
   // does NOT run installDist — so a Java edit rebuilt the jars and left
   // modules/ui/build/install/ui (the tree the Head is launched from, a few lines below) untouched.
-  // Proven live 2026-08-19: after editing WorkerSpawner.java, a `start` without skipBuild launched a
-  // Worker with the OLD classpath, and an explicit installDist then did real work. The launched
-  // artifacts are now built by name. Warm cost measured in this worktree (config cache reused):
+  // Proven live 2026-08-19: after editing WorkerSpawner.java (deleted since — item A11 removed
+  // WorkerSpawner along with the Worker child process it launched), a `start` without skipBuild
+  // launched a Worker with the OLD classpath, and an explicit installDist then did real work.
+  // The launched artifacts are now built by name. Warm cost measured in this worktree (config
+  // cache reused):
   // assemble alone 891/957/923 ms, assemble + both installDist 1055/1156 ms - about +0.15 s, once
   // per start, to make the message true.
   if (!opts.skipBuild) {
@@ -1717,17 +1745,13 @@ async function cmdStart(opts) {
         // Tempdoc 542 §B Layer 3: Head reads this to know where to write op-leases.json.
         // Absent → Head's OperationLeaseService is a no-op (production / non-dev-runner).
         JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
-        // Hot-reload: enable JDWP + DevReloadManager on Worker (tempdoc 305).
-        // Tempdoc 844 R3: the port comes from the per-run record written into run.json below,
-        // so the pusher reads it instead of assuming 5005.
+        // Hot-reload: DevReloadManager's gate (tempdoc 305). The JDWP listener is no longer an
+        // env var the launched process reads back — it is a launch flag on JAVA_OPTS below, since
+        // lane F item A11 deleted the Worker child whose command line used to carry it.
         // Tempdoc 844 M3: set EXPLICITLY in both directions. Spreading process.env above means an
         // ambient JUSTSEARCH_DEV_HOTRELOAD=true would otherwise survive a run where this decided
-        // hot reload is off, and the Worker would prefix its classpath with a classes dir the run
-        // record says is not there — a mixed classpath that run.json denies.
+        // hot reload is off, and the Engine would report a reload capability the run record denies.
         JUSTSEARCH_DEV_HOTRELOAD: devHotReload.enabled ? 'true' : 'false',
-        ...(devHotReload.enabled ? {
-          JUSTSEARCH_DEV_DEBUG_PORT: String(devHotReload.debugPort),
-        } : {}),
         // Head startup flags: SerialGC (small heap, no throughput need), MetaspaceSize=128m,
         // -XX:-UsePerfData (skip hsperfdata file); tiered compilation left at its default
         // (lane F PR 0), so the set no longer forks on AOT-cache presence.
@@ -1740,6 +1764,7 @@ async function cmdStart(opts) {
           headDistStamp: devStackProvenance.headDistStamp,
           logsDir,
           headHeap: process.env.JUSTSEARCH_HEAD_HEAP,
+          debugPort: devHotReload.enabled ? devHotReload.debugPort : null,
         }),
         // NOTE: justsearch.repo.root is NOT set here. In Tauri production, lib.rs sets it to
         // headless_dir where sidecar ONNX models live. In dev mode, OnnxModelDiscovery's sidecar
@@ -1867,8 +1892,10 @@ async function cmdStart(opts) {
   }
 
   // Tempdoc 730 Increment-4 review: stamp worker.log's identity now that HTTP-readiness confirms
-  // WorkerSpawner's own startup (and any rotation-on-spawn) has settled — see preserveWorkerLog /
-  // captureWorkerLogStamp above for why this feeds the stop-time ownership guard.
+  // that, at the time this was written, WorkerSpawner's own startup (and any rotation-on-spawn)
+  // had settled — see preserveWorkerLog / captureWorkerLogStamp above for why this feeds the
+  // stop-time ownership guard, and for the open question item A11 (WorkerSpawner's deletion)
+  // raises for that guard.
   const workerLogStamp = captureWorkerLogStamp(dataDir);
 
   // indexBasePath capture (271 stage 4)
@@ -2397,7 +2424,8 @@ async function stopRun(opts) {
   if (!uiInfo.closed) errors.push(`UI port ${uiPort} still listening after stop timeout`);
 
   // Tempdoc 730 B1: snapshot this run's worker.log into its own run dir before the next
-  // start's WorkerSpawner rotation can carry it away.
+  // start's WorkerSpawner rotation can carry it away — at the time this was written; item A11
+  // later deleted WorkerSpawner, see the open question recorded above preserveWorkerLog.
   const workerLog = await preserveWorkerLog(run, runPath);
 
   const stopReport = buildStopReport({
