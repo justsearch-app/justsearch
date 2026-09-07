@@ -47,8 +47,6 @@ public final class WorkerSpawner implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(WorkerSpawner.class);
 
     private static final long HEARTBEAT_INTERVAL_MS = 1000;
-    /** OS energy-intent poll cadence (tempdoc 630). Energy state changes slowly (plug/unplug). */
-    private static final long ENERGY_POLL_INTERVAL_MS = 15_000;
     private static final long PORT_POLL_INTERVAL_MS = 100;
     // Restart cap / backoff / stability constants now live in SupervisionPolicy (tempdoc 627) so the
     // pure SupervisionDecision authority owns the recovery policy. See SupervisionPolicy.DEFAULT_*.
@@ -152,12 +150,7 @@ public final class WorkerSpawner implements Closeable {
 
     private ScheduledFuture<?> heartbeatTask;
     private ScheduledFuture<?> monitorTask;
-    private ScheduledFuture<?> energyTask;
     private WindowsJobObject jobObject;
-    /** Latest polled OS energy-intent (tempdoc 630); read by /api/status for the "Paused" notice. */
-    private final AtomicReference<io.justsearch.app.util.EnergyState>
-        energyState =
-            new AtomicReference<>(io.justsearch.app.util.EnergyState.unknown());
 
     /**
      * Creates a WorkerSpawner with no-op telemetry.
@@ -221,13 +214,10 @@ public final class WorkerSpawner implements Closeable {
                 HEARTBEAT_INTERVAL_MS,
                 TimeUnit.MILLISECONDS);
 
-        // 5b. Start OS energy-intent poll (tempdoc 630): broadcast "reduce background work" so the
-        // Worker yields GPU-heavy backfill, and cache the state for the /api/status "Paused" notice.
-        energyTask = scheduler.scheduleAtFixedRate(
-                this::pollEnergyState,
-                0,
-                ENERGY_POLL_INTERVAL_MS,
-                TimeUnit.MILLISECONDS);
+        // 5b. (tempdoc 630) The OS energy-intent poll used to live here. Lane F item A5 moved it to
+        // EnergyStatePoller, owned by KnowledgeServerBootstrap: it publishes the in-process
+        // GpuSchedulingGauge and (transitionally) the same MMF byte, and it must outlive this class,
+        // which item A11 deletes.
 
         // 6. Await port discovery (with telemetry timing)
         int port;
@@ -699,40 +689,6 @@ public final class WorkerSpawner implements Closeable {
         }
     }
 
-    /**
-     * Polls the OS energy-intent (tempdoc 630) and broadcasts it: caches the {@link
-     * io.justsearch.app.util.EnergyState} for /api/status and writes the MMF "energy-reduced" byte
-     * so the Worker yields GPU-heavy backfill. Best-effort; a probe failure leaves the state UNKNOWN
-     * (⇒ not reduced ⇒ no throttle). The {@code justsearch.power.force_energy_state} sysprop
-     * ({@code reduced}/{@code full}) overrides the probe for testing / UI validation.
-     */
-    private void pollEnergyState() {
-        try {
-            io.justsearch.app.util.EnergyState state;
-            String forced = EnvRegistry.POWER_FORCE_ENERGY_STATE.getString("");
-            if ("reduced".equalsIgnoreCase(forced)) {
-                state = new io.justsearch.app.util.EnergyState(
-                        io.justsearch.app.util.EnergyState.Intent.REDUCED,
-                        io.justsearch.app.util.EnergyState.Source.AC);
-            } else if ("full".equalsIgnoreCase(forced)) {
-                state = new io.justsearch.app.util.EnergyState(
-                        io.justsearch.app.util.EnergyState.Intent.FULL,
-                        io.justsearch.app.util.EnergyState.Source.AC);
-            } else {
-                state = io.justsearch.app.util.WindowsPowerStatus.read();
-            }
-            energyState.set(state);
-            signalBus.writeEnergyReduced(state.reduced());
-        } catch (Exception e) {
-            log.debug("Energy-state poll failed (treated as unknown): {}", e.getMessage());
-        }
-    }
-
-    /** The latest polled OS energy-intent (tempdoc 630). Never null; UNKNOWN until first poll. */
-    public io.justsearch.app.util.EnergyState energyState() {
-        return energyState.get();
-    }
-
     private void checkWorkerHealth() {
         if (!running.get() || manualRestarting.get()) {
             return;
@@ -1000,9 +956,6 @@ public final class WorkerSpawner implements Closeable {
         // Cancel scheduled tasks
         if (heartbeatTask != null) {
             heartbeatTask.cancel(false);
-        }
-        if (energyTask != null) {
-            energyTask.cancel(false);
         }
         if (monitorTask != null) {
             monitorTask.cancel(false);

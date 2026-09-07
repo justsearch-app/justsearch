@@ -57,6 +57,44 @@ final class MmfSignalBusCompatibilityTest {
   }
 
   @Test
+  @DisplayName("the Worker's in-process GPU-scheduling gauge is fed from both MMF bytes (item A5)")
+  void gaugeIsFedFromTheMmfBytes() throws Exception {
+    Path signalPath = tempDir.resolve("worker_signal_gauge.lock");
+
+    try (MainSignalBus main = new MainSignalBus(signalPath)) {
+      main.open();
+      main.writeGpuActive(false);
+      main.writeEnergyReduced(true);
+    }
+
+    try (MmfWorkerSignalBus worker = new MmfWorkerSignalBus(signalPath)) {
+      worker.open();
+      // Lane F item A5: the readers observe the gauge, not the bytes. Until item A10 the bytes are
+      // still the transport, so the gauge must track them on every read.
+      assertFalse(worker.gpuScheduling().isMainGpuActive());
+      assertTrue(worker.gpuScheduling().isEnergyReduced());
+      assertTrue(worker.shouldYieldGpuBackfill(), "energy alone is a reason to yield");
+
+      try (MainSignalBus main = new MainSignalBus(signalPath)) {
+        main.open();
+        main.writeEnergyReduced(false);
+        main.writeGpuActive(true);
+      }
+
+      assertTrue(worker.gpuScheduling().isMainGpuActive(), "a later write must be picked up");
+      assertFalse(worker.gpuScheduling().isEnergyReduced());
+      assertTrue(worker.shouldYieldGpuBackfill(), "now the GPU reason holds");
+
+      try (MainSignalBus main = new MainSignalBus(signalPath)) {
+        main.open();
+        main.writeGpuActive(false);
+      }
+
+      assertFalse(worker.shouldYieldGpuBackfill(), "both reasons cleared ⇒ no yield");
+    }
+  }
+
+  @Test
   @DisplayName("Main writes MMF header, Worker validates it")
   void headerIsWrittenAndValidated() throws Exception {
     Path signalPath = tempDir.resolve("worker_signal_header.lock");

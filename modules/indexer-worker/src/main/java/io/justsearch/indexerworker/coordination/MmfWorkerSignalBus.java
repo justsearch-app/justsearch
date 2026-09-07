@@ -205,17 +205,38 @@ public final class MmfWorkerSignalBus implements WorkerSignalBus {
         : WorkerLivenessDecision.HeadLiveness.DEAD;
   }
 
+  /**
+   * The in-process GPU-scheduling gauge this bus feeds (lane F item A5).
+   *
+   * <p>Direction of travel: today the Head writes two memory-mapped bytes and this class copies them
+   * into the gauge on every read, so the gauge — not the file — is what every reader actually
+   * observes, and the composition rule has one owner. Item A6 hands the Engine root's single gauge
+   * in here instead of constructing one, and item A10 deletes the bytes and this class with them.
+   */
+  private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
+      new io.justsearch.core.scheduling.GpuSchedulingGauge();
+
+  /**
+   * The gauge, refreshed from the memory-mapped bytes. Reading through this is equivalent to the two
+   * accessors below and is the shape that survives the wire deletion.
+   */
+  public io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling() {
+    ensureOpen();
+    gpuScheduling.setMainGpuActive(
+        segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE) == 1);
+    gpuScheduling.setEnergyReduced(
+        segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_ENERGY_REDUCED) == 1);
+    return gpuScheduling;
+  }
+
   @Override
   public boolean isMainGpuActive() {
-    ensureOpen();
-    return segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE)
-        == 1;
+    return gpuScheduling().isMainGpuActive();
   }
 
   @Override
   public boolean isEnergyReduced() {
-    ensureOpen();
-    return segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_ENERGY_REDUCED) == 1;
+    return gpuScheduling().isEnergyReduced();
   }
 
   @Override

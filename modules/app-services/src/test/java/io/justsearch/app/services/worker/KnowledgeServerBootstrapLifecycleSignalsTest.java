@@ -13,7 +13,9 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Tempdoc 630: the Head-lifecycle status signals the bootstrap exposes for /api/status — the
  * energy-intent ("Paused — saving energy") and the post-resume "Catching up after sleep" window.
- * Exercised without starting a worker (spawner stays null; resume is a plain timestamp).
+ * Exercised without starting a worker (the energy poller is constructed but never started; resume is
+ * a plain timestamp). Lane F item A5 moved the poll off {@code WorkerSpawner} into
+ * {@code EnergyStatePoller}, so the UNKNOWN answer below no longer depends on a spawned process.
  */
 final class KnowledgeServerBootstrapLifecycleSignalsTest {
 
@@ -25,7 +27,7 @@ final class KnowledgeServerBootstrapLifecycleSignalsTest {
   }
 
   @Test
-  @DisplayName("energyState() is null-safe before the spawner exists (⇒ UNKNOWN, not reduced)")
+  @DisplayName("energyState() is UNKNOWN — not reduced, not null — before the first poll")
   void energyStateNullSafe(@TempDir Path tempDir) {
     var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
     EnergyState e = bootstrap.energyState();

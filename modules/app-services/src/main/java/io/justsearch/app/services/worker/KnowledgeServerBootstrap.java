@@ -83,6 +83,31 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private final java.util.concurrent.atomic.AtomicLong lastUserActivityEpochMs =
         new java.util.concurrent.atomic.AtomicLong(0);
 
+    /**
+     * Lane F item A5: the one in-process GPU-scheduling gauge. {@code main_gpu_active} is written
+     * from the inference mode-change listener ({@code InferenceWiring.wireGpuStatusBroadcast}) and
+     * {@code energy_reduced} from {@link #energyPoller}; while the Worker is still a separate
+     * process both writers ALSO publish the matching MMF byte, which is the half deleted at A10.
+     * The composition rule ("yield GPU-heavy backfill when either holds") lives in the gauge.
+     */
+    private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
+        new io.justsearch.core.scheduling.GpuSchedulingGauge();
+
+    /**
+     * Tempdoc 630's OS energy-intent poll, moved off {@code WorkerSpawner} at item A5 because it has
+     * to outlive the spawner (deleted at A11). Constructed eagerly and started with the integration,
+     * so {@link #energyState()} answers UNKNOWN — not null — before the first poll.
+     */
+    private final io.justsearch.app.services.power.EnergyStatePoller energyPoller =
+        new io.justsearch.app.services.power.EnergyStatePoller(
+            gpuScheduling,
+            reduced -> {
+                MainSignalBus bus = signalBus;
+                if (bus != null) {
+                    bus.writeEnergyReduced(reduced);
+                }
+            });
+
     /** Tempdoc 630: epoch-ms of the most recent OS-resume handled, for the "Catching up" notice. */
     private final java.util.concurrent.atomic.AtomicLong lastResumeEpochMs =
         new java.util.concurrent.atomic.AtomicLong(0);
@@ -283,6 +308,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 }
             });
             int port = spawner.start();
+
+            // 3b. Start the OS energy-intent poll (tempdoc 630). It used to be step 5b inside
+            // spawner.start(); item A5 moved it here because it must outlive the spawner (A11).
+            // Started right after the spawner so the signal bus is open and the transitional MMF
+            // write in the sink lands on the first poll, exactly as it did before the move.
+            energyPoller.start();
 
             // 4. Create circuit breaker for gRPC failure handling
             GrpcCircuitBreaker circuitBreaker = new GrpcCircuitBreaker(ipcTelemetry);
@@ -697,11 +728,23 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     /**
      * The latest polled OS energy-intent (tempdoc 630), for the /api/status "Paused — saving energy"
-     * Queue-card state. Null-safe: returns {@link EnergyState#unknown()} before the spawner exists.
+     * Queue-card state. Never null: {@link EnergyState#unknown()} until the first poll, which is
+     * also what it answers before {@link #start()} has run (item A5 moved the poll off the spawner,
+     * so this no longer depends on a spawned process existing).
      */
     public EnergyState energyState() {
-        WorkerSpawner s = spawner;
-        return s != null ? s.energyState() : EnergyState.unknown();
+        return energyPoller.energyState();
+    }
+
+    /**
+     * The in-process GPU-scheduling gauge (item A5): {@code main_gpu_active} and
+     * {@code energy_reduced} as one holder with one composition rule.
+     * {@code InferenceWiring.wireGpuStatusBroadcast} writes the GPU half; {@link #energyPoller}
+     * writes the energy half. At item A6 the Engine root hands this same instance to the worker half
+     * and the memory-mapped bytes stop being a transport.
+     */
+    public io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling() {
+        return gpuScheduling;
     }
 
     /**
@@ -914,6 +957,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
     public WorkerSpawner.ShutdownOutcome closeForUpgrade() {
         log.info("Shutting down Knowledge Server integration...");
         WorkerSpawner.ShutdownOutcome outcome = WorkerSpawner.ShutdownOutcome.GRACEFUL;
+
+        // Stop the energy poll before the signal bus goes: its transitional MMF write would
+        // otherwise race the unmap. The poller is restartable, and the last polled state survives,
+        // so a boot-recovery restart resumes without a UNKNOWN window.
+        try {
+            energyPoller.close();
+        } catch (Exception e) {
+            log.warn("Error stopping energy-state poller", e);
+        }
 
         if (client != null) {
             try {

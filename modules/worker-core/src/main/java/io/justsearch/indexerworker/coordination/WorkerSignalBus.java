@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.coordination;
 
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.BooleanSupplier;
@@ -95,10 +96,15 @@ public interface WorkerSignalBus extends Closeable {
    * One concept, two reasons; the GPU-heavy backfill sites read this instead of {@link
    * #isMainGpuActive()} alone.
    *
+   * <p>Lane F item A5: the rule itself now lives in {@link GpuSchedulingGauge}, the one in-process
+   * holder both halves of the merged Engine write and read. This method stays only so the seven
+   * production read sites keep compiling across the transition; item A10 deletes it together with
+   * the two reads above, and the callers ask the gauge directly.
+   *
    * @return true if GPU-heavy bulk backfill should be deferred
    */
   default boolean shouldYieldGpuBackfill() {
-    return isMainGpuActive() || isEnergyReduced();
+    return GpuSchedulingGauge.shouldYield(isMainGpuActive(), isEnergyReduced());
   }
 
   /**
