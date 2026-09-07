@@ -504,13 +504,28 @@ def test_fixture_must_declare_score_tie_epsilon():
 
 
 def test_committed_epsilon_matches_the_recorded_measurement():
-    """The epsilon and the measurement that justifies it must not drift apart."""
+    """The epsilon and the measurement that justifies it must not drift apart.
+
+    The committed value is derived from the CROSS-ENCODER score gap distribution over the six
+    committed captures, not from the original delivered-score calibration -- which is still in
+    the notes, labelled superseded, because it is how the number got here.
+    """
     fixture = wf.load_fixture(DEFAULT_FIXTURE)
-    assert fixture["scoreTieEpsilon"] == 0.01
+    assert fixture["scoreTieEpsilon"] == 0.001
     notes = " ".join(fixture["notes"])
-    assert "0.009442" in notes           # the measured max identity-matched jitter
-    assert "0.003652" in notes           # the smallest adjacent score gap
-    assert fixture["scoreTieEpsilon"] > 0.009442
+    assert "0.009442" in notes           # the delivered-basis max identity-matched jitter
+    assert "0.003652" in notes           # the delivered-basis smallest adjacent score gap
+    # The derivation the committed 0.001 actually rests on: what each candidate width excuses.
+    assert "655 adjacent score pairs" in notes
+    assert "102 of 655" in notes         # 15.6% of adjacent pairs fused at 0.01
+    assert "13 of 655" in notes          # 2.0% at the committed 0.001
+    # The old floor here was `> 0.009442`, the DELIVERED-score jitter the epsilon had to absorb.
+    # That premise is gone: the grouping basis is the cross-encoder score and its measured
+    # cross-build jitter is 0.0000, so there is nothing to clear. The binding constraints are
+    # now the other way round -- above the float32 granularity of a score near 0.26 (~1e-7), and
+    # well below the p5 adjacent gap (0.004456), so the window does not swallow real gaps.
+    assert fixture["scoreTieEpsilon"] > 1e-6
+    assert fixture["scoreTieEpsilon"] < 0.004456
 
 
 def test_none_score_is_a_shape_violation_not_a_universal_tie():
