@@ -32,8 +32,8 @@ retrieval quality is benchmarked on English, German, and French (see [Benchmarks
 
 ## Install (Windows)
 
-1. **Download** [`JustSearch_0.2.0_x64-setup.exe`](https://github.com/justsearch-app/justsearch/releases/download/v0.2.0/JustSearch_0.2.0_x64-setup.exe)
-   (249 MB) from the [v0.2.0 release](https://github.com/justsearch-app/justsearch/releases/tag/v0.2.0).
+1. **Download** [`JustSearch_0.3.0_x64-setup.exe`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/JustSearch_0.3.0_x64-setup.exe)
+   (261 MB) from the [v0.3.0 release](https://github.com/justsearch-app/justsearch/releases/tag/v0.3.0).
 2. **Run it.** The installer is **code-signed** — the publisher shown is **Elias Justus**. Windows
    SmartScreen may still show a reputation prompt while the signing certificate is new (reputation
    accrues with downloads); if it does, the "More info" panel names the verified publisher. The
@@ -41,14 +41,14 @@ retrieval quality is benchmarked on English, German, and French (see [Benchmarks
 3. **Launch JustSearch** and point it at a folder. On first launch the app asks consent to download its AI
    models (**~9 GB**, one time, from GitHub Releases + Hugging Face) — after that it runs **fully offline**.
 
-Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/justsearch/releases/download/v0.2.0/SHA256SUMS)):
+Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/SHA256SUMS)):
 
 ```text
-cba354165c38c90628082020d40fe00986814a3fa57da49c62dd18acb0f11772  JustSearch_0.2.0_x64-setup.exe
+465b9a90f763471bf5b6e33261d5eb17d3cf58981acb5d58d8d67dfd4da2d33f  JustSearch_0.3.0_x64-setup.exe
 ```
 
-<!-- hash verified 2026-08-13 against the asset downloaded from the published v0.2.0 GitHub
-     release (Authenticode Valid, CN=Elias Justus, timestamped; size 249.1 MB measured). -->
+<!-- hash verified 2026-09-07 against the asset downloaded from the published v0.3.0 GitHub
+     release (Authenticode Valid, CN=Elias Justus, SSL.com timestamped; 261,223,328 bytes measured). -->
 
 Full walkthrough (hash and publisher verification, Windows reputation guidance,
 build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how-to/verify-your-download.md).
@@ -58,7 +58,7 @@ build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how
 | | |
 |---|---|
 | **OS** | **Windows 10 or 11, 64-bit (x64) only** — macOS/Linux are not in the current scope ([NON-GOALS](NON-GOALS.md)). Verified on Windows 11; Windows 10 x64 is the expected WebView2 baseline but is not yet explicitly tested. WebView2, the VC++ runtime, and a Java runtime are bundled by the installer; there is nothing to install first. |
-| **Disk** | 249 MB installer + ~0.7 GB installed + **~9 GB one-time model download** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
+| **Disk** | 261 MB installer + ~0.7 GB installed + **~9 GB one-time model download** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
 | **RAM** | **16 GB recommended.** 8 GB is a conservative floor for keyword/semantic search only (not a benchmarked minimum; chat needs the GPU below regardless of RAM). The on-device chat model (~5.9 GB file) is loaded into memory when answering. |
 | **GPU** | **Required for chat.** Search and semantic ranking run on CPU — no GPU needed for those. Chat requires an NVIDIA GPU with **≥ 8 GB VRAM** (the app needs ~7.5 GB free VRAM to run the chat model). Without a supported NVIDIA GPU, or below that VRAM floor, no install path offers the chat model — chat does **not** fall back to CPU, so the app is search-only. |
 | **Network** | Only for the one-time model download. Nothing else, ever — see [Privacy](#privacy). |
@@ -207,7 +207,7 @@ Nothing leaves your machine, and you can check:
 
 ## Status
 
-**Alpha** (`0.2.0`), **Windows-only** (macOS/Linux are not in the current scope). The installer is
+**Alpha** (`0.3.0`), **Windows-only** (macOS/Linux are not in the current scope). The installer is
 **code-signed** (publisher: Elias Justus) as of v0.2.0; SmartScreen reputation for the new certificate
 accrues with downloads, so an early reputation prompt is possible and names the verified publisher. In active
 development since 2025; published 2026. Built in the open with heavy AI-agent assistance — the development
