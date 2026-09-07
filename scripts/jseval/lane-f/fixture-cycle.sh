@@ -2,6 +2,20 @@
 # Lane F: one fixture capture on a FRESH corpus (design 17.2 baseline; the fixture's own rule is
 # one capture per fresh corpus because the chat turns index agent history).
 # Precondition: a dev stack started with a hard-cleaned data dir is up on <port>.
+#
+# CAPTURE-RUN SETTINGS THE ORCHESTRATOR SETS AT STACK LAUNCH (boot-time, not per request --
+# this script does not set them, it assumes them; both sides of a paired diff must match):
+#   JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true  every kNN query exact, so the dense leg
+#       stops returning an approximate neighbour set that moves with the HNSW graph
+#   JUSTSEARCH_LLM_SLOTS=1                          exactly one llama-server slot (default 2,
+#       EnvRegistry.LLM_SLOTS / justsearch.llm.slots) -- two slots make the prompt-cache
+#       prefix a turn sees a scheduling outcome
+#   JUSTSEARCH_RERANK_DEADLINE_MS / JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS pinned HIGH
+#       (defaults 200 / 150) so the cross-encoder rerank cannot miss its deadline under load
+#       and reorder the hit set for a reason that is machine load, not the build
+#   ONE chat profile for both sides -- pass the SAME [profile] argument to both runs; the
+#       fixture's own `sampling` block (temperature 0.0 + seed) pins the rest.
+#
 # Steps: ingest docs/explanation + docs/reference by absolute path, wait for every enrichment
 # stage, activate the requested chat profile, run `workflow-fixture capture`.
 #

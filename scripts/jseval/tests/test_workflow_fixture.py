@@ -45,6 +45,33 @@ def test_committed_fixture_shape():
     assert cancelled[0]["cancelAfterEvent"] == "session_started"
 
 
+def test_committed_fixture_pins_the_agent_sampling():
+    """PR 0b: the fixture declares the `sampling` override the capture sends.
+
+    temperature 0 removes the sampler's freedom and the seed pins what freedom remains;
+    without both, the chat fields declared `exact` diff because the sampler differed
+    rather than because the build did (the agent path runs at 0.7/0.8 unpinned).
+    """
+    fixture = wf.load_fixture(DEFAULT_FIXTURE)
+    sampling = fixture["sampling"]
+    assert sampling["temperature"] == 0.0
+    assert isinstance(sampling["seed"], int) and not isinstance(sampling["seed"], bool)
+    assert set(sampling) <= wf.SAMPLING_KEYS
+
+
+def test_fixture_without_a_sampling_block_is_refused():
+    """The pin is REQUIRED, not advisory — an unpinned fixture must not validate."""
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    del fixture["sampling"]
+    with pytest.raises(wf.WorkflowFixtureError, match="sampling"):
+        wf.validate_fixture(fixture)
+    for malformed in ({}, {"temp": 0.0}, {"temperature": "cold"}, {"seed": 1.5}, "0.0"):
+        broken = _minimal_fixture({"queries.a": "exact"})
+        broken["sampling"] = malformed
+        with pytest.raises(wf.WorkflowFixtureError, match="sampling"):
+            wf.validate_fixture(broken)
+
+
 def test_hits_are_one_field_not_one_per_attribute():
     """Review blocker 1: per-attribute score-tagged lists permute independently.
 
@@ -598,13 +625,23 @@ def test_ordinary_turns_are_given_room_to_complete():
 
 
 def test_generation_nondeterminism_finding_is_recorded():
-    """Live finding 4: citationTargets stays `exact`; the finding is recorded, not hidden."""
+    """Live finding 4: citationTargets stays `exact`; the finding is recorded, not hidden.
+
+    The note must name the sampling the AGENT path actually runs under. It is not
+    `ConversationEngine`'s hard-coded 0.8/0.95 — an agent turn is shape-driven and never
+    reaches `parseSamplingParams`; it samples under `SamplingParams.AGENT` (0.7 / 0.8)
+    returned by `AgentLlmCaller.resolveAgentSampling`.
+    """
     fixture = wf.load_fixture(DEFAULT_FIXTURE)
     assert fixture["fields"]["chatTurns.citationTargets"] == "exact"
     notes = " ".join(fixture["notes"])
-    assert "ConversationEngine.java:1154" in notes
-    assert "SamplingParams(0.8, 0.95" in notes
+    assert "AgentLlmCaller.resolveAgentSampling" in notes
+    assert "SamplingParams.AGENT" in notes
+    assert "temperature 0.7, top_p 0.8" in notes
     assert "owner decision" in notes or "owner" in notes
+    # The superseded claim must be gone, not merely outnumbered.
+    assert "ConversationEngine.java:1154" not in notes
+    assert "SamplingParams(0.8, 0.95" not in notes
     # The cancelled turn WAS stable across both captures — say so, don't imply otherwise.
     assert "CANCELLED turn's fields were fully stable" in notes
 
@@ -922,6 +959,26 @@ def test_capture_records_the_chat_profile(tmp_path: Path):
     assert doc["provenance"]["aiRuntimeState"] == "completed"
 
 
+def test_capture_records_the_sampling_pin_in_provenance(tmp_path: Path):
+    """Recorded beside chatProfile and for the same reason: it decides what was generated.
+
+    Non-diffed — `provenance` is not walked by `diff` — so a pair captured under two
+    different pins is legible after the fact instead of reading as chat regressions.
+    """
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    fixture["sampling"] = {"temperature": 0.0, "top_p": None, "seed": 20260907}
+    doc = _capture_with_transport(
+        fixture, tmp_path / "c.json",
+        {"transport": httpx.MockTransport(_search_backend(_absolute_search_response()))},
+        skip_chat=True, corpus_root=_ROOT)
+    assert doc["provenance"]["sampling"] == {
+        "temperature": 0.0, "top_p": None, "seed": 20260907}
+    # Beside chatProfile, and neither is compared.
+    assert doc["provenance"]["chatProfile"] == "compact"
+    result = wf.diff(doc, doc, fixture)
+    assert not [e for e in result["fields"] if "sampling" in e["field"]]
+
+
 def test_chat_profile_falls_back_to_the_top_level_field():
     """`active.chatProfile ?? chatProfile` — the dev-MCP reads both shapes (server.mjs:2376)."""
     def handler(request: httpx.Request) -> httpx.Response:
@@ -995,6 +1052,16 @@ def test_corpus_root_env_is_used_when_no_option(monkeypatch, tmp_path: Path):
         skip_chat=True)
     assert doc["provenance"]["corpusRootSource"] == "env"
     assert doc["provenance"]["corpusRoot"] == _ROOT
+
+
+def test_capture_run_requirements_are_recorded():
+    """The pin is four settings, three of them boot-time — all four must be written down."""
+    notes = " ".join(wf.load_fixture(DEFAULT_FIXTURE)["notes"])
+    assert "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true" in notes
+    assert "justsearch.llm.slots" in notes and "JUSTSEARCH_LLM_SLOTS" in notes
+    assert "JUSTSEARCH_RERANK_DEADLINE_MS" in notes
+    assert "JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS" in notes
+    assert "ONE chat profile" in notes
 
 
 def test_chat_source_and_citation_paths_are_made_relative():
@@ -1102,6 +1169,45 @@ def test_cancel_is_issued_on_session_started_before_the_terminal_frame():
         wf.run_chat_turn(client, {"id": "c", "content": "x",
                                   "cancelAfterEvent": "session_started"})
     assert order == ["stream-open", "cancel", "session-read"]
+
+
+def test_run_chat_turn_sends_the_sampling_override_in_the_request_body():
+    """PR 0b: the pin has to reach the wire, not just sit in the fixture file."""
+    bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200, text=_CANCEL_STREAM_HEAD + _CANCEL_STREAM_TAIL,
+            headers={"Content-Type": "text/event-stream"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        wf.run_chat_turn(client, {"id": "c01", "content": "x", "maxIterations": 8},
+                         sampling={"temperature": 0.0, "seed": 20260907})
+
+    assert len(bodies) == 1
+    assert bodies[0]["sampling"] == {"temperature": 0.0, "seed": 20260907}
+    # Unchanged shape around it — the override is additive, not a replacement.
+    assert bodies[0]["maxIterations"] == 8
+    assert bodies[0]["messages"] == [{"role": "user", "content": "x"}]
+
+
+def test_run_chat_turn_omits_sampling_when_none_is_pinned():
+    """Absent means "no override" on the wire too — not `"sampling": null`."""
+    bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200, text=_CANCEL_STREAM_HEAD + _CANCEL_STREAM_TAIL,
+            headers={"Content-Type": "text/event-stream"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        wf.run_chat_turn(client, {"id": "c01", "content": "x"})
+
+    assert "sampling" not in bodies[0]
 
 
 def test_capture_sends_the_session_token_on_every_request(tmp_path: Path):
@@ -1298,7 +1404,8 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
     """A one-query/one-turn fixture that is HEALTHY by default.
 
     The health floor (`httpStatus`/`hitCount` on every query, a non-empty chat section)
-    is declared here so each test only has to add the field it is about.
+    is declared here so each test only has to add the field it is about. The `sampling`
+    pin is REQUIRED by `validate_fixture`, so it is part of that floor too.
     """
     declared = {"queries.httpStatus": "exact", "queries.hitCount": "exact",
                 "chatTurns.httpStatus": "exact"}
@@ -1308,6 +1415,7 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
         "version": 1,
         "id": "test-fixture",
         "scoreTieEpsilon": 0.01,
+        "sampling": {"temperature": 0.0, "seed": 7},
         "queries": [{"id": "q1", "query": "x", "limit": 10, "mode": "hybrid"}],
         "chatTurns": [{"id": "c1", "content": "x", "maxIterations": 1}],
         "fields": declared,

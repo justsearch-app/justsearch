@@ -74,21 +74,35 @@ Fields that legitimately move with the clock are **not captured at all** rather 
 given a class: ``SearchTrace.stages[].ms``, ``tookMs``, the ``latencyMs`` figures, the SSE
 ``heartbeat`` frames, and the per-run ``sessionId``.
 
-No fixed seed exists on the chat path
--------------------------------------
-``POST /api/chat/agent`` carries **no** ``seed`` request field. The only ``seed`` that
-reaches llama-server is the vision/VDU agreement-probe overload —
-``OnlineModeOps.sendChatRequestDetailed(..., Long seed)``
-(``modules/app-inference/src/main/java/io/justsearch/app/inference/OnlineModeOps.java:957``,
-written to the request body at ``:966``); ``sendChatRequest`` always passes ``null``
-(same file, ``:947-950``). Adding one is a backend change and out of scope for this
-instrument. Generative text is therefore treated under ``generative-text``
-**unconditionally**, not "under a fixed seed", and the fixture's chat turns are
-deliberately narrow and factual so that the chat fields declared ``exact`` (citation
-targets, source identity, tool names, terminal disposition) have the best chance of
-holding without one. If a chat ``exact`` field diffs, read it as a finding about the
-fixture's assumption first — but record it, do not reclassify: no class is added after a
-diff is seen.
+The chat path's sampling is pinned by the fixture
+-------------------------------------------------
+An agent turn is **shape-driven** and never reaches
+``ConversationEngine.parseSamplingParams``
+(``modules/app-services/src/main/java/io/justsearch/app/services/conversation/
+ConversationEngine.java:1151`` — the chat-completions path, not ``POST /api/chat/agent``).
+Its sampling is ``SamplingParams.AGENT``, temperature **0.7** / top_p **0.8**
+(``modules/app-api/src/main/java/io/justsearch/app/api/SamplingParams.java:175``), handed
+back by ``AgentLlmCaller.resolveAgentSampling``
+(``modules/app-agent/src/main/java/io/justsearch/agent/AgentLlmCaller.java:277-291``),
+which adds ``tool_choice``/grammar on a forced-tool turn and otherwise returns that
+constant unchanged.
+
+PR 0b adds an optional top-level ``sampling`` object on the chat request —
+``{"temperature": <double|null>, "top_p": <double|null>, "seed": <long|null>}``, every key
+optional, absent/null meaning "no override" — which the backend applies **over** that
+constant. The fixture **must** declare a ``sampling`` block
+(:func:`validate_fixture` refuses one that is missing or malformed);
+:func:`run_chat_turn` merges it into the body of every chat turn and :func:`capture`
+records it in the non-diffed ``provenance`` beside ``chatProfile``, so a pair captured
+under different sampling is legible after the fact.
+
+Generative text is **still** classified ``generative-text`` rather than "deterministic
+under a fixed seed": a seed pins the sampler, not the tool-call trajectory the turn takes.
+The fixture's chat turns stay deliberately narrow and factual so that the chat fields
+declared ``exact`` (citation targets, source identity, tool names, terminal disposition)
+have the best chance of holding. If a chat ``exact`` field diffs, read it as a finding
+about the fixture's assumption first — but record it, do not reclassify: no class is added
+after a diff is seen.
 
 Paths are relative to a declared corpus root
 --------------------------------------------
@@ -170,6 +184,14 @@ _TOKEN_EVENTS = frozenset({"chunk", "reasoning_chunk"})
 #: emits, which the health check now refuses.
 _HIT_REASON_CODE_KEYS = frozenset({"extractionReasonCode"})
 
+#: The keys the chat request's top-level ``sampling`` override carries (PR 0b). Each is
+#: individually optional and ``null`` means "no override" — the backend then keeps
+#: ``SamplingParams.AGENT`` (0.7 / 0.8) for that dimension. Declared as a CLOSED set so a
+#: typo (``topP``, ``top-p``, ``temp``) is refused at validation rather than silently sent
+#: and silently ignored by the backend, which would leave the capture unpinned while the
+#: fixture claims it is pinned.
+SAMPLING_KEYS = frozenset({"temperature", "top_p", "seed"})
+
 _SESSION_TOKEN_ENV = "JUSTSEARCH_SESSION_TOKEN"
 _CORPUS_ROOT_ENV = "JUSTSEARCH_FIXTURE_CORPUS_ROOT"
 
@@ -187,11 +209,56 @@ class WorkflowFixtureError(RuntimeError):
 # Fixture validation
 # ---------------------------------------------------------------------------
 
+def validate_sampling(sampling: Any) -> dict:
+    """Return the fixture's ``sampling`` override, raising unless it is well-formed.
+
+    REQUIRED, not optional. Without it the chat turns run under ``SamplingParams.AGENT``
+    (temperature 0.7, top_p 0.8 —
+    ``AgentLlmCaller.resolveAgentSampling``/``SamplingParams.java:175``), and a capture
+    taken that way cannot support the chat fields the fixture declares ``exact``: the two
+    sides of a pair differ because the sampler differed, not because the build did. An
+    EMPTY block is refused for the same reason — it declares a pin and pins nothing.
+
+    Unknown keys are refused rather than forwarded: the backend ignores what it does not
+    recognise, so a typo would leave the run unpinned while the artifact claims otherwise.
+    """
+    if not isinstance(sampling, dict) or not sampling:
+        raise WorkflowFixtureError(
+            "fixture must declare a non-empty `sampling` block pinning the agent's "
+            'sampling for the capture (e.g. {"temperature": 0.0, "seed": 20260907}). '
+            "Without it every chat turn samples under SamplingParams.AGENT "
+            "(temperature 0.7, top_p 0.8) and the chat fields declared `exact` diff for a "
+            "reason that is not a build difference."
+        )
+    unknown = sorted(set(sampling) - SAMPLING_KEYS)
+    if unknown:
+        raise WorkflowFixtureError(
+            f"fixture `sampling` declares unknown key(s) {unknown}; the chat request's "
+            f"sampling override carries exactly {sorted(SAMPLING_KEYS)} and the backend "
+            "silently ignores anything else, which would leave the capture unpinned"
+        )
+    for key in ("temperature", "top_p"):
+        value = sampling.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise WorkflowFixtureError(
+                f"fixture `sampling.{key}` must be a number or null, got {value!r}")
+    seed = sampling.get("seed")
+    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+        raise WorkflowFixtureError(
+            f"fixture `sampling.seed` must be an integer or null, got {seed!r}")
+    return dict(sampling)
+
+
 def validate_fixture(fixture: dict) -> dict[str, str]:
     """Return the declaration table, raising unless the fixture is well-formed.
 
     Refuses a class name outside :data:`ALLOWED_DIFFERENCE_CLASSES` — the "exactly three
-    classes, nothing else" rule is enforced here rather than trusted.
+    classes, nothing else" rule is enforced here rather than trusted — and refuses a
+    fixture with no ``sampling`` block: an unpinned capture samples the chat turns under
+    ``SamplingParams.AGENT`` (0.7 / 0.8) and the chat fields declared ``exact`` then diff
+    for a reason that is not a build difference.
     """
     if not isinstance(fixture, dict):
         raise WorkflowFixtureError("fixture must be a JSON object")
@@ -209,6 +276,7 @@ def validate_fixture(fixture: dict) -> dict[str, str]:
             "score tie. Scores are not byte-stable (GPU float nondeterminism), so exact "
             "equality would make the equal-score-order class inert."
         )
+    validate_sampling(fixture.get("sampling"))
     for path, klass in fields.items():
         if klass == EXACT:
             continue
@@ -810,6 +878,7 @@ def run_chat_turn(
     client: httpx.Client,
     spec: dict,
     *,
+    sampling: dict | None = None,
     session_token: str | None = None,
     timeout: float = 300.0,
     paths: CorpusRootRewriter | None = None,
@@ -819,12 +888,20 @@ def run_chat_turn(
     Returns the captured chat record. The cancel is issued **synchronously between two
     reads of the stream**, on a second connection — the run's own stream stays open so
     the terminal frame it ends with is what gets recorded.
+
+    ``sampling`` is the fixture's pin (PR 0b), sent as the request's top-level
+    ``sampling`` object and applied by the backend over ``SamplingParams.AGENT``.
     """
     cancel_after = spec.get("cancelAfterEvent")
     body = {
         "messages": [{"role": "user", "content": spec["content"]}],
         "maxIterations": spec.get("maxIterations", 3),
     }
+    if sampling:
+        # Passed through verbatim — `validate_sampling` has already refused an unknown key,
+        # so nothing here can be a silently-ignored typo. Copied rather than aliased: the
+        # same dict is reused for every turn of a capture and must not be mutated by one.
+        body["sampling"] = dict(sampling)
     frames: list[tuple[str, Any]] = []
     buf = SseBuffer()
     session_id: str | None = None
@@ -935,6 +1012,7 @@ def capture(
     Returns the capture document (also written to ``out_path``).
     """
     validate_fixture(fixture)
+    sampling = validate_sampling(fixture.get("sampling"))
     queries: dict[str, dict] = {}
     chat_turns: dict[str, dict] = {}
     observed_queries: dict[str, dict] = {}
@@ -977,8 +1055,8 @@ def capture(
         if not skip_chat:
             for spec in fixture["chatTurns"]:
                 chat_turns[spec["id"]] = run_chat_turn(
-                    client, spec, session_token=session_token, timeout=timeout,
-                    paths=paths)
+                    client, spec, sampling=sampling, session_token=session_token,
+                    timeout=timeout, paths=paths)
                 log.info("captured chat turn %s (terminal=%s)",
                          spec["id"], chat_turns[spec["id"]]["terminalEvent"])
         doc_count_end, doc_count_end_path = read_doc_count(client)
@@ -999,6 +1077,10 @@ def capture(
         # of surfacing as unexplained chat regressions.
         "chatProfile": chat_profile,
         "aiRuntimeState": ai_runtime_state,
+        # The sampling override sent on every chat turn (PR 0b), recorded for the same
+        # reason chatProfile is: it decides what the model produced, so a pair captured
+        # under two different pins compares two samplers, not two builds. Never diffed.
+        "sampling": sampling,
     }
 
     doc = {

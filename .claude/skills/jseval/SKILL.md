@@ -474,15 +474,33 @@ compact (`c01` in 3 iterations, `c02` in 6), so the profile choice does not cost
 completion property.
 
 **Generation is nondeterministic, and `citationTargets` is deliberately still `exact`.** Across two
-captures of one build, one turn's citation targets differed (`[]` vs two targets):
-`ConversationEngine.java:1154` hard-codes `new SamplingParams(0.8, 0.95, …)` — temperature 0.8,
-top_p 0.95 — and there is no settings key and no request field for temperature or seed. Design 16
-lists citation targets as deterministic, so reclassifying them is an owner decision, not the
-instrument's; the remedy is a backend sampling override (temperature 0 + a seed on the chat
-request). Until then, expect the chat `exact` fields to be the fixture's most fragile assumption
-and read a diff there as a finding, not as licence to reclassify. The **cancelled** turn was fully
-stable across both captures (terminal event, `CANCELLED` error code, session state, disposition and
-cancel trigger all identical), so the cancellation half of the row is sound as it stands.
+captures of one build, one turn's citation targets differed (`[]` vs two targets). The agent path is
+*shape-driven* and never reaches `ConversationEngine.parseSamplingParams`
+(`ConversationEngine.java:1151` — that is the chat-completions path, not `POST /api/chat/agent`):
+an agent turn samples under `SamplingParams.AGENT`, temperature **0.7** / top_p **0.8**
+(`SamplingParams.java:175`), returned by `AgentLlmCaller.resolveAgentSampling`
+(`AgentLlmCaller.java:277-291`, which applies the run's optional override through `agentBaseSampling` at `:305-318`), which adds `tool_choice`/grammar on a forced-tool turn and
+otherwise hands back that constant unchanged. PR 0b adds an optional top-level `sampling` object on
+the chat request — `{"temperature", "top_p", "seed"}`, each key optional, absent/null meaning no
+override — applied over that constant; the fixture declares the pin it wants (`temperature: 0.0` +
+a fixed seed) and `capture` sends it on every turn and records it in the non-diffed
+`provenance.sampling`. Design 16 lists citation targets as deterministic, so reclassifying them is
+an owner decision, not the instrument's. Until both sides of a pair are captured under the pin,
+expect the chat `exact` fields to be the fixture's most fragile assumption and read a diff there as
+a finding, not as licence to reclassify. The **cancelled** turn was fully stable across both
+captures (terminal event, `CANCELLED` error code, session state, disposition and cancel trigger all
+identical), so the cancellation half of the row is sound as it stands.
+
+**The capture run is pinned at boot, not only in the request.** Both sides of a paired diff must be
+captured with the same four settings, the first three set at stack launch:
+`JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true` (every kNN query exact, so the dense leg is not an
+approximate neighbour set that moves with the HNSW graph's build order); exactly **one**
+llama-server slot (`justsearch.llm.slots` / `JUSTSEARCH_LLM_SLOTS`, default 2 — two parallel slots
+make the prompt-cache prefix a turn sees a scheduling outcome); the cross-encoder reranker deadlines
+pinned high (`justsearch.rerank.deadline_ms` / `justsearch.rerank.chunks.deadline_ms`, defaults 200
+/ 150 — at the defaults a loaded machine can miss the deadline and reorder the hit set); and one
+chat profile for both sides. `scripts/jseval/lane-f/fixture-cycle.sh` carries the same list in its
+header.
 
 **Paths are relative to a declared corpus root.** Every path-bearing value the backend returns is
 the *absolute* indexed path (`IndexingDocumentOps` writes `DOC_ID = PATH = absolutePath`; a chunk's
