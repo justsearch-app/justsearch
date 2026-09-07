@@ -438,9 +438,11 @@ class "ordering of equal-score hits"; the width of a tie is a mechanism detail (
 two consecutive captures of **one** build against **one** index: over 118 identity-matched hits the
 score delta was non-zero on 111, max 0.009442, mean 0.001658 — GPU float nondeterminism in the
 dense / cross-encoder legs. In the same data *no* adjacent score gap was zero, so exact-equality
-grouping yields all-singleton groups and permits nothing. The fixture declares
-`scoreTieEpsilon: 0.01` — just above the observed max jitter, below all but 3 of the 108 adjacent
-gaps (smallest 0.003652). Consequences: `queries.hits[].score` is **not** a declared field and is
+grouping yields all-singleton groups and permits nothing. That calibration was against the
+DELIVERED score and gave `0.01` — just above the observed max jitter, below all but 3 of the 108
+adjacent gaps (smallest 0.003652). It is superseded on both counts: the grouping basis is now the
+cross-encoder score, whose measured cross-build jitter is `0.0000`, and the committed epsilon is
+`0.001`, derived from the CE-score gap distribution (below). Consequences: `queries.hits[].score` is **not** a declared field and is
 not in the diffed capture (observed values go to the capture's non-diffed `observed` block); the
 differ never compares scores, only the groups it derives from them; and the tie-group partition is
 consulted **only when the delivered order actually changed** — an unconditional partition
@@ -463,7 +465,7 @@ recording per query which number grouped. A query the CE did not score every hit
 lexical/TEXT fallback, or hits outside the rerank window) falls back to the delivered score for the
 **whole** query — a list mixing two bases would have epsilon comparing different scales.
 
-**`scoreTieEpsilon` stays `0.01`, and the scale is now measured.** The cross-encoder emits raw,
+**The scale is measured, not assumed.** The cross-encoder emits raw,
 unsigmoided model output (`CrossEncoderReranker.java:369-379` returns the logits directly; the only
 sigmoid in that module belongs to `CitationScorer`, a different class), so the epsilon — derived
 against the roughly 0–1 *delivered* score — had to be re-checked against the real scale. Measured
@@ -472,8 +474,9 @@ spanning **−3.0566 … +0.2603** (span 3.32), **17 of them negative**. It is t
 score nor the ±11 a generic ms-marco model would suggest; reading only the top three hits (0.26,
 0.14, 0.019) makes it look normalised, which is an artefact of the best hits sitting near zero. On
 that scale `0.01` leaves only 2 of the 19 adjacent gaps inside the epsilon (smallest 0.001404) —
-the same profile the original calibration had (below all but 3 of 108 gaps), so it is defensible
-and unchanged. Still unmeasured is the cross-encoder's *jitter* across two runs: that needs a pair
+the same profile the original calibration had (below all but 3 of 108 gaps). That kept it
+defensible; the wider six-capture gap distribution below is what later moved it to `0.001`. Still
+unmeasured at this point was the cross-encoder's *jitter* across two runs: that needs a pair
 with `observed.crossEncoderScores` on both sides, then the per-hit delta over identity-matched hits.
 
 **A dropped cross-encoder fails capture health.** When the stage is skipped for a drop reason
@@ -600,6 +603,44 @@ capture check. This gap is why the first four-capture acceptance passed with 0 r
 side captured a half-enriched index, disagreed with *itself* on 11 of 12 queries, and every
 disagreement was withdrawn as noise.
 
+**A capture whose chat turns had no live engine is refused, and liveness is not
+`activation.state`.** All six captures of the 2026-09-07 acceptance recorded
+`provenance.aiRuntimeState: "failed"` while the engine was demonstrably answering — their chat
+turns terminated `done` with per-turn `samplingApplied` read off `session_started`. The field was
+simply the wrong one. `activation.state` is the outcome of the last activation **procedure**;
+liveness is the realized identity under `active`, which the backend projects only while the engine
+is online. The dev-MCP reads it that way after the same false negative bit it
+(`scripts/dev/justsearch-dev-mcp/server.mjs:2680-2687`, tempdoc 842 review D3/N1): an engine
+brought up by AI **autostart** never runs the activation state machine at all, so
+activation-completed alone is a false negative there.
+
+Three things follow, and all three are now in place. `fixture-cycle.sh` **pre-checks** before
+firing `activate` — if the engine is already online on the requested profile it does not
+re-activate, which both avoids tearing down a healthy engine for a needless GPU self-test and
+closes the race in which autostart brings the engine back during the ingest wait after the
+script's own opening `deactivate`. It then polls on engine-online **and** profile-match rather
+than on `activation.state == "completed"`, keeps the `activate` response (a 4xx there used to
+vanish into `/dev/null`, making a refused activation indistinguishable from a slow one), and
+**exits 4** rather than capturing chat turns no model answered — the same shape as the
+enrichment refusal above, and `fixture-pair.sh` retries it once from a hard clean. The capture
+records **both** signals (`aiRuntimeState` beside `aiRuntimeOnline` / `aiRuntimeOnlineSignal` /
+`aiRuntimeVariantId` / `aiRuntimeModelFile`), because a failed activation procedure standing
+beside a live engine is worth seeing. And `capture_health` refuses a capture that ran chat turns
+without engine-online evidence — including one that never recorded it, since an unknown that
+reads as healthy is exactly how the half-enriched side passed the four-capture acceptance. A
+`--skip-chat` capture is exempt: it measures search alone.
+
+What made the failed activation itself is *not* established. Each cycle tears its data dir down
+with `--clean hard`, which takes the activation status file and the head log with it, so the
+`errorCode` from those six runs is gone. That is why the script now writes `diag-N-ai-activate.json` and `diag-N-ai-status.json` beside
+each capture — per capture, since a side runs N cycles into one directory: the next occurrence is
+diagnosable from the artifact. The `diag-` prefix is not cosmetic. `fixture-gate.sh` used to
+select a side with a `capture-*.json` shell glob, so the first naming (`capture-N-ai-status.json`)
+was read AS a capture: the acceptance re-run reported "captures per side: baseline=6" for three
+real captures and marked the three diagnostics UNHEALTHY with `chatProfile None`. Selection now
+goes through `workflow-fixture side-captures`, which matches `capture-<digits>.json` exactly and
+orders by cycle number; the prefix is the second, independent reason the collision cannot recur.
+
 **Per-side noise fractions include `noisy-both`.** A field unstable on both sides is unstable on
 each, so it counts towards both fractions. Counting only a side's exclusive noise understated
 every side sharing an unstable field with the other — the same acceptance measured baseline 9
@@ -621,14 +662,26 @@ rather than to the build. A field *absent* from a noise capture is not called no
 evidence of instability leaves it in the verdict, so a truncated noise capture can only make the
 gate stricter, never laxer.
 
-**The cross-encoder score is deterministic across builds (measured).** Pair run 4, over 117
-identity-matched hits between two fresh ingests of one corpus on one build: the cross-encoder score
-delta was **0.0000 at max, p95 and p50**. The sort key itself does not jitter, so `scoreTieEpsilon`
-is not absorbing CE noise — there is none. It stays `0.01` as a margin against the *fusion*-side
-jitter that moves hits into and out of the rerank window, which is what the 4K breadth addresses.
+**The cross-encoder score is deterministic across builds (measured), and `scoreTieEpsilon` is
+derived from the score distribution, not chosen.** Pair run 4, over 117 identity-matched hits
+between two fresh ingests of one corpus on one build: the cross-encoder score delta was **0.0000 at
+max, p95 and p50**. The sort key itself does not jitter, so the epsilon is not absorbing CE noise —
+there is none. It is pure margin, and margin is not free: every adjacent pair of hits whose scores
+fall inside it is declared a tie, and a tie may reorder freely under the equal-score-order class.
 
-**The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four boot-time pins
-above, a capture sets `JUSTSEARCH_RERANK_TOP_K=100`,
+So the width is set against what it would excuse. Over the six committed captures (655 adjacent
+score pairs, no exact ties), the adjacent-gap distribution is min `0.000488`, p5 `0.004456`, p10
+`0.005859`, p25 `0.0208`, p50 `0.0524`. At `0.01` the tie window swallows **102 of 655 (15.6%)** of
+adjacent pairs — a sixth of all neighbouring ranks free to swap on genuinely different scores. At
+`0.001` it is **13 of 655 (2.0%)**, still an order of magnitude above the float32 granularity of a
+score near `0.26` (~`1e-7`) and above the smallest gap actually observed. `0.001` is what the
+fixture declares. Going lower buys nothing measurable: at `0.0001` no observed pair is fused at all,
+which is the same as switching the class off.
+
+**The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four
+determinism pins above (exhaustive kNN, one LLM slot, the two rerank deadlines), a capture sets
+`JUSTSEARCH_RERANK_TOP_K=40` and `JUSTSEARCH_RERANK_GPU_MEM_MB=4096` — the window and the arena
+that has to hold it, which move together or the reranker dies (see above) —
 `JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000`,
 `JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50`,
 `JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false` and
@@ -726,7 +779,8 @@ that absence is the signal. A pin that can only be asserted and never contradict
 only these two records can disagree.
 
 **Both are capture-health checks, not diffed fields, and `diff` fails on them.** `capture_health`
-refuses a pair when either side's `provenance.pins` is absent or missing one of the four keys, when
+refuses a pair when either side's `provenance.pins` is absent or missing one of the keys in
+`PINNED_CONFIG_KEYS` (ten today), when
 the two sides' pins disagree on any key, when `provenance.samplingApplied` is absent or missing a
 recorded turn, when a turn's applied sampling is entirely null (the pre-PR-0b build), or when the
 two sides applied different sampling for a turn. They are health problems rather than declared
