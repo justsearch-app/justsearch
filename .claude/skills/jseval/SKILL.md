@@ -534,39 +534,60 @@ The active reranker is 12-layer / 12-head / 768-hidden (`models/onnx/reranker/co
 drops again the ladder steps **down**, not up — `top_k=30` (bucket 32) at 3072 MB, else the known-good
 20 at 2048.
 
-**The encoders run on CPU for a capture, and the intra-op pool is pinned.** Pair run 5's residual
-was index-time embedding jitter: CUDA kernels reduce in a nondeterministic order (atomics,
-split-K), so the same text embeds to slightly different vectors on two runs and those vectors move
-fusion candidates. That happens *upstream of every candidate budget*, so no budget pin removes it.
-ONNX Runtime on the CPU execution provider is bit-deterministic for a fixed thread count.
+**CPU encoders work, and are too slow to capture with (measured).** The theory holds: CUDA
+kernels reduce in a nondeterministic order, so the same text embeds to slightly different vectors
+on two runs, and those vectors move fusion candidates *upstream of every candidate budget* — which
+is why no budget pin removed it. ONNX Runtime on the CPU execution provider is bit-deterministic
+for a fixed thread count. But measured on this corpus: after the 15-minute enrichment wait,
+document embeddings were at **38%** and **0 of 1,283 chunks** had been embedded, at four intra-op
+threads. A cycle would exceed an hour and a pair two.
 
-No new key was needed for the provider: every encoder role already has one, read at
-`InferenceCompositionRoot.resolveVariant(..., <role>Cfg.gpuEnabled())` and honoured by
-`VariantSelector.select`'s `gpuAllowed`, which keeps a CPU-installed variant on CPU instead of
-promoting it to the CUDA EP. The capture pins them **per role** — `justsearch.embed.gpu.enabled`,
-`justsearch.splade.gpu_enabled`, `justsearch.ner.gpu_enabled`, `justsearch.rerank.gpu.enabled`,
-`justsearch.bgem3.gpu_enabled` — not via the master `justsearch.gpu.enabled`, because the master
-does **not** reach two of them: the embed flag has its own resolver branch and
-`justsearch.rerank.gpu.enabled` hard-defaults to `true` (`ResolvedConfigBuilder.java:1290-1301`,
-`:1366`).
+So `fixture-pair.sh` does not set them. The keys stay as documented instruments and the capture
+*records* them when they are set, so a bit-stable capture is legible as one, but they are not
+required and a GPU capture is not failed for lacking them. The per-role provider keys
+(`justsearch.embed.gpu.enabled`, `justsearch.splade.gpu_enabled`, `justsearch.ner.gpu_enabled`,
+`justsearch.rerank.gpu.enabled`, `justsearch.bgem3.gpu_enabled`) already existed;
+`justsearch.onnxruntime.intra_op_threads` was added because `SessionOptionsApplier.applyBase` never
+set the intra-op count for production sessions, and on CPU that count decides a GEMM's reduction
+order and therefore an embedding's low bits. GPU encoder jitter is handled instead by the noise
+pair below.
 
-One key *was* needed: **`justsearch.onnxruntime.intra_op_threads`** /
-`JUSTSEARCH_ORT_INTRA_OP_THREADS`. `SessionOptionsApplier.applyBase` set `interOpNumThreads` but
-never `intraOpNumThreads` for production sessions (only `OrtSessionAssembler`'s probe paths did),
-so ORT sized the pool from hardware concurrency. On CPU that count decides how a GEMM partitions
-its reduction — hence the summation order, hence an embedding's low bits: stable within one
-machine, silently different across two. Unset leaves ORT's own choice, so nothing changes for
-anyone who does not set it.
+## Gating with a noise pair
 
-The **chat model stays on GPU** deliberately: llama-server does not go through ORT EP selection (it
-takes `-ngl`), the chat turns are already pinned by the sampling override, and a 9B model on CPU
-would make a capture take hours.
+**Determinism is measured, not assumed.** Five paired rounds established that some fields are
+simply not stable on this stack. The gate therefore captures each side **twice on one build**, on
+two fresh ingests of the same corpus, and the same-build pair *defines what "within noise" means
+for each field*:
 
-*Cost, estimated not measured.* The scifact GPU baseline is 188 s of encoder time for 5,183
-documents (embedding 55.2 s, SPLADE 106.5 s, NER 26.5 s). Scaled to this corpus's ~1,276 chunks
-that is ~46 s of GPU encoder work; a 10–30x CPU factor, further slowed by `intra_op=1`, puts a
-cycle at roughly 15–60 minutes of extra encoder time — 30–120 minutes added to a pair. Time the
-first cycle and replace this estimate with the measurement.
+```bash
+bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/split  compact 33221 2   # capture-1 + capture-2
+bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/single compact 33221 2
+bash scripts/jseval/lane-f/fixture-gate.sh tmp/gate/split tmp/gate/single report.json
+```
+
+`diff` gains `--baseline-noise` / `--candidate-noise`. Per compared field it first asks whether the
+field is stable *within* a side, then whether it differs *between* sides. A field a side's own
+noise pair already moves is reported `noisy-baseline` / `noisy-candidate` / `noisy-both`, counted
+under `counts.noisy`, and **excluded from the regression verdict** — a difference the same build
+produces against itself cannot evidence a difference between two builds. The verdict the gate
+*would* have returned is kept on the entry as `crossSideStatus`, so nothing is hidden. Without the
+two flags, `diff` behaves exactly as before.
+
+This is the alternative to two worse options. Declaring the unstable fields non-exact would blind
+the gate to real regressions in them forever — the class would swallow the signal with the noise.
+Pinning the pipeline hard enough to silence them (CPU encoders) costs over an hour per cycle and
+stops measuring the shipping configuration.
+
+**The withdrawal is bounded.** `maxNoisyFraction` (fixture key, `0.10`) refuses the whole run when
+a side's noise pair moves more than that share of compared fields. Every noisy field leaves the
+verdict, so without a ceiling a pipeline degraded on *both* sides — a dropped reranker, an
+unfinished enrichment — would present as a very quiet diff with most fields silently excluded, and
+"almost nothing was compared" would read as "nothing regressed". A noise capture whose `pins`,
+`samplingApplied` or `chatProfile` differ from its own side's primary is refused for the same
+reason: it is a second configuration, so the noise it reports belongs to the configuration change
+rather than to the build. A field *absent* from a noise capture is not called noisy — absent
+evidence of instability leaves it in the verdict, so a truncated noise capture can only make the
+gate stricter, never laxer.
 
 **The cross-encoder score is deterministic across builds (measured).** Pair run 4, over 117
 identity-matched hits between two fresh ingests of one corpus on one build: the cross-encoder score

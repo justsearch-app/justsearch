@@ -112,12 +112,18 @@ def cmd_workflow_fixture_capture(ctx, base_url, fixture, out_path, session_token
               default=lambda: str(DEFAULT_FIXTURE),
               show_default="scripts/jseval/lane-f-workflow-fixture.v1.json",
               help="Fixture definition carrying the declared field classes.")
+@click.option("--baseline-noise", type=click.Path(exists=True, resolve_path=True), default=None,
+              help="Second SAME-BUILD capture of the baseline side. Fields its own side already "
+                   "moves are excluded from the verdict as noise.")
+@click.option("--candidate-noise", type=click.Path(exists=True, resolve_path=True), default=None,
+              help="Second SAME-BUILD capture of the candidate side (see --baseline-noise).")
 @click.option("--report-out", type=click.Path(resolve_path=True), default=None,
               help="Write the full diff result JSON to this path.")
 @click.option("--json", "json_out", is_flag=True,
               help="Emit the full diff result JSON on stdout.")
 @click.pass_context
-def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, json_out):
+def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
+                              candidate_noise, report_out, json_out):
     """Diff two captures under the fixture's declared equality relation.
 
     A field with no declared class must be byte-equal; an undeclared field is a
@@ -126,13 +132,22 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, jso
     compare (an empty section on both sides, a non-200 request, a zero-hit query, or a
     declaration the capture never emits) — two identical failures are byte-equal, so
     without it a broken backend would read as "no semantic regression".
+    With --baseline-noise / --candidate-noise (each the SECOND fresh-corpus capture of that
+    same side, same build) the differ measures determinism instead of assuming it: a field a
+    side own noise pair already moves is reported noisy-<side>, counted separately, and
+    excluded from the verdict, because a difference the same build produces against itself
+    cannot evidence a difference between two builds. A noise pair louder than the fixture
+    maxNoisyFraction fails the run outright, so "almost nothing was compared" can never read
+    as "nothing regressed".
+
     Exit 0 = pass, 1 = regression / missing field / unhealthy capture, 2 = usage error.
     """
     from .. import workflow_fixture as wf
 
     try:
         definition = wf.load_fixture(fixture)
-        result = wf.diff(baseline, candidate, definition)
+        result = wf.diff(baseline, candidate, definition,
+                         baseline_noise=baseline_noise, candidate_noise=candidate_noise)
     except (wf.WorkflowFixtureError, OSError, ValueError) as exc:
         click.echo(f"workflow-fixture diff: {exc}", err=True)
         sys.exit(2)
@@ -151,8 +166,24 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, jso
         click.echo(
             f"{'PASS' if result['pass'] else 'FAIL'}  "
             f"equal={counts['equal']} allowed={counts['allowed']} "
+            f"noisy={counts.get('noisy', 0)} "
             f"REGRESSION={counts['REGRESSION']} missing={counts['missing']}"
         )
+        by_side = result.get("noisy_by_side") or {}
+        if any(by_side.values()):
+            click.echo(
+                "  noisy (excluded from the verdict): "
+                + f"baseline={by_side.get('baseline', 0)} "
+                + f"candidate={by_side.get('candidate', 0)} "
+                + f"both={by_side.get('both', 0)} "
+                + f"(ceiling {result.get('maxNoisyFraction')})"
+            )
+            for entry in result["fields"]:
+                if str(entry.get("status", "")).startswith("noisy-"):
+                    click.echo(
+                        f"  {entry['status']}  {entry['record']}  {entry['field']}"
+                        f"  (cross-side: {entry.get('crossSideStatus')})"
+                    )
         for klass, n in result["allowed_by_class"].items():
             if n:
                 click.echo(f"  allowed:{klass} = {n}")

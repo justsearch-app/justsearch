@@ -304,11 +304,17 @@ PINNED_CONFIG_KEYS = (
     "index.hybrid.chunk_collapse_limit_multiplier",
     "index.hybrid.leg_arbitration_enabled",
     "index.hybrid.leg_recall_complete_enabled",
-    # CPU execution provider for the encoders + a fixed intra-op pool (PR 0b, fifth pair round).
-    # CUDA kernels reduce in a nondeterministic order, so the same text embeds to slightly
-    # different vectors on two runs and those vectors move fusion candidates — upstream of every
-    # budget, so no budget pin removes it. ORT on CPU is bit-deterministic for a FIXED thread
-    # count, which is why the thread pin belongs with the provider pin rather than beside it.
+)
+
+#: Recorded into ``provenance.pins`` WHEN SET, but never required. The CPU-execution-provider
+#: keys make the encoders bit-deterministic (CUDA kernels reduce in a nondeterministic order), and
+#: they work — but MEASURED on this corpus they are too slow to capture with: after the 15-minute
+#: enrichment wait, document embeddings were at 38% and 0 of 1,283 chunks were embedded at four
+#: intra-op threads, so a cycle exceeds an hour. They stay documented instruments for anyone who
+#: wants a bit-stable capture and can spend the time; a GPU capture is not failed for lacking them.
+#: GPU encoder jitter is handled instead by the NOISE PAIR, which measures each field's noise
+#: rather than assuming it away.
+OPTIONAL_CONFIG_PINS = (
     "justsearch.embed.gpu.enabled",
     "justsearch.splade.gpu_enabled",
     "justsearch.ner.gpu_enabled",
@@ -1303,7 +1309,9 @@ def read_config_pins(client: httpx.Client) -> tuple[dict, dict]:
     by_key = {e.get("key"): e for e in entries if isinstance(e, dict)}
     pins: dict = {}
     sources: dict = {}
-    for key in PINNED_CONFIG_KEYS:
+    # Required pins plus the optional instruments: an optional key that IS set is recorded, so a
+    # reader can tell a CPU-encoder capture from a GPU one, but its absence fails nothing.
+    for key in tuple(PINNED_CONFIG_KEYS) + tuple(OPTIONAL_CONFIG_PINS):
         entry = by_key.get(key)
         if not isinstance(entry, dict) or entry.get("value") is None:
             continue
@@ -2220,6 +2228,117 @@ def _cross_encoder_problems(baseline: dict, candidate: dict) -> list[str]:
     return problems
 
 
+#: Verdict status for a field the SAME-BUILD noise pair showed is not stable. Suffixed with the
+#: side whose noise pair moved (``baseline`` / ``candidate`` / ``both``).
+STATUS_NOISY_PREFIX = "noisy-"
+
+#: Default ceiling on the fraction of compared fields a side's noise pair may show as noisy
+#: before the gate refuses the whole run. Overridable per fixture as `maxNoisyFraction`.
+DEFAULT_MAX_NOISY_FRACTION = 0.10
+
+
+def _noise_side_status(
+    primary: dict,
+    noise: dict,
+    section: str,
+    record_id: str,
+    name: str,
+    klass: str,
+    epsilon: float,
+    limit: int | None,
+) -> bool:
+    """True when this field DIFFERS between a side's primary and its same-build noise capture.
+
+    "Differs" is judged under the fixture's own declared relation, not by byte equality: a tie
+    permutation the `equal-score-order` class already allows is not noise, it is the relation
+    working. Only a verdict the relation would call a REGRESSION counts.
+
+    A field the noise capture does not carry is NOT called noisy. That is the conservative
+    direction: absent evidence of instability leaves the field in the verdict, so a truncated or
+    empty noise capture can only make the gate stricter, never laxer. (The pin/profile health
+    checks below are what catch a noise capture that is broken rather than merely short.)
+    """
+    p_recs = _records(primary, section)
+    n_recs = _records(noise, section)
+    p_rec = p_recs.get(record_id)
+    n_rec = n_recs.get(record_id)
+    if not isinstance(p_rec, dict) or not isinstance(n_rec, dict):
+        return False
+    if name not in p_rec or name not in n_rec:
+        return False
+    cutoff = None
+    if section == "queries" and limit is not None:
+        cutoff = CutoffContext(
+            int(limit),
+            _observed_hits_captured(primary, record_id),
+            _observed_hits_captured(noise, record_id),
+        )
+    status, _ = compare_field(klass, p_rec[name], n_rec[name], epsilon, cutoff)
+    return status == STATUS_REGRESSION
+
+
+def _noise_problems(
+    entries: list[dict],
+    baseline: dict,
+    candidate: dict,
+    baseline_noise: dict | None,
+    candidate_noise: dict | None,
+    max_noisy_fraction: float,
+) -> list[str]:
+    """Refuse a gate whose noise pair is too loud, or whose noise capture is not comparable.
+
+    Two independent refusals.
+
+    A NOISE FRACTION above the declared ceiling means the instrument is measuring its own
+    instability rather than the build's. Every noisy field is excluded from the verdict, so a
+    pipeline degraded on both sides — a dropped reranker, a half-finished enrichment — would
+    otherwise present as a very quiet diff with most fields silently withdrawn. The ceiling is
+    what stops "nothing was compared" from reading like "nothing regressed".
+
+    A noise capture whose PINS, APPLIED SAMPLING or CHAT PROFILE differ from its own side's
+    primary is not a same-build noise measurement at all; it is a second configuration, and the
+    noise it reports belongs to the configuration change rather than to the build.
+    """
+    problems: list[str] = []
+    compared = [e for e in entries if e.get("class") is not None]
+    total = len(compared) or 1
+    for side, noise in (("baseline", baseline_noise), ("candidate", candidate_noise)):
+        if noise is None:
+            continue
+        noisy = [
+            e for e in compared
+            if str(e.get("status", "")).startswith(STATUS_NOISY_PREFIX)
+            and side in str(e.get("status", ""))
+        ]
+        fraction = len(noisy) / total
+        if fraction > max_noisy_fraction:
+            problems.append(
+                f"{side}: the same-build noise pair moved {len(noisy)} of {total} compared "
+                f"fields ({fraction:.1%}), above the declared maxNoisyFraction of "
+                f"{max_noisy_fraction:.1%}. Every noisy field is EXCLUDED from the verdict, so "
+                "at this level the gate is withdrawing most of what it was meant to compare and "
+                "a quiet result would mean 'almost nothing was checked', not 'nothing "
+                "regressed'. Find what is unstable on that side — a dropped reranker, an "
+                "unfinished enrichment, a moving index — before trusting any verdict."
+            )
+    for side, primary, noise in (
+        ("baseline", baseline, baseline_noise), ("candidate", candidate, candidate_noise)
+    ):
+        if noise is None:
+            continue
+        p_prov, n_prov = _provenance(primary), _provenance(noise)
+        for field in ("pins", "samplingApplied", "chatProfile"):
+            if p_prov.get(field) != n_prov.get(field):
+                problems.append(
+                    f"{side}: the noise capture's provenance.{field} differs from its own "
+                    f"primary capture's ({p_prov.get(field)!r} vs {n_prov.get(field)!r}). A "
+                    "noise pair has to be the SAME build under the SAME conditions — otherwise "
+                    "the 'noise' it measures is the condition change, and every field it "
+                    "excuses is excused for the wrong reason."
+                )
+    return problems
+
+
 def capture_health(
     baseline: dict, candidate: dict, declared_not_captured: list[str]
 ) -> dict:
@@ -2296,19 +2415,50 @@ def capture_health(
     return {"ok": not problems, "problems": problems}
 
 
-def diff(baseline: str | Path | dict, candidate: str | Path | dict, fixture: dict) -> dict:
-    """Diff two captures under the fixture's declared equality relation.
+def _load_capture(value):
+    if value is None or isinstance(value, dict):
+        return value
+    return json.loads(Path(value).read_text(encoding="utf-8"))
+
+
+def diff(
+    baseline: str | Path | dict,
+    candidate: str | Path | dict,
+    fixture: dict,
+    baseline_noise: str | Path | dict | None = None,
+    candidate_noise: str | Path | dict | None = None,
+) -> dict:
+    """Diff two captures under the fixture-declared equality relation.
 
     ``baseline`` / ``candidate`` are capture paths or already-loaded capture documents.
     Returns a structured result; ``pass`` is True only when nothing is ``REGRESSION`` or
     ``missing``.
+
+    GATING WITH A NOISE PAIR (design 16 relation refinement). Pass ``baseline_noise`` and/or
+    ``candidate_noise`` -- each the SECOND fresh-corpus capture of that same side, same build --
+    and the differ first asks, per field, whether that field is stable WITHIN a side before
+    asking whether it differs BETWEEN sides. A field that a side own noise pair already moves is
+    reported ``noisy-baseline`` / ``noisy-candidate`` / ``noisy-both``, counted under
+    ``counts.noisy``, and excluded from the regression verdict: a difference it shows across
+    sides cannot be attributed to the build, because the same build produces that difference
+    against itself.
+
+    This replaces ASSUMING determinism with MEASURING it. Five pair rounds established that some
+    fields are simply not stable on this stack (index-time GPU embedding jitter moves fusion
+    candidates, and no candidate-budget pin removes it), and both alternatives were worse:
+    declaring those fields non-exact would blind the gate to real regressions in them forever,
+    and pinning the pipeline hard enough to silence them (CPU encoders) costs over an hour per
+    cycle and stops measuring the shipping configuration.
+
+    Without the two noise arguments the behaviour is exactly as before.
     """
     declarations = validate_fixture(fixture)
     epsilon = float(fixture["scoreTieEpsilon"])
-    base = baseline if isinstance(baseline, dict) else json.loads(
-        Path(baseline).read_text(encoding="utf-8"))
-    cand = candidate if isinstance(candidate, dict) else json.loads(
-        Path(candidate).read_text(encoding="utf-8"))
+    max_noisy_fraction = float(fixture.get("maxNoisyFraction", DEFAULT_MAX_NOISY_FRACTION))
+    base = _load_capture(baseline)
+    cand = _load_capture(candidate)
+    base_noise = _load_capture(baseline_noise)
+    cand_noise = _load_capture(candidate_noise)
 
     # K per query, so the differ can find the tie group straddling the rank-K cutoff. Threaded
     # exactly as `epsilon` is — `diff` already holds both the fixture and the record id.
@@ -2355,21 +2505,57 @@ def diff(baseline: str | Path | dict, candidate: str | Path | dict, fixture: dic
                 else:
                     status, reason = compare_field(
                         klass, b_rec[name], c_rec[name], epsilon, cutoff)
-                    entry.update(status=status, reason=reason)
-                    if status == STATUS_REGRESSION:
-                        entry["baseline"] = b_rec[name]
-                        entry["candidate"] = c_rec[name]
+                    limit = query_limits.get(record_id) if section == "queries" else None
+                    noisy_sides = [
+                        side
+                        for side, primary, noise in (
+                            ("baseline", base, base_noise),
+                            ("candidate", cand, cand_noise),
+                        )
+                        if noise is not None
+                        and _noise_side_status(
+                            primary, noise, section, record_id, name, klass, epsilon, limit)
+                    ]
+                    if noisy_sides:
+                        # The cross-side verdict is kept for the reader -- it is what the gate
+                        # WOULD have said -- but it decides nothing: a field that a build moves
+                        # against itself cannot evidence a difference between two builds.
+                        marker = "both" if len(noisy_sides) == 2 else noisy_sides[0]
+                        entry.update(
+                            status=STATUS_NOISY_PREFIX + marker,
+                            reason=(
+                                "excluded from the verdict: the " + marker + " same-build noise "
+                                "pair already moves this field, so a cross-side difference here "
+                                "is not attributable to the build (cross-side would have been: "
+                                + status + ")"
+                            ),
+                            crossSideStatus=status,
+                            crossSideReason=reason,
+                        )
+                    else:
+                        entry.update(status=status, reason=reason)
+                        if status == STATUS_REGRESSION:
+                            entry["baseline"] = b_rec[name]
+                            entry["candidate"] = c_rec[name]
                 entries.append(entry)
 
-    counts = {"equal": 0, "allowed": 0, STATUS_REGRESSION: 0, STATUS_MISSING: 0}
+    counts = {"equal": 0, "allowed": 0, "noisy": 0, STATUS_REGRESSION: 0, STATUS_MISSING: 0}
     for entry in entries:
         status = entry["status"]
         if status == STATUS_EQUAL:
             counts["equal"] += 1
         elif status.startswith("allowed:"):
             counts["allowed"] += 1
+        elif status.startswith(STATUS_NOISY_PREFIX):
+            counts["noisy"] += 1
         else:
             counts[status] += 1
+
+    noisy_by_side = {"baseline": 0, "candidate": 0, "both": 0}
+    for entry in entries:
+        status = str(entry["status"])
+        if status.startswith(STATUS_NOISY_PREFIX):
+            noisy_by_side[status[len(STATUS_NOISY_PREFIX):]] += 1
 
     by_class = {k: 0 for k in ALLOWED_DIFFERENCE_CLASSES}
     for entry in entries:
@@ -2378,6 +2564,13 @@ def diff(baseline: str | Path | dict, candidate: str | Path | dict, fixture: dic
 
     declared_not_captured = sorted(set(declarations) - captured_paths)
     health = capture_health(base, cand, declared_not_captured)
+    if base_noise is not None or cand_noise is not None:
+        noise_problems = _noise_problems(
+            entries, base, cand, base_noise, cand_noise, max_noisy_fraction)
+        if noise_problems:
+            health = dict(health)
+            health["problems"] = list(health.get("problems") or []) + noise_problems
+            health["ok"] = False
 
     return {
         "schema": DIFF_SCHEMA,
@@ -2389,6 +2582,8 @@ def diff(baseline: str | Path | dict, candidate: str | Path | dict, fixture: dic
             and health["ok"]
         ),
         "counts": counts,
+        "noisy_by_side": noisy_by_side,
+        "maxNoisyFraction": max_noisy_fraction,
         "allowed_by_class": by_class,
         "health": health,
         "baseline_provenance": base.get("provenance"),
