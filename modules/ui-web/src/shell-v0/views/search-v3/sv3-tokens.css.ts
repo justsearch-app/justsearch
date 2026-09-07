@@ -183,24 +183,28 @@ export const sv3Tokens = css`
        inversion is carried as tokens instead (the spec's own recommendation). Dark catches light —
        a 1px inset top highlight and NO drop shadow; light casts one down. */
     --composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white));
-    /* Tempdoc 859 (live audit 2026-08-25) — WCAG 1.4.11 (Non-text Contrast) at 3:1. This edge is the
-       visual information that identifies the composer as an input, and at 5% white it measured
-       1.21:1 over the page: a boundary a reader with low contrast sensitivity cannot find at all.
-       35% is the smallest 5% step that clears 3:1 against BOTH adjacent colours — the page it sits on
-       (rgb(10,10,10) → 3.45:1) and the glass surface it sits over (rgb(20,20,20) → 3.21:1) — which is
-       what a boundary has to do; clearing only the outside would move the failure rather than close
-       it. Still a color-mix off '--color-white' rather than a literal, so the one primitive keeps
-       driving both themes' edges.
-       SCOPE — 1.4.11 IS NOT CLOSED FOR THIS COMPONENT, and the ratios above are the ENGAGED edge
-       only (the composer while the field holds focus). '.glass::after' spends 55% of this alpha back
-       while '--composer-rest' is 1 (864 Layer 1(d)), so the edge a reader sees BEFORE clicking in
-       computes 1.71:1 dark / 1.58:1 light — still well under the floor. That is pinned as a failing
-       assertion in 'sv3-tokens.test.ts' ("KNOWN OPEN: the RESTING edge…") rather than left to prose,
-       so a future fix has to flip it deliberately. It is not closed here because 864's resting knob
-       was an OWNER DECISION about the resting affordance: 864 chose the surface lift as the
-       de-emphasis precisely because it "spends no TEXT contrast", and the outline fade it added
-       alongside is the half that does spend non-text contrast. Dropping that fade, or clamping the
-       spend at the floor, is a design call — not one a token sheet gets to make on its own. */
+    /* Tempdoc 859 — WCAG 1.4.11 (Non-text Contrast) at 3:1. This edge is the visual information that
+       identifies the composer as an input, and at 5% white it was unfindable.
+       35% is the smallest 5% step at which the TOKEN AT FULL ALPHA clears 3:1 against both adjacent
+       colours (page rgb(10,10,10) → 3.45:1; glass rgb(20,20,20) → 3.21:1). Still a color-mix off
+       '--color-white' rather than a literal, so one primitive drives both themes' edges.
+       WHICH STATE THIS ACTUALLY PAINTS (measured audit, 2026-09-07 — the first wording here was token
+       arithmetic for a state that never reaches the screen). '.glass::after' has three painted
+       arms: RESTING, at 45% of this token ('calc(100% - 55% * var(--composer-rest))'); FOCUSED, where
+       '.glass:has(textarea:focus-visible)::after' re-points the border to '--ring' (9.69:1 dark /
+       5.84:1 light, unchanged by this token); and INVALID, which takes '--destructive'. Full alpha
+       would need '--composer-rest: 0' WITHOUT ':focus-visible' — and the knob is spent by
+       '.glass:has(textarea:focus)', while the shipped Chromium engine matches ':focus-visible' on
+       every focused textarea (measured: focusVisible true even after a mouse click). So full alpha is
+       unreachable in the shipped browser, and THE ONLY PAINTED STATE THIS TOKEN CHANGE ALTERS IS THE
+       RESTING EDGE: 1.07:1 → 1.59:1 over the page.
+       SCOPE — 1.4.11 IS THEREFORE STILL OPEN FOR THIS COMPONENT. The resting edge is better and not
+       fixed, pinned as a failing assertion in 'sv3-tokens.test.ts' ("KNOWN OPEN: the RESTING edge…")
+       rather than left to prose, so a future fix has to flip it deliberately. It is not closed here
+       because 864's resting knob was an OWNER DECISION about the resting affordance: 864 chose the
+       surface lift as the de-emphasis precisely because it "spends no TEXT contrast", and the outline
+       fade it added alongside is the half that does spend non-text contrast. Dropping that fade, or
+       clamping the spend at the floor, is a design call — not one a token sheet gets to make. */
     --composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent);
     --composer-shadow: none;
     --composer-highlight: inset 0 1px rgb(255 255 255 / 3%);
@@ -455,12 +459,15 @@ export const sv3Tokens = css`
     --sidebar-row-selected: var(--color-white);
     --composer-glass-surface: var(--card);
     /* 859 — the same 1.4.11 floor from the other side. 8% black was "the stronger half" of the two
-       and still only 1.16:1 over the page; 45% is the smallest 5% step clearing 3:1 against both
-       adjacent colours here (page rgb(252,252,252) → 3.28:1, card rgb(255,255,255) → 3.36:1). Light
-       needs a HIGHER alpha than dark because its edge darkens toward a near-white page instead of
-       lightening away from a near-black one, so the same nominal step buys less separation. These
-       are the ENGAGED ratios; the resting-knob gap noted on the dark declaration applies here
-       identically and measures 1.58:1, so 1.4.11 is open in this theme too. */
+       and still only 1.16:1 over the page; 45% is the smallest 5% step at which the TOKEN AT FULL
+       ALPHA clears 3:1 against both adjacent colours here (page rgb(252,252,252) → 3.28:1, card
+       rgb(255,255,255) → 3.36:1). Light needs a HIGHER alpha than dark because its edge darkens
+       toward a near-white page instead of lightening away from a near-black one, so the same nominal
+       step buys less separation.
+       The painted-state analysis on the dark declaration applies here unchanged: full alpha never
+       reaches the screen, the focused edge is '--ring' (5.84:1 measured), and the one painted state
+       this change alters is the RESTING edge — 1.07:1 → 1.60:1 over the page. 1.4.11 is open in this
+       theme too. */
     --composer-outline: rgb(0 0 0 / 45%);
     --composer-shadow: 0 12px 28px -18px rgb(0 0 0 / 40%);
     --composer-highlight: none;

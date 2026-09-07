@@ -1364,9 +1364,10 @@ describe('the chat column caps on one token, not three literals', () => {
 /* ── Tempdoc 859 (live audit 2026-08-25/26): the two measured token defects ──────────────────── */
 
 /**
- * Two findings the live console and live axe reported against the shipped window, pinned as MATHS
- * rather than as values so a later re-tune of the token cannot pass the letter of the fix and fail
- * its point.
+ * Two findings from the live audits of the shipped window, pinned as MATHS rather than as values so
+ * a later re-tune of the token cannot pass the letter of the fix and fail its point. (Contrast here
+ * came from canvas-resolved colour sampling, not from axe: axe's colour rules cover TEXT, and 1.4.11
+ * is about a non-text boundary.)
  *
  * The ratios are computed with the product's own contrast authority (`themes/contrast.ts` —
  * `contrastRatio`, the same function `conformanceGate` and the palette tests use), never by eye.
@@ -1377,11 +1378,16 @@ describe('the chat column caps on one token, not three literals', () => {
  * the first case re-checks that the sheet still derives those bases from the same primitives, so a
  * palette change cannot leave this arithmetic quietly describing a window that no longer exists.
  *
- * SCOPE, stated up front (review F1): what is CLOSED here is the ENGAGED edge — the composer while
- * the field holds focus. The RESTING edge is still below the floor and has its own case at the
- * bottom of this block, asserting that it fails. 1.4.11 is not closed for this component.
+ * SCOPE, stated up front (review F1, corrected by the measured audit 2026-09-07): the two ratio
+ * cases below assert the TOKEN AT FULL ALPHA, which is a property of the token and NOT a state the
+ * composer paints. `.glass::after` paints three arms — resting (45% of the token), focused (the
+ * border re-points to `--ring`), and invalid (`--destructive`) — and full alpha would need
+ * `--composer-rest: 0` without `:focus-visible`, which the shipped Chromium engine never produces
+ * (a focused textarea always matches `:focus-visible` there, measured). So the only PAINTED state
+ * this token governs is the resting edge, and it is still below the floor: see the KNOWN-OPEN case
+ * at the bottom of this block. 1.4.11 is not closed for this component.
  */
-describe('859: the ENGAGED composer boundary meets WCAG 1.4.11 in both themes', () => {
+describe('859: the composer outline token meets WCAG 1.4.11 at full alpha in both themes', () => {
   const WCAG_NON_TEXT = 3;
 
   /** Live-measured sRGB of the two page bases (see the block comment for why they are pinned). */
@@ -1427,7 +1433,7 @@ describe('859: the ENGAGED composer boundary meets WCAG 1.4.11 in both themes', 
     expect(lightBlock).toContain('--card: var(--color-white)');
   });
 
-  it('dark: the ENGAGED edge clears 3:1 against BOTH adjacent colours (it was 1.21:1 at 5% white)', () => {
+  it('dark: the token at FULL ALPHA clears 3:1 against BOTH adjacent colours (5% white was 1.21:1)', () => {
     const glass = mix(DARK_PAGE, WHITE, 0.96); // --composer-glass-surface
     const edge = over(WHITE, alphaOf(darkBlock), glass);
     // The OUTSIDE — the failure the audit reported, at 1.21:1.
@@ -1440,7 +1446,7 @@ describe('859: the ENGAGED composer boundary meets WCAG 1.4.11 in both themes', 
     expect(contrastRatio(over(WHITE, 0.05, glass), DARK_PAGE)).toBeCloseTo(1.215, 3);
   });
 
-  it('light: the ENGAGED edge clears 3:1 against both, which 8% black did not either', () => {
+  it('light: the token at FULL ALPHA clears 3:1 against both, which 8% black did not either', () => {
     const card = WHITE; // --composer-glass-surface: var(--card) → --color-white
     const edge = over(BLACK, alphaOf(lightBlock), card);
     expect(contrastRatio(edge, LIGHT_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
@@ -1451,11 +1457,16 @@ describe('859: the ENGAGED composer boundary meets WCAG 1.4.11 in both themes', 
   });
 
   /**
-   * THE KNOWN-OPEN HALF (review F1). Raising the token fixed the edge a reader sees while TYPING and
-   * did not fix the one they see before they click in — and the two cases above, asserting only the
-   * raw token, would have stayed green while that stayed broken. So the failure is pinned as a
-   * failure: it is measured, it is attributed, and a future fix has to come here and flip it
-   * deliberately rather than discovering it by accident.
+   * THE KNOWN-OPEN HALF, and the only state this token actually paints (review F1; numbers corrected
+   * by the measured audit 2026-09-07). The two cases above read the raw token, so the suite would
+   * have stayed green over a resting edge nobody can see. The failure is therefore pinned AS a
+   * failure — measured, attributed, and impossible to fix by accident.
+   *
+   * TWO surfaces, named because the first cut conflated them: the resting border composites over the
+   * RESTING glass, not the engaged one. `--composer-rest-surface` mixes the glass 35% back toward the
+   * page while `--composer-rest` is 1, so the backdrop is rgb(14,14,14) dark / rgb(253,253,253)
+   * light, not the rgb(20,20,20) / rgb(255,255,255) the full-alpha cases use. Compositing over the
+   * engaged glass is what produced the earlier 1.71 dark figure.
    *
    * The mechanism is `.glass::after`'s `border-color: color-mix(… var(--composer-outline)
    * calc(100% - 55% * var(--composer-rest)) …)` — tempdoc 864 Layer 1(d)'s RESTING KNOB, which
@@ -1467,29 +1478,55 @@ describe('859: the ENGAGED composer boundary meets WCAG 1.4.11 in both themes', 
    * de-emphasis entirely on the surface, as 864's own rationale would suggest) or clamping the spend
    * at the 3:1 floor — both design calls, both owner's.
    */
-  it('KNOWN OPEN: the RESTING edge is still below 3:1 in both themes (864 resting knob)', () => {
-    // `--composer-rest: 1` while the field is unfocused, so the border keeps 45% of the token alpha.
+  it('KNOWN OPEN: the RESTING edge — the one painted state — is still below 3:1 (864 knob)', () => {
+    // `--composer-rest: 1` while the field is unfocused: the border keeps 45% of the token alpha…
     const restSpend = 1 - 0.55;
     expect(
       styleTextOf(Sv3Composer).replace(/\s+/g, ' '),
       'the resting knob moved — re-measure before trusting the numbers below',
     ).toContain('var(--composer-outline) calc(100% - 55% * var(--composer-rest))');
+    // …and it sits on the RESTING glass, which is mixed 35% back toward the page by the same knob.
+    expect(styleTextOf(Sv3Composer).replace(/\s+/g, ' ')).toContain(
+      'var(--composer-glass-surface) calc(100% - 65% * var(--composer-rest))',
+    );
 
-    const glass = mix(DARK_PAGE, WHITE, 0.96);
-    const restingDark = over(WHITE, alphaOf(darkBlock) * restSpend, glass);
-    const restingLight = over(BLACK, alphaOf(lightBlock) * restSpend, WHITE);
+    const restGlassDark = mix(mix(DARK_PAGE, WHITE, 0.96), DARK_PAGE, 0.35);
+    const restGlassLight = mix(WHITE, LIGHT_PAGE, 0.35);
+    const restingDark = over(WHITE, alphaOf(darkBlock) * restSpend, restGlassDark);
+    const restingLight = over(BLACK, alphaOf(lightBlock) * restSpend, restGlassLight);
 
-    // Measured, not asserted-away: these are the numbers, and they are under the floor.
-    expect(contrastRatio(restingDark, DARK_PAGE)).toBeCloseTo(1.71, 2);
-    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeCloseTo(1.58, 2);
+    // Against the PAGE — the "can a reader find the box on the screen" question. Live canvas-resolved
+    // measurement reported 1.57 dark / 1.61 light; this arithmetic gives 1.59 / 1.60, the ~0.02 gap
+    // being `--glass-opacity` and the backdrop blur, which this model does not simulate. Both sit far
+    // enough under the floor that the conclusion does not depend on which number you take.
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeCloseTo(1.59, 2);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeCloseTo(1.6, 2);
     expect(contrastRatio(restingDark, DARK_PAGE)).toBeLessThan(WCAG_NON_TEXT);
     expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+    // Against the RESTING GLASS — the inside half of the same boundary, also short.
+    expect(contrastRatio(restingDark, restGlassDark)).toBeLessThan(WCAG_NON_TEXT);
+    expect(contrastRatio(restingLight, restGlassLight)).toBeLessThan(WCAG_NON_TEXT);
 
-    // The engaged edge, by contrast, IS closed — which is what makes this a scoped gap rather than
-    // "the fix did nothing".
-    expect(contrastRatio(over(WHITE, alphaOf(darkBlock), glass), DARK_PAGE)).toBeGreaterThanOrEqual(
-      WCAG_NON_TEXT,
+    // The token change was not a no-op on this state: it is the one painted arm it moved.
+    expect(contrastRatio(over(WHITE, 0.05 * restSpend, restGlassDark), DARK_PAGE)).toBeLessThan(1.1);
+    expect(contrastRatio(over(BLACK, 0.08 * restSpend, restGlassLight), LIGHT_PAGE)).toBeLessThan(
+      1.1,
     );
+  });
+
+  it('the FOCUSED edge is --ring, so this token never governs it (measured audit)', () => {
+    // Why the full-alpha cases above are a token property and not a screen state: the focus arm
+    // re-points the border away from `--composer-outline` entirely, and in the shipped Chromium a
+    // focused textarea always matches `:focus-visible` — so `--composer-rest: 0` (full alpha) and
+    // "not focus-visible" cannot both hold. The focused edge measured 9.69:1 dark / 5.84:1 light,
+    // unchanged by this PR.
+    const composer = styleTextOf(Sv3Composer);
+    const focusRule = /\.glass:has\(textarea:focus-visible\)::after\s*\{([^}]*)\}/.exec(composer);
+    expect(focusRule, 'the focus arm moved — re-check which token paints the focused edge').not.toBeNull();
+    expect(focusRule?.[1]).toContain('border-color: var(--ring)');
+    // …and the knob that would restore full alpha is spent by the plain `:focus` sibling, so the two
+    // conditions are entangled by construction rather than by coincidence.
+    expect(composer).toContain('.glass:has(textarea:focus) {');
   });
 });
 
@@ -1561,17 +1598,23 @@ describe('859: the reasoning-block bridge gives the hover somewhere to go', () =
   });
 });
 
-/* ── Tempdoc 859 (live axe 2026-08-25): the window's one serious violation ───────────────────── */
+/* ── Tempdoc 859: the resize grips' WCAG 2.2 2.5.8 floor ─────────────────────────────────────── */
 
 /**
- * WCAG 2.2 2.5.8 (Target Size, Minimum). Live axe on the sv3 window reported exactly one serious
- * violation — `button.sidebar-grip` at 16 CSS px wide against the 24 px floor — and the pane grip is
- * the same anatomy on the other edge, deliberately ("one window may not have two differently-sized
- * grips"), so both carry the floor or the anatomy forks.
+ * WCAG 2.2 2.5.8 (Target Size, Minimum): `button.sidebar-grip` measured 16 CSS px wide against the
+ * 24 px floor, and the pane grip is the same anatomy on the other edge, deliberately ("one window may
+ * not have two differently-sized grips"), so both carry the floor or the anatomy forks.
+ *
+ * THIS TEST IS THE ENFORCEMENT, and the measured audit (2026-09-07) is why that sentence is here
+ * rather than "axe caught it". The repo's `ui_measure.py` runs axe without the `wcag22aa` tag, so
+ * target-size is never evaluated in the normal run; and adding the tag makes the 16px grip PASS,
+ * because 2.5.8's spacing exception covers an undersized target with enough clear space around it.
+ * Neither of those makes the floor uninteresting — the exception depends on neighbouring layout a
+ * later change can remove without touching this rule — but it does mean no live tool is watching it.
+ * These assertions are.
  *
  * Asserted on the declaration rather than on a measured box: happy-dom computes no cascade and no
- * layout, so a `getBoundingClientRect` here would report 0 for a passing AND a failing grip. The
- * measured half is live axe, which is what found this in the first place.
+ * layout, so a `getBoundingClientRect` here would report 0 for a passing AND a failing grip.
  */
 describe('859: both resize grips clear the 24px target floor', () => {
   const ruleBodyOf = (styles: string, selector: string): string => {
