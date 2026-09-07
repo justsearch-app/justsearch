@@ -981,6 +981,46 @@ direct calls" — see Q2).
 
 ---
 
+### 11.1 Found while implementing A10-A13: the stated item order is infeasible (2026-09-07)
+
+Not a stop-rule trigger under 17.8 — the *inventory* still does not outgrow 917 — but a sequencing
+fact that must be recorded before A10-A13 are worked, because acting on the written order produces
+either a compile-red window the delivery constraint forbids or a large rework.
+
+**A10 cannot precede A11.** `WorkerSpawner` (group S, item A11) is constructed with a
+`MainSignalBus` (group M, item A10) and calls `signalBus.*` **17 times**
+(`WorkerSpawner.java`: `open`, `zeroPort`, `clearShutdown`, `writeHeartbeat`, `awaitPort`, …).
+Deleting the bus while the spawner exists cannot compile, and the spawner is not deletable at A10
+without pulling in the whole of A11 (the legacy `KnowledgeServerBootstrap` branch, `SupervisionPolicy`,
+`WorkerStartFailures`, the `IndexerWorker` entry point). §7's group split (W/M at A10, S at A11) was
+written under 17.4's compose-and-delete-as-one-checkpoint assumption, where the branch was expected
+to be red across A6-A13 and order therefore did not matter. Under a green-after-every-item
+delivery the dependency is binding and the two items **swap**: S first, then W+M.
+
+Nothing else about either item changes; the file inventories in §7 are unaffected.
+
+**Three couplings the item lists do not name, checked before relying on them:**
+
+| coupling | verdict |
+|---|---|
+| `SupervisionPolicy` ↔ the Brain (`BrainSupervisionPolicy`, `LlamaServerOps`) | **javadoc only.** `BrainSupervisionPolicy` is a separate record and `LlamaServerOps` reads `BrainSupervisionPolicy.defaults()`. Deleting the Worker's policy does not touch llama-server supervision, which design 3.1 keeps. Only prose references need correcting |
+| `SupervisionPolicy` / `SupervisionDecision` ↔ `governance/supervision-contract.v1.json` | **real, and bigger than a class deletion.** `SupervisionContractTest` asserts the register's per-process `policy` block **equals the live policy record defaults**, so deleting the record forces the register's whole Worker block out in the same commit. That register is the declared 3-process supervision contract (tempdoc 627); removing a process from it is a governance change, and §10 already accepts the loss ("no crash detection, no restart budget, no cooldown, no stability window") — so the register must say the Worker row is retired to lane F stage B, not simply lose it |
+| `BootRecoveryPolicy` / `BootRecoveryDecision` / `ResumeDetector` ↔ `SupervisionDecision` | **javadoc only.** All three survive: a boot recovery is still meaningful when the in-process start fails (a Lucene open failure), and the resume detector is clock-shaped, not process-shaped |
+
+**One open decision the item lists do not settle: does `KnowledgeServerHealthMonitor` survive A11?**
+§7 group S lists it for deletion; the A10-A13 brief does not. It has 30 referencers including
+`HeadlessApp`, `LocalApiServer` and `StatusLifecycleHandler`, and it owns three things that are not
+all process-shaped: (a) the health poll that drives the worker component's READY/LOST transitions —
+still meaningful in process; (b) the boot-recovery arm — still meaningful, since an in-process start
+can fail; (c) post-resume eager revalidation, which reconnects a channel that no longer exists.
+Deleting the whole class is consistent with §10's "supervision is deliberately lost until B" and
+with §7; keeping (a) and (b) while deleting (c) preserves `/api/health` behaviour that §10 does
+**not** list as an accepted loss. The two readings differ in what `/api/health` reports after a
+failed start, which is a user-visible contract, so it is recorded here rather than decided in a
+commit body.
+
+---
+
 ## 12. Open questions the implementer must resolve on first contact
 
 | # | question and evidence | candidates | recommendation |
