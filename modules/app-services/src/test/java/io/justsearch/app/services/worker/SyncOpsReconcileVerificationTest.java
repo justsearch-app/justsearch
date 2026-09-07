@@ -31,11 +31,9 @@ final class SyncOpsReconcileVerificationTest {
           @SuppressWarnings("unchecked")
           public <T> T execute(
               String operation,
-              RemoteKnowledgeClient.RpcDeadlineCategory category,
-              java.util.function.Function<
-                      io.justsearch.ipc.IngestServiceGrpc.IngestServiceBlockingStub, T>
-                  rpcFn) {
-            return (T) response; // canned; ignores the stub function
+              KnowledgeClient.RpcDeadlineCategory category,
+              java.util.function.Function<IngestServiceCalls, T> rpcFn) {
+            return (T) response; // canned; ignores the call function
           }
         };
     Map<Path, Instant> watchedRoots = new ConcurrentHashMap<>();

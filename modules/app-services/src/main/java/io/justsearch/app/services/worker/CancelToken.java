@@ -10,7 +10,7 @@ import java.util.Objects;
  * <p>Wraps a {@link Context.CancellableContext} so callers can:
  *
  * <ol>
- *   <li>Pass the token to a streaming RPC like {@link RemoteKnowledgeClient#scanRoot}.
+ *   <li>Pass the token to a streaming RPC like {@link KnowledgeClient#scanRoot}.
  *   <li>Call {@link #cancel()} from a different thread (typically the Javalin handler that
  *       initiated the RPC, in response to an HTTP-client disconnect or an explicit user "Cancel"
  *       click) to propagate gRPC cancellation. The Worker's
@@ -34,7 +34,7 @@ public final class CancelToken {
     this.context = Context.current().withCancellation();
   }
 
-  /** Returns the underlying gRPC context. Used by {@link RemoteKnowledgeClient} to scope RPC calls. */
+  /** Returns the underlying gRPC context. Used by {@link KnowledgeClient} to scope RPC calls. */
   Context.CancellableContext context() {
     return context;
   }
@@ -52,5 +52,20 @@ public final class CancelToken {
   /** Returns {@code true} once {@link #cancel} has fired (or the underlying context cancels). */
   public boolean isCancelled() {
     return context.isCancelled();
+  }
+
+  /**
+   * Runs {@code handler} once, on whichever thread cancels, when this token fires. Fires
+   * immediately if the token is already cancelled.
+   *
+   * <p>Lane F stage A item A6: this is the transport-neutral half of the token. The gRPC path uses
+   * {@link #context()} to scope a call; the in-process path has no context to scope and needs the
+   * notification instead. Item A10 replaces the {@code io.grpc.Context} inside with a plain JDK
+   * primitive, at which point this method is the whole class's outward surface
+   * (stage A §2: "re-home {@code CancelToken} free of {@code io.grpc}").
+   */
+  public void onCancel(Runnable handler) {
+    Objects.requireNonNull(handler, "handler");
+    context.addListener(ctx -> handler.run(), Runnable::run);
   }
 }

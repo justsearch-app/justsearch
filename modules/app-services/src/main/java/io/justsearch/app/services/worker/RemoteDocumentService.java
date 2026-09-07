@@ -36,12 +36,12 @@ import org.slf4j.LoggerFactory;
  *   <li>Worker is single source of truth for indexed data</li>
  * </ul>
  *
- * @see RemoteKnowledgeClient#fetchDocuments(List)
+ * @see KnowledgeClient#fetchDocuments(List)
  */
 public final class RemoteDocumentService implements DocumentService {
   private static final Logger log = LoggerFactory.getLogger(RemoteDocumentService.class);
 
-  private final Supplier<RemoteKnowledgeClient> clientSupplier;
+  private final Supplier<KnowledgeClient> clientSupplier;
   private final RagMetricCatalog catalog;
 
   /**
@@ -49,7 +49,7 @@ public final class RemoteDocumentService implements DocumentService {
    *
    * @param clientSupplier supplier for the gRPC client; resolves at use-time per §31 supplier-aware
    */
-  public RemoteDocumentService(Supplier<RemoteKnowledgeClient> clientSupplier) {
+  public RemoteDocumentService(Supplier<KnowledgeClient> clientSupplier) {
     this(clientSupplier, RagMetricCatalog.noop());
   }
 
@@ -60,7 +60,7 @@ public final class RemoteDocumentService implements DocumentService {
    * @param catalog RAG metric catalog (use {@link RagMetricCatalog#noop()} when not wired)
    */
   public RemoteDocumentService(
-      Supplier<RemoteKnowledgeClient> clientSupplier, RagMetricCatalog catalog) {
+      Supplier<KnowledgeClient> clientSupplier, RagMetricCatalog catalog) {
     this.clientSupplier = Objects.requireNonNull(clientSupplier, "clientSupplier");
     this.catalog = Objects.requireNonNull(catalog, "catalog");
   }

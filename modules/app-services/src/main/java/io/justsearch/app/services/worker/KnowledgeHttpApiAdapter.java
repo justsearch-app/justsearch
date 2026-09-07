@@ -126,7 +126,7 @@ public final class KnowledgeHttpApiAdapter {
    * field write. A {@code null}/blank collection preserves the pre-811 untagged behaviour.
    */
   public KnowledgeIngestResponse ingest(List<Path> files, String collection) {
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
     BatchResponse r = client.submitBatch(files, false, collection);
     return new KnowledgeIngestResponse(r.getAcceptedCount(), r.getErrorMessage());
   }
@@ -140,7 +140,7 @@ public final class KnowledgeHttpApiAdapter {
    */
   public KnowledgeIngestResponse scanRoot(
       String rootPath, String collection, List<String> excludeGlobs) {
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
     // Tempdoc 419 / T4: hold the worker-allocated scanId from the first event so the SSE endpoint at
     // GET /api/scans/{scanId}/progress can subscribe via the registry. The registry handles late
     // subscribers via replay so the UI can open the SSE connection AFTER reading the scanId.
@@ -220,13 +220,13 @@ public final class KnowledgeHttpApiAdapter {
   }
 
   public List<String> suggest(String query, int limit) {
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
     return client.suggest(query, limit).getSuggestionsList();
   }
 
   public FolderBrowseResponse listFolders(FolderBrowseRequest req) {
     Objects.requireNonNull(req, "req");
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
     int maxFolders = req.maxFolders() == null ? 0 : req.maxFolders();
     ListFoldersResponse proto = client.listFolders(req.parentPath(), maxFolders);
 
@@ -244,7 +244,7 @@ public final class KnowledgeHttpApiAdapter {
 
   public FolderFilesResponse listFolderFiles(FolderFilesRequest req) {
     Objects.requireNonNull(req, "req");
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
     int limit = req.limit() == null ? 0 : req.limit();
     ListFolderFilesResponse proto = client.listFolderFiles(
         req.folderPath(), limit, req.projection());

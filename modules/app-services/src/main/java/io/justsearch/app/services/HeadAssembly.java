@@ -21,7 +21,7 @@ import io.justsearch.app.services.gpl.GplJobCoordinator;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.app.observability.CapabilitiesController;
 import io.justsearch.app.observability.CapabilitiesService;
@@ -60,7 +60,7 @@ public final class HeadAssembly implements AutoCloseable {
   // few cross-phase intermediates (Worker connection state, inference handles, pre-substrate
   // operation registry, GPL/LambdaMART, indexing-jobs bridge).
   private volatile SearchPort searchPort;
-  private volatile RemoteKnowledgeClient knowledgeClient;
+  private volatile KnowledgeClient knowledgeClient;
   private volatile KnowledgeServerBootstrap knowledgeServerBootstrap;
   // §31 Phase 3: LateBoundServices DELETED. The 7 controller-services are constructed by
   // ServicePhase and held via this.serviceOut. The 3 controller back-refs (settings reset
@@ -1266,7 +1266,7 @@ public final class HeadAssembly implements AutoCloseable {
     // the connect window + outcome reasonCode so downstream consumers (FE panel, observability
     // exporters) can see post-boot substrate mutations that the sealed BootTrace can't.
     long t_rebuild_0 = System.currentTimeMillis();
-    RemoteKnowledgeClient client = ks.client();
+    KnowledgeClient client = ks.client();
     this.knowledgeClient = client;
     this.knowledgeServerBootstrap = ks;
     this.searchPort = client;

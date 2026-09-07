@@ -4,7 +4,7 @@ package io.justsearch.app.services.vdu;
 import io.justsearch.aibackend.backend.EngineCircuitBreaker;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.gpu.VramRequirements;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.indexing.SchemaFields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ public class VduBatchProcessor {
     private final VduProcessor vduProcessor;
     private final GpuCapabilitiesService gpuCapabilitiesService;
     // Tempdoc 672: live supplier, not a captured value — see OfflineCoordinator's field javadoc.
-    private final Supplier<RemoteKnowledgeClient> knowledgeClientSupplier;
+    private final Supplier<KnowledgeClient> knowledgeClientSupplier;
     private final VduMetricCatalog catalog;
     private final VduCapabilityState vduCapabilityState;
     // Tempdoc 672 follow-up: cooperative-checkpoint interrupt signal, checked between documents
@@ -47,7 +47,7 @@ public class VduBatchProcessor {
      */
     public VduBatchProcessor(VduProcessor vduProcessor,
                              GpuCapabilitiesService gpuCapabilitiesService,
-                             Supplier<RemoteKnowledgeClient> knowledgeClientSupplier) {
+                             Supplier<KnowledgeClient> knowledgeClientSupplier) {
         this(vduProcessor, gpuCapabilitiesService, knowledgeClientSupplier, VduMetricCatalog.noop(),
             new VduCapabilityState());
     }
@@ -68,14 +68,14 @@ public class VduBatchProcessor {
      */
     public VduBatchProcessor(VduProcessor vduProcessor,
                              GpuCapabilitiesService gpuCapabilitiesService,
-                             Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+                             Supplier<KnowledgeClient> knowledgeClientSupplier,
                              VduMetricCatalog catalog) {
         this(vduProcessor, gpuCapabilitiesService, knowledgeClientSupplier, catalog, new VduCapabilityState());
     }
 
     public VduBatchProcessor(VduProcessor vduProcessor,
                              GpuCapabilitiesService gpuCapabilitiesService,
-                             Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+                             Supplier<KnowledgeClient> knowledgeClientSupplier,
                              VduMetricCatalog catalog,
                              VduCapabilityState vduCapabilityState) {
         this(vduProcessor, gpuCapabilitiesService, knowledgeClientSupplier, catalog,
@@ -92,7 +92,7 @@ public class VduBatchProcessor {
      */
     public VduBatchProcessor(VduProcessor vduProcessor,
                              GpuCapabilitiesService gpuCapabilitiesService,
-                             Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+                             Supplier<KnowledgeClient> knowledgeClientSupplier,
                              VduMetricCatalog catalog,
                              VduCapabilityState vduCapabilityState,
                              java.util.function.BooleanSupplier shouldInterruptBatch) {
@@ -134,7 +134,7 @@ public class VduBatchProcessor {
     }
 
     public int processPendingFiles() {
-        RemoteKnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
+        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         if (knowledgeClient == null) {
             LOG.info("VDU batch processing skipped: Worker not connected yet");
             return 0;
@@ -331,7 +331,7 @@ public class VduBatchProcessor {
         return processed;
     }
 
-    private void markVduFailed(RemoteKnowledgeClient knowledgeClient, String docId, String reason) {
+    private void markVduFailed(KnowledgeClient knowledgeClient, String docId, String reason) {
         try {
             knowledgeClient.updateVduResult(
                 docId,

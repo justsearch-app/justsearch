@@ -43,7 +43,39 @@ final class RemoteIndexingJobsBridgeTest {
         InProcessServerBuilder.forName(name).directExecutor().addService(stub).build().start();
     channel = InProcessChannelBuilder.forName(name).directExecutor().build();
     var stubInstance = IngestServiceGrpc.newStub(channel);
-    bridge = new RemoteIndexingJobsBridge(() -> stubInstance);
+    // Lane F item A6: the bridge asks an IndexingJobsSource for frames instead of holding the
+    // async gRPC stub itself. This lambda IS the wire source, so the test still exercises real
+    // proto frames over a real (in-process) gRPC server — only the seam moved.
+    bridge =
+        new RemoteIndexingJobsBridge(
+            () ->
+                (onFrame, onError, onCompleted) -> {
+                  java.util.concurrent.atomic.AtomicBoolean stopped =
+                      new java.util.concurrent.atomic.AtomicBoolean(false);
+                  stubInstance.subscribeIndexingJobs(
+                      SubscribeIndexingJobsRequest.newBuilder().build(),
+                      new StreamObserver<IndexingJobsFrame>() {
+                        @Override
+                        public void onNext(IndexingJobsFrame frame) {
+                          if (!stopped.get()) {
+                            onFrame.accept(frame);
+                          }
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {
+                          if (!stopped.get()) {
+                            onError.accept(t);
+                          }
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                          onCompleted.run();
+                        }
+                      });
+                  return () -> stopped.set(true);
+                });
   }
 
   @AfterEach

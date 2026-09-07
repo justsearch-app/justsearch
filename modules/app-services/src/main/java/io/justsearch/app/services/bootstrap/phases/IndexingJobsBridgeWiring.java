@@ -7,7 +7,8 @@ import io.justsearch.app.observability.ledger.ActionEvent;
 import io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry;
 import io.justsearch.app.observability.ledger.ActionLedgerProjection;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.IndexingJobsSource;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
@@ -43,14 +44,15 @@ public final class IndexingJobsBridgeWiring {
   public record Output(RemoteIndexingJobsBridge bridge, RemoteIndexingJobsBridge.Subscription subscription) {}
 
   public static Output wire(
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       IndexingJobsChangeRegistry indexingJobsChangeRegistry,
       ActionLedgerChangeRegistry actionLedgerChangeRegistry) {
     RemoteIndexingJobsBridge bridge =
-        new RemoteIndexingJobsBridge(() -> {
-          RemoteKnowledgeClient kc = knowledgeClientSupplier.get();
-          return kc == null ? null : kc.ingestAsyncStub();
-        });
+        new RemoteIndexingJobsBridge(
+            () -> {
+              KnowledgeClient kc = knowledgeClientSupplier.get();
+              return kc == null ? null : (IndexingJobsSource) kc::subscribeIndexingJobs;
+            });
     RemoteIndexingJobsBridge.Subscription subscription =
         bridge.subscribe(delta -> {
           switch (delta) {

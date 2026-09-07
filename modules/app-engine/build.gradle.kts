@@ -26,6 +26,10 @@ dependencies {
   // Deliberately non-transitive (see the note above).
   implementation(project(":modules:app-services"))
   implementation(project(":modules:worker-services"))
+  // Item A6: KnowledgeServer (the index half's own composition) lives here. Rule 6b explicitly
+  // allows io.justsearch.app.engine.. -> io.justsearch.indexerworker..; `implementation` keeps it
+  // off ui's compile classpath, which is what stops the allowance leaking upward.
+  implementation(project(":modules:indexer-worker"))
   implementation(project(":modules:worker-core"))
   implementation(project(":modules:configuration"))
   implementation(project(":modules:telemetry"))
@@ -42,13 +46,14 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
 
-        // Test-only, and deliberately self-retiring (item A4). ForegroundLoadGateTest pins the
-        // gate's nine foreground operations against ForegroundLoadInterceptor.foregroundMethods(),
-        // the live producer until item A9 deletes the interceptor — two producers of one gauge may
-        // not drift while both exist. `indexer-worker` is a TEST dependency only: no main-source
-        // edge is created, so ArchUnit rule 6b (which imports with DoNotIncludeTests) is unaffected,
-        // and this line is removed with the interceptor at A9.
-        implementation(project(":modules:indexer-worker"))
+        // Item A4's ForegroundLoadGateTest pins the gate's nine foreground operations against
+        // ForegroundLoadInterceptor.foregroundMethods(), the live producer until item A9 deletes
+        // the interceptor — two producers of one gauge may not drift while both exist.
+        //
+        // The dependency itself is no longer test-only: item A6 made `indexer-worker` a
+        // main-source `implementation` edge (EngineRoot composes KnowledgeServer), and
+        // `testImplementation` extends `implementation`, so the test configuration inherits it.
+        // A9 deletes the drift-pin test, not the edge.
       }
     }
   }

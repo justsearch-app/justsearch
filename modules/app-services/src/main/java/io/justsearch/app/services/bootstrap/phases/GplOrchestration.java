@@ -7,7 +7,7 @@ import io.justsearch.app.services.gpl.GplJobCoordinator;
 import io.justsearch.app.services.gpl.GplRevalidationTrigger;
 import io.justsearch.app.services.gpl.GplTrainingTripleStore;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,7 +35,7 @@ public final class GplOrchestration {
    */
   public static Thread startAutoTrigger(
       GplJobCoordinator coordinator,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       Path snapshotFile,
       GplRevalidationTrigger trigger) {
@@ -49,7 +49,7 @@ public final class GplOrchestration {
 
   private static void autoTriggerLoop(
       GplJobCoordinator coordinator,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       Path snapshotFile,
       GplRevalidationTrigger trigger) {
@@ -63,7 +63,7 @@ public final class GplOrchestration {
         break;
       }
       try {
-        RemoteKnowledgeClient client = clientSupplier.get();
+        KnowledgeClient client = clientSupplier.get();
         if (client == null) {
           continue;
         }
@@ -104,7 +104,7 @@ public final class GplOrchestration {
   }
 
   /** Fetches MIME-type distribution via a facet-only search. Returns null on failure. */
-  public static Map<String, Long> fetchMimeFacets(RemoteKnowledgeClient client) {
+  public static Map<String, Long> fetchMimeFacets(KnowledgeClient client) {
     try {
       io.justsearch.ipc.SearchRequest req =
           io.justsearch.ipc.SearchRequest.newBuilder()
@@ -137,7 +137,7 @@ public final class GplOrchestration {
 
   /** Captures + persists a GPL eval snapshot after a successful job completion. Best-effort. */
   public static void captureSnapshot(
-      RemoteKnowledgeClient client, GplJobCoordinator coordinator, Path snapshotFile) {
+      KnowledgeClient client, GplJobCoordinator coordinator, Path snapshotFile) {
     try {
       io.justsearch.ipc.StatusResponse status = client.getStatus();
       Map<String, Long> mimeCounts = fetchMimeFacets(client);
@@ -165,7 +165,7 @@ public final class GplOrchestration {
    */
   public static Wired wire(
       Path dataDir,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       KnowledgeHttpApiAdapter agentSearchAdapter,
       Runnable onAfterSnapshot) {
@@ -178,7 +178,7 @@ public final class GplOrchestration {
             aiService,
             agentSearchAdapter,
             () -> {
-              RemoteKnowledgeClient client = clientSupplier.get();
+              KnowledgeClient client = clientSupplier.get();
               if (client != null) {
                 captureSnapshot(client, coordinatorHolder[0], snapshotFile);
               }
@@ -197,7 +197,7 @@ public final class GplOrchestration {
   /** Constructs the GPL job coordinator. Returns null if dependencies are unavailable. */
   public static GplJobCoordinator createCoordinator(
       Path dataDir,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       KnowledgeHttpApiAdapter adapter,
       Runnable onJobCompleted) {

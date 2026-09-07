@@ -5,7 +5,7 @@ import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -42,19 +42,19 @@ public class OfflineCoordinator {
     private final VduBatchProcessor vduBatchProcessor;
     // Tempdoc 672: live supplier, not a captured value — the Worker client is null at Head
     // bootstrap (async connect) and must be re-read at use-time, never frozen at construction.
-    private final Supplier<RemoteKnowledgeClient> knowledgeClientSupplier;
+    private final Supplier<KnowledgeClient> knowledgeClientSupplier;
     private final VduCapabilityState vduCapabilityState;
     private final AtomicBoolean processing = new AtomicBoolean(false);
 
     public OfflineCoordinator(OnlineAiLifecycleControl inferenceManager,
                               VduBatchProcessor vduBatchProcessor,
-                              Supplier<RemoteKnowledgeClient> knowledgeClientSupplier) {
+                              Supplier<KnowledgeClient> knowledgeClientSupplier) {
         this(inferenceManager, null, vduBatchProcessor, knowledgeClientSupplier, new VduCapabilityState());
     }
 
     public OfflineCoordinator(OnlineAiLifecycleControl inferenceManager,
                               VduBatchProcessor vduBatchProcessor,
-                              Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+                              Supplier<KnowledgeClient> knowledgeClientSupplier,
                               VduCapabilityState vduCapabilityState) {
         this(inferenceManager, null, vduBatchProcessor, knowledgeClientSupplier, vduCapabilityState);
     }
@@ -62,7 +62,7 @@ public class OfflineCoordinator {
     public OfflineCoordinator(OnlineAiLifecycleControl inferenceManager,
                               RuntimeReconciler reconciler,
                               VduBatchProcessor vduBatchProcessor,
-                              Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+                              Supplier<KnowledgeClient> knowledgeClientSupplier,
                               VduCapabilityState vduCapabilityState) {
         this.inferenceManager = inferenceManager;
         this.reconciler = reconciler;
@@ -98,7 +98,7 @@ public class OfflineCoordinator {
             procedureBegun = true;
         }
         try {
-            RemoteKnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
+            KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
             if (knowledgeClient == null) {
                 LOG.info("Offline processing skipped: Worker not connected yet");
                 return;
@@ -200,7 +200,7 @@ public class OfflineCoordinator {
      * @return true if VDU or embedding work is pending
      */
     public boolean hasPendingWork() {
-        RemoteKnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
+        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         if (knowledgeClient == null) {
             return false;
         }
@@ -212,7 +212,7 @@ public class OfflineCoordinator {
      * Get count of pending VDU files.
      */
     public int getPendingVduCount() {
-        RemoteKnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
+        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         return knowledgeClient == null ? 0 : knowledgeClient.countPendingVdu();
     }
 
@@ -220,7 +220,7 @@ public class OfflineCoordinator {
      * Get count of pending embeddings.
      */
     public int getPendingEmbeddingCount() {
-        RemoteKnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
+        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         return knowledgeClient == null ? 0 : knowledgeClient.countPendingEmbeddings();
     }
 

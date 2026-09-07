@@ -22,7 +22,7 @@ final class UpgradeController {
 
   private final OperationLeaseService leases;
   private final UpgradeShutdownAction orderlyShutdown;
-  private final Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient;
+  private final Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient;
   private final UpgradeReconciliationProbe reconciliation;
   private String noncePreparationId;
   private String shutdownNonce;
@@ -36,14 +36,14 @@ final class UpgradeController {
   UpgradeController(
       OperationLeaseService leases,
       UpgradeShutdownAction orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient) {
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient) {
     this(leases, orderlyShutdown, workerClient, null, null, null, null);
   }
 
   UpgradeController(
       OperationLeaseService leases,
       UpgradeShutdownAction orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient,
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient,
       Path dataDir,
       Supplier<String> runningVersion,
       BooleanSupplier headReady,

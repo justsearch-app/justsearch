@@ -869,7 +869,7 @@ public class LocalApiServer {
     core.debugStateController().setKnowledgeServer(ks);
     core.inferenceHandlers().setKnowledgeServer(ks);
     core.statusLifecycleHandler().setKnowledgeServer(ks, startError);
-    // Tempdoc 400 Phase 2.1 (LR1-c): wire the RemoteKnowledgeClient late so
+    // Tempdoc 400 Phase 2.1 (LR1-c): wire the KnowledgeClient late so
     // /api/debug/session-policies returns the authoritative PolicySnapshot in
     // eval mode. Pre-fix this controller stayed wired with null forever.
     core.sessionPoliciesController().setClient(ks != null ? ks.client() : null);

@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Handles pending counts, VDU result updates, processing marks, and recovery. All methods
  * delegate to the Worker via {@link IngestRpcExecutor}. Extracted from {@link
- * RemoteKnowledgeClient}.
+ * KnowledgeClient}.
  */
 final class VduOps {
     private static final Logger log = LoggerFactory.getLogger(VduOps.class);
@@ -76,7 +76,7 @@ final class VduOps {
             var response =
                     rpc.execute(
                             "updateVduResult",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
+                            KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
                             stub -> stub.updateVduResult(request));
 
             if (!response.getSuccess()) {
@@ -107,7 +107,7 @@ final class VduOps {
             var response =
                     rpc.execute(
                             "queryPendingVdu",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.queryPendingVdu(request));
 
             log.debug(
@@ -136,7 +136,7 @@ final class VduOps {
             var response =
                     rpc.execute(
                             "markVduProcessing",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.markVduProcessing(request));
 
             if (!response.getSuccess()) {
@@ -164,7 +164,7 @@ final class VduOps {
             var response =
                     rpc.execute(
                             "recoverVduProcessing",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
+                            KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
                             stub -> stub.recoverVduProcessing(request));
 
             int recovered = response.getRecoveredCount();

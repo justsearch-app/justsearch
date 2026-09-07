@@ -5,7 +5,7 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.util.Objects;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -135,7 +135,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
    */
   private record GplRunSnapshot(long processedDocs, long totalDocs, Instant lastRunAt, String lastError) {}
 
-  private final Supplier<RemoteKnowledgeClient> knowledgeClientSupplier;
+  private final Supplier<KnowledgeClient> knowledgeClientSupplier;
   private final OnlineAiService onlineAiService;
   private final boolean rerankerAvailable;
   private final GplTrainingTripleStore tripleStore;
@@ -158,7 +158,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
    * @param tripleStore persistent NDJSON store for training triples
    */
   public GplJobCoordinator(
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       OnlineAiService onlineAiService,
       boolean rerankerAvailable,
       GplTrainingTripleStore tripleStore) {
@@ -175,7 +175,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
    * @param onJobCompleted invoked on the job thread after {@link GplJobStatus.Status#COMPLETED}; may be null
    */
   public GplJobCoordinator(
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       OnlineAiService onlineAiService,
       boolean rerankerAvailable,
       GplTrainingTripleStore tripleStore,

@@ -4,12 +4,10 @@ package io.justsearch.app.services.worker;
 import io.justsearch.app.api.indexing.IndexingJobView;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
-import io.justsearch.ipc.SubscribeIndexingJobsRequest;
-import io.justsearch.ipc.IngestServiceGrpc;
-import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * fresh snapshot which replaces {@link #latestSnapshot} and emits a
  * {@link Delta.SnapshotReplaced} event so listeners can rebuild their keyed
  * state. Reconnect is currently bounded by the gRPC channel's keepalive +
- * retry policy at the {@code RemoteKnowledgeClient} layer; this class does not
+ * retry policy at the {@code KnowledgeClient} layer; this class does not
  * own its own backoff schedule for V1.
  *
  * <p>Per slice 445 lean scope (verification commit {@code 044b21ab3}): concrete
@@ -77,8 +75,9 @@ public final class RemoteIndexingJobsBridge {
     void close();
   }
 
-  private final Supplier<IngestServiceGrpc.IngestServiceStub> asyncStubSupplier;
-  private final List<java.util.function.Consumer<Delta>> listeners = new CopyOnWriteArrayList<>();
+  private final Supplier<IndexingJobsSource> sourceSupplier;
+  private volatile KnowledgeClient.IndexingJobsStream stream;
+  private final List<Consumer<Delta>> listeners = new CopyOnWriteArrayList<>();
   /**
    * The cached (seq, items) pair, updated ATOMICALLY together (tempdoc 550 §B.2 fix-pass). A new
    * SSE subscriber reads this ONE record (via {@link #latestSnapshotPair()}), so it can never see a
@@ -93,19 +92,20 @@ public final class RemoteIndexingJobsBridge {
   private volatile boolean stopped = false;
 
   /**
-   * Constructs the bridge against an asynchronous gRPC stub supplier.
+   * Constructs the bridge against a supplier of the knowledge client.
    *
    * <p>The supplier is resolved at {@link #start()} time (not construction
    * time), which lets the bridge be wired into the bootstrap eagerly even
-   * though the underlying gRPC channel only comes up after async Worker
-   * startup. {@link #start()} returns a future that fails fast when the
-   * supplier returns {@code null}; callers retry once the channel is ready.
+   * though the client only becomes usable after async Worker startup.
+   * {@link #start()} returns a future that fails fast when the supplier
+   * returns {@code null}; callers retry once the worker is up.
    *
-   * <p>The stub MUST be the async variant — blocking stub doesn't support
-   * server-streaming via the {@link StreamObserver} pattern.
+   * <p>Lane F stage A item A6: the bridge used to take the async gRPC stub directly. It now takes
+   * the client and asks it for a {@link KnowledgeClient.IndexingJobsStream}, so the same fan-out
+   * works whether the frames arrive over a socket or from the worker's change stream in this JVM.
    */
-  public RemoteIndexingJobsBridge(Supplier<IngestServiceGrpc.IngestServiceStub> asyncStubSupplier) {
-    this.asyncStubSupplier = Objects.requireNonNull(asyncStubSupplier, "asyncStubSupplier");
+  public RemoteIndexingJobsBridge(Supplier<IndexingJobsSource> sourceSupplier) {
+    this.sourceSupplier = Objects.requireNonNull(sourceSupplier, "sourceSupplier");
   }
 
   /**
@@ -134,7 +134,7 @@ public final class RemoteIndexingJobsBridge {
    * — they start receiving deltas from "now". For initial-state hydration use
    * {@link #latestSnapshot}.
    */
-  public Subscription subscribe(java.util.function.Consumer<Delta> listener) {
+  public Subscription subscribe(Consumer<Delta> listener) {
     Objects.requireNonNull(listener, "listener");
     listeners.add(listener);
     return () -> listeners.remove(listener);
@@ -162,17 +162,23 @@ public final class RemoteIndexingJobsBridge {
    * Stops listener fan-out. Subsequent frames arriving on the gRPC stream are
    * dropped without being delivered to listeners or mutating cached state.
    *
-   * <p>Note: this does NOT actively cancel the gRPC stream — the
-   * {@code asyncStub.subscribeIndexingJobs} server-streaming variant gives the
-   * client no handle on the underlying call. In practice the channel shutdown
-   * (driven by {@code RemoteKnowledgeClient}) closes the connection and the
-   * server stops emitting. For Phase 4 / production, wrap {@link #start()} in
-   * a {@code CancelToken}-bound {@code io.grpc.Context} (mirroring the
-   * scanRoot pattern) if proactive cancellation is required.
+   * <p>Lane F stage A item A6: the flow now hands back a
+   * {@link KnowledgeClient.IndexingJobsStream}, so stopping the bridge also stops <em>production</em>
+   * rather than only muting delivery. Before A6 the async gRPC stub gave the caller no handle on
+   * the underlying call, and the stream only ended when the channel was shut down.
    */
   public void stop() {
     stopped = true;
     listeners.clear();
+    KnowledgeClient.IndexingJobsStream open = stream;
+    stream = null;
+    if (open != null) {
+      try {
+        open.close();
+      } catch (RuntimeException e) {
+        log.warn("RemoteIndexingJobsBridge: closing the indexing-jobs flow failed", e);
+      }
+    }
   }
 
   private void openStream(CompletableFuture<Void> snapshotDelivered) {
@@ -180,20 +186,20 @@ public final class RemoteIndexingJobsBridge {
       snapshotDelivered.completeExceptionally(new IllegalStateException("bridge stopped"));
       return;
     }
-    IngestServiceGrpc.IngestServiceStub asyncStub = asyncStubSupplier.get();
-    if (asyncStub == null) {
-      // Allow start() to be retried once the channel is up. Reset the started
+    IndexingJobsSource source = sourceSupplier.get();
+    if (source == null) {
+      // Allow start() to be retried once the worker is up. Reset the started
       // flag so a follow-up start() will try again.
       started.set(false);
       snapshotDelivered.completeExceptionally(
           new IllegalStateException(
-              "Worker channel not connected yet; retry start() after connectKnowledgeServer."));
+              "Worker not connected yet; retry start() after connectKnowledgeServer."));
       return;
     }
-    StreamObserver<IndexingJobsFrame> obs =
-        new StreamObserver<>() {
+    Consumer<IndexingJobsFrame> onFrame =
+        new Consumer<>() {
           @Override
-          public void onNext(IndexingJobsFrame frame) {
+          public void accept(IndexingJobsFrame frame) {
             if (stopped) return;
             try {
               switch (frame.getBodyCase()) {
@@ -248,25 +254,25 @@ public final class RemoteIndexingJobsBridge {
             }
           }
 
-          @Override
-          public void onError(Throwable t) {
-            if (stopped) return;
-            log.warn("RemoteIndexingJobsBridge stream error; will rely on caller-driven reconnect", t);
-            if (!snapshotDelivered.isDone()) {
-              snapshotDelivered.completeExceptionally(t);
-            }
-            // V1 lean scope: do not auto-reconnect from the bridge. Higher layers
-            // (RemoteKnowledgeClient on reconnect, controller subscribe-on-demand)
-            // re-call start(). The bounded reconnect schedule is a Phase 4 concern.
-          }
-
-          @Override
-          public void onCompleted() {
-            log.info("RemoteIndexingJobsBridge stream completed by server");
-          }
         };
 
-    asyncStub.subscribeIndexingJobs(SubscribeIndexingJobsRequest.newBuilder().build(), obs);
+    Consumer<Throwable> onError =
+        t -> {
+          if (stopped) return;
+          log.warn("RemoteIndexingJobsBridge stream error; will rely on caller-driven reconnect", t);
+          if (!snapshotDelivered.isDone()) {
+            snapshotDelivered.completeExceptionally(t);
+          }
+          // V1 lean scope: do not auto-reconnect from the bridge. Higher layers
+          // (the client on reconnect, controller subscribe-on-demand) re-call start().
+          // The bounded reconnect schedule is a Phase 4 concern.
+        };
+
+    stream =
+        source.subscribe(
+            onFrame,
+            onError,
+            () -> log.info("RemoteIndexingJobsBridge stream completed by producer"));
   }
 
   /**

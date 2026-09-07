@@ -137,6 +137,7 @@ public final class KnowledgeServer implements Closeable {
 
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
+  private final WorkerSignalBus injectedSignalBus;
   private JobQueue jobQueue;
 
   // Tempdoc 550 Thesis II / 575 §4.3b (liveness): periodic reaper re-queues PROCESSING rows orphaned by a
@@ -291,8 +292,26 @@ public final class KnowledgeServer implements Closeable {
    * @param config Worker configuration
    */
   public KnowledgeServer(WorkerConfig config) {
+    this(config, null);
+  }
+
+  /**
+   * Creates a new KnowledgeServer with an externally-supplied signal bus (lane F stage A item A6).
+   *
+   * <p>When the index half runs inside the Engine JVM there is no second process, so the
+   * memory-mapped bus has nothing to carry: the composition root passes an
+   * {@code InProcessWorkerSignalBus} over the shared {@code GpuSchedulingGauge} instead. This
+   * matters for correctness, not tidiness — {@code MmfWorkerSignalBus.shouldDie()} is the suicide
+   * pact, and an in-JVM index half reading a heartbeat nobody writes would terminate the Engine.
+   *
+   * @param config Worker configuration
+   * @param signalBus the bus to use, or {@code null} to open the memory-mapped one (the separate
+   *     process path, deleted at item A10)
+   */
+  public KnowledgeServer(WorkerConfig config, WorkerSignalBus signalBus) {
     this.config = config;
     this.dataDir = config.dataDir();
+    this.injectedSignalBus = signalBus;
   }
 
   /**
@@ -461,9 +480,15 @@ public final class KnowledgeServer implements Closeable {
       // distinguish a real Head death from a benign OS-resume stale heartbeat. Read directly from
       // EnvRegistry (ConfigStore is not ready until step 3, like INDEX_TRACING_LEVEL above);
       // 0 ⇒ unknown ⇒ heartbeat-only (pre-630) behavior (standalone runs).
-      Path signalPath = dataDir.resolve("worker_signal.lock");
-      long headPid = EnvRegistry.HEAD_PID.getLong(0L);
-      signalBus = new MmfWorkerSignalBus(signalPath, headPid);
+      if (injectedSignalBus != null) {
+        // Lane F item A6: the Engine composition root supplies the in-process bus. No memory-mapped
+        // region, no suicide pact, no port to publish — see InProcessWorkerSignalBus.
+        signalBus = injectedSignalBus;
+      } else {
+        Path signalPath = dataDir.resolve("worker_signal.lock");
+        long headPid = EnvRegistry.HEAD_PID.getLong(0L);
+        signalBus = new MmfWorkerSignalBus(signalPath, headPid);
+      }
       signalBus.open();
 
       tPhase = System.nanoTime();
@@ -2113,6 +2138,30 @@ public final class KnowledgeServer implements Closeable {
    *
    * @return The bound gRPC port
    */
+  /**
+   * The composed application services (lane F stage A item A6).
+   *
+   * <p>Public so the Engine composition root can bind the ports over the same instance the
+   * indexing loop and the (until A9) gRPC wiring use. Null before {@link #start()}, and REPLACED on
+   * a deferred-runtime upgrade or a dev hot-reload — callers must re-read it rather than cache it.
+   */
+  public WorkerAppServices appServices() {
+    return appServices;
+  }
+
+  /**
+   * The process-scoped foreground-load gauge (tempdoc 885 item 3).
+   *
+   * <p>Public since lane F stage A item A6: {@code ForegroundLoadGate} in the composition root is
+   * the second producer while the wire interceptor still exists, and it must feed THIS instance.
+   * Reading the gauge off {@code indexingPacing().foregroundLoad()} instead would be wrong before
+   * {@link #start()} has run — the field starts as {@code IndexingPacing.unthrottled()}, which
+   * constructs a gauge of its own that nothing paces off.
+   */
+  public ForegroundLoad foregroundLoad() {
+    return foregroundLoad;
+  }
+
   public int getPort() {
     return grpcServer != null ? grpcServer.getPort() : -1;
   }

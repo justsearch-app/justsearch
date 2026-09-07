@@ -35,7 +35,7 @@ import java.util.List;
  * Builds UI-facing and debug status maps from gRPC proto responses.
  *
  * <p>Pure static functions: no mutable state, no RPC calls. Extracted from {@link
- * RemoteKnowledgeClient} to reduce file size.
+ * KnowledgeClient} to reduce file size.
  */
 final class WorkerStatusMapper {
 

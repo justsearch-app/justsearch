@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>All methods follow the same pattern: build proto request, call RPC via {@link
  * IngestRpcExecutor}, log result, swallow circuit breaker and general errors. Extracted from {@link
- * RemoteKnowledgeClient}.
+ * KnowledgeClient}.
  */
 final class MigrationOps {
     private static final Logger log = LoggerFactory.getLogger(MigrationOps.class);
@@ -39,7 +39,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "startMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.startMigration(req));
             if (!resp.getAccepted()) {
                 log.warn("startMigration rejected: {}", resp.getError());
@@ -71,7 +71,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "requestCutover",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.requestCutover(req));
             if (!resp.getAccepted()) {
                 log.warn("requestCutover rejected: {}", resp.getError());
@@ -95,7 +95,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "rollbackMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.rollbackMigration(req));
             if (!resp.getAccepted()) {
                 log.warn("rollbackMigration rejected: {}", resp.getError());
@@ -125,7 +125,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "pauseMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.pauseMigration(req));
             if (!resp.getAccepted()) {
                 log.warn("pauseMigration rejected: {}", resp.getError());
@@ -148,7 +148,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "resumeMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
                             stub -> stub.resumeMigration(req));
             if (!resp.getAccepted()) {
                 log.warn("resumeMigration rejected: {}", resp.getError());
@@ -182,7 +182,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "runIndexGc",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.INDEX_GC,
+                            KnowledgeClient.RpcDeadlineCategory.INDEX_GC,
                             stub -> stub.runIndexGc(req));
             if (!resp.getAccepted()) {
                 log.warn("runIndexGc rejected: {}", resp.getError());
@@ -225,7 +225,7 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "settleIndex",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.INDEX_GC,
+                            KnowledgeClient.RpcDeadlineCategory.INDEX_GC,
                             stub -> stub.settleIndex(req));
             if (!resp.getAccepted()) {
                 log.warn("settleIndex rejected: {}", resp.getError());

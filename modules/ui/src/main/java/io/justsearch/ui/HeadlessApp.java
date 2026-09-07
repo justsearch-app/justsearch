@@ -1140,7 +1140,19 @@ public class HeadlessApp {
     KnowledgeServerBootstrap bootstrap = null;
     try {
       log.info("Attempting to start Knowledge Server...");
-      bootstrap = new KnowledgeServerBootstrap(sharedWorkerCapability);
+      // Lane F stage A item A6: the index half is composed INSIDE this JVM. EngineRoot is the
+      // composition root (design 3.2) and the only module allowed to bind both halves; handing it
+      // to the bootstrap as the WorkerHost is what replaces "spawn a process, discover its port,
+      // open a channel". This is the single site that decides where the index lives.
+      io.justsearch.app.services.worker.KnowledgeServerConfig ksConfig =
+          io.justsearch.app.services.worker.KnowledgeServerConfig.load();
+      bootstrap =
+          new KnowledgeServerBootstrap(
+              ksConfig,
+              null,
+              sharedWorkerCapability,
+              new io.justsearch.app.engine.EngineRoot(
+                  ksConfig.deadlineMs(), ksConfig.batchSize()));
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.

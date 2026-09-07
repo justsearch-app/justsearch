@@ -2,7 +2,7 @@
 package io.justsearch.app.services.observability;
 
 import io.justsearch.app.api.inference.EncoderRuntimeView;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.ort.EncoderRole;
 import java.util.Map;
 import java.util.function.LongSupplier;
@@ -44,7 +44,7 @@ public final class WorkerEncoderRuntimeCache implements EncoderRuntimeCache {
    */
   private volatile boolean everFetched;
 
-  public WorkerEncoderRuntimeCache(Supplier<RemoteKnowledgeClient> clientSupplier) {
+  public WorkerEncoderRuntimeCache(Supplier<KnowledgeClient> clientSupplier) {
     this(fromClient(clientSupplier), System::currentTimeMillis);
   }
 
@@ -57,9 +57,9 @@ public final class WorkerEncoderRuntimeCache implements EncoderRuntimeCache {
 
   /** The production fetch: the two Worker reads the explainer needs, folded into one derivation. */
   private static Supplier<Map<EncoderRole, EncoderRuntimeView>> fromClient(
-      Supplier<RemoteKnowledgeClient> clientSupplier) {
+      Supplier<KnowledgeClient> clientSupplier) {
     return () -> {
-      RemoteKnowledgeClient client = clientSupplier == null ? null : clientSupplier.get();
+      KnowledgeClient client = clientSupplier == null ? null : clientSupplier.get();
       if (client == null) return Map.of(); // Worker not connected yet.
       return EncoderRuntimeExplainer.explainAll(
           client.getSessionPolicies(), client.getEncoderOrtCudaViews());

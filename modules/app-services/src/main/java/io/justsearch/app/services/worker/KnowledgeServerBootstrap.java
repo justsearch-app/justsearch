@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * bootstrap.start();
  *
  * // Use the client
- * RemoteKnowledgeClient client = bootstrap.client();
+ * KnowledgeClient client = bootstrap.client();
  * client.search("query", 10);
  *
  * // On shutdown
@@ -71,7 +71,21 @@ public final class KnowledgeServerBootstrap implements Closeable {
     // against a worker that is already up).
     private volatile MainSignalBus signalBus;
     private volatile WorkerSpawner spawner;
-    private volatile RemoteKnowledgeClient client;
+    private volatile KnowledgeClient client;
+
+    /**
+     * The same instance as {@link #client} on the legacy spawn-a-process path, and null on the
+     * in-process path. Only the port-rediscovery recovery inside PID validation needs the wire
+     * type; item A11 deletes both it and the path that sets this.
+     */
+    private volatile RemoteKnowledgeClient remoteClient;
+
+    /**
+     * Lane F item A6: where the index half lives. Non-null on the live path — the Engine
+     * composition root supplies itself — and null only for callers that still want the legacy
+     * spawn-a-process behaviour, which item A11 deletes with {@link WorkerSpawner}.
+     */
+    private final WorkerHost workerHost;
 
     /**
      * Tempdoc 672 follow-up: epoch-ms of the most recent {@link #recordUserActivity()} call. Since
@@ -204,6 +218,18 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     public KnowledgeServerBootstrap(
         KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability) {
+        this(config, telemetry, workerCapability, null);
+    }
+
+    /**
+     * Lane F item A6: the production ctor. {@code workerHost} decides where the index half lives —
+     * {@code io.justsearch.app.engine.EngineRoot} for the Engine JVM. A null host keeps the legacy
+     * spawn-a-Worker-process path, which exists only until item A11 deletes {@link WorkerSpawner}.
+     */
+    public KnowledgeServerBootstrap(
+        KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability,
+        WorkerHost workerHost) {
+        this.workerHost = workerHost;
         this.config = config;
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();
         this.workerCapability = workerCapability != null ? workerCapability : new WorkerCapability();
@@ -274,8 +300,46 @@ public final class KnowledgeServerBootstrap implements Closeable {
                     ? new IpcTelemetry(new IpcMetricCatalog(lt.registry()))
                     : IpcTelemetry.noop();
 
-            // 2. Create signal bus
+            // 2. Lane F item A6 — the in-process path. The composition root owns the index half's
+            // lifecycle; there is no process to spawn, no port to discover, no channel to open and
+            // no PID to validate against a spawn. Everything AFTER this branch (health polling,
+            // the READY transition, completeReadyInitialization) is shared with the legacy path on
+            // purpose: /api/health's worker component keeps its exact WORKER_* vocabulary, which
+            // design §6 re-cuts at D1, not here.
+            if (workerHost != null) {
+                energyPoller.start();
+                try {
+                    client = workerHost.start(gpuScheduling, ipcTelemetry);
+                } catch (IOException | InterruptedException | RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    // WorkerHost.start is declared broadly so a future host can fail its own way;
+                    // the bootstrap contract is IOException, so wrap anything else honestly rather
+                    // than widening start()'s throws clause.
+                    throw new IOException("Engine composition failed: " + e.getMessage(), e);
+                }
+                awaitHealthyAndComplete(0);
+                return;
+            }
+
+            // 2b. Create signal bus, then republish what the gauge already knows.
+            //
+            // A5 review #14: the bus is a fresh mapping every start, so a closeForUpgrade() ->
+            // start() cycle leaves both bytes at 0 while the Head may well be ONLINE. The gauge is
+            // the authority (A5), so the honest fix is to write its current values into the new
+            // mapping rather than wait for the next mode change or energy poll to happen to fire.
             signalBus = new MainSignalBus(config.signalFilePath());
+            signalBus.open();
+            signalBus.writeGpuActive(gpuScheduling.isMainGpuActive());
+            signalBus.writeEnergyReduced(gpuScheduling.isEnergyReduced());
+
+            // 2c. Start the OS energy-intent poll (tempdoc 630). It used to be step 5b inside
+            // spawner.start(); item A5 moved it out because it must outlive the spawner (A11), and
+            // the A5 review moved it here: behind spawner.start() the first poll waited out the
+            // port-discovery budget (up to DEFAULT_PORT_DISCOVERY_TIMEOUT_MS = 15 s), and a
+            // spawner.start() that threw meant the poll never started at all. The MMF sink is
+            // null-guarded, and the bus above is already open, so nothing is lost by starting early.
+            energyPoller.start();
 
             // 3. Create and start worker spawner (with IPC telemetry)
             spawner = new WorkerSpawner(config, signalBus, ipcTelemetry);
@@ -309,18 +373,14 @@ public final class KnowledgeServerBootstrap implements Closeable {
             });
             int port = spawner.start();
 
-            // 3b. Start the OS energy-intent poll (tempdoc 630). It used to be step 5b inside
-            // spawner.start(); item A5 moved it here because it must outlive the spawner (A11).
-            // Started right after the spawner so the signal bus is open and the transitional MMF
-            // write in the sink lands on the first poll, exactly as it did before the move.
-            energyPoller.start();
-
             // 4. Create circuit breaker for gRPC failure handling
             GrpcCircuitBreaker circuitBreaker = new GrpcCircuitBreaker(ipcTelemetry);
 
             // 5. Create and connect client (with circuit breaker and telemetry)
-            client = new RemoteKnowledgeClient(signalBus, config.deadlineMs(), config.maxRetries(), config.batchSize(), circuitBreaker, ipcTelemetry);
-            client.connect(port);
+            RemoteKnowledgeClient wireClient = new RemoteKnowledgeClient(signalBus, config.deadlineMs(), config.maxRetries(), config.batchSize(), circuitBreaker, ipcTelemetry);
+            wireClient.connect(port);
+            remoteClient = wireClient;
+            client = wireClient;
 
             // 5.5. Validate that the connected port belongs to our spawned worker PID
             long expectedPid = spawner.getWorkerPid();
@@ -329,41 +389,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // 5.6. Check for Head→Worker config divergence (tempdoc 329)
             checkConfigDivergence();
 
-            // 6. Verify health with bounded retry (Tempdoc 374 alpha.23 R13-A defect #1).
-            // Round-13 cycle 2 caught the worker still warming up Lucene SearcherManager.
-            // Pre-fix: a single isHealthy() call straddled the warmup, transitioned to ERROR,
-            // and steps 7-9 never ran. Post-fix: poll for up to healthCheckRetryBudgetMs.
-            // If the budget elapses without success, KnowledgeServerHealthMonitor takes over.
-            long retryBudgetMs = config.healthCheckRetryBudgetMs();
-            long healthCheckStartMs = System.currentTimeMillis();
-            boolean healthy = client.isHealthy();
-            while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
-                Thread.sleep(1000);
-                healthy = client.isHealthy();
-            }
-            long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
-
-            if (healthy) {
-                workerCapability.transition(CapabilityHealth.READY, null);
-                if (healthCheckElapsedMs >= 1000) {
-                    log.info("Knowledge Server became healthy after {}ms of warmup polling on port {}",
-                            healthCheckElapsedMs, port);
-                } else {
-                    log.info("Knowledge Server is READY on port {}", port);
-                }
-                completeReadyInitialization();
-            } else {
-                // Tempdoc 837 §3.1: the start-time health budget elapsed — the worker NEVER started.
-                // Review F7: this site is reachable DURING a recovery arc — the attempt's worker
-                // spawns and answers gRPC but never reaches healthy — and it was the one worker-down
-                // site without a suppression guard. The rule now lives in transitionWorkerDown, so
-                // this call is unconditional and the funnel decides.
-                transitionWorkerDown(
-                    LifecycleReasonCode.WORKER_SPAWN_FAILED,
-                    "Health check failed after " + healthCheckElapsedMs + "ms");
-                log.warn("Knowledge Server health check failed after {}ms budget; auxiliary services not initialized — background monitor will retry",
-                        healthCheckElapsedMs);
-            }
+            // 6. Verify health, transition to READY and run the ready-initialization sequence.
+            awaitHealthyAndComplete(port);
 
         } catch (Exception e) {
             // Read supervision's verdict BEFORE close() drops the spawner that holds it.
@@ -373,6 +400,56 @@ public final class KnowledgeServerBootstrap implements Closeable {
             log.error("Failed to start Knowledge Server integration", e);
             close();
             throw e;
+        }
+    }
+
+    /**
+     * Verifies health with a bounded retry (Tempdoc 374 alpha.23 R13-A defect #1), then transitions
+     * the worker capability and runs the ready-initialization sequence.
+     *
+     * <p>Round-13 cycle 2 caught the worker still warming up Lucene SearcherManager. Pre-fix: a
+     * single {@code isHealthy()} call straddled the warmup, transitioned to ERROR, and the
+     * auxiliary services never initialized. Post-fix: poll for up to
+     * {@code healthCheckRetryBudgetMs}; if the budget elapses without success,
+     * {@link KnowledgeServerHealthMonitor} takes over.
+     *
+     * <p>Lane F item A6 extracted this from {@code start()} so the in-process host and the legacy
+     * spawned process share one readiness path — the WORKER_* reason codes and the auxiliary-service
+     * sequence must not fork per transport.
+     *
+     * @param port the bound gRPC port for the log line, or 0 when the index half is in this JVM
+     */
+    private void awaitHealthyAndComplete(int port) throws InterruptedException {
+        long retryBudgetMs = config.healthCheckRetryBudgetMs();
+        long healthCheckStartMs = System.currentTimeMillis();
+        boolean healthy = client.isHealthy();
+        while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
+            Thread.sleep(1000);
+            healthy = client.isHealthy();
+        }
+        long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
+        String where = port > 0 ? "port " + port : "in-process";
+
+        if (healthy) {
+            workerCapability.transition(CapabilityHealth.READY, null);
+            if (healthCheckElapsedMs >= 1000) {
+                log.info("Knowledge Server became healthy after {}ms of warmup polling on {}",
+                        healthCheckElapsedMs, where);
+            } else {
+                log.info("Knowledge Server is READY on {}", where);
+            }
+            completeReadyInitialization();
+        } else {
+            // Tempdoc 837 §3.1: the start-time health budget elapsed — the worker NEVER started.
+            // Review F7: this site is reachable DURING a recovery arc — the attempt's worker
+            // spawns and answers but never reaches healthy — and it was the one worker-down
+            // site without a suppression guard. The rule now lives in transitionWorkerDown, so
+            // this call is unconditional and the funnel decides.
+            transitionWorkerDown(
+                LifecycleReasonCode.WORKER_SPAWN_FAILED,
+                "Health check failed after " + healthCheckElapsedMs + "ms");
+            log.warn("Knowledge Server health check failed after {}ms budget; auxiliary services not initialized — background monitor will retry",
+                    healthCheckElapsedMs);
         }
     }
 
@@ -599,7 +676,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
                     signalBus.zeroPort();
                     Thread.sleep(100);
                     long awaitTimeout = Math.min(1000, Math.max(100, remainingMs / 2));
-                    client.connect(signalBus.awaitPort(awaitTimeout, 100));
+                    remoteClient.connect(signalBus.awaitPort(awaitTimeout, 100));
                 });
     }
 
@@ -700,7 +777,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      *
      * @throws IllegalStateException if not started or not ready
      */
-    public RemoteKnowledgeClient client() {
+    public KnowledgeClient client() {
         if (client == null) {
             throw new IllegalStateException("Knowledge Server not started");
         }
@@ -976,6 +1053,17 @@ public final class KnowledgeServerBootstrap implements Closeable {
             client = null;
         }
 
+        if (workerHost != null) {
+            // Lane F item A6: the index half is in this JVM, so "shutdown" is an ordered close, not
+            // a process termination — GRACEFUL is the only outcome that can be reported honestly.
+            try {
+                workerHost.close();
+            } catch (RuntimeException e) {
+                log.warn("Error closing in-process worker host", e);
+                outcome = WorkerSpawner.ShutdownOutcome.FAILED;
+            }
+        }
+
         if (spawner != null) {
             try {
                 outcome = spawner.shutdownForUpgrade();
@@ -985,6 +1073,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             }
             spawner = null;
         }
+
+        remoteClient = null;
 
         // Signal bus is closed by spawner, but ensure cleanup
         signalBus = null;
@@ -1040,7 +1130,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     // Package-private for unit tests (KnowledgeServerBootstrapEvalModeTest).
     // Not intended as a stable API surface.
-    void tryIngestHelpFiles(RemoteKnowledgeClient client, KnowledgeServerConfig config) {
+    void tryIngestHelpFiles(KnowledgeClient client, KnowledgeServerConfig config) {
         try {
             // Skip help-file auto-ingest in eval mode so a "fresh" index truly starts empty.
             // The 5 bundled help docs would otherwise pollute baseline measurements

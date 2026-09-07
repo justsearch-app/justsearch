@@ -7,7 +7,7 @@ import io.justsearch.agent.api.AgentService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.observability.runtime.RuntimeContext;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.app.observability.InfraHealthGrpcService;
@@ -39,7 +39,7 @@ public final class BootstrapHelpers {
   public static void logAiServicesConfiguration(
       OnlineAiService onlineAiService,
       InferenceLifecycleManager inferenceManager,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       AgentService agentService) {
     log.info("=== AI Services Configuration ===");
     log.info("  OnlineAiService: {}", onlineAiService.getClass().getSimpleName());

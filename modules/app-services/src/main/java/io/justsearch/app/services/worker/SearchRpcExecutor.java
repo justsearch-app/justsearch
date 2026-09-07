@@ -1,18 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
-import io.justsearch.ipc.SearchServiceGrpc;
 import java.util.function.Function;
 
 /**
  * Abstraction for executing search RPCs with circuit breaker and deadline support.
  *
- * <p>Companion classes use this instead of depending on {@link RemoteKnowledgeClient} directly.
+ * <p>Companion classes use this instead of depending on {@link KnowledgeClient} directly.
  */
 @FunctionalInterface
-interface SearchRpcExecutor {
+public interface SearchRpcExecutor {
     <T> T execute(
             String operation,
-            RemoteKnowledgeClient.RpcDeadlineCategory category,
-            Function<SearchServiceGrpc.SearchServiceBlockingStub, T> rpc);
+            KnowledgeClient.RpcDeadlineCategory category,
+            Function<SearchServiceCalls, T> rpc);
 }

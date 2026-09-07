@@ -968,7 +968,7 @@ public class IndexingController {
    *
    * <p>{@code scanId} is now the queue's own value, read end to end (tempdoc 911 §F closed): the
    * {@code listFailedJobs}/{@code listFailedJobsByPathPrefix} SELECTs project {@code scan_id}, the
-   * proto {@code FailedJob} message carries it as field 7, {@code RemoteKnowledgeClient} passes it,
+   * proto {@code FailedJob} message carries it as field 7, {@code KnowledgeClient} passes it,
    * and {@code IndexingService.FailedJobInfo} holds it. So {@code ""} here means what {@link
    * IndexingJobView} says it means — single-file ingest, watcher, or a pre-{@code scan_id} row —
    * rather than "this surface never looked".

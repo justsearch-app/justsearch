@@ -31,7 +31,7 @@ import java.util.Set;
  * Search, suggest, fetch, and RAG context RPC operations.
  *
  * <p>Each method builds a proto request and delegates to the {@link SearchRpcExecutor} for circuit
- * breaker, deadline, and transport handling. Extracted from {@link RemoteKnowledgeClient}.
+ * breaker, deadline, and transport handling. Extracted from {@link KnowledgeClient}.
  */
 final class SearchRpcOps {
 
@@ -81,7 +81,7 @@ final class SearchRpcOps {
         SearchRequest req = request == null ? SearchRequest.newBuilder().build() : request;
         return rpc.execute(
                 "search",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.search(req));
     }
 
@@ -100,7 +100,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "searchVector",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.search(request));
     }
 
@@ -118,7 +118,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "suggest",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.suggest(request));
     }
 
@@ -158,7 +158,7 @@ final class SearchRpcOps {
                         .build();
         return rpc.execute(
                 "listAllDocumentIds",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.listAllDocumentIds(request));
     }
 
@@ -168,7 +168,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "fetchDocuments",
-                RemoteKnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
+                KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
                 stub -> stub.fetchDocuments(request));
     }
 
@@ -186,7 +186,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "fetchDocumentSlice",
-                RemoteKnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
+                KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
                 stub -> stub.fetchDocumentSlice(request));
     }
 
@@ -240,7 +240,7 @@ final class SearchRpcOps {
                 // the cost the RERANK category was created for ("20 docs x 2048 seq on CPU takes ~42s").
                 // Round 12's cold-reranker Document Q&A answered in ~9.5s -- under the 10s ceiling by
                 // 0.5s. The caller's own 20s budget (RAGContext.DEFAULT_TIMEOUT) is the real ceiling now.
-                RemoteKnowledgeClient.RpcDeadlineCategory.RERANK,
+                KnowledgeClient.RpcDeadlineCategory.RERANK,
                 stub -> stub.retrieveContext(request));
     }
 
@@ -329,7 +329,7 @@ final class SearchRpcOps {
                 "retrieveContext",
                 // Tempdoc 806 B.2 — see the sibling overload above: this RPC reranks, so it takes the
                 // RERANK budget rather than CONTENT_FETCH's 10s.
-                RemoteKnowledgeClient.RpcDeadlineCategory.RERANK,
+                KnowledgeClient.RpcDeadlineCategory.RERANK,
                 stub -> stub.retrieveContext(request));
     }
 
@@ -365,7 +365,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "listFolders",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.listFolders(request));
     }
 
@@ -378,7 +378,7 @@ final class SearchRpcOps {
         }
         return rpc.execute(
                 "listFolderFiles",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.listFolderFiles(builder.build()));
     }
 
@@ -400,7 +400,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "rerank",
-                RemoteKnowledgeClient.RpcDeadlineCategory.RERANK,
+                KnowledgeClient.RpcDeadlineCategory.RERANK,
                 stub -> stub.rerank(request));
     }
 
@@ -432,7 +432,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "matchCitations",
-                RemoteKnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
+                KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
                 stub -> stub.matchCitations(request));
     }
 }

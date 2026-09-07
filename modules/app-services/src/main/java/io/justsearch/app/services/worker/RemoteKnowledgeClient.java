@@ -1,102 +1,59 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
+
 import io.grpc.Channel;
 import io.grpc.ClientInterceptors;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.justsearch.ipc.grpc.GrpcMessageLimits;
-import io.justsearch.ipc.grpc.RequestIdClientInterceptor;
-import io.justsearch.ipc.grpc.TraceClientInterceptor;
-import io.justsearch.ipc.BatchRequest;
-import io.justsearch.ipc.BatchResponse;
-import io.justsearch.ipc.HealthCheckRequest;
+import io.grpc.stub.StreamObserver;
+import io.justsearch.ipc.CircuitBreakerOpenException;
 import io.justsearch.ipc.HealthCheckResponse;
 import io.justsearch.ipc.HealthServiceGrpc;
+import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IngestServiceGrpc;
-
-import io.justsearch.ipc.PipelineConfigs;
-import io.justsearch.ipc.SearchRequest;
-import io.justsearch.ipc.SearchResponse;
-import io.justsearch.ipc.SearchServiceGrpc;
-import io.justsearch.ipc.StatusRequest;
-import io.justsearch.ipc.StatusResponse;
-import io.justsearch.ipc.SuggestResponse;
-import io.justsearch.ipc.CircuitBreakerOpenException;
-import io.justsearch.ipc.grpc.GrpcRetryServiceConfig;
 import io.justsearch.ipc.KnowledgeServerNotConnectedException;
-import io.justsearch.ipc.DeleteByIdRequest;
-import io.justsearch.ipc.DeleteByIdResponse;
-import io.justsearch.ipc.DeleteByPathRequest;
-import io.justsearch.ipc.DeleteByPathResponse;
-import io.justsearch.ipc.FetchDocumentSliceResponse;
-import io.justsearch.ipc.FetchDocumentsResponse;
-import io.justsearch.ipc.ListFailedJobsRequest;
-import io.justsearch.ipc.ListFailedJobsResponse;
-import io.justsearch.ipc.ClearFailedJobsRequest;
-import io.justsearch.ipc.ClearFailedJobsResponse;
-import io.justsearch.ipc.ResetIndexRequest;
-import io.justsearch.ipc.ResetIndexResponse;
-import io.justsearch.ipc.ListFolderFilesResponse;
-import io.justsearch.ipc.ListFoldersResponse;
-import io.justsearch.ipc.SyncDirectoryResponse;
-import io.justsearch.ipc.RetrieveContextResponse;
-import io.justsearch.ipc.MatchCitationsResponse;
-import io.justsearch.ipc.RerankResponse;
-import io.justsearch.ipc.PathMapping;
-import io.justsearch.ipc.UpdatePathsRequest;
-import io.justsearch.ipc.UpdatePathsResponse;
-import io.justsearch.configuration.PlatformPaths;
-import io.justsearch.core.search.SearchPort;
-import io.justsearch.core.dto.Query;
-import io.justsearch.core.dto.Result;
-import io.justsearch.app.api.IndexingService;
-import java.io.Closeable;
-import java.io.File;
-import java.nio.file.Path;
-import java.time.Instant;
+import io.justsearch.ipc.ScanRootProgress;
+import io.justsearch.ipc.ScanRootRequest;
+import io.justsearch.ipc.SearchServiceGrpc;
+import io.justsearch.ipc.SubscribeIndexingJobsRequest;
+import io.justsearch.ipc.grpc.GrpcMessageLimits;
+import io.justsearch.ipc.grpc.GrpcRetryServiceConfig;
+import io.justsearch.ipc.grpc.RequestIdClientInterceptor;
+import io.justsearch.ipc.grpc.TraceClientInterceptor;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * gRPC client wrapper for the Knowledge Server (Worker process).
+ * The gRPC transport for {@link KnowledgeClient}: a channel, four stubs, and the reliability
+ * machinery that only a channel needs.
  *
- * <p>Provides methods across multiple service groups:
+ * <p>Reliability features, all of them properties of the <b>wire</b> and none of them of the work
+ * (lane F stage A §2, design §6):
  * <ul>
- *   <li>Connection lifecycle (connect, reconnect, close)</li>
- *   <li>Search, suggest, and document fetch (via SearchService)</li>
- *   <li>RAG context retrieval and citation matching</li>
- *   <li>Batch file submission and index status (via IngestService)</li>
- *   <li>Document deletion by ID or path prefix</li>
- *   <li>Health checks and worker status (via HealthService)</li>
- *   <li>Watched root management and persistence</li>
- *   <li>File watcher bootstrap and periodic sync control</li>
- *   <li>Schema migration orchestration</li>
- *   <li>AI/VDU operations (embedding queue, VDU processing)</li>
- *   <li>Index maintenance (GC, flush)</li>
- * </ul>
- *
- * <p>Reliability features:
- * <ul>
- *   <li>Port re-discovery from signal bus on worker restart</li>
+ *   <li>Port re-discovery from the MMF signal bus on worker restart</li>
  *   <li>gRPC retry policy for idempotent RPCs (SearchService, HealthService,
  *       5 IngestService methods; retryableStatusCodes=[UNAVAILABLE])</li>
  *   <li>Circuit breaker (3-failure threshold, 10s cooldown)</li>
- *   <li>Configurable RPC deadline categories</li>
+ *   <li>{@code IpcTelemetry}, message-size limits, and the trace/request-id client
+ *       interceptors</li>
  * </ul>
+ *
+ * <p><b>Not on the live path from stage A item A6.</b> The composition root
+ * ({@code io.justsearch.app.engine.EngineRoot}) now builds the Worker inside the Engine JVM and
+ * binds {@code EngineKnowledgeClient} instead; nothing in {@code src/main} constructs this class
+ * any more. It is kept compiling — with its tests — only until item A10 deletes the whole wire
+ * client stack (the MMF bus, the two circuit breakers, {@code IpcTelemetry} and this class) as
+ * one reviewable change. Until then {@code WholeProgramDeadCodeTest} reports it as unreferenced;
+ * that is the accepted red 17.4 predicts, not a defect.
  */
-public final class RemoteKnowledgeClient implements Closeable, SearchPort, IndexingService {
+public final class RemoteKnowledgeClient extends KnowledgeClient {
     private static final Logger log = LoggerFactory.getLogger(RemoteKnowledgeClient.class);
 
     private static final String HOST = "127.0.0.1";
@@ -104,70 +61,11 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
     private static final long GRPC_RETRY_MAX_BACKOFF_MS = 2000;
     private static final double GRPC_RETRY_BACKOFF_MULTIPLIER = 2.0d;
 
-    /**
-     * Deadline categories for gRPC operations.
-     *
-     * <p>Centralizes the scattered deadline configurations:
-     * <ul>
-     *   <li>23 methods use base deadlineMs (STANDARD)</li>
-     *   <li>5 methods use deadlineMs * 2 (CONTENT_FETCH, VDU_OPERATION)</li>
-     *   <li>1 method uses 30s (INDEX_GC)</li>
-     *   <li>2 methods use 300s (LONG_RUNNING)</li>
-     * </ul>
-     *
-     * <p>Each category has a multiplier applied to the base deadline.
-     */
-    public enum RpcDeadlineCategory {
-        /** Standard operations: search, health, basic status */
-        STANDARD(1.0),
-        /** Content-heavy operations: fetch documents, RAG context */
-        CONTENT_FETCH(2.0),
-        /** VDU updates and recovery */
-        VDU_OPERATION(2.0),
-        /** 360: Cross-encoder reranking — 20 docs × 2048 seq on CPU takes ~42s */
-        RERANK(12.0),         // 60s at 5s base = 12x
-        /** Index garbage collection */
-        INDEX_GC(6.0),        // 30s at 5s base = 6x
-        /** Sync/prune operations (large indexes) */
-        LONG_RUNNING(60.0);   // 300s at 5s base = 60x
-
-        private final double multiplier;
-
-        RpcDeadlineCategory(double multiplier) {
-            this.multiplier = multiplier;
-        }
-
-        public long apply(long baseDeadlineMs) {
-            return (long) (baseDeadlineMs * multiplier);
-        }
-    }
-
     private final MainSignalBus signalBus;
-    private final long deadlineMs;
     private final Map<String, Object> grpcServiceConfig;
     private final GrpcCircuitBreaker circuitBreaker;
-    private final IpcTelemetry telemetry;
-    private final IngestRpcExecutor ingestRpcExecutor;
-    private final MigrationOps migrationOps;
-    private final VduOps vduOps;
-    private final SyncOps syncOps;
-    private final SearchRpcOps searchRpcOps;
-    private final RootLifecycleOps rootLifecycleOps;
-    private final ExecutorService walkExecutor;
     private final AtomicReference<ManagedChannel> channelRef = new AtomicReference<>();
     private final AtomicInteger currentPort = new AtomicInteger(0);
-    private final AtomicBoolean closed = new AtomicBoolean(false);
-
-    // Persistent root tracking - survives restarts via JSON file
-    /**
-     * Maps path -> lastIndexed timestamp.
-     *
-     * <p>IMPORTANT: values must be non-null (ConcurrentHashMap rejects null). We use
-     * {@link WatchedRootsStore#NEVER_INDEXED} as a sentinel for "tracked but never indexed".
-     */
-    private final Map<Path, Instant> watchedRoots = new java.util.concurrent.ConcurrentHashMap<>();
-    private final WatchedRootsStore rootsStore;
-    private final WatchedRootsState watchedRootsState;
 
     // Test seam (683): when set via connectForTesting(Channel), the search-RPC path uses the
     // injected stub as-is — no ensureConnected() channel check, no reconnect() port re-discovery.
@@ -182,30 +80,6 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
     private volatile IngestServiceGrpc.IngestServiceStub ingestAsyncStub;
     private volatile HealthServiceGrpc.HealthServiceBlockingStub healthStub;
 
-    // Last-known-good ONNX model status from Worker's health check response (D-4, tempdoc 215).
-    // Updated on each successful getHealthCheck() call; returns empty list until first success.
-    private final AtomicReference<List<OnnxModelStatus>> onnxModelsCache =
-        new AtomicReference<>(List.of());
-
-    // Last-known WorkerOperationalView, cached as a side-effect of getWorkerOperationalView().
-    // Used by KnowledgeHttpApiAdapter to include index capabilities in search responses
-    // without making a per-search gRPC call (250 Phase 3).
-    private final AtomicReference<io.justsearch.app.api.status.WorkerOperationalView>
-        cachedOperationalView = new AtomicReference<>(null);
-
-    // Exclude patterns as a raw JSON string array, read from the RESOLVED config (tempdoc 883
-    // decision 4 slice 2 — previously the sysprop the settings promotion mirrored them into).
-    // Shared via this::getExcludeMatcher supplier with RootLifecycleOps.
-    private final Object excludeLock = new Object();
-    private volatile String excludeRawCache = null;
-    private volatile ExcludeMatcher excludeCache = ExcludeMatcher.empty();
-
-    /** Default batch size used when not specified. */
-    private static final int DEFAULT_BATCH_SIZE = 5000;
-
-    /** Maximum batch size allowed (must match Worker's MAX_BATCH_SIZE). */
-    private static final int MAX_BATCH_SIZE = 10_000;
-
     /**
      * Creates a new RemoteKnowledgeClient with a default circuit breaker and default batch size.
      *
@@ -214,7 +88,8 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
      * @param maxRetries maximum retry attempts for transient failures
      */
     public RemoteKnowledgeClient(MainSignalBus signalBus, long deadlineMs, int maxRetries) {
-        this(signalBus, deadlineMs, maxRetries, DEFAULT_BATCH_SIZE, new GrpcCircuitBreaker(), IpcTelemetry.noop());
+        this(signalBus, deadlineMs, maxRetries, DEFAULT_BATCH_SIZE, new GrpcCircuitBreaker(),
+             IpcTelemetry.noop());
     }
 
     /**
@@ -230,76 +105,10 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
     public RemoteKnowledgeClient(MainSignalBus signalBus, long deadlineMs, int maxRetries,
                                  int batchSize, GrpcCircuitBreaker circuitBreaker,
                                  IpcTelemetry telemetry) {
+        super(deadlineMs, batchSize, telemetry);
         this.signalBus = signalBus;
-        this.deadlineMs = deadlineMs;
-        if (batchSize <= 0 || batchSize > MAX_BATCH_SIZE) {
-            log.warn("Invalid batchSize {}, using default {}. Valid range: 1-{}",
-                     batchSize, DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE);
-        }
         this.grpcServiceConfig = buildGrpcRetryServiceConfig(maxRetries);
         this.circuitBreaker = circuitBreaker != null ? circuitBreaker : new GrpcCircuitBreaker();
-        this.telemetry = telemetry != null ? telemetry : IpcTelemetry.noop();
-        this.searchRpcOps = new SearchRpcOps(this::executeSearchRpc);
-        this.ingestRpcExecutor = this::executeIngestRpc;
-        this.migrationOps = new MigrationOps(ingestRpcExecutor);
-        this.vduOps = new VduOps(ingestRpcExecutor, this::getStatus);
-
-        // Initialize roots persistence file + state before syncOps so the reconcile-verification
-        // recorder callback (tempdoc 626 §Axis-C) can reference the assigned watchedRootsState field.
-        Path dataDir = PlatformPaths.resolveDataDir().toAbsolutePath().normalize();
-        Path rootsFile = dataDir.resolve("watched_roots.json");
-        this.rootsStore = new WatchedRootsStore(rootsFile, log);
-        this.watchedRootsState = new WatchedRootsState(watchedRoots, rootsStore);
-
-        // Tempdoc 626 §Axis-C — a force=false reconcile's delete-detection outcome updates the
-        // per-root verification state; an orphan-prune records a one-shot drift-corrected signal. Both
-        // callbacks run later on the periodic-sync thread.
-        this.syncOps = new SyncOps(ingestRpcExecutor, watchedRoots,
-            this.watchedRootsState::setDeleteDetectionUnverified,
-            (root, count) ->
-                this.watchedRootsState.recordDriftCorrected(root, count, System.currentTimeMillis()));
-        this.walkExecutor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "walk-bg");
-            t.setDaemon(true);
-            return t;
-        });
-        // Tempdoc 418 Phase B — RootLifecycleOps dispatches Worker-side ScanRoot RPCs
-        // for the watched-root walk and registers Worker-side watchers via WatchRoot/UnwatchRoot.
-        // Backpressure stays Head-side (between progress events); batching, admission, and
-        // enqueue happen Worker-side via WorkerScanOps.
-        // Tempdoc 821 §3-C2 — forward the root's collection into the scan RPC (the wire and the
-        // Worker have carried it all along; only this lambda dropped it).
-        // Tempdoc 821 §3-C3 — same defect on the mode: this lambda hard-coded
-        // SCAN_MODE_INITIAL, so a force-reindex arrived at the Worker indistinguishable from an
-        // ordinary rewalk. The caller decides the mode now; this lambda only carries it.
-        RootLifecycleOps.ScanRootFn scanRootFn =
-            (rootPath, collection, mode, excludeGlobs, progressConsumer) ->
-                scanRoot(rootPath, collection, mode, excludeGlobs, progressConsumer);
-        RootLifecycleOps.WorkerWatchFn workerWatchFn =
-            new RootLifecycleOps.WorkerWatchFn() {
-                @Override
-                public void watch(String rootPath, String collection) {
-                    watchRoot(rootPath, collection);
-                }
-
-                @Override
-                public void unwatch(String rootPath) {
-                    unwatchRoot(rootPath);
-                }
-            };
-        // Tempdoc 418 B-H.3 — Worker now owns backpressure (queue-depth aware throttle inside
-        // WorkerScanOps) and cancellation (via ServerCallStreamObserver.isCancelled()), so Head
-        // no longer needs the queue-depth supplier or its in-callback await loop.
-        this.rootLifecycleOps = new RootLifecycleOps(watchedRoots, watchedRootsState,
-            this::getExcludeMatcher, scanRootFn, workerWatchFn,
-            this::executeDeleteByPath, this::deleteById,
-            syncOps, walkExecutor);
-        rootsStore.migrateLegacyRootsFileIfNeeded();
-        watchedRootsState.loadPersistedRoots();
-    }
-
-    public void reindexPersistedRoots() {
-        rootLifecycleOps.reindexPersistedRoots();
     }
 
     /**
@@ -344,10 +153,10 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
 
     /**
      * Test seam (683): wires a prebuilt channel (e.g. in-process) into the search path so
-     * {@link #search(io.justsearch.core.dto.Query)} runs without {@link ManagedChannelBuilder}
-     * and without signal-bus port re-discovery. Production callers use {@link #connect(int)}.
+     * {@code search(Query)} runs without {@link ManagedChannelBuilder} and without signal-bus
+     * port re-discovery. Production callers use {@link #connect(int)}.
      *
-     * <p>Tempdoc 821 §3-C2 — the ingest stub is pinned too, so {@link #scanRoot} (and with it the
+     * <p>Tempdoc 821 §3-C2 — the ingest stub is pinned too, so {@code scanRoot} (and with it the
      * watched-root scan arm's ScanRootRequest) is exercisable over an in-process server.
      */
     void connectForTesting(Channel channel) {
@@ -384,6 +193,7 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
     /**
      * Reconnects using the signal bus to discover the current port.
      */
+    @Override
     public void reconnect() {
         reconnect(-1);  // No PID validation
     }
@@ -398,6 +208,7 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
      * @param expectedPid if &gt; 0, validates the worker PID matches after connecting
      * @throws IllegalStateException if no valid port or PID mismatch detected
      */
+    @Override
     public void reconnect(long expectedPid) {
         int newPort = signalBus.readPort();
         if (newPort <= 0) {
@@ -453,1197 +264,66 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
     }
 
     /**
-     * Returns the deadline for an RPC operation based on its category.
-     *
-     * @param category the deadline category
-     * @return the deadline in milliseconds
-     */
-    private long deadline(RpcDeadlineCategory category) {
-        return category.apply(deadlineMs);
-    }
-
-    private SearchServiceGrpc.SearchServiceBlockingStub searchStubWithDeadline(RpcDeadlineCategory category) {
-        return searchStub.withDeadlineAfter(deadline(category), TimeUnit.MILLISECONDS);
-    }
-
-    private IngestServiceGrpc.IngestServiceBlockingStub ingestStubWithDeadline(RpcDeadlineCategory category) {
-        return ingestStub.withDeadlineAfter(deadline(category), TimeUnit.MILLISECONDS);
-    }
-
-    private <T> T executeSearchRpc(
-            String operation,
-            RpcDeadlineCategory category,
-            java.util.function.Function<SearchServiceGrpc.SearchServiceBlockingStub, T> rpc) {
-        if (!testChannelPinned) {
-            ensureConnected();
-            reconnect();
-        }
-        return executeWithCircuitBreaker(operation, () -> rpc.apply(searchStubWithDeadline(category)));
-    }
-
-    private <T> T executeIngestRpc(
-            String operation,
-            RpcDeadlineCategory category,
-            java.util.function.Function<IngestServiceGrpc.IngestServiceBlockingStub, T> rpc) {
-        ensureConnected();
-        reconnect();
-        return executeWithCircuitBreaker(operation, () -> rpc.apply(ingestStubWithDeadline(category)));
-    }
-
-    private <T> T executeHealthRpc(
-            String operation,
-            RpcDeadlineCategory category,
-            java.util.function.Function<HealthServiceGrpc.HealthServiceBlockingStub, T> rpc) {
-        return executeHealthRpc(operation, deadline(category), rpc);
-    }
-
-    private <T> T executeHealthRpc(
-            String operation,
-            long callDeadlineMs,
-            java.util.function.Function<HealthServiceGrpc.HealthServiceBlockingStub, T> rpc) {
-        ensureConnected();
-        reconnect();
-        return executeWithCircuitBreaker(
-            operation,
-            () -> rpc.apply(healthStub.withDeadlineAfter(callDeadlineMs, TimeUnit.MILLISECONDS)));
-    }
-
-    private DeleteByPathResponse executeDeleteByPath(Path normalizedPath) {
-        DeleteByPathRequest request = DeleteByPathRequest.newBuilder()
-            .setPath(normalizedPath.toString())
-            .build();
-        return executeIngestRpc(
-            "deleteByPath",
-            RpcDeadlineCategory.STANDARD,
-            stub -> stub.deleteByPath(request));
-    }
-
-    /**
      * Resets the circuit breaker to CLOSED state.
      * Intended for use after worker restart.
      */
+    @Override
     public void resetCircuitBreaker() {
         circuitBreaker.reset();
     }
 
-    /**
-     * Slice 445: accessor for the async IngestService stub. Used by
-     * {@link RemoteIndexingJobsBridge} to subscribe to the long-lived
-     * SubscribeIndexingJobs server-streaming RPC. Returns {@code null} if not
-     * yet connected.
-     */
-    public IngestServiceGrpc.IngestServiceStub ingestAsyncStub() {
-        return ingestAsyncStub;
-    }
-
-    // ========== Search Service (delegates to SearchRpcOps) ==========
-
-    public SearchResponse search(String query, int limit) {
-        return searchRpcOps.search(query, limit);
-    }
-
-    public SearchResponse search(String query, int limit, io.justsearch.ipc.PipelineConfig pipeline) {
-        return searchRpcOps.search(query, limit, pipeline);
-    }
-
-    public SearchResponse search(SearchRequest request) {
-        return searchRpcOps.search(request);
-    }
-
-    public SearchResponse searchVector(List<Float> queryVector, int limit) {
-        return searchRpcOps.searchVector(queryVector, limit);
-    }
-
-    public SuggestResponse suggest(String query, int limit) {
-        return searchRpcOps.suggest(query, limit);
-    }
-
-    public FetchDocumentsResponse fetchDocuments(List<String> docIds) {
-        return searchRpcOps.fetchDocuments(docIds);
-    }
-
-    public FetchDocumentSliceResponse fetchDocumentSlice(String docId, int offsetChars, int maxChars) {
-        return searchRpcOps.fetchDocumentSlice(docId, offsetChars, maxChars);
-    }
-
-    public RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK) {
-        return searchRpcOps.retrieveContext(question, docIds, topK);
-    }
-
-    public RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK, int maxContextTokens) {
-        return searchRpcOps.retrieveContext(question, docIds, topK, maxContextTokens);
-    }
-
-    public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params) {
-        return searchRpcOps.retrieveContext(params);
-    }
-
-    public MatchCitationsResponse matchCitations(
-        String answerText,
-        List<String> chunkDocIds,
-        List<Integer> chunkIndices,
-        List<String> passageTexts,
-        double threshold) {
-        return searchRpcOps.matchCitations(
-            answerText, chunkDocIds, chunkIndices, passageTexts, threshold);
-    }
-
-    /**
-     * 360: Cross-encoder reranking via Worker's GPU-capable model.
-     *
-     * @param query the search query
-     * @param documentTexts pre-built document texts (title + snippet)
-     * @param deadlineMs budget for inference (0 = server default)
-     * @return rerank response with sorted indices and scores
-     */
-    public RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs) {
-        return searchRpcOps.rerank(query, documentTexts, deadlineMs);
-    }
-
-    public ListFoldersResponse listFolders(String parentPath, int maxFolders) {
-        return searchRpcOps.listFolders(parentPath, maxFolders);
-    }
-
-    public ListFolderFilesResponse listFolderFiles(
-        String folderPath, int limit, List<String> projection) {
-        return searchRpcOps.listFolderFiles(folderPath, limit, projection);
-    }
-
-    /**
-     * Lists all parent document IDs in the Worker's index (paginated).
-     *
-     * <p>Used by the GPL coordinator to iterate the full corpus without depending on folder
-     * hierarchy. Excludes chunk documents.
-     *
-     * @param offset zero-based page start
-     * @param limit max IDs to return (0 → default 1000 on the Worker)
-     * @return response with doc IDs, total count, and timing
-     */
-    public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(int offset, int limit) {
-        return searchRpcOps.listAllDocumentIds(offset, limit);
-    }
-
-    /** Continues document-ID pagination against the immutable snapshot from the first page. */
-    public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(
-            int offset, int limit, String snapshotToken) {
-        return searchRpcOps.listAllDocumentIds(offset, limit, snapshotToken);
-    }
-
-    // ========== Ingest Service ==========
-
-    /**
-     * Submits a batch of files for indexing.
-     *
-     * @param paths list of file paths to index
-     * @return batch response with accepted count
-     */
-    public BatchResponse submitBatch(List<Path> paths) {
-        return submitBatch(paths, false);
-    }
-
-    /**
-     * Submits a batch of file paths for indexing with optional force flag.
-     *
-     * @param paths list of file paths to index
-     * @param force if true, bypass "file unchanged" check and force re-extraction
-     * @return batch response with accepted count
-     */
-    public BatchResponse submitBatch(List<Path> paths, boolean force) {
-        return submitBatch(paths, force, null);
-    }
-
-    /**
-     * Submits a batch of file paths for indexing with optional force flag and collection tag.
-     *
-     * @param paths list of file paths to index
-     * @param force if true, bypass "file unchanged" check and force re-extraction
-     * @param collection optional collection tag for the indexed documents (null for default)
-     * @return batch response with accepted count
-     */
-    public BatchResponse submitBatch(List<Path> paths, boolean force, String collection) {
-        BatchRequest.Builder builder = BatchRequest.newBuilder();
-        for (Path path : paths) {
-            builder.addFilePaths(path.toAbsolutePath().toString());
-        }
-        builder.setForceReindex(force);
-        if (collection != null && !collection.isBlank()) {
-            builder.setTargetCollection(collection);
-        }
-        BatchRequest request = builder.build();
-        return executeIngestRpc(
-            "submitBatch",
-            RpcDeadlineCategory.STANDARD,
-            stub -> stub.submitBatch(request));
-    }
-
-    /**
-     * Deletes a single document by exact ID (normalized path).
-     * Used by file watcher to handle DELETE events.
-     *
-     * @param docId the document ID (will be normalized)
-     * @return response indicating success/failure
-     */
-    public DeleteByIdResponse deleteById(String docId) {
-        DeleteByIdRequest request = DeleteByIdRequest.newBuilder()
-                .setDocId(docId)
-                .build();
-        return executeIngestRpc(
-            "deleteById",
-            RpcDeadlineCategory.STANDARD,
-            stub -> stub.deleteById(request));
-    }
-
-    /**
-     * Updates document paths in the Lucene index after file MOVE/RENAME operations. For each
-     * mapping, rewrites the parent document's DOC_ID/PATH/FILENAME and all chunk documents'
-     * PARENT_DOC_ID/PATH fields.
-     *
-     * @param pathMappings map of old absolute path to new absolute path
-     * @return number of parent documents successfully updated
-     */
-    public int updateDocumentPaths(Map<Path, Path> pathMappings) {
-        UpdatePathsRequest.Builder reqBuilder = UpdatePathsRequest.newBuilder();
-        for (var entry : pathMappings.entrySet()) {
-            String oldPath = normalizePath(entry.getKey().toAbsolutePath().toString());
-            String newPath = normalizePath(entry.getValue().toAbsolutePath().toString());
-            reqBuilder.addMappings(
-                PathMapping.newBuilder()
-                    .setOldPath(oldPath)
-                    .setNewPath(newPath)
-                    .build());
-        }
-        UpdatePathsResponse resp = executeIngestRpc(
-            "updateDocumentPaths",
-            RpcDeadlineCategory.STANDARD,
-            stub -> stub.updateDocumentPaths(reqBuilder.build()));
-        if (!resp.getFailedPathsList().isEmpty()) {
-            log.warn("updateDocumentPaths: {} failed paths: {}",
-                resp.getFailedPathsList().size(), resp.getFailedPathsList());
-        }
-        return resp.getUpdatedCount();
-    }
-
-    /** Normalizes a path for index storage (lowercase on Windows, platform separators). */
-    private static String normalizePath(String path) {
-        if (path == null) return null;
-        String normalized = path.replace('/', File.separatorChar);
-        if (PlatformPaths.isWindows()) {
-            normalized = normalized.toLowerCase(Locale.ROOT);
-        }
-        return normalized;
-    }
-
-    /**
-     * Gets the current indexing status.
-     *
-     * <p>Records timing and response size metrics via IpcTelemetry.
-     *
-     * @return status response with queue depth and health
-     */
-    public StatusResponse getStatus() {
-        try (var sample = telemetry.startStatusPoll()) { // NOPMD - telemetry timing
-            StatusRequest request = StatusRequest.newBuilder().build();
-            StatusResponse response = executeIngestRpc(
-                "getStatus",
-                RpcDeadlineCategory.STANDARD,
-                stub -> stub.indexStatus(request));
-            telemetry.recordStatusResponseSize(response.getSerializedSize());
-            return response;
-        }
-    }
-
-    /**
-     * Returns the raw Lucene commit user data map from the Worker's latest index commit.
-     *
-     * <p>Fetches the current {@link StatusResponse} and extracts the {@code commit_user_data}
-     * map, which contains all key-value pairs written during the last Lucene commit
-     * (e.g. fingerprints, schema hashes, model SHAs). Returns an empty map when the Worker
-     * is unavailable or no commit has been made yet.
-     */
-    public Map<String, String> getCommitMetadata() {
-        StatusResponse status = getStatus();
-        return status.getCommitUserDataMap();
-    }
-
-    /**
-     * Returns a typed Worker operational status view for the /api/status endpoint.
-     *
-     * <p>This avoids leaking proto DTOs into the UI module while keeping the response
-     * backwards-compatible via the record's Jackson serialization.
-     */
-    public io.justsearch.app.api.status.WorkerOperationalView getWorkerOperationalView() {
-        StatusResponse status = getStatus();
-        io.justsearch.app.api.status.WorkerOperationalView view;
-        try {
-            view = WorkerStatusMapper.toUiStatusMap(status, getHealthCheck());
-        } catch (Exception e) {
-            log.debug("Failed to fetch worker health readiness details for UI status", e);
-            view = WorkerStatusMapper.toUiStatusMap(status);
-        }
-        cachedOperationalView.set(view);
-        return view;
-    }
-
-    /**
-     * Returns the last-known WorkerOperationalView without making a gRPC call.
-     *
-     * <p>Updated as a side-effect of {@link #getWorkerOperationalView()}. Returns null if the
-     * operational view has never been fetched (e.g., before the first status poll).
-     */
-    public io.justsearch.app.api.status.WorkerOperationalView cachedOperationalView() {
-        return cachedOperationalView.get();
-    }
-
-    /**
-     * Returns a UI-friendly snapshot of Worker status as a plain Map.
-     *
-     * @deprecated Use {@link #getWorkerOperationalView()} and serialize via Jackson.
-     */
-    // 341: getStatusMapForUi() removed — use getWorkerOperationalView() with Jackson serialization.
-
-    /**
-     * Returns a JSON-friendly snapshot of Worker status + health check for debug surfaces.
-     *
-     * <p>Returns a typed record to avoid leaking proto DTOs across module boundaries.
-     */
-    public io.justsearch.app.api.status.WorkerDebugView getDebugWorkerState() {
-        StatusResponse status = getStatus();
-        io.justsearch.app.api.status.HealthNodeView healthNode;
-        Map<String, String> effectiveConfig;
-        try {
-            var health = getHealthCheck();
-            healthNode = WorkerStatusMapper.buildHealthNode(health);
-            // tempdoc 623 U7: surface the worker effective_config (carrying ort.version) into the
-            // debug-only WorkerDebugView — retained un-hashed in the eval manifest, no status-contract change.
-            effectiveConfig = health.getEffectiveConfigMap();
-        } catch (Exception e) {
-            healthNode = new io.justsearch.app.api.status.HealthNodeView(false, "", 0, "", false, false);
-            effectiveConfig = Map.of();
-        }
-        return WorkerStatusMapper.toDebugWorkerState(status, healthNode, effectiveConfig);
-    }
-
-    // ========== Health Service ==========
-
-    /**
-     * Checks if the Knowledge Server is healthy.
-     *
-     * <p>Like every health RPC this goes through {@link #executeHealthRpc}, which calls
-     * {@link #reconnect()} — a no-op unless the signal bus reports a DIFFERENT port, in which case
-     * the channel genuinely must be rebuilt. The existing connection is reused otherwise.
-     *
-     * @return true if serving
-     */
-    public boolean isHealthy() {
-        try {
-            HealthCheckRequest request = HealthCheckRequest.newBuilder().build();
-            HealthCheckResponse response = executeHealthRpc(
-                "isHealthy",
-                RpcDeadlineCategory.STANDARD,
-                stub -> stub.check(request));
-            return response.getServing();
-        } catch (CircuitBreakerOpenException e) {
-            log.debug("Health check rejected by circuit breaker");
-            return false;
-        } catch (Exception e) {
-            log.debug("Health check failed", e);
-            return false;
-        }
-    }
-
-    /**
-     * Returns the full health check response (including worker_state) for diagnostics.
-     *
-     * <p>Prefer this over {@link #isHealthy()} when you need details like {@code worker_state} or {@code pid}.
-     *
-     * <p>Same connection handling as {@link #isHealthy()}: the shared health-RPC path re-reads the
-     * signal bus and rebuilds the channel only when the reported port has actually changed.
-     */
-    public HealthCheckResponse getHealthCheck() {
-        return getHealthCheck(deadline(RpcDeadlineCategory.STANDARD));
-    }
-
-    /**
-     * Health check with an explicit per-call gRPC deadline, for callers that own a total budget and
-     * must be able to spend it over several attempts.
-     *
-     * <p>Boot-time PID validation is the motivating caller: its whole window equals the STANDARD
-     * deadline, so a single slow cold call (the worker-side check touches SQLite and Lucene, which
-     * are expensive on first contact) consumed the entire budget and its retry loop never iterated.
-     * Passing a per-attempt deadline keeps the retry loop a retry loop.
-     *
-     * @param callDeadlineMs the gRPC deadline for this one call, in milliseconds
-     */
-    public HealthCheckResponse getHealthCheck(long callDeadlineMs) {
-        HealthCheckResponse response = executeHealthRpc(
-            "getHealthCheck",
-            callDeadlineMs,
-            stub -> stub.check(HealthCheckRequest.newBuilder().build()));
-        // Update last-known-good ONNX model cache from Worker's startup-time discovery (D-4).
-        // executeHealthRpc never returns null — it throws on failure, so cache is only updated
-        // on success. On failure, last-known-good is preserved.
-        var models = response.getOnnxModelsList();
-        if (!models.isEmpty()) {
-            onnxModelsCache.set(models.stream()
-                .map(m -> new OnnxModelStatus(
-                    m.getModelName(), m.getFound(), m.getPath(), m.getAutoDiscovered(),
-                    m.getSessionActive()))
-                .toList());
-        }
-        return response;
-    }
-
-    /**
-     * Returns the last-known-good ONNX model discovery status from the Worker.
-     *
-     * <p>Updated on each successful {@link #getHealthCheck()} call. Returns an empty list until the
-     * first successful health check response containing ONNX model data.
-     */
-    public List<OnnxModelStatus> getLastKnownOnnxModels() {
-        return onnxModelsCache.get();
-    }
-
-    /**
-     * Gets the server version.
-     *
-     * @return version string or null if unavailable
-     */
-    public String getVersion() {
-        try {
-                HealthCheckResponse response = executeHealthRpc(
-                "getVersion",
-                RpcDeadlineCategory.STANDARD,
-                stub -> stub.check(HealthCheckRequest.newBuilder().build()));
-            return response.getVersion();
-        } catch (CircuitBreakerOpenException e) {
-            log.debug("getVersion rejected by circuit breaker");
-            return null;
-        } catch (Exception e) {
-            log.debug("Failed to get version", e);
-            return null;
-        }
-    }
-
-    // ========== SearchPort Implementation ==========
+    // ========== The transport seam ==========
 
     @Override
-    public Result search(Query intent) {
-        // Map Core Query to IPC SearchRequest
-        String queryText = extractQueryText(intent);
-        int limit = intent.limit();
-        String cursorToken = intent.cursor() == null ? null : intent.cursor().token();
-
-        // Cursor support is TEXT-only in the Worker gRPC surface. When a cursor is provided, force TEXT pipeline.
-        io.justsearch.ipc.PipelineConfig pipeline = (cursorToken != null && !cursorToken.isBlank())
-            ? PipelineConfigs.TEXT
-            : PipelineConfigs.HYBRID;
-
-        // Execute via gRPC
-        SearchRequest.Builder req =
-            SearchRequest.newBuilder().setQuery(queryText).setLimit(limit).setPipeline(pipeline);
-        if (cursorToken != null && !cursorToken.isBlank()) {
-            req.setCursor(cursorToken);
-        }
-        SearchResponse response = searchRpcOps.search(req.build());
-
-        // Map IPC SearchResponse to Core Result
-        return toCoreResult(response);
-    }
-
-    private String extractQueryText(Query intent) {
-        if (intent.clauses() == null) {
-            return "";
-        }
-        return intent.clauses().stream()
-            .filter(c -> "text".equalsIgnoreCase(c.type()) && c.value() != null)
-            .map(c -> c.value().toString())
-            .findFirst()
-            .orElse("");
-    }
-
-    private Result toCoreResult(SearchResponse response) {
-        List<Result.Hit> hits = response.getResultsList().stream()
-            .map(r -> new Result.Hit(r.getId(), r.getScore(), Map.of()))
-            .toList();
-
-        io.justsearch.core.dto.Cursor cursor = null;
-        String nextCursor = response.getNextCursor();
-        if (!nextCursor.isBlank()) {
-            cursor = io.justsearch.core.dto.Cursor.legacy(nextCursor);
-        }
-
-        return new Result(
-            hits,
-            Map.of(),
-            cursor,
-            Map.of("total_hits", response.getTotalHits(), "took_ms", response.getTookMs()));
-    }
-
-    // ========== Exclude Matcher Cache ==========
-
-    /**
-     * The resolved exclude-patterns JSON, or {@code ""}. {@code globalOrNull} because sync batches
-     * can be driven before the store is published; no excludes is the safe answer there.
-     *
-     * <p>Package-private so the tempdoc 883 slice-2 rewiring (settings.json at ordinal 300 instead
-     * of the promoted sysprop) has a direct test; {@code getExcludeMatcher} is unreachable without
-     * a live gRPC client.
-     */
-    static String resolvedExcludePatterns() {
-        var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-        if (store == null) return "";
-        String raw = store.get().ui().excludePatterns();
-        return raw == null ? "" : raw;
-    }
-
-    private ExcludeMatcher getExcludeMatcher() {
-        boolean windows = PlatformPaths.isWindows();
-        // String-equality cache on the raw JSON, unchanged: a resolved value is the same kind of
-        // immutable string the sysprop was, and ConfigStoreRebuilder swaps it wholesale.
-        String raw = resolvedExcludePatterns();
-        if (raw.isBlank()) {
-            excludeRawCache = "";
-            excludeCache = ExcludeMatcher.empty();
-            return excludeCache;
-        }
-        if (raw.equals(excludeRawCache)) {
-            return excludeCache;
-        }
-        synchronized (excludeLock) {
-            String raw2 = resolvedExcludePatterns();
-            if (raw2.equals(excludeRawCache)) {
-                return excludeCache;
-            }
-            ExcludeMatcher next = ExcludeMatcher.fromRawJson(raw2, windows);
-            excludeRawCache = raw2;
-            excludeCache = next;
-            return next;
-        }
-    }
-
-    // ========== IndexingService Implementation (delegates to RootLifecycleOps) ==========
-
-    @Override
-    public List<Path> getWatchedPaths() {
-        return rootLifecycleOps.getWatchedPaths();
-    }
-
-    @Override
-    public List<IndexingService.WatchedRoot> getWatchedRoots() {
-        return rootLifecycleOps.getWatchedRoots();
-    }
-
-    @Override
-    public void addWatchedPath(Path path) {
-        rootLifecycleOps.addWatchedPath(path);
-    }
-
-    @Override
-    public void addWatchedRoot(String collection, Path path) {
-        rootLifecycleOps.addWatchedRoot(collection, path);
-    }
-
-    @Override
-    public int deleteDocsByPathPrefix(Path pathPrefix) {
-        return rootLifecycleOps.deleteDocsByPathPrefix(pathPrefix);
-    }
-
-    @Override
-    public boolean deleteDocById(String docId) {
-        return rootLifecycleOps.deleteDocById(docId);
-    }
-
-    /**
-     * Tempdoc 811 (C-2a) — collection-keyed removal route. Gating (which collections are deletable)
-     * belongs to the caller via {@code IngestCollectionPolicy.isDeletable}; this is the transport.
-     */
-    @Override
-    public int deleteDocsByCollection(String collection) {
-        if (collection == null || collection.isBlank()) {
-            return -1;
-        }
-        io.justsearch.ipc.DeleteByCollectionRequest request =
-            io.justsearch.ipc.DeleteByCollectionRequest.newBuilder()
-                .setCollection(collection)
-                .build();
-        io.justsearch.ipc.DeleteByCollectionResponse response =
-            executeIngestRpc(
-                "deleteByCollection",
-                RpcDeadlineCategory.STANDARD,
-                stub -> stub.deleteByCollection(request));
-        if (response == null) {
-            return -1;
-        }
-        if (!response.getError().isEmpty()) {
-            log.warn("deleteByCollection RPC returned error for {}: {}", collection, response.getError());
-        }
-        return response.getDeletedDocs();
-    }
-
-    @Override
-    public int removeWatchedPath(Path path) {
-        return rootLifecycleOps.removeWatchedPath(path);
-    }
-
-    @Override
-    public void flush() {
-        rootLifecycleOps.flush();
-    }
-
-    @Override
-    public void reindexWatchedRoots(boolean force) {
-        rootLifecycleOps.reindexWatchedRoots(force);
-    }
-
-    @Override
-    public boolean reconcileRoot(String pathHash, boolean force) {
-        // Tempdoc 626 §Recency (Move C) — resolve the privacy-safe pathHash to the real root Head-side
-        // (raw paths never cross the wire — ADR-0028), then run a per-root force reconcile. A force=true
-        // syncDirectory re-prunes orphans + re-walks the root, re-converging it AND (via SyncOps' §Recency
-        // recording) refreshing the per-root verification state — clearing deleteDetectionUnverified and
-        // stamping lastVerifiedAt. Mirrors ResolvePathHashHandler's head-side watched-roots fallback.
-        if (pathHash == null || pathHash.isBlank()) {
-            return false;
-        }
-        for (IndexingService.WatchedRoot root : rootLifecycleOps.getWatchedRoots()) {
-            if (root.path() == null) {
-                continue;
-            }
-            if (sha256Hex(root.path().toString()).equalsIgnoreCase(pathHash)) {
-                syncDirectory(root.path().toString(), force);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String sha256Hex(String value) {
-        try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] digest = md.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
-    }
-
-    @Override
-    public boolean startMigration(String reason) {
-        return migrationOps.startMigration(reason);
-    }
-
-    @Override
-    public boolean requestCutover(boolean forceSwitching) {
-        return migrationOps.requestCutover(forceSwitching);
-    }
-
-    @Override
-    public boolean rollbackMigration() {
-        return migrationOps.rollbackMigration();
-    }
-
-    @Override
-    public boolean pauseMigration(String reason) {
-        return migrationOps.pauseMigration(reason);
-    }
-
-    @Override
-    public boolean resumeMigration() {
-        return migrationOps.resumeMigration();
-    }
-
-    @Override
-    public IndexingService.IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
-        return migrationOps.runIndexGc(keepLatest, pruneMarkedOnly);
-    }
-
-    @Override
-    public IndexingService.SettleIndexOutcome settleIndex(
-            boolean expungeDeletesOnly, int maxSegments) {
-        return migrationOps.settleIndex(expungeDeletesOnly, maxSegments);
-    }
-
-    /**
-     * Projects the Worker's gRPC quiescence message onto the app-api contract record.
-     *
-     * <p>The mapping lives here, at the single gRPC boundary, so the generated proto type never
-     * reaches {@code ui.api} — see {@code UiApiGuardrailsTest} and {@link
-     * io.justsearch.app.api.WorkerQuiescenceSnapshot}.
-     */
-    private static io.justsearch.app.api.WorkerQuiescenceSnapshot toSnapshot(
-            io.justsearch.ipc.UpgradeQuiescenceResponse response) {
-        if (response == null) {
-            return null;
-        }
-        return new io.justsearch.app.api.WorkerQuiescenceSnapshot(
-                response.getPreparationId(),
-                response.getReady(),
-                response.getLoopQuiesced(),
-                response.getQueueCheckpointed(),
-                response.getMigrationState(),
-                response.getBlockersList());
-    }
-
-    public io.justsearch.app.api.WorkerQuiescenceSnapshot prepareUpgrade(String preparationId) {
-        var request =
-                io.justsearch.ipc.UpgradeQuiescenceRequest.newBuilder()
-                        .setPreparationId(preparationId)
-                        .build();
-        return toSnapshot(
-                executeIngestRpc(
-                        "prepareUpgrade",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.prepareUpgrade(request)));
-    }
-
-    public io.justsearch.app.api.WorkerQuiescenceSnapshot upgradeStatus(String preparationId) {
-        var request =
-                io.justsearch.ipc.UpgradeQuiescenceRequest.newBuilder()
-                        .setPreparationId(preparationId)
-                        .build();
-        return toSnapshot(
-                executeIngestRpc(
-                        "upgradeStatus",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.upgradeStatus(request)));
-    }
-
-    public io.justsearch.app.api.WorkerQuiescenceSnapshot cancelUpgrade(String preparationId) {
-        var request =
-                io.justsearch.ipc.UpgradeQuiescenceRequest.newBuilder()
-                        .setPreparationId(preparationId)
-                        .build();
-        return toSnapshot(
-                executeIngestRpc(
-                        "cancelUpgrade",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.cancelUpgrade(request)));
-    }
-
-    @Override
-    public List<IndexingService.FailedJobInfo> listFailedJobs(int limit) {
-        ListFailedJobsRequest req = ListFailedJobsRequest.newBuilder()
-                .setLimit(limit).build();
-        ListFailedJobsResponse resp = executeIngestRpc(
-                "listFailedJobs", RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFailedJobs(req));
-        return resp.getJobsList().stream()
-                .map(j -> new IndexingService.FailedJobInfo(
-                        j.getPath(), j.getErrorMessage(), j.getAttempts(),
-                        j.getLastUpdatedMs(), j.getCollection(),
-                        j.getState().isEmpty() ? "FAILED" : j.getState(),
-                        j.getScanId()))
-                .toList();
-    }
-
-    @Override
-    public List<IndexingService.FailedJobInfo> listFailedJobsByPathPrefix(
-            Path pathPrefix, int limit) {
-        if (pathPrefix == null) {
-            return List.of();
-        }
-        io.justsearch.ipc.ListFailedJobsByPathPrefixRequest req =
-                io.justsearch.ipc.ListFailedJobsByPathPrefixRequest.newBuilder()
-                        .setPathPrefix(pathPrefix.toString())
-                        .setLimit(limit)
-                        .build();
-        ListFailedJobsResponse resp = executeIngestRpc(
-                "listFailedJobsByPathPrefix", RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFailedJobsByPathPrefix(req));
-        return resp.getJobsList().stream()
-                .map(j -> new IndexingService.FailedJobInfo(
-                        j.getPath(), j.getErrorMessage(), j.getAttempts(),
-                        j.getLastUpdatedMs(), j.getCollection(),
-                        j.getState().isEmpty() ? "FAILED" : j.getState(),
-                        j.getScanId()))
-                .toList();
-    }
-
-    @Override
-    public IndexingService.JobCounts countJobsByPathPrefix(Path pathPrefix) {
-        if (pathPrefix == null) {
-            return IndexingService.JobCounts.zero();
-        }
-        io.justsearch.ipc.CountJobsByPathPrefixRequest req =
-                io.justsearch.ipc.CountJobsByPathPrefixRequest.newBuilder()
-                        .setPathPrefix(pathPrefix.toString())
-                        .build();
-        io.justsearch.ipc.CountJobsByPathPrefixResponse resp = executeIngestRpc(
-                "countJobsByPathPrefix", RpcDeadlineCategory.STANDARD,
-                stub -> stub.countJobsByPathPrefix(req));
-        io.justsearch.ipc.IndexingJobCounts c = resp.getCounts();
-        long inFlight = c.getPendingCount() + c.getProcessingCount();
-        io.justsearch.ipc.RootCoverageCounts cov = resp.getCoverage();
-        return new IndexingService.JobCounts(
-                inFlight,
-                c.getFailedCount(),
-                new IndexingService.RootCoverage(
-                        cov.getParentDocsTotalEmbedding(),
-                        cov.getParentDocsSettledEmbedding(),
-                        cov.getParentDocsTotalSplade(),
-                        cov.getParentDocsSettledSplade(),
-                        cov.getParentDocsTotalNer(),
-                        cov.getParentDocsSettledNer(),
-                        cov.getChunkDocsTotal(),
-                        cov.getChunkDocsSettled()));
-    }
-
-    @Override
-    public int clearFailedJobs() {
-        ClearFailedJobsRequest req = ClearFailedJobsRequest.newBuilder().build();
-        ClearFailedJobsResponse resp = executeIngestRpc(
-                "clearFailedJobs", RpcDeadlineCategory.STANDARD,
-                stub -> stub.clearFailedJobs(req));
-        return resp.getDeletedCount();
-    }
-
-    @Override
-    public void clearAllRoots() {
-        rootLifecycleOps.clearAllRoots();
-    }
-
-    @Override
-    public boolean resetIndex() {
-        ResetIndexRequest req = ResetIndexRequest.newBuilder().build();
-        ResetIndexResponse resp = executeIngestRpc(
-                "resetIndex", RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.resetIndex(req));
-        return resp.getSuccess();
-    }
-
-    /**
-     * Tempdoc 406 — admin-triggered runtime swap. Drains current ingest runtime,
-     * opens a fresh one on the same path. Returns the swap duration in
-     * milliseconds. Not retried automatically (admin-triggered, not idempotent at
-     * the RPC level).
-     *
-     * @param reason low-cardinality tag forwarded to telemetry; defaults to
-     *     "admin_triggered" if blank
-     */
-    @Override
-    public long reloadRuntime(String reason) {
-        io.justsearch.ipc.ReloadRuntimeRequest req =
-                io.justsearch.ipc.ReloadRuntimeRequest.newBuilder()
-                        .setReason(reason == null ? "" : reason)
-                        .build();
-        io.justsearch.ipc.ReloadRuntimeResponse resp = executeIngestRpc(
-                "reloadRuntime", RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.reloadRuntime(req));
-        return resp.getSwapDurationMs();
-    }
-
-    /**
-     * Fetches the Worker-side session-policies snapshot and parses the JSON payloads into a
-     * typed {@link Map} response (tempdoc 397 §14.28 U4). Backs
-     * {@code /api/debug/session-policies} in Head — returns Worker's authoritative
-     * PolicySnapshot (built at boot via InferenceCompositionRoot.compose), not a Head-side
-     * re-resolve.
-     *
-     * <p>Encapsulated in this class so {@code ui.api.SessionPoliciesController} doesn't depend
-     * on {@code io.justsearch.ipc} proto types (UiApiGuardrailsTest). Returned shape mirrors
-     * today's REST response: {@code {configStatus, runtime, models}}.
-     */
-    public Map<String, Object> getSessionPolicies() {
-        io.justsearch.ipc.SessionPoliciesRequest req =
-                io.justsearch.ipc.SessionPoliciesRequest.newBuilder().build();
-        io.justsearch.ipc.SessionPoliciesResponse grpcResp;
-        Map<String, Object> response = new java.util.LinkedHashMap<>();
-        try {
-            grpcResp = executeIngestRpc(
-                    "getSessionPolicies", RpcDeadlineCategory.STANDARD,
-                    stub -> stub.getSessionPolicies(req));
-        } catch (RuntimeException e) {
-            // Phase 2.1a debug spike (tempdoc 400 LR1-c). Pre-Phase-2.1 this
-            // catch was silent, masking the root cause of worker-unreachable
-            // in eval mode. Kept as a log.warn after the spike so operators
-            // can diagnose recurrences. Does not leak request data; logs the
-            // exception type + message only.
-            log.warn(
-                    "getSessionPolicies RPC failed: {}: {}",
-                    e.getClass().getSimpleName(),
-                    e.getMessage(),
-                    e);
-            response.put("configStatus", "worker-unreachable");
-            response.put("runtime", new java.util.LinkedHashMap<>());
-            response.put("models", new java.util.TreeMap<>());
-            return response;
-        }
-        response.put("configStatus", grpcResp.getConfigStatus());
-        try {
-            tools.jackson.databind.ObjectMapper mapper =
-                    new tools.jackson.databind.json.JsonMapper();
-            Object runtime =
-                    grpcResp.getRuntimePolicyJson().isEmpty()
-                            ? new java.util.LinkedHashMap<>()
-                            : mapper.readValue(grpcResp.getRuntimePolicyJson(), Object.class);
-            response.put("runtime", runtime);
-            Map<String, Object> models = new java.util.TreeMap<>();
-            for (var entry : grpcResp.getModelPoliciesJsonMap().entrySet()) {
-                models.put(entry.getKey(), mapper.readValue(entry.getValue(), Object.class));
-            }
-            response.put("models", models);
-        } catch (RuntimeException e) {
-            response.put("configStatus", "surface-unavailable");
-            response.put("runtime", new java.util.LinkedHashMap<>());
-            response.put("models", new java.util.TreeMap<>());
-        }
-        return response;
-    }
-
-    /**
-     * Tempdoc 422: returns per-encoder {@link io.justsearch.app.api.status.OrtCudaView} typed
-     * keyed by {@link io.justsearch.ort.EncoderRole}. Source of truth for the
-     * {@code /api/inference/encoders} explainer's runtime accelerator state. Mirrors
-     * {@link #getSessionPolicies()}'s shape: typed Head-side return, no proto types leaked
-     * across modules.
-     *
-     * <p>On RPC failure, returns an empty map and logs (consistent with
-     * {@code getSessionPolicies()} returning {@code "worker-unreachable"}).
-     */
-    public Map<io.justsearch.ort.EncoderRole, io.justsearch.app.api.status.OrtCudaView>
-            getEncoderOrtCudaViews() {
-        StatusResponse status;
-        try {
-            status = getStatus();
-        } catch (RuntimeException e) {
-            log.warn(
-                    "getEncoderOrtCudaViews status RPC failed: {}: {}",
-                    e.getClass().getSimpleName(),
-                    e.getMessage());
-            return Map.of();
-        }
-        var gpu = status.getGpu();
-        Map<io.justsearch.ort.EncoderRole, io.justsearch.app.api.status.OrtCudaView> views =
-                new java.util.EnumMap<>(io.justsearch.ort.EncoderRole.class);
-        views.put(io.justsearch.ort.EncoderRole.EMBEDDING,
-                WorkerStatusMapper.mapOrtCudaProbe(gpu.getEmbedOrtCuda()));
-        views.put(io.justsearch.ort.EncoderRole.BGE_M3,
-                WorkerStatusMapper.mapOrtCudaProbe(gpu.getBgeM3OrtCuda()));
-        views.put(io.justsearch.ort.EncoderRole.SPLADE,
-                WorkerStatusMapper.mapOrtCudaProbe(gpu.getSpladeOrtCuda()));
-        views.put(io.justsearch.ort.EncoderRole.NER,
-                WorkerStatusMapper.mapOrtCudaProbe(gpu.getNerOrtCuda()));
-        views.put(io.justsearch.ort.EncoderRole.RERANKER,
-                WorkerStatusMapper.mapOrtCudaProbe(gpu.getRerankerOrtCuda()));
-        views.put(io.justsearch.ort.EncoderRole.CITATION,
-                WorkerStatusMapper.mapOrtCudaProbe(gpu.getCitationOrtCuda()));
-        return views;
-    }
-
-    /**
-     * Fetches the most recent privacy-safe ingestion ledger events from the Worker.
-     * Returns rows containing only path-hash identifiers; raw paths never cross the boundary.
-     * Backs {@code GET /api/diagnostics/ingestion/recent} (tempdoc 410 §12).
-     */
-    @Override
-    public List<Map<String, Object>> recentIngestionEvents(int limit) {
-        io.justsearch.ipc.RecentIngestionEventsRequest req =
-                io.justsearch.ipc.RecentIngestionEventsRequest.newBuilder().setLimit(limit).build();
-        io.justsearch.ipc.RecentIngestionEventsResponse resp =
-                executeIngestRpc(
-                        "recentIngestionEvents",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.recentIngestionEvents(req));
-        List<Map<String, Object>> events = new java.util.ArrayList<>(resp.getEventsCount());
-        for (io.justsearch.ipc.IngestionEvent event : resp.getEventsList()) {
-            Map<String, Object> row = new java.util.LinkedHashMap<>();
-            row.put("id", event.getId());
-            row.put("pathHash", event.getPathHash());
-            row.put("collection", emptyToNull(event.getCollection()));
-            row.put("outcomeClass", event.getOutcomeClass());
-            row.put("reasonCode", event.getReasonCode());
-            row.put("retryPolicy", event.getRetryPolicy());
-            row.put("diagnosticSummary", emptyToNull(event.getDiagnosticSummary()));
-            row.put("observedAtMs", event.getObservedAtMs());
-            row.put("sourceSizeBytes", event.getSourceSizeBytes());
-            row.put("sourceModifiedAtMs", event.getSourceModifiedAtMs());
-            row.put("sourceKind", event.getSourceKind());
-            row.put("artifactStatus", event.getArtifactStatus());
-            row.put("policyId", event.getPolicyId());
-            row.put("parserId", event.getParserId());
-            events.add(row);
-        }
-        return events;
-    }
-
-    /**
-     * Fetches grouped ingestion outcome counts since the given epoch ms (0 = all retained).
-     * Backs {@code GET /api/diagnostics/ingestion/summary} (tempdoc 410 §12).
-     */
-    @Override
-    public List<Map<String, Object>> ingestionOutcomeSummary(long sinceMs) {
-        io.justsearch.ipc.IngestionOutcomeSummaryRequest req =
-                io.justsearch.ipc.IngestionOutcomeSummaryRequest.newBuilder()
-                        .setSinceMs(sinceMs)
-                        .build();
-        io.justsearch.ipc.IngestionOutcomeSummaryResponse resp =
-                executeIngestRpc(
-                        "ingestionOutcomeSummary",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.ingestionOutcomeSummary(req));
-        List<Map<String, Object>> rollups = new java.util.ArrayList<>(resp.getRollupsCount());
-        for (io.justsearch.ipc.IngestionOutcomeRollup rollup : resp.getRollupsList()) {
-            Map<String, Object> row = new java.util.LinkedHashMap<>();
-            row.put("outcomeClass", rollup.getOutcomeClass());
-            row.put("reasonCode", rollup.getReasonCode());
-            row.put("retryPolicy", rollup.getRetryPolicy());
-            row.put("count", rollup.getCount());
-            row.put("lastObservedAtMs", rollup.getLastObservedAtMs());
-            rollups.add(row);
-        }
-        return rollups;
-    }
-
-    /**
-     * ADR-0028 / tempdoc 419 T5.3 — scoped reverse-lookup. Calls {@code LookupPathByHash}
-     * and returns a typed map: {@code found, path, lastSeenAtMs, removedAtMs}. Backs the
-     * single-purpose endpoint {@code POST /api/library/resolve-hash}; diagnostic export
-     * endpoints MUST NOT call this method (enforced by ArchUnit pin
-     * {@code LibraryResolveHashOnlyCallerPin}).
-     */
-    @Override
-    public Map<String, Object> resolvePathHash(String pathHash) {
-        Objects.requireNonNull(pathHash, "pathHash");
-        io.justsearch.ipc.LookupPathByHashRequest req =
-                io.justsearch.ipc.LookupPathByHashRequest.newBuilder()
-                        .setPathHash(pathHash)
-                        .build();
-        io.justsearch.ipc.LookupPathByHashResponse resp =
-                executeIngestRpc(
-                        "lookupPathByHash",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.lookupPathByHash(req));
-        Map<String, Object> row = new java.util.LinkedHashMap<>();
-        row.put("found", resp.getFound());
-        if (resp.getFound()) {
-            row.put("path", resp.getPath());
-            row.put("lastSeenAtMs", resp.getLastSeenAtMs());
-            row.put("removedAtMs", resp.getRemovedAtMs());
-        }
-        return row;
-    }
-
-    /**
-     * Slice 445: cancel an in-flight job by its {@code pathHash}. Forwards to the worker's
-     * {@code CancelIndexingJob} RPC; the worker resolves the hash via its
-     * {@code PathResolutionStore} and marks the row terminal.
-     */
-    @Override
-    public Map<String, Object> cancelIndexingJob(String pathHash) {
-        Objects.requireNonNull(pathHash, "pathHash");
-        io.justsearch.ipc.CancelIndexingJobRequest req =
-                io.justsearch.ipc.CancelIndexingJobRequest.newBuilder()
-                        .setPathHash(pathHash)
-                        .build();
-        io.justsearch.ipc.CancelIndexingJobResponse resp =
-                executeIngestRpc(
-                        "cancelIndexingJob",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.cancelIndexingJob(req));
-        Map<String, Object> row = new java.util.LinkedHashMap<>();
-        row.put("cancelled", resp.getCancelled());
-        row.put("previousState", resp.getPreviousState());
-        return row;
-    }
-
-    /**
-     * Slice 445: retry a FAILED job by its {@code pathHash}. Forwards to the worker's
-     * {@code RetryIndexingJob} RPC; the worker resolves the hash and re-enqueues the row.
-     */
-    @Override
-    public Map<String, Object> retryIndexingJob(String pathHash) {
-        Objects.requireNonNull(pathHash, "pathHash");
-        io.justsearch.ipc.RetryIndexingJobRequest req =
-                io.justsearch.ipc.RetryIndexingJobRequest.newBuilder()
-                        .setPathHash(pathHash)
-                        .build();
-        io.justsearch.ipc.RetryIndexingJobResponse resp =
-                executeIngestRpc(
-                        "retryIndexingJob",
-                        RpcDeadlineCategory.STANDARD,
-                        stub -> stub.retryIndexingJob(req));
-        Map<String, Object> row = new java.util.LinkedHashMap<>();
-        row.put("retried", resp.getRetried());
-        row.put("previousState", resp.getPreviousState());
-        return row;
-    }
-
-    private static String emptyToNull(String value) {
-        return value == null || value.isEmpty() ? null : value;
-    }
-
-    /**
-     * Tempdoc 418 Phase B — server-streaming ScanRoot. Worker walks the root and admits each
-     * discovered file via {@code WorkerIngestionAuthority}; this client forwards every
-     * {@link io.justsearch.ipc.ScanRootProgress} to {@code progressConsumer} and returns the
-     * terminal progress event (the one with {@code complete=true}).
-     *
-     * <p>Cancellation is gRPC-native: the client may stop iterating to terminate the walk
-     * (the server-side {@code Files.walkFileTree} responds to the cancellation by returning
-     * TERMINATE on the next visitor call).
-     *
-     * @param rootPath absolute root path; Worker validates it is a directory and emits a typed
-     *     terminal event ({@code ROOT_NOT_DIRECTORY}) if not.
-     * @param collection optional collection tag; null/blank routes to the default collection.
-     * @param mode {@link io.justsearch.ipc.ScanMode} (INITIAL | RESCAN | FORCE_REINDEX).
-     * @param excludeGlobs caller-supplied globs layered on top of
-     *     {@code WorkerIngestionAuthority.shouldSkip}.
-     * @param progressConsumer invoked for every progress event the server emits.
-     * @return the terminal progress event (last value seen).
-     */
-    public io.justsearch.ipc.ScanRootProgress scanRoot(
-            String rootPath,
-            String collection,
-            io.justsearch.ipc.ScanMode mode,
-            List<String> excludeGlobs,
-            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer) {
-        return scanRoot(rootPath, collection, mode, excludeGlobs, null, progressConsumer);
-    }
-
-    /**
-     * Tempdoc 419 / T3 — overload that accepts a {@link CancelToken}. The streaming gRPC call
-     * runs under the token's cancellable {@link io.grpc.Context}, so calling
-     * {@link CancelToken#cancel()} from any thread propagates a gRPC CANCELLED status to the
-     * Worker. The Worker's {@code ServerCallStreamObserver.isCancelled()} (tempdoc 418 B-H.3)
-     * flips and the scan loop terminates within the next batch. Closes the validation finding
-     * (2026-04-26) where HTTP-client abort had no effect on the in-flight gRPC scan.
-     *
-     * <p>Passing {@code null} for {@code cancelToken} is equivalent to the legacy 5-arg
-     * overload — no cancel is wired.
-     */
-    public io.justsearch.ipc.ScanRootProgress scanRoot(
-            String rootPath,
-            String collection,
-            io.justsearch.ipc.ScanMode mode,
-            List<String> excludeGlobs,
-            CancelToken cancelToken,
-            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer) {
-        Objects.requireNonNull(rootPath, "rootPath");
-        Objects.requireNonNull(progressConsumer, "progressConsumer");
+    protected <T> T executeSearchRpc(
+            String operation,
+            RpcDeadlineCategory category,
+            Function<SearchServiceCalls, T> rpc) {
         if (!testChannelPinned) {
             ensureConnected();
             reconnect();
         }
-        io.justsearch.ipc.ScanRootRequest.Builder builder =
-                io.justsearch.ipc.ScanRootRequest.newBuilder()
-                        .setRootPath(rootPath)
-                        .setMode(mode == null ? io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL : mode);
-        if (collection != null && !collection.isBlank()) {
-            builder.setCollection(collection);
+        SearchServiceGrpc.SearchServiceBlockingStub stub =
+            searchStub.withDeadlineAfter(deadline(category), TimeUnit.MILLISECONDS);
+        return executeWithCircuitBreaker(operation, () -> rpc.apply(new SearchStubCalls(stub)));
+    }
+
+    @Override
+    protected <T> T executeIngestRpc(
+            String operation,
+            RpcDeadlineCategory category,
+            Function<IngestServiceCalls, T> rpc) {
+        ensureConnected();
+        reconnect();
+        IngestServiceGrpc.IngestServiceBlockingStub stub =
+            ingestStub.withDeadlineAfter(deadline(category), TimeUnit.MILLISECONDS);
+        return executeWithCircuitBreaker(operation, () -> rpc.apply(new IngestStubCalls(stub)));
+    }
+
+    @Override
+    protected <T> T executeHealthRpc(
+            String operation,
+            long callDeadlineMs,
+            Function<HealthServiceCalls, T> rpc) {
+        ensureConnected();
+        reconnect();
+        HealthServiceGrpc.HealthServiceBlockingStub stub =
+            healthStub.withDeadlineAfter(callDeadlineMs, TimeUnit.MILLISECONDS);
+        return executeWithCircuitBreaker(operation, () -> rpc.apply(stub::check));
+    }
+
+    @Override
+    protected ScanRootProgress executeScanRoot(
+            ScanRootRequest request,
+            CancelToken cancelToken,
+            Consumer<ScanRootProgress> progressConsumer) {
+        if (!testChannelPinned) {
+            ensureConnected();
+            reconnect();
         }
-        if (excludeGlobs != null) {
-            for (String glob : excludeGlobs) {
-                if (glob != null && !glob.isBlank()) {
-                    builder.addExcludeGlobs(glob);
-                }
-            }
-        }
-        io.justsearch.ipc.ScanRootRequest request = builder.build();
-        java.util.function.Supplier<io.justsearch.ipc.ScanRootProgress> body =
-                () ->
-                        executeWithCircuitBreaker(
-                                "scanRoot",
-                                () -> drainScanIterator(request, progressConsumer));
+        java.util.function.Supplier<ScanRootProgress> body =
+                () -> executeWithCircuitBreaker(
+                        "scanRoot", () -> drainScanIterator(request, progressConsumer));
         if (cancelToken == null) {
             return body.get();
         }
@@ -1660,15 +340,17 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
         }
     }
 
-    private io.justsearch.ipc.ScanRootProgress drainScanIterator(
-            io.justsearch.ipc.ScanRootRequest request,
-            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer) {
-        java.util.Iterator<io.justsearch.ipc.ScanRootProgress> events =
-                ingestStubWithDeadline(RpcDeadlineCategory.LONG_RUNNING).scanRoot(request);
-        io.justsearch.ipc.ScanRootProgress last = null;
+    private ScanRootProgress drainScanIterator(
+            ScanRootRequest request, Consumer<ScanRootProgress> progressConsumer) {
+        java.util.Iterator<ScanRootProgress> events =
+                ingestStub
+                    .withDeadlineAfter(deadline(RpcDeadlineCategory.LONG_RUNNING),
+                                       TimeUnit.MILLISECONDS)
+                    .scanRoot(request);
+        ScanRootProgress last = null;
         try {
             while (events.hasNext()) {
-                io.justsearch.ipc.ScanRootProgress event = events.next();
+                ScanRootProgress event = events.next();
                 last = event;
                 progressConsumer.accept(event);
                 if (event.getComplete()) {
@@ -1681,11 +363,7 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
             // iterator is mid-stream. Emit a synthetic terminal event so callers always see
             // a clean signal regardless of cancel timing.
             if (e.getStatus().getCode() == io.grpc.Status.Code.CANCELLED) {
-                io.justsearch.ipc.ScanRootProgress cancelled =
-                        io.justsearch.ipc.ScanRootProgress.newBuilder()
-                                .setComplete(true)
-                                .setTerminalReasonCode("CLIENT_CANCELLED")
-                                .build();
+                ScanRootProgress cancelled = scanCancelledEvent();
                 progressConsumer.accept(cancelled);
                 return cancelled;
             }
@@ -1694,94 +372,50 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
         if (last == null) {
             // Server closed the stream without emitting anything — synthesize a terminal
             // event so callers always see a clean signal.
-            last =
-                    io.justsearch.ipc.ScanRootProgress.newBuilder()
-                            .setComplete(true)
-                            .setTerminalReasonCode("EMPTY_STREAM")
-                            .build();
+            last = scanEmptyStreamEvent();
             progressConsumer.accept(last);
         }
         return last;
     }
 
-    /**
-     * Tempdoc 418 Phase B — registers the Worker watcher subscription for a root. Phase A's
-     * registry is bookkeeping-only; Phase B's watcher migration upgrades it to real change-event
-     * delivery via the Methvin watcher.
-     */
-    public io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection) {
-        Objects.requireNonNull(rootPath, "rootPath");
-        io.justsearch.ipc.WatchRootRequest.Builder builder =
-                io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(rootPath);
-        if (collection != null && !collection.isBlank()) {
-            builder.setCollection(collection);
+    @Override
+    public IndexingJobsStream subscribeIndexingJobs(
+            Consumer<IndexingJobsFrame> onFrame,
+            Consumer<Throwable> onError,
+            Runnable onCompleted) {
+        IngestServiceGrpc.IngestServiceStub asyncStub = ingestAsyncStub;
+        if (asyncStub == null) {
+            throw new KnowledgeServerNotConnectedException();
         }
-        io.justsearch.ipc.WatchRootRequest request = builder.build();
-        return executeIngestRpc(
-                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request));
-    }
+        StreamObserver<IndexingJobsFrame> observer =
+            new StreamObserver<>() {
+                @Override
+                public void onNext(IndexingJobsFrame frame) {
+                    onFrame.accept(frame);
+                }
 
-    /** Tempdoc 418 Phase B — removes a Worker watcher subscription. Idempotent. */
-    public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(String rootPath) {
-        Objects.requireNonNull(rootPath, "rootPath");
-        io.justsearch.ipc.UnwatchRootRequest request =
-                io.justsearch.ipc.UnwatchRootRequest.newBuilder().setRootPath(rootPath).build();
-        return executeIngestRpc(
-                "unwatchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.unwatchRoot(request));
-    }
+                @Override
+                public void onError(Throwable t) {
+                    onError.accept(t);
+                }
 
-    public SyncDirectoryResponse syncDirectory(String rootPath, boolean force) {
-        return syncOps.syncDirectory(rootPath, force);
-    }
-
-    public void startPeriodicSync() {
-        syncOps.startPeriodicSync();
-    }
-
-    void stopPeriodicSync() {
-        syncOps.stopPeriodicSync();
+                @Override
+                public void onCompleted() {
+                    onCompleted.run();
+                }
+            };
+        io.grpc.Context.CancellableContext ctx =
+            io.grpc.Context.current().withCancellation();
+        ctx.run(
+            () ->
+                asyncStub.subscribeIndexingJobs(
+                    SubscribeIndexingJobsRequest.newBuilder().build(), observer));
+        return () -> ctx.cancel(null);
     }
 
     @Override
-    public void reindex() {
-        reindexWatchedRoots();
-    }
-
-    // ========== Pending Status Counts (Phase 2) ==========
-
-    public int countPendingEmbeddings() {
-        return vduOps.countPendingEmbeddings();
-    }
-
-    public int countPendingVdu() {
-        return vduOps.countPendingVdu();
-    }
-
-    // ========== VDU Result Update (Phase 3) ==========
-
-    public boolean updateVduResult(
-            String docId,
-            String extractedContent,
-            io.justsearch.ipc.VduUpdateOutcome outcome,
-            String enrichment,
-            int pageCount) {
-        return vduOps.updateVduResult(docId, extractedContent, outcome, enrichment, pageCount);
-    }
-
-    public List<String> queryPendingVduDocIds() {
-        return vduOps.queryPendingVduDocIds();
-    }
-
-    public List<String> queryPendingVduDocIds(int limit) {
-        return vduOps.queryPendingVduDocIds(limit);
-    }
-
-    public int markVduProcessing(String docId, int maxRetries) {
-        return vduOps.markVduProcessing(docId, maxRetries);
-    }
-
-    public int recoverVduProcessing() {
-        return vduOps.recoverVduProcessing();
+    protected void closeTransport() {
+        closeChannel();
     }
 
     private void ensureConnected() {
@@ -1808,17 +442,4 @@ public final class RemoteKnowledgeClient implements Closeable, SearchPort, Index
         ingestAsyncStub = null;
         healthStub = null;
     }
-
-    @Override
-    public void close() {
-        if (closed.compareAndSet(false, true)) {
-            // Stop periodic sync first
-            stopPeriodicSync();
-
-            walkExecutor.shutdownNow();
-            closeChannel();
-            log.info("RemoteKnowledgeClient closed");
-        }
-    }
-
 }

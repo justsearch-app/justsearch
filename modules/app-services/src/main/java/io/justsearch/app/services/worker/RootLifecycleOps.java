@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * Watched-root lifecycle operations: add, remove, reindex, exclude matcher, and watcher
  * coordination.
  *
- * <p>Manages the IndexingService contract methods. Extracted from {@link RemoteKnowledgeClient}.
+ * <p>Manages the IndexingService contract methods. Extracted from {@link KnowledgeClient}.
  */
 final class RootLifecycleOps {
     private static final Logger log = LoggerFactory.getLogger(RootLifecycleOps.class);
@@ -82,7 +82,7 @@ final class RootLifecycleOps {
 
     /**
      * Tempdoc 418 Phase B — registers/unregisters Worker-side watch subscriptions.
-     * Implementations forward to {@code RemoteKnowledgeClient.watchRoot/unwatchRoot}. The
+     * Implementations forward to {@code KnowledgeClient.watchRoot/unwatchRoot}. The
      * Worker-side watcher runs alongside the Head-side watcher during the Phase B soak window;
      * the SQLite jobs table uses {@code INSERT OR REPLACE} so duplicate enqueues from both
      * watchers coalesce automatically (no Head-side dedup required).
@@ -96,7 +96,7 @@ final class RootLifecycleOps {
     /**
      * Tempdoc 418 Phase B — dispatch a Worker-side ScanRoot RPC. Implementations forward each
      * {@link ScanRootProgress} to {@code progressConsumer} and return the terminal event.
-     * Production wiring uses {@code RemoteKnowledgeClient.scanRoot}.
+     * Production wiring uses {@code KnowledgeClient.scanRoot}.
      *
      * <p>Tempdoc 821 §3-C2 — {@code collection} is the label the scan's admitted documents carry,
      * mirroring the watcher arm's {@link WorkerWatchFn#watch(String, String)}. A {@code null} or

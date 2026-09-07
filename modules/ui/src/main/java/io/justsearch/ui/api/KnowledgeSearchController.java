@@ -878,7 +878,7 @@ public class KnowledgeSearchController {
 
   /**
    * Tempdoc 811 (C-2a) — the watched-root containment authority for ingest tagging. Reads the same
-   * registry {@code GET /api/indexing/roots} serves ({@code RemoteKnowledgeClient} implements {@code
+   * registry {@code GET /api/indexing/roots} serves ({@code KnowledgeClient} implements {@code
    * IndexingService}, delegating to {@code RootLifecycleOps}'s watched-root state), so an in-root
    * ad-hoc ingest inherits exactly the collection the root's own scan writes. Best-effort: when the
    * Worker is not connected, an empty binding list makes every path resolve out-of-root, which is

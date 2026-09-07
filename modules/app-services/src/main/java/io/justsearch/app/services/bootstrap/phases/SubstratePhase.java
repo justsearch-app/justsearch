@@ -19,7 +19,7 @@ import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
 import io.justsearch.app.services.mcphost.McpHostService;
 import io.justsearch.app.services.mcphost.McpServerConfig;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,7 +78,7 @@ public final class SubstratePhase {
   public static io.justsearch.app.services.bootstrap.PhaseOutcome<Output> runWithOutcome(
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
       Supplier<io.justsearch.app.api.SettingsService> settingsServiceSupplier,
@@ -127,7 +127,7 @@ public final class SubstratePhase {
   private static Output runInternal(
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
       Supplier<io.justsearch.app.api.SettingsService> settingsServiceSupplier,

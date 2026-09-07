@@ -18,7 +18,7 @@ import java.util.Map;
  * (typically {@code "CUDA"} or {@code "CPU"}; {@code ""} when policy is missing).
  *
  * <p>{@code policy} is the raw per-encoder sub-map from
- * {@code RemoteKnowledgeClient.getSessionPolicies()} (untyped per §14.28 U4); callers can
+ * {@code KnowledgeClient.getSessionPolicies()} (untyped per §14.28 U4); callers can
  * traverse it to inspect arena cap, device id, etc. without re-shaping.
  */
 public record EncoderRuntimeView(

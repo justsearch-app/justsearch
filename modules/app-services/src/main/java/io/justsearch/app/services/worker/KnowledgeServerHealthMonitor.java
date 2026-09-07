@@ -651,9 +651,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   /**
    * Tempdoc 630: on a detected resume, eagerly close the two stale-after-suspend windows using the
-   * existing actuators — reconnect the gRPC channel ({@link RemoteKnowledgeClient#reconnect()}) and
+   * existing actuators — reconnect the gRPC channel ({@link KnowledgeClient#reconnect()}) and
    * re-register watchers + kick a (freshness-skipping) reconcile walk ({@link
-   * RemoteKnowledgeClient#reindexPersistedRoots()}, which catches filesystem events missed while the
+   * KnowledgeClient#reindexPersistedRoots()}, which catches filesystem events missed while the
    * watcher was frozen). Each step is best-effort and independently guarded so a transient failure
    * never aborts the tick or the other step; the reactive paths (first-RPC reconnect, periodic sync)
    * remain the backstop.
@@ -666,7 +666,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // Tempdoc 630: stamp the resume so /api/status can surface a brief "Catching up after sleep"
     // transient while the reconcile below runs (auto-clears after the notice window).
     bootstrap.markResumed(nowMs.getAsLong());
-    RemoteKnowledgeClient client;
+    KnowledgeClient client;
     try {
       client = bootstrap.client();
     } catch (RuntimeException e) {

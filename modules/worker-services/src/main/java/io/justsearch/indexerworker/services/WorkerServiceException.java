@@ -58,6 +58,23 @@ public final class WorkerServiceException extends RuntimeException {
      * asked for the indexing-jobs change feed. */
     UNIMPLEMENTED,
 
+    /**
+     * The caller's deadline elapsed before the call finished. <b>No producer at A3, one at A6:</b>
+     * the transport used to enforce the deadline (the Head's {@code RpcDeadlineCategory} set it and
+     * gRPC cancelled the call), so nothing worker-side ever raised it. With the wire gone,
+     * {@code EngineKnowledgeClient} is the producer — it schedules the cancel that flips the call's
+     * {@link CallContext.CancelSignal} and reports the elapsed budget here. Design §6: a bound that
+     * vanished with the channel would be a lost operation contract, not a simplification.
+     */
+    DEADLINE_EXCEEDED,
+
+    /**
+     * The caller abandoned the call. Same provenance as {@link #DEADLINE_EXCEEDED}: raised by the
+     * in-process client when a {@code CancelToken} fires, where gRPC used to raise {@code CANCELLED}
+     * on the wire.
+     */
+    CANCELLED,
+
     /** An unexpected failure. 18 sites, the catch-all for a {@code RuntimeException} escape. */
     INTERNAL
   }
@@ -105,5 +122,13 @@ public final class WorkerServiceException extends RuntimeException {
 
   public static WorkerServiceException internal(String message) {
     return new WorkerServiceException(Status.INTERNAL, message);
+  }
+
+  public static WorkerServiceException deadlineExceeded(String message) {
+    return new WorkerServiceException(Status.DEADLINE_EXCEEDED, message);
+  }
+
+  public static WorkerServiceException cancelled(String message) {
+    return new WorkerServiceException(Status.CANCELLED, message);
   }
 }

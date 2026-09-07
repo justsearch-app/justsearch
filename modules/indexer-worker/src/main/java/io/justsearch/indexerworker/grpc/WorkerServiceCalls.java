@@ -50,6 +50,11 @@ public final class WorkerServiceCalls {
       case RESOURCE_EXHAUSTED -> Status.RESOURCE_EXHAUSTED;
       case UNAVAILABLE -> Status.UNAVAILABLE;
       case UNIMPLEMENTED -> Status.UNIMPLEMENTED;
+      // Lane F item A6 gave these two a producer (the in-process deadline and CancelToken). They
+      // are unreachable over the wire, where gRPC raises the same codes itself, but the mapping is
+      // exhaustive on purpose: an unmapped member would fall to INTERNAL and re-label the failure.
+      case DEADLINE_EXCEEDED -> Status.DEADLINE_EXCEEDED;
+      case CANCELLED -> Status.CANCELLED;
       case INTERNAL -> Status.INTERNAL;
     };
   }

@@ -102,7 +102,7 @@ public final class BootRecoveryDecision {
    * Observed inputs. All of them are facts the monitor can read without doing anything: whether a
    * gRPC client is bound, what the capability currently holds, and this arm's own bookkeeping.
    *
-   * @param clientBound a {@code RemoteKnowledgeClient} is bound, i.e. the bootstrap is up and the
+   * @param clientBound a {@code KnowledgeClient} is bound, i.e. the bootstrap is up and the
    *     ordinary health arm owns it
    * @param supervisionActive a supervisor is alive right now and holding the restart budget
    *     ({@code KnowledgeServerBootstrap.supervisionActive()}) — a live question, re-asked every

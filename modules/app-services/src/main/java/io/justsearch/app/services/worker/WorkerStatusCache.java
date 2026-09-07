@@ -112,7 +112,7 @@ final class WorkerStatusCache {
           Map.of());
     }
 
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
     StatusResponse s = client.getStatus();
 
     // Include embedding compatibility status in extras
@@ -204,7 +204,7 @@ final class WorkerStatusCache {
     facetSnapshotTimestampMs = now;
 
     try {
-      RemoteKnowledgeClient client = knowledgeServer.client();
+      KnowledgeClient client = knowledgeServer.client();
       SearchRequest facetReq =
           SearchRequest.newBuilder()
               .setQuery("*:*")

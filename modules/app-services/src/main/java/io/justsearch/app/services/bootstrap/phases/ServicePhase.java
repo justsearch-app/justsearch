@@ -47,7 +47,7 @@ import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.app.services.vdu.OfflineCoordinator;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.Telemetry;
@@ -76,7 +76,7 @@ public final class ServicePhase {
   /** Bundled inputs (record keeps the parameter surface manageable). */
   public record Input(
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       IndexingService indexingService,
       Supplier<IndexingService> indexingServiceSupplier,
       DocumentService documentService,
@@ -90,7 +90,7 @@ public final class ServicePhase {
       // Tempdoc 672: live supplier for the VDU offline coordinator, mirroring
       // indexingServiceSupplier — the Worker client is null at bootstrap (async connect) and
       // must be re-read at use-time, not captured by value.
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       // Tempdoc 672 follow-up: live supplier for the Head's own activity/energy signals (used to
       // abort an in-progress VDU batch if the user becomes active mid-run) — same live-reference
       // rationale as knowledgeClientSupplier above.
@@ -282,7 +282,7 @@ public final class ServicePhase {
     // async Worker connect) — mirrors the same fix already shipped for the VDU offline coordinator.
     WorkerFeatureCache workerFeatureCache =
         () -> {
-          RemoteKnowledgeClient client = in.knowledgeClientSupplier().get();
+          KnowledgeClient client = in.knowledgeClientSupplier().get();
           return client != null ? client.getLastKnownOnnxModels() : List.of();
         };
     RuntimeActivationService runtimeActivationHelper =

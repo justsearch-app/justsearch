@@ -620,7 +620,7 @@ final class KnowledgeSearchEngine {
     // 363: Refresh facet snapshot for QU grounding (non-blocking, cached with TTL)
     statusCache.refreshFacetSnapshotIfStale();
 
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
 
     int requestedLimit = req.limit() == null ? 10 : Math.max(1, req.limit());
     // When reranking is enabled, fetch more candidates to improve reranking quality

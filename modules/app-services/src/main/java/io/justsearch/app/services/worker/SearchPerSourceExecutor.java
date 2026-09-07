@@ -37,7 +37,7 @@ final class SearchPerSourceExecutor {
    * robust to source tokens). Falls back to unfiltered retrieval if all per-source calls fail.
    */
   static SearchResponse execute(
-      RemoteKnowledgeClient client, SearchRequest baseReq, List<String> sources, int totalLimit) {
+      KnowledgeClient client, SearchRequest baseReq, List<String> sources, int totalLimit) {
 
     int perSourceLimit = Math.max(1, (int) Math.ceil((double) totalLimit / sources.size()));
 

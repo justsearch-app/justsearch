@@ -16,7 +16,7 @@ import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.util.ContextBudget;
 import java.nio.file.Path;
 import java.util.List;
@@ -68,7 +68,7 @@ public final class AgentToolFactory {
   public static Output build(
       Path dataDir,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       IndexingService indexingService,
       OnlineAiService onlineAiService,
       LambdaMartReranker lambdaMartReranker,
@@ -128,7 +128,7 @@ public final class AgentToolFactory {
   static Output assemble(
       Path dataDir,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       IndexingService indexingService,
       OnlineAiService onlineAiService,
       LambdaMartReranker lambdaMartReranker,

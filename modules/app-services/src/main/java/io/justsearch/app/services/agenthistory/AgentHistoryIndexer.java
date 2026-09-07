@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.agenthistory;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * {@code HeadAssembly}). The {@code done}/{@code error} record carries the run's final answer +
  * grounding sources, so no full-history replay is needed. The transcript is written atomically
  * (temp + {@code ATOMIC_MOVE}) and indexed via the explicit-collection ingest API
- * ({@link RemoteKnowledgeClient#submitBatch(List, boolean, String)} with {@code "agent-history"}) —
+ * ({@link KnowledgeClient#submitBatch(List, boolean, String)} with {@code "agent-history"}) —
  * which sidesteps the YAML-only watched-collection config (the transcript does not need a watched
  * root). The search-side scoping (default-exclude + an "Agent history" scope) is the D4b half.
  *
@@ -75,7 +75,7 @@ public final class AgentHistoryIndexer {
   private static final Logger LOG = LoggerFactory.getLogger(AgentHistoryIndexer.class);
 
   private final Path historyDir;
-  private final Supplier<RemoteKnowledgeClient> clientSupplier;
+  private final Supplier<KnowledgeClient> clientSupplier;
   private final ExecutorService executor;
 
   /**
@@ -86,13 +86,13 @@ public final class AgentHistoryIndexer {
       java.util.function.Consumer<java.util.function.BiConsumer<String, Map<String, Object>>>
           addEventListener,
       Path historyDir,
-      Supplier<RemoteKnowledgeClient> clientSupplier) {
+      Supplier<KnowledgeClient> clientSupplier) {
     var indexer = new AgentHistoryIndexer(historyDir, clientSupplier);
     addEventListener.accept(indexer::onEvent);
     return indexer;
   }
 
-  public AgentHistoryIndexer(Path historyDir, Supplier<RemoteKnowledgeClient> clientSupplier) {
+  public AgentHistoryIndexer(Path historyDir, Supplier<KnowledgeClient> clientSupplier) {
     this.historyDir = historyDir;
     this.clientSupplier = clientSupplier;
     this.executor =
@@ -328,7 +328,7 @@ public final class AgentHistoryIndexer {
    * harmless — the ingest is keyed by path and forced, so it re-indexes the same document.
    */
   private void submitAndClearPending(String sessionId, Path target) throws IOException {
-    RemoteKnowledgeClient client = clientSupplier.get();
+    KnowledgeClient client = clientSupplier.get();
     if (client == null) {
       return; // marker stays; a later pass with a client submits it
     }

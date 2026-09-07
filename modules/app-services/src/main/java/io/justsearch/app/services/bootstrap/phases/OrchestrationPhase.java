@@ -15,7 +15,7 @@ import io.justsearch.app.services.gpl.GplJobCoordinator;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.search.SearchServiceImpl;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.core.search.SearchPort;
 import io.justsearch.telemetry.Telemetry;
@@ -49,7 +49,7 @@ public final class OrchestrationPhase {
       Supplier<SearchPort> searchPortSupplier,
       InferenceLifecycleManager inferenceManager,
       OnlineAiService onlineAiService,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       KnowledgeHttpApiAdapter agentSearchAdapter,
       LambdaMartReranker lambdaMartReranker,
       IndexingService indexingService,

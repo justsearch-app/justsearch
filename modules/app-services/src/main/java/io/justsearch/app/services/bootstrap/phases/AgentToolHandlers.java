@@ -12,7 +12,7 @@ import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -147,7 +147,7 @@ public final class AgentToolHandlers {
   public static boolean registerLateBound(
       HandlerRegistry operationHandlers,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       WorkerCapability workerCapability,
       Path dataDir,
       IndexingService indexingService,

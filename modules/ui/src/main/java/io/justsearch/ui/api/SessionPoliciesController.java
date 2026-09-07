@@ -2,7 +2,7 @@
 package io.justsearch.ui.api;
 
 import io.javalin.http.Context;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -16,7 +16,7 @@ import java.util.TreeMap;
  * observed when constructing ORT sessions, not what Head's re-resolve would produce from its
  * own {@code ConfigStore} + detected hardware.
  *
- * <p>Proto-type handling lives in {@link RemoteKnowledgeClient#getSessionPolicies} per
+ * <p>Proto-type handling lives in {@link KnowledgeClient#getSessionPolicies} per
  * {@code UiApiGuardrailsTest} (ui.api must not depend on ipc proto types). This controller
  * is a thin HTTP adapter over the typed Map response.
  *
@@ -33,7 +33,7 @@ import java.util.TreeMap;
 @io.justsearch.contracts.AdvisoryContract(
     description =
         "Endpoint returns PolicySnapshot built at Worker boot (397 §14.28 U4). In"
-            + " runHeadlessEval mode the RemoteKnowledgeClient reference is null at Head-side"
+            + " runHeadlessEval mode the KnowledgeClient reference is null at Head-side"
             + " LocalApiServer construction and late-bound via setClient once Worker is ready"
             + " (400 Phase 2.1). Pre-400 Phase 2.1 the late-bind was wired for 4 other"
             + " controllers but missed here, producing a permanent worker-unreachable response"
@@ -43,14 +43,14 @@ import java.util.TreeMap;
 public final class SessionPoliciesController {
 
   /**
-   * Volatile so {@link #setClient(RemoteKnowledgeClient)} late-bind from the
+   * Volatile so {@link #setClient(KnowledgeClient)} late-bind from the
    * {@link io.justsearch.ui.api.LocalApiServer#lateBindKnowledgeServer} path is visible to any
    * subsequent {@link #handle} invocation on the Javalin thread pool. Single-writer (LocalApiServer
    * boot orchestration), multi-reader (request threads).
    */
-  private volatile RemoteKnowledgeClient client;
+  private volatile KnowledgeClient client;
 
-  public SessionPoliciesController(RemoteKnowledgeClient client) {
+  public SessionPoliciesController(KnowledgeClient client) {
     this.client = client;
   }
 
@@ -62,7 +62,7 @@ public final class SessionPoliciesController {
    * is reachable. Pre-400 Phase 2.1 the late-bind was missing, so {@link #buildResponse} returned
    * {@code worker-unreachable} forever in eval mode despite the Worker being READY.
    */
-  public void setClient(RemoteKnowledgeClient client) {
+  public void setClient(KnowledgeClient client) {
     this.client = client;
   }
 
@@ -74,7 +74,7 @@ public final class SessionPoliciesController {
 
   /** Package-private for tests. Returns the typed response body (Jackson serialises). */
   Map<String, Object> buildResponse() {
-    RemoteKnowledgeClient current = this.client;
+    KnowledgeClient current = this.client;
     if (current == null) {
       Map<String, Object> response = new LinkedHashMap<>();
       response.put("configStatus", "worker-unreachable");

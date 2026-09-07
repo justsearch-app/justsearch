@@ -35,6 +35,9 @@ dependencies {
   implementation(project(":modules:app-api"))
   implementation(project(":modules:app-inference"))
   implementation(project(":modules:app-services"))
+  // Lane F stage A item A6: HeadlessApp composes the Engine through EngineRoot, the only module
+  // allowed to bind both halves. `implementation`, so worker internals stay off this classpath.
+  implementation(project(":modules:app-engine"))
   implementation(project(":modules:app-agent-api"))
   // Validation finding (2026-04-26): HeadlessApp's LocalTelemetry must register
   // catalog DEFINITIONS for every emit path HeadAssembly touches. Adding

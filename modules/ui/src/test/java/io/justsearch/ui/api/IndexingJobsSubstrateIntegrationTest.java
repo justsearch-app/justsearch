@@ -95,7 +95,38 @@ final class IndexingJobsSubstrateIntegrationTest {
             .start();
     grpcChannel = InProcessChannelBuilder.forName(name).directExecutor().build();
     var asyncStub = IngestServiceGrpc.newStub(grpcChannel);
-    bridge = new RemoteIndexingJobsBridge(() -> asyncStub);
+    // Lane F item A6: the bridge takes an IndexingJobsSource; this lambda is the wire one, so the
+    // substrate is still exercised over a real in-process gRPC server end to end.
+    bridge =
+        new RemoteIndexingJobsBridge(
+            () ->
+                (onFrame, onError, onCompleted) -> {
+                  java.util.concurrent.atomic.AtomicBoolean stopped =
+                      new java.util.concurrent.atomic.AtomicBoolean(false);
+                  asyncStub.subscribeIndexingJobs(
+                      SubscribeIndexingJobsRequest.newBuilder().build(),
+                      new StreamObserver<>() {
+                        @Override
+                        public void onNext(IndexingJobsFrame frame) {
+                          if (!stopped.get()) {
+                            onFrame.accept(frame);
+                          }
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {
+                          if (!stopped.get()) {
+                            onError.accept(t);
+                          }
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                          onCompleted.run();
+                        }
+                      });
+                  return () -> stopped.set(true);
+                });
     changeRegistry = new IndexingJobsChangeRegistry();
 
     // Wire bridge → registry forwarding (mirrors HeadAssembly line-for-line).

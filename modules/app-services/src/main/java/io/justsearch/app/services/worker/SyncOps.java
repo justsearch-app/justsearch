@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
  * Sync and periodic maintenance operations for watched roots.
  *
  * <p>Handles prune, sync directory, and periodic sync scheduling. Extracted from
- * {@link RemoteKnowledgeClient}.
+ * {@link KnowledgeClient}.
  */
 final class SyncOps {
     private static final Logger log = LoggerFactory.getLogger(SyncOps.class);
@@ -87,7 +87,7 @@ final class SyncOps {
         PruneRequest request = PruneRequest.newBuilder().setPathPrefix(pathPrefix).build();
         return rpc.execute(
                 "pruneMissing",
-                RemoteKnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
+                KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
                 stub -> stub.pruneMissing(request));
     }
 
@@ -96,7 +96,7 @@ final class SyncOps {
                 SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
         return rpc.execute(
                 "syncDirectory",
-                RemoteKnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
+                KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
                 stub -> stub.syncDirectory(request));
     }
 
