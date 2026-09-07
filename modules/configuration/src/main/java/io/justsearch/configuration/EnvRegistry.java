@@ -949,7 +949,19 @@ public enum EnvRegistry {
 
     // ==================== Dev Hot-Reload (tempdoc 305 Phase 2) ====================
 
-    /** Enables dev hot-reload service restart on recompile (default false). */
+    /**
+     * Enables dev hot-reload service restart on recompile (default false).
+     *
+     * <p><b>Kept, where its two siblings below were deleted.</b> The review pass asked whether this
+     * row survived stage A for a reason or by omission — it is the former, and the difference is
+     * where the key is read. This one is resolved into {@code ResolvedConfig} by
+     * {@code ResolvedConfigBuilder:1036} and gated in the Engine's own JVM at
+     * {@code KnowledgeServer.java:990}, which constructs {@code DevReloadManager} (referenced by
+     * name, not {@code @link}: it is package-private in {@code indexer-worker}, a module this one
+     * does not and must not depend on). That reader is
+     * in-process and was never part of the Worker child, so deleting the Worker child did not touch
+     * it. {@code DEV_HOTRELOAD_CLASSES_DIR} and {@code DEV_DEBUG_PORT} had no such reader.
+     */
     DEV_HOTRELOAD("justsearch.dev.hotreload", "JUSTSEARCH_DEV_HOTRELOAD", LifecycleStage.PERMANENT),
 
     // Lane F stage A item A11 deleted DEV_HOTRELOAD_CLASSES_DIR and DEV_DEBUG_PORT from here.

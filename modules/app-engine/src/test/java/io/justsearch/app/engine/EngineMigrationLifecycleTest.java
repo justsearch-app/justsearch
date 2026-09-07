@@ -210,6 +210,9 @@ final class EngineMigrationLifecycleTest {
     writeWatchedRoots(dataDir, watchedRoot);
 
     engine = EngineTestHarness.start(dataDir);
+    // Captured before the migration starts, so the release assertion at the end of this test has a
+    // pointer to compare against.
+    String activeBeforePause = engine.status().getMigration().getActiveGenerationId();
     assertTrue(engine.client().startMigration("pause_resume_test"), "startMigration accepted");
     assertTrue(engine.client().pauseMigration("system_test"), "pauseMigration must be accepted");
 
@@ -264,6 +267,19 @@ final class EngineMigrationLifecycleTest {
         "resume must let the enumerator finish the corpus it was held off; files_seen was stuck at "
             + seenAtPause);
     assertFalse(engine.status().getMigration().getPaused(), "the pause flag must be cleared");
+
+    // The second half of "resume releases BOTH". Up to here the test has only shown the enumerator
+    // was released; the pause window above asserted two things were held (the walk and the switch)
+    // and it would be asymmetric — and exactly the kind of half-assertion this review pass is for —
+    // to check only one of them on the way out. A resume that clears the flag and restarts the walk
+    // but leaves the cutover monitor parked would satisfy every assertion above and still leave the
+    // migration unable to ever finish.
+    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted after resume");
+    assertTrue(
+        awaitActiveGenerationChanged(engine.indexBase(), activeBeforePause, 180_000),
+        "resume must release the cutover monitor too: the promotion has to actually happen, not"
+            + " merely be accepted. Active generation was still "
+            + activeBeforePause);
   }
 
   // =========================================================================

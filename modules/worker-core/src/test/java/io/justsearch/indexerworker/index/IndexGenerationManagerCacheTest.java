@@ -89,4 +89,62 @@ final class IndexGenerationManagerCacheTest {
         Boolean.TRUE.equals(reader.readStateBestEffort().migration_paused()),
         "and the resume too — this is the direction that silently wedged the migration enumerator");
   }
+
+  /**
+   * The stamp must be content, not (mtime, size) — review pass, lane F stage A major 11.
+   *
+   * <p>The cross-instance test above passes under EITHER stamp, because its two writes happen to
+   * differ in length ({@code "migration_paused":true} vs {@code false}) and far enough apart in time
+   * to land on different timestamps. That made it look like the stamp was verified when only the
+   * easy case was. This is the hard case, and it is not contrived: {@code MIGRATING} and
+   * {@code SWITCHING} are both nine characters, so the cutover's own state transition rewrites
+   * state.json to exactly the same byte length. Pair that with a filesystem timestamp that has not
+   * ticked — routine on Windows, where NTFS updates the last-write time lazily — and (mtime, size)
+   * reports "unchanged" for a file whose content changed.
+   *
+   * <p>The consequence is not a delayed refresh. It is the cache serving a pre-cutover state to a
+   * component that has to see the cutover, which is the same class of wedge the cross-instance
+   * defect caused. So the mtime is pinned back explicitly here rather than hoped for: the test
+   * asserts the property under the adverse precondition instead of waiting for a machine fast
+   * enough to produce it by chance.
+   */
+  @Test
+  void aSameLengthWriteWithinOneTimestampTickIsStillSeen(@TempDir Path tempDir) throws Exception {
+    Path indexBase = tempDir.resolve("index");
+    IndexGenerationManager writer = new IndexGenerationManager(indexBase);
+    var layout = writer.initializeOrLoad();
+    assertNotNull(layout, "layout created");
+    Path statePath = layout.statePath();
+
+    // Get the file into MIGRATING first. Written directly because the point is the byte-level
+    // collision, and going through the migration API would drag in generation directories the
+    // cache has nothing to do with.
+    String migrating =
+        java.nio.file.Files.readString(statePath, java.nio.charset.StandardCharsets.UTF_8)
+            .replace("\"IDLE\"", "\"MIGRATING\"");
+    java.nio.file.Files.writeString(statePath, migrating, java.nio.charset.StandardCharsets.UTF_8);
+
+    IndexGenerationManager reader = new IndexGenerationManager(indexBase);
+    assertEquals(
+        "MIGRATING",
+        reader.readStateBestEffort().migration_state(),
+        "precondition: the reader has parsed and cached the MIGRATING revision");
+
+    java.nio.file.attribute.FileTime frozen = java.nio.file.Files.getLastModifiedTime(statePath);
+    String switching = migrating.replace("\"MIGRATING\"", "\"SWITCHING\"");
+    assertEquals(
+        migrating.length(),
+        switching.length(),
+        "precondition: this test only means something if the two revisions are the same length");
+    java.nio.file.Files.writeString(statePath, switching, java.nio.charset.StandardCharsets.UTF_8);
+    // The tick that did not happen.
+    java.nio.file.Files.setLastModifiedTime(statePath, frozen);
+
+    assertEquals(
+        "SWITCHING",
+        reader.readStateBestEffort().migration_state(),
+        "a same-length rewrite under an unchanged mtime must still invalidate the cache. Under an"
+            + " (mtime, size) stamp this returns MIGRATING — the cutover is invisible to every"
+            + " reader holding a cache, which is the stale read the stamp was added to prevent.");
+  }
 }

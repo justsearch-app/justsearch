@@ -124,8 +124,8 @@ public final class IndexGenerationManager {
   // writeState() invalidates by nulling it. (tempdoc 589 — replaces a non-volatile lastReadVersion +
   // a non-atomic stateVersion++ counter, which together formed a data race.)
   //
-  // Lane F stage A item A12: the cache also carries the (mtime, size) of the state.json it was
-  // parsed from, and a hit is only a hit while that stamp still matches. Invalidating on THIS
+  // Lane F stage A item A12: the cache also carries a stamp identifying the state.json revision it
+  // was parsed from, and a hit is only a hit while that stamp still matches. Invalidating on THIS
   // instance's own writes is not enough, because one state.json has several managers over it in one
   // JVM — KnowledgeServer builds one (KnowledgeServer.java:611) for the migration enumerator and the
   // cutover monitor, WorkerIngestService builds its own from the same indexBasePath
@@ -133,22 +133,29 @@ public final class IndexGenerationManager {
   // builds two more temporaries (KnowledgeServerMigrationOps.java:542, :718). A write through one
   // left every other instance serving its own stale parse forever. The concrete defect that found
   // this: `resumeMigration` wrote through the service's manager, the enumerator kept reading
-  // `migration_paused=true` out of the server's manager, and the migration never resumed. The stamp
-  // costs one file-attribute read where the miss cost a full JSON parse, so the cache still does the
-  // job tempdoc 589 gave it.
+  // `migration_paused=true` out of the server's manager, and the migration never resumed.
+  //
+  // The stamp is a CONTENT HASH, not (mtime, size). The review pass caught that pair colliding on
+  // precisely the writes this cache has to notice: state.json's fields are mostly fixed-width, so
+  // an active/previous generation-id swap, a migration_state transition between two equal-length
+  // names, or a `migration_paused` true->... flip through a rewrite lands at the SAME byte length,
+  // and two writes inside one filesystem timestamp tick then produce the same (mtime, size) for
+  // different content. Windows makes that likely rather than theoretical — NTFS updates the
+  // last-write time lazily, so back-to-back writes routinely share a stamp. A collision here is not
+  // a missed refresh; it is the stale read the stamp exists to prevent, restored silently. Hashing
+  // the bytes has no such window. It costs a read of a file measured in hundreds of bytes plus one
+  // SHA-256 where the miss costs a full Jackson parse, so the cache still does the job tempdoc 589
+  // gave it.
   private volatile CachedState cache = null;
 
   /**
    * Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read").
    *
    * @param value the parsed, normalized state
-   * @param mtimeMillis the state.json modification time it was parsed from, or -1 if unreadable
-   * @param size the state.json size it was parsed from, or -1 if unreadable
+   * @param contentHash hex SHA-256 of the state.json bytes it was parsed from, or {@code null} if
+   *     the file was unreadable at that moment
    */
-  private record CachedState(State value, long mtimeMillis, long size) {}
-
-  /** The (mtime, size) pair identifying a state.json revision; {@code null} when unreadable. */
-  private record FileStamp(long mtimeMillis, long size) {}
+  private record CachedState(State value, String contentHash) {}
 
   public IndexGenerationManager(Path indexBasePath) {
     this.basePath = normalize(Objects.requireNonNull(indexBasePath, "indexBasePath"));
@@ -678,7 +685,7 @@ public final class IndexGenerationManager {
    * never observes a torn version/state pair (tempdoc 589).
    */
   public State readStateBestEffort() {
-    FileStamp stamp = stampBestEffort();
+    String stamp = contentStampBestEffort();
     CachedState cached = cache; // single volatile read — the whole entry is atomic
     // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
     // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
@@ -687,9 +694,7 @@ public final class IndexGenerationManager {
     // fix for a transient NULL — which is worse, because every caller projects null as an empty
     // migration state. A permanently missing state.json serves the last parse, which is exactly
     // what the pre-stamp cache did.
-    if (cached != null
-        && (stamp == null
-            || (cached.mtimeMillis() == stamp.mtimeMillis() && cached.size() == stamp.size()))) {
+    if (cached != null && (stamp == null || stamp.equals(cached.contentHash()))) {
       return cached.value();
     }
     try {
@@ -716,23 +721,30 @@ public final class IndexGenerationManager {
       // The window is small either way. It is also exactly the window this whole change exists for
       // — concurrent writes through a DIFFERENT manager instance over the same file — so sizing the
       // fix to the common case rather than the racing one would have missed the point.
-      cache =
-          new CachedState(
-              normalized,
-              stamp == null ? -1L : stamp.mtimeMillis(),
-              stamp == null ? -1L : stamp.size());
+      cache = new CachedState(normalized, stamp);
       return normalized;
     } catch (Exception e) {
       return null;
     }
   }
 
-  /** Reads state.json's (mtime, size); {@code null} when the file is absent or unreadable. */
-  private FileStamp stampBestEffort() {
+  /**
+   * Hex SHA-256 of state.json's bytes; {@code null} when the file is absent or unreadable.
+   *
+   * <p>Deliberately reads the whole file rather than sampling its attributes — see the cache comment
+   * on {@link #cache} for why (mtime, size) cannot identify a state.json revision. The file is a
+   * handful of fixed-width fields; SHA-256 over it is not the expensive part of anything.
+   *
+   * <p>{@code null} is a distinct answer from "hash of nothing", and callers treat it as "cannot
+   * tell, keep serving the last parse" rather than "changed": {@code writeState} replaces state.json
+   * by rename, and the brief window where the old name is gone must not be reported as a new
+   * revision.
+   */
+  private String contentStampBestEffort() {
     try {
-      java.nio.file.attribute.BasicFileAttributes attrs =
-          Files.readAttributes(statePath, java.nio.file.attribute.BasicFileAttributes.class);
-      return new FileStamp(attrs.lastModifiedTime().toMillis(), attrs.size());
+      byte[] bytes = Files.readAllBytes(statePath);
+      return java.util.HexFormat.of()
+          .formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
     } catch (Exception absentOrUnreadable) {
       return null;
     }
