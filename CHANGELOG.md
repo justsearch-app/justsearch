@@ -13,17 +13,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
-### Added
-<!-- 852 promotion: these bullets assume the Search v3 cutover PR lands before the tag; the sv3 agent confirms or trims them -->
-- A rebuilt chat window, with one chronological timeline per answer that shows the model's reasoning interleaved with the tools it used (#533)
-- A floating composer that stays over the transcript instead of being pinned below it (#529)
-- Chat width presets — narrow, default and wide (#573)
-- Visible control over what the model is given: a context floor, a compact view, an editable summary and per-item exclusions (#503)
-- Branch and version pager on any turn, with edit, retry and cascade delete (#505)
-- A settings window you can open from anywhere, with the same layout wherever you open it (#527)
-- Keyboard navigation through the steps of a run (#516)
-- A health and activity panel inside the chat window (#514)
+## [0.3.0] - 2026-09-07
 
+### Added
 - Agent tools can read the documents they find, page by page, within a declared path scope, and say so honestly when a file is outside the index (#566)
 - Agent tools run behind a consent boundary: a risk ceiling per grant, argument-level scope, and undo that cannot reach outside the run (#581)
 - The model is only offered tools that actually exist and can run, from one authority (#584)
