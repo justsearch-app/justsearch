@@ -503,11 +503,42 @@ any permutation allowed, a member absent from the other side's group is a regres
 closed** when the cutoff group runs to the end of a full 2K response (or an older capture records no
 `hitsCaptured`): the group may continue past what was observed, so its membership is unproven.
 
-**Consequence: captures taken at the old limit are not comparable to new ones.** `limit` also feeds
-the backend's candidate budget / collapse limit / rerank pool, so the top-K set at limit 2K is *not*
-guaranteed identical to the top-K set at limit K. Both sides of a pair use the same limit, so the
-diff itself stays sound — but a pair mixing a pre-change capture with a post-change one compares two
-request shapes, not two builds. Re-capture both sides.
+**The capture requests `captureLimitMultiplier * K` (4K), and the multiplier is declared.** K is
+what gets compared; the extra breadth does two jobs. It makes the cutoff tie group observable
+whole, and it puts the **cross-encoder window** well past the compared K. The window is the request
+limit (`searchLimit = max(requestedLimit, rerankConfig.topK())`, `KnowledgeSearchEngine.java:625-629`;
+window = `min(topK, results.size())`, `:969-970`), so at 2K it ended *exactly* at the captured set
+and a chunk whose fusion rank jittered across rank 20 was reranked on one build and not the other —
+the three unmatched hits at ranks 7–8 of pair run 4. At 4K a hit near compared rank 10 has to move
+~30 fusion ranks to fall out of the window. `limit` also feeds the candidate budget / collapse
+limit / rerank pool, so the top-K set at one multiplier is not guaranteed identical to another's:
+both sides of a pair must use the same one. Re-capture both sides.
+
+**The rerank window and its arena move together, or the reranker dies.** `JUSTSEARCH_RERANK_TOP_K`
+sets *both* the wire limit and the cross-encoder batch, and that batch is one un-split tensor padded
+up to a bucket from `{4,8,16,24,32,48,64}` (`CrossEncoderReranker.BATCH_SIZE_BUCKETS`). Pair run 3
+pinned `top_k=100`, which is outside the ladder entirely, and exhausted the default 2048 MB arena on
+every query. The capture now pins `JUSTSEARCH_RERANK_TOP_K=40` (pads to bucket 48) with
+`JUSTSEARCH_RERANK_GPU_MEM_MB=4096`, sized to hold the per-row headroom the working configuration
+had rather than guessed:
+
+| docs | padded bucket | arena | MB per padded row | outcome |
+|---|---|---|---|---|
+| 20 | 24 | 2048 | 85.3 | worked |
+| 40 | 48 | **4096** | **85.3** | this capture |
+| 100 | 100 | 2048 | 20.5 | `INFERENCE_FAILED` |
+
+The active reranker is 12-layer / 12-head / 768-hidden (`models/onnx/reranker/config.json`,
+`NewForSequenceClassification` — not the MiniLM backup), so one layer's attention scores at bucket
+48 and sequence 512 are roughly 576 MB: inside 4096, not comfortably inside 2048. If the reranker
+drops again the ladder steps **down**, not up — `top_k=30` (bucket 32) at 3072 MB, else the known-good
+20 at 2048.
+
+**The cross-encoder score is deterministic across builds (measured).** Pair run 4, over 117
+identity-matched hits between two fresh ingests of one corpus on one build: the cross-encoder score
+delta was **0.0000 at max, p95 and p50**. The sort key itself does not jitter, so `scoreTieEpsilon`
+is not absorbing CE noise — there is none. It stays `0.01` as a margin against the *fusion*-side
+jitter that moves hits into and out of the rerank window, which is what the 4K breadth addresses.
 
 **The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four boot-time pins
 above, a capture sets `JUSTSEARCH_RERANK_TOP_K=100`,

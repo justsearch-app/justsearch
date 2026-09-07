@@ -137,7 +137,7 @@ def test_cutoff_group_rule_is_recorded_in_the_fixture_notes():
     notes = " ".join(wf.load_fixture(DEFAULT_FIXTURE)["notes"])
     assert "STRADDLING THE RANK-K CUTOFF" in notes
     assert "NO fourth class is introduced" in notes
-    assert "CAPTURES TAKEN AT THE OLD LIMIT ARE NOT COMPARABLE TO NEW ONES" in notes
+    assert "CAPTURES TAKEN AT A DIFFERENT captureLimitMultiplier ARE NOT COMPARABLE" in notes
 
 
 def test_hits_are_one_field_not_one_per_attribute():
@@ -771,12 +771,24 @@ def test_chat_turns_get_no_cutoff():
     assert wf.diff(base, cand, fixture)["pass"] is False
 
 
-def test_build_search_body_asks_for_twice_the_declared_limit():
-    """K is what gets compared; the extra K is what makes the cutoff group observable."""
-    assert wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})["limit"] == 20
-    assert wf._build_search_body({"query": "q", "limit": 3})["limit"] == 6
-    # …and the default limit doubles too, rather than silently staying at 10.
-    assert wf._build_search_body({"query": "q"})["limit"] == 20
+def test_build_search_body_asks_for_the_capture_multiple_of_the_declared_limit():
+    """K is compared; the extra breadth makes the cutoff group observable AND clears the
+    cross-encoder window past K.
+
+    The window is the request limit, so at 2K it ended exactly at the captured set and a hit
+    whose FUSION rank jittered across rank 2K was reranked on one build and not the other
+    (the three unmatched hits at ranks 7-8 of pair run 4). The default is 4K.
+    """
+    assert wf.DEFAULT_CAPTURE_LIMIT_MULTIPLIER == 4
+    assert wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})["limit"] == 40
+    assert wf._build_search_body({"query": "q", "limit": 3})["limit"] == 12
+    # …and the default limit scales too, rather than silently staying at 10.
+    assert wf._build_search_body({"query": "q"})["limit"] == 40
+    # The fixture's own declaration wins over the fallback.
+    assert wf._build_search_body({"query": "q", "limit": 10},
+                                 {"captureLimitMultiplier": 2})["limit"] == 20
+    # The shipped fixture declares it, so the request breadth is not an implicit constant.
+    assert wf.load_fixture(DEFAULT_FIXTURE)["captureLimitMultiplier"] == 4
 
 
 def test_compared_slice_keeps_the_whole_cutoff_group_and_drops_the_rest():
@@ -2150,9 +2162,9 @@ def test_capture_sends_the_session_token_on_every_request(tmp_path: Path):
 
 
 def test_build_search_body_carries_the_fixture_spec():
-    """The spec's query/mode ride verbatim; `limit` is doubled (see the cutoff-group tests)."""
+    """The spec's query/mode ride verbatim; `limit` is the capture multiple of K."""
     body = wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})
-    assert body == {"query": "q", "limit": 20, "mode": "hybrid",
+    assert body == {"query": "q", "limit": 40, "mode": "hybrid",
                     "includeExcerpts": True, "debug": True}
 
 
@@ -2345,7 +2357,8 @@ _HEALTHY_PIN_VALUES = {
     "justsearch.llm.slots": "1",
     "justsearch.rerank.deadline_ms": "5000",
     "justsearch.rerank.chunks.deadline_ms": "5000",
-    "justsearch.rerank.top_k": "100",
+    "justsearch.rerank.top_k": "40",
+    "justsearch.rerank.gpu_mem_mb": "4096",
     "index.hybrid.candidate_limit_max": "5000",
     "index.hybrid.chunk_collapse_limit_multiplier": "50",
     "index.hybrid.leg_arbitration_enabled": "false",

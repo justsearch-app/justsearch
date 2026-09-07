@@ -44,17 +44,24 @@ export JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS=60000
 #
 # These are ordinary tuning keys set to non-truncating values, not a capture-only code path:
 # the product behaviour under them is a behaviour the product supports.
-# NOT PINNED, and this is a correction: JUSTSEARCH_RERANK_TOP_K=100 was set here for pair run 3
-# to widen the wire limit (searchLimit = max(requestedLimit, rerankConfig.topK())). It BROKE the
-# cross-encoder. The CE window is the same number, so the batch went 20 -> 100 documents and the
-# stage came back `skipped` / INFERENCE_FAILED on every query — ONNX Runtime arena exhaustion, the
-# failure KnowledgeSearchEngine.java:1094-1098 names (remedy: JUSTSEARCH_RERANK_GPU_MEM_MB). Pair 3
-# therefore ran with NO reranker: results kept fusion order, `observed.scoreBasis` was `delivered`
-# for all 12 queries, and its "2 regressions" measured a degraded pipeline, not a quieter one.
-# Widening the budgets without enlarging the CE batch means raising the REQUEST limit (which the
-# capture owns) while leaving top_k alone, or raising JUSTSEARCH_RERANK_GPU_MEM_MB first — neither
-# is pinned blind here. capture_health now REFUSES a capture whose cross-encoder was dropped, so
-# this cannot recur silently.
+# --- Rerank window + its arena (PR 0b, fourth pair round) --------------------------------
+# These two move TOGETHER or the reranker dies. JUSTSEARCH_RERANK_TOP_K sets BOTH the wire limit
+# and the cross-encoder batch (KnowledgeSearchEngine.java:625-629, :969-970), and the batch is
+# padded up to a bucket from {4,8,16,24,32,48,64} (CrossEncoderReranker.BATCH_SIZE_BUCKETS) as ONE
+# un-split batch. Round 3 pinned top_k=100 -- outside the bucket ladder entirely -- and exhausted
+# the default 2048 MB arena on every query (cross-encoder skipped / INFERENCE_FAILED; results
+# silently kept fusion order and the diff got QUIETER).
+#
+# 40 pads to bucket 48. Arena sized to keep the per-row headroom the WORKING config had, not
+# guessed:  20 docs -> bucket 24 @ 2048 MB = 85.3 MB/row  (worked)
+#           40 docs -> bucket 48 @ 4096 MB = 85.3 MB/row  (this)
+#          100 docs -> bucket 100 @ 2048 MB = 20.5 MB/row (failed)
+# The active reranker is 12-layer / 12-head / 768-hidden (models/onnx/reranker/config.json), so one
+# layer's attention scores at bucket 48 / seq 512 are ~576 MB -- inside 4096, not comfortably
+# inside 2048. IF THE RERANKER DROPS AGAIN, step DOWN: top_k=30 (bucket 32) @ 3072, else 20 @ 2048.
+export JUSTSEARCH_RERANK_TOP_K=40
+export JUSTSEARCH_RERANK_GPU_MEM_MB=4096
+
 export JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000     # whole-doc legs stop truncating (default 100, corpus ~102 docs)
 export JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50 # parent collapse cap 40 -> 5000 (default 2)
 export JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false      # kill the Jaccard alpha step function
@@ -96,7 +103,7 @@ cycle() { # n
 
 log "tree=$(git rev-parse --short HEAD) profile=$profile"
 log "pins: exhaustive=$JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH slots=$JUSTSEARCH_LLM_SLOTS rerank_deadline_ms=$JUSTSEARCH_RERANK_DEADLINE_MS"
-log "pins: candidate_limit_max=$JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX collapse_mult=$JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER"
+log "pins: rerank_top_k=$JUSTSEARCH_RERANK_TOP_K rerank_gpu_mem_mb=$JUSTSEARCH_RERANK_GPU_MEM_MB candidate_limit_max=$JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX collapse_mult=$JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER"
 log "pins: leg_arbitration=$JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED recall_complete=$JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE"
 cycle 1 || exit 1
 cycle 2 || exit 1

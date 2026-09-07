@@ -291,10 +291,15 @@ PINNED_CONFIG_KEYS = (
     "justsearch.llm.slots",
     "justsearch.rerank.deadline_ms",
     "justsearch.rerank.chunks.deadline_ms",
-    # Candidate budgets and the two step functions (PR 0b, second pair round). NOTE
-    # `justsearch.rerank.top_k` is deliberately NOT here: pinning it to 100 widened the wire
-    # limit but also the CE batch (they are the same number), and the cross-encoder then failed
-    # with INFERENCE_FAILED on every query of pair run 3 — see `cross_encoder_problems`.
+    # The rerank window and the arena that has to hold it (PR 0b, fourth pair round). These two
+    # move TOGETHER or the reranker dies: the window IS the batch, the batch is padded up to a
+    # bucket from {4,8,16,24,32,48,64} (`CrossEncoderReranker.BATCH_SIZE_BUCKETS`), and 100 —
+    # tried in round 3 — is outside that ladder entirely and exhausted the 2048 MB arena on
+    # every query. 40 pads to 48 and 4096 MB restores the SAME arena-per-padded-row the working
+    # 20-doc/24-bucket configuration had (85.3 MB).
+    "justsearch.rerank.top_k",
+    "justsearch.rerank.gpu_mem_mb",
+    # Candidate budgets and the two step functions (PR 0b, second pair round).
     "index.hybrid.candidate_limit_max",
     "index.hybrid.chunk_collapse_limit_multiplier",
     "index.hybrid.leg_arbitration_enabled",
@@ -1079,8 +1084,33 @@ def _session_headers(session_token: str | None) -> dict[str, str]:
     return {"X-JustSearch-Session": token} if token and token.strip() else {}
 
 
-def _build_search_body(spec: dict) -> dict:
-    """The search request for one query spec — asking for ``2 * K``, not K.
+#: Default multiplier for how many hits the capture REQUESTS relative to the compared K.
+#: Declared in the fixture as `captureLimitMultiplier`; this is the fallback for a fixture
+#: written before the key existed.
+DEFAULT_CAPTURE_LIMIT_MULTIPLIER = 4
+
+
+def capture_limit(spec: dict, fixture: dict | None = None) -> int:
+    """How many hits to REQUEST for one query spec: ``K * captureLimitMultiplier``.
+
+    Separate from the compared K on purpose. The request breadth has two jobs the compared
+    breadth does not: it must be wide enough for the cutoff tie group to be observed whole, and
+    wide enough that the CROSS-ENCODER WINDOW clears the compared K by a margin. The window is
+    the request limit (``searchLimit = max(requestedLimit, rerankConfig.topK())``,
+    ``KnowledgeSearchEngine.java:625-629``; window = ``min(topK, results.size())``, ``:969-970``),
+    so at 2K the window ended exactly at the captured set and a chunk whose FUSION rank jittered
+    across rank 20 was reranked on one build and not the other — the three unmatched hits at
+    ranks 7-8 of pair run 4. At 4K the window is four times the compared K, so a hit near
+    compared rank 10 has to move ~30 fusion ranks to fall out of it.
+    """
+    k = spec.get("limit", 10)
+    multiplier = (fixture or {}).get(
+        "captureLimitMultiplier", DEFAULT_CAPTURE_LIMIT_MULTIPLIER)
+    return max(k, int(k) * int(multiplier))
+
+
+def _build_search_body(spec: dict, fixture: dict | None = None) -> dict:
+    """The search request for one query spec — asking for ``captureLimitMultiplier * K``, not K.
 
     K (the spec's declared ``limit``) is still what the capture COMPARES; the extra K is what
     makes the tie group straddling the rank-K cutoff observable whole (see
@@ -1090,7 +1120,7 @@ def _build_search_body(spec: dict) -> dict:
     limit so the diff stays sound — but a capture taken at the old limit is NOT comparable to
     one taken now.
     """
-    body: dict = {"query": spec["query"], "limit": spec.get("limit", 10) * 2}
+    body: dict = {"query": spec["query"], "limit": capture_limit(spec, fixture)}
     mode = spec.get("mode")
     if mode:
         body["mode"] = mode
@@ -1495,7 +1525,7 @@ def capture(
         # index their own agent history (measured: docCount 91 -> 102 across one capture's
         # three turns), so running them first would move the index under the queries.
         for spec in fixture["queries"]:
-            resp = client.post("/api/knowledge/search", json=_build_search_body(spec))
+            resp = client.post("/api/knowledge/search", json=_build_search_body(spec, fixture))
             payload = resp.json() if resp.status_code == 200 else {}
             record = capture_query_record(
                 payload, http_status=resp.status_code, paths=paths,
