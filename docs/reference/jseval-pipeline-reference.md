@@ -429,15 +429,27 @@ recording per query which number grouped. A query the CE did not score every hit
 lexical/TEXT fallback, or hits outside the rerank window) falls back to the delivered score for the
 **whole** query — a list mixing two bases would have epsilon comparing different scales.
 
-**`scoreTieEpsilon` is not yet calibrated for this basis (open item).** The `0.01` above was
-measured against the *delivered* score, a roughly 0–1 normalised value. The cross-encoder emits
-**raw logits** (`CrossEncoderReranker.java:369-379` returns them unsigmoided), a scale spanning
-roughly −11…+11, so `0.01` is proportionally far tighter here — it will group *less*, which is the
-conservative direction, but may leave the class close to inert. The measurement could not be taken
-from the 2026-09-07 captures because CE scores were not recorded then. Take it from the next pair:
-for each identity-matched hit present in both captures, the delta between
-`observed.crossEncoderScores`; set `scoreTieEpsilon` just above the max, exactly as `0.01` was
-derived.
+**`scoreTieEpsilon` stays `0.01`, and the scale is now measured.** The cross-encoder emits raw,
+unsigmoided model output (`CrossEncoderReranker.java:369-379` returns the logits directly; the only
+sigmoid in that module belongs to `CitationScorer`, a different class), so the epsilon — derived
+against the roughly 0–1 *delivered* score — had to be re-checked against the real scale. Measured
+on a real `debug:true`, `limit:20` response over `docs/explanation`: 20 cross-encoder scores
+spanning **−3.0566 … +0.2603** (span 3.32), **17 of them negative**. It is therefore neither a 0–1
+score nor the ±11 a generic ms-marco model would suggest; reading only the top three hits (0.26,
+0.14, 0.019) makes it look normalised, which is an artefact of the best hits sitting near zero. On
+that scale `0.01` leaves only 2 of the 19 adjacent gaps inside the epsilon (smallest 0.001404) —
+the same profile the original calibration had (below all but 3 of 108 gaps), so it is defensible
+and unchanged. Still unmeasured is the cross-encoder's *jitter* across two runs: that needs a pair
+with `observed.crossEncoderScores` on both sides, then the per-hit delta over identity-matched hits.
+
+**A dropped cross-encoder fails capture health.** When the stage is skipped for a drop reason
+(`INFERENCE_FAILED`, `DEADLINE_EXCEEDED`, `MODEL_NOT_LOADED`, `RPC_FAILED`, `UNKNOWN`) the results
+keep their fusion order, so the capture records a *different pipeline's* output. Both sides of a
+pair degrade together, so the diff gets **quieter**, not noisier — the dangerous direction. Pair run
+3 read as "2 regressions, nearly clean" while every query showed `cross-encoder: skipped /
+INFERENCE_FAILED`, caused by a `JUSTSEARCH_RERANK_TOP_K=100` pin that pushed the rerank batch from
+20 to 100 documents into an ONNX Runtime arena failure. That pin has been removed; the health check
+makes a green earned by disabling the reranker impossible to mistake for a clean pair.
 
 **`equal-score-order` covers the tie group straddling the rank-K cutoff, because equal-score hits
 beyond K are unobserved at K** (K = the query spec's `limit`, 10 in the shipped fixture). Measured

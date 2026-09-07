@@ -931,6 +931,156 @@ def test_the_cutoff_slice_uses_the_cross_encoder_basis_too():
     assert len(record["hits[]"]) == 3,         "the slice must extend to the whole CE tie group holding rank 2"
 
 
+#: The `trace` arrays of the FIRST THREE results of a real `debug:true`, `limit:20`
+#: `POST /api/knowledge/search` response over `docs/explanation`
+#: (captured 2026-09-07, `tmp/raw-search-debug.json`), copied verbatim.
+#:
+#: This is the wire shape the extraction has to work against, and it is worth pinning from a
+#: real body rather than a hand-built one: pair run 3 recorded `scoreBasis: delivered` on all
+#: 12 queries and the first hypothesis was a wrong JSON path. It was not — the path below is
+#: exactly what the code reads; the cross-encoder stage was ABSENT because the stage had been
+#: dropped (`INFERENCE_FAILED`). A synthetic fixture could not have told those two apart.
+#:
+#: Note the shape facts this pins: stages are `{id, rank, score, detail}`; `rank` and `detail`
+#: are ABSENT on the cross-encoder entry (`SearchTraceMapper.mapHitStages` appends it with
+#: nulls for both); and `results[i].score` equals the `branch-fusion` stage score, NOT the
+#: cross-encoder's — which is the whole reason the basis had to change.
+_REAL_TRACES = [
+    [
+        {"id": "sparse-retrieval", "rank": 19, "score": 3.7805243,
+         "detail": {"sparse_rank": 19.0, "sparse": 3.7805243}},
+        {"id": "dense-retrieval", "rank": 16, "score": 0.5049805,
+         "detail": {"vector": 0.5049805, "vector_rank": 16.0}},
+        {"id": "fusion", "score": 0.42335153, "detail": {"cc_alpha": 0.5, "cc": 0.42335153}},
+        {"id": "chunk-merge", "score": 0.49315822, "detail": {"chunk_cc": 0.49315822}},
+        {"id": "branch-fusion", "score": 0.46152, "detail": {"branch_merge_cc": 0.46152}},
+        {"id": "cross-encoder", "score": 0.2602539},
+    ],
+    [
+        {"id": "sparse-retrieval", "rank": 8, "score": 4.6122785, "detail": {}},
+        {"id": "dense-retrieval", "rank": 11, "score": 0.5312805, "detail": {}},
+        {"id": "fusion", "score": 0.36807224, "detail": {}},
+        {"id": "branch-fusion", "score": 0.5792252, "detail": {}},
+        {"id": "cross-encoder", "score": 0.14123535},
+    ],
+    [
+        {"id": "sparse-retrieval", "rank": 3, "score": 5.011, "detail": {}},
+        {"id": "dense-retrieval", "rank": 2, "score": 0.61, "detail": {}},
+        {"id": "fusion", "score": 0.56067425, "detail": {}},
+        {"id": "branch-fusion", "score": 0.6673769, "detail": {}},
+        {"id": "cross-encoder", "score": 0.019317627},
+    ],
+]
+
+#: `results[i].score` of the same three hits — the branch-fusion value, freshness-decayed.
+#: NOT monotone with the delivered order, which is the defect the CE basis fixes.
+_REAL_DELIVERED = [0.4615199863910675, 0.5792251825332642, 0.6673769354820251]
+
+
+def _real_response() -> dict:
+    """A trimmed real response: the three real traces above on minimal hit envelopes.
+
+    Only `trace` and `score` are real; the identity fields are simplified because the
+    extraction under test does not read them (path rewriting has its own tests).
+    """
+    return {
+        "totalHits": 3,
+        "matchCount": 3,
+        "results": [
+            {
+                "id": f"h{i}",
+                "score": _REAL_DELIVERED[i],
+                "fields": {"doc_id": f"h{i}", "path": f"docs/h{i}.md",
+                           "filename": f"h{i}.md", "is_chunk": "true",
+                           "parent_doc_id": f"h{i}", "chunk_index": str(i)},
+                "matchedFields": [], "excerptRegions": [], "trace": trace,
+            }
+            for i, trace in enumerate(_REAL_TRACES)
+        ],
+        "searchTrace": {"stages": [], "degradation": {}},
+    }
+
+
+def test_cross_encoder_score_is_read_from_the_real_wire_shape():
+    """Proven against a real `debug:true` body, not a synthetic one.
+
+    Pins the exact path — `results[i].trace[]`, entry with `id == "cross-encoder"`, its
+    `score` — and the three real values.
+    """
+    response = _real_response()
+    hits = response["results"]
+    assert [wf.stage_score(h, "cross-encoder") for h in hits] == [
+        0.2602539, 0.14123535, 0.019317627]
+    assert [wf.stage_score(h, "fusion") for h in hits] == [
+        0.42335153, 0.36807224, 0.56067425]
+
+    basis, scores = wf.resolve_score_basis(hits)
+    assert basis == wf.SCORE_BASIS_CROSS_ENCODER
+    assert scores == [0.2602539, 0.14123535, 0.019317627]
+
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    assert [t["score"] for t in record["hits[]"]] == [0.2602539, 0.14123535, 0.019317627], \
+        "the stored tag must be the cross-encoder score"
+
+
+def test_the_real_response_shows_why_the_delivered_score_is_the_wrong_basis():
+    """The delivered score RISES down the list while the CE score falls.
+
+    `results[i].score` equals the branch-fusion stage score, and the list is ordered by the
+    cross-encoder. Grouping on the delivered score therefore grouped a CE-ordered list by an
+    unrelated key — measured non-monotone in all 12 queries of both 2026-09-07 captures.
+    """
+    hits = _real_response()["results"]
+    delivered = [h["score"] for h in hits]
+    ce = [wf.stage_score(h, "cross-encoder") for h in hits]
+
+    assert delivered == sorted(delivered), \
+        "the delivered score INCREASES down the delivered order — it cannot be the sort key"
+    assert ce == sorted(ce, reverse=True), \
+        "the cross-encoder score decreases monotonically — it IS the sort key"
+    # And each hit's delivered score is its branch-fusion stage score, not its CE score.
+    for h in hits:
+        assert abs(h["score"] - wf.stage_score(h, "branch-fusion")) < 1e-6
+
+
+def test_a_hit_without_a_cross_encoder_entry_falls_back():
+    """The fallback the dropped-CE case needs: no `cross-encoder` entry in `trace`."""
+    response = _real_response()
+    for h in response["results"]:
+        h["trace"] = [st for st in h["trace"] if st["id"] != "cross-encoder"]
+    basis, scores = wf.resolve_score_basis(response["results"])
+    assert basis == wf.SCORE_BASIS_DELIVERED
+    assert scores == _REAL_DELIVERED
+
+
+def test_a_dropped_cross_encoder_fails_capture_health():
+    """A capture whose CE was dropped records a DEGRADED pipeline, so it is refused.
+
+    Both sides of a pair degrade together, so the diff gets QUIETER — the dangerous
+    direction. Pair run 3 read as "2 regressions, nearly clean" with every query showing
+    `cross-encoder: skipped / INFERENCE_FAILED`.
+    """
+    record = {
+        "httpStatus": 200, "matchCount": 1, "hitCount": 1, "hits[]": [],
+        "trace.stageStatuses": {"10:cross-encoder": "skipped"},
+        "trace.stageReasons": {"10:cross-encoder": "INFERENCE_FAILED"},
+    }
+    base = _capture({"q1": record})
+    problems = wf._cross_encoder_problems(base, base)
+    assert problems, "a dropped cross-encoder must be a health problem"
+    assert "INFERENCE_FAILED" in problems[0]
+    assert "JUSTSEARCH_RERANK_GPU_MEM_MB" in problems[0], "the message must name the remedy"
+
+    # A cross-encoder that RAN is not a problem, and neither is a by-design skip.
+    ok = dict(record, **{"trace.stageStatuses": {"10:cross-encoder": "executed"},
+                         "trace.stageReasons": {}})
+    assert not wf._cross_encoder_problems(_capture({"q1": ok}), _capture({"q1": ok}))
+    by_design = dict(record, **{"trace.stageReasons": {"10:cross-encoder": "not-selected"}})
+    assert not wf._cross_encoder_problems(
+        _capture({"q1": by_design}), _capture({"q1": by_design})), \
+        "a by-design skip is not a drop"
+
+
 def test_candidate_pool_counts_are_observed_only():
     """`totalHits` and `trace.stageCardinality` are pool sizes, not evidence.
 

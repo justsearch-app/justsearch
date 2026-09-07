@@ -44,7 +44,17 @@ export JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS=60000
 #
 # These are ordinary tuning keys set to non-truncating values, not a capture-only code path:
 # the product behaviour under them is a behaviour the product supports.
-export JUSTSEARCH_RERANK_TOP_K=100                          # wire limit -> 100, widens every downstream budget
+# NOT PINNED, and this is a correction: JUSTSEARCH_RERANK_TOP_K=100 was set here for pair run 3
+# to widen the wire limit (searchLimit = max(requestedLimit, rerankConfig.topK())). It BROKE the
+# cross-encoder. The CE window is the same number, so the batch went 20 -> 100 documents and the
+# stage came back `skipped` / INFERENCE_FAILED on every query — ONNX Runtime arena exhaustion, the
+# failure KnowledgeSearchEngine.java:1094-1098 names (remedy: JUSTSEARCH_RERANK_GPU_MEM_MB). Pair 3
+# therefore ran with NO reranker: results kept fusion order, `observed.scoreBasis` was `delivered`
+# for all 12 queries, and its "2 regressions" measured a degraded pipeline, not a quieter one.
+# Widening the budgets without enlarging the CE batch means raising the REQUEST limit (which the
+# capture owns) while leaving top_k alone, or raising JUSTSEARCH_RERANK_GPU_MEM_MB first — neither
+# is pinned blind here. capture_health now REFUSES a capture whose cross-encoder was dropped, so
+# this cannot recur silently.
 export JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000     # whole-doc legs stop truncating (default 100, corpus ~102 docs)
 export JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50 # parent collapse cap 40 -> 5000 (default 2)
 export JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false      # kill the Jaccard alpha step function
@@ -86,7 +96,7 @@ cycle() { # n
 
 log "tree=$(git rev-parse --short HEAD) profile=$profile"
 log "pins: exhaustive=$JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH slots=$JUSTSEARCH_LLM_SLOTS rerank_deadline_ms=$JUSTSEARCH_RERANK_DEADLINE_MS"
-log "pins: rerank_top_k=$JUSTSEARCH_RERANK_TOP_K candidate_limit_max=$JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX collapse_mult=$JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER"
+log "pins: candidate_limit_max=$JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX collapse_mult=$JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER"
 log "pins: leg_arbitration=$JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED recall_complete=$JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE"
 cycle 1 || exit 1
 cycle 2 || exit 1

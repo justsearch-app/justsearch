@@ -291,8 +291,10 @@ PINNED_CONFIG_KEYS = (
     "justsearch.llm.slots",
     "justsearch.rerank.deadline_ms",
     "justsearch.rerank.chunks.deadline_ms",
-    # Candidate budgets and the two step functions (PR 0b, second pair round).
-    "justsearch.rerank.top_k",
+    # Candidate budgets and the two step functions (PR 0b, second pair round). NOTE
+    # `justsearch.rerank.top_k` is deliberately NOT here: pinning it to 100 widened the wire
+    # limit but also the CE batch (they are the same number), and the cross-encoder then failed
+    # with INFERENCE_FAILED on every query of pair run 3 — see `cross_encoder_problems`.
     "index.hybrid.candidate_limit_max",
     "index.hybrid.chunk_collapse_limit_multiplier",
     "index.hybrid.leg_arbitration_enabled",
@@ -2135,6 +2137,48 @@ def _applied_sampling_problems(baseline: dict, candidate: dict) -> list[str]:
     return problems
 
 
+#: Cross-encoder skip reasons that mean the relevance model was EXPECTED to run and did not.
+#: `CrossEncoderSkipReason.isDrop()` (app-api) — a by-design skip is not in this set.
+CROSS_ENCODER_DROP_REASONS = frozenset({
+    "DEADLINE_EXCEEDED", "RPC_FAILED", "MODEL_NOT_LOADED", "INFERENCE_FAILED", "UNKNOWN",
+})
+
+
+def _cross_encoder_problems(baseline: dict, candidate: dict) -> list[str]:
+    """Refuse a capture whose cross-encoder was DROPPED.
+
+    The cross-encoder decides the delivered order. When it is dropped the results keep their
+    fusion order, so the capture records a DIFFERENT PIPELINE's output — and because both sides
+    of a pair are usually taken on the same stack, both are degraded identically and the diff
+    gets QUIETER, not noisier. That is the dangerous direction: pair run 3 read as "2
+    regressions, nearly clean" while every query had `cross-encoder: skipped /
+    INFERENCE_FAILED`, caused by a JUSTSEARCH_RERANK_TOP_K=100 pin that pushed the CE batch from
+    20 to 100 documents into an ONNX Runtime arena failure. A green earned by disabling the
+    reranker is worth nothing, so it is a health problem rather than a warning.
+    """
+    problems: list[str] = []
+    for label, capture in (("baseline", baseline), ("candidate", candidate)):
+        for record_id, record in sorted(_records(capture, "queries").items()):
+            statuses = record.get("trace.stageStatuses") or {}
+            reasons = record.get("trace.stageReasons") or {}
+            for key, status in sorted(statuses.items()):
+                if not key.endswith(":cross-encoder") or status != "skipped":
+                    continue
+                reason = str(reasons.get(key) or "").upper()
+                if reason in CROSS_ENCODER_DROP_REASONS:
+                    problems.append(
+                        f"{label} queries/{record_id}: the cross-encoder was DROPPED "
+                        f"({reason}), so this query's results keep their FUSION order and the "
+                        "capture records a degraded pipeline. Both sides of a pair degrade "
+                        "together, so the diff gets quieter rather than noisier — a green here "
+                        "would be earned by disabling the reranker. If the Worker log shows an "
+                        "ONNX Runtime arena allocation failure, raise "
+                        "JUSTSEARCH_RERANK_GPU_MEM_MB or lower the rerank window; then "
+                        "re-capture."
+                    )
+    return problems
+
+
 def capture_health(
     baseline: dict, candidate: dict, declared_not_captured: list[str]
 ) -> dict:
@@ -2154,6 +2198,7 @@ def capture_health(
     problems: list[str] = []
     problems.extend(_pin_problems(baseline, candidate))
     problems.extend(_applied_sampling_problems(baseline, candidate))
+    problems.extend(_cross_encoder_problems(baseline, candidate))
     for section in ("queries", "chatTurns"):
         if not _records(baseline, section) and not _records(candidate, section):
             problems.append(
