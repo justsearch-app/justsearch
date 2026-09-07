@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.agent.api.AgentErrorCode;
 import io.justsearch.agent.api.AgentEvent;
+import io.justsearch.agent.api.AgentEventPayloads;
 import io.justsearch.agent.api.AgentProfile;
 import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.registry.AuditPolicy;
@@ -177,6 +178,57 @@ class AgentLoopServiceTest {
       assertEquals(SamplingParams.AGENT.topP(), used.topP(), 1e-9,
           "call " + i + " keeps the preset top_p (the override left it absent)");
     }
+  }
+
+  /**
+   * PR 0b review D3 — {@code session_started} echoes the sampling the run will ACTUALLY use.
+   *
+   * <p>Without the echo a capture can only record what it REQUESTED. Run the same fixture against a
+   * build that predates the override and the artifact still shows {@code sampling} set, because the
+   * capture wrote its own request back — a pin the backend silently never applied, reported as
+   * applied. The echo is what makes the two distinguishable, so the assertion is on the EVENT, not
+   * on the request.
+   */
+  @Test
+  @DisplayName("PR 0b: session_started echoes the sampling the run actually applies")
+  void sessionStarted_echoesTheAppliedSampling() {
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("ok")));
+    var service = buildService(ai, new StubTool("search", RiskTier.LOW, "r"));
+
+    var events =
+        runWithRequest(
+            service,
+            requestWithSampling(
+                userMessage("hi"), 1, List.of(), null,
+                new AgentRequest.SamplingOverride(0.0, null, 4242L)));
+
+    var started =
+        events.stream()
+            .filter(AgentEvent.SessionStarted.class::isInstance)
+            .map(AgentEvent.SessionStarted.class::cast)
+            .findFirst()
+            .orElse(null);
+    assertNotNull(started, "the run must emit session_started");
+    assertEquals(0.0, started.samplingTemperature(), 1e-9, "the APPLIED temperature");
+    assertEquals(
+        SamplingParams.AGENT.topP(), started.samplingTopP(), 1e-9,
+        "an unset knob echoes the preset's value, not null — it is what the run will use");
+    assertEquals(4242L, started.samplingSeed(), "the APPLIED seed");
+    assertEquals(
+        started.samplingSeed(),
+        ai.recordedSampling.get(0).seed(),
+        "and the echo must equal what the LLM call actually got, or it is a second authority");
+
+    // The wire payload omits a null seed rather than writing an explicit null, so a reader can tell
+    // "this build does not report applied sampling" from "this run applied none".
+    var unpinned = AgentEventPayloads.base(new AgentEvent.SessionStarted("s"));
+    assertEquals(Map.of("sessionId", "s"), unpinned,
+        "an un-echoed session_started payload must be byte-identical to the pre-PR-0b shape");
+    var pinned =
+        AgentEventPayloads.base(new AgentEvent.SessionStarted("s", 0.0, 0.8, 7L, null));
+    assertEquals(0.0, pinned.get("samplingTemperature"));
+    assertEquals(0.8, pinned.get("samplingTopP"));
+    assertEquals(7L, pinned.get("samplingSeed"));
   }
 
   /**

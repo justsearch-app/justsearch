@@ -549,7 +549,17 @@ public final class AgentLoopService implements AgentService {
 
     boolean agentSuccess = false;
     try (Scope ignored = agentSpan.makeCurrent()) {
-      sink.accept(new AgentEvent.SessionStarted(sessionId));
+      // Lane F PR 0b — echo the sampling this run will ACTUALLY use, resolved through the one
+      // site that applies the request's optional override. A capture can then prove the pin it
+      // requested is the pin the backend used, instead of recording its own request back.
+      SamplingParams appliedSampling = AgentLlmCaller.agentBaseSampling(session);
+      sink.accept(
+          new AgentEvent.SessionStarted(
+              sessionId,
+              appliedSampling.temperature(),
+              appliedSampling.topP(),
+              appliedSampling.seed(),
+              TraceContext.none()));
       sink.accept(
           new AgentEvent.AgentProgress("init", "Starting agent session", 0, // 561 #4: no raw UUID
               request.maxIterations()));

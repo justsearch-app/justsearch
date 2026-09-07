@@ -688,8 +688,36 @@ public sealed interface AgentEvent {
     }
   }
 
-  /** Session started — sent once at the beginning with the session ID. */
-  record SessionStarted(String sessionId, TraceContext trace) implements AgentEvent {
+  /**
+   * Session started — sent once at the beginning with the session ID.
+   *
+   * <p>It also carries the sampling the run will ACTUALLY use (lane F PR 0b): the agent preset with
+   * the request's optional {@code sampling} override applied, as
+   * {@code AgentLlmCaller.agentBaseSampling} resolves it. Without this a caller can only observe
+   * what it REQUESTED — a capture taken against a build that predates the override would record a
+   * pin it silently never applied and read as pinned. All three are nullable and independently
+   * optional: {@code samplingSeed} is null on every run that pinned no seed, which is every run
+   * today, and an absent field on the wire is what a pre-PR-0b build produces.
+   *
+   * @param sessionId the run's id
+   * @param samplingTemperature the temperature every LLM call in this run will use
+   * @param samplingTopP the nucleus mass every LLM call in this run will use
+   * @param samplingSeed the RNG seed sent to llama-server, or null when the run pinned none
+   * @param trace the shared trace envelope
+   */
+  record SessionStarted(
+      String sessionId,
+      Double samplingTemperature,
+      Double samplingTopP,
+      Long samplingSeed,
+      TraceContext trace)
+      implements AgentEvent {
+
+    /** Back-compat constructor (pre-lane-F-PR-0b): no applied-sampling echo. */
+    public SessionStarted(String sessionId, TraceContext trace) {
+      this(sessionId, null, null, null, trace);
+    }
+
     public SessionStarted(String sessionId) {
       this(sessionId, TraceContext.none());
     }
