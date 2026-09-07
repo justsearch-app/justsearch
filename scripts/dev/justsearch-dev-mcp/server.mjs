@@ -977,9 +977,10 @@ export async function resolveReloadTarget({ mainRepoRoot, runJson }) {
           : hr
           ? 'This stack was started with hotReload: false, so its Worker has no JDWP listener — '
             + 'there is nothing to push bytecode to. (The old instructions claimed reload still '
-            + 'pushed method-body changes without it; WorkerSpawner\'s early return guards the '
-            + '-agentlib:jdwp flag too, so that was never true.) Stop and start again; hotReload '
-            + 'now defaults true.'
+            + 'pushed method-body changes without it; WorkerSpawner\'s early return used to guard '
+            + 'the -agentlib:jdwp flag too, so that was never true — item A11 has since deleted '
+            + 'WorkerSpawner and the Worker child process it launched.) Stop and start again; '
+            + 'hotReload now defaults true.'
           : 'This run record predates the per-run hot-reload record (tempdoc 844 R3), so the JDWP '
             + 'port and target identity of its Worker are unknown. Refusing to attach to a port on '
             + 'the assumption that it is 5005 and belongs to this run. Stop and start again.',
@@ -2896,7 +2897,14 @@ export async function main() {
       }
       const module = recordedModule || 'worker-services';
       const debugPort = input.debugPort || recordedPort;
-      const signalFile = dataDir ? path.join(dataDir, 'worker_signal.lock') : null;
+      // Lane F stage A review S2. The reload trigger used to be a byte at offset 29 of the
+      // memory-mapped worker_signal.lock, which only worked because the Worker was a second
+      // process sharing that region. It is one JVM now, and the request is a file in the runtime
+      // directory: InProcessWorkerSignalBus polls for it and deletes it on consumption
+      // (RELOAD_REQUEST_FILENAME). Existence is the entire payload, so the write is a create.
+      const reloadRequestFile = dataDir
+        ? path.join(dataDir, 'runtime', 'dev-reload.request')
+        : null;
       const classesDir = path.join(runRoot, 'modules', module, 'build', 'classes', 'java', 'main');
       // The pusher is the tool THIS server ships with, not whatever copy the run's tree happens to
       // hold: an older copy would silently skip the identity check it does not have. The bytecode
@@ -2967,8 +2975,8 @@ export async function main() {
       // 4. 371: If hot-swap succeeded, propagate the current build stamp to the Worker
       //    so it reports the correct stamp after reload (avoids false-positive staleness warnings).
       //    On structural-change failure, skip — the Worker is genuinely stale.
-      //    MUST happen BEFORE the MMF signal: the Worker reads this file during performReload(),
-      //    which starts as soon as the sentinel detects the signal byte.
+      //    MUST happen BEFORE the reload request is written: the Engine reads this file during
+      //    performReload(), which starts as soon as the sentinel sees the request file.
       //    Tempdoc 844 §5.6 #2: the stamp is read from the RUN's tree, not the caller's — copying
       //    the caller's stamp into a peer's data dir is what defeated 371's stale-JVM detection.
       if (result.hotSwapOk && dataDir) {
@@ -2983,31 +2991,33 @@ export async function main() {
         }
       }
 
-      // 5. Write reload signal to MMF (triggers Worker's DevReloadManager).
-      //    Tempdoc 844 §5.6 #3 / R5: this used to be gated only on `signalFile` being non-null,
+      // 5. Ask the Engine to reconstruct its services (triggers DevReloadManager).
+      //    Tempdoc 844 §5.6 #3 / R5: this used to be gated only on the signal file being non-null,
       //    with a comment saying reconstruction should happen anyway — so a FAILED push still
       //    quiesced and reconstructed the Worker's services. Tearing services down is not a
       //    consolation prize for a push that did not land, and on a peer's stack it was an
       //    unauthorized teardown. It now happens only when new bytecode actually went in, and the
       //    skip is stated rather than silent.
-      if (result.hotSwapOk && signalFile) {
+      if (result.hotSwapOk && reloadRequestFile) {
         try {
-          const fh = await fsp.open(signalFile, 'r+');
+          await fsp.mkdir(path.dirname(reloadRequestFile), { recursive: true });
+          // 'w' and not 'wx': a leftover request from a reload that was interrupted before the
+          // Engine consumed it must not make the next reload look like it failed to ask.
+          const fh = await fsp.open(reloadRequestFile, 'w');
           try {
-            const buf = Buffer.from([1]);
-            await fh.write(buf, 0, 1, 29); // OFFSET_RELOAD_SIGNAL = 29
+            await fh.writeFile(new Date().toISOString() + ' reload requested\n', 'utf8');
             result.signalWritten = true;
           } finally {
             await fh.close();
           }
         } catch (err) {
-          result.signalError = `Failed to write signal: ${err.message}`;
+          result.signalError = `Failed to write reload request: ${err.message}`;
         }
       } else if (!result.hotSwapOk) {
         result.signalSkippedReason = 'No new bytecode was pushed, so services were NOT reconstructed '
           + '— the running stack is unchanged.';
-      } else if (!signalFile) {
-        result.signalSkippedReason = 'The run record has no dataDir, so the reload signal file could '
+      } else if (!reloadRequestFile) {
+        result.signalSkippedReason = 'The run record has no dataDir, so the reload request file could '
           + 'not be located; bytecode was pushed but services were NOT reconstructed.';
       }
 

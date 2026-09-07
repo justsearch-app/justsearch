@@ -68,14 +68,21 @@ class RuntimeManifestPublisherTest {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, null);
 
+    // Lane F item A11 + the review's grpcPort decision: the only production caller
+    // (RuntimeManifestListenerWiring) passes null, because the index half is composed in this JVM
+    // and there is no port. Pinning 12345 here pinned the publisher's ability to carry a number
+    // nothing supplies — which would keep reading as "the manifest reports a worker port" long
+    // after it stopped being able to.
     RuntimeManifest updated =
-        publisher.publishWorkerReady(12345, tmp.resolve("index").toString(), "LIFECYCLE_STATE_READY");
+        publisher.publishWorkerReady(null, tmp.resolve("index").toString(), "LIFECYCLE_STATE_READY");
 
     assertEquals(54321, updated.head().apiPort());
     assertEquals("LIFECYCLE_STATE_READY", updated.lifecycle());
     assertNotNull(updated.worker());
     assertEquals("ready", updated.worker().state());
-    assertEquals(12345, updated.worker().grpcPort());
+    assertNull(
+        updated.worker().grpcPort(),
+        "there is no worker port to report; NON_NULL keeps the field out of the JSON entirely");
     assertEquals(tmp.resolve("index").toString(), updated.worker().indexBasePath());
     assertNotNull(updated.worker().readyAt());
     assertNull(updated.worker().spawnError(), "spawnError null when state=ready");

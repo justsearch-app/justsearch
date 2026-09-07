@@ -47,6 +47,7 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   // now read manifest.json. The entry is no longer on this allowlist.
   ['worker-config-snapshot.json', 'tempdoc 501 §5 carve-out — Head→Worker config passing (-Djustsearch.worker.config_snapshot), not an external discovery surface'],
   ['instances', 'tempdoc 501 §3.7 — per-instance history directory (mirror of tmp/dev-runner/runs/)'],
+  ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 
 /**
@@ -88,7 +89,11 @@ const SKIP_PATHS = [
 // noise all use that substring). The capture group must end in a known
 // artifact-class extension (.json, .txt, .lock, .log, .ndjson) or be the
 // literal `instances` directory.
-const ARTIFACT_TAIL = '(?:[A-Za-z0-9._-]+\\.(?:json|txt|lock|log|ndjson)|instances)';
+// `request` is here for the same reason the other extensions are: an artifact class that appears
+// in <dataDir>/runtime/ must be one the closure rule can see. Adding dev-reload.request to the
+// allowlist without adding its extension here would have been a sanction for something the check
+// was not watching — the allowlist would have grown while coverage stayed the same.
+const ARTIFACT_TAIL = '(?:[A-Za-z0-9._-]+\\.(?:json|txt|lock|log|ndjson|request)|instances)';
 const PATTERNS = [
   // Java/Kotlin Path API: .resolve("runtime").resolve("<artifact>")
   new RegExp(`\\.resolve\\(["']runtime["']\\)\\s*\\.resolve\\(["'](${ARTIFACT_TAIL})["']\\)`, 'g'),

@@ -172,6 +172,14 @@ public record RuntimeManifest(
   public record WorkerInfo(
       /** {@code "pending"} | {@code "ready"} | {@code "failed"}. Always present. */
       String state,
+      /**
+       * <b>Deprecated: no producer since lane F item A11.</b> The index half is composed inside
+       * this JVM, so there is no worker process, no port and no channel; this is always null and,
+       * being {@code NON_NULL}, absent from the published JSON. It is kept for one stage because
+       * the manifest's schema version is a compatibility promise to external readers — stage B's
+       * versioned schema bump (design 7.2, the child registry) is where it goes, with the rest of
+       * the worker projection's process vocabulary.
+       */
       Integer grpcPort,
       String indexBasePath,
       String readyAt,

@@ -39,10 +39,10 @@ import org.slf4j.LoggerFactory;
  * Head's; in one JVM there is one {@code ResolvedConfig} and divergence is not a thing that can
  * happen. The snapshot tier itself is retired at item A19; nothing here depends on it either way.
  *
- * <p><b>What is deliberately still here at A6.</b> {@link KnowledgeServer#start()} still binds the
- * gRPC server and still calls {@code signalBus.writePort} — both harmless (the in-process bus
- * publishes the port nowhere) and both deleted at item A9. Keeping them for one item is what lets
- * the branch stay compiling and green between A6 and A9 rather than opening a red window.
+ * <p><b>What A6 deliberately left standing, and where it went.</b> Between A6 and A9
+ * {@link KnowledgeServer#start()} still bound the gRPC server and still published a port — both
+ * harmless (the in-process bus published it nowhere), and keeping them for one item is what let the
+ * branch stay compiling and green rather than opening a red window. Item A9 deleted both.
  *
  * <p>Adding a port is a catalogue entry, an interface, and a binding in this class (design 3.3).
  * Nothing else in the repo may construct an implementation of a port.
@@ -65,7 +65,16 @@ public final class EngineRoot implements WorkerHost {
    */
   public EngineRoot(long deadlineMs, int batchSize) {
     this(
-        gauge -> new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(gauge)),
+        gauge -> {
+          WorkerConfig workerConfig = WorkerConfig.load();
+          // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
+          // dev MCP tool from another process. Supplying the directory here is what re-arms it;
+          // the no-arg bus (tests, any composition without a data dir) leaves reload disabled
+          // rather than watching a path nobody writes.
+          return new KnowledgeServer(
+              workerConfig,
+              new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")));
+        },
         deadlineMs,
         batchSize);
   }

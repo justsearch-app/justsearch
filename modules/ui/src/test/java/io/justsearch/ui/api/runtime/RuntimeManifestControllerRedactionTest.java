@@ -132,10 +132,11 @@ class RuntimeManifestControllerRedactionTest {
             .sessionToken("token")
             .readyAt("2026-05-20T20:00:00Z")
             .build();
+    // No grpcPort: lane F item A11 left it without a producer, and this test is about the public
+    // projection preserving the worker sub-record, which state/indexBasePath assert without it.
     RuntimeManifest.WorkerInfo worker =
         RuntimeManifestWorkerInfoBuilder.builder()
             .state("ready")
-            .grpcPort(9000)
             .indexBasePath("/data/idx")
             .readyAt("2026-05-20T20:01:00Z")
             .build();
@@ -165,7 +166,8 @@ class RuntimeManifestControllerRedactionTest {
     RuntimeManifest publicView = manifest.publicProjection();
 
     assertNotNull(publicView.worker(), "worker sub-record must survive projection");
-    assertEquals(9000, publicView.worker().grpcPort());
+    assertEquals("ready", publicView.worker().state());
+    assertEquals("/data/idx", publicView.worker().indexBasePath());
     assertNotNull(publicView.ai(), "ai sub-record must survive projection");
     assertEquals("READY", publicView.ai().phase());
     // Tempdoc 682 Item 2: the build-pin pair is not a credential — it must survive projection.

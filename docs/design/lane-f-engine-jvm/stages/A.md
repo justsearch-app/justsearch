@@ -337,6 +337,34 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   callers read the services per call through `KnowledgeServer.appServices()`
   (`EngineKnowledgeClient` holds a supplier for exactly this reason). The **trigger** is still the
   MMF reload byte and still dies at A10; Q1's replacement stays A18's.
+  **CORRECTED 2026-09-07 (review S2): the last sentence was wrong, and wrong in the direction that
+  hides work.** The trigger did not die at A10 — it died at **A6**. The MMF byte was only ever read
+  through `WorkerSignalBus.isReloadRequested()`, and A6 swapped the bus for
+  `InProcessWorkerSignalBus`, which inherits the interface **default**: `return false`. So from A6
+  onward the sentinel polled a method with no producer, and the dev MCP `reload` tool went on
+  writing offset 29 of a file nobody reads and reporting `signalWritten: true`. Hot reload was off
+  for the whole of stage A and nothing could have failed: a producer writing where no one reads and
+  a consumer reading a default no one writes are individually well-formed. This bullet's "loses one
+  step and keeps the rest" described the reload *body*, which was accurate, and then generalised to
+  the mechanism, which was not — the body was intact and unreachable.
+  **Re-homed now rather than at A18**, onto `<dataDir>/runtime/dev-reload.request`: existence is
+  the payload, the Engine deletes it on consumption (so one push is one reload, and a compile
+  landing mid-reload gets its own), it is sanctioned on the runtime-closure allowlist, and
+  `.request` was added to that check's artifact-class list — an allowlist entry for a class the
+  check could not see would have grown the sanction without growing the coverage. Deferring this
+  was not a scheduling choice: hot reload is the verification loop for every remaining item in the
+  lane, so the deferral was paid for by every item after A6.
+- **A11 (`worker.grpcPort` resolved: left null, deprecated in place, retired by stage B).** The A11
+  bullet below flagged a manifest field with no producer and did not decide it. Owner decision: it
+  stays declared and stays null now, carries a one-line deprecation naming what removes it (stage
+  B's versioned schema bump, design 7.2, the child registry), and the two tests that pinned it are
+  retargeted onto the in-process answer rather than onto a port nothing fills. Being
+  `@JsonInclude(NON_NULL)`, a null field is simply absent from the published JSON, so no external
+  reader sees a fabricated 0 or -1 in the meantime. Three test sites moved, not two: the
+  `WorkerBootRecoveryE2ETest` assertion from review F3 also read the port, and its property — a
+  READY worker projection must identify what it is serving — is asserted through `indexBasePath`,
+  the locator that survived the collapse, plus a negative on `grpcPort` ever appearing. The port
+  was never the property; it was the only locator the split architecture had.
 - **A9 (residue swept, per retire-with-a-sweep).** Sixteen files deleted plus
   `GrpcMessageLimitsParityTest`, whose `assumeTrue` would have turned a half-deleted parity into a
   silent skip. Every surviving reference to a deleted class corrected in place, including three
