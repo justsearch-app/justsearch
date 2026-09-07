@@ -53,11 +53,8 @@ the session continues (e.g., merging from main).
 
 ## Hard Rules
 
-1. **Never `git checkout` in the main worktree.** It stays on `main`. All
-   feature work happens in worktrees. <!-- rule:never-checkout-in-main -->
-2. **Never share a worktree** between two agent sessions. <!-- rule:never-share-worktree -->
-3. **One branch per worktree.** Git enforces this, but don't work around it. <!-- rule:one-branch-per-worktree -->
-4. **After compaction**, verify your worktree and branch. <!-- rule:after-compaction-verify -->
+1. **Never share a worktree** between two agent sessions. <!-- rule:never-share-worktree -->
+2. **After compaction**, verify your worktree and branch. <!-- rule:after-compaction-verify -->
    The `compact-restore` hook emits a one-shot **Current worktree** block (dir + branch) only
    when it verifies the saved session, worktree, and branch — confirm it matches; on a
    non-compaction session start or omitted snapshot, check directly:
@@ -66,14 +63,14 @@ the session continues (e.g., merging from main).
    git branch --show-current
    ```
    If either doesn't match expectations, investigate before editing.
-5. **Never run destructive git commands in the main worktree.** The main
-   checkout may contain uncommitted work from other agents. Destructive
-   commands destroy that work silently. <!-- rule:never-destructive-git-in-main -->
-6. **Never delete, move, or restore files in the main worktree that you
+3. **Never run destructive git commands in the main worktree.** The main
+   checkout stays on `main` and may contain uncommitted work from other agents.
+   Destructive commands destroy that work silently. <!-- rule:never-destructive-git-in-main -->
+4. **Never delete, move, or restore files in the main worktree that you
    didn't create.** Untracked or modified files may belong to another
    agent's in-progress work. If they block your build, ask the user —
    do not remove them unless the user explicitly approves. <!-- rule:never-delete-untracked-in-main -->
-7. **Always verify a new worktree's base contains the work you expect**
+5. **Always verify a new worktree's base contains the work you expect**
    before writing code. `worktree.baseRef:"head"` (in `.claude/settings.json`)
    makes `EnterWorktree`/`--worktree`/subagent worktrees branch from local
    `HEAD` by construction, but a manual `git worktree add` ignores it and the
@@ -208,10 +205,8 @@ publication and cleanup scoped to your branch:
 - Do not use local merge/fast-forward as the normal public path; publish by PR
   squash, then update `main`.
 - Stage your own files explicitly (`git add <paths>`), not `git add -A`.
-- The four orchestration skills tracked on public `main`
-  (`.claude/skills/{design,plan,takeover,theorize}`) were leaked once by a
-  `git add -A` and the owner has since **accepted them as tracked** — never open a
-  PR to remove them (repeated removal PRs, e.g. #151, are unwanted). <!-- rule:accepted-tracked-skills-no-removal -->
+- Keep diffs scoped to your task: untouched-code reformatting conflicts with
+  other worktrees.
 - There is no shared inbox file to append to (the observations store was retired,
   tempdoc 872): route out-of-scope findings per CLAUDE.md `log-pre-existing-issues`.
 
