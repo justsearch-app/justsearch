@@ -188,7 +188,7 @@ determinism measured, not assumed: each side of the paired diff captures twice o
 ingests of the corpus (GPU encoders, the pins on); a field that differs within a side's own pair
 is noise on that side and cannot count as a regression across sides; the declared relation applies
 to every field stable within both sides' pairs; a side whose noise pair exceeds a declared
-fraction of noisy fields (0.10) is refused as too noisy to gate; the raw counts are reported
+fraction of noisy fields (0.05, about ten fields on the shipped fixture) is refused as too noisy to gate; the raw counts are reported
 beside the verdict. No allowed-difference class is added; the three classes and the byte-equal
 rule are unchanged for stable fields. Captures taken before PR 0b are not comparable to captures
 after it (the request breadth and the pins changed) and the split-side baseline capture is
