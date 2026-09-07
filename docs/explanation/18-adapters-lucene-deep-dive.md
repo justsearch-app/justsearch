@@ -498,13 +498,21 @@ tie on it gives an order that is stable per index and random per build. The bare
 path), then `chunk_index`, then `doc_id` as the final total-order comparator
 (`LuceneRuntimeUtils#buildChunkTieBreakSort`). Two ingests of the same corpus agree on that key.
 
-**The cost, accepted deliberately.** A sorted search runs on `TopFieldCollector`, which cannot set a
-minimum competitive score when the score comparator is followed by others. So the chunk BM25 and
-SPLADE legs lose the top-score bulk-scorer pruning `TopScoreDocCollector` applies past the 1000-hit
-threshold, and their `totalHits` becomes an exact count rather than a `GREATER_THAN_OR_EQUAL_TO`
-lower bound past 1000 matches. The whole-document read path has always paid exactly this
-(`ReadPathOps#search`), and the fused `totalHits` the API reports is the union of these legs'
-counts — a count that means the same thing on every leg is worth more than the pruning.
+**Pruning is retained; only a `totalHits` margin moves.** A leading score comparator does not cost
+WAND/block-max pruning. `TopFieldCollector`'s constructor sets `scoreMode = TOP_SCORES` and
+`canSetMinScore = true` whenever `firstComparator.getClass() ==
+FieldComparator.RelevanceComparator.class && reverseMul[0] == 1 && totalHitsThreshold !=
+Integer.MAX_VALUE` — all three hold for these sorts (`SortField.FIELD_SCORE` is a non-reversed
+relevance comparator, and the threshold is Lucene's default 1000). So there is no latency
+regression, and the whole-document read path was never paying one either.
+
+What does change, besides the order of equal-score hits, is a small margin in the reported
+`totalHits` past the threshold. `updateMinCompetitiveScore` passes the bottom entry's **raw** score
+to `setMinCompetitiveScore` with no `Math.nextUp`, because with a secondary comparator a later doc
+that ties the bottom score can still win on the tie-break and so must not be skipped. Docs equal to
+the bottom score are therefore visited and counted, where a docId-tie-broken `TopScoreDocCollector`
+would have excluded them. (Both statements verified against the shipped lucene-core 10.4.0
+bytecode.)
 
 ### 6.3 Lookahead Strategy
 

@@ -81,15 +81,21 @@ public final class ChunkSearchOps {
    * already sorted, which is why only the chunk legs drifted).
    *
    * <p>{@code doDocScores = true} keeps every returned score exactly what the bare overload
-   * produced. TWO THINGS OTHER THAN ORDER DO CHANGE, and are accepted rather than unnoticed:
-   * a sorted search runs on {@code TopFieldCollector}, which cannot set a minimum competitive
-   * score once the first comparator is followed by others, so (a) these legs lose the
-   * top-score bulk-scorer pruning {@code TopScoreDocCollector} applied past the 1000-hit
-   * threshold, and (b) {@code totalHits} becomes an EXACT count rather than a
-   * {@code GREATER_THAN_OR_EQUAL_TO} lower bound past 1000 matches. The whole-document read path
-   * has always paid exactly this ({@code ReadPathOps.java:377}), and a candidate-set count that
-   * means the same thing on every leg is worth more here than the pruning: the fused
-   * {@code totalHits} the API reports is the union of these legs' counts.
+   * produced, and WAND/block-max pruning is RETAINED. A leading score comparator does not cost it:
+   * {@code TopFieldCollector}'s constructor sets {@code scoreMode = TOP_SCORES} and
+   * {@code canSetMinScore = true} whenever
+   * {@code firstComparator.getClass() == FieldComparator.RelevanceComparator.class &&
+   * reverseMul[0] == 1 && totalHitsThreshold != Integer.MAX_VALUE} — all three hold here
+   * ({@code SortField.FIELD_SCORE} is a non-reversed relevance comparator and the threshold is
+   * Lucene's default 1000). Verified against the shipped lucene-core 10.4.0 bytecode, not inferred.
+   *
+   * <p>What changes is therefore the order of equal-score hits and, past the {@code totalHits}
+   * threshold, a small margin in the reported {@code totalHits}. The margin has one cause:
+   * {@code updateMinCompetitiveScore} passes the bottom entry's RAW score to
+   * {@code setMinCompetitiveScore}, with no {@code Math.nextUp} — because with a secondary
+   * comparator a later doc that ties the bottom score can still win on the tie-break, so it may
+   * not be skipped. Docs equal to the bottom score are consequently visited and counted, where a
+   * docId-tie-broken {@code TopScoreDocCollector} would have excluded them.
    */
   private org.apache.lucene.search.TopDocs searchChunksWithStableTieBreak(
       org.apache.lucene.search.IndexSearcher searcher, Query query, int limit)
@@ -106,7 +112,7 @@ public final class ChunkSearchOps {
    * <p>A whole-document row's {@code doc_id} IS deterministic — it is the normalized absolute path
    * ({@code IndexingDocumentOps.java:162,172,174}) — so it needs neither of the two chunk
    * comparators, and adding them would only cost two missing-docvalues reads per hit. The
-   * {@code TopFieldCollector} trade-off noted on the chunk helper applies here too.
+   * {@code totalHits}-margin note on the chunk helper applies here too.
    */
   private org.apache.lucene.search.TopDocs searchDocsWithStableTieBreak(
       org.apache.lucene.search.IndexSearcher searcher, Query query, int limit)
