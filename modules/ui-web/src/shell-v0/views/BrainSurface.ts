@@ -40,6 +40,7 @@ import {
   type AiRuntimeStatus,
   type PackImportStatus,
 } from '../state/aiStateStore.js';
+import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import {
   enqueueUiModePersistence,
   UI_MODE_INTENT_HEADER,
@@ -377,6 +378,21 @@ export interface SkipExplanation {
 }
 
 /**
+ * Every `skipCause` the wire can carry, projected from the generated schema type rather than
+ * restated here: `SSOT/schemas/ai-install-status.v1.json` states the closed set (from the backend
+ * `SkipCause` enum, via `@WireEnumIds`), so this union tracks the backend automatically.
+ */
+type SkipCauseWire = NonNullable<NonNullable<AiInstallStatus['packages']>[number]['skipCause']>;
+
+/**
+ * The causes that carry a classification — the wire set minus `''`, the deliberate "unknown, never
+ * a guess" form. These are exactly the keys the copy maps below must cover, so a fifth backend
+ * cause fails the `satisfies` check at compile time instead of silently rendering the neutral
+ * fallback in the UI.
+ */
+type ClassifiedSkipCause = Exclude<SkipCauseWire, ''>;
+
+/**
  * The badge per `SkipCause` id. An id this build does not recognise — and an EMPTY one, which the
  * backend uses deliberately for "unknown, never a guess" — gets the neutral word.
  *
@@ -391,7 +407,7 @@ const SKIP_BADGE: Readonly<Record<string, string>> = {
   intent: 'Not in this mode',
   'user-declined': 'Declined',
   'dev-only': 'Development only',
-};
+} satisfies Record<ClassifiedSkipCause, string>;
 
 /**
  * The sentence to show when the record carries no authored prose. Keyed on the same typed cause,
@@ -403,7 +419,7 @@ const SKIP_FALLBACK_DETAIL: Readonly<Record<string, string>> = {
   intent: 'This component is not part of the install mode you chose.',
   'user-declined': 'You chose not to install this component.',
   'dev-only': 'This component ships for development stacks only and is never part of an install.',
-};
+} satisfies Record<ClassifiedSkipCause, string>;
 
 /**
  * Explain a per-package install status, or `null` when the package was not skipped.
