@@ -23,8 +23,10 @@ formats (text extraction is backed by [Apache Tika](https://tika.apache.org/), p
 images) — and answers questions over them with cited passages, **without anything leaving your machine.**
 It combines three retrieval paradigms (keyword, dense-vector, learned-sparse) with a cross-encoder reranker,
 and exposes that retrieval over the **Model Context Protocol (MCP)** so any AI agent — local or cloud — can
-use it as a **private retrieval backend**: your files stay on your device; only the model's answer leaves
-your agent.
+use it as a **private retrieval backend**: indexing and retrieval stay on your device. The built-in
+assistant keeps the whole loop on-device. When you connect an external AI client, the retrieved passages
+and their metadata are handed to that client, and what happens to them from there is governed by that
+client and its model provider, not by JustSearch.
 
 It is multilingual by construction: the embedding model
 ([gte-multilingual-base](https://huggingface.co/Alibaba-NLP/gte-multilingual-base)) supports 70+ languages;
@@ -90,11 +92,13 @@ client lists no tools, POST a `tools/list` JSON-RPC request at the URL above bef
 means that build has no MCP endpoint, so use a newer release or a from-source build.
 
 Six tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
-`justsearch_status`, `justsearch_runtime_manifest`. Your documents never leave the machine — only the agent's
-answer does.
+`justsearch_status`, `justsearch_runtime_manifest`. The server binds to loopback and never uploads anything
+itself, but the passages it returns go to whichever client you connected — a cloud-hosted agent will forward
+them to its model provider like any other tool result.
 
 Does wiring an agent to these tools measurably improve its answers? We benchmark that under a fail-closed
-publication policy, and no result currently meets the bar for publication — see the
+publication policy. The one accepted publication so far is *adoption-only*: agents used the tools, but no
+stratum showed an accuracy or efficiency improvement — see the
 [status note](#agent-utility-publication-status) below and
 [`docs/reference/benchmarks/agent-utility.md`](docs/reference/benchmarks/agent-utility.md).
 
@@ -199,9 +203,12 @@ The public API surface is mapped in [`docs/reference/api-contract-map.md`](docs/
 
 ## Privacy
 
-Nothing leaves your machine, and you can check:
+JustSearch itself sends nothing off your machine, and you can check:
 - The webview's Content-Security-Policy pins network access to `127.0.0.1` — it *cannot* reach the public internet.
 - No analytics/telemetry exporter exists in the code.
+- The MCP server binds to loopback. The one egress path is the one you choose: an external MCP client you
+  connect receives retrieved passages and file paths as tool results, and a cloud-hosted client forwards
+  those to its model provider. Use the built-in assistant or a local client to keep the whole loop on-device.
 - The only outbound request is the one-time model download (from GitHub Releases + HuggingFace); after that, run
   a network monitor and watch it stay silent. Threat model: [`docs/reference/security/threat-model.md`](docs/reference/security/threat-model.md).
 
