@@ -55,15 +55,13 @@ Use the right Gradle command for the verification level you need:
 |---------|-----------|-------------|
 | `./gradlew test` | Unit tests only (`src/test/java`) | **Fast inner loop** — after every code change |
 | `./gradlew check` | Unit + integration + PMD + Spotless | **Pre-commit** — before pushing |
-| `./gradlew fullTestSuite` | Unit + integration + system (no soak; system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
-| `./gradlew nightlyTestSuite` | Full suite including soak (requires opt-in flags for system/soak tiers) | Nightly CI only |
+| `./gradlew fullTestSuite` | Unit + integration + system (system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
 
 **Opt-in flags** (system-tests module only):
 
 - `-PincludeSystemTests=true` — include system/chaos tests
 - `-PincludeAiTests=true` — include AI inference tests (requires GPU)
 - `-PincludeAgentTests=true` — include agent deterministic battery tests
-- `-PincludeSoakTests=true` — include long-running soak tests
 
 Source of truth for test tier definitions: `modules/system-tests/build.gradle.kts`.
 
@@ -141,7 +139,7 @@ PMD is configured in `config/pmd/ruleset.xml` across 6 categories:
 | documentation (1) | `CommentContent` — the parked-marker (TODO/FIXME/XXX) ban, successor to the retired `todo-fixme` kernel gate |
 
 **Scope — every Java source set.** `pmdMain` uses `ruleset.xml`; every other source set
-(`test`, `integrationTest`, `systemTest`, `soakTest`, `determinismTest`, `testFixtures`) uses
+(`test`, `integrationTest`, `systemTest`, `determinismTest`, `testFixtures`) uses
 `config/pmd/ruleset-tests.xml`, which is the same ruleset minus `SystemPrintln` (a test's console
 output is its report) and `NonThreadSafeSingleton` (it fires on `@BeforeAll`/`@AfterAll` fixture
 assignment, which JUnit serialises). CLI-entry-point modules (`ssot-tools`, `core-contracts`) point

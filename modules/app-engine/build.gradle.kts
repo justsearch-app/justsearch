@@ -46,6 +46,14 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
 
+        // Lane F stage A item A12 — the format-capability matrix moved here from the retired
+        // chaos tier, and it is deterministic-by-fixture: the rows and their expected end states
+        // come from worker-services' test fixtures rather than from a corpus checked in beside the
+        // test, and the field names it asserts on come from the schema module.
+        implementation(testFixtures(project(":modules:worker-services")))
+        implementation(project(":modules:indexing"))
+        implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
+
         // Item A4's ForegroundLoadGateTest pins the gate's nine foreground operations against
         // ForegroundLoadInterceptor.foregroundMethods(), the live producer until item A9 deletes
         // the interceptor — two producers of one gauge may not drift while both exist.

@@ -589,10 +589,10 @@
     {
       "id": "adr-0048-chaos-witness",
       "adr": "0048",
-      "premise": "The duty-cycle claim is a live property, not a unit one: indexing must be throttled rather than stopped while real foreground searches are in flight. This chaos case is the witness that runs against merged code.",
+      "premise": "The duty-cycle claim is a live property, not a stubbed one: indexing must be throttled rather than stopped while real foreground searches are in flight, and status/health polling must not throttle it at all. Retargeted at lane F stage A item A12 — the witness kept its subject and both arms, and moved from ChaosSuiteTest$TimeLordTests (an opt-in systemTest tier that had been unreachable since item A9 deleted the gRPC server the spawned Worker published a port on) to a test that composes the same index half in-process and runs on every build. The witness is stronger, not weaker: in one JVM it can also assert the gauge itself (ForegroundLoad.startedTotal), which the wire test could not see.",
       "kind": "test",
-      "file": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ChaosSuiteTest.java",
-      "test": "io.justsearch.systemtests.ChaosSuiteTest$TimeLordTests#indexingRunsAtAReducedDutyUnderForegroundSearchLoad"
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
+      "test": "io.justsearch.app.engine.EngineForegroundPacingTest#indexingRunsAtAReducedDutyUnderForegroundSearchLoad"
     },
     {
       "id": "adr-0048-foreground-gauge-is-worker-local",

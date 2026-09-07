@@ -123,10 +123,32 @@ public final class IndexGenerationManager {
   // a gRPC handler thread can never observe a torn version/state pair while a migration thread writes;
   // writeState() invalidates by nulling it. (tempdoc 589 — replaces a non-volatile lastReadVersion +
   // a non-atomic stateVersion++ counter, which together formed a data race.)
+  //
+  // Lane F stage A item A12: the cache also carries the (mtime, size) of the state.json it was
+  // parsed from, and a hit is only a hit while that stamp still matches. Invalidating on THIS
+  // instance's own writes is not enough, because one state.json has several managers over it in one
+  // JVM — KnowledgeServer builds one (KnowledgeServer.java:611) for the migration enumerator and the
+  // cutover monitor, WorkerIngestService builds its own from the same indexBasePath
+  // (WorkerIngestService.java:177) for the migration control calls, and the switch-buffer replay
+  // builds two more temporaries (KnowledgeServerMigrationOps.java:542, :718). A write through one
+  // left every other instance serving its own stale parse forever. The concrete defect that found
+  // this: `resumeMigration` wrote through the service's manager, the enumerator kept reading
+  // `migration_paused=true` out of the server's manager, and the migration never resumed. The stamp
+  // costs one file-attribute read where the miss cost a full JSON parse, so the cache still does the
+  // job tempdoc 589 gave it.
   private volatile CachedState cache = null;
 
-  /** Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read"). */
-  private record CachedState(State value) {}
+  /**
+   * Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read").
+   *
+   * @param value the parsed, normalized state
+   * @param mtimeMillis the state.json modification time it was parsed from, or -1 if unreadable
+   * @param size the state.json size it was parsed from, or -1 if unreadable
+   */
+  private record CachedState(State value, long mtimeMillis, long size) {}
+
+  /** The (mtime, size) pair identifying a state.json revision; {@code null} when unreadable. */
+  private record FileStamp(long mtimeMillis, long size) {}
 
   public IndexGenerationManager(Path indexBasePath) {
     this.basePath = normalize(Objects.requireNonNull(indexBasePath, "indexBasePath"));
@@ -656,8 +678,18 @@ public final class IndexGenerationManager {
    * never observes a torn version/state pair (tempdoc 589).
    */
   public State readStateBestEffort() {
-    CachedState cached = cache; // single volatile read — the (present?, value) pair is atomic
-    if (cached != null) {
+    FileStamp stamp = stampBestEffort();
+    CachedState cached = cache; // single volatile read — the whole entry is atomic
+    // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
+    // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
+    // state.json), and on Windows a file being renamed over is briefly unopenable. Treating that
+    // window as "re-read" rather than "unchanged" would trade the stale read this stamp exists to
+    // fix for a transient NULL — which is worse, because every caller projects null as an empty
+    // migration state. A permanently missing state.json serves the last parse, which is exactly
+    // what the pre-stamp cache did.
+    if (cached != null
+        && (stamp == null
+            || (cached.mtimeMillis() == stamp.mtimeMillis() && cached.size() == stamp.size()))) {
       return cached.value();
     }
     try {
@@ -667,9 +699,41 @@ public final class IndexGenerationManager {
         return null;
       }
       State normalized = normalizeAndUpgradeStateIfNeeded(s);
-      cache = new CachedState(normalized); // single volatile publish
+      // Stamp from BEFORE the read — the one taken at the top of this method — and not a fresh one
+      // taken after the parse. The two orders fail in opposite directions and only this one fails
+      // safe:
+      //
+      //   after-parse:  read stamp S1, parse V from revision R1, ANOTHER MANAGER WRITES (file
+      //                 becomes R2), stamp S2 = R2, cache (V-from-R1, stamp-of-R2). The next
+      //                 caller's stamp is R2, which MATCHES, so it is served R1's value — and goes
+      //                 on being served it until some later write moves the stamp again. That is
+      //                 the exact stale-read this stamp was added to prevent, reintroduced in a
+      //                 narrower window.
+      //   before-read:  cache (V, S1). If the file changed at any point during the read, the next
+      //                 caller's stamp is S2 != S1, so it misses and re-parses. The cost is one
+      //                 extra parse; there is no order in which a stale value can be served.
+      //
+      // The window is small either way. It is also exactly the window this whole change exists for
+      // — concurrent writes through a DIFFERENT manager instance over the same file — so sizing the
+      // fix to the common case rather than the racing one would have missed the point.
+      cache =
+          new CachedState(
+              normalized,
+              stamp == null ? -1L : stamp.mtimeMillis(),
+              stamp == null ? -1L : stamp.size());
       return normalized;
     } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /** Reads state.json's (mtime, size); {@code null} when the file is absent or unreadable. */
+  private FileStamp stampBestEffort() {
+    try {
+      java.nio.file.attribute.BasicFileAttributes attrs =
+          Files.readAttributes(statePath, java.nio.file.attribute.BasicFileAttributes.class);
+      return new FileStamp(attrs.lastModifiedTime().toMillis(), attrs.size());
+    } catch (Exception absentOrUnreadable) {
       return null;
     }
   }

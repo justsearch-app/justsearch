@@ -162,7 +162,7 @@ public class IndexingLoop implements Closeable {
    * ({@code WorkerHealthService.workerStateSupplier} via
    * {@code DefaultWorkerAppServices.indexingLoopState()}). Wire-string identity is
    * preserved through {@link Enum#name()} — every consumer that pinned the literal
-   * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code ChaosSuiteTest} and
+   * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code EngineForegroundPacingTest} and
    * {@code KnowledgeServer}'s queue-depth gauge at L1127) keeps working unchanged.
    *
    * <p>Tempdoc 516 P2: previously a stringly-typed FSM (the {@code STATE_*} String
@@ -1046,7 +1046,7 @@ public class IndexingLoop implements Closeable {
    *
    * <p>Backed by {@link LoopState}; new callers should prefer {@link #loopState()} for
    * type safety. This String accessor is retained for the worker-state wire emission
-   * path ({@code ChaosSuiteTest}, {@code WorkerAppServices.indexingLoopState()},
+   * path ({@code EngineForegroundPacingTest}, {@code WorkerAppServices.indexingLoopState()},
    * existing Mockito stubs in the {@code WorkerIngestService*} test family) where the
    * String form crosses a process or test-mock boundary.
    *

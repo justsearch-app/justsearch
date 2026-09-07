@@ -51,7 +51,7 @@
       "tag": "systemTest",
       "tier": "opt-in-system-evidence",
       "owner": "system-tests end-to-end coverage",
-      "reason": "System tests exercise multi-process behavior and are not part of default hosted unit-test evidence.",
+      "reason": "System tests exercise behaviour across a real external boundary the Engine still has (llama-server, the extraction sandbox child pool) and are not part of default hosted unit-test evidence. Until lane F stage A this tier also carried the Head/Worker multi-process cases; item A12 retired those whose subject was the process pair and moved the surviving product cases into the app-engine unit suite, where they run every build.",
       "cadence": "manual or release-oriented verification before changing system lifecycle behavior"
     },
     {

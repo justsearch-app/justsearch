@@ -4,12 +4,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import io.justsearch.app.engine.EngineRoot;
+import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.gpu.VramDetector;
 import io.justsearch.indexing.chunking.ChunkSplitter;
+import io.justsearch.ipc.SearchResponse;
+import io.justsearch.ipc.StatusResponse;
 import io.justsearch.systemtests.chaos.ExternalLlamaServerClient;
-import io.justsearch.systemtests.chaos.GrpcTestClient;
-import io.justsearch.systemtests.chaos.MmfTestHarness;
-import io.justsearch.systemtests.chaos.WorkerProcessManager;
 import io.justsearch.systemtests.provisioning.TestEnvironmentProvisioner;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -37,15 +42,58 @@ import org.slf4j.LoggerFactory;
  * <p><b>Prerequisites:</b>
  * <ul>
  *   <li>llama-server running at localhost:8080 with a text model (e.g., Qwen, Llama)</li>
- *   <li>Worker distribution built (./gradlew :modules:indexer-worker:installDist)</li>
  * </ul>
  *
  * <p><b>Note:</b> Tests will FAIL if llama-server is not available.
  * This is intentional - silent skipping hides untested code paths.
+ *
+ * <p><b>Lane F stage A item A12 — this class now composes the Engine in-process.</b> It used to
+ * reach a real index through the chaos tier's three-part rig: {@code WorkerProcessManager} spawned
+ * a Worker JVM from the installed distribution, {@code MmfTestHarness} read the gRPC port that
+ * process published into a memory-mapped signal file, and {@code GrpcTestClient} dialled that port.
+ * All three are gone with the process collapse. The index half is now built in this JVM by
+ * {@link EngineRoot}, and every index call goes through the {@link KnowledgeClient} it returns.
+ * The class stays in {@code systemTest} rather than moving to the {@code app-engine} unit tier
+ * (where the other A12 conversions landed) for one reason only: it is {@code @Tag("ai")} and needs
+ * an external llama-server, which a unit-tier suite may not require.
+ *
+ * <p><b>What changed meaning, stated rather than smoothed over.</b>
+ *
+ * <ol>
+ *   <li><b>What was dropped, and why.</b> {@code worker.spawnWorker()}'s returned PID (logged,
+ *       never asserted), the {@code mmf.keepAlive()} heartbeat that kept a spawned Worker from
+ *       honouring the suicide pact, and the {@code mmf.awaitPort(30_000, 100)} handshake. All
+ *       three were about the second process; there is no process, no watchdog and no port. The
+ *       "worker should be healthy" gate survives as {@code client.isHealthy()}, which now answers
+ *       from the composed index half rather than from a health RPC over a channel.
+ *   <li><b>{@code grpcClient.awaitIndexing(n, timeoutMs, pollMs)} is inlined here</b> as
+ *       {@link #awaitIndexed}, condition-for-condition with the retired implementation
+ *       (GrpcTestClient.java:410-434): the queue has drained AND the index holds at least
+ *       {@code n} documents.
+ *   <li><b>The class-level {@link Timeout} is new.</b> {@code conventions.jvm-base} applies
+ *       {@code junit.jupiter.execution.timeout.default=30s} to every {@code Test} task
+ *       (JvmBaseConventionsPlugin.kt:118) and the {@code systemTest} task does not override it, so
+ *       every method here ran under a 30s cap that its own 30s/60s waits and a real LLM round trip
+ *       cannot fit inside. That is a pre-existing condition, not something the collapse caused, but
+ *       leaving it in place would mean shipping a converted test that still cannot pass. Flagged
+ *       because it is an addition, not a translation.
+ * </ol>
+ *
+ * <p><b>{@link TestEnvironmentProvisioner} is kept for its system properties, not its
+ * fail-fast.</b> Under the split architecture it served two purposes: it verified the worker
+ * distribution existed, and it pointed {@code justsearch.repo.root} / {@code justsearch.ssot.path}
+ * / {@code justsearch.config} at the real project directories. The Engine runs in <em>this</em>
+ * JVM now, so the second purpose is exactly what it needs — those are the same values the spawned
+ * Worker used to receive as {@code -D} JVM args. The first purpose is vestigial: its
+ * {@code verifyWorkerDist()} still requires {@code justsearch.worker.dist.dir} to name a real
+ * directory (the {@code systemTest} task still sets it, and {@code prepareTests} still builds it),
+ * but nothing in this class spawns anything. Item A13, which collapses the standalone
+ * distribution, has to revisit that precondition.
  */
 @DisplayName("Summarization Pipeline E2E Tests")
 @Tag("systemTest")
 @Tag("ai")
+@Timeout(600)
 class SummarizationPipelineE2ETest {
   private static final Logger log = LoggerFactory.getLogger(SummarizationPipelineE2ETest.class);
   private static final int LLAMA_SERVER_PORT = 8080;
@@ -121,9 +169,8 @@ class SummarizationPipelineE2ETest {
   private static boolean llamaServerAvailable;
   private static HttpClient httpClient;
 
-  private WorkerProcessManager worker;
-  private MmfTestHarness mmf;
-  private GrpcTestClient grpcClient;
+  private EngineRoot engine;
+  private KnowledgeClient client;
   private Path testDataDir;
 
   @BeforeAll
@@ -151,19 +198,14 @@ class SummarizationPipelineE2ETest {
   }
 
   @AfterEach
-  void cleanup() throws Exception {
-    if (grpcClient != null) {
-      grpcClient.close();
-      grpcClient = null;
+  void cleanup() {
+    // EngineRoot.close() closes the KnowledgeClient it handed out, so the client is released by
+    // dropping the reference rather than by a second close.
+    if (engine != null) {
+      engine.close();
+      engine = null;
     }
-    if (worker != null) {
-      worker.close();
-      worker = null;
-    }
-    if (mmf != null) {
-      mmf.close();
-      mmf = null;
-    }
+    client = null;
   }
 
   // =========================================================================
@@ -517,22 +559,11 @@ class SummarizationPipelineE2ETest {
     // Clean data directory for isolation
     cleanDataDirectory(env.getTempDir());
 
-    // 1. Spawn worker
-    worker = WorkerProcessManager.fromDistribution(env.getWorkerDistDir(), env.getTempDir());
-    worker.withJvmArgs(env.getWorkerJvmArgs());
-    long pid = worker.spawnWorker();
-    log.info("Worker spawned with PID: {}", pid);
-
-    // 2. Open MMF and discover gRPC port
-    mmf = new MmfTestHarness(worker.getSignalFilePath());
-    mmf.open();
-    mmf.keepAlive();
-
-    int grpcPort = mmf.awaitPort(30_000, 100);
-    log.info("Worker gRPC port: {}", grpcPort);
-
-    grpcClient = new GrpcTestClient(grpcPort);
-    assertTrue(grpcClient.isHealthy(), "Worker should be healthy");
+    // 1-2. Compose the Engine's index half in this JVM. This replaces spawn + port discovery +
+    // channel: there is no second process to spawn, no signal file to read a port out of, and no
+    // channel to open. startEngine() either hands back a working client or throws.
+    startEngine(env.getTempDir());
+    assertTrue(client.isHealthy(), "Engine should be healthy");
 
     // 3. Create test document file
     Path testDoc = testDataDir.resolve("quarterly-report.md");
@@ -542,11 +573,11 @@ class SummarizationPipelineE2ETest {
     log.info("Created test document: {} (docId: {})", filePath, docId);
 
     // 4. Submit for indexing
-    int accepted = grpcClient.submitBatch(List.of(filePath));
+    int accepted = client.submitBatch(List.of(testDoc)).getAcceptedCount();
     assertEquals(1, accepted, "Should accept 1 file");
 
     // 5. Wait for indexing
-    assertTrue(grpcClient.awaitIndexing(1, 30_000, 200), "Should index within 30s");
+    assertTrue(awaitIndexed(1, 30_000, 200), "Should index within 30s");
 
     // 6. Verify document is indexed and searchable
     assertTrue(awaitSearchable("quarterly", 10_000),
@@ -600,6 +631,58 @@ class SummarizationPipelineE2ETest {
   // =========================================================================
 
   /**
+   * Publishes the resolved config the Engine reads and composes the index half in-process.
+   *
+   * <p>{@code WorkerConfig.load()} reads {@code ConfigStore.global()} (WorkerConfig.java:44-58),
+   * so the data directory and index base path have to be published before {@link EngineRoot#start}
+   * builds the {@code KnowledgeServer}. This is the whole of what
+   * {@code WorkerProcessManager.fromDistribution(...).withJvmArgs(...).spawnWorker()} plus
+   * {@code MmfTestHarness.awaitPort} plus {@code new GrpcTestClient(port)} collapse to.
+   *
+   * @param dataDir the Engine's data directory — the same directory the spawned Worker used to
+   *     receive as {@code -Djustsearch.data.dir}
+   */
+  private void startEngine(Path dataDir) throws Exception {
+    Path indexBase = dataDir.resolve("index");
+    Files.createDirectories(dataDir);
+    Files.createDirectories(indexBase);
+    ConfigStore.setGlobal(new ConfigStore(new ResolvedConfigBuilder()
+        .contributeBaseSources()
+        .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
+        .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
+        .build()));
+
+    engine = new EngineRoot(30_000L, 5_000);
+    client = engine.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+  }
+
+  /**
+   * Waits until the queue has drained and the index holds at least {@code expectedDocCount}
+   * documents.
+   *
+   * <p>The condition is the retired {@code GrpcTestClient.awaitIndexing} verbatim
+   * (GrpcTestClient.java:410-434); only the transport under {@code getStatus()} changed.
+   */
+  private boolean awaitIndexed(long expectedDocCount, long timeoutMs, long pollIntervalMs)
+      throws InterruptedException {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        StatusResponse status = client.getStatus();
+        if (status.getCore().getQueueDepth() == 0
+            && status.getCore().getDocCount() >= expectedDocCount) {
+          return true;
+        }
+      } catch (RuntimeException e) {
+        // A status call can fail while the index half swaps a writer; the loop re-reads.
+        log.debug("Status check failed: {}", e.getMessage());
+      }
+      Thread.sleep(pollIntervalMs);
+    }
+    return false;
+  }
+
+  /**
    * Reconstructs original content from chunks (verifies no gaps).
    */
   private String reconstructFromChunks(List<ChunkSplitter.Chunk> chunks, String original) {
@@ -642,7 +725,7 @@ class SummarizationPipelineE2ETest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        var response = grpcClient.searchText(query, 10);
+        SearchResponse response = client.search(query, 10);
         if (response.getTotalHits() > 0) {
           log.debug("Search '{}' returned {} hits", query, response.getTotalHits());
           return true;

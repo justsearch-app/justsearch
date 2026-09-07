@@ -19,6 +19,15 @@
       "expectedStressTests": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/LifecycleStressTest.java"
       ]
+    },
+    {
+      "modulePath": "modules/app-engine",
+      "gradleTask": ":modules:app-engine:test",
+      "owner": "Engine composition root / index half",
+      "reason": "Lane F stage A item A12. File-lock contention against the in-process index half (the converted WindowsTortureTest). Its instrument, FileIntruder, promises 10-50ms lock holds; on a machine saturated by a concurrent whole-repo build the holding threads are not scheduled to release on time and the writer starves, so the test stops measuring survival and starts measuring machine load. Measured 2026-09-07: passes in ~10s under :modules:app-engine:test, blew its 180s liveness budget on both methods during a concurrent ./gradlew test. Quarantined at full assertion strength rather than given a longer budget.",
+      "expectedStressTests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineFileLockContentionTest.java"
+      ]
     }
   ]
 }

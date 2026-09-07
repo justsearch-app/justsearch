@@ -27,7 +27,6 @@ fun intOverride(gradleProp: String, envVar: String, defaultValue: Int): Int {
 }
 
 val includeSystemTests = flagEnabled("includeSystemTests", "JUSTSEARCH_INCLUDE_SYSTEM_TESTS")
-val includeSoakTests = flagEnabled("includeSoakTests", "JUSTSEARCH_INCLUDE_SOAK_TESTS")
 val includeAiTests = flagEnabled("includeAiTests", "JUSTSEARCH_INCLUDE_AI_TESTS")
 val includeAgentTests = flagEnabled("includeAgentTests", "JUSTSEARCH_INCLUDE_AGENT_TESTS")
 val ragEvalTimeoutMinutes = intOverride(
@@ -118,14 +117,6 @@ sourceSets {
     compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output
     runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output
   }
-
-  // Soak tests (long-running, memory leak detection)
-  create("soakTest") {
-    java.srcDir("src/soakTest/java")
-    resources.srcDir("src/soakTest/resources")
-    compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output
-    runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output
-  }
 }
 
 // Configuration for test tiers
@@ -143,15 +134,6 @@ val systemTestImplementation by configurations.getting {
 }
 val systemTestRuntimeOnly by configurations.getting {
   extendsFrom(configurations.testRuntimeOnly.get())
-}
-
-val soakTestImplementation by configurations.getting {
-  extendsFrom(configurations.testImplementation.get())
-  extendsFrom(configurations.implementation.get())
-}
-val soakTestRuntimeOnly by configurations.getting {
-  extendsFrom(configurations.testRuntimeOnly.get())
-  extendsFrom(configurations.runtimeOnly.get())
 }
 
 dependencies {
@@ -174,6 +156,11 @@ dependencies {
   add("integrationTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
   add("systemTestImplementation", project(":modules:indexing"))
   add("systemTestImplementation", project(":modules:gpu-bridge"))
+  // Lane F stage A item A12 — the surviving system tests compose the Engine's index half
+  // IN PROCESS (EngineRoot) instead of spawning a Worker and dialling a port. `configuration`
+  // is what publishes the resolved config EngineRoot reads through WorkerConfig.load().
+  add("systemTestImplementation", project(":modules:app-engine"))
+  add("systemTestImplementation", project(":modules:configuration"))
   add("systemTestImplementation", testFixtures(project(":modules:worker-services")))
   add("systemTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
 }
@@ -300,7 +287,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   // action is registered after the convention plugin's project-wide
   // `tasks.withType<Test>().configureEach { ... }`, so it applies last and wins — the same
   // ordering this file already relies on for other Test-wide convention overrides (e.g.
-  // `maxHeapSize` below for systemTest/soakTest vs. the convention's 384m default).
+  // `maxHeapSize` below for systemTest vs. the convention's 384m default).
   // Flake VISIBILITY does not disappear: it moves to the flaky-test extraction in
   // unit-test attribution (tempdoc 829 R5, same PR). Revisit when this lane joins required
   // contexts (tempdoc 825 §3 is that path).
@@ -371,39 +358,6 @@ val systemTest = tasks.register<Test>("systemTest") {
       .dir("install/indexer-worker").get().asFile.absolutePath)
 }
 
-// Soak test task (Memory Leak Detection, Nightly)
-val soakTest = tasks.register<Test>("soakTest") {
-  description = "Runs soak tests (memory leak detection, long-running)."
-  group = "verification"
-
-  // Soak tests are intentionally opt-in; they can take hours.
-  // Enable with `-PincludeSoakTests=true` or `JUSTSEARCH_INCLUDE_SOAK_TESTS=true`.
-  enabled = includeSoakTests
-
-  testClassesDirs = sourceSets["soakTest"].output.classesDirs
-  classpath = sourceSets["soakTest"].runtimeClasspath
-
-  useJUnitPlatform()
-
-  // Time limit: 4 hours (Nightly)
-  timeout.set(Duration.ofHours(4))
-
-  // Soak tests need more heap
-  maxHeapSize = "2g"
-
-  // Enable NMT for the test JVM (for self-tracking if needed)
-  jvmArgs("-XX:NativeMemoryTracking=summary")
-
-  testLogging {
-    events("passed", "skipped", "failed")
-    showStandardStreams = true
-  }
-
-  // Pass system property for worker distribution directory location
-  systemProperty("justsearch.worker.dist.dir", project(":modules:indexer-worker").layout.buildDirectory
-      .dir("install/indexer-worker").get().asFile.absolutePath)
-}
-
 // Make check depend on unit tests
 tasks.named("check") {
   dependsOn(tasks.named("test"))
@@ -417,7 +371,7 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
 // The blanket `pmd { isIgnoreFailures = true }` that used to sit here is gone (tempdoc 930
 // §22.2 follow-up 10). It was the same dormancy hole `modules/benchmarks` carried until
 // follow-up 2 removed it: every PMD task in this module reported and then passed. `pmdMain`
-// was already clean; the 84 violations it was hiding in `systemTest`/`soakTest`/`integrationTest`
+// was already clean; the 84 violations it was hiding in `systemTest`/`integrationTest`
 // were cleared, and `config/pmd/ruleset-tests.xml` drops the two rules that a system test
 // genuinely disproves (`SystemPrintln`, `NonThreadSafeSingleton`) instead of ignoring all of them.
 
@@ -444,11 +398,4 @@ tasks.register("fullTestSuite") {
   description = "Runs all test tiers: unit, integration, and system tests."
   group = "verification"
   dependsOn(tasks.named("test"), integrationTest, systemTest)
-}
-
-// Custom task for nightly test suite (includes soak tests)
-tasks.register("nightlyTestSuite") {
-  description = "Runs all test tiers including soak tests (nightly)."
-  group = "verification"
-  dependsOn(tasks.named("test"), integrationTest, systemTest, soakTest)
 }

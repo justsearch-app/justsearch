@@ -629,7 +629,7 @@ tasks.register("quickBuild") {
 // ============================================================================
 
 // Every PMD task in every module — `pmdMain` plus one per non-main source set (`test`,
-// `integrationTest`, `systemTest`, `soakTest`, `determinismTest`, `testFixtures`). CI runs THIS,
+// `integrationTest`, `systemTest`, `determinismTest`, `testFixtures`). CI runs THIS,
 // not a hand-written list of task names: a module that registers a new `JvmTestSuite` gets a new
 // `pmd<Suite>` task, and a list would silently not cover it — the same dormancy shape follow-up 2
 // found in `pmdMain` and this change found in `modules/system-tests`. `dependsOn(provider { … })`

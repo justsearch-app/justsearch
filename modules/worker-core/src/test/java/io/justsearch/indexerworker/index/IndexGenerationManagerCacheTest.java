@@ -45,4 +45,48 @@ final class IndexGenerationManagerCacheTest {
     // The new state is itself cached until the next write.
     assertSame(read3, mgr.readStateBestEffort(), "post-write read is cached again");
   }
+
+  /**
+   * Lane F stage A item A12 — a write through ONE manager must be visible to every other manager
+   * over the same {@code state.json}.
+   *
+   * <p>This is not hypothetical layering: one index base path has several managers in a single JVM.
+   * {@code KnowledgeServer} builds one for the migration enumerator and the cutover monitor
+   * (KnowledgeServer.java:611); {@code WorkerIngestService} builds its own from the same
+   * {@code indexBasePath} for the migration control calls (WorkerIngestService.java:177); the
+   * switch-buffer replay builds two more temporaries (KnowledgeServerMigrationOps.java:542, :718).
+   * Before the stamp check, a cache was invalidated only by its OWN writes, so
+   * {@code resumeMigration} — which writes through the service's manager — was invisible to the
+   * enumerator's manager, which went on serving {@code migration_paused=true} out of its cache and
+   * never resumed. The in-process migration test
+   * ({@code app-engine .../EngineMigrationLifecycleTest}) is the end-to-end guard; this is the unit
+   * one.
+   */
+  @Test
+  void aWriteThroughOneManagerIsVisibleToAnotherOverTheSameStateFile(@TempDir Path tempDir)
+      throws Exception {
+    Path indexBase = tempDir.resolve("index");
+    IndexGenerationManager writer = new IndexGenerationManager(indexBase);
+    assertNotNull(writer.initializeOrLoad(), "layout created");
+
+    IndexGenerationManager reader = new IndexGenerationManager(indexBase);
+    IndexGenerationManager.State beforePause = reader.readStateBestEffort();
+    assertNotNull(beforePause, "the second manager sees the same state file");
+    assertEquals(
+        Boolean.FALSE,
+        Boolean.TRUE.equals(beforePause.migration_paused()),
+        "not paused to begin with");
+
+    writer.setMigrationPaused(true, "cross-instance");
+    assertEquals(
+        Boolean.TRUE,
+        Boolean.TRUE.equals(reader.readStateBestEffort().migration_paused()),
+        "the reader must observe the pause written through the other manager");
+
+    writer.setMigrationPaused(false, null);
+    assertEquals(
+        Boolean.FALSE,
+        Boolean.TRUE.equals(reader.readStateBestEffort().migration_paused()),
+        "and the resume too — this is the direction that silently wedged the migration enumerator");
+  }
 }
