@@ -67,6 +67,22 @@ Use the right Gradle command for the verification level you need:
 
 Source of truth for test tier definitions: `modules/system-tests/build.gradle.kts`.
 
+**Load-sensitive latency gates are quarantined, not weakened.** A test that asserts wall-clock
+latency fails on a machine running a concurrent Gradle build for a reason that has nothing to do
+with the code — and the right response is never to raise the threshold, because a tight threshold
+is exactly what makes it a regression detector. Tag it `@Tag("load-sensitive")`, exclude the tag
+from the suite that `check` depends on, and run it from a dedicated task on an idle machine:
+
+| Command | What runs |
+|---------|-----------|
+| `./gradlew :modules:app-services:loadSensitiveTest` | the `load-sensitive` latency gates, thresholds unchanged |
+
+There is **no perf-ratchet CI lane** today, so these tasks are manual by construction: wiring one
+into hosted CI would reproduce the flake there instead of here. If a perf lane is ever added, wire
+every `loadSensitiveTest` task into it rather than back into `check`. Worked case:
+`LambdaMartBenchmarkTest` (5 ms p50; measured 8.6-22 ms under sibling-worktree build load on four
+occasions in one session, green on every isolated re-run), quarantined 2026-09-07.
+
 **AI eval runtime policy (canonical):**
 
 1. Keep AI tests opt-in for normal dev and CI verification paths (`-PincludeAiTests=true` required).
