@@ -304,6 +304,17 @@ PINNED_CONFIG_KEYS = (
     "index.hybrid.chunk_collapse_limit_multiplier",
     "index.hybrid.leg_arbitration_enabled",
     "index.hybrid.leg_recall_complete_enabled",
+    # CPU execution provider for the encoders + a fixed intra-op pool (PR 0b, fifth pair round).
+    # CUDA kernels reduce in a nondeterministic order, so the same text embeds to slightly
+    # different vectors on two runs and those vectors move fusion candidates — upstream of every
+    # budget, so no budget pin removes it. ORT on CPU is bit-deterministic for a FIXED thread
+    # count, which is why the thread pin belongs with the provider pin rather than beside it.
+    "justsearch.embed.gpu.enabled",
+    "justsearch.splade.gpu_enabled",
+    "justsearch.ner.gpu_enabled",
+    "justsearch.rerank.gpu.enabled",
+    "justsearch.bgem3.gpu_enabled",
+    "justsearch.onnxruntime.intra_op_threads",
 )
 
 #: Cutoffs that are HARD-CODED and therefore cannot be pinned by any env setting. Recorded here

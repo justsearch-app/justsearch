@@ -62,6 +62,41 @@ export JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS=60000
 export JUSTSEARCH_RERANK_TOP_K=40
 export JUSTSEARCH_RERANK_GPU_MEM_MB=4096
 
+# --- CPU execution provider for the ENCODERS (PR 0b, fifth pair round) --------------------
+# Pair 5's residual was index-time embedding jitter on the GPU moving fusion candidates: no
+# budget pin removes it, because it is produced upstream of every budget. CUDA kernels reduce in
+# a nondeterministic order (atomics / split-K), so the same text embeds to slightly different
+# vectors on two runs; ONNX Runtime on CPU is bit-deterministic for a fixed thread count.
+#
+# No new key was needed — every encoder role already has one, read at
+# InferenceCompositionRoot.resolveVariant(..., <role>Cfg.gpuEnabled()) and honoured by
+# VariantSelector.select's `gpuAllowed` (a CPU-installed variant then stays CPU instead of being
+# promoted to the CUDA EP). Set per role rather than via the master justsearch.gpu.enabled,
+# because the master does NOT reach two of them: justsearch.embed.gpu.enabled has its own
+# resolver branch and justsearch.rerank.gpu.enabled hard-defaults to TRUE
+# (ResolvedConfigBuilder.java:1290-1301, :1366).
+#
+# The chat model is deliberately LEFT ON GPU: llama-server does not go through ORT EP selection
+# (it takes -ngl), the chat turns are already pinned by the sampling override, and putting a
+# 9B model on CPU would make a capture take hours.
+export JUSTSEARCH_EMBED_GPU_ENABLED=false
+export JUSTSEARCH_SPLADE_GPU_ENABLED=false
+export JUSTSEARCH_NER_GPU_ENABLED=false
+export JUSTSEARCH_RERANK_GPU_ENABLED=false
+export JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED=false
+export JUSTSEARCH_BGE_M3_GPU_ENABLED=false
+# Thread count decides how a CPU GEMM partitions its reduction, so it decides the summation
+# ORDER and therefore the low bits. ORT otherwise sizes the pool from hardware concurrency:
+# stable on one machine, silently different on another. 1 is the strongest pin and the slowest;
+# it is the right trade for a gating reference.
+export JUSTSEARCH_ORT_INTRA_OP_THREADS=1
+#
+# COST: the encoders now run on CPU. Estimated from the scifact GPU baseline (5,183 documents:
+# embedding 55.2 s, SPLADE 106.5 s, NER 26.5 s = 188 s of encoder time), scaled to this corpus's
+# ~1,276 chunks (~0.25x) = ~46 s of GPU encoder work, times a 10-30x CPU factor and again by
+# intra_op=1 => roughly 15-60 min of extra encoder time PER CYCLE, so 30-120 min added to a pair.
+# Estimate, not a measurement: time the first cycle and record the real figure here.
+#
 export JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000     # whole-doc legs stop truncating (default 100, corpus ~102 docs)
 export JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50 # parent collapse cap 40 -> 5000 (default 2)
 export JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false      # kill the Jaccard alpha step function
@@ -105,6 +140,7 @@ log "tree=$(git rev-parse --short HEAD) profile=$profile"
 log "pins: exhaustive=$JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH slots=$JUSTSEARCH_LLM_SLOTS rerank_deadline_ms=$JUSTSEARCH_RERANK_DEADLINE_MS"
 log "pins: rerank_top_k=$JUSTSEARCH_RERANK_TOP_K rerank_gpu_mem_mb=$JUSTSEARCH_RERANK_GPU_MEM_MB candidate_limit_max=$JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX collapse_mult=$JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER"
 log "pins: leg_arbitration=$JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED recall_complete=$JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE"
+log "pins: encoders_on_cpu embed=$JUSTSEARCH_EMBED_GPU_ENABLED splade=$JUSTSEARCH_SPLADE_GPU_ENABLED ner=$JUSTSEARCH_NER_GPU_ENABLED rerank=$JUSTSEARCH_RERANK_GPU_ENABLED intra_op_threads=$JUSTSEARCH_ORT_INTRA_OP_THREADS"
 cycle 1 || exit 1
 cycle 2 || exit 1
 (cd scripts/jseval && python -m jseval workflow-fixture diff --baseline "$out_abs/capture-1.json" --candidate "$out_abs/capture-2.json" --report-out "$out_abs/diff.json") 2>&1 | tee -a "$out_abs/pair.log"

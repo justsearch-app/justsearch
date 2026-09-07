@@ -1379,7 +1379,27 @@ public enum EnvRegistry {
      * <p>Cost is O(vectors) per query. It is a capture/diagnostic knob, not a production default.
      */
     INDEX_VECTOR_EXHAUSTIVE_SEARCH("index.vector.exhaustive_search",
-        "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH", LifecycleStage.PERMANENT);
+        "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH", LifecycleStage.PERMANENT),
+
+    // ============ ORT intra-op thread pin (lane F PR 0b) ============
+
+    /**
+     * Fixed intra-op thread count for every ONNX Runtime session; unset (the default) leaves
+     * ORT's own choice, which is today's behaviour.
+     *
+     * <p>ORT sizes the intra-op pool from hardware concurrency. On the CPU execution provider
+     * that count decides how a GEMM's reduction is partitioned, and a different partition sums
+     * the same floats in a different ORDER — so an embedding's low bits move with the thread
+     * count. Within one machine the count is stable, so this changes nothing there; ACROSS two
+     * machines, or a machine whose available parallelism differs between runs, it is a silent
+     * source of vector drift. A deterministic capture pins it (lane F: alongside the CPU
+     * execution-provider pins) so bit-stability does not depend on the host's core count.
+     *
+     * <p>Applies to CPU and CUDA sessions alike ({@code SessionOptionsApplier.applyBase}); it is
+     * only load-bearing for CPU, where the reduction happens on those threads.
+     */
+    ORT_INTRA_OP_THREADS("justsearch.onnxruntime.intra_op_threads",
+        "JUSTSEARCH_ORT_INTRA_OP_THREADS", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

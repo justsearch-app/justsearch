@@ -337,8 +337,19 @@ public record ResolvedConfig(
      *
      * @param ortProfilingDir directory for per-session profile files; null = disabled
      * @param verboseLogging enables ORT VERBOSE-level session logging
+     * @param intraOpThreads fixed ONNX Runtime intra-op thread count; null (the default) leaves
+     *     ORT's own hardware-derived choice, i.e. today's behaviour. Lane F PR 0b: on the CPU
+     *     execution provider the intra-op count decides how a GEMM's reduction is partitioned, so
+     *     it decides the summation ORDER and therefore an embedding's low bits. Pinned for
+     *     deterministic captures so bit-stability does not depend on the host's core count.
      */
-    public record Profiling(Path ortProfilingDir, boolean verboseLogging) {}
+    public record Profiling(Path ortProfilingDir, boolean verboseLogging, Integer intraOpThreads) {
+
+      /** Back-compat constructor (pre-lane-F-PR-0b): no intra-op pin. */
+      public Profiling(Path ortProfilingDir, boolean verboseLogging) {
+        this(ortProfilingDir, verboseLogging, null);
+      }
+    }
 
     /**
      * Enrichment-backfill pacing knobs (tempdoc 710 Wave-1.5 Move 4). Previously bare literals in

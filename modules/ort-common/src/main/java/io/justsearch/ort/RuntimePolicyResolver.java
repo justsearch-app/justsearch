@@ -62,12 +62,17 @@ public final class RuntimePolicyResolver {
             /* cudnnMaxWorkspace= */ true,
             /* epLevelUnifiedStream= */ true);
 
+    // Lane F PR 0b — the intra-op pin rides the same Profiling sub-record the other ORT session
+    // knobs do, so it reaches SessionOptionsApplier through the resolved config rather than a
+    // System.getenv read in the apply path (the closure property §14.24 FB established).
+    ResolvedConfig.Ai.Profiling sessionKnobs = cfg.ai().profiling();
     RuntimePolicy.Session session =
         new RuntimePolicy.Session(
             /* interOpThreads= */ 1,
             /* allowSpinning= */ false,
             /* forceSpinningStop= */ true,
-            /* useDeviceAllocatorForInitializers= */ true);
+            /* useDeviceAllocatorForInitializers= */ true,
+            /* intraOpThreads= */ sessionKnobs != null ? sessionKnobs.intraOpThreads() : null);
 
     // Tempdoc 397 §14.24 FB: Profiling sub-record carries the formerly env-var-only diagnostic
     // knobs. Resolver populates from cfg.ai().profiling(); SessionOptionsApplier reads these

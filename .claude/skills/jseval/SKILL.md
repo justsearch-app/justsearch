@@ -534,6 +534,40 @@ The active reranker is 12-layer / 12-head / 768-hidden (`models/onnx/reranker/co
 drops again the ladder steps **down**, not up — `top_k=30` (bucket 32) at 3072 MB, else the known-good
 20 at 2048.
 
+**The encoders run on CPU for a capture, and the intra-op pool is pinned.** Pair run 5's residual
+was index-time embedding jitter: CUDA kernels reduce in a nondeterministic order (atomics,
+split-K), so the same text embeds to slightly different vectors on two runs and those vectors move
+fusion candidates. That happens *upstream of every candidate budget*, so no budget pin removes it.
+ONNX Runtime on the CPU execution provider is bit-deterministic for a fixed thread count.
+
+No new key was needed for the provider: every encoder role already has one, read at
+`InferenceCompositionRoot.resolveVariant(..., <role>Cfg.gpuEnabled())` and honoured by
+`VariantSelector.select`'s `gpuAllowed`, which keeps a CPU-installed variant on CPU instead of
+promoting it to the CUDA EP. The capture pins them **per role** — `justsearch.embed.gpu.enabled`,
+`justsearch.splade.gpu_enabled`, `justsearch.ner.gpu_enabled`, `justsearch.rerank.gpu.enabled`,
+`justsearch.bgem3.gpu_enabled` — not via the master `justsearch.gpu.enabled`, because the master
+does **not** reach two of them: the embed flag has its own resolver branch and
+`justsearch.rerank.gpu.enabled` hard-defaults to `true` (`ResolvedConfigBuilder.java:1290-1301`,
+`:1366`).
+
+One key *was* needed: **`justsearch.onnxruntime.intra_op_threads`** /
+`JUSTSEARCH_ORT_INTRA_OP_THREADS`. `SessionOptionsApplier.applyBase` set `interOpNumThreads` but
+never `intraOpNumThreads` for production sessions (only `OrtSessionAssembler`'s probe paths did),
+so ORT sized the pool from hardware concurrency. On CPU that count decides how a GEMM partitions
+its reduction — hence the summation order, hence an embedding's low bits: stable within one
+machine, silently different across two. Unset leaves ORT's own choice, so nothing changes for
+anyone who does not set it.
+
+The **chat model stays on GPU** deliberately: llama-server does not go through ORT EP selection (it
+takes `-ngl`), the chat turns are already pinned by the sampling override, and a 9B model on CPU
+would make a capture take hours.
+
+*Cost, estimated not measured.* The scifact GPU baseline is 188 s of encoder time for 5,183
+documents (embedding 55.2 s, SPLADE 106.5 s, NER 26.5 s). Scaled to this corpus's ~1,276 chunks
+that is ~46 s of GPU encoder work; a 10–30x CPU factor, further slowed by `intra_op=1`, puts a
+cycle at roughly 15–60 minutes of extra encoder time — 30–120 minutes added to a pair. Time the
+first cycle and replace this estimate with the measurement.
+
 **The cross-encoder score is deterministic across builds (measured).** Pair run 4, over 117
 identity-matched hits between two fresh ingests of one corpus on one build: the cross-encoder score
 delta was **0.0000 at max, p95 and p50**. The sort key itself does not jitter, so `scoreTieEpsilon`

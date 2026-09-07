@@ -2363,6 +2363,12 @@ _HEALTHY_PIN_VALUES = {
     "index.hybrid.chunk_collapse_limit_multiplier": "50",
     "index.hybrid.leg_arbitration_enabled": "false",
     "index.hybrid.leg_recall_complete_enabled": "false",
+    "justsearch.embed.gpu.enabled": "false",
+    "justsearch.splade.gpu_enabled": "false",
+    "justsearch.ner.gpu_enabled": "false",
+    "justsearch.rerank.gpu.enabled": "false",
+    "justsearch.bgem3.gpu_enabled": "false",
+    "justsearch.onnxruntime.intra_op_threads": "1",
 }
 _HEALTHY_PINS = {k: _HEALTHY_PIN_VALUES[k] for k in wf.PINNED_CONFIG_KEYS}
 _HEALTHY_APPLIED = {"temperature": 0.0, "top_p": 0.8, "seed": 7}
