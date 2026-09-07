@@ -38,12 +38,12 @@ ingest of the fixture corpus (`docs/explanation` + `docs/reference` of this tree
 the 5 bundled help documents, paths relative to the worktree root), compact chat profile, every
 capture-run pin on and recorded in `provenance.pins`, applied sampling echoed per turn, enrichment
 complete at capture start (refused otherwise). `side-b/` is a second set of three taken the same
-way on the same build, and `gate.json` is the gate over the two: **PASS, 210 equal, 1 allowed, 0
-regressions, 7 noisy fields per side (3.2 percent, ceiling 5 percent)**. The noisy fields are the
-hit lists of 7 of 12 queries at the tie level (a hit within the cross-encoder epsilon of a neighbour
-swapping with one at the rerank-window boundary) and one chat turn's four source fields on one
-side; the other two turns (one cancelled) and every other field were identical across all six
-captures.
+way on the same build, and `gate.json` is the gate over the two: **PASS, 216 equal, 3 allowed, 0 regressions, 3 noisy fields on one side and 2 on the other
+(1.4 and 0.9 percent, ceiling 5 percent)**. The noisy fields are the hit lists of 3 of 12 queries
+at the rerank-window boundary; all three chat turns (one cancelled) and every other field were
+identical across all six captures. `gate-before-dense-leg-fix.json` is the same gate before the
+chunk dense leg's tie-break was fixed (7 noisy fields per side), kept to show what that fix
+removed.
 
 **Read the PASS for what it is: on ONE build, it is the noise withdrawal by construction.** Both
 sides of this record are the same tree, so the only correct verdict is "no difference", and the

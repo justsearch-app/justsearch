@@ -1,15 +1,11 @@
 {
   "allowed_by_class": {
     "equal-score-order": 0,
-    "generative-text": 3,
+    "generative-text": 1,
     "new-reason-code": 0
   },
   "baseline_provenance": {
-    "aiRuntimeModelFile": "Qwen3.5-4B-Q4_K_M.gguf",
-    "aiRuntimeOnline": true,
-    "aiRuntimeOnlineSignal": "active.modelPath",
     "aiRuntimeState": "failed",
-    "aiRuntimeVariantId": "cuda12",
     "available": true,
     "chatProfile": "compact",
     "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
@@ -18,7 +14,7 @@
     "docCountAtStart": 96,
     "docCountSource": "embedding.docCount",
     "enrichment": {
-      "chunkDocCount": 1288,
+      "chunkDocCount": 1284,
       "chunkEmbeddingPendingCount": 0,
       "chunkSpladeCoveragePercent": 0.0,
       "chunkSpladeEnabled": false,
@@ -35,7 +31,7 @@
       "spladeEnabled": true
     },
     "indexAvailable": true,
-    "observed_at": "2026-09-07T20:17:20.970665400Z",
+    "observed_at": "2026-09-07T18:26:14.819809700Z",
     "pathsOutsideCorpusRoot": 0,
     "pathsOutsideCorpusRootExamples": [],
     "pinSources": {
@@ -48,7 +44,6 @@
       "justsearch.llm.slots": "env_var",
       "justsearch.ner.gpu_enabled": "jvm_arg",
       "justsearch.rerank.chunks.deadline_ms": "env_var",
-      "justsearch.rerank.chunks.gpu.enabled": "default",
       "justsearch.rerank.deadline_ms": "env_var",
       "justsearch.rerank.gpu.enabled": "default",
       "justsearch.rerank.gpu_mem_mb": "env_var",
@@ -65,7 +60,6 @@
       "justsearch.llm.slots": "1",
       "justsearch.ner.gpu_enabled": "true",
       "justsearch.rerank.chunks.deadline_ms": "60000",
-      "justsearch.rerank.chunks.gpu.enabled": "false",
       "justsearch.rerank.deadline_ms": "60000",
       "justsearch.rerank.gpu.enabled": "true",
       "justsearch.rerank.gpu_mem_mb": "4096",
@@ -97,23 +91,19 @@
     "schema_version": 1,
     "service": "JustSearch Local API",
     "status": "ok",
-    "worker.buildStamp": "8a048084ff68bc54"
+    "worker.buildStamp": "867c7c8dd24ec9bd"
   },
   "candidate_provenance": {
-    "aiRuntimeModelFile": "Qwen3.5-4B-Q4_K_M.gguf",
-    "aiRuntimeOnline": true,
-    "aiRuntimeOnlineSignal": "active.modelPath",
     "aiRuntimeState": "failed",
-    "aiRuntimeVariantId": "cuda12",
     "available": true,
     "chatProfile": "compact",
     "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
     "corpusRootSource": "option",
-    "docCountAtEnd": 98,
+    "docCountAtEnd": 97,
     "docCountAtStart": 96,
     "docCountSource": "embedding.docCount",
     "enrichment": {
-      "chunkDocCount": 1288,
+      "chunkDocCount": 1285,
       "chunkEmbeddingPendingCount": 0,
       "chunkSpladeCoveragePercent": 0.0,
       "chunkSpladeEnabled": false,
@@ -130,7 +120,7 @@
       "spladeEnabled": true
     },
     "indexAvailable": true,
-    "observed_at": "2026-09-07T20:27:41.742454600Z",
+    "observed_at": "2026-09-07T18:45:47.751744400Z",
     "pathsOutsideCorpusRoot": 0,
     "pathsOutsideCorpusRootExamples": [],
     "pinSources": {
@@ -143,7 +133,6 @@
       "justsearch.llm.slots": "env_var",
       "justsearch.ner.gpu_enabled": "jvm_arg",
       "justsearch.rerank.chunks.deadline_ms": "env_var",
-      "justsearch.rerank.chunks.gpu.enabled": "default",
       "justsearch.rerank.deadline_ms": "env_var",
       "justsearch.rerank.gpu.enabled": "default",
       "justsearch.rerank.gpu_mem_mb": "env_var",
@@ -160,7 +149,6 @@
       "justsearch.llm.slots": "1",
       "justsearch.ner.gpu_enabled": "true",
       "justsearch.rerank.chunks.deadline_ms": "60000",
-      "justsearch.rerank.chunks.gpu.enabled": "false",
       "justsearch.rerank.deadline_ms": "60000",
       "justsearch.rerank.gpu.enabled": "true",
       "justsearch.rerank.gpu_mem_mb": "4096",
@@ -192,7 +180,7 @@
     "schema_version": 1,
     "service": "JustSearch Local API",
     "status": "ok",
-    "worker.buildStamp": "8a048084ff68bc54"
+    "worker.buildStamp": "867c7c8dd24ec9bd"
   },
   "captures_per_side": {
     "baseline": 3,
@@ -200,10 +188,10 @@
   },
   "counts": {
     "REGRESSION": 0,
-    "allowed": 3,
-    "equal": 216,
+    "allowed": 1,
+    "equal": 210,
     "missing": 0,
-    "noisy": 3
+    "noisy": 11
   },
   "declared_not_captured": [],
   "fields": [
@@ -293,7 +281,7 @@
     },
     {
       "class": "equal-score-order",
-      "crossSideReason": "tie group 7 (score -0.06591797) is not a permutation of the baseline's: member(s) present in the baseline and not in the candidate: ['{\"chunkIndex\": \"2\", \"chunkSpan\": \"3023:4852\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"0:389\", \"1019:1428\"], \"filename\": \"01-system-overview.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\"], \"parentDocId\": \"docs/explanation/01-system-overview.md\", \"path\": \"docs/explanation/01-system-overview.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 1, 1] vs candidate [1, 1, 1, 1, 1, 1, 1, 2] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
       "crossSideStatus": "REGRESSION",
       "field": "queries.hits[]",
       "reason": "excluded from the verdict: the both same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
@@ -449,7 +437,7 @@
     },
     {
       "class": "equal-score-order",
-      "crossSideReason": "tie group 3 (score 0.45532227) is not a permutation of the baseline's: member(s) present in the baseline and not in the candidate: ['{\"chunkIndex\": \"54\", \"chunkSpan\": \"93300:95321\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"722:1169\"], \"filename\": \"search-quality-register.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\", \"path\", \"title\"], \"parentDocId\": \"docs/reference/search-quality-register.md\", \"path\": \"docs/reference/search-quality-register.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']",
+      "crossSideReason": "the cutoff tie group (the group holding rank 10) is not the same SET on both sides: member(s) only in the baseline ['{\"chunkIndex\": \"34\", \"chunkSpan\": \"58786:60682\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"708:1134\"], \"filename\": \"environment-variables.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\", \"path\"], \"parentDocId\": \"docs/reference/configuration/environment-variables.md\", \"path\": \"docs/reference/configuration/environment-variables.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']; only in the candidate ['{\"chunkIndex\": \"33\", \"chunkSpan\": \"57152:58977\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"0:373\", \"1036:1497\"], \"filename\": \"environment-variables.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\", \"path\"], \"parentDocId\": \"docs/reference/configuration/environment-variables.md\", \"path\": \"docs/reference/configuration/environment-variables.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']",
       "crossSideStatus": "REGRESSION",
       "field": "queries.hits[]",
       "reason": "excluded from the verdict: the both same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
@@ -528,7 +516,7 @@
     },
     {
       "class": "equal-score-order",
-      "crossSideReason": "tie group 7 (score 0.101135254) is not a permutation of the baseline's: member(s) present in the baseline and not in the candidate: ['{\"chunkIndex\": \"27\", \"chunkSpan\": \"45734:47539\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"44:516\", \"673:1087\"], \"filename\": \"08-observability.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\"], \"parentDocId\": \"docs/explanation/08-observability.md\", \"path\": \"docs/explanation/08-observability.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 1, 1, 1] vs candidate [1, 1, 1, 1, 2, 1, 1, 1] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
       "crossSideStatus": "REGRESSION",
       "field": "queries.hits[]",
       "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
@@ -607,10 +595,12 @@
     },
     {
       "class": "equal-score-order",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
       "field": "queries.hits[]",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
       "record": "queries/q06",
-      "status": "equal"
+      "status": "noisy-baseline"
     },
     {
       "class": "exact",
@@ -838,10 +828,12 @@
     },
     {
       "class": "equal-score-order",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 2, 2, 1, 1] vs candidate [1, 1, 1, 2, 1, 1, 1, 1] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "crossSideStatus": "REGRESSION",
       "field": "queries.hits[]",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
       "record": "queries/q09",
-      "status": "equal"
+      "status": "noisy-baseline"
     },
     {
       "class": "exact",
@@ -992,10 +984,12 @@
     },
     {
       "class": "equal-score-order",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
       "field": "queries.hits[]",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the both same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
       "record": "queries/q11",
-      "status": "equal"
+      "status": "noisy-both"
     },
     {
       "class": "exact",
@@ -1069,10 +1063,12 @@
     },
     {
       "class": "equal-score-order",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 2] vs candidate [1, 1, 1, 1, 1, 2, 2] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "crossSideStatus": "REGRESSION",
       "field": "queries.hits[]",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
       "record": "queries/q12",
-      "status": "equal"
+      "status": "noisy-baseline"
     },
     {
       "class": "exact",
@@ -1252,9 +1248,9 @@
     {
       "class": "generative-text",
       "field": "chatTurns.reasoningText",
-      "reason": "generative text differs (no fixed seed on the chat path)",
+      "reason": "byte-equal",
       "record": "chatTurns/c01",
-      "status": "allowed:generative-text"
+      "status": "equal"
     },
     {
       "class": "exact",
@@ -1441,9 +1437,9 @@
     {
       "class": "generative-text",
       "field": "chatTurns.finalResponse",
-      "reason": "generative text differs (no fixed seed on the chat path)",
+      "reason": "byte-equal",
       "record": "chatTurns/c02",
-      "status": "allowed:generative-text"
+      "status": "equal"
     },
     {
       "class": "exact",
@@ -1482,31 +1478,39 @@
     },
     {
       "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
       "field": "chatTurns.sourceExcerptDigests",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
       "record": "chatTurns/c02",
-      "status": "equal"
+      "status": "noisy-candidate"
     },
     {
       "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
       "field": "chatTurns.sourcePaths",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
       "record": "chatTurns/c02",
-      "status": "equal"
+      "status": "noisy-candidate"
     },
     {
       "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
       "field": "chatTurns.sourceRefs",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
       "record": "chatTurns/c02",
-      "status": "equal"
+      "status": "noisy-candidate"
     },
     {
       "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
       "field": "chatTurns.sourceSpans",
-      "reason": "byte-equal",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
       "record": "chatTurns/c02",
-      "status": "equal"
+      "status": "noisy-candidate"
     },
     {
       "class": "exact",
@@ -1776,9 +1780,9 @@
   },
   "maxNoisyFraction": 0.05,
   "noisy_by_side": {
-    "baseline": 1,
-    "both": 2,
-    "candidate": 0
+    "baseline": 4,
+    "both": 3,
+    "candidate": 4
   },
   "pass": true,
   "schema": "jseval.workflow-fixture-diff.v1"
