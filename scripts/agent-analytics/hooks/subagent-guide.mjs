@@ -16,9 +16,10 @@ import { hardInvariants } from '../lib/hard-invariants.mjs';
 import { isDirectRun } from '../lib/hook-base.mjs';
 
 /**
- * Hook `additionalContext` output cap. The brief is deliberately minimal; this
- * constant exists so the cap is asserted by a test rather than only asserted by
- * a comment nobody re-measures after adding a line.
+ * Self-imposed budget for the brief's `additionalContext` (no harness-enforced
+ * cap is documented; ~10K is the house limit tempdoc 935 D2 cites). The brief is
+ * deliberately minimal; the constant exists so the budget is asserted by a test
+ * rather than only by a comment nobody re-measures after adding a line.
  */
 export const GUIDANCE_CHAR_CAP = 10000;
 

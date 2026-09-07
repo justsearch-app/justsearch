@@ -55,7 +55,10 @@ run('brief carries the artifact-path / read-the-schema line (935 D2)', () => {
 run('all three hygiene lines are present together, and only three were added', () => {
   const lines = buildGuidance({}).split('\n');
   const hygiene = lines.filter(
-    (l) => /set -o pipefail/.test(l) || /gitignore-aware/.test(l) || /absolute path/i.test(l),
+    (l) =>
+      /set -o pipefail/.test(l) ||
+      /gitignore-aware/.test(l) ||
+      /explicit absolute path.*actual schema/i.test(l),
   );
   assert.equal(hygiene.length, 3, `expected exactly 3 hygiene lines, got ${hygiene.length}`);
 });
