@@ -22,7 +22,7 @@ import io.justsearch.app.api.status.TelemetryMetricsView;
 import io.justsearch.app.api.status.VectorFormatView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.app.services.settings.UiSettingsStore;
@@ -185,7 +185,7 @@ final class LifecycleContractTest {
     inferenceCap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
 
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())
@@ -237,7 +237,7 @@ final class LifecycleContractTest {
 
     OnlineAiService __onlineAi = OnlineAiService.unavailable();
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())
@@ -279,7 +279,7 @@ final class LifecycleContractTest {
 
     OnlineAiService __onlineAi = OnlineAiService.unavailable();
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())
@@ -336,7 +336,7 @@ final class LifecycleContractTest {
     // PENDING is the initial state for configured=true — no transition needed
 
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())
@@ -388,7 +388,7 @@ final class LifecycleContractTest {
     var inferenceCap = new io.justsearch.app.services.lifecycle.InferenceCapability(true);
 
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())
@@ -436,7 +436,7 @@ final class LifecycleContractTest {
 
     // Mock a KnowledgeServerBootstrap that is "ready" but throws on status fetch.
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())
@@ -486,7 +486,7 @@ final class LifecycleContractTest {
 
     OnlineAiService __onlineAi = OnlineAiService.unavailable();
     KnowledgeServerBootstrap mockKs = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient mockClient = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
     when(mockClient.getWorkerOperationalView())

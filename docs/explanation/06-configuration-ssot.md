@@ -168,7 +168,7 @@ New UX-facing fields introduced for market-readiness:
 
 **Two enforcement layers:**
 1. **Cleanup** (`POST /api/indexing/excludes/apply`): walks watched roots, deletes already-indexed docs matching patterns. Directory patterns use `deleteDocsByPathPrefix` optimization; file patterns use `deleteDocById`. Supports `?dryRun=true` for per-pattern match preview without deletion.
-2. **Live prevention**: file watcher event handler (`RemoteKnowledgeClient`) filters excluded paths before submitting to the Worker. Filtered at the event handler, not at the watcher source (library limitation).
+2. **Live prevention**: file watcher event handler (`KnowledgeClient`) filters excluded paths before submitting to the Worker. Filtered at the event handler, not at the watcher source (library limitation).
 
 **Worker-side hardcoded skip lists** provide a baseline independent of user-configured patterns — see `docs/explanation/03-knowledge-server.md` § "File skip lists."
 

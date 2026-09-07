@@ -67,7 +67,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     System.setProperty(EVAL_MODE_PROP, "true");
     Path dataDir = Files.createDirectories(tempDir.resolve("data"));
     KnowledgeServerConfig config = configFor(dataDir, tempDir.resolve("working"));
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
     KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
     bootstrap.tryIngestHelpFiles(client, config);
@@ -90,7 +90,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     KnowledgeServerConfig config = configFor(dataDir, workingDir);
 
     // Don't stub submitBatch — default null return is fine; production ignores the return value.
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
     KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
     bootstrap.tryIngestHelpFiles(client, config);

@@ -14,11 +14,11 @@ package io.justsearch.core.scheduling;
  *       engaged; tempdoc 630). Written from a polled {@code GetSystemPowerStatus}.
  * </ul>
  *
- * <p><b>Why this type exists.</b> Both signals cross a process boundary today: the Head writes two
- * bytes of the memory-mapped signal file ({@code MainSignalBus.writeGpuActive} /
- * {@code writeEnergyReduced}) and the Worker reads them back through {@code WorkerSignalBus}. Lane F
- * merges the two processes, so the MMF slots go with the wire — the *quantity* the scheduler is
- * about is a pair of booleans in one JVM, not a shared file. This class is that pair, and it is
+ * <p><b>Why this type exists.</b> Both signals used to cross a process boundary: the Head wrote two
+ * bytes of the memory-mapped signal file and the Worker read them back through
+ * {@code WorkerSignalBus}. Lane F merged the two processes, so the MMF slots went with the wire
+ * (item A10) — the *quantity* the scheduler is about is a pair of booleans in one JVM, not a shared
+ * file. This class is that pair, and it is
  * deliberately in {@code core}: {@code core} carries no project dependency at all, and both halves
  * already see it: {@code app-services} declares {@code api(project(":modules:core"))}
  * ({@code modules/app-services/build.gradle.kts:23}), and the worker half reaches it through
@@ -34,13 +34,13 @@ package io.justsearch.core.scheduling;
  * {@code BackfillScheduler} and {@code EmbeddingBackfillOps}, where energy always defers but the
  * GPU signal defers only when {@code embeddingProvider.isUsingGpu()} — a CPU-backed backfill has no
  * reason to yield VRAM it is not using. The two are deliberately NOT merged: they answer different
- * questions. Named here so item A10's sweep of the MMF readers cannot miss the second one.
+ * questions. Named here because item A10's sweep of the MMF readers had to reach both.
  *
- * <p><b>Transitional state (until item A10).</b> While the split process still exists the MMF stays
- * the transport: the writers set this gauge <em>and</em> the byte, and the Worker's
- * {@code MmfWorkerSignalBus} feeds its own gauge from the byte on every read. The gauge is therefore
- * the read surface and the single owner of the composition rule in both processes now, and becomes
- * the only mechanism once {@code MmfWorkerSignalLayoutV1} is deleted.
+ * <p><b>This gauge is now the only mechanism.</b> Item A10 deleted the memory-mapped writers and
+ * readers, so there is no second copy of either signal: the inference mode-change listener and the
+ * energy poller write this instance, and the index half reads the same instance. Sharing ONE
+ * instance is therefore load-bearing rather than tidy — a composition that hands the index half a
+ * fresh gauge gives it a pair of booleans nobody writes, and it never yields.
  *
  * <p>Thread-safe: written from the inference mode-change listener and the energy poll thread, read
  * from the indexing loop and backfill threads. Both fields are {@code volatile} and independent, so

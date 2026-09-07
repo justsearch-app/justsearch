@@ -7,7 +7,7 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,7 +37,7 @@ class OfflineCoordinatorTest {
     private StubInferenceLifecycleManager inferenceManager;
     private RuntimeReconciler reconciler;
     private VduBatchProcessor vduBatchProcessor;
-    private RemoteKnowledgeClient knowledgeClient;
+    private KnowledgeClient knowledgeClient;
     private VduCapabilityState capabilityState;
     private OfflineCoordinator coordinator;
 
@@ -57,7 +57,7 @@ class OfflineCoordinatorTest {
                 new RuntimeGpuLease());
         vduBatchProcessor = mock(VduBatchProcessor.class);
         when(vduBatchProcessor.processPendingFiles()).thenReturn(0);
-        knowledgeClient = mock(RemoteKnowledgeClient.class);
+        knowledgeClient = mock(KnowledgeClient.class);
         capabilityState = new VduCapabilityState();
         coordinator =
             new OfflineCoordinator(

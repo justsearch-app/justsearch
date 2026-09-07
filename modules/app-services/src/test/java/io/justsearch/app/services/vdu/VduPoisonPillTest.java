@@ -33,14 +33,14 @@ class VduPoisonPillTest {
 
   private StubVduProcessor stubProcessor;
   private StubVramDetector stubVram;
-  private TrackingStubRemoteKnowledgeClient stubClient;
+  private TrackingStubKnowledgeClient stubClient;
   private TestableVduBatchProcessor batchProcessor;
 
   @BeforeEach
   void setup() {
     stubProcessor = new StubVduProcessor();
     stubVram = new StubVramDetector().withMeetsVduRequirements(true);
-    stubClient = new TrackingStubRemoteKnowledgeClient();
+    stubClient = new TrackingStubKnowledgeClient();
     batchProcessor = new TestableVduBatchProcessor(stubProcessor, stubVram, stubClient);
   }
 
@@ -214,8 +214,8 @@ class VduPoisonPillTest {
   /**
    * Extended stub that tracks per-document retry counts for testing.
    */
-  static class TrackingStubRemoteKnowledgeClient extends StubRemoteKnowledgeClient {
-    // Inherits all functionality from StubRemoteKnowledgeClient
+  static class TrackingStubKnowledgeClient extends StubKnowledgeClient {
+    // Inherits all functionality from StubKnowledgeClient
   }
 
   /**
@@ -225,11 +225,11 @@ class VduPoisonPillTest {
   static class TestableVduBatchProcessor {
     private final StubVduProcessor vduProcessor;
     private final StubVramDetector vramDetector;
-    private final StubRemoteKnowledgeClient knowledgeClient;
+    private final StubKnowledgeClient knowledgeClient;
 
     TestableVduBatchProcessor(StubVduProcessor vduProcessor,
                               StubVramDetector vramDetector,
-                              StubRemoteKnowledgeClient knowledgeClient) {
+                              StubKnowledgeClient knowledgeClient) {
       this.vduProcessor = vduProcessor;
       this.vramDetector = vramDetector;
       this.knowledgeClient = knowledgeClient;

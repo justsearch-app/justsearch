@@ -590,7 +590,7 @@
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsStore.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
       ],
       "tests": [
@@ -1231,15 +1231,13 @@
       "reconciliation": "REACQUIRE_FOR_CURRENT_PROCESS",
       "status": "READY",
       "implementationSources": [
-        "modules/app-util/src/main/java/io/justsearch/app/util/AppInstanceLock.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/MainSignalBus.java",
-        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/coordination/MmfWorkerSignalBus.java"
+        "modules/app-util/src/main/java/io/justsearch/app/util/AppInstanceLock.java"
       ],
       "tests": [
         "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockTest.java"
       ],
       "fixtures": [],
-      "mmapNote": "worker_signal.lock matches this row's *.lock glob exactly, but it is not a PID marker: it is a memory-mapped Head<->Worker IPC region (MainSignalBus.java:63-73, MmfWorkerSignalBus.java:98-103) holding port, heartbeat and PID bytes, recreated each launch. Same lifecycle, different thing; named here so the row's format line is not read as covering more than it says."
+      "mmapNote": "HISTORICAL. worker_signal.lock matched this row's *.lock glob exactly without being a PID marker: it was the memory-mapped Head<->Worker IPC region holding port, heartbeat and PID bytes, recreated each launch. Lane F stage A item A10 deleted both ends of it (MainSignalBus, MmfWorkerSignalBus) when the two processes became one JVM, so no such file is written any more. The note is kept because the *.lock glob is unchanged and a reader still has to know the row does not cover a mapped region."
     },
     {
       "id": "agent-history-transcripts",
@@ -1431,6 +1429,10 @@
     }
   ],
   "nonDurableWriteSites": [
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBus.java",
+      "reason": "Dev-only signal file, not a store: it deletes <dataDir>/runtime/dev-reload.request to consume a hot-reload poke written by an external dev tool. Nothing is ever written here (existence IS the signal) and nothing survives a restart, so there is no format, no version and nothing to recover. This is what is left of the memory-mapped signal bus lane F stage A item A10 deleted — the one signal that genuinely crossed a process boundary, re-homed from a byte onto a file."
+    },
     {
       "path": "modules/app-util/src/main/java/io/justsearch/app/util/TempFileManager.java",
       "reason": "JVM/OS temp scratch: allocates and reaps files under java.io.tmpdir for in-flight work."

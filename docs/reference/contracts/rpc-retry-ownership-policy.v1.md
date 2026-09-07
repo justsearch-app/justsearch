@@ -82,9 +82,14 @@ The contract's machine-readable companions (the matrix + retry-policy-profile JS
 8. Evidence-reference existence checks.
 
 Runtime wiring parity is validated by executable module tests:
-1. `RemoteKnowledgeClientRetryConfigTest`
-2. `GrpcRetryServiceConfigTest`
-3. `GrpcAiTranslatorServiceTest`
+1. `GrpcAiTranslatorServiceTest`
+
+> **Head-to-Worker rows are historical as of lane F stage A (2026-09).** Items A9 and A10 deleted
+> that channel — server, client, retry service config and circuit breaker — so the two tests that
+> pinned its runtime wiring (`RemoteKnowledgeClientRetryConfigTest`, `GrpcRetryServiceConfigTest`)
+> went with it. The rows below are kept as the record of what the wire promised; the surviving
+> enforced surface is the Brain's translator channel. Nothing re-validates the Head-to-Worker
+> rows, and they must not be read as describing live behaviour.
 
 ## Change Rules
 

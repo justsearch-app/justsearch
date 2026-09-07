@@ -114,7 +114,7 @@ Important direction rule (to prevent leaking internal proto churn into the UI la
   - The Head should translate gRPC responses into **Head-owned** JSON DTOs (or plain maps) and expose those over REST.
   - This keeps the UI REST surface stable even if the proto evolves.
 
-This is enforced by ArchUnit guardrails (see `UiApiGuardrailsTest`). A concrete example is Worker status mapping: `RemoteKnowledgeClient` exposes UI-friendly status snapshots to the Head so `LocalApiServer` doesn’t depend on proto DTO types.
+This is enforced by ArchUnit guardrails (see `UiApiGuardrailsTest`). A concrete example is Worker status mapping: `KnowledgeClient` exposes UI-friendly status snapshots to the Head so `LocalApiServer` doesn’t depend on proto DTO types.
 
 ## Network posture (local-only)
 The Local API is intentionally **not** a network service.

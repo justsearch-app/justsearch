@@ -12,8 +12,9 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadOnlyRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
-import io.justsearch.indexerworker.coordination.MmfWorkerSignalBus;
+import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
@@ -289,7 +290,12 @@ public final class KnowledgeServer implements Closeable {
       new AtomicReference<>(java.util.Optional::empty);
 
   /**
-   * Creates a new KnowledgeServer with the specified configuration.
+   * Creates a new KnowledgeServer with the specified configuration and its own signal bus.
+   *
+   * <p>The bus it builds reads a gauge no other component writes, so nothing claims the GPU and
+   * nothing reports an energy signal. That is the right answer for an index half composed on its
+   * own; the Engine's composition root uses the two-argument constructor instead, because the
+   * point of the gauge is that the Head-side writers and this reader share ONE instance.
    *
    * @param config Worker configuration
    */
@@ -300,15 +306,15 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Creates a new KnowledgeServer with an externally-supplied signal bus (lane F stage A item A6).
    *
-   * <p>When the index half runs inside the Engine JVM there is no second process, so the
-   * memory-mapped bus has nothing to carry: the composition root passes an
-   * {@code InProcessWorkerSignalBus} over the shared {@code GpuSchedulingGauge} instead. This
-   * matters for correctness, not tidiness — {@code MmfWorkerSignalBus.shouldDie()} is the suicide
-   * pact, and an in-JVM index half reading a heartbeat nobody writes would terminate the Engine.
+   * <p>When the index half runs inside the Engine JVM there is no second process, so a
+   * memory-mapped bus would have nothing to carry: the composition root passes an
+   * {@code InProcessWorkerSignalBus} over the shared {@code GpuSchedulingGauge} instead. Item A10
+   * deleted the memory-mapped implementation and the suicide pact with it, so this parameter is now
+   * about gauge identity rather than transport: a bus built here would read a gauge the Head-side
+   * writers never touch, and the index half would never yield the GPU.
    *
    * @param config Worker configuration
-   * @param signalBus the bus to use, or {@code null} to open the memory-mapped one (the separate
-   *     process path, deleted at item A10)
+   * @param signalBus the bus to use, or {@code null} to build one over a private gauge
    */
   public KnowledgeServer(WorkerConfig config, WorkerSignalBus signalBus) {
     this.config = config;
@@ -493,18 +499,15 @@ public final class KnowledgeServer implements Closeable {
       tPrev = tPhase;
 
       // 1. Initialize signal bus.
-      // Tempdoc 630: pass Head's PID (forwarded via EnvRegistry.HEAD_PID) so the suicide-pact can
-      // distinguish a real Head death from a benign OS-resume stale heartbeat. Read directly from
-      // EnvRegistry (ConfigStore is not ready until step 3, like INDEX_TRACING_LEVEL above);
-      // 0 ⇒ unknown ⇒ heartbeat-only (pre-630) behavior (standalone runs).
+      // Lane F item A6: the Engine composition root supplies the in-process bus over the gauge it
+      // shares with the Head-side writers. Item A10 deleted the memory-mapped alternative, so the
+      // fallback below is the same implementation over a gauge nobody else writes — the honest
+      // reading for an index half composed on its own (tests, a standalone boot): no GPU claim, no
+      // energy signal, and therefore no yielding.
       if (injectedSignalBus != null) {
-        // Lane F item A6: the Engine composition root supplies the in-process bus. No memory-mapped
-        // region, no suicide pact, no port to publish — see InProcessWorkerSignalBus.
         signalBus = injectedSignalBus;
       } else {
-        Path signalPath = dataDir.resolve("worker_signal.lock");
-        long headPid = EnvRegistry.HEAD_PID.getLong(0L);
-        signalBus = new MmfWorkerSignalBus(signalPath, headPid);
+        signalBus = new InProcessWorkerSignalBus(new GpuSchedulingGauge());
       }
       signalBus.open();
 
@@ -2001,11 +2004,10 @@ public final class KnowledgeServer implements Closeable {
         try {
           Thread.sleep(1000); // Check every second
 
-          if (signalBus.shouldDie()) {
-            log.info("Sentinel detected termination condition, initiating shutdown");
-            initiateShutdown();
-            break;
-          }
+          // Lane F item A10: the suicide-pact arm is gone with the memory-mapped bus that fed it.
+          // In one JVM there is no heartbeat to miss, so self-termination on a stale beat could
+          // only ever be a false positive. Shutdown is now exclusively the ordered in-process
+          // sequence the composition root drives.
 
           // Dev hot-reload: check for reload signal from Gradle continuous build
           if (devReloadManager != null && signalBus.isReloadRequested()) {

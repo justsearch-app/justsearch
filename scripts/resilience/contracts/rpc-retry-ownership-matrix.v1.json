@@ -25,9 +25,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -46,9 +45,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -67,9 +65,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -88,9 +85,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -109,9 +105,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -130,9 +125,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -151,9 +145,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -172,9 +165,8 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only search surface; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",
@@ -193,7 +185,7 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Read-only paginated corpus iteration used by GPL training job; safe for bounded transport retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/gpl/GplJobCoordinator.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceListAllDocumentIdsTest.java"
@@ -212,8 +204,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -233,8 +224,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -254,8 +244,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -275,8 +264,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -296,8 +284,7 @@
       "deadlineCategory": "LONG_RUNNING",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -317,8 +304,7 @@
       "deadlineCategory": "LONG_RUNNING",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -338,8 +324,7 @@
       "deadlineCategory": "VDU_OPERATION",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -359,8 +344,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -380,8 +364,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -401,8 +384,7 @@
       "deadlineCategory": "VDU_OPERATION",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -422,8 +404,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -443,8 +424,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -464,8 +444,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -485,8 +464,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -506,8 +484,7 @@
       "deadlineCategory": "INDEX_GC",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -527,8 +504,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -548,8 +524,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -569,8 +544,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -590,8 +564,7 @@
       "deadlineCategory": "STANDARD",
       "evidenceRefs": [
         "modules/ipc-common/src/main/proto/indexing.proto",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.IngestService",
@@ -614,8 +587,7 @@
       "idempotencyKeySupport": "none",
       "stateSafetyNotes": "Control-plane health probe; safe for bounded retry.",
       "evidenceRefs": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteKnowledgeClientRetryConfigTest.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.HealthService",

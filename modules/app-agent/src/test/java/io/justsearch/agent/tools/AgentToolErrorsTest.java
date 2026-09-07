@@ -85,40 +85,6 @@ class AgentToolErrorsTest {
   }
 
   @Test
-  @DisplayName("877 open item: a signal-bus reconnect failure is the Worker being down, not INTERNAL")
-  void signalBusDownIsServiceUnavailable() {
-    // Verbatim from the live /api/worker/restart chaos run: the model was handed
-    // "Browse error: No valid port in signal bus". RemoteKnowledgeClient.reconnect throws this
-    // before any gRPC call exists, so the transport-name arm cannot see it.
-    OperationResult r =
-        AgentToolErrors.classify(
-            "core_browse_folders",
-            "Browse error",
-            new IllegalStateException("No valid port in signal bus"));
-
-    assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
-    assertEquals(Boolean.TRUE, r.retryable().orElseThrow(), "waiting is the remedy");
-    assertFalse(
-        r.message().contains("signal bus"),
-        "the internal invariant must not reach the model: " + r.message());
-    assertTrue(r.message().contains("retry shortly"), r.message());
-    assertTrue(r.message().startsWith("Browse error: "), r.message());
-  }
-
-  @Test
-  @DisplayName("877 open item: the reconnect PID-mismatch sibling classifies identically")
-  void reconnectPidMismatchIsServiceUnavailable() {
-    OperationResult r =
-        AgentToolErrors.classify(
-            "core_search_index",
-            "Search error",
-            new IllegalStateException("PID mismatch after reconnect: expected 1, got 2"));
-
-    assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
-    assertFalse(r.message().contains("PID mismatch"), r.message());
-  }
-
-  @Test
   @DisplayName("an unreachable Worker gets the same actionable sentence, not a transport dump")
   void workerUnreachableMessageIsActionable() {
     class StatusRuntimeException extends RuntimeException {
@@ -139,7 +105,10 @@ class AgentToolErrorsTest {
   }
 
   @Test
-  @DisplayName("an unrelated IllegalStateException is still INTERNAL_ERROR — the arm is narrow")
+  // Lane F item A10 deleted the signal-bus reconnect arm together with its only thrower
+  // (RemoteKnowledgeClient.reconnect). This test used to pin that the arm was narrow; it now pins
+  // the stronger fact that no IllegalStateException is special-cased at all.
+  @DisplayName("an IllegalStateException is INTERNAL_ERROR — no message-matching arm survives")
   void unrelatedIllegalStateStaysInternal() {
     OperationResult r =
         AgentToolErrors.classify(

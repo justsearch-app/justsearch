@@ -254,6 +254,34 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   item re-homes a cross-cutting concern from the transport onto a seam, the acceptance test has to
   enter through the **seam's real caller**, because the vocabulary is exactly what changed.
 
+- **S1 (the port catalogue exists, and it is smaller than 3.3 describes — deliberately).**
+  `governance/engine-ports.v1.json` + the `engine-port` gate. Design 3.3 lists five day-one ports;
+  only **two** are interfaces a composition root can bind (`SearchPort`, `IndexingService`). The
+  other three are catalogued as what they actually are — operations is a **register**
+  (`operation-surfaces.v1.json` plus the OperationCatalog/Dispatcher pair, not one Java type),
+  memory is **planned** (3.3 itself says "no new behaviour in lane F", and nothing moved), health is
+  an **HTTP surface** pinned by the readiness reason codes. Writing five `kind: interface` entries
+  would have been worse than writing two: the gate would then guard types nobody implements while
+  the real drift went on being guarded only by its own register.
+- **S1 (the gate's direction is source → register, not register → source).** The check that earns
+  its keep is that a class found implementing a port must be *declared*. That is the drift a
+  collapsed process introduces: while the index half was a second JVM, implementing the engine API
+  meant standing up a gRPC server, and in one address space it means typing
+  `implements SearchPort`. The reverse direction (a declared entry going stale) is also checked,
+  but it is the cheap half. Rule 6b guards the boundary; this guards the set of things allowed to
+  speak for it — different questions, which is why both exist.
+- **S1 (two things the implementation taught, both from being falsified).** (a) The live binding
+  does **not** say `implements SearchPort`: `EngineKnowledgeClient extends KnowledgeClient`, so a
+  pure implements-scan reported it missing. Rather than drop the live binding from the catalogue —
+  which would have left the register describing the abstract facade as though it were the thing
+  that answers a search — implementations carry an explicit `via`, and `via: "extends X"` is
+  checked rather than trusted. (b) The self-test found a real bug in the `extends` matcher before
+  the gate shipped: `class X extends A implements B {` captured greedily to the brace and yielded
+  the single name "A implements B", matching nothing. Seven fixture cases, five of them asserting
+  the gate FAILS — a gate observed only passing is a gate nobody has tested (`verdict-is-gate`).
+  The register row lives in `consult-register.v1.json`, not in `CLAUDE.md`: the always-loaded
+  budget ratchet refused the table row (86 B over), which is the mechanism working as designed.
+
 - **A7.** The item says "a bounded buffer … drop-oldest or block, your call, justified". **Block,
   never drop**, with a timeout that fails the flow — and the justification is a property of these
   two streams, not a preference: both carry *ordered state deltas folded into a keyed cache*
@@ -644,10 +672,30 @@ publication. **Depends on Q1** (hot reload): the `Delegating*` wrappers exist on
 
 ### A10 — delete `RemoteKnowledgeClient`, the wire client stack and the MMF bus
 
-See the deletion inventory (§7) groups W and M.
-**Acceptance:** the two `GrpcCircuitBreaker` classes, `IpcTelemetry`, `MainSignalBus`,
-`MmfWorkerSignalBus`, `MmfWorkerSignalLayoutV1`, `MmfWorkerSignalHeaderV1` and their tests are gone;
-`git grep -c 'MmfWorkerSignal' modules` is 0.
+See the deletion inventory (§7) groups W and M. **Two of the acceptance criteria below were
+wrong when written and are corrected here, at implementation** (§7 was grep-verified at `fe19df0d5`,
+before A6 re-homed these):
+
+- **`IpcTelemetry` is NOT deleted.** Group W listed it as a wire class, but A6 made it a constructor
+  parameter of the transport-independent `KnowledgeClient` facade and of `EngineRoot` /
+  `EngineKnowledgeClient` (`WorkerHost.start(GpuSchedulingGauge, IpcTelemetry)`), and
+  `KnowledgeClient` still records the status-poll pair through it. What A10 deleted is the three
+  CHANNEL recorders and their catalog entries — `ipc.grpc.reconnect`,
+  `ipc.circuit_breaker.state_change`, `ipc.circuit_breaker.rejected` — because those had no producer
+  left once the client stack went. The spawn/supervision recorders are producerless too (A11) but
+  are kept for stage B's supervisor.
+- **`MmfWorkerSignalLayoutV1` / `MmfWorkerSignalHeaderV1` are NOT deleted, so
+  `git grep -c MmfWorkerSignal modules` is not 0.** Both are still referenced by
+  `system-tests/src/main/.../chaos/MmfTestHarness.java`, which ~19 systemTest classes construct.
+  Deleting them would red the systemTest compile, which item A12 owns. They go with group C.
+
+**Acceptance (as implemented):** the two `GrpcCircuitBreaker` classes, `CircuitBreakerState`,
+`GrpcRetryServiceConfig`, the two client interceptors, `Ingest/SearchStubCalls`,
+`RemoteKnowledgeClient`, `MainSignalBus`, `MmfWorkerSignalBus` and `WorkerLivenessDecision` (the
+suicide-pact policy, whose only production consumer was `MmfWorkerSignalBus.shouldDie`) are gone,
+with the tests whose subject was a wire property; `WorkerSignalBus` loses `writePort`,
+`readHeartbeat`, `isShutdownRequested` and `shouldDie`; `CancelToken` is free of `io.grpc`;
+`git grep -l MainSignalBus modules` and `git grep -l RemoteKnowledgeClient modules` are both empty.
 
 ### A11 — delete `WorkerSpawner`, `SupervisionPolicy` and the argv builders
 

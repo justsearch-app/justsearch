@@ -183,10 +183,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final AtomicReference<Outcome> outcome = new AtomicReference<>(Outcome.RUNNING);
     private volatile Runnable cancelHandler;
     private final ScheduledFuture<?> alarm;
-    private final long budgetMs;
 
     Budget(long budgetMs) {
-      this.budgetMs = budgetMs;
       this.alarm = deadlines.schedule(this::expire, budgetMs, TimeUnit.MILLISECONDS);
     }
 
@@ -223,10 +221,6 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               }
             }
           });
-    }
-
-    long budgetMs() {
-      return budgetMs;
     }
 
     @Override

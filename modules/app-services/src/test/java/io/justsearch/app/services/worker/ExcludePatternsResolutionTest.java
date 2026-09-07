@@ -81,20 +81,20 @@ final class ExcludePatternsResolutionTest {
   }
 
   @Test
-  @DisplayName("RemoteKnowledgeClient reads the resolved list, not the sysprop")
+  @DisplayName("KnowledgeClient reads the resolved list, not the sysprop")
   void remoteKnowledgeClientReadsTheResolvedList() {
     publishSettings(List.of("**/*.tmp"));
 
     assertNull(System.getProperty(KEY));
-    assertEquals("[\"**/*.tmp\"]", RemoteKnowledgeClient.resolvedExcludePatterns());
+    assertEquals("[\"**/*.tmp\"]", KnowledgeClient.resolvedExcludePatterns());
   }
 
   @Test
-  @DisplayName("RemoteKnowledgeClient tolerates a store that is not published yet")
+  @DisplayName("KnowledgeClient tolerates a store that is not published yet")
   void remoteKnowledgeClientToleratesNoStore() {
     TestResolvedConfigHelper.restoreGlobal(null);
 
-    assertEquals("", RemoteKnowledgeClient.resolvedExcludePatterns());
+    assertEquals("", KnowledgeClient.resolvedExcludePatterns());
   }
 
   @Test

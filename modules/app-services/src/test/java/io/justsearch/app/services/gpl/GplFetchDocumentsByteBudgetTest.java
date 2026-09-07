@@ -13,7 +13,7 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.services.worker.BoundedDocumentFetch;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
 import io.justsearch.ipc.ListAllDocumentIdsResponse;
@@ -59,7 +59,7 @@ final class GplFetchDocumentsByteBudgetTest {
 
   @TempDir Path tempDir;
 
-  @Mock RemoteKnowledgeClient knowledgeClient;
+  @Mock KnowledgeClient knowledgeClient;
   @Mock OnlineAiService onlineAiService;
 
   private GplTrainingTripleStore tripleStore;

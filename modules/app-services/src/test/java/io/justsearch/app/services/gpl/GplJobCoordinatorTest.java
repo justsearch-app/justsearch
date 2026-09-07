@@ -25,7 +25,7 @@ import ch.qos.logback.core.read.ListAppender;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.SamplingParams;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.ipc.RerankResponse;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -58,7 +58,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 /**
  * Unit tests for {@link GplJobCoordinator}.
  *
- * <p>Uses Mockito to stub RemoteKnowledgeClient (concrete class) and OnlineAiService. The
+ * <p>Uses Mockito to stub KnowledgeClient (concrete class) and OnlineAiService. The
  * GplTrainingTripleStore uses a real temp-dir backed instance for write verification.
  */
 @ExtendWith(MockitoExtension.class)
@@ -68,7 +68,7 @@ class GplJobCoordinatorTest {
 
   @TempDir Path tempDir;
 
-  @Mock RemoteKnowledgeClient knowledgeClient;
+  @Mock KnowledgeClient knowledgeClient;
   @Mock OnlineAiService onlineAiService;
 
   private GplTrainingTripleStore tripleStore;

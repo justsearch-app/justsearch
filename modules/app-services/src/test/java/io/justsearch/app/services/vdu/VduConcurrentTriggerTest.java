@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 class VduConcurrentTriggerTest {
 
   private StubInferenceLifecycleManager stubInference;
-  private StubRemoteKnowledgeClient stubClient;
+  private StubKnowledgeClient stubClient;
   private SlowVduBatchProcessor slowBatchProcessor;
   private TestableOfflineCoordinator coordinator;
 
@@ -46,7 +46,7 @@ class VduConcurrentTriggerTest {
   @BeforeEach
   void setup() {
     stubInference = new StubInferenceLifecycleManager().withMode(Mode.ONLINE);
-    stubClient = new StubRemoteKnowledgeClient();
+    stubClient = new StubKnowledgeClient();
     slowBatchProcessor = new SlowVduBatchProcessor(500);
 
     coordinator = new TestableOfflineCoordinator(stubInference, slowBatchProcessor, stubClient);
@@ -257,12 +257,12 @@ class VduConcurrentTriggerTest {
   static class TestableOfflineCoordinator {
     private final StubInferenceLifecycleManager inferenceManager;
     private final SlowVduBatchProcessor vduBatchProcessor;
-    private final StubRemoteKnowledgeClient knowledgeClient;
+    private final StubKnowledgeClient knowledgeClient;
     private final AtomicBoolean processing = new AtomicBoolean(false);
 
     TestableOfflineCoordinator(StubInferenceLifecycleManager inferenceManager,
                                SlowVduBatchProcessor vduBatchProcessor,
-                               StubRemoteKnowledgeClient knowledgeClient) {
+                               StubKnowledgeClient knowledgeClient) {
       this.inferenceManager = inferenceManager;
       this.vduBatchProcessor = vduBatchProcessor;
       this.knowledgeClient = knowledgeClient;

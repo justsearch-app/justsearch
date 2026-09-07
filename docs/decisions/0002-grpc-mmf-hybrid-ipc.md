@@ -51,7 +51,7 @@ The Worker starts its gRPC server on port 0 (ephemeral). The OS assigns a port, 
 **Negative:**
 
 - Two IPC mechanisms to understand and maintain.
-- MMF layout is fragile — offset/size changes require coordinated updates across Head and Worker. Mitigated by single-ownership in `MmfWorkerSignalLayoutV1.java` and a cross-compat test (`MmfSignalBusCompatibilityTest`).
+- MMF layout is fragile — offset/size changes require coordinated updates across Head and Worker. Mitigated by single-ownership in `MmfWorkerSignalLayoutV1.java` and, until lane F stage A item A10, a cross-compat test. That test was deleted with the Worker-side bus it compared against: with one JVM there is no second reader whose view of the offsets could drift.
 - Windows-specific complexity: MMF files are OS-locked while mapped, requiring explicit `Unsafe.invokeCleaner()` to unmap before the data directory can be deleted.
 - MMF fields rely on "effectively atomic" aligned reads on x86/ARM — not guaranteed by the Java specification (acceptable for desktop target platforms).
 

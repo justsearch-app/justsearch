@@ -10,7 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.ipc.VduUpdateOutcome;
@@ -41,7 +41,7 @@ class VduBatchProcessorModeScopingTest {
     when(vduProcessor.process(any(Path.class)))
         .thenReturn(new VduProcessor.VduResult("extracted text", "{}", 1));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Path file1 = writeFile("doc1.png");
     Path file2 = writeFile("doc2.png");
     Path file3 = writeFile("doc3.png");
@@ -81,7 +81,7 @@ class VduBatchProcessorModeScopingTest {
         .when(vduProcessor)
         .enterVduMode();
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     List<String> docIds = List.of(writeFile("doc1.png").toString(), writeFile("doc2.png").toString());
     when(client.countPendingVdu()).thenReturn(docIds.size());
     when(client.queryPendingVduDocIds()).thenReturn(docIds);
@@ -114,7 +114,7 @@ class VduBatchProcessorModeScopingTest {
     when(vduProcessor.process(any(Path.class)))
         .thenReturn(new VduProcessor.VduResult("extracted text", "{}", 1));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     List<String> docIds =
         List.of(
             writeFile("doc1.png").toString(),

@@ -85,7 +85,6 @@ System tests also cover schema migration + blue/green correctness (current):
 
 Additional high-signal system/contract tests (current):
 
-* `MmfSignalBusCompatibilityTest` (prevents MMF layout drift between Head/Worker by exercising cross-read/write compatibility)
 * `HttpPagingCursorE2ETest` (end-to-end cursor round-trip semantics over HTTP)
 * `VduBatchProcessorE2ETest` (Tier-2 VDU OCR lane; requires llama-server for scanned-PDF OCR/searchability assertions)
 

@@ -1,71 +1,104 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
-import io.grpc.Context;
 import java.util.Objects;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Caller-controlled cancel signal for long-running gRPC calls (tempdoc 419 / T3).
+ * Caller-controlled cancel signal for long-running calls (tempdoc 419 / T3).
  *
- * <p>Wraps a {@link Context.CancellableContext} so callers can:
+ * <p>The contract is unchanged since 419: a caller passes the token to a long-running call such as
+ * {@link KnowledgeClient#scanRoot}, and calls {@link #cancel()} from a different thread — typically
+ * the Javalin handler that started the call, in response to an HTTP-client disconnect or an
+ * explicit user "Cancel" click — to stop it. The producer stops within the next batch.
  *
- * <ol>
- *   <li>Pass the token to a streaming RPC like {@link KnowledgeClient#scanRoot}.
- *   <li>Call {@link #cancel()} from a different thread (typically the Javalin handler that
- *       initiated the RPC, in response to an HTTP-client disconnect or an explicit user "Cancel"
- *       click) to propagate gRPC cancellation. The Worker's
- *       {@code ServerCallStreamObserver.isCancelled()} (tempdoc 418 B-H.3) flips to {@code true}
- *       and the scan loop terminates within the next batch.
- * </ol>
+ * <p><b>Lane F stage A item A10 re-homed the implementation off {@code io.grpc.Context}.</b> The
+ * token was a wrapper over a {@code Context.CancellableContext} because cancelling a gRPC call
+ * meant cancelling the context the call was bound to; the {@code context()} accessor existed for
+ * exactly one caller, {@code RemoteKnowledgeClient}, which item A10 deleted with the rest of the
+ * wire client stack. What remains is {@link #onCancel}, which is what the in-process path
+ * always needed: there
+ * is no call context to scope, so the producer registers a notification and flips its own cancel
+ * signal. Keeping the gRPC type after its only user was gone would have made a transport
+ * dependency out of a plain observable boolean — and dragged the gRPC runtime into every module
+ * that cancels a scan.
  *
- * <p><strong>Interaction with {@code RpcDeadlineCategory}:</strong> orthogonal. gRPC channel-
- * level deadlines and {@link Context.CancellableContext} are independent cancel sources —
- * either firing first cancels the call cleanly. Combining both is safe and intentional: the
- * deadline is the upper bound; the cancel token lets callers terminate earlier.
+ * <p><b>Interaction with {@code RpcDeadlineCategory}:</b> orthogonal, as before. The deadline is
+ * the upper bound the call is given; the token lets the caller terminate earlier. Either firing
+ * first ends the call cleanly.
  *
- * <p>This class is the backing primitive for the validation finding logged 2026-04-26
- * (HTTP-client abort doesn't propagate to gRPC). See ADR / observation in
- * {@code docs/observations.md}.
+ * <p>Thread-safe. {@link #cancel} is idempotent and may race with {@link #onCancel} from another
+ * thread without dropping or double-running a handler.
  */
 public final class CancelToken {
-  private final Context.CancellableContext context;
 
-  public CancelToken() {
-    this.context = Context.current().withCancellation();
-  }
+  /** Set exactly once, by whichever thread wins the cancel. */
+  private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
-  /** Returns the underlying gRPC context. Used by {@link KnowledgeClient} to scope RPC calls. */
-  Context.CancellableContext context() {
-    return context;
-  }
+  /**
+   * Handlers registered before the cancel fired. Drained to {@code null} by the cancelling thread,
+   * which is what makes "run each handler exactly once" hold across the register/cancel race: a
+   * handler registered after the drain sees a null queue and runs inline instead of being queued
+   * onto a list nobody will read again.
+   */
+  private final AtomicReference<Queue<Runnable>> handlers =
+      new AtomicReference<>(new ConcurrentLinkedQueue<>());
 
-  /** Cancels the associated gRPC call. Idempotent — subsequent calls are no-ops. */
+  /** The reason passed to {@link #cancel(String)}, for diagnostics. */
+  private volatile String reason;
+
+  /** Cancels the associated call. Idempotent — subsequent calls are no-ops. */
   public void cancel() {
     cancel("client cancelled");
   }
 
   /** Cancels with a caller-supplied diagnostic message. */
   public void cancel(String reason) {
-    context.cancel(new java.util.concurrent.CancellationException(Objects.requireNonNull(reason, "reason")));
+    Objects.requireNonNull(reason, "reason");
+    if (!cancelled.compareAndSet(false, true)) {
+      return;
+    }
+    this.reason = reason;
+    Queue<Runnable> pending = handlers.getAndSet(null);
+    if (pending == null) {
+      return;
+    }
+    for (Runnable handler = pending.poll(); handler != null; handler = pending.poll()) {
+      handler.run();
+    }
   }
 
-  /** Returns {@code true} once {@link #cancel} has fired (or the underlying context cancels). */
+  /** Returns {@code true} once {@link #cancel} has fired. */
   public boolean isCancelled() {
-    return context.isCancelled();
+    return cancelled.get();
+  }
+
+  /** The reason this token was cancelled, or {@code null} if it has not been. */
+  public String reason() {
+    return reason;
   }
 
   /**
    * Runs {@code handler} once, on whichever thread cancels, when this token fires. Fires
-   * immediately if the token is already cancelled.
+   * immediately, on the calling thread, if the token is already cancelled.
    *
-   * <p>Lane F stage A item A6: this is the transport-neutral half of the token. The gRPC path uses
-   * {@link #context()} to scope a call; the in-process path has no context to scope and needs the
-   * notification instead. Item A10 replaces the {@code io.grpc.Context} inside with a plain JDK
-   * primitive, at which point this method is the whole class's outward surface
-   * (stage A §2: "re-home {@code CancelToken} free of {@code io.grpc}").
+   * <p>This is the whole outward surface the producers use: the in-process path has no call context
+   * to scope, so it wires this to its own cancel signal.
    */
   public void onCancel(Runnable handler) {
     Objects.requireNonNull(handler, "handler");
-    context.addListener(ctx -> handler.run(), Runnable::run);
+    Queue<Runnable> pending = handlers.get();
+    if (pending != null) {
+      pending.add(handler);
+      // Re-check: a cancel that drained the queue between get() and add() would otherwise leave
+      // this handler queued and never run.
+      if (handlers.get() != null || !pending.remove(handler)) {
+        return;
+      }
+    }
+    handler.run();
   }
 }

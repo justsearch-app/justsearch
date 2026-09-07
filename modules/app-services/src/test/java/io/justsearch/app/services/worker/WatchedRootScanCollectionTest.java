@@ -6,15 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import io.grpc.ManagedChannel;
-import io.grpc.Server;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
-import io.justsearch.ipc.IngestServiceGrpc;
 import io.justsearch.ipc.ScanMode;
-import io.justsearch.ipc.ScanRootProgress;
 import io.justsearch.ipc.ScanRootRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -255,20 +248,22 @@ final class WatchedRootScanCollectionTest {
 
   /**
    * The tests above run against a test-supplied ScanRootFn, so they pin the Java threading but not
-   * the PRODUCTION lambda that maps it onto the RPC. This drives the real
-   * {@link RemoteKnowledgeClient#addWatchedRoot} over an in-process gRPC server and asserts the
-   * {@link ScanRootRequest} the Worker would actually receive — so reverting that lambda's
-   * collection argument to {@code null} fails here. Harness pattern per
-   * {@link RemoteKnowledgeClientSearchRoundTripTest}.
+   * the PRODUCTION lambda that maps it onto the port call. This drives the real
+   * {@link KnowledgeClient#addWatchedRoot} through a {@link TestKnowledgeClient} and asserts the
+   * {@link ScanRootRequest} the index half would actually receive — so reverting that lambda's
+   * collection argument to {@code null} fails here.
+   *
+   * <p>Lane F stage A item A10 replaced the in-process gRPC server and the memory-mapped signal bus
+   * this nested class used with the client double. The subject is unchanged: the assertions were
+   * always about the request the production ScanRootFn assembles, never about how it travelled.
    */
   @Nested
-  @DisplayName("production lambda → ScanRootRequest (in-process gRPC)")
-  class ProductionWireForwarding {
+  @DisplayName("production lambda -> ScanRootRequest")
+  class ProductionScanRequestForwarding {
 
-    private Server server;
-    private ManagedChannel channel;
-    private CapturingIngestService ingest;
-    private RemoteKnowledgeClient client;
+    private final AtomicReference<ScanRootRequest> request = new AtomicReference<>();
+    private final CountDownLatch received = new CountDownLatch(1);
+    private KnowledgeClient client;
     private String prevDataDir;
 
     @BeforeEach
@@ -277,31 +272,21 @@ final class WatchedRootScanCollectionTest {
       Path dataDir = Files.createDirectories(tempDir.resolve("data"));
       System.setProperty("justsearch.data.dir", dataDir.toString());
 
-      String name = InProcessServerBuilder.generateName();
-      ingest = new CapturingIngestService();
-      server =
-          InProcessServerBuilder.forName(name).directExecutor().addService(ingest).build().start();
-      channel = InProcessChannelBuilder.forName(name).directExecutor().build();
-
-      // Signal bus is never opened/read: connectForTesting bypasses reconnect() port discovery.
-      MainSignalBus signalBus = new MainSignalBus(dataDir.resolve("signals/worker-signal.mmf"));
-      client = new RemoteKnowledgeClient(signalBus, /*deadlineMs=*/ 5000, /*maxRetries=*/ 0);
-      client.connectForTesting(channel);
+      client =
+          new TestKnowledgeClient(
+              null,
+              null,
+              req -> {
+                request.set(req);
+                received.countDown();
+              });
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
       if (client != null) {
         client.close();
         client = null;
-      }
-      if (channel != null) {
-        channel.shutdownNow();
-        channel.awaitTermination(2, TimeUnit.SECONDS);
-      }
-      if (server != null) {
-        server.shutdownNow();
-        server.awaitTermination(2, TimeUnit.SECONDS);
       }
       if (prevDataDir == null) {
         System.clearProperty("justsearch.data.dir");
@@ -311,42 +296,27 @@ final class WatchedRootScanCollectionTest {
     }
 
     @Test
-    @DisplayName("addWatchedRoot's scan reaches the wire with the root's collection set")
+    @DisplayName("addWatchedRoot's scan reaches the index half with the root's collection set")
     void scanRequestCarriesTheRootsCollection() throws Exception {
       Path root = Files.createDirectories(tempDir.resolve("wired"));
 
       client.addWatchedRoot("my-notes", root);
 
       assertTrue(
-          ingest.received.await(10, TimeUnit.SECONDS),
-          "the background walk must dispatch a ScanRoot RPC");
-      ScanRootRequest request = ingest.request.get();
+          received.await(10, TimeUnit.SECONDS),
+          "the background walk must dispatch a ScanRoot call");
+      ScanRootRequest sent = request.get();
       assertEquals(
           "my-notes",
-          request.getCollection(),
+          sent.getCollection(),
           "the production ScanRootFn must forward the collection into ScanRootRequest — a literal"
               + " null here is the defect this pins");
       assertEquals(
           root.toAbsolutePath().normalize().toString(),
-          request.getRootPath(),
+          sent.getRootPath(),
           "same request, so the collection cannot belong to some other root's scan");
       assertEquals(
-          ScanMode.SCAN_MODE_INITIAL, request.getMode(), "a watched root's own scan is the initial one");
-    }
-  }
-
-  /** In-process IngestService that records the ScanRootRequest and completes the stream. */
-  private static final class CapturingIngestService
-      extends IngestServiceGrpc.IngestServiceImplBase {
-    private final AtomicReference<ScanRootRequest> request = new AtomicReference<>();
-    private final CountDownLatch received = new CountDownLatch(1);
-
-    @Override
-    public void scanRoot(ScanRootRequest req, StreamObserver<ScanRootProgress> responseObserver) {
-      request.set(req);
-      responseObserver.onNext(ScanRootProgress.newBuilder().setComplete(true).build());
-      responseObserver.onCompleted();
-      received.countDown();
+          ScanMode.SCAN_MODE_INITIAL, sent.getMode(), "a watched root's own scan is the initial one");
     }
   }
 }

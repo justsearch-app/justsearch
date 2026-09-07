@@ -481,7 +481,16 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   holder rewrite is a focused follow-up tempdoc with a smaller blast radius.
 
 - **IPC metrics (Head `ipc.*` namespace)**:
-  These metrics track Worker process lifecycle and gRPC communication health:
+  These metrics track Worker process lifecycle and, historically, channel health.
+
+  **Lane F stage A (2026-09):** items A9-A11 merged the Head and the Worker into one Engine JVM.
+  The three channel counters (`ipc.grpc.reconnect`, `ipc.circuit_breaker.state_change`,
+  `ipc.circuit_breaker.rejected`) were removed from the catalog with the wire client stack that
+  emitted them — there is no channel to reconnect or trip a breaker on. The spawn/supervision
+  counters below are still declared but have had no producer since A11 deleted the Worker process;
+  they are held for the stage B supervisor rather than removed. Only `ipc.status.poll_ms` and
+  `ipc.status.response_bytes` are emitted today.
+
 
   | Metric | Type | Description |
   | :--- | :--- | :--- |
@@ -493,9 +502,6 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   | `ipc.worker.stability_reset` | Counter | Restart counter resets after stable operation |
   | `ipc.shutdown.timeout` | Counter | Shutdown timeouts |
   | `ipc.shutdown.forcible_kill` | Counter | Forcible process kills |
-  | `ipc.grpc.reconnect` | Counter | gRPC reconnections |
-  | `ipc.circuit_breaker.state_change` | Counter | Circuit breaker state transitions (tags: `from`, `to`) |
-  | `ipc.circuit_breaker.rejected` | Counter | Requests rejected by open circuit |
   | `ipc.status.poll_ms` | Timer | Status polling latency |
   | `ipc.status.response_bytes` | Histogram | Status response size |
 

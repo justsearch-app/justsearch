@@ -104,18 +104,6 @@
       "note": "Functional-core extraction from BackfillScheduler (the System.currentTimeMillis next-retry timestamp stays in the scheduler)."
     },
     {
-      "id": "worker-liveness-suicide",
-      "gradlePath": ":modules:worker-services",
-      "targetClass": "io.justsearch.indexerworker.loop.WorkerLivenessDecision",
-      "targetTests": [
-        "io.justsearch.indexerworker.loop.WorkerLivenessDecisionTest"
-      ],
-      "pure": true,
-      "law": "The Worker self-exits iff an explicit shutdown is signalled, OR — past the startup grace — the Main (Head) heartbeat is stale AND Head is not known-alive (tempdoc 630). A stale heartbeat ALONE does not kill: it must be corroborated by Head-PID death (HeadLiveness != ALIVE), because an OS suspend/resume yields a benign stale beat while Head (PID persisting across suspend) is alive. HeadLiveness.UNKNOWN (no PID signal) preserves the pre-630 heartbeat-only behavior. A flipped Head-liveness comparison silently re-introduces the false-suicide-on-every-wake, or (the unsafe direction) lets a real orphan outlive a dead Head.",
-      "guard": "test:WorkerLivenessDecisionTest",
-      "note": "The Worker's heartbeat-suicide functional core; the impure shell (MmfWorkerSignalBus.shouldDie + headLiveness) gathers nowMs/heartbeat/Head-PID-liveness and interprets the boolean verbatim. The liveness-continuity precondition (tempdoc 630) dual to the 627 Observation-Actuation Closure: an invalid (suspend-confounded) staleness observation must not actuate."
-    },
-    {
       "id": "legibility-floor-check",
       "gradlePath": ":modules:app-services",
       "targetClass": "io.justsearch.app.services.vdu.LegibilityMeasures",

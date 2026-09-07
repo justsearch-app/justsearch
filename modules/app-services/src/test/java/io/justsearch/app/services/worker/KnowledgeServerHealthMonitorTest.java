@@ -114,7 +114,7 @@ final class KnowledgeServerHealthMonitorTest {
   @Test
   void firstTickSeedsClockAndDoesNotReValidate() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
     when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
@@ -131,7 +131,7 @@ final class KnowledgeServerHealthMonitorTest {
   @Test
   void normalCadenceTickDoesNotReValidate() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
     when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
@@ -163,7 +163,7 @@ final class KnowledgeServerHealthMonitorTest {
   @Test
   void largeGapTriggersReconcileAndNoReconnect() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
     when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);

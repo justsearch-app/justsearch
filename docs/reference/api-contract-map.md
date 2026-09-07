@@ -652,7 +652,7 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 ### Library Resolve-Hash (ADR-0028, scoped exemption)
 
 **Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java` (`handleResolvePathHash`)
-+ `modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java` (`resolvePathHash`)
++ `modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java` (`resolvePathHash`)
 + `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java`
 
 `POST /api/library/resolve-hash`:

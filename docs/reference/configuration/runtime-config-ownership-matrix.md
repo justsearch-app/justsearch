@@ -176,7 +176,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.GPL_REEVAL_SIZE_FACTOR | permanent | - | JUSTSEARCH_GPL_REEVAL_SIZE_FACTOR | justsearch.gpl.reeval_size_factor | GPL_REEVAL_SIZE_FACTOR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPU_ENABLED | permanent | - | JUSTSEARCH_GPU_ENABLED | justsearch.gpu.enabled | GPU_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPU_LAYERS | permanent | - | JUSTSEARCH_GPU_LAYERS | justsearch.gpu.layers | GPU_LAYERS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.HEAD_PID | permanent | - | JUSTSEARCH_HEAD_PID | justsearch.head.pid | HEAD_PID | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HEAD_BUILD_STAMP | permanent | - | JUSTSEARCH_HEAD_BUILD_STAMP | justsearch.head.stamp | HEAD_BUILD_STAMP | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HEAD_TRACING_LEVEL | permanent | - | JUSTSEARCH_HEAD_TRACING_LEVEL | justsearch.head.tracing_level | HEAD_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HOME | permanent | - | JUSTSEARCH_HOME | justsearch.home | HOME | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

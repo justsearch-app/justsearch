@@ -216,8 +216,8 @@ To prevent configuration leakage and ensure testability, environment access is r
 | Resource | Exclusive Owner | Enforcement |
 |----------|-----------------|-------------|
 | `IndexWriter` | `adapters-lucene` | ArchUnit `IndexWriterOwnershipTest` |
-| `MappedByteBuffer` (Head) | `MainSignalBus` | ArchUnit guardrail |
-| `MappedByteBuffer` (Worker) | `MmfWorkerSignalBus` | ArchUnit guardrail |
+| `MappedByteBuffer` (Head) | *none — forbidden outright* | ArchUnit guardrail |
+| `MappedByteBuffer` (Worker) | *none — forbidden outright* | ArchUnit guardrail |
 
 ### Network Egress Isolation
 
@@ -298,7 +298,7 @@ A ServiceLoader-based plugin system for extensibility (egress control, artifact 
 
 **`ui` -> `core` direct dependency:** The `ui` module imports `DocumentTypeDetector`, `TokenEstimation`, and two other types directly from `core` (4 imports total). This is a direct dependency, not a violation — `core` is a foundation module intended for cross-cutting use.
 
-**Near-duplication between `core` and `app-api` DTOs:** The `core` module defines `Query`, `Result.Hit`, `Facet`, and `Cursor` as internal DTOs for the gRPC contract boundary. The `app-api` module defines `SearchRequest`, `KnowledgeSearchResponse`, and related types as external REST contract DTOs. This near-duplication is intentional layering — internal gRPC contract vs external REST contract — with field-by-field translation occurring in `DefaultAppFacade` and `RemoteKnowledgeClient`. Not a code quality issue. See [ADR-0025](../decisions/0025-core-dto-dual-type-layering.md) for the full decision record.
+**Near-duplication between `core` and `app-api` DTOs:** The `core` module defines `Query`, `Result.Hit`, `Facet`, and `Cursor` as internal DTOs for the gRPC contract boundary. The `app-api` module defines `SearchRequest`, `KnowledgeSearchResponse`, and related types as external REST contract DTOs. This near-duplication is intentional layering — internal gRPC contract vs external REST contract — with field-by-field translation occurring in `DefaultAppFacade` and `KnowledgeClient`. Not a code quality issue. See [ADR-0025](../decisions/0025-core-dto-dual-type-layering.md) for the full decision record.
 
 **ai-bridge decomposition (ADR-0017):** The former `ai-bridge` monolith was split into focused modules. Current ownership is: `ai-backend` for backend abstractions/local translator support, `gpu-bridge` for GPU/VRAM detection, `prompt-support` for prompt support, and `app-inference` for llama-server lifecycle. The hollow `app-ai` gRPC translator module and the unused `ai-worker` process were deleted entirely. See [ADR-0017](../decisions/0017-ai-bridge-module-decomposition.md) for rationale and historical context.
 

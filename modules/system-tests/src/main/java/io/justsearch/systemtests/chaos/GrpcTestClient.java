@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Lightweight gRPC client for chaos testing.
  *
- * <p>Unlike the production {@code RemoteKnowledgeClient}, this client:
+ * <p>Unlike the production {@code KnowledgeClient}, this client:
  * <ul>
  *   <li>Does NOT retry on failures (we want to observe failures)</li>
  *   <li>Has configurable timeouts for testing latency</li>

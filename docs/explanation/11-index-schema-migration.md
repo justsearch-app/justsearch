@@ -156,7 +156,7 @@ it against an index that was physically still perfectly compatible (tempdoc 804)
 - **Validation:** `EmbeddingCompatibilityController` (ECC) compares the stored fingerprint against the current model's fingerprint and enters one of: `COMPATIBLE` (fingerprint match or new index), `REBUILDING` (mismatch, re-embedding in progress), `BLOCKED_LEGACY` (no fingerprint stored).
 - **Migration trigger (tempdoc 312 item 20):** When `BLUE_GREEN_MIGRATE` policy is set and the stored embedding fingerprint differs from the current model's fingerprint, `KnowledgeServer.start()` triggers a blue-green migration (same mechanics as schema mismatch — see below). This allows embedding model upgrades to rebuild the index with the new model's vectors without slow read-modify-write backfill.
 
-The Head does not probe Lucene directly; it forwards these fields via the Worker status map (`RemoteKnowledgeClient.getStatusMapForUi()`).
+The Head does not probe Lucene directly; it forwards these fields via the Worker operational view (`KnowledgeClient.getWorkerOperationalView()`).
 
 Regression coverage:
 

@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -236,7 +236,7 @@ class AgentHistoryIndexerTest {
   @DisplayName("909: the same write WITH a client submits and leaves no marker")
   void transcriptWrittenWithAClientIsNotMarkedPending() throws Exception {
     Path historyDir = tempDir.resolve("h-up");
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     var indexer = new AgentHistoryIndexer(historyDir, () -> client);
 
     indexer.reconcileNow(() -> List.of("sess-up"), id -> doneEvents("WROTE-WHILE-UP"));
@@ -267,7 +267,7 @@ class AgentHistoryIndexerTest {
 
     // Boot 2: a NEW indexer over the same directory, Worker up. The marker is the only carrier of
     // state between the two — there is no in-memory queue to inherit.
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     var rebooted = new AgentHistoryIndexer(historyDir, () -> client);
     int rebuilt = rebooted.reconcileNow(() -> List.of("sess-r"), id -> doneEvents("RECOVER-ZQX"));
 
@@ -296,7 +296,7 @@ class AgentHistoryIndexerTest {
     Path historyDir = Files.createDirectories(tempDir.resolve("h-skip"));
     Path good = historyDir.resolve("sess-ok.md");
     Files.writeString(good, AgentHistoryIndexer.TRANSCRIPT_HEADER + "\n\nthe original answer\n");
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     var indexer = new AgentHistoryIndexer(historyDir, () -> client);
 
     int rebuilt =
@@ -323,7 +323,7 @@ class AgentHistoryIndexerTest {
     new AgentHistoryIndexer(historyDir, () -> null)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
 
-    RemoteKnowledgeClient failing = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient failing = mock(KnowledgeClient.class);
     when(failing.submitBatch(anyList(), anyBoolean(), anyString()))
         .thenThrow(new IllegalStateException("worker RPC failed"));
     new AgentHistoryIndexer(historyDir, () -> failing)
@@ -334,7 +334,7 @@ class AgentHistoryIndexerTest {
         "a throwing submit is not a successful one — the marker must survive it");
 
     // …and the pass after that, with a working client, still recovers the transcript.
-    RemoteKnowledgeClient ok = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient ok = mock(KnowledgeClient.class);
     new AgentHistoryIndexer(historyDir, () -> ok)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
     verify(ok, times(1))

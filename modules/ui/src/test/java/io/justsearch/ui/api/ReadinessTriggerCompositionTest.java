@@ -31,7 +31,7 @@ import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.observability.health.LifecycleSnapshotTap;
 import io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -83,7 +83,7 @@ final class ReadinessTriggerCompositionTest {
     InferenceCapability inference = new InferenceCapability(false);
 
     KnowledgeServerBootstrap knowledgeServer = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     when(knowledgeServer.client()).thenReturn(client);
 

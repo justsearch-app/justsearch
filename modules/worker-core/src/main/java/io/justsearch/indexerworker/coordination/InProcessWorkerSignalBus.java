@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,13 +23,14 @@ import org.slf4j.LoggerFactory;
  *       ({@code InferenceWiring} and {@code EnergyStatePoller}). No byte, no polling lag: the
  *       reader observes the writer's field.
  *   <li><b>heartbeat / shutdown / suicide pact</b> — the "did the Head die?" question. In one JVM
- *       the answer is always no: if the Engine dies, the index half died with it. {@link
- *       #shouldDie()} is therefore permanently {@code false}, and the sentinel thread's kill path
- *       has no producer. This is deliberate, not an omission — a process that killed itself
- *       because it could not find its own heartbeat would be the defect.
- *   <li><b>port publication</b> — {@link #writePort(int)} records the port for diagnostics and
- *       publishes it nowhere: there is no second process to discover it. Item A9 removes the
- *       caller.
+ *       the answer is always no: if the Engine dies, the index half died with it. Item A6 answered
+ *       it with a permanent {@code false}; item A10 removed the question from {@link
+ *       WorkerSignalBus} altogether, together with the sentinel's kill arm. This is deliberate, not
+ *       an omission — a process that killed itself because it could not find its own heartbeat
+ *       would be the defect.
+ *   <li><b>port publication</b> — item A9 removed the caller and item A10 removed the member:
+ *       there was never a second process to discover the port, so recording it was diagnostics
+ *       nothing read.
  *   <li><b>reload signal</b> — re-homed onto a request FILE,
  *       {@code <dataDir>/runtime/dev-reload.request} (review S2). It was deferred to item A18 and
  *       that was wrong: the trigger was the only part of hot reload that lived in the memory-mapped
@@ -60,7 +60,6 @@ public final class InProcessWorkerSignalBus implements WorkerSignalBus {
 
   private final GpuSchedulingGauge gpuScheduling;
   private final long startupTime = System.currentTimeMillis();
-  private final AtomicInteger boundPort = new AtomicInteger(0);
   private volatile BooleanSupplier pendingIngestProbe;
   private final Path reloadRequest;
 
@@ -87,33 +86,6 @@ public final class InProcessWorkerSignalBus implements WorkerSignalBus {
   @Override
   public void open() {
     // Nothing to map: the "bus" is a reference to a gauge in this JVM.
-  }
-
-  @Override
-  public void writePort(int port) {
-    boundPort.set(port);
-  }
-
-  /** The port the index half last bound, or 0. Diagnostic only; nothing discovers it. */
-  public int boundPort() {
-    return boundPort.get();
-  }
-
-  @Override
-  public long readHeartbeat() {
-    // The Engine is alive by construction while this method can be called at all.
-    return System.currentTimeMillis();
-  }
-
-  @Override
-  public boolean isShutdownRequested() {
-    // Shutdown is an ordered in-process sequence owned by the composition root, not a byte.
-    return false;
-  }
-
-  @Override
-  public boolean shouldDie() {
-    return false;
   }
 
   @Override

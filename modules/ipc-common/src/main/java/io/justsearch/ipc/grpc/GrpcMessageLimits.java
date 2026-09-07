@@ -2,21 +2,29 @@
 package io.justsearch.ipc.grpc;
 
 /**
- * Shared gRPC inbound message-size limit for the Head-to-Worker channel.
+ * The size bounds that used to be the Head-to-Worker channel's, and outlived it as the Engine's
+ * document-fetch budget.
  *
- * <p>Single value read by BOTH ends of the channel - the Worker's gRPC server
- * (deleted at lane F stage A item A9 with the rest of the server) and the Head's client
- * ({@code RemoteKnowledgeClient}). Before tempdoc 882 item 5 the two ends had drifted since the
- * first commit: the server advertised 32 MiB while the client never called
- * {@code maxInboundMessageSize}, so grpc-java's 4 MiB default silently capped replies (e.g.
- * {@code FetchDocuments}, reachable at roughly 21 full-size documents in one unary call).
+ * <p>Both values began as one number read by both ends of a gRPC channel — a drift class tempdoc
+ * 882 item 5 named after finding the two ends had disagreed since the first commit (the server
+ * advertised 32 MiB while the client never called {@code maxInboundMessageSize}, so grpc-java's
+ * 4 MiB default silently capped replies such as {@code FetchDocuments} at roughly 21 full-size
+ * documents in one call). Lane F stage A deleted the channel: item A9 the server end, item A10 the
+ * client end.
+ *
+ * <p>The class is kept because the bound was never really about a channel. It is the size at which
+ * one {@code FetchDocuments} answer stops being a reasonable unit of work, and
+ * {@code BoundedDocumentFetch} still derives its byte budget from it while
+ * {@code WorkerSearchService} still trims to the character cap — the same two-ends-one-value shape,
+ * now inside one JVM. The name is a fossil of where the number came from; the number is live.
  */
 public final class GrpcMessageLimits {
   private GrpcMessageLimits() {}
 
   /**
-   * Max inbound message size, in bytes. Read by both ends of the channel until item A9 deleted the
-   * server end; the Head's client is the only reader left, and it goes at item A10.
+   * Max size, in bytes, of a single document-fetch answer. Was the channel's inbound message limit
+   * until items A9/A10 deleted both ends of the channel; {@code BoundedDocumentFetch} derives its
+   * default byte budget from it and is the reader that remains.
    */
   public static final int MAX_INBOUND_MESSAGE_BYTES = 32 * 1024 * 1024;
 

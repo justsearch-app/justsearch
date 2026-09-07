@@ -6,7 +6,7 @@ package io.justsearch.app.services.worker;
  * loop (tempdoc 630 latency-hardening slice). A task scheduled every {@code expectedIntervalMs} that
  * observes an inter-tick gap far larger than its interval was almost certainly frozen — the machine
  * suspended and resumed. Pure + {@code nowMs}-injected (the project idiom; see {@code
- * BootRecoveryDecision} / {@code PolledStateLiveness} / {@code WorkerLivenessDecision}) so it is
+ * BootRecoveryDecision} / {@code PolledStateLiveness}) so it is
  * unit-testable without a real clock or a real suspend.
  *
  * <p>Wall-clock by necessity: only a clock that <em>advances</em> during the freeze can see the gap

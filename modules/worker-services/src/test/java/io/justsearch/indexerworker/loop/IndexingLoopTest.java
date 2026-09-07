@@ -1667,23 +1667,9 @@ class IndexingLoopTest {
     @Override
     public void open() {}
 
-    @Override
-    public void writePort(int port) {}
 
-    @Override
-    public long readHeartbeat() {
-      return 0L;
-    }
 
-    @Override
-    public boolean isShutdownRequested() {
-      return false;
-    }
 
-    @Override
-    public boolean shouldDie() {
-      return false;
-    }
 
     @Override
     public boolean isMainGpuActive() {

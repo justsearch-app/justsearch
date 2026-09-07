@@ -20,7 +20,7 @@ final class RemoteDocumentServiceExportSeamTest {
   @Test
   @DisplayName("maps persisted extraction provenance from the Worker response")
   void mapsExtractionProvenance() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.fetchDocumentSlice("doc-1", 0, 200_000))
         .thenReturn(
             FetchDocumentSliceResponse.newBuilder()
@@ -53,7 +53,7 @@ final class RemoteDocumentServiceExportSeamTest {
   @Test
   @DisplayName("preserves unknown truncation when a legacy Worker omits the optional field")
   void preservesUnknownContentTruncation() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.fetchDocumentSlice("legacy", 0, 20_000))
         .thenReturn(
             FetchDocumentSliceResponse.newBuilder()
@@ -77,7 +77,7 @@ final class RemoteDocumentServiceExportSeamTest {
   @Test
   @DisplayName("maps the existing Worker parent-ID RPC without folder browsing")
   void mapsDocumentIdPage() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.listAllDocumentIds(0, 50_000))
         .thenReturn(
             ListAllDocumentIdsResponse.newBuilder()

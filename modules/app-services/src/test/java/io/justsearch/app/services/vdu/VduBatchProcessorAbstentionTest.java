@@ -13,7 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.ipc.VduUpdateOutcome;
@@ -49,7 +49,7 @@ class VduBatchProcessorAbstentionTest {
     when(vduProcessor.process(any(Path.class)))
         .thenReturn(new VduProcessor.VduResult("", null, 2, rejectedVerdict));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Path file = writeFile("doc.png");
     when(client.countPendingVdu()).thenReturn(1);
     when(client.queryPendingVduDocIds()).thenReturn(List.of(file.toString()));
@@ -98,7 +98,7 @@ class VduBatchProcessorAbstentionTest {
     when(vduProcessor.process(any(Path.class)))
         .thenReturn(new VduProcessor.VduResult("suspect text", null, 3, agreementRejectedVerdict));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Path file = writeFile("doc3.png");
     when(client.countPendingVdu()).thenReturn(1);
     when(client.queryPendingVduDocIds()).thenReturn(List.of(file.toString()));
@@ -144,7 +144,7 @@ class VduBatchProcessorAbstentionTest {
             new VduProcessor.VduResult(
                 "genuinely extracted text", "{\"summary\":\"ok\"}", 1, GateVerdict.passed()));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Path file = writeFile("doc2.png");
     when(client.countPendingVdu()).thenReturn(1);
     when(client.queryPendingVduDocIds()).thenReturn(List.of(file.toString()));

@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import io.justsearch.app.api.inference.EncoderRuntimeResponse;
 import io.justsearch.app.api.inference.EncoderRuntimeView;
 import io.justsearch.app.api.status.OrtCudaView;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.ort.EncoderRole;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -41,7 +41,7 @@ class EncoderRuntimeControllerTest {
   @DisplayName(
       "client reports worker-unreachable getSessionPolicies → snapshotStatus passthrough")
   void workerUnreachablePassthrough() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> policies = new LinkedHashMap<>();
     policies.put("configStatus", "worker-unreachable");
     policies.put("runtime", new LinkedHashMap<>());
@@ -56,7 +56,7 @@ class EncoderRuntimeControllerTest {
   @Test
   @DisplayName("empty models map → snapshotStatus='policy-unavailable'")
   void emptyModelsReturnsPolicyUnavailable() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> policies = new LinkedHashMap<>();
     policies.put("configStatus", "ok");
     policies.put("runtime", new LinkedHashMap<>());
@@ -73,7 +73,7 @@ class EncoderRuntimeControllerTest {
   @DisplayName(
       "happy path: 2 encoders policy, both have OrtCudaView → emits both keyed by consumerName")
   void happyPathTwoEncoders() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> policies = buildPoliciesEnvelope();
     Map<String, Object> models = new TreeMap<>();
     models.put("EMBEDDING", policyForGpu());
@@ -108,7 +108,7 @@ class EncoderRuntimeControllerTest {
   @Test
   @DisplayName("unknown role key in policies map is skipped, not thrown")
   void unknownRoleKeyIsSkipped() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> policies = buildPoliciesEnvelope();
     Map<String, Object> models = new TreeMap<>();
     models.put("FUTURE_ROLE", policyForCpu());
@@ -134,7 +134,7 @@ class EncoderRuntimeControllerTest {
     EncoderRuntimeController controller = new EncoderRuntimeController(null);
     assertEquals("worker-unreachable", controller.buildResponse().snapshotStatus());
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> policies = buildPoliciesEnvelope();
     Map<String, Object> models = new TreeMap<>();
     models.put("EMBEDDING", policyForGpu());
@@ -152,7 +152,7 @@ class EncoderRuntimeControllerTest {
   @Test
   @DisplayName("setClient(null) reverts to worker-unreachable (Worker unbind)")
   void setClientNullRevertsToWorkerUnreachable() {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     EncoderRuntimeController controller = new EncoderRuntimeController(client);
     controller.setClient(null);
     assertEquals("worker-unreachable", controller.buildResponse().snapshotStatus());

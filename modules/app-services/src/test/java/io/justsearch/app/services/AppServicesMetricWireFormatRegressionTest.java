@@ -15,9 +15,7 @@ import io.justsearch.app.services.vdu.VduMetricCatalog;
 import io.justsearch.app.services.vdu.VduOutcome;
 import io.justsearch.app.services.vdu.VduOutcomeTags;
 import io.justsearch.app.services.vdu.VduTimeoutTags;
-import io.justsearch.app.services.worker.CircuitBreakerState;
 import io.justsearch.app.services.worker.IpcMetricCatalog;
-import io.justsearch.app.services.worker.IpcTags.CircuitBreakerStateChangeTags;
 import io.justsearch.app.services.worker.IpcTags.WorkerRestartTags;
 import io.justsearch.app.services.worker.RagMetricCatalog;
 import io.justsearch.app.services.worker.RagRetrievalMode;
@@ -71,8 +69,6 @@ final class AppServicesMetricWireFormatRegressionTest {
       var headApi = new HeadApiMetricCatalog(telemetry.registry());
 
       ipc.workerRestart.increment(new WorkerRestartTags(WorkerRestartOutcome.SUCCESS));
-      ipc.circuitBreakerStateChange.increment(
-          new CircuitBreakerStateChangeTags(CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN));
       ipc.portDiscoveryMs.record(123L, EmptyTags.INSTANCE);
 
       rag.retrievalTotal.increment(RagRetrievalTags.of(RagRetrievalMode.RAG));
@@ -98,10 +94,9 @@ final class AppServicesMetricWireFormatRegressionTest {
         anyLineWithName(ndjson, "ipc.worker.restart").stream()
             .anyMatch(l -> l.contains("\"outcome\":\"success\"")),
         "ipc.worker.restart missing outcome=success; got: " + ndjson);
-    assertTrue(
-        anyLineWithName(ndjson, "ipc.circuit_breaker.state_change").stream()
-            .anyMatch(l -> l.contains("\"from\":\"CLOSED\"") && l.contains("\"to\":\"OPEN\"")),
-        "circuit_breaker.state_change missing from/to tags; got: " + ndjson);
+    // Lane F item A10 deleted the circuit breaker with the wire; ipc.circuit_breaker.state_change
+    // no longer exists, so the multi-key tag-schema shape it used to pin is carried by the
+    // remaining multi-key emitters below (headApi.requestMs, headApi.errorTotal).
     assertTrue(
         containsLine(ndjson, "ipc.port_discovery_ms", "\"type\":\"histogram\""),
         "ipc.port_discovery_ms missing; got: " + ndjson);

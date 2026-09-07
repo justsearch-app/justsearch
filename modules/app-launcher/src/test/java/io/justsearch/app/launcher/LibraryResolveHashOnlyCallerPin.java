@@ -50,7 +50,7 @@ final class LibraryResolveHashOnlyCallerPin {
    *       {@code InfraContext}.
    *   <li>{@code InfraContext} — passes the store reference between modules.
    *   <li>{@code SqlitePathResolutionStore} — the implementation itself.
-   *   <li>{@code RemoteKnowledgeClient} — Head-side gRPC client wrapper for the lookup RPC.
+   *   <li>{@code KnowledgeClient} — Head-side gRPC client wrapper for the lookup RPC.
    *   <li>{@code IndexingService} — interface declares the {@code resolvePathHash} method
    *       so {@code IndexingController} can call it.
    * </ul>
@@ -68,7 +68,7 @@ final class LibraryResolveHashOnlyCallerPin {
       "io.justsearch.indexerworker.server.KnowledgeServer",
       "io.justsearch.indexerworker.server.InfraContext",
       "io.justsearch.indexerworker.queue.SqlitePathResolutionStore",
-      "io.justsearch.app.services.worker.RemoteKnowledgeClient",
+      "io.justsearch.app.services.worker.KnowledgeClient",
       "io.justsearch.app.api.IndexingService");
 
   /**
@@ -77,7 +77,7 @@ final class LibraryResolveHashOnlyCallerPin {
    * silently slip out of the guard.
    */
   static final java.util.Set<String> EXPORT_CLASSES_FORBIDDEN_FROM_RESOLVER = java.util.Set.of(
-      // RemoteKnowledgeClient hosts both the export reads (recentIngestionEvents,
+      // KnowledgeClient hosts both the export reads (recentIngestionEvents,
       // ingestionOutcomeSummary) and the resolver call. The class is APPROVED above because
       // the resolver method exists; the per-method enforcement happens in IndexingController
       // (export handlers don't invoke resolvePathHash).

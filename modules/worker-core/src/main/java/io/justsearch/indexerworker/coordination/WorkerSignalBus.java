@@ -7,19 +7,26 @@ import java.io.IOException;
 import java.util.function.BooleanSupplier;
 
 /**
- * Interface for worker-main process coordination signals.
+ * The signals the index half reads from the rest of the Engine.
  *
- * <p>The signal bus enables inter-process communication for:
- * <ul>
- *   <li>Heartbeat monitoring (suicide pact liveness check)</li>
- *   <li>Shutdown signaling</li>
- *   <li>Port discovery</li>
- * </ul>
+ * <p><b>Lane F stage A item A10 narrowed this interface to what one JVM can actually answer.</b>
+ * It began as a cross-process coordination surface: the memory-mapped bus carried a port to
+ * discover, a heartbeat to watch, a shutdown byte and the suicide pact built on top of them. All
+ * four existed only because the Head and the index half were two processes, and the wire client
+ * stack that wrote them ({@code MainSignalBus}) and the implementation that read them
+ * ({@code MmfWorkerSignalBus}) were deleted with this item. Inside one JVM "did the other half
+ * die?" has no answer to poll for — if the Engine dies, the index half died with it — so the
+ * members were removed rather than left returning a constant nothing produces.
+ *
+ * <p>What remains is scheduling advice, and it is genuinely intra-process: the GPU/energy gauge the
+ * composition root shares with its writers, and the pending-ingest probe the indexing loop
+ * publishes about itself. The dev hot-reload trigger is the one cross-process signal left, and it
+ * is a file rather than a byte (see {@link InProcessWorkerSignalBus}).
  *
  * <p>Implementations:
  * <ul>
- *   <li>{@link MmfWorkerSignalBus} - Memory-mapped file implementation for production</li>
- *   <li>MockWorkerSignalBus - In-memory mock for hermetic testing (in testFixtures)</li>
+ *   <li>{@link InProcessWorkerSignalBus} - the live one: a reference to the process-wide gauge</li>
+ *   <li>Per-test anonymous stubs - hermetic testing</li>
  * </ul>
  */
 public interface WorkerSignalBus extends Closeable {
@@ -30,43 +37,6 @@ public interface WorkerSignalBus extends Closeable {
    * @throws IOException if the signal bus cannot be opened
    */
   void open() throws IOException;
-
-  /**
-   * Writes the gRPC port to the signal bus.
-   * Called by the worker after binding to an ephemeral port.
-   *
-   * @param port The actual bound port number
-   */
-  void writePort(int port);
-
-  /**
-   * Reads the main process heartbeat.
-   * Used for the "suicide pact" liveness check.
-   *
-   * @return Main process heartbeat timestamp (epoch millis)
-   */
-  long readHeartbeat();
-
-  /**
-   * Checks if a shutdown signal has been set.
-   *
-   * @return true if shutdown is requested
-   */
-  boolean isShutdownRequested();
-
-  /**
-   * Determines if the worker should terminate based on the "suicide pact" logic.
-   *
-   * <p>Rules:
-   * <ul>
-   *   <li>Ignores heartbeat during the startup grace period</li>
-   *   <li>After grace period, terminates if heartbeat is stale</li>
-   *   <li>Always terminates if shutdown signal is set</li>
-   * </ul>
-   *
-   * @return true if the worker should terminate
-   */
-  boolean shouldDie();
 
   /**
    * Checks if the Main process is actively using the GPU (Online Mode).
@@ -97,9 +67,9 @@ public interface WorkerSignalBus extends Closeable {
    * #isMainGpuActive()} alone.
    *
    * <p>Lane F item A5: the rule itself now lives in {@link GpuSchedulingGauge}, the one in-process
-   * holder both halves of the merged Engine write and read. This method stays only so the seven
-   * production read sites keep compiling across the transition; item A10 deletes it together with
-   * the two reads above, and the callers ask the gauge directly.
+   * holder both halves of the merged Engine write and read. This method is the read side the
+   * GPU-heavy backfill sites already hold a bus for, so it stays and delegates — there is one rule
+   * and one copy of it, which is the property item A10 had to preserve when it deleted the wire.
    *
    * @return true if GPU-heavy bulk backfill should be deferred
    */

@@ -7,6 +7,25 @@ description: 'MMF signaling, the "Suicide Pact", and the indexing duty cycle.'
 
 # Process Coordination
 
+> **Largely historical as of lane F stage A (2026-09). Do not treat this page as current.**
+>
+> The Head and the Worker are one Engine JVM. Item A9 deleted the gRPC server and its
+> interceptors, item A10 deleted the wire client stack (`RemoteKnowledgeClient`) and BOTH ends of
+> the memory-mapped signal bus (`MainSignalBus`, `MmfWorkerSignalBus`), and item A11 deleted the
+> Worker process and its spawner. Concretely, everything below about port discovery, the suicide
+> pact, the heartbeat, the shutdown byte and `MmfSignalBusCompatibilityTest` describes a shape that
+> no longer exists in the product. The two signals that survived — `main_gpu_active` and
+> `energy_reduced` — are fields on the in-process `GpuSchedulingGauge`
+> (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), and the dev
+> hot-reload trigger is a request FILE under `<dataDir>/runtime/`
+> (`InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME`), not a byte.
+>
+> The page is kept, not deleted, because it is the readable record of why the coordination was
+> built this way and what the merge gave up; it is rewritten when lane F stage A closes and the
+> single spawn path (item A13) settles what the process story actually is. The MMF layout classes
+> in `ipc-common` still exist and still have a test, but only the system-test harness reads them
+> (item A12 owns that).
+
 In a multi-process architecture, coordination is the hardest problem. JustSearch uses a custom "Nervous System" built on **Memory-Mapped Files (MMF)** and **gRPC** to ensure sub-millisecond coordination between the Main Process ("Head") and the Knowledge Server ("Body").
 
 ## Why Not Just REST?
@@ -22,7 +41,8 @@ The `WorkerSignalBus` uses a tiny 64-byte shared memory segment specifically str
 *   **Safety:** Little-endian byte order is enforced to ensure cross-process compatibility.
 *   **Schema ownership (important)**: the MMF layout constants are single-owned in
     `modules/ipc-common/src/main/java/io/justsearch/ipc/mmf/MmfWorkerSignalLayoutV1.java` to prevent silent drift.
-    A cross-compat test (`MmfSignalBusCompatibilityTest`) ensures Head/Worker agree on offsets/sizes.
+    A cross-compat test used to ensure Head/Worker agreed on offsets/sizes; it was deleted at
+    item A10 with the Worker-side implementation it compared against.
 
 | Offset | Size | Purpose | Writer | Reader |
 | :--- | :--- | :--- | :--- | :--- |

@@ -161,7 +161,7 @@ class HeadAssemblyTest {
             org.mockito.Mockito.mock(
                 io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
         var client =
-            org.mockito.Mockito.mock(io.justsearch.app.services.worker.RemoteKnowledgeClient.class);
+            org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
         cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
         org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
         org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
@@ -222,7 +222,7 @@ class HeadAssemblyTest {
             org.mockito.Mockito.mock(
                 io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
         var client =
-            org.mockito.Mockito.mock(io.justsearch.app.services.worker.RemoteKnowledgeClient.class);
+            org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
         org.mockito.Mockito.when(client.recoverVduProcessing()).thenReturn(0);
         org.mockito.Mockito.when(client.countPendingVdu()).thenReturn(0);
         org.mockito.Mockito.when(client.countPendingEmbeddings()).thenReturn(0);

@@ -33,13 +33,15 @@ class IndexerWorkerGuardrailsTest {
           .dependOnClassesThat()
           .resideInAnyPackage("io.justsearch.testsupport..");
 
+  // Lane F stage A item A10 deleted MmfWorkerSignalBus, this rule's one exemption. Strengthened
+  // rather than retired with it (the same move as its app-services twin): the invariant is that the
+  // index half does no memory-mapped IO, and inside one JVM there is no cross-process signal left
+  // to justify re-opening the exemption.
   @ArchTest
-  static final ArchRule mmfMappedByteBufferMustBeIsolatedToMmfWorkerSignalBus =
+  static final ArchRule indexerWorkerMustNotDoMemoryMappedIo =
       noClasses()
           .that()
           .resideInAnyPackage("io.justsearch.indexerworker..")
-          .and()
-          .doNotHaveFullyQualifiedName("io.justsearch.indexerworker.coordination.MmfWorkerSignalBus")
           .should()
           .dependOnClassesThat()
           .haveFullyQualifiedName("java.nio.MappedByteBuffer");

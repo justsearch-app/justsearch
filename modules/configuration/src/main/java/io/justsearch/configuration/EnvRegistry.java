@@ -987,13 +987,6 @@ public enum EnvRegistry {
         "justsearch.worker.config_snapshot", "JUSTSEARCH_WORKER_CONFIG_SNAPSHOT", LifecycleStage.PERMANENT),
 
     /**
-     * Main (Head) process PID, forwarded Head→Worker so the Worker can probe Head liveness and
-     * distinguish a real Head death from a benign OS-resume stale heartbeat (tempdoc 630). Absent
-     * on standalone worker runs, where the Worker falls back to heartbeat-only suicide.
-     */
-    HEAD_PID("justsearch.head.pid", "JUSTSEARCH_HEAD_PID", LifecycleStage.PERMANENT),
-
-    /**
      * Dev/test override for the OS energy-intent poll (tempdoc 630): {@code reduced} or {@code full}
      * forces the energy state, bypassing the {@code GetSystemPowerStatus} probe so the throttle +
      * "Paused" UI can be exercised on AC / without toggling Windows Energy Saver. Empty = probe.

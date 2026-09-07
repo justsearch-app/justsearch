@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -93,6 +95,40 @@ final class InProcessWorkerSignalBusReloadTest {
         new InProcessWorkerSignalBus(new GpuSchedulingGauge(), tempDir.resolve("never-created"));
     assertFalse(bus.isReloadRequested());
     bus.clearReloadSignal();
+  }
+
+  @Test
+  @DisplayName("the dev MCP tool and this bus name the SAME request file (retargeted 882 item 26)")
+  void devMcpToolWritesTheFilenameThisBusPolls() throws Exception {
+    // Retargeted from MmfWorkerSignalLayoutV1Test.devMcpServerWritesReloadByteAtDeclaredOffset,
+    // which pinned the producer to OFFSET_RELOAD_SIGNAL. Review S2 moved the trigger off the
+    // memory-mapped byte onto a file, so that pin stopped matching the code the day the byte
+    // stopped being written — and the property it protected is the one that matters MORE now:
+    // producer and consumer agree on a name. Nothing checks a filename typo at compile time, and
+    // the failure mode is silent (the tool reports a successful push; nothing reloads), which is
+    // exactly the defect S2 was written to fix.
+    Path repoRoot = findRepoRoot();
+    Assumptions.assumeTrue(
+        repoRoot != null, "Could not locate repo root (settings.gradle.kts) — skipping.");
+    Path serverScript = repoRoot.resolve("scripts/dev/justsearch-dev-mcp/server.mjs");
+    Assumptions.assumeTrue(
+        Files.exists(serverScript), "scripts/dev/justsearch-dev-mcp/server.mjs not found — skipping.");
+
+    String content = Files.readString(serverScript, StandardCharsets.UTF_8);
+    String expected = "'" + InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME + "'";
+    assertTrue(
+        content.contains(expected),
+        "The dev MCP reload tool must create the file this bus polls ("
+            + InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME
+            + "); server.mjs does not mention it, so a push would report success and reload nothing.");
+  }
+
+  private static Path findRepoRoot() {
+    Path dir = Path.of("").toAbsolutePath();
+    while (dir != null && !Files.exists(dir.resolve("settings.gradle.kts"))) {
+      dir = dir.getParent();
+    }
+    return dir;
   }
 
   @Test

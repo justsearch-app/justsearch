@@ -9,9 +9,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 519 §7 / Step 7: GPU-status broadcast wiring + Online Mode auto-start helpers
- * extracted from {@code HeadAssembly}. Bridges InferenceLifecycleManager mode changes
- * to the Worker's MainSignalBus so the Worker can pause/resume GPU-accelerated embeddings
- * when the LLM activates/deactivates.
+ * extracted from {@code HeadAssembly}. Bridges InferenceLifecycleManager mode changes to the
+ * in-process {@code GpuSchedulingGauge} so the index half can pause/resume GPU-accelerated
+ * embeddings when the LLM activates/deactivates. (Before lane F item A5 the bridge wrote a
+ * memory-mapped byte through {@code MainSignalBus}; item A10 deleted that bus.)
  */
 public final class InferenceWiring {
 

@@ -27,10 +27,10 @@ import org.junit.jupiter.api.Test;
  * iterates the server-streaming response correctly: the iterator surfaces every
  * {@link ScanRootProgress} in order, terminates cleanly on {@code complete=true}, and the
  * client's "iterate-until-complete-then-return-last" pattern (used by
- * {@link RemoteKnowledgeClient#scanRoot}) yields the terminal event.
+ * {@link KnowledgeClient#scanRoot}) yields the terminal event.
  *
  * <p>This is the streaming companion to {@code GrpcVduOperationsTest}. Phase B's
- * {@code RemoteKnowledgeClient.scanRoot} wraps the same iterator with a
+ * {@code KnowledgeClient.scanRoot} wraps the same iterator with a
  * {@link java.util.function.Consumer} forward — the integration test in B4 covers the
  * Head→Worker round-trip end-to-end; this test pins the wire contract.
  */

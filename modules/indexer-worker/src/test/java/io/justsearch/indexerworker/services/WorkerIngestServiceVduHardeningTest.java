@@ -818,10 +818,6 @@ final class WorkerIngestServiceVduHardeningTest {
     private final long startupTime = System.currentTimeMillis();
 
     @Override public void open() {}
-    @Override public void writePort(int port) {}
-    @Override public long readHeartbeat() { return System.currentTimeMillis(); }
-    @Override public boolean isShutdownRequested() { return false; }
-    @Override public boolean shouldDie() { return false; }
     @Override public boolean isMainGpuActive() { return false; }
     @Override public long startupTime() { return startupTime; }
     @Override public void close() {}

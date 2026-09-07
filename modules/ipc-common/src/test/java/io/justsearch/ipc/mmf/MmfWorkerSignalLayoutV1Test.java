@@ -5,20 +5,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tempdoc 882 item 26: pins the MMF v1 signal-bus byte layout so the field ranges never overlap
- * again, and ties {@link MmfWorkerSignalLayoutV1#OFFSET_RELOAD_SIGNAL} to the dev MCP server's
- * write site so the two cannot silently drift apart.
+ * again.
+ *
+ * <p>It also used to tie {@link MmfWorkerSignalLayoutV1#OFFSET_RELOAD_SIGNAL} to the dev MCP
+ * server's write site. That pin was RETARGETED, not dropped: lane F stage A review S2 moved the
+ * hot-reload trigger off the memory-mapped byte onto a request file, so the two halves that can
+ * now drift are the dev tool's path literal and
+ * {@code InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME}. That is asserted in
+ * {@code InProcessWorkerSignalBusReloadTest}, which is the module that can see both.
+ *
+ * <p>The layout itself outlives its two Java implementations (item A10 deleted both) because the
+ * system-test harness still reads it; item A12 owns that.
  */
 class MmfWorkerSignalLayoutV1Test {
 
@@ -89,31 +92,5 @@ class MmfWorkerSignalLayoutV1Test {
         MmfWorkerSignalLayoutV1.OFFSET_RESERVED1_START
             + MmfWorkerSignalLayoutV1.RESERVED1_LENGTH_BYTES);
     assertEquals(64, MmfWorkerSignalLayoutV1.MMF_SIZE_BYTES);
-  }
-
-  @Test
-  void devMcpServerWritesReloadByteAtDeclaredOffset() throws IOException {
-    Path repoRoot = findRepoRoot();
-    Assumptions.assumeTrue(repoRoot != null,
-        "Could not locate repo root (settings.gradle.kts) from this test run — skipping.");
-
-    Path serverScript = repoRoot.resolve("scripts/dev/justsearch-dev-mcp/server.mjs");
-    Assumptions.assumeTrue(Files.exists(serverScript),
-        "scripts/dev/justsearch-dev-mcp/server.mjs not found — skipping.");
-
-    String content = Files.readString(serverScript, StandardCharsets.UTF_8);
-    String expectedWrite =
-        "fh.write(buf, 0, 1, " + MmfWorkerSignalLayoutV1.OFFSET_RELOAD_SIGNAL + ")";
-    assertTrue(content.contains(expectedWrite),
-        "Expected the dev MCP server to write the reload byte at OFFSET_RELOAD_SIGNAL ("
-            + MmfWorkerSignalLayoutV1.OFFSET_RELOAD_SIGNAL + "), i.e. contain: " + expectedWrite);
-  }
-
-  private static Path findRepoRoot() {
-    Path dir = Paths.get("").toAbsolutePath();
-    while (dir != null && !Files.exists(dir.resolve("settings.gradle.kts"))) {
-      dir = dir.getParent();
-    }
-    return dir;
   }
 }

@@ -106,41 +106,10 @@ public final class AgentToolErrors {
     if (cause instanceof TimeoutException) {
       return ApiErrorCode.TIMEOUT;
     }
-    if (isWorkerUnreachable(cause) || isWorkerRestarting(cause)) {
+    if (isWorkerUnreachable(cause)) {
       return ApiErrorCode.SERVICE_UNAVAILABLE;
     }
     return ApiErrorCode.INTERNAL_ERROR;
-  }
-
-  /**
-   * The Worker outage that never reaches the transport. When the Worker process was being replaced,
-   * the Head's client re-discovered its port through the shared signal bus, and
-   * {@code RemoteKnowledgeClient.reconnect} throws a plain {@link IllegalStateException} before any
-   * gRPC call exists to fail — so {@link #isWorkerUnreachable} (which looks for transport types)
-   * cannot see it and the failure landed in {@code INTERNAL_ERROR}, with its internal invariant
-   * text copied to the model.
-   *
-   * <p>Matched on the message for the same reason the transport types are matched by name: the
-   * thrower lives in {@code app-services}, which {@code app-agent} does not depend on. The two
-   * literals are the complete set {@code reconnect} can throw
-   * ({@code RemoteKnowledgeClient.java:404} and its PID-validation sibling below it), both meaning
-   * "the Worker is mid-restart".
-   *
-   * <p><b>Lane F stage A:</b> item A6 made {@code EngineKnowledgeClient} the live client and item
-   * A11 deleted the worker process, so nothing reconnects and this branch has no producer on the
-   * Engine path. It is kept until item A10 removes {@code RemoteKnowledgeClient}, which is still the
-   * declared thrower.
-   */
-  private static boolean isWorkerRestarting(Throwable cause) {
-    if (!(cause instanceof IllegalStateException)) {
-      return false;
-    }
-    String message = cause.getMessage();
-    if (message == null) {
-      return false;
-    }
-    return message.contains("No valid port in signal bus")
-        || message.contains("PID mismatch after reconnect");
   }
 
   /**

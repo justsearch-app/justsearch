@@ -1,25 +1,16 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.Server;
-import io.grpc.Status;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.indexing.rag.ContextBudgeter;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsRequest;
 import io.justsearch.ipc.FetchDocumentsResponse;
 import io.justsearch.ipc.RetrieveContextRequest;
 import io.justsearch.ipc.RetrieveContextResponse;
-import io.justsearch.ipc.SearchServiceGrpc;
-import io.justsearch.ipc.mmf.MmfWorkerSignalLayoutV1;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.lang.reflect.Field;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
@@ -31,14 +22,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * The 200k-character cap on the fallback context, including header and separator overhead.
+ *
+ * <p>Lane F stage A item A10 moved the harness off a real Netty server and the memory-mapped signal
+ * bus onto {@link TestKnowledgeClient}. The property survives the transport untouched: the budget
+ * is arithmetic {@code RemoteDocumentService} does on the documents it got back, and the only thing
+ * the wire contributed was a way to make {@code retrieveContext} fail so the fallback runs. That
+ * failure is now thrown directly — {@code RemoteDocumentService} catches {@code Exception} and
+ * falls back, so the arm reached is the same one, for the same reason.
+ */
 @DisplayName("RemoteDocumentService fallback context budgeting")
 final class RemoteDocumentServiceContextBudgetTest {
 
   private static final int MAX_CONTEXT_CHARS = 200_000;
 
-  private Server server;
-  private MainSignalBus signalBus;
-  private RemoteKnowledgeClient client;
+  private KnowledgeClient client;
   private String prevDataDir;
   private Path tempDataDir;
 
@@ -48,42 +47,19 @@ final class RemoteDocumentServiceContextBudgetTest {
     tempDataDir = Files.createTempDirectory("justsearch-scale002-test-");
     System.setProperty("justsearch.data.dir", tempDataDir.toString());
 
-    // Start a minimal SearchService over a real loopback port so RemoteKnowledgeClient can connect.
-    FailingRetrieveContextService service =
-        new FailingRetrieveContextService(
-            Map.of(
-                "doc-1", "A".repeat(100_000),
-                "doc-2", "B".repeat(150_000)));
-    server = NettyServerBuilder.forPort(0).addService(service).build().start();
-
-    // Create and open the signal bus MMF, then write the chosen gRPC port so reconnect() is stable.
-    Path signalPath = tempDataDir.resolve("signals").resolve("worker-signal.mmf");
-    signalBus = new MainSignalBus(signalPath);
-    signalBus.open();
-    writePortForTests(signalBus, server.getPort());
-
-    // Generous deadline to avoid flaky failures on contended CI runners.
-    // The test flow is: retrieveContext (UNAVAILABLE → retry → fail) → fallback → fetchDocuments.
-    // Both RPCs use CONTENT_FETCH (2x multiplier), so effective deadline = 10s per RPC.
-    // At deadlineMs=500 (1s effective), CI runners under load hit DEADLINE_EXCEEDED on
-    // fetchDocuments, causing the fallback's inner catch to return docsUsed=0.
-    client = new RemoteKnowledgeClient(signalBus, /*deadlineMs=*/ 5000, /*maxRetries=*/ 1);
-    client.connect(server.getPort());
+    client =
+        new TestKnowledgeClient(
+            new FailingRetrieveContextCalls(
+                Map.of(
+                    "doc-1", "A".repeat(100_000),
+                    "doc-2", "B".repeat(150_000))));
   }
 
   @AfterEach
-  void tearDown() throws Exception {
+  void tearDown() {
     if (client != null) {
       client.close();
       client = null;
-    }
-    if (signalBus != null) {
-      signalBus.close();
-      signalBus = null;
-    }
-    if (server != null) {
-      server.shutdownNow().awaitTermination();
-      server = null;
     }
     if (prevDataDir == null) {
       System.clearProperty("justsearch.data.dir");
@@ -101,13 +77,15 @@ final class RemoteDocumentServiceContextBudgetTest {
     docIds.add("doc-1");
     docIds.add("doc-2");
 
-    var result = service
-        .retrieveContextWithMeta("what is this?", docIds, 5)
-        .toCompletableFuture()
-        // Generous timeout; test validates correctness (200K cap), not latency.
-        .get(6, TimeUnit.SECONDS);
+    var result =
+        service
+            .retrieveContextWithMeta("what is this?", docIds, 5)
+            .toCompletableFuture()
+            // Generous timeout; test validates correctness (200K cap), not latency.
+            .get(6, TimeUnit.SECONDS);
 
-    assertFalse(result.usedChunks(), "Should indicate fallback to full docs when retrieveContext RPC fails");
+    assertFalse(
+        result.usedChunks(), "Should indicate fallback to full docs when retrieveContext fails");
     assertEquals(0, result.chunksUsed(), "Fallback should report chunksUsed=0");
     assertEquals(2, result.docsUsed(), "Should include both docs (second truncated to fit cap)");
 
@@ -125,54 +103,34 @@ final class RemoteDocumentServiceContextBudgetTest {
     String sep = ContextBudgeter.SECTION_SEPARATOR;
     String a = "A".repeat(100_000);
     String b = "B".repeat(150_000);
-    int remainingForB = MAX_CONTEXT_CHARS - (header1.length() + a.length() + sep.length() + header2.length());
+    int remainingForB =
+        MAX_CONTEXT_CHARS - (header1.length() + a.length() + sep.length() + header2.length());
     String expected = header1 + a + sep + header2 + b.substring(0, remainingForB);
     assertEquals(expected, context, "Context should be truncated exactly to budget including overhead");
   }
 
-  private static void writePortForTests(MainSignalBus bus, int port) throws Exception {
-    Field f = MainSignalBus.class.getDeclaredField("segment");
-    f.setAccessible(true);
-    MemorySegment segment = (MemorySegment) f.get(bus);
-    segment.set(
-        ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
-        MmfWorkerSignalLayoutV1.OFFSET_WORKER_GRPC_PORT,
-        port);
-    segment.force();
-
-    // Sanity: ensure the normal public read path sees it (protects against endian mistakes).
-    assertEquals(port, bus.readPort());
-  }
-
-  private static final class FailingRetrieveContextService extends SearchServiceGrpc.SearchServiceImplBase {
+  private static final class FailingRetrieveContextCalls extends TestKnowledgeClient.SearchCalls {
     private final Map<String, String> docs;
 
-    private FailingRetrieveContextService(Map<String, String> docs) {
+    private FailingRetrieveContextCalls(Map<String, String> docs) {
       this.docs = docs;
     }
 
     @Override
-    public void retrieveContext(RetrieveContextRequest request,
-                                StreamObserver<RetrieveContextResponse> responseObserver) {
-      responseObserver.onError(
-          Status.UNAVAILABLE.withDescription("forced failure for fallback test").asRuntimeException());
+    public RetrieveContextResponse retrieveContext(RetrieveContextRequest request) {
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.UNAVAILABLE, "forced failure for fallback test");
     }
 
     @Override
-    public void fetchDocuments(FetchDocumentsRequest request,
-                               StreamObserver<FetchDocumentsResponse> responseObserver) {
+    public FetchDocumentsResponse fetchDocuments(FetchDocumentsRequest request) {
       FetchDocumentsResponse.Builder out = FetchDocumentsResponse.newBuilder();
       for (String docId : request.getDocIdsList()) {
         String content = docs.getOrDefault(docId, "");
         out.addDocuments(
-            DocumentContent.newBuilder()
-                .setDocId(docId)
-                .setContent(content)
-                .setFound(true)
-                .build());
+            DocumentContent.newBuilder().setDocId(docId).setContent(content).setFound(true).build());
       }
-      responseObserver.onNext(out.build());
-      responseObserver.onCompleted();
+      return out.build();
     }
   }
 }

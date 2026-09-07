@@ -32,7 +32,7 @@ import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Source;
 import io.justsearch.app.services.observability.health.LifecycleSnapshotTap;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -46,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>The property under test is a negative one: {@code GET /api/status} must no longer perform the
  * {@code IndexStatus} unary on the request thread. A test that only asserted "the response still
  * has a worker view" would pass on the pre-item code, so every assertion here is on the
- * <em>interaction count</em> with the mocked {@link RemoteKnowledgeClient}, which distinguishes
+ * <em>interaction count</em> with the mocked {@link KnowledgeClient}, which distinguishes
  * "served from the sample" from "fetched again".
  */
 @DisplayName("Worker status sampler (885 item 6)")
@@ -57,7 +57,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("a sampler tick feeds the health taps with no status request anywhere")
   void samplerTickFeedsTapsWithoutAnyStatusRequest(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     // A real capability, starting PENDING exactly as it is before the Worker connects.
     var worker = new io.justsearch.app.services.lifecycle.WorkerCapability();
@@ -92,7 +92,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("a status read after a sample performs zero Worker RPCs")
   void statusReadPerformsNoWorkerRpc(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
@@ -118,7 +118,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("the taps do not reconcile on the read path")
   void readPathDoesNotFeedTaps(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
     handler.sampleAndBuildStatusSnapshot();
@@ -149,7 +149,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("the first read before any sample takes exactly one synchronous sample")
   void firstReadBeforeAnySampleObservesOnce(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
@@ -164,7 +164,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("a failed sample is still a sample, and reads report it stale without re-calling")
   void failedSampleIsCachedAndReportedStale(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenThrow(new IllegalStateException("worker gone"));
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
@@ -183,7 +183,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("a sample older than SAMPLE_STALE_PERIODS periods reads stale; one within does not")
   void ageBasedStalenessCrossesAtThreePeriods(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
@@ -220,7 +220,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("an aged-out sample recovers to fresh when the sampler ticks again")
   void agedSampleRecoversOnTheNextTick(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
@@ -240,7 +240,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("handleStatus routes ?fresh=true to a sample and anything else to the cache")
   void handleStatusRoutesTheFreshParam(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
     handler.sampleAndBuildStatusSnapshot();
@@ -270,7 +270,7 @@ final class WorkerStatusSamplerTest {
   @Test
   @DisplayName("the sampling period is 2 s while index work is in flight and 10 s when idle")
   void samplingPeriodTracksInFlightIndexWork(@TempDir Path indexBase) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
@@ -300,7 +300,7 @@ final class WorkerStatusSamplerTest {
   // ---------------------------------------------------------------- helpers
 
   private static StatusLifecycleHandler reachableHandler(
-      Path indexBase, RemoteKnowledgeClient client) {
+      Path indexBase, KnowledgeClient client) {
     io.justsearch.app.services.lifecycle.WorkerCapability worker =
         mock(io.justsearch.app.services.lifecycle.WorkerCapability.class);
     when(worker.available()).thenReturn(true);
@@ -312,7 +312,7 @@ final class WorkerStatusSamplerTest {
    * can drive an actual capability transition rather than restub a mock. */
   private static StatusLifecycleHandler handlerWith(
       Path indexBase,
-      RemoteKnowledgeClient client,
+      KnowledgeClient client,
       io.justsearch.app.services.lifecycle.WorkerCapability worker) {
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     when(ks.client()).thenReturn(client);

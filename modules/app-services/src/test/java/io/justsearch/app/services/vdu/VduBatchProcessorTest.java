@@ -26,14 +26,14 @@ class VduBatchProcessorTest {
 
     private StubVduProcessor vduProcessor;
     private StubVramDetector vramDetector;
-    private StubRemoteKnowledgeClient knowledgeClient;
+    private StubKnowledgeClient knowledgeClient;
     private TestableVduBatchProcessor batchProcessor;
 
     @BeforeEach
     void setUp() {
         vduProcessor = new StubVduProcessor();
         vramDetector = new StubVramDetector();
-        knowledgeClient = new StubRemoteKnowledgeClient();
+        knowledgeClient = new StubKnowledgeClient();
         batchProcessor = new TestableVduBatchProcessor(vduProcessor, vramDetector, knowledgeClient);
     }
 
@@ -341,11 +341,11 @@ class VduBatchProcessorTest {
     static class TestableVduBatchProcessor {
         private final StubVduProcessor vduProcessor;
         private final StubVramDetector vramDetector;
-        private final StubRemoteKnowledgeClient knowledgeClient;
+        private final StubKnowledgeClient knowledgeClient;
 
         TestableVduBatchProcessor(StubVduProcessor vduProcessor,
                                   StubVramDetector vramDetector,
-                                  StubRemoteKnowledgeClient knowledgeClient) {
+                                  StubKnowledgeClient knowledgeClient) {
             this.vduProcessor = vduProcessor;
             this.vramDetector = vramDetector;
             this.knowledgeClient = knowledgeClient;

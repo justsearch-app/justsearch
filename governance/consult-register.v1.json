@@ -106,7 +106,7 @@
         "Define the method + messages in the .proto (e.g. indexing.proto).",
         "Implement the service method in modules/worker-services/.",
         "NO LONGER A STEP: lane F stage A item A9 deleted the gRPC server and its three Delegating*Service wrappers, so there is no forward to add — callers reach WorkerIngestService directly through KnowledgeServer.appServices().",
-        "Add the client call in modules/app-services/ (RemoteKnowledgeClient or the relevant client).",
+        "Add the client call in modules/app-services/ (KnowledgeClient, or the relevant client).",
         "Add a contract test.",
         "Verify: ./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test",
         "Full reference: docs/reference/contributing/common-workflows.md (Add a gRPC method)."
@@ -235,6 +235,26 @@
         "A live (accepted*/stable*) ADR must name a probe or state a reason: `probes: none - <reason>`. A bare `probes: none` states nothing and still fails.",
         "Verify: node scripts/governance/run.mjs --gate adr-coverage --mode gate.",
         "If the decision changed inside a tempdoc, the ADR update rides in the SAME PR — see docs/reference/contributing/agent-guide.md §3.8."
+      ]
+    },
+    {
+      "id": "engine-ports",
+      "pathIncludes": [
+        "governance/engine-ports.v1.json",
+        "modules/app-engine/",
+        "modules/core/src/main/java/io/justsearch/core/search/SearchPort.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java"
+      ],
+      "region": "Engine ports (lane F design 3.3)",
+      "docs": [
+        "governance/engine-ports.v1.json",
+        "docs/design/lane-f-engine-jvm/design.md"
+      ],
+      "recipe": [
+        "The engine API is a catalogued set of ports. Design 3.3: 'Adding a port is a catalogue entry, an interface and a composition-root binding. Nothing else in the repo may construct an implementation of a port.'",
+        "Before implementing SearchPort or IndexingService anywhere, check whether you should be BINDING through the existing implementation instead. While the index half was a second process, implementing the engine API meant writing a gRPC server; in one JVM it means writing 'implements SearchPort', which any module can now do by accident.",
+        "If the binding is genuine, declare it in governance/engine-ports.v1.json under its port, naming the composition-root site that binds it (and 'via: extends <Class>' if it reaches the port through a superclass). Then run: node scripts/governance/run.mjs --gate engine-port --mode gate.",
+        "Rule 6b (LayeringEnforcementTest, ADR-0049) is the complementary pin: it stops application code reaching PAST a port into Lucene. Sharing a JVM does not license that."
       ]
     },
     {

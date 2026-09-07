@@ -6,12 +6,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Stub RemoteKnowledgeClient for unit testing VDU components.
+ * Stub knowledge client for unit testing VDU components.
  *
- * <p>Simulates gRPC responses without actual network calls.
+ * <p>Answers the VDU calls in-process, without constructing a real client.
  * Tracks method invocations for verification.
  */
-public class StubRemoteKnowledgeClient {
+public class StubKnowledgeClient {
 
     // Configurable return values
     private int pendingVduCount = 0;
@@ -64,32 +64,32 @@ public class StubRemoteKnowledgeClient {
 
     // ========== Configuration Methods ==========
 
-    public StubRemoteKnowledgeClient withPendingVduCount(int count) {
+    public StubKnowledgeClient withPendingVduCount(int count) {
         this.pendingVduCount = count;
         return this;
     }
 
-    public StubRemoteKnowledgeClient withPendingEmbeddingsCount(int count) {
+    public StubKnowledgeClient withPendingEmbeddingsCount(int count) {
         this.pendingEmbeddingsCount = count;
         return this;
     }
 
-    public StubRemoteKnowledgeClient withPendingVduDocIds(List<String> docIds) {
+    public StubKnowledgeClient withPendingVduDocIds(List<String> docIds) {
         this.pendingVduDocIds = new ArrayList<>(docIds);
         return this;
     }
 
-    public StubRemoteKnowledgeClient withRecoveredCount(int count) {
+    public StubKnowledgeClient withRecoveredCount(int count) {
         this.recoveredCount = count;
         return this;
     }
 
-    public StubRemoteKnowledgeClient withUpdateVduResultSuccess(boolean success) {
+    public StubKnowledgeClient withUpdateVduResultSuccess(boolean success) {
         this.updateVduResultSuccess = success;
         return this;
     }
 
-    public StubRemoteKnowledgeClient withMarkVduProcessingRetryCount(int count) {
+    public StubKnowledgeClient withMarkVduProcessingRetryCount(int count) {
         this.markVduProcessingRetryCount = count;
         return this;
     }
