@@ -41,6 +41,14 @@ testing {
         implementation(libs.junit.jupiter.api)
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
+
+        // Test-only, and deliberately self-retiring (item A4). ForegroundLoadGateTest pins the
+        // gate's nine foreground operations against ForegroundLoadInterceptor.foregroundMethods(),
+        // the live producer until item A9 deletes the interceptor — two producers of one gauge may
+        // not drift while both exist. `indexer-worker` is a TEST dependency only: no main-source
+        // edge is created, so ArchUnit rule 6b (which imports with DoNotIncludeTests) is unaffected,
+        // and this line is removed with the interceptor at A9.
+        implementation(project(":modules:indexer-worker"))
       }
     }
   }
