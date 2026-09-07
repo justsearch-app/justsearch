@@ -29,7 +29,7 @@ final class HeadlessAppStartErrorTest {
 
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir, dir.resolve("worker_signal.lock"),
+        false, dir, dir, dir, dir.resolve("worker_signal.lock"),
         5_000L, 1_000L, 3, "256m", 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 

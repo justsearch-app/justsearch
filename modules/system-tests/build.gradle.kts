@@ -170,12 +170,11 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   description = "Runs integration tests (Golden Corpus, Relevance)."
   group = "verification"
 
-  // Tempdoc 419 / T6.2 — IsolatedBackendFixture spawns HeadlessApp, which spawns the Worker
-  // subprocess from modules/indexer-worker/build/install/indexer-worker. Without this,
-  // fresh-checkout runs see Head boot fine while Worker spawn silently fails (the fixture
-  // would then time out in awaitDocumentSearchable instead of failing fast). Mirrors the
-  // same dependency on :modules:ui:runHeadless (modules/ui/build.gradle.kts:1844).
-  dependsOn(":modules:indexer-worker:installDist")
+  // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
+  // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from
+  // that distribution. Lane F stage A item A13 deleted it: the fixture spawns ONE child JVM off
+  // the test JVM's own java.class.path (IsolatedBackendFixture#writeArgfile), which already
+  // carries the index half, so there is no artifact to pre-build.
 
   testClassesDirs = sourceSets["integrationTest"].output.classesDirs
   classpath = sourceSets["integrationTest"].runtimeClasspath
@@ -265,15 +264,9 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   // Forward RAG eval context format for agent-style context experiments (tempdoc 213)
   System.getProperty("rag.eval.context.format")?.let { systemProperty("rag.eval.context.format", it) }
 
-  // Tempdoc 419 / T6.2 — IsolatedBackendFixture spawns HeadlessApp in a child JVM whose
-  // working directory is this module, not the repo root. Pass the absolute worker lib
-  // path through so KnowledgeServerConfig.resolveWorkerLibDir doesn't need to walk
-  // relative paths to find the installDist output. Mirrors the pattern systemTest uses
-  // for justsearch.worker.dist.dir.
-  systemProperty(
-      "justsearch.worker.lib.dir",
-      project(":modules:indexer-worker").layout.buildDirectory
-          .dir("install/indexer-worker/lib").get().asFile.absolutePath)
+  // Item A13 removed the justsearch.worker.lib.dir system property that used to be forwarded
+  // here (tempdoc 419 / T6.2). It pointed KnowledgeServerConfig.resolveWorkerLibDir at the Worker
+  // installDist output; both the resolver and the distribution are gone.
 
   // Tempdoc 829 R3 — this lane is advisory (ci.yml `continue-on-error: true`) and absent
   // from `required_status_checks.contexts`, so a self-recovered flake here cannot change
@@ -353,9 +346,8 @@ val systemTest = tasks.register<Test>("systemTest") {
     showStandardStreams = true
   }
 
-  // Pass system property for worker distribution directory location
-  systemProperty("justsearch.worker.dist.dir", project(":modules:indexer-worker").layout.buildDirectory
-      .dir("install/indexer-worker").get().asFile.absolutePath)
+  // Item A13 removed the justsearch.worker.dist.dir system property: there is no Worker
+  // distribution for a system test to point at.
 }
 
 // Make check depend on unit tests

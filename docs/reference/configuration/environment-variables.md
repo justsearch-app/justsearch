@@ -51,7 +51,7 @@ Scope:
 | `JUSTSEARCH_SEARCH_PROFILE` | `justsearch.search.pipeline.profile` | String | Selects a search pipeline profile (e.g., `default`, `semantic`, `hybrid`). |
 | **Worker / Build Info** | | | |
 | `JUSTSEARCH_INDEXER_WORKER_VERSION` | `indexer.worker.version` | String | Overrides the Worker version string (primarily for build/debug). |
-| `JUSTSEARCH_BUILD_STAMP` | `justsearch.build.stamp` | String | SHA-256 content hash of Worker distribution (16 hex chars). Injected by `WorkerSpawner` from `build-stamp.txt`. Used for stale-JVM detection — jseval compares the running stamp against the on-disk stamp to warn of mismatches. (371) |
+| `JUSTSEARCH_BUILD_STAMP` | `justsearch.build.stamp` | String | SHA-256 content hash of the Engine distribution (16 hex chars), from `modules/ui/build/install/ui/build-stamp.txt`. Used for stale-JVM detection — jseval compares the running stamp against the on-disk stamp to warn of mismatches. Lane F stage A item A13 re-homed the stamp off the deleted Worker distribution; its `WorkerSpawner` injector went at item A11, so today only `DevReloadManager` sets this after a hot reload. (371, ADR-0021) |
 | **AI (inference + embeddings)** | | | |
 | `JUSTSEARCH_AI_AUTOSTART_ENABLED` | `justsearch.ai.autostart.enabled` | Bool | Auto-start llama-server on backend startup. Used by eval runs (`-Pllm=true`). (369) |
 | `JUSTSEARCH_AI_AUTOSTART_DISABLED` | `justsearch.ai.autostart.disabled` | Bool | Explicitly disable LLM auto-start, overriding `AI_AUTOSTART_ENABLED`. (369) |

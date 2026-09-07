@@ -305,8 +305,8 @@ public class HotSwapPush {
                 + identityEntry
                 + "\nThat is a stale distribution - the launcher predates the hot-reload classpath, so"
                 + " the process cannot see that directory at all. Refusing to push.\nRemedy: rebuild"
-                + " the dist in that tree (gradlew.bat :modules:ui:installDist"
-                + " :modules:indexer-worker:installDist) and restart the stack.");
+                + " the dist in that tree (gradlew.bat :modules:ui:installDist) and restart the"
+                + " stack.");
             return Identity.REFUSED_CLASSPATH_ABSENT;
         }
         System.err.println(

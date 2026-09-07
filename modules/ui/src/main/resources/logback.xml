@@ -19,11 +19,19 @@
     internals flooded the head log at <1% signal density.
 
     Pattern: each entry-point module owns its own logback.xml, mirroring
-    indexer-worker/src/main/resources/logback.xml (Worker process) and
     app-launcher/src/main/resources/logback.xml (Launcher process). With this
     file on the ui-headless.jar classpath, Logback finds it automatically in
     both dev (`runHeadless`) and prod (Tauri shell spawn) without any
     -Dlogback.configurationFile system property.
+
+    Lane F stage A item A13 deleted the second config
+    (indexer-worker/src/main/resources/logback.xml, the Worker process's). Since item A6 the index
+    half runs INSIDE this JVM, so both files were on one classpath and only the first found won.
+    Three settings that were real there and absent here were re-homed below: the
+    ${JUSTSEARCH_LOG_LEVEL:-INFO} parameterisation of io.justsearch, and the org.apache.lucene /
+    org.sqlite noise floors. (The Worker's file/JSON appender and OTel MDC bridge already have
+    equivalents here; its worker.log appender was already dead — nothing writes
+    <dataDir>/logs/worker.log, see DebugStateController.java.)
   -->
   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>${justsearch.data.dir:-build/headless-data}/logs/headless-backend.log</file>
@@ -88,6 +96,27 @@
   <logger name="org.eclipse.jetty" level="WARN"/>
   <!-- Javalin's own internals are quieter at INFO; keep them visible. -->
   <logger name="io.javalin" level="INFO"/>
+
+  <!--
+    Re-homed from the Worker's deleted logback.xml (item A13). Lucene and SQLite now run in THIS
+    JVM, and both are chatty below WARN.
+  -->
+  <logger name="org.apache.lucene" level="WARN"/>
+  <logger name="org.sqlite" level="WARN"/>
+
+  <!--
+    Also re-homed from the Worker's config (tempdoc 734 O-2, commit 9a2a7807).
+    io.justsearch defaults to INFO, NOT DEBUG: several call sites intentionally log raw user
+    query/chat text at DEBUG/TRACE per the WARN/DEBUG split in
+    docs/reference/contributing/logging-conventions.md ("Query Text Redaction"). The diagnostics
+    export bundles logs/ (DiagnosticsServiceImpl#addDirectoryRedacted) with path-only redaction —
+    no query/content redaction — so query text must not be written at INFO or above.
+    JUSTSEARCH_LOG_LEVEL=DEBUG restores verbose local debugging; scripts/dev/dev-runner.cjs sets it
+    for the dev stack, which before A13 had no effect on the Engine because only the Worker's
+    (unloaded) config read it. Do not lower this default instead.
+    Pinned by modules/ui/src/test/.../EngineLogbackConfigurationTest.
+  -->
+  <logger name="io.justsearch" level="${JUSTSEARCH_LOG_LEVEL:-INFO}"/>
 
   <root level="INFO">
     <appender-ref ref="OTEL_MDC"/>

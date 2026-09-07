@@ -203,17 +203,10 @@ class KnowledgeServerTest {
 
   // ==================== Phase 2: State Getters ====================
 
-  @Nested
-  @DisplayName("getPort()")
-  class GetPortTests {
-
-    @Test
-    @DisplayName("always returns -1: there is no socket to bind")
-    void noSocket_returnsMinusOne() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      assertEquals(-1, server.getPort());
-    }
-  }
+  // Lane F stage A item A13 deleted KnowledgeServer#getPort() along with its last caller (the
+  // standalone IndexerWorker.main log line). It had returned a constant -1 since A9 removed the
+  // gRPC server, so the nested GetPortTests block that pinned "-1, there is no socket" went with
+  // it: inside one JVM there is no port to be wrong about.
 
   @Nested
   @DisplayName("isRunning()")

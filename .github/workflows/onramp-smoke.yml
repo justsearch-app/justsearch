@@ -71,7 +71,7 @@ jobs:
       - name: Build required distributions
         run: >-
           devcontainer exec --workspace-folder . --id-label "$DEVCONTAINER_ID_LABEL"
-          ./gradlew assemble :modules:ui:installDist :modules:indexer-worker:installDist
+          ./gradlew assemble :modules:ui:installDist
           -PskipWebBuild=true
 
       - name: Onramp first-success smoke (Tier 0)
@@ -131,7 +131,7 @@ jobs:
       # the launch dir (dev-runner.cjs:1037 fail-fasts without it). Without any of this, the lane fails
       # at "FAIL stack start timed out" (the original 2026-07-02 run 28607534344).
       - name: Build (assemble + installDist — keeps stack-start off the cold-build path)
-        run: ./gradlew.bat assemble :modules:ui:installDist :modules:indexer-worker:installDist -PskipWebBuild=true
+        run: ./gradlew.bat assemble :modules:ui:installDist -PskipWebBuild=true
 
       # Force the model-less Tier 0 path deterministically (independent of whether models/ exists).
       - name: Prepare empty models dir

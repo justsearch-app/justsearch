@@ -282,6 +282,44 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   The register row lives in `consult-register.v1.json`, not in `CLAUDE.md`: the always-loaded
   budget ratchet refused the table row (86 B over), which is the mechanism working as designed.
 
+- **A13 (the shipped installer was already paying twice, and the collapse had to notice).** The
+  item reads as "delete the worker distribution", which sounds like removing a staging step. It is
+  not: `modules/ui`'s `runtimeClasspath` already contains `project(':modules:indexer-worker')`
+  and its transitive ORT/Lucene/Tika/SQLite, and `headlessDist` copies that whole classpath into
+  `lib/` — so the bundle carried the **untrimmed 371 MB `onnxruntime_gpu` jar in `lib/`** AND a
+  5.8 MB trimmed copy under `lib/worker/`. Deleting `lib/worker/` without moving the trim would
+  have shipped the untrimmed jar as the only one. `stageTrimmedOnnxRuntimeGpu` now sources from
+  the Engine dist and the untrimmed jar is excluded from `lib/`; the trim's byte policy (win-x64
+  core trio + JNI shim + TensorRT provider, no Linux natives, no CUDA EP DLL) is unchanged and was
+  re-measured at 5.8 MB.
+- **A13 (the Worker AOT cache had been warming a class that has not existed for two Lucene
+  versions).** Folding the two caches into one meant reading the Worker's touch list, and
+  `org.apache.lucene.codecs.lucene100.Lucene100Codec` has been gone since the Lucene 10.4 bump.
+  `AotTraining.touch()` swallows `ClassNotFoundException` by design — it must, because a touch
+  list is a best-effort warm — so the entry warmed nothing and said nothing. Corrected to
+  `lucene104.Lucene104Codec` plus the product's own `JustSearchCodec`, and every remaining touch
+  was probed against the built `install/ui/lib` (36 checked, 0 missing) rather than assumed. The
+  general shape: a best-effort list with a swallowed failure mode needs a periodic probe, because
+  it cannot degrade loudly.
+- **A13 (`JUSTSEARCH_LOG_LEVEL` had been doing nothing since A6).** The
+  `${JUSTSEARCH_LOG_LEVEL:-INFO}` parameterisation of the `io.justsearch` logger lived in the
+  **Worker's** `logback.xml`, which stopped being loaded when the index half stopped being a
+  process. `dev-runner.cjs:1740` has been setting `JUSTSEARCH_LOG_LEVEL=DEBUG` into a config
+  nothing read. Re-homed into the Head's `logback.xml` with the two noise floors
+  (`org.apache.lucene`, `org.sqlite`) that were also Worker-only, and pinned by
+  `EngineLogbackConfigurationTest`. **Scope note:** stage A §7 assigns the worker `logback.xml`
+  deletion to **A16**; it moved to A13 because A13 deletes the distribution that file shipped in,
+  and leaving a logging config in a jar with no process to configure is the residue this lane
+  exists to remove. A16 still owns the `engine.log` rename and the `core.head-log` ->
+  `core.engine-log` channel collapse; only the deletion moved.
+- **A13 (what could not be verified, stated rather than implied).** The installer and the dev stack
+  are both unrunnable from this session by constraint. So `bundleSidecarResources`,
+  `smokeSidecarBundle` and `verify-installer-nsis-win.ps1` are **changed but unexercised** — the
+  first two need a jlink runtime plus network downloads (`downloadLlamaCudaPrebuilt` fails on an
+  SSL handshake here), the third needs a built installer. What WAS verified is the load-bearing
+  half: the trimmed jar is produced, at the same size, with the same contents. A packaging change
+  nobody ran is a claim, and it is recorded as one.
+
 - **A7.** The item says "a bounded buffer … drop-oldest or block, your call, justified". **Block,
   never drop**, with a timeout that fails the flow — and the justification is a property of these
   two streams, not a preference: both carry *ordered state deltas folded into a keyed cache*

@@ -1183,10 +1183,10 @@ jobs:
   # only, small + fast", and this file's header requires each job be named after the fact it
   # proves rather than becoming "one opaque Windows bucket".
   #
-  # Windows, not ubuntu: the tier spawns a real Head child JVM (HeadlessApp), which in turn
-  # spawns the Worker from `:modules:indexer-worker:installDist` — process spawn, argfile
-  # classpath quoting, and worker-lib path resolution are exactly the surfaces that differ per
-  # OS, and Windows is the OS the product ships on. The tier has never been validated on Linux;
+  # Windows, not ubuntu: the tier spawns a real Engine child JVM (HeadlessApp) — process spawn
+  # and argfile classpath quoting are exactly the surfaces that differ per OS, and Windows is the
+  # OS the product ships on. (Before lane F stage A item A13 that child spawned a Worker of its
+  # own from `:modules:indexer-worker:installDist`; there is one process and one dist now.) The tier has never been validated on Linux;
   # moving it there is a separate exercise with its own evidence, not an assumption to make here.
   #
   # ADVISORY (continue-on-error + deliberately absent from workflow-signal-policy.v1.json's

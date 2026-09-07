@@ -210,8 +210,11 @@ final class DevReloadManager {
   /**
    * 371: Reads the build stamp left by the MCP reload tool and updates the system property.
    * The MCP tool writes the on-disk stamp to {@code <dataDir>/reload-build-stamp.txt} after
-   * a successful HotSwapPush. We read it here so the next {@code IndexStatus} RPC reports
-   * the correct stamp, preventing false-positive "stale JVM" warnings from jseval.
+   * a successful HotSwapPush. We read it here so the next status projection reports the correct
+   * stamp, preventing false-positive "stale JVM" warnings from jseval. (It reached the Head over
+   * the {@code IndexStatus} RPC until lane F stage A item A9 deleted the wire; the stamp itself
+   * now describes the Engine distribution — item A13 re-homed {@code generateBuildStamp} onto
+   * {@code modules/ui/build/install/ui/build-stamp.txt}.)
    */
   private void updateBuildStampFromReloadFile() {
     try {

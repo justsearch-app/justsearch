@@ -196,11 +196,9 @@ dependencies {
 
 tasks.named("check") { dependsOn(tasks.named("integrationTest")) }
 
-// Ensure worker JAR is built before integration tests run
-// Ensure worker JAR is built before integration tests run
-tasks.named("integrationTest") {
-  dependsOn(project(":modules:indexer-worker").tasks.named("installDist"))
-}
+// Lane F stage A item A13: the `:modules:indexer-worker:installDist` dependency that used to sit
+// here is gone with the Worker distribution. These integration tests get the index half from their
+// own runtimeClasspath; there is no artifact to pre-build.
 
 tasks.register<JavaExec>("runSearchDump") {
   group = "phase13"

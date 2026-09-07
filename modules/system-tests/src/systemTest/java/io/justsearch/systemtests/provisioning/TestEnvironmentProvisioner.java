@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
  *
  *     @Test
  *     void myTest() {
- *         Path workerDist = env.getWorkerDistDir();
  *         Path tempDir = env.getTempDir();
  *         String[] jvmArgs = env.getWorkerJvmArgs();
  *         // ...
@@ -51,7 +50,6 @@ import org.slf4j.LoggerFactory;
 public class TestEnvironmentProvisioner implements BeforeAllCallback, AfterAllCallback, BeforeEachCallback {
   private static final Logger log = LoggerFactory.getLogger(TestEnvironmentProvisioner.class);
 
-  private Path workerDistDir;
   private Path tempDir;
   private Path projectRoot;
   private boolean initialized = false;
@@ -73,20 +71,21 @@ public class TestEnvironmentProvisioner implements BeforeAllCallback, AfterAllCa
 
     log.info("TestEnvironmentProvisioner: Initializing test environment");
 
-    // Step 1: Verify worker distribution directory exists (fail-fast)
-    verifyWorkerDist();
+    // Lane F stage A item A13 removed step 1, the verifyWorkerDist() fail-fast: there is no
+    // Worker distribution to verify. What this extension is kept for is the system properties
+    // below (justsearch.repo.root / ssot.path / config), which the Engine reads in THIS JVM.
 
-    // Step 2: Find project root
+    // Step 1: Find project root
     findProjectRoot();
 
-    // Step 3: Create temp directory for test data (signals, indices)
+    // Step 2: Create temp directory for test data (signals, indices)
     String testClassName = context.getTestClass()
         .map(Class::getSimpleName)
         .orElse("unknown");
     tempDir = Files.createTempDirectory("test-env-" + testClassName + "-");
     log.info("Created temp directory: {}", tempDir);
 
-    // Step 4: Set system properties to point to real SSOT/config (no copying!)
+    // Step 3: Set system properties to point to real SSOT/config (no copying!)
     configureSystemProperties();
 
     initialized = true;
@@ -131,16 +130,6 @@ public class TestEnvironmentProvisioner implements BeforeAllCallback, AfterAllCa
   // =========================================================================
   // Public Accessors
   // =========================================================================
-
-  /**
-   * Returns the path to the worker distribution directory (contains bin/ and lib/).
-   *
-   * @throws IllegalStateException if called before initialization
-   */
-  public Path getWorkerDistDir() {
-    ensureInitialized();
-    return workerDistDir;
-  }
 
   /**
    * Returns the temporary directory for this test class.
@@ -208,24 +197,6 @@ public class TestEnvironmentProvisioner implements BeforeAllCallback, AfterAllCa
   // =========================================================================
   // Private Implementation
   // =========================================================================
-
-  private void verifyWorkerDist() {
-    String distPath = System.getProperty("justsearch.worker.dist.dir");
-    if (distPath == null || distPath.isBlank()) {
-      throw new IllegalStateException(
-          "Worker distribution not configured. Set system property 'justsearch.worker.dist.dir' or run: " +
-          "./gradlew :modules:indexer-worker:installDist");
-    }
-
-    workerDistDir = Path.of(distPath);
-    if (!Files.isDirectory(workerDistDir)) {
-      throw new IllegalStateException(
-          "Worker distribution directory not found at: " + workerDistDir + "\n" +
-          "Run: ./gradlew :modules:indexer-worker:installDist");
-    }
-
-    log.info("Worker distribution verified: {}", workerDistDir);
-  }
 
   private void findProjectRoot() {
     // Start from current directory and walk up to find project root

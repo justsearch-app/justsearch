@@ -593,12 +593,15 @@ tasks.named("check") {
 // Test Preparation and End-to-End Test Alias
 // ============================================================================
 
-// Unified task to build all artifacts required for system/integration tests
-// This ensures both shadow JAR and distribution are built before tests run
+// Unified task to build all artifacts required for system/integration tests.
+//
+// Lane F stage A item A13: this used to build the Worker distribution
+// (`:modules:indexer-worker:installDist`), which no longer exists. The one distribution left is
+// the Engine's, and the system tests that spawn a backend do so from the ONE remaining spawn path.
 tasks.register("prepareTests") {
   group = "verification"
   description = "Builds all artifacts required for system/integration tests"
-  dependsOn(":modules:indexer-worker:installDist")
+  dependsOn(":modules:ui:installDist")
 }
 
 // Alias for running all system tests (Process + Chaos tests)

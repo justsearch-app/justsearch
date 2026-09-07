@@ -180,13 +180,13 @@ public final class KnowledgeServer implements Closeable {
   @SuppressWarnings("unused")
   private io.justsearch.indexerworker.services.WorkerOpsMetricCatalog workerOpsCatalog;
   /**
-   * Signalled by {@link #initiateShutdown()} and awaited by {@link #blockUntilShutdown()}.
+   * Signalled by {@link #initiateShutdown()} and read by {@link #isRunning()}.
    *
-   * <p>Lane F stage A item A9: this used to be the gRPC {@code Server}'s own termination. With the
-   * server gone the standalone {@code IndexerWorker.main} still needs something to park on until
-   * the sentinel decides to stop, and "running" needed a definition that is not "a socket is
-   * bound". Under the Engine (the live path since A6) neither is used: the composition root owns
-   * the lifecycle and nothing blocks here.
+   * <p>Lane F stage A item A9: this used to be the gRPC {@code Server}'s own termination, and
+   * "running" needed a definition that is not "a socket is bound". Item A13 deleted the standalone
+   * {@code IndexerWorker.main} that parked on this latch, so nothing blocks on it any more — it
+   * survives purely as the second conjunct of {@link #isRunning()}: the sentinel or a migration
+   * cutover releases it, and the Engine composition root owns the lifecycle around it.
    */
   private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
@@ -1043,7 +1043,7 @@ public final class KnowledgeServer implements Closeable {
       // tempdoc 628 Stage D-part2: if startup failed because the index is corrupt and could not be
       // auto-recovered (FAIL_CLOSED / recovery-failed), stamp a fatal-reason marker so the Head can
       // offer a "Rebuild index" affordance instead of blind-restarting. This is a controlled exit (the
-      // throw below → IndexerWorker's handler → System.exit), so the write is reliable.
+      // throw below → the Engine's boot failure path in HeadlessApp), so the write is reliable.
       //
       // A FAIL_CLOSED schema mismatch is the same kind of fact and was missing (tempdoc 915, live
       // validation): the refusal reached the Head only as "Worker process crashed (exit code 1)",
@@ -2112,15 +2112,6 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Blocks until the server terminates.
-   *
-   * @throws InterruptedException if interrupted while waiting
-   */
-  public void blockUntilShutdown() throws InterruptedException {
-    shutdownLatch.await();
-  }
-
-  /**
    * The composed application services (lane F stage A item A6).
    *
    * <p>Public so the Engine composition root can bind the ports over the same instance the
@@ -2143,17 +2134,6 @@ public final class KnowledgeServer implements Closeable {
    */
   public ForegroundLoad foregroundLoad() {
     return foregroundLoad;
-  }
-
-  /**
-   * Always {@code -1} since item A9: there is no socket. Kept for one item so the standalone
-   * {@code IndexerWorker.main} log line and the boot tests still compile; item A13 (one spawn path)
-   * removes the last caller.
-   *
-   * @return -1
-   */
-  public int getPort() {
-    return -1;
   }
 
   /**
@@ -2301,8 +2281,8 @@ public final class KnowledgeServer implements Closeable {
       }
     }
 
-    // Item A9: releasing the shutdown latch replaces stopping the gRPC server. Anything parked in
-    // blockUntilShutdown() (the standalone entry point) resumes here.
+    // Item A9: releasing the shutdown latch replaces stopping the gRPC server. Item A13 deleted the
+    // standalone entry point that parked on it, so this now only flips isRunning() to false.
     shutdownLatch.countDown();
 
     // Stop migration enumerator thread (best-effort)

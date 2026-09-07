@@ -46,7 +46,6 @@ final class KnowledgeSearchControllerIngestCollectionTest {
             tempDir,
             tempDir,
             tempDir,
-            tempDir,
             tempDir.resolve("worker_signal.lock"),
             5_000L,
             15_000L,

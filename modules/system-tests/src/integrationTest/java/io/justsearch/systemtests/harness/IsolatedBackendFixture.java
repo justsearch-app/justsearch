@@ -259,14 +259,12 @@ public final class IsolatedBackendFixture {
     env.put("JUSTSEARCH_DATA_DIR", dataDir.toAbsolutePath().toString());
     env.put("JUSTSEARCH_API_PORT", "0");
     env.put("JUSTSEARCH_REPO_ROOT", repoRoot.toAbsolutePath().toString());
-    // The test JVM's working dir is the module, not the repo root, so the dev-layout
-    // lookup in KnowledgeServerConfig.resolveWorkerLibDir would fail. The Gradle task
-    // wires justsearch.worker.lib.dir as a system property; forward it as the env var
-    // KnowledgeServerConfig actually reads.
-    String workerLibDir = System.getProperty("justsearch.worker.lib.dir");
-    if (workerLibDir != null && !workerLibDir.isBlank()) {
-      env.put("JUSTSEARCH_WORKER_LIB_DIR", workerLibDir);
-    }
+    // Lane F stage A item A13 removed the JUSTSEARCH_WORKER_LIB_DIR forward that used to sit here.
+    // It existed because the spawned HeadlessApp went on to spawn a Worker from an installDist
+    // tree, and this test JVM's working dir is the module rather than the repo root, so
+    // KnowledgeServerConfig.resolveWorkerLibDir could not find it by relative walk. There is one
+    // process now: the child JVM launched below runs the index half off the classpath in
+    // writeArgfile(), and both the resolver and the distribution are deleted.
     return env;
   }
 

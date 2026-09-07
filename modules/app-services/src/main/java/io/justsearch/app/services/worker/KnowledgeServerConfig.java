@@ -23,7 +23,6 @@ public record KnowledgeServerConfig(
         Path dataDir,
         Path libDir,
         Path workingDirectory,
-        Path workerLibDir,
         Path signalFilePath,
         long deadlineMs,
         long portDiscoveryTimeoutMs,
@@ -112,7 +111,6 @@ public record KnowledgeServerConfig(
         Path dataDir = resolveDataDir();
         Path libDir = resolveLibDir();
         Path workingDir = resolveWorkingDirectory();
-        Path workerLibDir = resolveWorkerLibDir(libDir, workingDir);
         Path signalFile = dataDir.resolve("worker_signal.lock");
 
         long deadline = parseLong(
@@ -156,7 +154,6 @@ public record KnowledgeServerConfig(
                 dataDir,
                 libDir,
                 workingDir,
-                workerLibDir,
                 signalFile,
                 deadline,
                 portTimeout,
@@ -169,8 +166,7 @@ public record KnowledgeServerConfig(
                 healthCheckRetryBudget,
                 bootFaultInjectAttempts);
 
-        log.info("Loaded KnowledgeServerConfig: production={}, dataDir={}, workerLibDir={}",
-                isProd, dataDir, workerLibDir);
+        log.info("Loaded KnowledgeServerConfig: production={}, dataDir={}", isProd, dataDir);
 
         return config;
     }
@@ -250,41 +246,11 @@ public record KnowledgeServerConfig(
         }
     }
 
-    private static Path resolveWorkerLibDir(Path libDir, Path workingDir) {
-        // 1. Explicit override via env/sysprop (value is a directory path)
-        String configured = envOrProperty("JUSTSEARCH_WORKER_LIB_DIR", "justsearch.worker.lib.dir");
-        if (configured != null && !configured.isBlank()) {
-            Path configuredPath = Path.of(configured);
-            if (Files.isDirectory(configuredPath)) {
-                return configuredPath.toAbsolutePath();
-            }
-        }
-
-        // 2. Production/bundled layout: lib/worker/ subdirectory alongside Head's lib/
-        // Always checked — the bundled layout may exist even when prod=false (e.g.,
-        // alpha builds with CORS relaxed for browser testing), so the `isProd` flag
-        // that callers used to pass in never changed behaviour.
-        Path prodWorkerLib = libDir.resolve("worker");
-        if (Files.isDirectory(prodWorkerLib)) {
-            return prodWorkerLib.toAbsolutePath();
-        }
-
-        // 3. Development: installDist output
-        Path devWorkerLib = workingDir
-                .resolve("modules")
-                .resolve("indexer-worker")
-                .resolve("build")
-                .resolve("install")
-                .resolve("indexer-worker")
-                .resolve("lib");
-
-        if (Files.isDirectory(devWorkerLib)) {
-            return devWorkerLib.toAbsolutePath();
-        }
-
-        throw new IllegalStateException(
-                "Worker lib directory not found. Build with: ./gradlew :modules:indexer-worker:installDist");
-    }
+    // Lane F stage A item A13 deleted resolveWorkerLibDir and the workerLibDir record component.
+    // It answered "where are the Worker distribution jars" for the deleted WorkerSpawner (item
+    // A11), resolving JUSTSEARCH_WORKER_LIB_DIR / justsearch.worker.lib.dir, then the bundled
+    // lib/worker/ layout, then modules/indexer-worker/build/install/indexer-worker/lib. All three
+    // are gone: one JVM has one classpath, and the index half is on it.
 
     /**
      * Resolves the repository root using the centralized configuration loader.

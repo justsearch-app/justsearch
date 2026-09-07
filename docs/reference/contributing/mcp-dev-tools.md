@@ -122,11 +122,13 @@ Starting the required MCP itself needs only the tracked checkout, Git, and Node.
 root npm installation is still required to regenerate its third-party runtime or run repository
 JavaScript development checks; it is not a task-creation prerequisite.
 
-Build the Worker distribution and UI assets before relying on the dev stack:
+Build the Engine distribution and UI assets before relying on the dev stack:
 
 ```bash
-./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist
+./gradlew.bat :modules:ui:installDist
 ```
+
+(One task, one distribution: lane F stage A item A13 deleted the separate Worker distribution — the index half is now jars inside the Engine's own `lib/`.)
 
 If AI runtime behavior is part of the investigation, also verify model files, native runtime availability, and GPU/runtime prerequisites with the project-specific preflight scripts before drawing conclusions from failures.
 
@@ -134,7 +136,7 @@ Operational checks that are still worth doing before longer investigations:
 
 | Area | Check |
 |------|-------|
-| Worker distribution | `modules/indexer-worker/build/install/indexer-worker/` should exist after the Gradle command above. |
+| Engine distribution | `modules/ui/build/install/ui/` should exist after the Gradle command above, and its `lib/` should contain `indexer-worker-*.jar`. |
 | UI assets | `modules/ui-web/dist/` should exist when testing packaged/static UI behavior. |
 | Models | Online LLM paths and Worker ONNX encoder assets must match the current settings/model manifest. Do not assume old GGUF embedding paths. |
 | Runtime variant | CPU-only online runtime is valid but slow; GPU behavior requires a GPU-capable runtime variant and matching configuration. |
@@ -379,7 +381,7 @@ Three properties are load-bearing, and each replaces a measured silent failure (
 | `HOTSWAP_TIMED_OUT` | The pusher was killed by its own timeout. Whether bytecode was redefined is **unknown** — the kill may have landed on either side of the JVM's `redefineClasses` call — so `classesRedefined` is `null` and no reconstruction signal was written. | Do **not** assume the Worker is unchanged. Restart the stack to get back to a known state. |
 | `COMPILE_FAILED` | Gradle `compileJava` failed in the run's tree. | Fix the compile error; the tail of the Gradle output is in the message. |
 | `TARGET_IDENTITY_MISMATCH` | The JVM on the run's JDWP port was not launched from the tree the run record names — **none** of its classpath entries lie under that tree. | Nothing was pushed. Re-orient with `quick_health` — a foreign or stale backend is holding that port. |
-| `HOT_RELOAD_CLASSPATH_ABSENT` | The JVM **was** launched from the run record's tree, but without the hot-reload classes dir on its classpath — a distribution built before that classpath existed. Distinct from the cross-tree case above, which it used to be misreported as (tempdoc 844 F3). | Nothing was pushed. Rebuild the dist in that tree (`./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist`) and restart the stack. |
+| `HOT_RELOAD_CLASSPATH_ABSENT` | The JVM **was** launched from the run record's tree, but without the hot-reload classes dir on its classpath — a distribution built before that classpath existed. Distinct from the cross-tree case above, which it used to be misreported as (tempdoc 844 F3). | Nothing was pushed. Rebuild the dist in that tree (`./gradlew.bat :modules:ui:installDist`) and restart the stack. |
 | `TARGET_IDENTITY_UNVERIFIED` | The push tool did not confirm the target's identity (e.g. an older `HotSwapPush` copy). | Treated as not-confirmed rather than success; rebuild/refresh the checkout. |
 | `NO_CLASSES_REDEFINED` | Changed classes existed, but none is loaded in the target VM, so no bytecode was replaced. | Not a success and not a signal-worthy event. Exercise the code path first, or restart. |
 | `STRUCTURAL_CHANGE` | Added/removed methods or fields — standard HotSwap cannot apply it. Detected from the JVM's own wording too (`HotSwap not supported by target VM: add method not implemented` and the rest of that JDI family), which is what a real structural change actually prints; matching only the pusher's phrasing made this code unreachable until tempdoc 844 F1. | Restart the dev stack. |
@@ -398,7 +400,7 @@ and writes no signal — distinct from a push that failed.
 | `HANDSHAKE_REQUIRED` | The holder is running a `MUST_COMPLETE` op-lease (migration, bulk-reindex, index GC, etc.); `warn` takeover is upgraded to a sync handshake. Response includes `criticalOps[]`. | Wait for the op to complete (use the per-op `expectedDurationSec` to estimate), or escalate to `takeover: "force"` with user approval (records a `forcibly_interrupted_critical_op` disposition in the stop-report). |
 | `REQUIRES_CONFIRMATION` | A `force` takeover hit an `UNSAFE_TO_INTERRUPT` op-lease. | Pass `--confirm-interrupt=<opId>` matching one of the `criticalOps[].opId` values in the response. The typed token guards against typo'd reclaims of unsafe-to-interrupt ops. |
 | `RUN_NOT_FOUND` / `NO_API_URL` | The active run record references a runId that no longer exists or has no `apiBaseUrl`. | Call `quick_health` to re-orient; the run may have partially failed. |
-| `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
+| `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `./gradlew.bat :modules:ui:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
 | `START_TIMED_OUT` | The dev-runner start subprocess did not report a result inside `startTimeoutMs`. **Readiness was not confirmed and it is not established that this call started anything.** Whatever could be read off disk afterwards is under `observed` (active runId, recorded ports/URLs, and one `/api/health` status code) — observations, not a started stack. Before tempdoc 844 this branch synthesized `ok: true` from any runId in `active.json`, so a start that died mid-boot, or a run that was already there, was reported as a successful start. | Call `quick_health { probe: true }` to find out what is actually running, and `tail_log { kind: "backend_stderr" }` if the boot failed. |
 | `INVALID_DIST_FROM` | `distFrom` is neither the main repo nor a sibling worktree under `.claude/worktrees`, or that checkout has no `scripts/dev/dev-runner.cjs`. A **bare worktree name** (`"round14"`) is resolved against `.claude/worktrees/<name>`; when no such directory exists the message lists the names that do. | Pass a worktree name, a path to a sibling worktree, or the main repo root. |
 

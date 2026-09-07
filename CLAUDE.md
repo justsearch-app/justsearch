@@ -129,7 +129,7 @@ Provenance for the above: owner decisions 2026-07-07 / 2026-07-14, pilot P-C 202
 | Process | Module | Entry Point |
 |---------|--------|-------------|
 | **Head** (UI Host) | `modules/ui` | `HeadlessApp.java` |
-| **Body** (Worker) | `modules/indexer-worker` | `IndexerWorker.java` |
+| **Body** (index half) | `modules/indexer-worker` | composed in-process by `EngineRoot.java` (lane F A6/A13 — no separate process) |
 | **Brain** (Inference) | `modules/app-inference` | Manages `llama-server.exe` |
 
 Full architecture: `docs/explanation/01-system-overview.md`. Key API endpoints: `docs/reference/api-contract-map.md`.

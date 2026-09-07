@@ -803,10 +803,18 @@ function resolveGitHead() {
 }
 
 /**
- * Content stamp of the launched Head dist (mirrors the Worker's generateBuildStamp,
- * indexer-worker/build.gradle.kts): a short hash over the lib jars' name|size|mtime.
+ * Content stamp of the launched Engine dist: a short hash over the lib jars' name|size|mtime.
  * Detects both "wrong worktree" (paired with repoRoot) and "stale dist" (jar changed
  * but installDist reported UP-TO-DATE). Null when the dist dir is absent.
+ *
+ * Lane F stage A item A13: this used to be described as mirroring the Worker's
+ * `generateBuildStamp` (indexer-worker/build.gradle.kts). That distribution is gone and the
+ * ADR-0021 task moved to `:modules:ui` (writing modules/ui/build/install/ui/build-stamp.txt), so
+ * both stamps now describe the same one distribution — but they are still DIFFERENT stamps, not
+ * one mirrored: ADR-0021's is a Gradle content hash written to a file and consumed by jseval and
+ * the MCP reload tool, while this one is an mtime-based provenance value computed here, injected
+ * as `-Djustsearch.head.stamp` by buildHeadJavaOpts, and cross-checked against the running
+ * Engine's self-reported stamp by the MCP server. Do not substitute one for the other.
  */
 function computeHeadDistStamp() {
   try {
@@ -855,7 +863,7 @@ function resolveProvenance(distFromRoot = null) {
  * An explicit JUSTSEARCH_DEV_DEBUG_PORT still wins (operator override); otherwise the first free
  * port from 5005 upward is taken, so a second stack cannot silently share the first one's port.
  */
-/** The one module whose classes dir goes on the Worker classpath for hot reload (R4). */
+/** The one module whose classes dir goes on the Engine classpath for hot reload (R4). */
 const HOTRELOAD_MODULE = 'worker-services';
 
 /** Filesystem timestamp slack, so ordinary granularity is not read as a rebuild. */
@@ -903,7 +911,7 @@ function newestClassMtimeMs(dir) {
 }
 
 /**
- * Tempdoc 844 M3 — may the hot-reload classes dir go FIRST on the Worker's classpath?
+ * Tempdoc 844 M3 — may the hot-reload classes dir go FIRST on the Engine's classpath?
  *
  * R4 prefixes `modules/worker-services/build/classes/java/main` so the pushed bytecode and the
  * classes loaded later come from one tree. That is only true when the classes dir and the
@@ -911,6 +919,11 @@ function newestClassMtimeMs(dir) {
  * installDist does not run, so the two are independently aged: worker-services from build B,
  * everything else from build A's jars, with nothing comparing them — and `freshness.buildArtifact`
  * derives from the dist stamp alone, so it would still say FRESH.
+ *
+ * Lane F stage A item A13: the jars compared against are the ENGINE dist's
+ * (`modules/ui/build/install/ui/lib`) — the one tree the process is launched from. There is no
+ * second (worker) distribution to choose between any more; `worker-services-*.jar` is installed
+ * into the Engine dist like every other module jar.
  *
  * The rule: prefix only when the pairing is established.
  *  - the build step ran → both artifacts came out of the one Gradle invocation → prefix;
@@ -946,7 +959,7 @@ function assessHotReloadClasspath({ classesDir, buildRan, libDir }) {
       ok: false,
       verdict: 'DIST_JAR_UNREADABLE',
       reason: `no ${HOTRELOAD_MODULE}-*.jar could be read under ${toPosix(libDir)}, so the classes `
-        + 'dir cannot be shown to match the jars the Worker launches from. Start without '
+        + 'dir cannot be shown to match the jars the Engine launches from. Start without '
         + '--skip-build.',
     };
   }
@@ -973,8 +986,10 @@ async function resolveDevHotReload(enabled, { buildRan = true } = {}) {
   const classpath = assessHotReloadClasspath({
     classesDir,
     buildRan,
-    libDir: path.join(
-      repoRoot, 'modules', 'indexer-worker', 'build', 'install', 'indexer-worker', 'lib'),
+    // Lane F stage A item A13: the Worker distribution is gone, so the jars to pair the classes
+    // dir against are the Engine dist's — the same tree this file launches from a few hundred
+    // lines below (modules/ui/build/install/ui/bin).
+    libDir: path.join(repoRoot, 'modules', 'ui', 'build', 'install', 'ui', 'lib'),
   });
   if (!classpath.ok) {
     process.stderr.write(
@@ -1624,14 +1639,17 @@ async function cmdStart(opts) {
   // launched a Worker with the OLD classpath, and an explicit installDist then did real work.
   // The launched artifacts are now built by name. Warm cost measured in this worktree (config
   // cache reused):
-  // assemble alone 891/957/923 ms, assemble + both installDist 1055/1156 ms - about +0.15 s, once
+  // assemble alone 891/957/923 ms, assemble + installDist 1055/1156 ms - about +0.15 s, once
   // per start, to make the message true.
+  // Lane F stage A item A13: that measurement covered TWO installDist tasks, because the Worker
+  // shipped its own distribution. There is one distribution now — the Engine's, built by
+  // :modules:ui:installDist — so the list names it alone; the cost can only have gone down.
   if (!opts.skipBuild) {
     process.stderr.write(
       '[dev-runner] Ensuring distribution is up-to-date (assemble + installDist)...\n');
     const buildResult = spawnSync(
       gradlePath,
-      ['assemble', ':modules:ui:installDist', ':modules:indexer-worker:installDist', '-PskipWebBuild=true'],
+      ['assemble', ':modules:ui:installDist', '-PskipWebBuild=true'],
       // Tempdoc 696: pin a >= 24 JDK so a stale JDK-8 JAVA_HOME can't fail the assemble.
       {
         cwd: repoRoot,
@@ -1673,15 +1691,15 @@ async function cmdStart(opts) {
   // Without this check, spawn() fails silently and the only feedback is a 60s timeout.
   if (!fs.existsSync(startScript)) {
     const gradleCmd = process.platform === 'win32' ? './gradlew.bat' : './gradlew';
-    const remedy = `node scripts/dev/prepare-worktree.cjs (or: ${gradleCmd} :modules:ui:installDist :modules:indexer-worker:installDist)`;
+    const remedy = `node scripts/dev/prepare-worktree.cjs (or: ${gradleCmd} :modules:ui:installDist)`;
     // Tempdoc 844 B2: a fully-understood, recoverable condition with a printed remedy is NOT an
     // unhandled exception. It surfaced as error code UNHANDLED on 16 of 20 observed `start` errors,
     // which mis-states the severity and puts it outside the documented admission code set.
     // Classified here — the layer that knows the condition — so the MCP wrapper needs no re-derivation.
     const err = new Error(
       `Head dist not found at ${startScript}. Make this checkout dev-ready (tempdoc 618 §3):\n` +
-        `  node scripts/dev/prepare-worktree.cjs           # one command: npm ci + both installDists\n` +
-        `  or: ${gradleCmd} :modules:ui:installDist :modules:indexer-worker:installDist\n` +
+        `  node scripts/dev/prepare-worktree.cjs           # one command: npm ci + installDist\n` +
+        `  or: ${gradleCmd} :modules:ui:installDist\n` +
         `Then retry start (or drop --skip-build to build automatically).`,
     );
     err.code = 'DIST_NOT_BUILT';

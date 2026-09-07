@@ -57,7 +57,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`
 - `:modules:app-api-tck` -> `:modules:ai-backend`
 - `:modules:app-config` -> `:modules:configuration`
-- `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
+- `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
 - `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
 - `:modules:app-observability` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-util`, `:modules:configuration`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:prompt-support`
@@ -72,7 +72,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:ort-common` -> `:modules:configuration`
 - `:modules:reranker` -> `:modules:configuration`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:system-tests` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:ipc-common`
-- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`
+- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:worker-core` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:worker-services` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:extension-substrate`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`
 
@@ -111,6 +111,8 @@ graph TD
   app-engine --> app-services
   app-engine --> configuration
   app-engine --> core
+  app-engine --> indexer-worker
+  app-engine --> indexing
   app-engine --> telemetry
   app-engine --> worker-core
   app-engine --> worker-services
@@ -191,6 +193,7 @@ graph TD
   ui --> app-agent-api
   ui --> app-api
   ui --> app-config
+  ui --> app-engine
   ui --> app-inference
   ui --> app-observability
   ui --> app-services
@@ -229,10 +232,10 @@ graph TD
 
 | Module | Direct deps | Notes |
 |--------|-------------|-------|
-| `ui` | 19 | Head REST API + orchestration bridge |
+| `ui` | 20 | Head REST API + orchestration bridge |
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
 | `worker-services` | 12 |  |
-| `indexer-worker` | 11 | Worker process runtime, includes AI bridge + Lucene + gRPC |
+| `indexer-worker` | 11 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `app-launcher` | 10 | CLI/distribution wiring; pulls in most runtime modules |
-| `app-observability` | 8 |  |
+| `app-engine` | 9 |  |
 <!-- GENERATED:MODULE_DEPS:END -->

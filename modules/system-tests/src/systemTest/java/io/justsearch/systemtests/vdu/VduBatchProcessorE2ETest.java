@@ -87,10 +87,8 @@ import org.slf4j.LoggerFactory;
  * fail-fast.</b> It points {@code justsearch.repo.root} / {@code justsearch.ssot.path} /
  * {@code justsearch.config} at the real project directories — the same values the spawned Worker
  * used to receive as {@code -D} JVM args, and which the Engine now needs in <em>this</em> JVM. Its
- * {@code verifyWorkerDist()} precondition is vestigial: it still requires
- * {@code justsearch.worker.dist.dir} to name a real directory (the {@code systemTest} task still
- * sets it, and {@code prepareTests} still builds it), but nothing here spawns anything. Item A13,
- * which collapses the standalone distribution, has to revisit that precondition.
+ * {@code verifyWorkerDist()} precondition is gone: item A13 deleted it, and the
+ * {@code justsearch.worker.dist.dir} property it demanded, with the Worker distribution itself.
  */
 @DisplayName("VDU Batch Processor E2E Tests")
 @Tag("systemTest")

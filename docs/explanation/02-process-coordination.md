@@ -193,7 +193,7 @@ After port discovery, `KnowledgeServerBootstrap.validateWorkerPid()` verifies th
 
 ### Crash Reporting
 
-`Thread.setDefaultUncaughtExceptionHandler` is installed as the first statement in `main()` for both Head (`HeadlessApp.java`) and Worker (`IndexerWorker.java`). It catches uncaught exceptions on any thread (including virtual threads) and writes a structured crash report before `System.exit(1)`.
+`Thread.setDefaultUncaughtExceptionHandler` is installed as the first statement in `HeadlessApp.main()`. It catches uncaught exceptions on any thread (including virtual threads) and writes a structured crash report before `System.exit(1)`. (There was a second installation in `IndexerWorker.main()` for the Worker process; lane F stage A item A13 deleted that entry point, and the index half now crashes into the Engine's handler.)
 
 `CrashReporter` (`modules/telemetry/`) writes JSON to `<dataDir>/crashes/crash-<role>-<pid>-<epochMs>.json`:
 - Manual JSON via `StringBuilder` (no Jackson — must not itself crash during crash handling)
@@ -291,7 +291,7 @@ When `hotSwapOk === false` and structural changes are detected, the Worker conti
 
 After a successful reload (`hotSwapOk === true`), the MCP reload tool propagates the build stamp:
 
-1. Reads `build-stamp.txt` from the distribution root (`build/install/indexer-worker/build-stamp.txt`).
+1. Reads `build-stamp.txt` from the distribution root (`modules/ui/build/install/ui/build-stamp.txt` — lane F stage A item A13 re-homed `generateBuildStamp` onto the one surviving distribution; it used to stamp `modules/indexer-worker/build/install/indexer-worker/`).
 2. Writes the stamp to `<dataDir>/reload-build-stamp.txt` **before** the MMF signal, to avoid a race with the Worker's sentinel thread that triggers `performReload()`.
 3. After service reconstruction, `DevReloadManager.updateBuildStampFromReloadFile()` reads the reload stamp file and calls `System.setProperty()` to update the running system property.
 

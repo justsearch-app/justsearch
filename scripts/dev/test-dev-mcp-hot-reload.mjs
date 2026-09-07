@@ -443,9 +443,12 @@ const outcomeTests = [
  * outcome tests above prove hotSwapOk is false for every outcome except a confirmed redefinition.
  */
 const signalGateTests = [
-  ['the reload signal write is gated on hotSwapOk (was: gated only on signalFile)', async () => {
+  // The gated variable was renamed `signalFile` → `reloadRequestFile` in server.mjs without this
+  // assertion following it, so the case had been red on `main` before lane F stage A item A13
+  // touched the file. Re-pinned to the live name; the property (gated on hotSwapOk) is unchanged.
+  ['the reload signal write is gated on hotSwapOk (was: gated only on the request file)', async () => {
     const src = await fsp.readFile(path.join(HERE, 'justsearch-dev-mcp', 'server.mjs'), 'utf8');
-    assert.match(src, /if \(result\.hotSwapOk && signalFile\) \{/);
+    assert.match(src, /if \(result\.hotSwapOk && reloadRequestFile\) \{/);
     assert.doesNotMatch(src, /Continue to signal write so service reconstruction still happens/);
   }],
   ['a skipped signal is stated, not silent', async () => {
@@ -453,9 +456,16 @@ const signalGateTests = [
     assert.match(src, /signalSkippedReason/);
     assert.match(src, /services were NOT reconstructed/);
   }],
+  // Lane F stage A item A13 moved the ADR-0021 stamp file with its producing task: the read is now
+  // modules/ui/build/install/ui/build-stamp.txt, the one surviving distribution. §5.6 #2's property
+  // is unchanged and is what this pins — the stamp comes from the RUN's tree (`runRoot`), never the
+  // caller's — plus the retired Worker-dist path asserted absent so it cannot creep back.
   ['the build stamp is copied from the RUN\'s tree, never the caller\'s (§5.6 #2)', async () => {
     const src = await fsp.readFile(path.join(HERE, 'justsearch-dev-mcp', 'server.mjs'), 'utf8');
-    assert.match(src, /const stampPath = path\.join\(runRoot,/);
+    assert.match(
+      src,
+      /const stampPath = path\.join\(runRoot, 'modules', 'ui', 'build', 'install', 'ui', 'build-stamp\.txt'\)/);
+    assert.doesNotMatch(src, /'install', 'indexer-worker'/);
   }],
   ['the pusher is invoked with the recorded identity token when the run has one', async () => {
     const src = await fsp.readFile(path.join(HERE, 'justsearch-dev-mcp', 'server.mjs'), 'utf8');
@@ -490,14 +500,24 @@ const signalGateTests = [
     assert.match(src, /hsArgs\.push\(identityClassesDir, runRoot\)/);
   }],
   // ── F4: `start` builds what it launches, so its "up-to-date" claim is true.
-  ['F4: the dev-runner build step runs the two installDist tasks, not assemble alone', async () => {
+  // Lane F stage A item A13: this used to assert the list held BOTH installDist tasks. There is
+  // one distribution now, so the same property — the build step builds the tree that is actually
+  // launched — is asserted as an identity between the task and the spawn path instead of a
+  // hardcoded pair, and the retired task is asserted absent so it cannot creep back.
+  ['F4: the dev-runner build step installs exactly the dist it launches from', async () => {
     const src = await fsp.readFile(path.join(HERE, 'dev-runner.cjs'), 'utf8');
-    const tasks = src.match(/\[\s*'assemble',\s*'([^']+)',\s*'([^']+)',\s*'-PskipWebBuild=true'\s*\]/);
+    const tasks = src.match(/\[\s*'assemble',\s*'([^']+)',\s*'-PskipWebBuild=true'\s*\]/);
     assert.ok(tasks, 'the gradle task list for the pre-launch build was not found');
-    assert.deepEqual(
-      [tasks[1], tasks[2]],
-      [':modules:ui:installDist', ':modules:indexer-worker:installDist'],
-    );
+    assert.equal(tasks[1], ':modules:ui:installDist');
+    const builtModule = tasks[1].match(/^:modules:([^:]+):installDist$/)?.[1];
+    assert.ok(builtModule, `not an installDist task: ${tasks[1]}`);
+    const launch = src.match(
+      /path\.join\(repoRoot, 'modules', '([^']+)', 'build', 'install', '([^']+)', 'bin'\)/);
+    assert.ok(launch, 'the dist the dev-runner launches from was not found');
+    assert.equal(
+      launch[1], builtModule,
+      `start builds :modules:${builtModule}:installDist but launches from modules/${launch[1]}`);
+    assert.doesNotMatch(src, /:modules:indexer-worker:installDist/);
   }],
   ['F4: the message names what it actually runs (assemble alone did not refresh the launched dist)', async () => {
     const src = await fsp.readFile(path.join(HERE, 'dev-runner.cjs'), 'utf8');

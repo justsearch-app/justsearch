@@ -259,10 +259,10 @@ After modifying Java code:
 1. Stop the dev stack:
    - If you used `npm --prefix modules/ui-web run dev:all`, press **Ctrl+C** in that terminal.
    - If you used `run-headless-api.ps1`, press **Ctrl+C** in that terminal.
-2. Rebuild (Java-only, skips web bundle): `.\gradlew.bat :modules:ui:compileJava :modules:app-services:compileJava :modules:indexer-worker:installDist -PskipWebBuild=true --no-daemon`
+2. Rebuild (Java-only, skips web bundle): `.\gradlew.bat :modules:ui:installDist -PskipWebBuild=true --no-daemon`
 3. Restart: `.\scripts\dev\run-headless-api.ps1 -SkipBuild`
 
-**Worker distribution note:** `:modules:ui:runHeadless` now builds `:modules:indexer-worker:installDist` automatically, so the spawned Worker stays in sync with new gRPC methods (e.g. `/api/preview` / `FetchDocumentSlice`).
+**One distribution:** lane F stage A item A13 deleted the Worker distribution. `:modules:ui:installDist` builds the only tree the backend launches from, and the index half is in its `lib/` — there is no second artifact that can drift out of sync.
 
 ### API Testing Without UI
 

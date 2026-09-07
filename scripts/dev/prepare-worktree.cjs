@@ -23,7 +23,7 @@
  *
  * Usage (run from inside the worktree):
  *   node scripts/dev/prepare-worktree.cjs            # npm ci + installDist
- *   node scripts/dev/prepare-worktree.cjs --no-dist  # FE-only (skip the Java dists)
+ *   node scripts/dev/prepare-worktree.cjs --no-dist  # FE-only (skip the Java dist)
  */
 'use strict';
 const fs = require('fs');
@@ -106,7 +106,10 @@ if (!noDist) {
     console.error(`[prepare-worktree] ${e.message}`);
     process.exit(1);
   }
-  run(gradle, [':modules:ui:installDist', ':modules:indexer-worker:installDist'], repoRoot, {
+  // Lane F stage A item A13: one distribution. `:modules:indexer-worker:installDist` used to be
+  // built alongside this one for the Worker child process; that process and its `application`
+  // distribution are gone, and the Engine dist carries the worker jars.
+  run(gradle, [':modules:ui:installDist'], repoRoot, {
     JAVA_HOME: devJdkHome,
   });
 }

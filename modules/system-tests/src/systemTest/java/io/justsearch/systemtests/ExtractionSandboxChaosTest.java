@@ -44,6 +44,30 @@ import org.slf4j.LoggerFactory;
  * <p>{@code JUSTSEARCH_EXTRACTION_SANDBOX_MODE=process} forces every file out of process; under
  * the shipped {@code auto} default a {@code .txt} file is parsed in-process and would never reach
  * the pool.
+ *
+ * <p><b>Status after lane F stage A item A13 — a decision is open on this class, deliberately.</b>
+ * Item A12 escalated it rather than converting it, and A13 has now removed the thing it runs
+ * against: there is no Worker distribution, no {@code bin/indexer-worker} start script, and no
+ * {@code justsearch.worker.dist.dir} system property (the {@code systemTest} task no longer sets
+ * one). This class still <em>compiles</em> — {@code WorkerProcessManager}, {@code GrpcTestClient}
+ * and {@code MmfTestHarness} all survive in {@code src/main} — and the {@code systemTest} task is
+ * opt-in ({@code -PincludeSystemTests=true}), so nothing in {@code build} depends on it. Run it
+ * and every method fails fast in {@link #setup()} with the message below, which is the intended
+ * outcome: the loss is visible, not silent. Two further consequences of A13 make that concrete:
+ * {@link #workerLog()} reads {@code logs/worker.log}, which nothing writes any more (item A13
+ * deleted the Worker's logback.xml), and {@link #restartReasons()} reads
+ * {@code telemetry/metrics-worker.ndjson} from a data dir no separate process populates.
+ *
+ * <p>The two halves need different answers and neither is A13's to give:
+ * <ul>
+ *   <li>{@link #sandboxFailuresAreContainedAndTheWorkerSurvives} is convertible in-process —
+ *       {@code EnvRegistry.get()} checks the system property before the env var, so the
+ *       {@code JUSTSEARCH_EXTRACTION_SANDBOX_*} overrides are reachable via {@code
+ *       System.setProperty} against an {@code EngineRoot}-composed Engine.</li>
+ *   <li>{@link #workerShutdownLeavesNoOrphanChild} is not: it needs a <em>killable parent</em> for
+ *       the extraction child's parent-PID gate, and in-process that parent is the test JVM
+ *       itself.</li>
+ * </ul>
  */
 @DisplayName("Chaos Suite: extraction sandbox pool")
 @Timeout(value = 20, unit = TimeUnit.MINUTES)
@@ -68,17 +92,15 @@ class ExtractionSandboxChaosTest {
   @BeforeAll
   static void locateDistribution() {
     projectRoot = findProjectRoot(Path.of(System.getProperty("user.dir")));
-    String distPath = System.getProperty("justsearch.worker.dist.dir");
-    if (distPath == null || distPath.isBlank()) {
-      distPath = System.getProperty("justsearch.worker.dist");
-    }
-    if (distPath != null && !distPath.isBlank()) {
-      workerDistPath = Path.of(distPath);
-    } else if (projectRoot != null) {
-      workerDistPath = projectRoot.resolve("modules/indexer-worker/build/install/indexer-worker");
-    } else {
-      workerDistPath = Path.of("modules/indexer-worker/build/install/indexer-worker");
-    }
+    // Item A13 removed the `justsearch.worker.dist.dir` / `justsearch.worker.dist` system
+    // properties along with their producer; reading a property nothing sets would only disguise
+    // the conventional path below as configurable. That path is where the Worker distribution used
+    // to be built, and looking there is what makes its absence a legible failure rather than a
+    // NoSuchFileException deeper in WorkerProcessManager.
+    workerDistPath =
+        projectRoot != null
+            ? projectRoot.resolve("modules/indexer-worker/build/install/indexer-worker")
+            : Path.of("modules/indexer-worker/build/install/indexer-worker");
     String scriptName = isWindows() ? "indexer-worker.bat" : "indexer-worker";
     workerDistExists = Files.exists(workerDistPath.resolve("bin").resolve(scriptName));
     log.info("Worker distribution {} (exists={})", workerDistPath, workerDistExists);
@@ -102,7 +124,14 @@ class ExtractionSandboxChaosTest {
   @BeforeEach
   void setup() throws IOException {
     assertTrue(workerDistExists && projectRoot != null,
-        "Worker distribution required: ./gradlew :modules:indexer-worker:installDist");
+        "This class needs a Worker distribution at " + workerDistPath + ", and lane F stage A item "
+            + "A13 deleted it — `:modules:indexer-worker` is no longer a Gradle `application`, so "
+            + "there is no `installDist` to run and no `bin/indexer-worker` to launch. It is kept "
+            + "compiling on purpose: the decision on its two halves (convert "
+            + "sandboxFailuresAreContainedAndTheWorkerSurvives in-process against EngineRoot; "
+            + "decide separately what replaces workerShutdownLeavesNoOrphanChild, which needs a "
+            + "killable parent process) is open and belongs to the lane, not to A13. See this "
+            + "class's javadoc.");
     testDataDir = Path.of(System.getProperty("java.io.tmpdir"), "justsearch-sandbox-chaos",
         "run-" + System.currentTimeMillis(), "data");
     Files.createDirectories(testDataDir);

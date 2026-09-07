@@ -84,11 +84,10 @@ import org.slf4j.LoggerFactory;
  * distribution existed, and it pointed {@code justsearch.repo.root} / {@code justsearch.ssot.path}
  * / {@code justsearch.config} at the real project directories. The Engine runs in <em>this</em>
  * JVM now, so the second purpose is exactly what it needs — those are the same values the spawned
- * Worker used to receive as {@code -D} JVM args. The first purpose is vestigial: its
- * {@code verifyWorkerDist()} still requires {@code justsearch.worker.dist.dir} to name a real
- * directory (the {@code systemTest} task still sets it, and {@code prepareTests} still builds it),
- * but nothing in this class spawns anything. Item A13, which collapses the standalone
- * distribution, has to revisit that precondition.
+ * Worker used to receive as {@code -D} JVM args. Item A13 deleted the first: {@code
+ * verifyWorkerDist()} and the {@code justsearch.worker.dist.dir} property it demanded are gone
+ * with the distribution, so the extension no longer has a precondition that nothing in this class
+ * exercises.
  */
 @DisplayName("Summarization Pipeline E2E Tests")
 @Tag("systemTest")
