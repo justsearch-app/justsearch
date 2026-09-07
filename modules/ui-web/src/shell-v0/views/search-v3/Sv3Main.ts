@@ -910,20 +910,34 @@ export class Sv3Main extends JfElement {
         --ease-standard: var(--ease-sv3-enter);
       }
 
-      /* The model's thinking (components/chat/ReasoningBlock.ts). Its --text-muted is the resting
-         body and --text-secondary the emphasis it brightens to on hover, so the two map to
-         DIFFERENT rungs than the tool card's (which uses --text-secondary as its subdued rung) —
-         the shipped hierarchy is per-component, and a bridge carries meaning, not names. */
+      /* The model's thinking (components/chat/ReasoningBlock.ts). Read the COMPONENT, not the token
+         names: its '.container' (the collapsed label and the whole expanded trace) rests on
+         '--text-secondary', and '.disclosure:hover' brightens to '--text-primary'. So the subdued
+         rung here is --text-secondary — a different mapping from the tool card's, which is what "a
+         bridge carries meaning, not names" means in practice.
+         Tempdoc 859 (live console, 2026-08-26) — this bridge used to point --text-secondary AND
+         --text-primary at --foreground, on a comment claiming --text-muted was the resting body. It
+         is not: ReasoningBlock reads --text-muted nowhere. The two rungs therefore resolved to one
+         value and the hover shift was a silent no-op in this window. --secondary-label is the
+         window's aside grade — but LIFTED, and the lift is not decoration: '--text-secondary' also
+         colours the copy control, which the shipped block paints on a DOUBLED '--surface-subtle'
+         wash, where the bare aside grade measures 4.33:1 (the window's own contrast oracle,
+         'Sv3Main.imports.test.ts', reports it). The mix runs toward '--foreground' in the same 90%
+         step and for the same reason the token sheet's '--sv3-cite-weak' does — the smallest move
+         that clears AA with margin (5.08:1 dark / 5.13:1 light on that wash) while staying visibly
+         below the ink hover brightens to. */
       jf-reasoning-block {
         --surface-subtle: var(--muted);
         --text-muted: var(--secondary-label);
-        --text-secondary: var(--foreground);
+        --text-secondary: color-mix(in srgb, var(--secondary-label) 90%, var(--foreground));
         --border-muted: var(--border);
         --accent-primary: var(--ring);
         /* Passed down to the nested <jf-markdown-block> the block renders its content into: it is
            outside the '.sv3-markdown' class bridge, so its tokens arrive here or not at all. The
-           component re-points --text-primary to --text-muted itself (ReasoningBlock.ts:120-123),
-           which is why a code well on the already-washed container goes to --background. */
+           component re-points the nested block's --text-primary to its OWN --text-secondary
+           ('.content jf-markdown-block' in ReasoningBlock.ts), so the trace body rides the subdued
+           rung set above; --text-primary here is what the disclosure brightens TO on hover, which is
+           why a code well on the already-washed container goes to --background. */
         --surface-tertiary: var(--background);
         --text-primary: var(--foreground);
         --text-tint: var(--info-foreground);
@@ -1247,11 +1261,18 @@ export class Sv3Main extends JfElement {
         margin-left: var(--space-1);
       }
       /* Tempdoc 859 §D §2.6 — an honesty note, not a warning.
-         Live audit 2026-08-25 (D1) — never rendered during the original audit (same class as
-         .run-prompt-fine above, same wash, same fix), but it carries the identical --secondary-label
-         token and sits on the same 8% --success wash, so it fails the same way. --foreground clears
-         AA on the wash; the note stays quiet by weight and by following the "answer" text below it,
-         not by shouting a warning color, so an honesty note still reads as one. */
+         Live audit 2026-08-25 (D1) — the FIX here is right and the rationale that shipped with it was
+         not, so the rationale is corrected rather than quietly kept (a comment stating a surface this
+         rule never paints on is false authority the next reader would reason from).
+         What was claimed: that the notice "sits on the same 8% --success wash" as .run-prompt-fine
+         above, and so fails the same way. What it actually does: 'cutShortNotice' renders it inside
+         'div.turn' in the TRANSCRIPT (see the render site), directly under the answer it qualifies,
+         and never inside '.run-prompt' — the held-decision box that owns the wash. Its measured
+         backdrop is --background (dark rgb(10,10,10) / light rgb(252,252,252)), not the wash.
+         Why --foreground still stands: the note is transcript prose, so it takes the transcript's own
+         ink rather than the aside grade a passing reader would skim over, and it stays quiet by
+         weight and by following the answer, not by shouting a warning color. The wash's contrast
+         problem belongs to .run-prompt-fine and .run-prompt-auto; this line never had it. */
       .cut-short {
         margin: var(--space-2) 0 0;
         color: var(--foreground);
@@ -1266,7 +1287,8 @@ export class Sv3Main extends JfElement {
          tempdoc 853 (F-09).
          Live audit 2026-08-25 (D1, closing-window findings) — separately from the target-size fix
          above, this label's --secondary-label ink measured 4.37:1 on the gate's 8% --success wash
-         (same defect as .run-prompt-fine/.cut-short in this file). --foreground clears AA on the
+         (same defect as .run-prompt-fine in this file — NOT .cut-short, which renders in the
+         transcript on --background and never on this wash). --foreground clears AA on the
          wash; the label stays quiet by staying the smallest type in the window, not by color. */
       .run-prompt-auto {
         flex: 1 1 100%;

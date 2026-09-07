@@ -183,7 +183,21 @@ export const sv3Tokens = css`
        inversion is carried as tokens instead (the spec's own recommendation). Dark catches light —
        a 1px inset top highlight and NO drop shadow; light casts one down. */
     --composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white));
-    --composer-outline: color-mix(in srgb, var(--color-white) 5%, transparent);
+    /* Tempdoc 859 (live audit 2026-08-25) — WCAG 1.4.11 (Non-text Contrast) at 3:1. This edge is the
+       visual information that identifies the composer as an input, and at 5% white it measured
+       1.21:1 over the page: a boundary a reader with low contrast sensitivity cannot find at all.
+       35% is the smallest 5% step that clears 3:1 against BOTH adjacent colours — the page it sits on
+       (rgb(10,10,10) → 3.45:1) and the glass surface it sits over (rgb(20,20,20) → 3.21:1) — which is
+       what a boundary has to do; clearing only the outside would move the failure rather than close
+       it. Still a color-mix off '--color-white' rather than a literal, so the one primitive keeps
+       driving both themes' edges.
+       Residual, recorded rather than silently inherited: '.glass::after' spends 55% of this alpha
+       back while '--composer-rest' is 1 (864 Layer 1(d)), so the UNFOCUSED edge is still below the
+       floor. Closing that is a design call on 864's resting knob — 864 chose the surface lift as the
+       de-emphasis precisely because it "spends no TEXT contrast", and the outline fade it added
+       alongside is the half that does spend non-text contrast — so it is named here for the measured
+       audit rather than decided from a token sheet. */
+    --composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent);
     --composer-shadow: none;
     --composer-highlight: inset 0 1px rgb(255 255 255 / 3%);
     /* The USER message's fill ('bg-message' / 'text-message-foreground'). Both are pure
@@ -436,7 +450,13 @@ export const sv3Tokens = css`
     --sidebar-row-active: var(--color-white);
     --sidebar-row-selected: var(--color-white);
     --composer-glass-surface: var(--card);
-    --composer-outline: rgb(0 0 0 / 8%);
+    /* 859 — the same 1.4.11 floor from the other side. 8% black was "the stronger half" of the two
+       and still only 1.16:1 over the page; 45% is the smallest 5% step clearing 3:1 against both
+       adjacent colours here (page rgb(252,252,252) → 3.28:1, card rgb(255,255,255) → 3.36:1). Light
+       needs a HIGHER alpha than dark because its edge darkens toward a near-white page instead of
+       lightening away from a near-black one, so the same nominal step buys less separation. The
+       resting-knob residual noted on the dark declaration applies to this theme identically. */
+    --composer-outline: rgb(0 0 0 / 45%);
     --composer-shadow: 0 12px 28px -18px rgb(0 0 0 / 40%);
     --composer-highlight: none;
     --dialog-border: color-mix(in srgb, var(--foreground) 10%, transparent);

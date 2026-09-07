@@ -481,3 +481,112 @@ describe('Control (jf-control)', () => {
     });
   });
 });
+
+/**
+ * Tempdoc 859 (live console, 2026-08-25) — `[jf-control] no accessible name` fired on EVERY Search v3
+ * and unified-chat session, in six independent Playwright captures, while axe found nothing. Both were
+ * right: nothing was actually nameless, and the selfcheck was measuring a half-built element.
+ *
+ * It ran inside `render()`, so it saw whatever one frame happened to hold. Two shapes tripped it,
+ * both reproduced by instrumenting the suite: a `<jf-control>` rendering before its own `label`
+ * binding and slot text had been committed, and `jf-button`'s inner control, whose name arrives
+ * through the OUTER slot — its only light child is a `<slot>` element, whose `textContent` is empty
+ * however loud the button reads.
+ *
+ * A dev signal that cries wolf on every session is worse than none: it gets filtered, and then the
+ * real nameless control it exists to catch arrives in the same noise. So the check is deferred past
+ * the render that scheduled it and reads the name the way the flat tree does. These cases pin both
+ * directions — the false positives are gone AND a genuinely nameless control still reports.
+ */
+describe('Control name selfcheck (tempdoc 859)', () => {
+  /** The check runs on a macrotask; this is the turn it fires in. */
+  const afterCheck = async (el: Control): Promise<void> => {
+    await el.updateComplete;
+    await new Promise<void>((r) => setTimeout(r, 0));
+    await new Promise<void>((r) => setTimeout(r, 0));
+  };
+
+  type ErrorSpy = { mock: { calls: unknown[][] }; mockRestore: () => void };
+
+  const nameErrors = (spy: ErrorSpy): unknown[][] =>
+    spy.mock.calls.filter((args) => String(args[0] ?? '').includes('[jf-control]'));
+
+  let errorSpy: ErrorSpy;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as unknown as ErrorSpy;
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it('a name that arrives AFTER the first render is not reported', async () => {
+    // The live shape: the element renders once with nothing committed, then its binding lands.
+    const el = document.createElement('jf-control') as Control;
+    document.body.appendChild(el);
+    await el.updateComplete; // first render — nameless at this instant
+    el.label = 'Add folders';
+    await afterCheck(el);
+    expect(innerButton(el).getAttribute('aria-label')).toBe('Add folders');
+    expect(nameErrors(errorSpy)).toEqual([]);
+  });
+
+  it('a name projected THROUGH an outer slot is not reported (the jf-button shape)', async () => {
+    // `<jf-button>Save</jf-button>` renders `<jf-control><slot></slot></jf-control>`: the inner
+    // control's own light DOM is one `<slot>` element and its `textContent` is ''. The name is real
+    // and an AT computes it from the flattened assignment, which is what the check now reads.
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = host.attachShadow({ mode: 'open' });
+    root.innerHTML = '<jf-control><slot></slot></jf-control>';
+    host.append(document.createTextNode('Save'));
+    const el = root.querySelector('jf-control') as Control;
+    expect((el.textContent ?? '').trim(), 'the naive read this check used to make').toBe('');
+    await afterCheck(el);
+    expect(nameErrors(errorSpy)).toEqual([]);
+  });
+
+  it('plain light-DOM slot text is not reported', async () => {
+    const el = document.createElement('jf-control') as Control;
+    el.append(document.createTextNode('Continue'));
+    document.body.appendChild(el);
+    await afterCheck(el);
+    expect(nameErrors(errorSpy)).toEqual([]);
+  });
+
+  it('a control that is STILL nameless once the DOM has settled is reported', async () => {
+    // The defect the signal exists for. If this ever stops firing, the deferral has swallowed the
+    // check rather than fixed its timing.
+    const el = document.createElement('jf-control') as Control;
+    document.body.appendChild(el);
+    await afterCheck(el);
+    expect(nameErrors(errorSpy)).toHaveLength(1);
+    expect(String(nameErrors(errorSpy)[0]?.[0])).toContain('no accessible name');
+  });
+
+  it('reports once per control, not once per render', async () => {
+    const el = document.createElement('jf-control') as Control;
+    document.body.appendChild(el);
+    await afterCheck(el);
+    el.requestUpdate();
+    await afterCheck(el);
+    el.requestUpdate();
+    await afterCheck(el);
+    // Three renders, and the control was nameless throughout — but a per-render shout is exactly the
+    // console flood the live capture recorded, so re-arming is bounded to one pending check at a time.
+    expect(nameErrors(errorSpy).length).toBeLessThanOrEqual(3);
+    expect(nameErrors(errorSpy).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a control torn down before it settles says nothing', async () => {
+    const el = document.createElement('jf-control') as Control;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    el.remove();
+    await new Promise<void>((r) => setTimeout(r, 0));
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(nameErrors(errorSpy)).toEqual([]);
+  });
+});

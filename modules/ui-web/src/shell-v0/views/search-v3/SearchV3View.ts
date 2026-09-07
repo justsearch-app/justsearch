@@ -431,6 +431,17 @@ export class SearchV3View extends JfElement {
         left: var(--sidebar-width);
         transform: translateX(-50%);
         inline-size: var(--space-4);
+        /* Live axe 2026-08-25 (tempdoc 859) — WCAG 2.2 2.5.8 (Target Size, Minimum), the window's one
+           SERIOUS violation: the grip measured 16 CSS px wide against the criterion's 24 px floor.
+           The TARGET grows; the VISUAL does not. What a reader sees of this control is the 2px line
+           '::after' draws at 'left: 50%', which is positioned against the button's centre and is
+           therefore unmoved and unresized by a wider box — the box itself is 'background: transparent'
+           and paints nothing. Written as a floor rather than by editing 'inline-size' so the spec's
+           16px anatomy stays legible as the intent, and as the literal 24px the criterion names
+           rather than a spacing token a later scale re-tune could drop back under the floor (the
+           '.run-prompt-auto' / ReasoningBlock precedent). The block axis is already full-height via
+           'inset-block: 0'. */
+        min-inline-size: 24px;
         padding: 0;
         border: 0;
         background: transparent;
@@ -582,6 +593,11 @@ export class SearchV3View extends JfElement {
         right: var(--pane-width);
         transform: translateX(50%);
         inline-size: var(--space-4);
+        /* 859 live axe — the sidebar grip's 2.5.8 floor, for the sidebar grip's reason. axe only
+           reported the sidebar one because the pane was closed at capture time, but "one window may
+           not have two differently-sized grips" (above) is exactly why this cannot be fixed on one
+           of them: leaving this at 16px would fork the anatomy the comment above pins. */
+        min-inline-size: 24px;
         padding: 0;
         border: 0;
         background: transparent;

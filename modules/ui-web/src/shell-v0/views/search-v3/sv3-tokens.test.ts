@@ -20,6 +20,10 @@ import { Sv3Composer } from './Sv3Composer.js';
 import { Sv3ContextBar } from './Sv3ContextBar.js';
 import { Sv3Palette } from './Sv3Palette.js';
 import { Sv3Empty } from './Sv3Empty.js';
+// Tempdoc 859 — the contrast assertions below compute ratios with the product's own authority
+// (the same `contrastRatio` conformanceGate and the palette tests use), never by eye.
+import { contrastRatio, type Rgb } from '../../themes/contrast.js';
+import { ReasoningBlock } from '../../components/chat/ReasoningBlock.js';
 import {
   SV3_HEADLINE_EXIT_MS,
   SV3_MORPH_DURATION_MS,
@@ -642,14 +646,16 @@ describe('the composer glass is token-fed material, so dark inverts without a co
     expect(dark).toContain(
       '--composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white))',
     );
+    // Tempdoc 859 — 5% → 35%: the WCAG 1.4.11 floor, pinned as a value here and as a computed ratio
+    // in the contrast block below (this line would happily accept a value that still failed).
     expect(dark).toContain(
-      '--composer-outline: color-mix(in srgb, var(--color-white) 5%, transparent)',
+      '--composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent)',
     );
     // Light casts a tight contact shadow down and catches nothing.
     expect(light).toContain('--composer-shadow: 0 12px 28px -18px rgb(0 0 0 / 40%)');
     expect(light).toContain('--composer-highlight: none');
     expect(light).toContain('--composer-glass-surface: var(--card)');
-    expect(light).toContain('--composer-outline: rgb(0 0 0 / 8%)');
+    expect(light).toContain('--composer-outline: rgb(0 0 0 / 45%)'); // 859 — 8% → 45%, same floor
   });
 
   it('reads focus and validity off the wrapper, so ONE mark shows at a time', () => {
@@ -1352,4 +1358,195 @@ describe('the chat column caps on one token, not three literals', () => {
     // a reader who never chose a preset gets, and what a detached/preview render falls back to.
     expect(tokens).toContain('--measure-prose: 48rem');
   });
+});
+
+/* ── Tempdoc 859 (live audit 2026-08-25/26): the two measured token defects ──────────────────── */
+
+/**
+ * Two findings the live console and live axe reported against the shipped window, pinned as MATHS
+ * rather than as values so a later re-tune of the token cannot pass the letter of the fix and fail
+ * its point.
+ *
+ * The ratios are computed with the product's own contrast authority (`themes/contrast.ts` —
+ * `contrastRatio`, the same function `conformanceGate` and the palette tests use), never by eye.
+ * `parseColor` deliberately does not implement `oklch()` (its own doc says: resolve those in a
+ * browser and pass the `rgb()`), and happy-dom computes no cascade here, so the two `oklch()` page
+ * bases are pinned at the values the LIVE audit measured on the running window:
+ * dark `--background` = rgb(10,10,10), light `--background` = rgb(252,252,252). The pin is guarded —
+ * the first case re-checks that the sheet still derives those bases from the same primitives, so a
+ * palette change cannot leave this arithmetic quietly describing a window that no longer exists.
+ */
+describe('859: the composer boundary meets WCAG 1.4.11 in both themes', () => {
+  const WCAG_NON_TEXT = 3;
+
+  /** Live-measured sRGB of the two page bases (see the block comment for why they are pinned). */
+  const DARK_PAGE: Rgb = [10, 10, 10];
+  const LIGHT_PAGE: Rgb = [252, 252, 252];
+  const WHITE: Rgb = [255, 255, 255];
+  const BLACK: Rgb = [0, 0, 0];
+
+  /** Source-over compositing of `fg` at `alpha` onto an opaque `bg` — what a 1px translucent border does. */
+  const over = (fg: Rgb, alpha: number, bg: Rgb): Rgb =>
+    [0, 1, 2].map((i) =>
+      Math.round((fg[i] as number) * alpha + (bg[i] as number) * (1 - alpha)),
+    ) as unknown as Rgb;
+
+  /** `color-mix(in srgb, A p%, B)` on two opaque colours. */
+  const mix = (a: Rgb, b: Rgb, pa: number): Rgb =>
+    [0, 1, 2].map((i) =>
+      Math.round((a[i] as number) * pa + (b[i] as number) * (1 - pa)),
+    ) as unknown as Rgb;
+
+  const themeSplit = tokens.indexOf(":host([theme='light'])");
+  const darkBlock = tokens.slice(0, themeSplit);
+  const lightBlock = tokens.slice(themeSplit);
+
+  const alphaOf = (block: string): number => {
+    const m =
+      /--composer-outline: color-mix\(in srgb, var\(--color-white\) (\d+)%/.exec(block) ??
+      /--composer-outline: rgb\(0 0 0 \/ (\d+)%\)/.exec(block);
+    if (m === null) throw new Error('the --composer-outline declaration changed shape');
+    return Number(m[1]) / 100;
+  };
+
+  it('the page bases this arithmetic assumes are still the ones the sheet declares', () => {
+    expect(darkBlock).toContain('--background: var(--color-neutral-950)');
+    expect(tokens).toContain('--color-neutral-950: oklch(14.5% 0 0)');
+    expect(lightBlock).toContain('--background: var(--color-zinc-25)');
+    expect(tokens).toContain('--color-zinc-25: oklch(99.2% 0 0)');
+    // …and the surface the edge is drawn OVER, in each theme.
+    expect(darkBlock).toContain(
+      '--composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white))',
+    );
+    expect(lightBlock).toContain('--composer-glass-surface: var(--card)');
+    expect(lightBlock).toContain('--card: var(--color-white)');
+  });
+
+  it('dark: the edge clears 3:1 against BOTH adjacent colours (it was 1.21:1 at 5% white)', () => {
+    const glass = mix(DARK_PAGE, WHITE, 0.96); // --composer-glass-surface
+    const edge = over(WHITE, alphaOf(darkBlock), glass);
+    // The OUTSIDE — the failure the audit reported, at 1.21:1.
+    expect(contrastRatio(edge, DARK_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // The INSIDE. A boundary that only cleared the floor on one side would have moved the failure,
+    // not closed it — 1.4.11 is about the adjacent colours, plural.
+    expect(contrastRatio(edge, glass)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // The old value recomputed: it lands on the audit's measured 1.21:1, which is what validates this
+    // arithmetic against the running window rather than against itself.
+    expect(contrastRatio(over(WHITE, 0.05, glass), DARK_PAGE)).toBeCloseTo(1.215, 3);
+  });
+
+  it('light: the edge clears 3:1 against both, which 8% black did not either', () => {
+    const card = WHITE; // --composer-glass-surface: var(--card) → --color-white
+    const edge = over(BLACK, alphaOf(lightBlock), card);
+    expect(contrastRatio(edge, LIGHT_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    expect(contrastRatio(edge, card)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // "The light theme's 8% black edge is the stronger half" was true AND still nowhere near 3:1 —
+    // pinned so the audit's wording is never read as "light was fine".
+    expect(contrastRatio(over(BLACK, 0.08, card), LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
+  });
+});
+
+/**
+ * Tempdoc 859 (2026-08-26) — the `jf-reasoning-block` bridge pointed `--text-primary` AND
+ * `--text-secondary` at `--foreground`, so `ReasoningBlock`'s `.disclosure:hover` colour shift
+ * resolved to the value it was already showing: a hover state that changed nothing, in the one
+ * window that renders the model's thinking most.
+ */
+describe('859: the reasoning-block bridge gives the hover somewhere to go', () => {
+  const bridge = (): string => {
+    const m = /jf-reasoning-block\s*\{([^}]*)\}/.exec(styleTextOf(Sv3Main));
+    if (m === null) throw new Error('Sv3Main.styles has no `jf-reasoning-block` bridge');
+    return m[1] as string;
+  };
+
+  const valueOf = (block: string, prop: string): string => {
+    const m = new RegExp(`${prop}:\\s*([^;]+);`).exec(block);
+    if (m === null) throw new Error(`the bridge declares no \`${prop}\``);
+    return (m[1] as string).trim();
+  };
+
+  it('resting and hover rungs resolve to DIFFERENT tokens', () => {
+    const block = bridge();
+    const resting = valueOf(block, '--text-secondary'); // ReasoningBlock `.container`
+    const hover = valueOf(block, '--text-primary'); // ReasoningBlock `.disclosure:hover`
+    expect(resting).not.toBe(hover);
+    // Named, not merely different: the hover takes the window's full ink, and the resting rung takes
+    // its aside grade lifted the smallest step toward that ink — the lift is what keeps the copy
+    // control (which reads the same rung) above AA on the block's doubled wash, measured by the
+    // window's contrast oracle in `Sv3Main.imports.test.ts`. A bridge that made the two differ by
+    // pointing at two EQUAL aliases would satisfy `not.toBe` while still painting one colour, so
+    // both ends are pinned by name and the case below pins that the names are not the same value.
+    expect(resting).toBe('color-mix(in srgb, var(--secondary-label) 90%, var(--foreground))');
+    expect(hover).toBe('var(--foreground)');
+    // …and the resting rung is genuinely DERIVED from the quiet grade, not a second hand-picked one.
+    expect(resting).toContain('var(--secondary-label)');
+  });
+
+  it('reads the rungs the component actually uses, not the ones the bridge used to name', () => {
+    // The bridge's original comment claimed `--text-muted` was ReasoningBlock's resting body. It is
+    // not — the component reads that token nowhere, which is how the two live rungs came to be
+    // aliased together unnoticed. Pinned against the component's own sheet so the mapping cannot
+    // drift back to a name-based guess.
+    // ReasoningBlock's `static styles` is ONE CSSResult, not the array `styleTextOf` walks.
+    const block = (ReasoningBlock.styles as unknown as { cssText: string }).cssText;
+    expect(block, 'the component sheet moved').toContain('.container {');
+    expect(/\.container\s*\{[^}]*color:\s*var\(--text-secondary\)/.test(block)).toBe(true);
+    expect(/\.disclosure:hover\s*\{[^}]*color:\s*var\(--text-primary\)/.test(block)).toBe(true);
+    // …and it reads --text-muted nowhere, which is the claim the old bridge comment got wrong.
+    expect(block.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('--text-muted');
+  });
+
+  it('the two tokens the bridge names really are different values in both themes', () => {
+    // The alias check above is about the bridge; this is about the palette behind it. If a theme ever
+    // pointed --secondary-label at --foreground the hover would be a no-op again with the bridge
+    // still reading correctly, so the sheet is asserted too.
+    const themeSplit = tokens.indexOf(":host([theme='light'])");
+    for (const [name, block] of [
+      ['dark', tokens.slice(0, themeSplit)],
+      ['light', tokens.slice(themeSplit)],
+    ] as const) {
+      const secondary = /--secondary-label: ([^;]+);/.exec(block)?.[1]?.trim();
+      const foreground = /--foreground: ([^;]+);/.exec(block)?.[1]?.trim();
+      expect(secondary, `${name}: --secondary-label`).toBeDefined();
+      expect(foreground, `${name}: --foreground`).toBeDefined();
+      expect(secondary, `${name}: the two rungs collapsed onto one token`).not.toBe(foreground);
+    }
+  });
+});
+
+/* ── Tempdoc 859 (live axe 2026-08-25): the window's one serious violation ───────────────────── */
+
+/**
+ * WCAG 2.2 2.5.8 (Target Size, Minimum). Live axe on the sv3 window reported exactly one serious
+ * violation — `button.sidebar-grip` at 16 CSS px wide against the 24 px floor — and the pane grip is
+ * the same anatomy on the other edge, deliberately ("one window may not have two differently-sized
+ * grips"), so both carry the floor or the anatomy forks.
+ *
+ * Asserted on the declaration rather than on a measured box: happy-dom computes no cascade and no
+ * layout, so a `getBoundingClientRect` here would report 0 for a passing AND a failing grip. The
+ * measured half is live axe, which is what found this in the first place.
+ */
+describe('859: both resize grips clear the 24px target floor', () => {
+  const ruleBodyOf = (styles: string, selector: string): string => {
+    const m = new RegExp(`${selector}\\s*\\{([^}]*)\\}`).exec(styles);
+    if (m === null) throw new Error(`SearchV3View.styles has no \`${selector}\` rule`);
+    return m[1] as string;
+  };
+
+  for (const grip of ['sidebar-grip', 'pane-grip'] as const) {
+    it(`button.${grip} pins a 24px inline floor without resizing its visible line`, () => {
+      const body = ruleBodyOf(styleTextOf(SearchV3View), `button\\.${grip}`);
+      expect(body).toMatch(/min-inline-size:\s*24px/);
+      // The block axis is already full-height; the target grows in ONE axis only.
+      expect(body).toMatch(/inset-block:\s*0/);
+      // The VISUAL is unchanged: the 16px anatomy stays the declared size, the box paints nothing,
+      // and the 2px line is drawn by `::after` positioned against the box's centre. A "fix" that
+      // widened the drawn line instead would pass a size assertion and change the design.
+      expect(body).toMatch(/inline-size:\s*var\(--space-4\)/);
+      expect(body).toMatch(/background:\s*transparent/);
+      const after = ruleBodyOf(styleTextOf(SearchV3View), `button\\.${grip}::after`);
+      expect(after).toMatch(/inline-size:\s*2px/);
+      expect(after).toMatch(/left:\s*50%/);
+    });
+  }
 });

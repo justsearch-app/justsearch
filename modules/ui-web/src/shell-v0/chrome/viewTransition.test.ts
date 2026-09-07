@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { surfaceTransitionsEnabled, startSurfaceTransition } from './viewTransition.js';
+import {
+  adoptTransitionPromises,
+  isBenignTransitionAbort,
+  surfaceTransitionsEnabled,
+  startSurfaceTransition,
+} from './viewTransition.js';
+import { appLog } from '../../utils/logger.js';
 
 type VTDoc = Document & { startViewTransition?: (cb: () => Promise<void> | void) => unknown };
 
@@ -62,5 +68,124 @@ describe('viewTransition (tempdoc 609 §R T1.1)', () => {
     // The callback awaits the host's updateComplete (the pending Lit flush) before resolving.
     await captured!();
     expect(resolved).toBe(true);
+  });
+});
+
+/**
+ * Tempdoc 859 (live console, 2026-08-25) — `SES_UNHANDLED_REJECTION: TimeoutError: Transition was
+ * aborted because of timeout in DOM update`, on nearly every Search v3 load and again while a run sat
+ * at the budget gate, plus the App-level "Unhandled promise rejection" `main.jsx` logs behind it.
+ *
+ * The cause was a DROPPED handle: `startViewTransition` hands back a `ViewTransition` whose `ready` /
+ * `finished` / `updateCallbackDone` are live promises, and a rejected promise nobody adopted IS an
+ * unhandled rejection. These pin both halves of the fix — a benign skip is silent, and a real failure
+ * is still reported rather than swallowed.
+ */
+describe('viewTransition rejection adoption (tempdoc 859)', () => {
+  /** A rejected promise the runtime would report unless something adopts it. */
+  const rejecting = (reason: unknown): Promise<never> => Promise.reject(reason);
+  const domError = (name: string, message: string): Error => {
+    const e = new Error(message);
+    e.name = name;
+    return e;
+  };
+
+  /** Drain the microtask queue AND the macrotask turn where Node/V8 fires `unhandledRejection`. */
+  const settle = async (): Promise<void> => {
+    for (let i = 0; i < 3; i += 1) await Promise.resolve();
+    await new Promise<void>((r) => setTimeout(r, 0));
+  };
+
+  it('classifies the two skip reasons as benign and everything else as not', () => {
+    expect(isBenignTransitionAbort(domError('TimeoutError', 'timeout in DOM update'))).toBe(true);
+    expect(isBenignTransitionAbort(domError('AbortError', 'superseded'))).toBe(true);
+    expect(isBenignTransitionAbort(domError('TypeError', 'x is not a function'))).toBe(false);
+    // A blanket catch would call these benign too; the classifier is what keeps it from becoming one.
+    expect(isBenignTransitionAbort('a string')).toBe(false);
+    expect(isBenignTransitionAbort(null)).toBe(false);
+    expect(isBenignTransitionAbort(undefined)).toBe(false);
+  });
+
+  it('an ABORTED transition produces no unhandled rejection and no diagnostic', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    const logged = vi.spyOn(appLog, 'error').mockImplementation(() => {});
+    try {
+      // The exact live shape: the update callback outran the API's DOM-update budget, so `ready`
+      // rejects with a TimeoutError while the other faces settle.
+      adoptTransitionPromises({
+        ready: rejecting(domError('TimeoutError', 'Transition was aborted because of timeout in DOM update')),
+        finished: Promise.resolve(),
+        updateCallbackDone: Promise.resolve(),
+      });
+      await settle();
+      expect(unhandled, 'the skipped transition reached the global rejection channel').toEqual([]);
+      expect(logged, 'a skipped transition is not an app fault').not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      logged.mockRestore();
+    }
+  });
+
+  it('a REAL transition failure is still reported through the app diagnostic channel', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    const logged = vi.spyOn(appLog, 'error').mockImplementation(() => {});
+    try {
+      adoptTransitionPromises({
+        ready: Promise.resolve(),
+        finished: rejecting(domError('TypeError', 'the update callback threw')),
+        updateCallbackDone: Promise.resolve(),
+      });
+      await settle();
+      expect(unhandled).toEqual([]);
+      expect(logged).toHaveBeenCalledWith('View transition failed', {
+        reason: { name: 'TypeError', message: 'the update callback threw' },
+      });
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      logged.mockRestore();
+    }
+  });
+
+  it('tolerates the handle shapes a browser may hand back', () => {
+    // Progressive enhancement: an older/partial implementation, or a stub returning nothing at all,
+    // must not turn adoption itself into the fault.
+    expect(() => adoptTransitionPromises(undefined)).not.toThrow();
+    expect(() => adoptTransitionPromises(null)).not.toThrow();
+    expect(() => adoptTransitionPromises({})).not.toThrow();
+    expect(() => adoptTransitionPromises({ ready: 'not a promise' })).not.toThrow();
+  });
+
+  it('startSurfaceTransition adopts the handle it used to drop', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    const logged = vi.spyOn(appLog, 'error').mockImplementation(() => {});
+    try {
+      (document as unknown as { startViewTransition: unknown }).startViewTransition = vi.fn(() => ({
+        ready: rejecting(
+          domError('TimeoutError', 'Transition was aborted because of timeout in DOM update'),
+        ),
+        finished: Promise.resolve(),
+        updateCallbackDone: Promise.resolve(),
+      }));
+      stubReducedMotion(false);
+      expect(startSurfaceTransition({ updateComplete: Promise.resolve(true) })).toBe(true);
+      await settle();
+      expect(unhandled, 'the shell surface swap still leaks its transition handle').toEqual([]);
+      expect(logged).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      logged.mockRestore();
+    }
   });
 });
