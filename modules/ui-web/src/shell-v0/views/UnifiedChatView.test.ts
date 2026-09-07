@@ -6461,3 +6461,85 @@ describe('UnifiedChatView reloaded-turn shape provenance (tempdoc 941 F4)', () =
     view.remove();
   });
 });
+
+/**
+ * Tempdoc 941 — the RESUMED thread carries the same per-message shape data as a live one.
+ *
+ * F4 above closed the unified-thread (record) path. The conversation-history path is the other
+ * half: `loadConversation` stamped ONE conversation-level shape across every resumed message, so
+ * in a mixed conversation a `core.rag-ask` turn came back declaring the shape that merely OPENED
+ * the conversation. `resumeConversation` now surfaces the per-message `shapeId` the store has
+ * stamped since 863, and the window reads it.
+ */
+describe('UnifiedChatView resumed-thread shape provenance (tempdoc 941)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The window auto-restores the last-viewed conversation at mount, which would consume a
+    // one-shot mock before the test's own load ran. Start each case with no pointer.
+    clearLastViewedConversation();
+  });
+
+  afterEach(() => {
+    vi.mocked(resumeConversation).mockResolvedValue({
+      sessionId: 'uc',
+      shapeId: 'core.free-chat',
+      messages: [],
+    });
+  });
+
+  async function loadResumed(messages: unknown[]): Promise<UnifiedChatView> {
+    vi.mocked(resumeConversation).mockResolvedValue({
+      sessionId: 'uc-mixed',
+      shapeId: 'core.free-chat',
+      messages: messages as never,
+    });
+    const view = mountView();
+    await view.updateComplete;
+    // @ts-expect-error — private method, driven directly (the mocked store answers the fetch).
+    await view.loadConversation('uc-mixed', 'core.free-chat');
+    return view;
+  }
+
+  it('stamps each resumed turn with the shape the RECORD declares', async () => {
+    const view = await loadResumed([
+      { role: 'user', content: 'q', id: 'm1', shapeId: 'core.rag-ask' },
+      { role: 'assistant', content: 'a', id: 'm2', shapeId: 'core.rag-ask' },
+      { role: 'user', content: 'run it', id: 'm3', shapeId: 'core.agent-run' },
+    ]);
+    expect(view.thread.map((m) => m.shapeId)).toEqual([
+      'core.rag-ask',
+      'core.rag-ask',
+      'core.agent-run',
+    ]);
+    // Precision: the conversation-level shape was `core.free-chat`, so every one of these would
+    // have read `core.free-chat` before — the assertion cannot pass for the old reason.
+    view.remove();
+  });
+
+  it('falls back to the conversation shape for a record that declares none, or an unknown one', async () => {
+    const view = await loadResumed([
+      { role: 'user', content: 'legacy', id: 'm1' },
+      { role: 'user', content: 'from a newer build', id: 'm2', shapeId: 'core.not-a-shape' },
+    ]);
+    // No backfill exists for pre-863 rows, and a shape this build does not know must not be cast
+    // into the union — both keep the only fact available, the conversation's own shape.
+    expect(view.thread.map((m) => m.shapeId)).toEqual(['core.free-chat', 'core.free-chat']);
+    view.remove();
+  });
+
+  it('carries a resumed turn’s standaloneQuestion onto the thread', async () => {
+    const view = await loadResumed([
+      {
+        role: 'assistant',
+        content: 'a',
+        id: 'm1',
+        shapeId: 'core.rag-ask',
+        standaloneQuestion: 'What did the Q3 report say about churn?',
+      },
+    ]);
+    expect(view.thread[0]?.standaloneQuestion).toBe(
+      'What did the Q3 report say about churn?',
+    );
+    view.remove();
+  });
+});

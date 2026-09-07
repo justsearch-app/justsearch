@@ -16,6 +16,10 @@ import type {
   AdvisorySnapshot,
   AdvisoryStore,
 } from './AdvisoryStore.js';
+import {
+  __resetForTest as resetResourceCatalog,
+  __seedForTest as seedResourceCatalog,
+} from '../../../i18n/resourceCatalog.js';
 
 class StubAdvisoryStore {
   private listeners = new Set<AdvisoryListener>();
@@ -89,6 +93,7 @@ async function activateJfButton(el: Element | null | undefined): Promise<void> {
 describe('AdvisoryInboxDrawer', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    resetResourceCatalog();
   });
 
   it('renders empty state when no advisories', async () => {
@@ -526,6 +531,93 @@ describe('AdvisoryInboxDrawer', () => {
     el.open = true;
     await el.updateComplete;
     expect(el.shadowRoot?.querySelectorAll('.item')?.length).toBe(2);
+  });
+
+  /**
+   * Tempdoc 941 — the per-reason sentence the backend authors reaches the reader.
+   *
+   * Every health emitter builds `bodyI18nKey` as `health-events.<id>.message`, so before this the
+   * expanded detail could only ever show the GENERIC sentence — "the indexer is unavailable" —
+   * even when the condition's reason (`classExtras.reason`, stamped by
+   * `HealthRecoveryProjector.projectCondition`) had its own authored copy saying the Worker is
+   * merely starting. The alarm and the status read identically.
+   */
+  it('941 — the expanded detail prefers the per-reason authored sentence over the generic one', async () => {
+    seedResourceCatalog({
+      'health-events.index.unavailable.message': 'The indexer is unavailable.',
+      'health-events.index.unavailable.reason.WorkerStarting.message':
+        'The Worker is starting up; the index will be available shortly.',
+    });
+    const store = new StubAdvisoryStore();
+    const el = make(store as unknown as AdvisoryStore);
+    el.open = true;
+    const condRecord: AdvisoryRecord = {
+      key: 'health.recoverable:index.unavailable',
+      event: {
+        classId: 'health.recoverable',
+        id: 'health.recoverable:index.unavailable',
+        occurredAt: '2026-05-15T10:00:00Z',
+        renderHint: 'PERSISTED',
+        diagnosticsLink: null,
+        provenance: null,
+        primaryAction: null,
+        bodyI18nKey: 'health-events.index.unavailable.message',
+        classExtras: {
+          conditionId: 'index.unavailable',
+          subject: 'worker.index',
+          reason: 'WorkerStarting',
+        },
+      },
+      acknowledged: false,
+      sourceRenderHint: 'PERSISTED',
+      origin: 'stream',
+    };
+    store.push({ advisories: [condRecord], unreadCount: 1 });
+    await el.updateComplete;
+    (el.shadowRoot?.querySelector('.item') as HTMLElement).click();
+    await el.updateComplete;
+    const detail = el.shadowRoot?.querySelector('.item-detail');
+    expect(detail?.textContent).toContain('The Worker is starting up');
+    // Precision: this must pass because the REASON key was read, not because both strings are
+    // present. The generic sentence is the one it replaced.
+    expect(detail?.textContent).not.toContain('The indexer is unavailable.');
+  });
+
+  it('941 — falls back to the generic bodyI18nKey sentence when the reason has no authored copy', async () => {
+    seedResourceCatalog({
+      'health-events.index.unavailable.message': 'The indexer is unavailable.',
+    });
+    const store = new StubAdvisoryStore();
+    const el = make(store as unknown as AdvisoryStore);
+    el.open = true;
+    const condRecord: AdvisoryRecord = {
+      key: 'health.recoverable:index.unavailable',
+      event: {
+        classId: 'health.recoverable',
+        id: 'health.recoverable:index.unavailable',
+        occurredAt: '2026-05-15T10:00:00Z',
+        renderHint: 'PERSISTED',
+        diagnosticsLink: null,
+        provenance: null,
+        primaryAction: null,
+        bodyI18nKey: 'health-events.index.unavailable.message',
+        classExtras: {
+          conditionId: 'index.unavailable',
+          subject: 'worker.index',
+          reason: 'NoAuthoredCopyForThis',
+        },
+      },
+      acknowledged: false,
+      sourceRenderHint: 'PERSISTED',
+      origin: 'stream',
+    };
+    store.push({ advisories: [condRecord], unreadCount: 1 });
+    await el.updateComplete;
+    (el.shadowRoot?.querySelector('.item') as HTMLElement).click();
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector('.item-detail')?.textContent).toContain(
+      'The indexer is unavailable.',
+    );
   });
 
   it('slice 496 — chip count reflects advisory count per value', async () => {

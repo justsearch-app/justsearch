@@ -29,6 +29,7 @@ import {
 } from './AdvisoryStore.js';
 import {
   advisoryClassChrome,
+  healthAdvisoryReasonBody,
   type AdvisoryClassChromeEntry,
 } from './AdvisoryClassChrome.js';
 import '../DispatchSource.js';
@@ -594,9 +595,18 @@ export class AdvisoryInboxDrawer extends JfElement {
                 ${prov
                   ? html`<jf-dispatch-source .provenance=${prov} detailed></jf-dispatch-source>`
                   : nothing}
-                ${record.event.bodyI18nKey
-                  ? html`<div>${present({ kind: 'resource', key: record.event.bodyI18nKey }).label}</div>`
-                  : nothing}
+                ${/* Tempdoc 941 — the reason-specific authored sentence wins over the generic
+                      `health-events.<id>.message` that `bodyI18nKey` always names. Same
+                      resolution the toast body uses (one authority in AdvisoryClassChrome). */ ''}
+                ${(() => {
+                  const reasonBody = healthAdvisoryReasonBody(record.event.classId, extras);
+                  if (reasonBody) return html`<div>${reasonBody}</div>`;
+                  return record.event.bodyI18nKey
+                    ? html`<div>
+                        ${present({ kind: 'resource', key: record.event.bodyI18nKey }).label}
+                      </div>`
+                    : nothing;
+                })()}
                 ${diag
                   ? html`
                       <div class="item-diagnostics">

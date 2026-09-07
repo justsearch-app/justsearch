@@ -8,7 +8,11 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { present, presentLabel } from './present';
-import { localizeResourceKey } from '../../i18n/resourceCatalog';
+import {
+  localizeResourceKey,
+  __seedForTest as seedResourceCatalog,
+  __resetForTest as resetResourceCatalog,
+} from '../../i18n/resourceCatalog';
 import { describeEffect } from '../substrates/effects/describe';
 import {
   registerStatusBarItem,
@@ -57,6 +61,62 @@ describe('present() — condition', () => {
   });
   it('never leaks the raw condition id', () => {
     expect(present({ kind: 'condition', id: 'index.unavailable' }).label).not.toContain('.');
+  });
+});
+
+/**
+ * Tempdoc 941 — the health-events catalog copy the backend authors and the frontend never read.
+ *
+ * `bootHealthEventsCatalog` merges `health-events.*` into the SAME store `localizeResourceKey`
+ * reads, so these tests seed that store directly (the boot path's own fetch is covered in
+ * `i18n/resourceCatalog.test.ts`) and assert the resolution ORDER: per-reason message > generic
+ * message for the description, authored label > humanized id for the label.
+ */
+describe('present() — condition reads the authored health-events copy (941)', () => {
+  afterEach(() => resetResourceCatalog());
+
+  it('prefers the per-reason message over the generic one', () => {
+    seedResourceCatalog({
+      'health-events.index.unavailable.label': 'Indexer unavailable',
+      'health-events.index.unavailable.message': 'The indexer is unavailable.',
+      'health-events.index.unavailable.reason.WorkerStarting.message':
+        'The Worker is starting up; the index will be available shortly.',
+    });
+    const presented = present({
+      kind: 'condition',
+      id: 'index.unavailable',
+      reason: 'WorkerStarting',
+    });
+    expect(presented.label).toBe('Indexer unavailable');
+    expect(presented.description).toBe(
+      'The Worker is starting up; the index will be available shortly.',
+    );
+  });
+
+  it('falls back to the generic message when the reason has no authored override', () => {
+    seedResourceCatalog({
+      'health-events.index.unavailable.message': 'The indexer is unavailable.',
+    });
+    // A reason the catalog does not carry copy for must not blank the description.
+    expect(
+      present({ kind: 'condition', id: 'index.unavailable', reason: 'SomethingElse' }).description,
+    ).toBe('The indexer is unavailable.');
+    // …and so must a condition asserted with no reason at all.
+    expect(present({ kind: 'condition', id: 'index.unavailable' }).description).toBe(
+      'The indexer is unavailable.',
+    );
+  });
+
+  it('leaves the description absent — not a raw key — when the catalog has no entry', () => {
+    seedResourceCatalog({ 'health-events.other.thing.message': 'Unrelated.' });
+    const presented = present({
+      kind: 'condition',
+      id: 'schema.reindex-required',
+      reason: 'SchemaMismatch',
+    });
+    expect(presented.description).toBeUndefined();
+    // The pre-941 humanized-id fallback is unchanged when nothing is authored.
+    expect(presented.label).toBe('Schema Reindex Required');
   });
 });
 

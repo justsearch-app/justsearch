@@ -28,7 +28,17 @@ const STORAGE_KEY_BODY = 'justsearch.conversationShapeCatalog.body';
 const STORAGE_KEY_ETAG = 'justsearch.conversationShapeCatalog.etag';
 
 let entriesById: Map<string, ConversationShape> = new Map();
-let bootAttempted = false;
+/**
+ * Tempdoc 941 — did the boot fetch actually GET AN ANSWER (200 or 304)?
+ *
+ * Was `bootAttempted`, tested together with "the index is non-empty". The boot seeds the index
+ * from the localStorage body BEFORE it fetches, so a boot that raced an unanswering backend left
+ * the guard set AND the index non-empty — permanently closed on whatever the previous session (or
+ * the previous VERSION) had cached. Success is recorded where success happens.
+ */
+let bootSucceeded = false;
+/** Shared in-flight boot, so a readiness-driven re-attempt joins the request rather than racing it. */
+let inFlightBoot: Promise<void> | null = null;
 const listeners: Set<() => void> = new Set();
 
 interface CachedEntry {
@@ -96,11 +106,24 @@ export async function bootConversationShapeRegistry(
   baseUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (bootAttempted && entriesById.size > 0) {
-    return;
-  }
-  bootAttempted = true;
+  if (bootSucceeded) return;
+  if (inFlightBoot) return inFlightBoot;
+  inFlightBoot = fetchConversationShapeCatalog(baseUrl, fetchImpl).finally(() => {
+    inFlightBoot = null;
+  });
+  return inFlightBoot;
+}
 
+/**
+ * Tempdoc 941 — the boot is re-attemptable: calling it again after an unanswered attempt refetches
+ * (`i18n.ts` `watchForBackendReady` does exactly that on the shell's backend-ready edge). The
+ * first-install backoff above covers a backend that is merely SLOW; the re-attempt covers one that
+ * was not there at all when the document loaded.
+ */
+async function fetchConversationShapeCatalog(
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<void> {
   const cached = loadFromStorage();
   if (cached) {
     rebuildIndex(cached.body);
@@ -120,6 +143,8 @@ export async function bootConversationShapeRegistry(
     }
     const populated = await tryFetchAndPopulate(baseUrl, fetchImpl, cached?.etag);
     if (populated) {
+      // 941 — the backend answered AND the catalog is populated: the boot is closed.
+      bootSucceeded = true;
       return;
     }
     if (!isFirstInstall) return;
@@ -206,7 +231,8 @@ export function onConversationShapeCatalogChange(listener: () => void): () => vo
 /** Reset internal state between tests. */
 export function __resetConversationShapeCatalogForTest(): void {
   entriesById = new Map();
-  bootAttempted = false;
+  bootSucceeded = false;
+  inFlightBoot = null;
   listeners.clear();
   try {
     if (typeof localStorage !== 'undefined') {
@@ -222,6 +248,6 @@ export function __resetConversationShapeCatalogForTest(): void {
 export function __seedConversationShapeCatalogForTest(
   catalog: ConversationShapeCatalog,
 ): void {
-  bootAttempted = true;
+  bootSucceeded = true;
   rebuildIndex(catalog);
 }

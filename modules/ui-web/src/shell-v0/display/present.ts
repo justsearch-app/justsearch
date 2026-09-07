@@ -28,8 +28,14 @@ export type EntityRef =
   | { readonly kind: 'surface'; readonly id: string }
   | { readonly kind: 'effect'; readonly effect: Effect }
   | { readonly kind: 'resource'; readonly key: string }
-  /** A health/recovery condition id (e.g. `schema.reindex-required`). */
-  | { readonly kind: 'condition'; readonly id: string }
+  /**
+   * A health/recovery condition id (e.g. `schema.reindex-required`), optionally with the
+   * condition's REASON code (`AssertedCondition.reason`, e.g. `SchemaMismatch`).
+   *
+   * Tempdoc 941 — the reason is what selects the authored per-reason sentence
+   * (`health-events.<id>.reason.<ReasonCode>.message`). See the `condition` case below.
+   */
+  | { readonly kind: 'condition'; readonly id: string; readonly reason?: string }
   /** A navigation target (surface id or `justsearch://surface/<id>` route). */
   | { readonly kind: 'route'; readonly target: string }
   /**
@@ -81,6 +87,19 @@ function humanizeFullId(id: string): string {
     .filter((s) => s.length > 0)
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
     .join(' ');
+}
+
+/**
+ * Tempdoc 941 — resolve a `health-events.*` catalog key, or `null` when the catalog has no
+ * entry for it.
+ *
+ * `localizeResourceKey` echoes the RAW KEY back on a miss (its documented defensive contract),
+ * so "resolved" has to be tested as "came back different from what went in". Every caller here
+ * needs that same test, so it lives once.
+ */
+function healthEventCopy(key: string): string | null {
+  const resolved = localizeResourceKey(key);
+  return resolved.length > 0 && resolved !== key ? resolved : null;
 }
 
 /** Extract a surface id from a `justsearch://surface/<id>` route or a bare id. */
@@ -142,10 +161,34 @@ export function present(ref: EntityRef): Presented {
     case 'resource':
       return { label: brand(localizeResourceKey(ref.key)) };
     case 'condition': {
-      // Try an i18n entry first; otherwise humanize the full id (keep namespace).
-      const resolved = localizeResourceKey(ref.id);
+      // Tempdoc 941 — the backend AUTHORS this copy and the frontend never read it.
+      //
+      // `health-events.en.properties` declares, per condition id, a short `.label` (badges,
+      // lists), a full `.message` sentence, and — where the reason merits its own wording — a
+      // per-reason override `health-events.<id>.reason.<ReasonCode>.message`. The catalog is
+      // boot-fetched into the same store `localizeResourceKey` reads (`bootHealthEventsCatalog`,
+      // i18n.ts), so all three are resolvable here. This case used to look up the BARE condition
+      // id (`localizeResourceKey('schema.reindex-required')`) — a key no namespace in that
+      // catalog ever emits — so its i18n branch could not hit and every condition rendered as a
+      // humanized id with no description at all.
+      //
+      // The per-reason sentence is the point: `index.unavailable` reads "The indexer is
+      // unavailable" generically, but with reason `WorkerStarting` the authored copy says the
+      // Worker is starting and the index will be along shortly — the difference between an
+      // alarm and a status. The generic `.message` is the fallback when a reason has no
+      // override (most do not), and the pre-941 humanized id remains the last resort so an
+      // unbooted catalog degrades exactly as before.
+      const authoredLabel = healthEventCopy(`health-events.${ref.id}.label`);
+      const legacy = localizeResourceKey(ref.id);
+      const label =
+        authoredLabel ?? (legacy !== ref.id ? legacy : humanizeFullId(ref.id));
+      const reasonMessage = ref.reason
+        ? healthEventCopy(`health-events.${ref.id}.reason.${ref.reason}.message`)
+        : null;
+      const description = reasonMessage ?? healthEventCopy(`health-events.${ref.id}.message`);
       return {
-        label: brand(resolved !== ref.id ? resolved : humanizeFullId(ref.id)),
+        label: brand(label),
+        ...(description !== null ? { description } : {}),
       };
     }
     case 'route': {

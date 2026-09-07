@@ -9,6 +9,10 @@
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
 import { parseSseBuffer, parseSseBufferJson } from './sse';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
+// Tempdoc 941 — the app's ONE client-originated message channel (559 Authority III). Imported for
+// the same reason `liveChannelBudget` is: the seam is a plain function over a document event, with
+// no chrome dependency, so the stream can report through it without acquiring a view dependency.
+import { emitEphemeralToast } from '../shell-v0/components/advisory/ephemeralToast.js';
 
 // ==================== Stream Event Types ====================
 
@@ -611,6 +615,42 @@ export const REPLAY_TRUNCATED_EVENT = 'replay_truncated';
 /** The SSE event name carrying a run's identity triple (`runId`, `shapeId`, `conversationId`). */
 export const RUN_STARTED_EVENT = 'run_started';
 
+/**
+ * Tempdoc 941 — report a per-event handler throw without letting it kill the stream.
+ *
+ * The throw must not abort the stream: one broken consumer (a citations handler, a reasoning
+ * handler) must not cost the reader the rest of an answer that is still arriving. But it was
+ * previously only `console.warn`ed, which means the APP never learned anything — and the whole
+ * point of 847 F-12 is that the user-visible result of a throwing evidence handler is
+ * indistinguishable from a backend that sent nothing. A console line is not a channel: nobody has
+ * devtools open, and the turn renders as though the missing part was never sent.
+ *
+ * So it goes out through the app's ONE client-originated message channel
+ * ({@link emitEphemeralToast} — 559 Authority III), the same seam every other client-side notice
+ * uses. The wording is about the consequence the reader can actually observe (part of the response
+ * is missing), not about the exception: `handlerError` stays on the console line for the person
+ * who can act on it.
+ *
+ * Deduped per stream per EVENT NAME, because the failure mode is systematic, not incidental: a
+ * `chunk` handler that throws once throws on every token, and one bug must not become several
+ * hundred toasts. First occurrence per event name is the signal; the rest are the same fact.
+ */
+function reportHandlerFailure(
+  eventName: string,
+  handlerError: unknown,
+  alreadyReported: Set<string>,
+): void {
+  console.warn(`[stream] handler for "${eventName}" threw`, handlerError);
+  if (alreadyReported.has(eventName)) return;
+  alreadyReported.add(eventName);
+  emitEphemeralToast({
+    message:
+      'Part of this response could not be displayed — the rest of it is still arriving. ' +
+      'See the browser console for the failure detail.',
+    severity: 'warning',
+  });
+}
+
 export async function consumeShapeStream(
   url: string,
   body: unknown,
@@ -675,6 +715,8 @@ export async function consumeShapeStream(
   let buffer = '';
   let errorFromEvent: (Error & { code?: string; errorClass?: string }) | null = null;
   let receivedTerminal = false;
+  /** Event names whose handler failure this stream has already reported (see the dedup note). */
+  const reportedHandlerEvents = new Set<string>();
 
   try {
     while (true) {
@@ -712,12 +754,7 @@ export async function consumeShapeStream(
         try {
           onEvent(ev.event, payload);
         } catch (handlerError) {
-          // Per-event handler errors are swallowed; they shouldn't abort the stream. But swallowing
-          // them SILENTLY made a throwing evidence handler indistinguishable from an event that
-          // never arrived (tempdoc 847 F-12: a live turn rendering no citation marks looks exactly
-          // like a backend that sent none). The stream still survives — the throw is reported, not
-          // rethrown — so a future live-path failure is visible in the console instead of invisible.
-          console.warn(`[stream] handler for "${ev.event}" threw`, handlerError);
+          reportHandlerFailure(ev.event, handlerError, reportedHandlerEvents);
         }
       });
     }

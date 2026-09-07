@@ -517,6 +517,35 @@ export interface ResumedMessage {
   // writes, synthetic idx-N for legacy data). Used as the branch-point id
   // when the user clicks "Branch here" on an assistant turn.
   id?: string;
+  /**
+   * Tempdoc 941 — the shape THIS turn was dispatched by, per message.
+   *
+   * `FileConversationStore.enrichMessage` stamps `shapeId` on every appended message (863 §4.A.5
+   * F1) precisely because the conversation-level `shapeId` cannot answer it: that one is
+   * first-wins for the whole conversation (A-10.1), so in a MIXED conversation every turn reports
+   * the shape that OPENED it. The live path already reads the per-turn fact
+   * (`UnifiedChatView.recordShapeId`, off `attributes.shapeId` in the unified thread); the resume
+   * path threw it away and stamped one conversation-level shape across the whole transcript —
+   * which is how a `core.rag-ask` answer over five sources came back framed as "Model answer —
+   * this mode does not search your documents". Same evidence, different claim about it.
+   *
+   * Absent for a row written before 863 (there is deliberately no backfill), in which case the
+   * caller falls back to the conversation-level shape, as it always did.
+   */
+  shapeId?: string;
+  /**
+   * Tempdoc 941 — the decontextualized question this turn's retrieval actually ran on, when the
+   * record carries it (`QueryRewriteInjector.ATTR_STANDALONE_QUESTION` = `rag.standaloneQuestion`).
+   *
+   * The live path pins it onto the committed turn so the "Interpreted as: …" transparency line
+   * survives the stream (603 C2); carrying it here is what lets a RELOADED turn say the same
+   * thing. Honest limit: the injector writes it to the dispatch context, and no producer persists
+   * it onto the store record today — so this reads a field that is currently always absent
+   * rather than inventing one. It is read defensively (nested `attributes`, both spellings) so
+   * the transparency line appears the moment a producer does start carrying it, instead of the
+   * record and the reader having to be changed together.
+   */
+  standaloneQuestion?: string;
 }
 
 export interface ResumedConversation {
@@ -562,6 +591,18 @@ export interface ResumeOptions {
   readonly claim?: boolean;
 }
 
+/**
+ * The first of `values` that is a non-blank string, else `undefined`. "Absent ⇒ no key" — an empty
+ * string is not a fact, and writing one onto a resumed turn would claim a shape/rewrite that was
+ * never recorded (tempdoc 941; same `putIfPresent` discipline the Java writer uses).
+ */
+function firstString(...values: readonly unknown[]): string | undefined {
+  for (const v of values) {
+    if (typeof v === 'string' && v.trim().length > 0) return v;
+  }
+  return undefined;
+}
+
 export async function resumeConversation(
   sessionId: string,
   shapeId: string,
@@ -575,7 +616,17 @@ export async function resumeConversation(
     if (res.status === 423) return { sessionId, shapeId, messages: [], locked: true };
     if (!res.ok) return { sessionId, shapeId, messages: [] };
     const data = (await res.json()) as {
-      messages?: Array<{ role?: string; content?: string; id?: string }>;
+      // Tempdoc 941 — the endpoint returns the STORE'S OWN message maps verbatim
+      // (`ChatController.handleLoadHistory` → `conversationStore.loadHistory`), so the per-message
+      // facts the store stamps are already on the wire; only the reader was narrow.
+      messages?: Array<{
+        role?: string;
+        content?: string;
+        id?: string;
+        shapeId?: unknown;
+        standaloneQuestion?: unknown;
+        attributes?: Record<string, unknown>;
+      }>;
       parentSessionId?: string;
       branchPointMessageId?: string;
       parentFirstUserMessage?: string;
@@ -586,11 +637,26 @@ export async function resumeConversation(
     };
     const messages = (data.messages ?? [])
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-      .map((m): ResumedMessage => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content as string,
-        id: typeof m.id === 'string' ? m.id : undefined,
-      }));
+      .map((m): ResumedMessage => {
+        // Tempdoc 941 — the store stamps `shapeId` at the message's top level
+        // (`FileConversationStore.enrichMessage`); `attributes.shapeId` is the same fact under the
+        // unified-thread spelling (`InteractionThreadController.chatTurn` lifts it there, and
+        // `UnifiedChatView.recordShapeId` reads it). Accept either so the two transports of one
+        // fact cannot disagree about whether this reader sees it.
+        const shapeId = firstString(m.shapeId, m.attributes?.['shapeId']);
+        const standaloneQuestion = firstString(
+          m.attributes?.['rag.standaloneQuestion'],
+          m.attributes?.['standaloneQuestion'],
+          m.standaloneQuestion,
+        );
+        return {
+          role: m.role as 'user' | 'assistant',
+          content: m.content as string,
+          id: typeof m.id === 'string' ? m.id : undefined,
+          ...(shapeId !== undefined ? { shapeId } : {}),
+          ...(standaloneQuestion !== undefined ? { standaloneQuestion } : {}),
+        };
+      });
     if (claim) setActiveConversation(sessionId);
     return {
       sessionId,

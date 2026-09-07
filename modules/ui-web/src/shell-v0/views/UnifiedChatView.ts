@@ -370,6 +370,28 @@ function makeCommittedSearchId(): string {
 }
 
 /**
+ * Tempdoc 941 — a shape id a RECORD declares, narrowed to the shapes this build knows, or
+ * `undefined` when the record declares nothing usable.
+ *
+ * The two readers of a per-turn shape — the live unified-thread path ({@link
+ * UnifiedChatView.recordShapeId}) and the resumed-history path ({@link
+ * UnifiedChatView.loadConversation}) — must narrow identically, or a mixed conversation would
+ * frame the same turn one way while streaming and another after a reload. Returning `undefined`
+ * rather than a default keeps the FALLBACK at each call site, where the two legitimately differ
+ * (the live path falls back to the window's current mode, the resume path to the conversation's
+ * first-wins shape).
+ *
+ * A shape this build does not know (a downgrade, or one retired from {@link
+ * CORE_INTERACTION_SHAPES}) is `undefined`, never cast into the union.
+ */
+function asKnownShape(declared: unknown): CoreInteractionShapeId | undefined {
+  return typeof declared === 'string' &&
+    (CORE_INTERACTION_SHAPES as readonly string[]).includes(declared)
+    ? (declared as CoreInteractionShapeId)
+    : undefined;
+}
+
+/**
  * Search Thread Round-2 R1a — drop a single cause bullet that only restates the headline+body (the
  * live-audit finding: the "Reindex required." headline already names the rebuild story, so the sole
  * `index.*_legacy`/`index.schema_mismatch`/`index.embedding_mismatch` cause bullet is a duplicate).
@@ -2108,12 +2130,21 @@ export class UnifiedChatView extends JfElement {
         }
       }
     }
+    // Tempdoc 941 — the turn's OWN shape wins over the conversation's.
+    //
+    // `resolvedShape` is first-wins for the whole record (A-10.1), so stamping it on every
+    // message made a mixed conversation's turns all claim the shape that opened it — and the
+    // frame authority reads that shape to decide a turn's epistemic class. This is the reload
+    // half of the fact `recordShapeId` already reads on the live path; the same fallback applies
+    // (a row written before 863, or one declaring a shape this build does not know, keeps the
+    // conversation-level answer, which is the only fact available for it).
     this.thread = resumed.messages.map((m, idx) => ({
       role: m.role,
       content: m.content,
-      shapeId: resolvedShape,
+      shapeId: asKnownShape(m.shapeId) ?? resolvedShape,
       id: m.id,
       inheritedFromParent: idx <= inheritedThrough,
+      ...(m.standaloneQuestion ? { standaloneQuestion: m.standaloneQuestion } : {}),
     }));
     // Slice 515 FIX-8 — capture parent preview for the branch banner.
     this.parentFirstMessagePreview = resumed.parentFirstUserMessage ?? null;
@@ -5221,11 +5252,7 @@ export class UnifiedChatView extends JfElement {
    * rather than being cast into the union.
    */
   private recordShapeId(it: UnifiedTurnItem): CoreInteractionShapeId {
-    const declared = it.attributes.shapeId;
-    return typeof declared === 'string' &&
-      (CORE_INTERACTION_SHAPES as readonly string[]).includes(declared)
-      ? (declared as CoreInteractionShapeId)
-      : this.currentShapeId();
+    return asKnownShape(it.attributes.shapeId) ?? this.currentShapeId();
   }
 
   /**
