@@ -31,7 +31,17 @@ const STORAGE_KEY_BODY = 'justsearch.diagnosticChannelCatalog.body';
 const STORAGE_KEY_ETAG = 'justsearch.diagnosticChannelCatalog.etag';
 
 let entriesById: Map<string, DiagnosticChannel> = new Map();
-let bootAttempted = false;
+/**
+ * Tempdoc 941 — did the boot fetch actually GET AN ANSWER (200 or 304)?
+ *
+ * Was `bootAttempted`, tested together with "the index is non-empty". The boot seeds the index
+ * from the localStorage body BEFORE it fetches, so a boot that raced an unanswering backend left
+ * the guard set AND the index non-empty — permanently closed on whatever the previous session (or
+ * the previous VERSION) had cached. Success is recorded where success happens.
+ */
+let bootSucceeded = false;
+/** Shared in-flight boot, so a readiness-driven re-attempt joins the request rather than racing it. */
+let inFlightBoot: Promise<void> | null = null;
 let listeners: Set<() => void> = new Set();
 
 interface CachedEntry {
@@ -85,19 +95,27 @@ function rebuildIndex(catalog: DiagnosticChannelCatalog): void {
 }
 
 /**
- * Boot-time fetch of the DiagnosticChannel catalog. Call once from app boot
- * (see `i18n.ts`). On subsequent calls, no-op unless the previous fetch failed
- * and the catalog is empty.
+ * Boot-time fetch of the DiagnosticChannel catalog. Call from app boot (see `i18n.ts`).
+ * No-op once the backend has actually ANSWERED (200 or 304); until then every call re-attempts,
+ * which is what makes the boot list safe to re-run on the shell's backend-ready edge
+ * (`i18n.ts` `watchForBackendReady`, tempdoc 941).
  */
 export async function bootDiagnosticChannelRegistry(
   baseUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (bootAttempted && entriesById.size > 0) {
-    return;
-  }
-  bootAttempted = true;
+  if (bootSucceeded) return;
+  if (inFlightBoot) return inFlightBoot;
+  inFlightBoot = fetchDiagnosticChannelCatalog(baseUrl, fetchImpl).finally(() => {
+    inFlightBoot = null;
+  });
+  return inFlightBoot;
+}
 
+async function fetchDiagnosticChannelCatalog(
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<void> {
   const cached = loadFromStorage();
   if (cached) {
     rebuildIndex(cached.body);
@@ -117,6 +135,7 @@ export async function bootDiagnosticChannelRegistry(
     });
 
     if (response.status === 304) {
+      bootSucceeded = true;
       return;
     }
 
@@ -141,6 +160,7 @@ export async function bootDiagnosticChannelRegistry(
       const etag = response.headers.get('ETag') ?? '';
       if (etag) saveToStorage(body, etag);
       rebuildIndex(body);
+      bootSucceeded = true;
     } else {
       console.debug(
         '[DiagnosticChannelCatalogClient] response missing `entries` array; cached catalog retained',
@@ -182,7 +202,8 @@ export function onDiagnosticChannelCatalogChange(
 /** Test-only: reset module state. */
 export function __resetForTest(): void {
   entriesById = new Map();
-  bootAttempted = false;
+  bootSucceeded = false;
+  inFlightBoot = null;
   listeners = new Set();
   try {
     if (typeof localStorage !== 'undefined') {
@@ -197,5 +218,5 @@ export function __resetForTest(): void {
 /** Test-only: seed the catalog directly without an HTTP call. */
 export function __seedForTest(catalog: DiagnosticChannelCatalog): void {
   rebuildIndex(catalog);
-  bootAttempted = true;
+  bootSucceeded = true;
 }

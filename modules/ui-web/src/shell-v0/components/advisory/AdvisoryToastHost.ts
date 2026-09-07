@@ -20,7 +20,7 @@ import {
   type AdvisoryRecord,
   type AdvisorySnapshot,
 } from './AdvisoryStore.js';
-import { advisoryClassChrome } from './AdvisoryClassChrome.js';
+import { advisoryClassChrome, healthAdvisoryReasonBody } from './AdvisoryClassChrome.js';
 import { capWithOverflow } from '../../projections/boundedProjection.js';
 import { icon } from '../Icon.js';
 import '../Button.js';
@@ -515,10 +515,17 @@ export class AdvisoryToastHost extends JfElement {
       // severity there — so the same interpolation authority the activity row uses applies here.
       // Declining (null) drops the body rather than showing a brace: no advisory carries a
       // parameterized message today, so this closes the path before it can be walked.
-      const body = isLocal || !t.record.event.bodyI18nKey
+      //
+      // Tempdoc 941 — `bodyI18nKey` is always the GENERIC `health-events.<id>.message`. When the
+      // condition carries a reason with its own authored sentence, that sentence wins: it is the
+      // more specific true thing about this occurrence. Interpolated through the same authority,
+      // since a per-reason message may carry placeholders exactly like the generic one.
+      const reasonBody = isLocal ? null : healthAdvisoryReasonBody(t.record.event.classId, extras);
+      const body = isLocal || !(reasonBody || t.record.event.bodyI18nKey)
         ? ''
         : (interpolateMessage(
-            present({ kind: 'resource', key: t.record.event.bodyI18nKey }).label,
+            reasonBody ??
+              present({ kind: 'resource', key: t.record.event.bodyI18nKey as string }).label,
             extras,
           ) ?? '');
       // The internal ids are kept, not deleted — moved out of the headline and behind the app-wide
