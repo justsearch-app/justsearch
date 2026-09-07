@@ -51,7 +51,7 @@ Commands, all read-only:
 
 ```
 node scripts/agent-analytics/baseline-economics.mjs --since 2026-06-18 --until 2026-07-14 --md   # BEFORE
-node scripts/agent-analytics/baseline-economics.mjs --since 2026-07-14 --md                      # AFTER
+node scripts/agent-analytics/baseline-economics.mjs --since 2026-07-14 --until 2026-09-07 --md   # AFTER (captured ~15:50Z)
 node scripts/agent-analytics/baseline-economics.mjs --md                                         # DEFAULT
 gh pr list --state merged --limit 1000 --json number,title,mergedAt                              # 643 PRs
 ```
@@ -77,7 +77,9 @@ numbers are the ones tempdoc 743 recorded on 2026-07-16.
 | Orchestrator / worker tokens | 84.0% / 16.0% | — | 21.8% / 78.2% | −62 pp orchestrator |
 
 Weekly cost/merge in the AFTER window spans $73 to $275 (3.8x), wider than every delta above
-except the complete-weeks one. No pairing shows improvement.
+except the complete-weeks one. No pairing shows improvement beyond restatement noise. The
+AFTER window is open-ended and drifts with every merge (a re-run the same evening read
+$114.56, +4.1%); the direction does not change.
 
 ### Rework
 
@@ -124,6 +126,11 @@ Per the rule's own text, applied 2026-09-07 in `CLAUDE.md`:
   (hook-enforced by `subagent-model-guard`), never-delegate list, dev-stack rules, precedence.
 - The provenance line records the judgment and points here. `AGENTS.md` already read
   "Delegate only bounded work" and needed no change.
+- Reading of "delete this paragraph": applied to the economic claim, not to the whole
+  block, because the fit/risky list, the explicit-model rule and the never-delegate list are
+  scope and safety rules that the falsifier never measured and a hook enforces one of them.
+  A reviewer could read the late-window rework rise (52.6%) as "rework up, raise the floor";
+  declined here on composition grounds and because the 0.3.0 hardening rounds sit inside it.
 
 Honest limit the owner should weigh: the evidence chain the falsifier named is broken at the
 BEFORE edge. The rule was applied because the alternative, "inconclusive so keep it", is the
