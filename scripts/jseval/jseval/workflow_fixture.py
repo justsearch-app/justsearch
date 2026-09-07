@@ -51,6 +51,39 @@ of three (design.md 17.7):
       land in different groups and swapping them is a REGRESSION. That is the safe
       direction: it under-permits, never over-permits.
 
+    **The tie group straddling the rank-K cutoff is compared as a SET** (K = the query
+    spec's declared ``limit``). Equal-score hits beyond K are UNOBSERVED at K, so when
+    index-time GPU embedding jitter moves near-tied chunks across the rank-K boundary, a
+    swap between the hit at rank K and a tied hit at rank K+1 reads as a *membership* change
+    rather than as the tie permutation it is. Measured live on q06 (tie-group score 0.121)
+    and q10 (0.236): one member of the BOTTOM tie group differed between two builds, with the
+    rest of the group invisible past rank 10. This is still "ordering of equal-score hits",
+    now across the K boundary, so it stays inside THIS class — no fourth class is introduced.
+    Two halves:
+
+    * CAPTURE asks the backend for ``2 * K`` and stores the top K PLUS the remainder of the
+      tie group holding rank K, dropping everything after that group (it was never part of
+      the top-K contract). ``hitCount`` keeps its meaning — the TOP-K count,
+      ``min(returned, K)``. Making it the compared-slice length would turn a legitimate
+      11-vs-12 cutoff-group size into a REGRESSION on an exact field, i.e. re-create the
+      failure this change removes. How many hits the backend returned (``hitsCaptured``) and
+      how many were kept (``hitsCompared``) go in the capture's NON-diffed ``observed``
+      block: both legitimately differ between two builds.
+    * DIFF compares every group ABOVE the cutoff group under the unchanged rules (the
+      order-guard and the whole-member multiset), and the cutoff group itself as an unordered
+      SET over its full observed membership — any permutation is allowed; a member absent
+      from the other side's group is a REGRESSION, and the ``new-reason-code`` subset rule
+      still applies to members present on both sides. It FAILS CLOSED when the cutoff group
+      ran to the end of a FULL 2K response, or when an older capture records no
+      ``hitsCaptured``: the group may continue past what was observed, so its membership is
+      unproven and a set difference must not be waved through.
+
+    **Consequence a reader must know: the capture now asks the backend for 2K, and ``limit``
+    feeds the backend's candidate budget / collapse limit / rerank pool — so the top-K set at
+    limit 2K is NOT guaranteed identical to the top-K set at limit K.** Both sides of a pair
+    use the same limit, so the diff itself stays sound; but captures taken at the old limit
+    are **not** comparable to new ones.
+
     **The whole hit is one value.** ``queries.hits[]`` carries the entire per-hit
     projection as a single dict per position — id, source identity, chunk span, excerpt
     spans, matched fields, stage ids. Projecting each attribute into its OWN score-tagged
@@ -83,7 +116,8 @@ ConversationEngine.java:1151`` — the chat-completions path, not ``POST /api/ch
 Its sampling is ``SamplingParams.AGENT``, temperature **0.7** / top_p **0.8**
 (``modules/app-api/src/main/java/io/justsearch/app/api/SamplingParams.java:175``), handed
 back by ``AgentLlmCaller.resolveAgentSampling``
-(``modules/app-agent/src/main/java/io/justsearch/agent/AgentLlmCaller.java:277-291``),
+(``modules/app-agent/src/main/java/io/justsearch/agent/AgentLlmCaller.java:282-295``,
+applying the run's optional override through ``agentBaseSampling`` at ``:310-322``),
 which adds ``tool_choice``/grammar on a forced-tool turn and otherwise returns that
 constant unchanged.
 
@@ -95,6 +129,28 @@ constant. The fixture **must** declare a ``sampling`` block
 :func:`run_chat_turn` merges it into the body of every chat turn and :func:`capture`
 records it in the non-diffed ``provenance`` beside ``chatProfile``, so a pair captured
 under different sampling is legible after the fact.
+
+**The capture records the REQUESTED pin and the APPLIED one, and the difference is the
+point.** ``provenance.sampling`` is only what this capture *asked* for — it writes its own
+request back, so run the same fixture against a build predating the override and the artifact
+still reads as pinned while the backend silently ignored it. ``provenance.samplingApplied``
+is what the run said it would *actually* use: the ``session_started`` frame now echoes
+``samplingTemperature`` / ``samplingTopP`` / ``samplingSeed``, each key OMITTED when the
+backend resolved no value and **all three absent on a build predating PR 0b**
+(``AgentEventPayloads.sessionStartedPayload``). :func:`applied_sampling` reads them per turn,
+never defaulting an absent key, and :func:`capture_health` fails a diff when the echo is
+missing or when the two sides applied different sampling. A pin that can only be asserted,
+never contradicted, is not evidence; only these two can disagree.
+
+The same argument covers the four **boot-time** settings the pair must share
+(:data:`PINNED_CONFIG_KEYS`). The capture cannot set them — the orchestrator does, at stack
+launch — so :func:`read_config_pins` OBSERVES them from ``GET /api/debug/effective-config``
+into ``provenance.pins``, and a missing or disagreeing pin is a capture-HEALTH failure rather
+than a diffed row: they are not outputs either build produced, they are the conditions both
+were measured under, and a pair captured under different conditions is not a comparison of
+two builds at all. (The PR 0b pair run fetched ``/api/config/effective``, which does not
+exist — ``tmp/pr0b-pair/effective-config-1.json`` holds the ``NOT_FOUND`` body — so that run
+recorded no pins and could not have caught a mismatch.)
 
 Generative text is **still** classified ``generative-text`` rather than "deterministic
 under a fixed seed": a seed pins the sampler, not the tool-call trajectory the turn takes.
@@ -148,7 +204,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, NamedTuple
 
 import httpx
 
@@ -192,6 +248,41 @@ _HIT_REASON_CODE_KEYS = frozenset({"extractionReasonCode"})
 #: fixture claims it is pinned.
 SAMPLING_KEYS = frozenset({"temperature", "top_p", "seed"})
 
+#: The keys a ``chatTurns`` spec may carry — the CLOSED set the capture actually honours.
+#: ``id`` (the record key), ``content`` (the user message), ``maxIterations`` and
+#: ``cancelAfterEvent`` are read by :func:`run_chat_turn` and :func:`capture`; nothing else is
+#: read anywhere. Closed for the same reason :data:`SAMPLING_KEYS` is: a typo (``maxIterms``)
+#: would otherwise be silently ignored and the turn would run at the default cap of 3 while
+#: the fixture claims 8 — an unpinned run that reads as a pinned one.
+CHAT_TURN_KEYS = frozenset({"id", "content", "maxIterations", "cancelAfterEvent"})
+
+#: The ``session_started`` payload keys carrying the sampling the run will ACTUALLY use, mapped
+#: to the names ``provenance.samplingApplied`` records them under (the fixture's own
+#: :data:`SAMPLING_KEYS` vocabulary, so requested and applied are directly comparable).
+#: Each key is OMITTED by the backend when it resolved no value, and ALL THREE are absent on a
+#: build predating PR 0b — ``AgentEventPayloads.sessionStartedPayload``
+#: (``modules/app-agent-api/src/main/java/io/justsearch/agent/api/AgentEventPayloads.java:
+#: 346-358``) writes no key rather than an explicit null, exactly so that "this build does not
+#: report applied sampling" is distinguishable from "this run applied none". That absence is
+#: the signal; it is never defaulted.
+APPLIED_SAMPLING_KEYS = {
+    "samplingTemperature": "temperature",
+    "samplingTopP": "top_p",
+    "samplingSeed": "seed",
+}
+
+#: The four BOOT-TIME settings both sides of a paired diff must have run under, recorded from
+#: ``GET /api/debug/effective-config`` into ``provenance.pins``. They are not request
+#: parameters — the orchestrator sets them at stack launch — so the capture cannot pin them,
+#: only OBSERVE them, which is why a mismatch is a capture-health failure rather than a field
+#: diff. See the ``THE CAPTURE RUN IS PINNED`` fixture note for what each one does.
+PINNED_CONFIG_KEYS = (
+    "index.vector.exhaustive_search",
+    "justsearch.llm.slots",
+    "justsearch.rerank.deadline_ms",
+    "justsearch.rerank.chunks.deadline_ms",
+)
+
 _SESSION_TOKEN_ENV = "JUSTSEARCH_SESSION_TOKEN"
 _CORPUS_ROOT_ENV = "JUSTSEARCH_FIXTURE_CORPUS_ROOT"
 
@@ -219,6 +310,9 @@ def validate_sampling(sampling: Any) -> dict:
     sides of a pair differ because the sampler differed, not because the build did. An
     EMPTY block is refused for the same reason — it declares a pin and pins nothing.
 
+    A block whose values are ALL null is refused for the same reason an empty one is: every
+    key means "no override", so it declares a pin and pins nothing.
+
     Unknown keys are refused rather than forwarded: the backend ignores what it does not
     recognise, so a typo would leave the run unpinned while the artifact claims otherwise.
     """
@@ -236,6 +330,15 @@ def validate_sampling(sampling: Any) -> dict:
             f"fixture `sampling` declares unknown key(s) {unknown}; the chat request's "
             f"sampling override carries exactly {sorted(SAMPLING_KEYS)} and the backend "
             "silently ignores anything else, which would leave the capture unpinned"
+        )
+    if all(sampling.get(key) is None for key in sampling):
+        raise WorkflowFixtureError(
+            "fixture `sampling` block declares a pin and pins NOTHING — every value is null, "
+            "and null means 'no override' on each key individually, so the chat turns still "
+            "run under SamplingParams.AGENT (temperature 0.7, top_p 0.8). Give at least one "
+            'key a value (e.g. {"temperature": 0.0, "seed": 20260907}), or drop the block '
+            "and let validation refuse it, rather than claiming a pin the capture does not "
+            "have."
         )
     for key in ("temperature", "top_p"):
         value = sampling.get(key)
@@ -298,6 +401,19 @@ def validate_fixture(fixture: dict) -> dict[str, str]:
             if ident in seen:
                 raise WorkflowFixtureError(f"duplicate `{key}` id {ident!r}")
             seen.add(ident)
+            # A chat-turn spec is validated against a CLOSED key set: the capture reads
+            # exactly CHAT_TURN_KEYS and silently ignores anything else, so `maxIterms: 8`
+            # would leave the turn running at the default cap of 3 while the fixture reads as
+            # if it declared 8. Refused here rather than discovered as a MAX_ITERATIONS
+            # capture-health failure with no visible cause.
+            if key == "chatTurns":
+                unknown = sorted(set(item) - CHAT_TURN_KEYS)
+                if unknown:
+                    raise WorkflowFixtureError(
+                        f"chat turn {ident!r} declares unknown key(s) {unknown}; a chat-turn "
+                        f"spec carries exactly {sorted(CHAT_TURN_KEYS)} and the capture reads "
+                        "nothing else, so anything here is silently ignored"
+                    )
     return dict(fields)
 
 
@@ -545,6 +661,67 @@ def _span(start: Any, end: Any) -> str | None:
     return f"{start}:{end}"
 
 
+def _is_number(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float))
+
+
+def _within(score: float, anchor: float, epsilon: float) -> bool:
+    """``|score - anchor| <= epsilon``, INCLUSIVE at the boundary.
+
+    The slack is not cosmetic: ``abs(0.99 - 1.00)`` is ``0.010000000000000009`` in IEEE
+    754, so a bare ``<= 0.01`` puts an exactly-at-epsilon hit in a different tie group
+    depending on representation error — the partition would then be decided by which
+    decimal literals the backend happened to emit rather than by the declared threshold.
+    """
+    return abs(score - anchor) <= epsilon * (1.0 + 1e-9) + 1e-12
+
+
+def _tie_index_groups(scores: list[Any], epsilon: float) -> list[list[int]]:
+    """Partition consecutive POSITIONS into within-``epsilon`` tie groups.
+
+    THE one implementation of the grouping rule, shared by the capture (which slices the
+    cutoff group out of a raw ``results`` list) and the differ (:func:`_tie_groups`, which
+    groups a stored score-tagged list). A second copy would let the two sides disagree about
+    where the cutoff group ends, which is exactly the disagreement the cutoff rule removes.
+
+    A hit joins the current group when its score is within ``epsilon`` of that group's FIRST
+    member — not of its predecessor, so a chain of small steps cannot accumulate into an
+    arbitrarily wide group. A non-numeric score starts a singleton and lets nothing join it;
+    judging it a shape violation is the differ's business, not the partition's.
+    """
+    groups: list[list[int]] = []
+    anchor: Any = None
+    for index, score in enumerate(scores):
+        if groups and anchor is not None and _is_number(score) and _within(
+            score, anchor, epsilon
+        ):
+            groups[-1].append(index)
+        else:
+            groups.append([index])
+            anchor = score if _is_number(score) else None
+    return groups
+
+
+def compared_slice(hits: list[dict], limit: int, epsilon: float) -> list[dict]:
+    """The top ``limit`` hits PLUS the remainder of the tie group holding rank ``limit``.
+
+    The capture asks the backend for ``2 * limit`` so that this group can be observed WHOLE;
+    everything after it is dropped, because it was never part of the top-K contract. Without
+    this the group is only PARTLY observed at K and a swap with a member sitting at K+1 reads
+    as a membership change rather than the tie permutation it is (measured live on q06 / q10,
+    where index-time GPU embedding jitter moved near-tied chunks across the rank-10 cutoff).
+
+    The returned slice always ENDS on a tie-group boundary, which is what lets the differ
+    assert that the cutoff group is the last group of the partition.
+    """
+    if limit <= 0 or len(hits) <= limit:
+        return list(hits)
+    for group in _tie_index_groups([h.get("score") for h in hits], epsilon):
+        if group[0] <= limit - 1 <= group[-1]:
+            return list(hits[: group[-1] + 1])
+    return list(hits[:limit])  # pragma: no cover - every index lands in some group
+
+
 def score_tagged(hits: Iterable[dict], project) -> list[dict]:
     """Build the ``equal-score-order`` representation: ``[{score, value}, ...]``.
 
@@ -600,14 +777,28 @@ def hit_projection(hit: dict, paths: CorpusRootRewriter | None = None) -> dict:
 
 
 def capture_query_record(
-    response: dict, *, http_status: int = 200, paths: CorpusRootRewriter | None = None
+    response: dict,
+    *,
+    http_status: int = 200,
+    paths: CorpusRootRewriter | None = None,
+    limit: int = 10,
+    epsilon: float = 0.0,
 ) -> dict:
     """Project one ``/api/knowledge/search`` response onto the declared field set.
 
     Timing (``tookMs``, ``stages[].ms``, the ``latencyMs`` figures) is dropped here rather
     than declared, so it can never be compared by accident.
+
+    ``limit`` is K — the query spec's declared limit, and the number of hits that are under
+    contract. The request asked for ``2 * K``, so ``hits[]`` carries the COMPARED SLICE (top
+    K plus the remainder of the tie group holding rank K; see :func:`compared_slice`) while
+    ``hitCount`` stays the TOP-K count. The defaults reproduce the pre-cutoff behaviour for
+    existing callers: at ``epsilon=0.0`` only byte-equal scores group, so with fewer than K
+    hits — every synthetic response in the tests — the slice is the whole list, exactly as
+    before.
     """
-    hits = list(response.get("results") or [])
+    all_hits = list(response.get("results") or [])
+    hits = compared_slice(all_hits, limit, epsilon)
     trace = response.get("searchTrace") or {}
     stages = list(trace.get("stages") or [])
     degradation = trace.get("degradation") or {}
@@ -619,7 +810,12 @@ def capture_query_record(
         "httpStatus": http_status,
         "totalHits": response.get("totalHits"),
         "matchCount": response.get("matchCount"),
-        "hitCount": len(hits),
+        # The TOP-K count, NOT the compared-slice length. `hitCount` is a declared, exactly
+        # diffed field: making it the slice length would turn a legitimate cutoff-group size
+        # difference (11 members vs 12) into a REGRESSION on the very query the cutoff rule
+        # exists to stop failing. How many were captured / compared live in the capture's
+        # non-diffed `observed` block instead.
+        "hitCount": min(len(all_hits), limit) if limit > 0 else len(all_hits),
         # NOTE there is no "hits[].score" field. Scores jitter (max 0.009442 measured over
         # two captures of one build), so a declared score field would be a REGRESSION on
         # every query. The score survives only inside the score-tagged wrapper below, where
@@ -765,7 +961,17 @@ def _session_headers(session_token: str | None) -> dict[str, str]:
 
 
 def _build_search_body(spec: dict) -> dict:
-    body: dict = {"query": spec["query"], "limit": spec.get("limit", 10)}
+    """The search request for one query spec — asking for ``2 * K``, not K.
+
+    K (the spec's declared ``limit``) is still what the capture COMPARES; the extra K is what
+    makes the tie group straddling the rank-K cutoff observable whole (see
+    :func:`compared_slice`). CAVEAT, recorded because it is not free: ``limit`` also feeds the
+    backend's candidate budget / collapse limit / rerank pool, so the top-K set at limit 2K is
+    not guaranteed identical to the top-K set at limit K. Both sides of a pair use the same
+    limit so the diff stays sound — but a capture taken at the old limit is NOT comparable to
+    one taken now.
+    """
+    body: dict = {"query": spec["query"], "limit": spec.get("limit", 10) * 2}
     mode = spec.get("mode")
     if mode:
         body["mode"] = mode
@@ -784,6 +990,27 @@ def observed_query_scores(response: dict) -> list:
     about, and no weakening of the undeclared-field rule.
     """
     return [h.get("score") for h in (response.get("results") or [])]
+
+
+def observed_query_counts(response: dict, record: dict) -> dict:
+    """``hitsCaptured`` / ``hitsCompared``, for the same non-diffed ``observed`` block.
+
+    ``hitsCaptured`` is how many hits the backend returned for the ``2 * K`` request;
+    ``hitsCompared`` is how many landed in the compared slice (top K plus the rest of the
+    cutoff tie group). NEITHER may go in the query record: ``diff`` treats every field in
+    ``queries``/``chatTurns`` as declared-or-regression, and both of these legitimately
+    differ between two builds — a cutoff group of 11 members on one side and 12 on the other
+    is precisely the situation the cutoff rule exists to tolerate. Recording them among the
+    diffed fields would manufacture the false positive this change removes.
+
+    The differ still READS ``hitsCaptured`` (never compares it): a cutoff group that ran to
+    the end of a full 2K response may continue past what was observed, and that is the case
+    the cutoff rule fails closed on.
+    """
+    return {
+        "hitsCaptured": len(response.get("results") or []),
+        "hitsCompared": len(record.get("hits[]") or []),
+    }
 
 
 #: Candidate paths for the index document count on ``/api/status``, in order. The status
@@ -853,6 +1080,53 @@ def read_ai_runtime(client: httpx.Client) -> tuple[Any, Any]:
     return profile, activation.get("state")
 
 
+def read_config_pins(client: httpx.Client) -> tuple[dict, dict]:
+    """``({key: value}, {key: winning source})`` for :data:`PINNED_CONFIG_KEYS`.
+
+    Reads ``GET /api/debug/effective-config`` — the REAL route. The PR 0b pair run fetched
+    ``/api/config/effective``, which does not exist: ``tmp/pr0b-pair/effective-config-1.json``
+    is the backend's ``NOT_FOUND`` body, so that run recorded no pins at all and its diff
+    could not have caught a pin mismatch.
+
+    Shape (``EffectiveConfigController.buildResolvedConfigEntries`` ->
+    ``EffectiveConfigEntry``): a top-level ``resolvedConfig`` array of
+    ``{key, value, source, ordinal, detail, candidates[]}``. The record is annotated
+    ``@JsonInclude(NON_NULL)``, so ``value`` is OMITTED — not null — for a key no source
+    supplied. ``value`` is always a STRING (``"true"``, ``"200"``), never a typed scalar.
+
+    A key with no value is recorded as MISSING rather than as a value, because that is what an
+    unpinned run looks like: ``index.vector.exhaustive_search`` has no registered default
+    (``EnvRegistry.java:1381`` — the two-argument constructor), so a stack launched without
+    ``JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH`` resolves it to nothing and the pin's absence
+    becomes a capture-health failure instead of a silent "both sides agree on nothing".
+
+    Best-effort in one direction only: an unreachable or absent endpoint yields EMPTY pins
+    rather than an exception, so a capture still gets written — and :func:`capture_health`
+    then refuses to pass a diff built on it.
+    """
+    try:
+        resp = client.get("/api/debug/effective-config", timeout=30.0)
+        resp.raise_for_status()
+        doc = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:  # pragma: no cover - live-only path
+        log.warning("pins: GET /api/debug/effective-config failed (%s)", exc)
+        return {}, {}
+    entries = doc.get("resolvedConfig") if isinstance(doc, dict) else None
+    if not isinstance(entries, list):
+        log.warning("pins: /api/debug/effective-config carries no `resolvedConfig` array")
+        return {}, {}
+    by_key = {e.get("key"): e for e in entries if isinstance(e, dict)}
+    pins: dict = {}
+    sources: dict = {}
+    for key in PINNED_CONFIG_KEYS:
+        entry = by_key.get(key)
+        if not isinstance(entry, dict) or entry.get("value") is None:
+            continue
+        pins[key] = entry.get("value")
+        sources[key] = entry.get("source")
+    return pins, sources
+
+
 def capture_provenance(client: httpx.Client) -> dict:
     """Informational backend identity from ``/api/status``. Never diffed."""
     try:
@@ -874,6 +1148,36 @@ def capture_provenance(client: httpx.Client) -> dict:
     }
 
 
+def applied_sampling(frames: list[tuple[str, Any]]) -> dict:
+    """The sampling the run ACTUALLY used, read off the ``session_started`` frame.
+
+    Returns ``{"temperature": …, "top_p": …, "seed": …}`` with ``None`` for each key the
+    frame omitted. All three ``None`` is the load-bearing case: it means the backend told the
+    capture nothing, which is what a build predating PR 0b does — see
+    :data:`APPLIED_SAMPLING_KEYS`. :func:`capture_health` fails a diff on it rather than
+    reading it as "the run applied no override".
+    """
+    for event, payload in frames:
+        if event == "session_started" and isinstance(payload, dict):
+            return {name: payload.get(key) for key, name in APPLIED_SAMPLING_KEYS.items()}
+    return {name: None for name in APPLIED_SAMPLING_KEYS.values()}
+
+
+class ChatTurnCapture(NamedTuple):
+    """One agent turn's DIFFED record plus the NON-diffed sampling the run applied.
+
+    Two values rather than one dict on purpose. ``diff`` walks every key of a ``chatTurns``
+    record and treats an undeclared one as a REGRESSION by construction, so putting the
+    applied sampling on the record would either fail every turn or force a ``fields`` entry
+    for something that legitimately differs between two builds — which is precisely the
+    signal it exists to carry. It rides to ``provenance.samplingApplied`` instead, where
+    :func:`capture_health` compares it as a run precondition.
+    """
+
+    record: dict
+    sampling_applied: dict
+
+
 def run_chat_turn(
     client: httpx.Client,
     spec: dict,
@@ -882,15 +1186,19 @@ def run_chat_turn(
     session_token: str | None = None,
     timeout: float = 300.0,
     paths: CorpusRootRewriter | None = None,
-) -> dict:
+) -> ChatTurnCapture:
     """Run one agent turn, optionally cancelling it after a named event.
 
-    Returns the captured chat record. The cancel is issued **synchronously between two
-    reads of the stream**, on a second connection — the run's own stream stays open so
-    the terminal frame it ends with is what gets recorded.
+    Returns :class:`ChatTurnCapture` — the captured chat record plus the sampling the backend
+    said it would actually use. The cancel is issued **synchronously between two reads of the
+    stream**, on a second connection — the run's own stream stays open so the terminal frame
+    it ends with is what gets recorded.
 
     ``sampling`` is the fixture's pin (PR 0b), sent as the request's top-level
-    ``sampling`` object and applied by the backend over ``SamplingParams.AGENT``.
+    ``sampling`` object and applied by the backend over ``SamplingParams.AGENT``. What comes
+    BACK on ``session_started`` is what the backend resolved; the two are recorded separately
+    (``provenance.sampling`` vs ``provenance.samplingApplied``) because a build that ignores
+    the override is only detectable when they can disagree.
     """
     cancel_after = spec.get("cancelAfterEvent")
     body = {
@@ -918,8 +1226,11 @@ def run_chat_turn(
         http_status = response.status_code
         if response.status_code != 200:
             response.read()
-            return capture_chat_record(
-                [], http_status=http_status, cancel=cancel or None, paths=paths)
+            return ChatTurnCapture(
+                capture_chat_record(
+                    [], http_status=http_status, cancel=cancel or None, paths=paths),
+                applied_sampling([]),
+            )
         for text in response.iter_text():
             for frame in buf.feed(text):
                 frames.append(frame)
@@ -948,8 +1259,11 @@ def run_chat_turn(
         cancel["terminalReasonCode"] = terminal_reason
         cancel.update(_session_state(client, session_id))
 
-    return capture_chat_record(
-        frames, http_status=http_status, cancel=cancel or None, paths=paths)
+    return ChatTurnCapture(
+        capture_chat_record(
+            frames, http_status=http_status, cancel=cancel or None, paths=paths),
+        applied_sampling(frames),
+    )
 
 
 def _cancel_session(
@@ -1013,9 +1327,13 @@ def capture(
     """
     validate_fixture(fixture)
     sampling = validate_sampling(fixture.get("sampling"))
+    # The same epsilon the differ uses, so the cutoff group the capture slices out is the
+    # cutoff group the differ later finds (see `compared_slice` / `_tie_index_groups`).
+    epsilon = float(fixture["scoreTieEpsilon"])
     queries: dict[str, dict] = {}
     chat_turns: dict[str, dict] = {}
     observed_queries: dict[str, dict] = {}
+    sampling_applied: dict[str, dict] = {}
 
     with httpx.Client(
         base_url=base_url, timeout=timeout, headers=_session_headers(session_token)
@@ -1035,11 +1353,17 @@ def capture(
         for spec in fixture["queries"]:
             resp = client.post("/api/knowledge/search", json=_build_search_body(spec))
             payload = resp.json() if resp.status_code == 200 else {}
-            queries[spec["id"]] = capture_query_record(
-                payload, http_status=resp.status_code, paths=paths)
-            observed_queries[spec["id"]] = {"scores": observed_query_scores(payload)}
-            log.info("captured query %s (%d hits)",
-                     spec["id"], queries[spec["id"]]["hitCount"])
+            record = capture_query_record(
+                payload, http_status=resp.status_code, paths=paths,
+                limit=spec.get("limit", 10), epsilon=epsilon)
+            queries[spec["id"]] = record
+            observed_queries[spec["id"]] = {
+                "scores": observed_query_scores(payload),
+                **observed_query_counts(payload, record),
+            }
+            log.info("captured query %s (%d hits, %d compared)",
+                     spec["id"], record["hitCount"],
+                     observed_queries[spec["id"]]["hitsCompared"])
         # Refuse a capture with any rejected query. An all-401 artifact is byte-identical to
         # another all-401 artifact, so without this it would diff clean against the other
         # build and read as "no semantic regression"; a partial one is unusable as a baseline
@@ -1054,11 +1378,19 @@ def capture(
             )
         if not skip_chat:
             for spec in fixture["chatTurns"]:
-                chat_turns[spec["id"]] = run_chat_turn(
+                turn = run_chat_turn(
                     client, spec, sampling=sampling, session_token=session_token,
                     timeout=timeout, paths=paths)
-                log.info("captured chat turn %s (terminal=%s)",
-                         spec["id"], chat_turns[spec["id"]]["terminalEvent"])
+                chat_turns[spec["id"]] = turn.record
+                # The APPLIED sampling, beside the REQUESTED one in provenance. Not a diffed
+                # field: it legitimately differs between two builds (that is the whole point
+                # — a build that ignores the override reports different values, or none at
+                # all), so it is compared by `capture_health` as a run precondition.
+                sampling_applied[spec["id"]] = turn.sampling_applied
+                log.info("captured chat turn %s (terminal=%s, applied sampling %s)",
+                         spec["id"], turn.record["terminalEvent"], turn.sampling_applied)
+        pins, pin_sources = read_config_pins(client)
+        log.info("boot-time pins %s (sources %s)", pins, pin_sources)
         doc_count_end, doc_count_end_path = read_doc_count(client)
 
     # The root block rides in `provenance` — NOT diffed, by design: the two captures come
@@ -1081,6 +1413,17 @@ def capture(
         # reason chatProfile is: it decides what the model produced, so a pair captured
         # under two different pins compares two samplers, not two builds. Never diffed.
         "sampling": sampling,
+        # …and what the backend said it would ACTUALLY use, per turn, read off
+        # `session_started`. `sampling` above is only what this capture ASKED for: run the
+        # same fixture against a build predating the override and the artifact still shows it
+        # set, because the capture writes its own request back. Only `samplingApplied` can
+        # contradict it, so only `samplingApplied` can prove the pin took.
+        "samplingApplied": sampling_applied,
+        # The four BOOT-TIME settings, observed from /api/debug/effective-config. The capture
+        # cannot set these — the orchestrator does, at stack launch — so it records them and
+        # `capture_health` refuses a pair that ran under different ones.
+        "pins": pins,
+        "pinSources": pin_sources,
     }
 
     doc = {
@@ -1135,25 +1478,13 @@ def _reason_codes(value: Any, prefix: str = "") -> set[str]:
     return codes
 
 
-def _within(score: float, anchor: float, epsilon: float) -> bool:
-    """``|score - anchor| <= epsilon``, INCLUSIVE at the boundary.
-
-    The slack is not cosmetic: ``abs(0.99 - 1.00)`` is ``0.010000000000000009`` in IEEE
-    754, so a bare ``<= 0.01`` puts an exactly-at-epsilon hit in a different tie group
-    depending on representation error — the partition would then be decided by which
-    decimal literals the backend happened to emit rather than by the declared threshold.
-    """
-    return abs(score - anchor) <= epsilon * (1.0 + 1e-9) + 1e-12
-
-
 def _tie_groups(
     value: Any, epsilon: float = 0.0
 ) -> tuple[bool, list[tuple[Any, list[Any]]] | None]:
     """Split a score-tagged list into consecutive within-``epsilon`` groups.
 
-    A hit joins the current group when its score is within ``epsilon`` of that group's
-    FIRST member (not of its predecessor — a chain of small steps must not accumulate into
-    an arbitrarily wide group).
+    The grouping rule itself lives in :func:`_tie_index_groups` (shared with the capture's
+    :func:`compared_slice`); this adds the shape check the differ needs.
 
     Returns ``(ok, groups)``. ``ok`` is False on a shape violation — not a score-tagged
     list, or a ``None``/non-numeric score. A missing score is a violation rather than a
@@ -1162,18 +1493,16 @@ def _tie_groups(
     """
     if not isinstance(value, list):
         return False, None
-    groups: list[tuple[Any, list[Any]]] = []
     for item in value:
         if not isinstance(item, dict) or "score" not in item or "value" not in item:
             return False, None
-        score = item["score"]
-        if isinstance(score, bool) or not isinstance(score, (int, float)):
+        if not _is_number(item["score"]):
             return False, None
-        if groups and _within(score, groups[-1][0], epsilon):
-            groups[-1][1].append(item["value"])
-        else:
-            groups.append((score, [item["value"]]))
-    return True, groups
+    partition = _tie_index_groups([item["score"] for item in value], epsilon)
+    return True, [
+        (value[group[0]]["score"], [value[i]["value"] for i in group])
+        for group in partition
+    ]
 
 
 def _split_member(member: Any) -> tuple[str, dict[str, Any]]:
@@ -1208,8 +1537,29 @@ def _compare_tie_group(
             f"member(s) present in the baseline and not in the candidate: {changed}"
         ), []
 
+    return _compare_member_reason_codes(
+        b_keys, c_keys, f"tie group {index} (score {score})")
+
+
+def _compare_member_reason_codes(
+    b_keys: list[tuple[str, dict[str, Any]]],
+    c_keys: list[tuple[str, dict[str, Any]]],
+    label: str,
+) -> tuple[bool, str, list[str]]:
+    """Apply the ``new-reason-code`` subset rule to members already paired on their exact keys.
+
+    Shared by the ordinary tie-group comparison (:func:`_compare_tie_group`) and the cutoff
+    group's set comparison (:func:`_compare_cutoff_group`) — the rule is the same in both
+    places, only the membership test that precedes it differs.
+
+    Returns ``(ok, reason, gained_codes)``.
+    """
+    keys: list[str] = []
+    for key, _ in b_keys:
+        if key not in keys:
+            keys.append(key)
     gained: list[str] = []
-    for key in b_counts:
+    for key in keys:
         b_codes: dict[str, set[str]] = {}
         c_codes: dict[str, set[str]] = {}
         for sink, pairs in ((b_codes, b_keys), (c_codes, c_keys)):
@@ -1220,29 +1570,139 @@ def _compare_tie_group(
                     sink.setdefault(name, set())
                     if code is not None:
                         sink[name].add(str(code))
-        for name in set(b_codes) | set(c_codes):
+        for name in sorted(set(b_codes) | set(c_codes)):
             before = b_codes.get(name, set())
             after = c_codes.get(name, set())
             lost = sorted(before - after)
             if lost:
                 return False, (
-                    f"tie group {index} (score {score}): reason code(s) {lost} present in "
+                    f"{label}: reason code(s) {lost} present in "
                     f"the baseline's {name!r} and gone in the candidate"
                 ), []
             gained.extend(f"{name}={c}" for c in sorted(after - before))
     return True, "", gained
 
 
-def _compare_equal_score_order(
-    baseline: Any, candidate: Any, epsilon: float = 0.0
-) -> tuple[str, str]:
-    ok_b, groups_b = _tie_groups(baseline, epsilon)
-    ok_c, groups_c = _tie_groups(candidate, epsilon)
-    if not ok_b or not ok_c:
-        return STATUS_REGRESSION, (
-            "declared equal-score-order but the value is not a score-tagged list of "
-            "numeric-scored items ([{score, value}, ...])"
+class CutoffContext(NamedTuple):
+    """What the differ needs to apply the cutoff-group rule to one query's ``hits[]``.
+
+    ``limit`` is K, read from the query spec (``diff`` already has the fixture and the record
+    id, exactly as it already does for ``epsilon``). The two ``hits_captured`` figures are
+    read from each capture's NON-diffed ``observed`` block — read, never compared — and are
+    what tells the differ whether the cutoff group could still extend past what was observed.
+    ``None`` on either side means an older capture that did not record it, which fails closed.
+    """
+
+    limit: int
+    baseline_hits_captured: int | None = None
+    candidate_hits_captured: int | None = None
+
+
+def _cutoff_group_index(
+    groups: list[tuple[Any, list[Any]]], limit: int | None
+) -> int | None:
+    """Index of the tie group holding flattened rank ``limit`` (0-based ``limit - 1``).
+
+    ``None`` when there is no cutoff to speak of: no limit, or a compared slice with fewer
+    than ``limit`` members (the backend simply returned fewer hits than the contract asks
+    for, so nothing sits at the boundary).
+    """
+    if limit is None or limit <= 0:
+        return None
+    if sum(len(members) for _, members in groups) < limit:
+        return None
+    seen = 0
+    for index, (_, members) in enumerate(groups):
+        seen += len(members)
+        if seen >= limit:
+            return index
+    return None  # pragma: no cover - the total was already checked
+
+
+def _cutoff_membership_unproven(
+    hits_captured: int | None, compared: int, limit: int
+) -> bool:
+    """True when the cutoff group may extend past what the backend actually returned.
+
+    The capture asks for ``2 * limit``. If the compared slice runs to the LAST hit returned
+    **and** the backend returned the full ``2 * limit`` it was asked for, the tie group can
+    continue past rank 2K and its membership is unproven — a member "absent from the other
+    side" may simply be one this capture never saw. An older capture with no ``hitsCaptured``
+    is unproven for the same reason: there is no evidence either way. Both fail CLOSED.
+    """
+    if not isinstance(hits_captured, int) or isinstance(hits_captured, bool):
+        return True
+    return compared >= hits_captured and hits_captured >= 2 * limit
+
+
+def _compare_cutoff_group(
+    baseline: list[Any], candidate: list[Any], cutoff: CutoffContext,
+    compared_b: int, compared_c: int,
+) -> tuple[bool, str, list[str]]:
+    """Compare the cutoff tie group as an unordered SET over its full observed membership.
+
+    Any permutation is allowed — that is the whole point, since a hit at rank K and a tied
+    hit at rank K+1 swapping places is "ordering of equal-score hits" across the K boundary,
+    not a membership change. A member ABSENT from the other side's group is still a
+    REGRESSION, and the ``new-reason-code`` subset rule still applies to the members present
+    on both sides.
+
+    Returns ``(ok, reason, gained_codes)``.
+    """
+    b_keys = [_split_member(m) for m in baseline]
+    c_keys = [_split_member(m) for m in candidate]
+    b_set = {key for key, _ in b_keys}
+    c_set = {key for key, _ in c_keys}
+    if b_set != c_set:
+        unproven = (
+            _cutoff_membership_unproven(
+                cutoff.baseline_hits_captured, compared_b, cutoff.limit)
+            or _cutoff_membership_unproven(
+                cutoff.candidate_hits_captured, compared_c, cutoff.limit)
         )
+        reason = (
+            f"the cutoff tie group (the group holding rank {cutoff.limit}) is not the same "
+            f"SET on both sides: member(s) only in the baseline "
+            f"{sorted(b_set - c_set)[:3]}; only in the candidate {sorted(c_set - b_set)[:3]}"
+        )
+        if unproven:
+            # FAIL CLOSED. The group ran to the end of a full 2K response (or the capture
+            # does not record how many hits it saw), so it may continue past what was
+            # observed and the set difference cannot be told apart from an unseen member.
+            if not isinstance(cutoff.baseline_hits_captured, int) or not isinstance(
+                cutoff.candidate_hits_captured, int
+            ):
+                cause = (
+                    "a capture does not record `hitsCaptured` in its `observed` block (an "
+                    "older capture), so nothing says where the group really ends"
+                )
+            else:
+                cause = (
+                    f"the group runs to the end of what was captured (baseline "
+                    f"{cutoff.baseline_hits_captured}, candidate "
+                    f"{cutoff.candidate_hits_captured} hits for a request of "
+                    f"{2 * cutoff.limit})"
+                )
+            reason += (
+                f" — and {cause}, so its membership past the capture is UNPROVEN and this "
+                "fails closed rather than being read as a permitted permutation"
+            )
+        return False, reason, []
+    return _compare_member_reason_codes(
+        b_keys, c_keys, f"cutoff tie group (rank {cutoff.limit})")
+
+
+def _compare_ordered_groups(
+    groups_b: list[tuple[Any, list[Any]]],
+    groups_c: list[tuple[Any, list[Any]]],
+    epsilon: float,
+) -> tuple[str | None, str, list[str], bool]:
+    """The unchanged tie-group rules, applied to a run of groups.
+
+    Returns ``(regression_status_or_None, reason, gained_codes, reordered)``. Called with the
+    WHOLE partition when there is no cutoff group, and with the groups strictly ABOVE the
+    cutoff group when there is one — those keep today's semantics untouched.
+    """
     # The partition is a MEANS, not the end: what the class permits is "hits whose scores
     # tie may swap". So the partition is only consulted when something actually swapped.
     #
@@ -1264,7 +1724,7 @@ def _compare_equal_score_order(
             f"{[len(m) for _, m in groups_b]} vs candidate "
             f"{[len(m) for _, m in groups_c]} at epsilon {epsilon}) — a hit crossed a "
             "tie-group boundary AND the delivered order changed"
-        )
+        ), [], False
     if order_b == order_c:
         # Nothing reordered. Still run the per-group member/reason-code comparison below so
         # a CHANGED hit at the same position is caught — but pair members positionally,
@@ -1279,14 +1739,88 @@ def _compare_equal_score_order(
             return STATUS_REGRESSION, (
                 f"tie group {index} (score {score}) has {len(members_b)} members in the "
                 f"baseline and {len(members_c)} in the candidate"
-            )
+            ), [], False
         ok, reason, group_gained = _compare_tie_group(members_b, members_c, index, score)
         if not ok:
-            return STATUS_REGRESSION, reason
+            return STATUS_REGRESSION, reason, [], False
         gained.extend(group_gained)
         if [_split_member(m)[0] for m in members_b] != [
             _split_member(m)[0] for m in members_c
         ]:
+            reordered = True
+    return None, "", gained, reordered
+
+
+def _compare_equal_score_order(
+    baseline: Any, candidate: Any, epsilon: float = 0.0,
+    cutoff: CutoffContext | None = None,
+) -> tuple[str, str]:
+    """The ``equal-score-order`` comparison, cutoff group included.
+
+    ``cutoff`` is present only for ``queries.hits[]`` (``chatTurns`` has no rank-K contract).
+    With it, the groups strictly ABOVE the cutoff group keep today's rules and the cutoff
+    group is compared as a set; without it, the whole partition takes today's rules.
+    """
+    ok_b, groups_b = _tie_groups(baseline, epsilon)
+    ok_c, groups_c = _tie_groups(candidate, epsilon)
+    if not ok_b or not ok_c:
+        return STATUS_REGRESSION, (
+            "declared equal-score-order but the value is not a score-tagged list of "
+            "numeric-scored items ([{score, value}, ...])"
+        )
+
+    limit = cutoff.limit if cutoff else None
+    cut_b = _cutoff_group_index(groups_b, limit)
+    cut_c = _cutoff_group_index(groups_c, limit)
+    # The capture slices at the cutoff group's LAST member, so that group is the last of the
+    # partition by construction. Assert it rather than assume it: a capture taken before the
+    # slice existed (or at some other limit) would otherwise be compared under a rule its
+    # data cannot support, silently.
+    for label, cut, groups in (
+        ("baseline", cut_b, groups_b), ("candidate", cut_c, groups_c)
+    ):
+        if cut is not None and cut != len(groups) - 1:
+            return STATUS_REGRESSION, (
+                f"the {label} capture's cutoff tie group (the group holding rank {limit}) is "
+                f"group {cut} of {len(groups)}, not the last — the capture was not sliced at "
+                "the cutoff group, so the membership of that group is only partly observed "
+                "and the cutoff rule cannot be applied to it"
+            )
+
+    # The cutoff group is split off only when the DELIVERED ORDER actually changed — the same
+    # guard that keeps the q07 false positive out (see `_compare_ordered_groups`), applied
+    # one level up. Splitting unconditionally would re-create that false positive at the
+    # boundary: a hit that merely JOINED the cutoff group without moving leaves the whole
+    # order identical but shortens the head partition by one group, which the head's own
+    # partition check would then call a regression with nothing reordered.
+    #
+    # And only when BOTH sides have a cutoff group. One side short of K hits is a real
+    # difference that `hitCount` (exact) already reports; here it falls back to the stricter
+    # whole-partition rules, which under-permits rather than over-permits.
+    tail_b: list[Any] | None = None
+    tail_c: list[Any] | None = None
+    head_b, head_c = groups_b, groups_c
+    reordered_at_all = (
+        [_split_member(m)[0] for _, members in groups_b for m in members]
+        != [_split_member(m)[0] for _, members in groups_c for m in members]
+    )
+    if reordered_at_all and cut_b is not None and cut_c is not None:
+        head_b, tail_b = groups_b[:cut_b], groups_b[cut_b][1]
+        head_c, tail_c = groups_c[:cut_c], groups_c[cut_c][1]
+
+    status, reason, gained, reordered = _compare_ordered_groups(head_b, head_c, epsilon)
+    if status is not None:
+        return status, reason
+
+    if tail_b is not None and tail_c is not None and cutoff is not None:
+        ok, cut_reason, cut_gained = _compare_cutoff_group(
+            tail_b, tail_c, cutoff,
+            sum(len(m) for _, m in groups_b), sum(len(m) for _, m in groups_c),
+        )
+        if not ok:
+            return STATUS_REGRESSION, cut_reason
+        gained.extend(cut_gained)
+        if [_split_member(m)[0] for m in tail_b] != [_split_member(m)[0] for m in tail_c]:
             reordered = True
 
     if gained:
@@ -1302,12 +1836,17 @@ def _compare_equal_score_order(
 
 
 def compare_field(
-    klass: str, baseline: Any, candidate: Any, epsilon: float = 0.0
+    klass: str, baseline: Any, candidate: Any, epsilon: float = 0.0,
+    cutoff: CutoffContext | None = None,
 ) -> tuple[str, str]:
     """Compare one field under its declared class. Returns ``(status, reason)``.
 
     Raises :class:`WorkflowFixtureError` on a class name outside the closed set — the
     differ refuses an unknown class rather than defaulting to permissive.
+
+    ``cutoff`` is threaded the same way ``epsilon`` already is: :func:`diff` holds the fixture
+    and the record id, so it can hand down the query spec's ``limit``. It is ``None`` for
+    ``chatTurns``, which has no rank-K cutoff.
     """
     if klass != EXACT and klass not in ALLOWED_DIFFERENCE_CLASSES:
         raise WorkflowFixtureError(
@@ -1335,12 +1874,123 @@ def compare_field(
         gained = sorted(after - before)
         return f"allowed:{klass}", f"new reason code(s) only in the candidate: {gained}"
 
-    return _compare_equal_score_order(baseline, candidate, epsilon)
+    return _compare_equal_score_order(baseline, candidate, epsilon, cutoff)
 
 
 def _records(doc: dict, section: str) -> dict[str, dict]:
     value = doc.get(section) or {}
     return value if isinstance(value, dict) else {}
+
+
+def _observed_hits_captured(doc: dict, record_id: str) -> int | None:
+    """``observed.queries.<id>.hitsCaptured``, or ``None`` on an older capture.
+
+    READ, never compared — the ``observed`` block is not walked by :func:`diff`. It is the
+    only evidence for whether a cutoff tie group could extend past what the backend returned;
+    ``None`` makes :func:`_cutoff_membership_unproven` fail closed.
+    """
+    node: Any = doc
+    for key in ("observed", "queries", record_id, "hitsCaptured"):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(key)
+    return node if _is_number(node) and not isinstance(node, float) else None
+
+
+def _provenance(doc: dict) -> dict:
+    prov = doc.get("provenance")
+    return prov if isinstance(prov, dict) else {}
+
+
+def _pin_problems(baseline: dict, candidate: dict) -> list[str]:
+    """The four BOOT-TIME pins must be present on both sides and must AGREE.
+
+    A health problem rather than a diffed field, and the distinction is the point: these are
+    not things either build produced, they are the conditions the two runs were performed
+    under. A pair whose sides ran under different pins is comparing two CONFIGURATIONS, not
+    two builds, and every byte-equal field it reports is meaningless — so the verdict has to
+    fail wholesale rather than record a difference on one row.
+    """
+    problems: list[str] = []
+    pins: dict[str, dict] = {}
+    for label, doc in (("baseline", baseline), ("candidate", candidate)):
+        value = _provenance(doc).get("pins")
+        pins[label] = value if isinstance(value, dict) else {}
+        missing = [k for k in PINNED_CONFIG_KEYS if pins[label].get(k) is None]
+        if missing:
+            problems.append(
+                f"{label}: provenance.pins is missing {missing} — the capture could not prove "
+                "the run's boot-time settings. Either the backend does not serve GET "
+                "/api/debug/effective-config, or the setting was never set: a stack launched "
+                "without JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true resolves "
+                "index.vector.exhaustive_search to no value at all (it has no default). "
+                "Re-capture with the four pins set at stack launch."
+            )
+    for key in PINNED_CONFIG_KEYS:
+        before = pins["baseline"].get(key)
+        after = pins["candidate"].get(key)
+        if before is not None and after is not None and before != after:
+            problems.append(
+                f"the two captures ran under DIFFERENT {key}: baseline {before!r} vs "
+                f"candidate {after!r}. A paired diff whose sides ran under different "
+                "boot-time settings compares two configurations, not two builds — every "
+                "field it reports as equal is meaningless. Re-capture both sides identically."
+            )
+    return problems
+
+
+def _applied_sampling_problems(baseline: dict, candidate: dict) -> list[str]:
+    """The APPLIED sampling must be reported for every turn, on both sides, and must AGREE.
+
+    ``provenance.sampling`` is only what the capture ASKED for — it writes its own request
+    back, so it reads as "pinned" even against a build that never implemented the override.
+    ``provenance.samplingApplied`` is what ``session_started`` said the run would really use,
+    and its ABSENCE is the pre-PR-0b signal, checked here explicitly: a turn whose applied
+    sampling is entirely null means the backend reported nothing, which must FAIL rather than
+    be read as "the run applied no override".
+    """
+    problems: list[str] = []
+    applied: dict[str, dict] = {}
+    for label, doc in (("baseline", baseline), ("candidate", candidate)):
+        value = _provenance(doc).get("samplingApplied")
+        if not isinstance(value, dict):
+            problems.append(
+                f"{label}: provenance.samplingApplied is absent — this capture cannot show "
+                "what sampling the run ACTUALLY used, only what it requested. Either the "
+                "capture predates the applied-sampling echo, or the backend does. Re-capture "
+                "against a build whose session_started frame carries samplingTemperature / "
+                "samplingTopP / samplingSeed."
+            )
+            applied[label] = {}
+            continue
+        applied[label] = value
+        for turn_id in sorted(_records(doc, "chatTurns")):
+            turn = value.get(turn_id)
+            if not isinstance(turn, dict):
+                problems.append(
+                    f"{label} chatTurns/{turn_id}: no entry in provenance.samplingApplied, "
+                    "so the sampling this turn ran under is unknown"
+                )
+            elif all(v is None for v in turn.values()):
+                problems.append(
+                    f"{label} chatTurns/{turn_id}: the session_started frame carried NO "
+                    "applied sampling (samplingTemperature / samplingTopP / samplingSeed all "
+                    "absent), which is what a build predating PR 0b does — the requested "
+                    f"pin {_provenance(doc).get('sampling')!r} was never proved to have been "
+                    "applied. Re-capture against a build that echoes it."
+                )
+    for turn_id in sorted(set(applied["baseline"]) | set(applied["candidate"])):
+        before = applied["baseline"].get(turn_id)
+        after = applied["candidate"].get(turn_id)
+        if isinstance(before, dict) and isinstance(after, dict) and before != after:
+            problems.append(
+                f"chatTurns/{turn_id}: the two captures APPLIED different sampling — "
+                f"baseline {before!r} vs candidate {after!r}. The two sides sampled "
+                "differently, so their generative and tool-trajectory fields differ for a "
+                "reason that is not a build difference. Re-capture both sides under the same "
+                "pin."
+            )
+    return problems
 
 
 def capture_health(
@@ -1351,8 +2001,17 @@ def capture_health(
     Two identical *failures* are byte-equal, so without this an all-401 backend (or a
     half-captured fixture) diffs clean and reads as "no semantic regression". The health
     block is part of the verdict, not a warning: a diff whose health fails does not pass.
+
+    It also asserts the two runs' PRECONDITIONS — the four boot-time pins and the sampling
+    each turn actually applied (:func:`_pin_problems`, :func:`_applied_sampling_problems`).
+    Those are health problems rather than declared fields because they are not outputs either
+    build produced; they are the conditions under which both were measured. A pair captured
+    under different conditions is not a comparison of two builds at all, so the right verdict
+    is "this diff is not evidence", not "field X differs".
     """
     problems: list[str] = []
+    problems.extend(_pin_problems(baseline, candidate))
+    problems.extend(_applied_sampling_problems(baseline, candidate))
     for section in ("queries", "chatTurns"):
         if not _records(baseline, section) and not _records(candidate, section):
             problems.append(
@@ -1423,12 +2082,27 @@ def diff(baseline: str | Path | dict, candidate: str | Path | dict, fixture: dic
     cand = candidate if isinstance(candidate, dict) else json.loads(
         Path(candidate).read_text(encoding="utf-8"))
 
+    # K per query, so the differ can find the tie group straddling the rank-K cutoff. Threaded
+    # exactly as `epsilon` is — `diff` already holds both the fixture and the record id.
+    query_limits = {
+        spec["id"]: spec.get("limit", 10)
+        for spec in fixture.get("queries") or []
+        if isinstance(spec, dict) and spec.get("id")
+    }
+
     entries: list[dict] = []
     captured_paths: set[str] = set()
     for section in ("queries", "chatTurns"):
         b_recs = _records(base, section)
         c_recs = _records(cand, section)
         for record_id in sorted(set(b_recs) | set(c_recs)):
+            cutoff: CutoffContext | None = None
+            if section == "queries" and record_id in query_limits:
+                cutoff = CutoffContext(
+                    int(query_limits[record_id]),
+                    _observed_hits_captured(base, record_id),
+                    _observed_hits_captured(cand, record_id),
+                )
             b_rec = b_recs.get(record_id)
             c_rec = c_recs.get(record_id)
             field_names = sorted(set(b_rec or {}) | set(c_rec or {}))
@@ -1452,7 +2126,7 @@ def diff(baseline: str | Path | dict, candidate: str | Path | dict, fixture: dic
                     entry.update(status=STATUS_MISSING, reason="absent from the candidate capture")
                 else:
                     status, reason = compare_field(
-                        klass, b_rec[name], c_rec[name], epsilon)
+                        klass, b_rec[name], c_rec[name], epsilon, cutoff)
                     entry.update(status=status, reason=reason)
                     if status == STATUS_REGRESSION:
                         entry["baseline"] = b_rec[name]

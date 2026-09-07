@@ -72,6 +72,74 @@ def test_fixture_without_a_sampling_block_is_refused():
             wf.validate_fixture(broken)
 
 
+def test_an_all_null_sampling_block_is_refused():
+    """A block whose values are ALL null declares a pin and pins nothing.
+
+    Each key means "no override" individually, so `{"temperature": null, "seed": null}` runs
+    the turns under SamplingParams.AGENT exactly as an absent block does — while the artifact
+    records a `sampling` block and reads as pinned.
+    """
+    for empty_pin in ({"temperature": None},
+                      {"temperature": None, "top_p": None, "seed": None}):
+        fixture = _minimal_fixture({"queries.a": "exact"})
+        fixture["sampling"] = empty_pin
+        with pytest.raises(wf.WorkflowFixtureError, match="pins NOTHING"):
+            wf.validate_fixture(fixture)
+    # One real value is enough — the refusal is about pinning nothing, not about nulls.
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    fixture["sampling"] = {"temperature": None, "top_p": None, "seed": 7}
+    assert wf.validate_sampling(fixture["sampling"])["seed"] == 7
+
+
+def test_a_chat_turn_spec_is_validated_against_a_closed_key_set():
+    """`maxIterms: 8` must be REFUSED, not silently ignored.
+
+    The capture reads exactly CHAT_TURN_KEYS, so a typo leaves the turn at the default cap of
+    3 while the fixture reads as if it declared 8 — surfacing much later as an unexplained
+    MAX_ITERATIONS capture-health failure.
+    """
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    fixture["chatTurns"] = [{"id": "c1", "content": "x", "maxIterms": 8}]
+    with pytest.raises(wf.WorkflowFixtureError, match="maxIterms"):
+        wf.validate_fixture(fixture)
+
+    # Every key the capture actually honours passes.
+    fixture["chatTurns"] = [{"id": "c1", "content": "x", "maxIterations": 8,
+                             "cancelAfterEvent": "session_started"}]
+    assert wf.validate_fixture(fixture)
+    assert wf.CHAT_TURN_KEYS == {"id", "content", "maxIterations", "cancelAfterEvent"}
+    # …and the shipped fixture uses nothing outside it.
+    for turn in wf.load_fixture(DEFAULT_FIXTURE)["chatTurns"]:
+        assert set(turn) <= wf.CHAT_TURN_KEYS
+
+
+def test_c02_was_replaced_with_a_single_anchor_question():
+    """c02 looped at maxIterations 8 on BOTH captures even at temperature 0.
+
+    A looping turn is not merely a partial answer: its tool trajectory diverges as soon as
+    retrieval does, so the `exact` chat fields downstream of it differ for a reason that is
+    not a build difference. The replacement has c01's shape — one obvious anchor document.
+    """
+    fixture = wf.load_fixture(DEFAULT_FIXTURE)
+    c02 = next(t for t in fixture["chatTurns"] if t["id"] == "c02")
+    assert "IndexingPacing" not in c02["content"]
+    assert "three processes" in c02["content"]
+    assert c02["maxIterations"] == 8
+    notes = " ".join(fixture["notes"])
+    assert "C02 WAS REPLACED" in notes
+    assert "docs/explanation/01-system-overview.md" in notes
+    # The superseded "c02 completes in 6 iterations" claim must be gone, not outnumbered.
+    assert "c02 in 6" not in notes
+
+
+def test_cutoff_group_rule_is_recorded_in_the_fixture_notes():
+    """Including the caveat a reader must not miss: 2K changes what the backend ranks."""
+    notes = " ".join(wf.load_fixture(DEFAULT_FIXTURE)["notes"])
+    assert "STRADDLING THE RANK-K CUTOFF" in notes
+    assert "NO fourth class is introduced" in notes
+    assert "CAPTURES TAKEN AT THE OLD LIMIT ARE NOT COMPARABLE TO NEW ONES" in notes
+
+
 def test_hits_are_one_field_not_one_per_attribute():
     """Review blocker 1: per-attribute score-tagged lists permute independently.
 
@@ -470,6 +538,534 @@ def test_new_reason_code_on_a_hit_is_allowed_and_a_lost_one_is_not():
                    _capture({"q1": {"hits[]": plain}}), fixture)
     assert lost["pass"] is False
     assert "gone in the candidate" in _entry(lost, "queries.hits[]")["reason"]
+
+
+# ---------------------------------------------------------------------------
+# The cutoff tie group (the group straddling rank K)
+# ---------------------------------------------------------------------------
+#
+# Every fixture here declares limit 3, so K = 3 and the capture would have asked the backend
+# for 6. The compared slice therefore ends on a tie-group boundary — hits `c` and `d` below
+# are one group whose FIRST member sits at rank 3, i.e. the cutoff group.
+
+def _cutoff_fixture(limit: int = 3) -> dict:
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    fixture["queries"][0]["limit"] = limit
+    return fixture
+
+
+def _cutoff_capture(tagged, *, hits_captured: int | None = 6) -> dict:
+    """A capture whose q1 carries ``tagged`` as its compared slice.
+
+    ``hits_captured`` is what the backend returned for the 2K request, recorded where the
+    real capture records it: the non-diffed ``observed`` block. ``None`` omits the whole
+    block, i.e. an older capture.
+    """
+    observed = None
+    if hits_captured is not None:
+        observed = {"q1": {"scores": [t["score"] for t in tagged],
+                           "hitsCaptured": hits_captured,
+                           "hitsCompared": len(tagged)}}
+    return _capture({"q1": {"hits[]": tagged, "hitCount": 3}}, observed=observed)
+
+
+def test_swap_across_the_rank_k_cutoff_inside_one_tie_group_is_allowed():
+    """The q06 / q10 live failure: one member of the BOTTOM tie group differed.
+
+    At limit 10 only the rank-10 half of that group was captured, so a swap with its rank-11
+    partner read as "tie group N is not a permutation". With the group observed whole, the
+    swap is what it is: a permutation of equal-score hits, across the K boundary.
+    """
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),      # the cutoff group, ranks 3-4
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.499, _hit("d")), (0.500, _hit("c")),      # same group, swapped
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    # The status string, not merely `pass`: this must be recorded as one of the three
+    # declared classes, and specifically as the ordering class.
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order"
+
+
+def test_cutoff_group_tolerates_a_head_partition_change_that_today_would_fail():
+    """The discriminating case — this FAILS if the cutoff rule is removed.
+
+    A swap inside the cutoff group plus a jittered gap ABOVE it: the old whole-list guard
+    saw "the order changed AND the partition sizes differ" and called it a regression, even
+    though the only reordering happened inside one tie group and nothing above it moved.
+    Splitting the cutoff group off means the head's order is unchanged (so its partition is
+    never consulted, exactly as the q07 fix intends) and the cutoff group is a set.
+    """
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.880, _hit("b")),      # gap 0.020 -> two head groups
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.895, _hit("b")),      # gap 0.005 -> ONE head group
+        (0.499, _hit("d")), (0.500, _hit("c")),
+    ]))
+    # Guard the premise: the two partitions really do differ in shape.
+    assert [len(m) for _, m in wf._tie_groups(base["queries"]["q1"]["hits[]"], 0.01)[1]] == [
+        1, 1, 2]
+    assert [len(m) for _, m in wf._tie_groups(cand["queries"]["q1"]["hits[]"], 0.01)[1]] == [
+        2, 2]
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order"
+    # …and without the cutoff (the same values compared as a plain hits[] list) it is the
+    # REGRESSION the rule exists to remove — proof the pass above is the rule's doing.
+    without_cutoff = wf.compare_field(
+        "equal-score-order", base["queries"]["q1"]["hits[]"],
+        cand["queries"]["q1"]["hits[]"], 0.01, None)
+    assert without_cutoff[0] == "REGRESSION"
+    assert "tie-group partition differs" in without_cutoff[1]
+
+
+def test_a_hit_that_joins_the_cutoff_group_without_moving_is_not_a_regression():
+    """The q07 false positive, at the boundary — caught in the post-implementation pass.
+
+    `b` jitters from its own group into the cutoff group while the DELIVERED ORDER stays
+    identical. Splitting the partition at the cutoff unconditionally shortened the head by
+    one group and the head's own partition check called it a regression with nothing
+    reordered. The split is therefore gated on "did anything actually reorder", exactly as
+    the whole-list guard already was.
+    """
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),      # groups [a] [b] [c,d]
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.505, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),      # groups [a] [b,c,d] — same order
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order"
+
+
+def test_a_member_missing_from_the_other_sides_cutoff_group_is_a_regression():
+    """Permutation across the cutoff is allowed; a different document is not."""
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("e")),      # d -> e: a real membership change
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "cutoff tie group" in reason and "not the same SET" in reason
+    # The membership is PROVEN here (4 compared out of 6 captured), so the regression must
+    # not be reported as the fail-closed case — that would hide a genuine finding behind
+    # "we could not tell".
+    assert "UNPROVEN" not in reason
+
+
+def test_a_change_in_a_group_above_the_cutoff_is_a_regression_exactly_as_today():
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("ZZZ")),    # above the cutoff group
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "not a permutation" in reason          # the unchanged per-group rule fired…
+    assert "cutoff tie group" not in reason       # …not the cutoff rule
+
+
+def test_a_cutoff_group_that_ran_off_the_end_of_a_full_2k_response_fails_closed():
+    """The group may continue past rank 2K, so a set difference cannot be told from an unseen
+    member. Fail closed, and say why."""
+    fixture = _cutoff_fixture()
+    # 6 compared out of 6 captured, and 6 == 2 * K: the group ran to the end of a FULL
+    # response, so nothing proves where it really ends.
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")), (0.498, _hit("e")), (0.497, _hit("f")),
+    ]), hits_captured=6)
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")), (0.498, _hit("e")), (0.497, _hit("g")),
+    ]), hits_captured=6)
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "UNPROVEN" in reason
+    assert "runs to the end of what was captured" in reason   # the 2K cause, named
+
+
+def test_a_capture_without_hits_captured_fails_closed_too():
+    """An older capture records no `hitsCaptured`, so there is no evidence either way."""
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]), hits_captured=None)
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("e")),
+    ]), hits_captured=None)
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "UNPROVEN" in reason
+    assert "older capture" in reason      # …and for THIS cause, not the 2K one
+    assert "runs to the end of what was captured" not in reason
+
+
+def test_an_unsliced_capture_is_named_not_silently_compared():
+    """The cutoff group is the LAST group by construction — assert it, don't assume it."""
+    fixture = _cutoff_fixture()
+    unsliced = _tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+        (0.100, _hit("e")),                          # past the cutoff group: never sliced off
+    ])
+    swapped = list(unsliced)
+    swapped[2], swapped[3] = swapped[3], swapped[2]
+    result = wf.diff(_cutoff_capture(unsliced), _cutoff_capture(swapped), fixture)
+    assert result["pass"] is False
+    assert "was not sliced at the cutoff group" in _entry(result, "queries.hits[]")["reason"]
+
+
+def test_a_new_reason_code_inside_the_cutoff_group_is_still_allowed():
+    """The subset rule keeps applying to members present on both sides of the set."""
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.499, _hit("d")), (0.500, _hit("c", extractionReasonCode="OCR_FALLBACK")),
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    assert _status(result, "queries.hits[]") == "allowed:new-reason-code"
+
+    lost = wf.diff(cand, base, fixture)
+    assert lost["pass"] is False
+    assert "gone in the candidate" in _entry(lost, "queries.hits[]")["reason"]
+
+
+def test_chat_turns_get_no_cutoff():
+    """There is no rank-K contract on a chat turn, so nothing is passed down for one."""
+    fixture = _minimal_fixture({"chatTurns.sourceRefs": "exact"})
+    base = _capture(chat={"c1": {"sourceRefs": ["docs/a.md#0"]}})
+    cand = _capture(chat={"c1": {"sourceRefs": ["docs/b.md#0"]}})
+    assert wf.diff(base, cand, fixture)["pass"] is False
+
+
+def test_build_search_body_asks_for_twice_the_declared_limit():
+    """K is what gets compared; the extra K is what makes the cutoff group observable."""
+    assert wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})["limit"] == 20
+    assert wf._build_search_body({"query": "q", "limit": 3})["limit"] == 6
+    # …and the default limit doubles too, rather than silently staying at 10.
+    assert wf._build_search_body({"query": "q"})["limit"] == 20
+
+
+def test_compared_slice_keeps_the_whole_cutoff_group_and_drops_the_rest():
+    hits = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])["results"]
+    kept = wf.compared_slice(hits, 3, 0.01)
+    assert [h["id"] for h in kept] == ["h0", "h1", "h2", "h3", "h4"]
+    # Nothing to extend when the cutoff group is a singleton.
+    assert len(wf.compared_slice(hits, 2, 0.01)) == 2
+    # Fewer hits than K: the whole list, unchanged.
+    assert wf.compared_slice(hits, 99, 0.01) == hits
+
+
+def test_hit_count_stays_the_top_k_count_when_the_slice_is_longer():
+    """`hitCount` is diffed `exact`: an 11-vs-12 cutoff group must not fail on it."""
+    response = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])
+    record = wf.capture_query_record(response, limit=3, epsilon=0.01)
+    assert record["hitCount"] == 3                  # top-K, NOT the slice length
+    assert len(record["hits[]"]) == 5               # …and the slice really is longer
+    # A shorter response still reports what it returned rather than K.
+    assert wf.capture_query_record(
+        _response_with_scores([0.9, 0.8]), limit=3, epsilon=0.01)["hitCount"] == 2
+
+
+def test_hits_captured_and_compared_are_observed_only_and_never_diffed():
+    """Both legitimately differ between builds, so they must not be diffed fields."""
+    response = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])
+    record = wf.capture_query_record(response, limit=3, epsilon=0.01)
+    counts = wf.observed_query_counts(response, record)
+    assert counts == {"hitsCaptured": 6, "hitsCompared": 5}
+    assert "hitsCaptured" not in record and "hitsCompared" not in record
+
+    # And the differ does not walk them: two captures whose counts differ, with identical
+    # query records, still diff clean and produce no entry for either name.
+    fixture = _cutoff_fixture()
+    tagged = _tagged([(0.900, _hit("a")), (0.800, _hit("b")),
+                      (0.500, _hit("c")), (0.499, _hit("d"))])
+    result = wf.diff(_cutoff_capture(tagged, hits_captured=6),
+                     _cutoff_capture(tagged, hits_captured=4), fixture)
+    assert result["pass"] is True, result["health"]["problems"]
+    compared = {e["field"] for e in result["fields"]}
+    assert not [f for f in compared if "hitsCaptured" in f or "hitsCompared" in f]
+    # …and the pass is for the right reason: the hits[] field was byte-equal, not waved
+    # through under an allowed class.
+    assert _status(result, "queries.hits[]") == "equal"
+
+
+def test_capture_records_the_counts_in_the_observed_block(tmp_path: Path):
+    """End to end through `capture`: the counts land in `observed`, not in `queries`."""
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    client_kwargs = {"transport": httpx.MockTransport(
+        _search_backend(_absolute_search_response(), roots=[_ROOT]))}
+    doc = _capture_with_transport(fixture, tmp_path / "out.json", client_kwargs)
+    observed = doc["observed"]["queries"]["q1"]
+    assert observed["hitsCaptured"] == 2
+    assert observed["hitsCompared"] == 2
+    assert "hitsCaptured" not in doc["queries"]["q1"]
+    assert "hitsCompared" not in doc["queries"]["q1"]
+
+
+# ---------------------------------------------------------------------------
+# Run preconditions: the boot-time pins and the APPLIED sampling
+# ---------------------------------------------------------------------------
+#
+# These are not fields either build produced — they are the conditions both runs were
+# performed under, so they are capture-HEALTH problems rather than diffed rows. Every
+# assertion below checks the problem TEXT, not just `pass is False`: a test that only
+# asserted the verdict would pass because some unrelated health check happened to fire.
+
+def _problems(baseline, candidate, fixture=None):
+    fixture = fixture or _minimal_fixture({"queries.a": "exact"})
+    return wf.diff(baseline, candidate, fixture)["health"]["problems"]
+
+
+def _has(problems, *needles):
+    return [p for p in problems if all(n in p for n in needles)]
+
+
+def test_absent_pins_fail_the_diff():
+    """No `provenance.pins` at all — an older capture, or an endpoint that 404s."""
+    base = _capture({"q1": {"a": 1}}, provenance={"pins": None})
+    cand = _capture({"q1": {"a": 1}})
+    problems = _problems(base, cand)
+    hit = _has(problems, "baseline", "provenance.pins is missing")
+    assert hit, problems
+    assert "index.vector.exhaustive_search" in hit[0]
+    assert "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true" in hit[0]
+    assert wf.diff(base, cand, _minimal_fixture({"queries.a": "exact"}))["pass"] is False
+    # The candidate had all four, so only ONE side is named.
+    assert not _has(problems, "candidate:", "provenance.pins is missing")
+
+
+def test_pins_missing_one_key_fail_the_diff_and_the_key_is_named():
+    partial = dict(_HEALTHY_PINS)
+    del partial["justsearch.llm.slots"]
+    base = _capture({"q1": {"a": 1}}, provenance={"pins": partial})
+    problems = _problems(base, _capture({"q1": {"a": 1}}))
+    hit = _has(problems, "provenance.pins is missing")
+    assert hit, problems
+    # The named list is EXACTLY the absent key — not the three that were present.
+    assert "provenance.pins is missing ['justsearch.llm.slots']" in hit[0]
+
+
+def test_pins_that_differ_between_the_two_sides_fail_the_diff():
+    """A pair whose sides ran under different boot-time settings is not a build comparison."""
+    other = dict(_HEALTHY_PINS, **{"justsearch.llm.slots": "2"})
+    problems = _problems(_capture({"q1": {"a": 1}}),
+                         _capture({"q1": {"a": 1}}, provenance={"pins": other}))
+    hit = _has(problems, "ran under DIFFERENT justsearch.llm.slots")
+    assert hit, problems
+    assert "'1'" in hit[0] and "'2'" in hit[0]      # both values, so the reader can act
+    assert "two configurations, not two builds" in hit[0]
+
+
+def test_absent_applied_sampling_fails_the_diff():
+    """`provenance.sampling` is only what was REQUESTED — absence of the applied echo fails."""
+    base = _capture({"q1": {"a": 1}}, provenance={"samplingApplied": None})
+    problems = _problems(base, _capture({"q1": {"a": 1}}))
+    hit = _has(problems, "baseline", "provenance.samplingApplied is absent")
+    assert hit, problems
+    assert "only what it requested" in hit[0]
+
+
+def test_applied_sampling_missing_a_recorded_turn_fails_the_diff():
+    base = _capture({"q1": {"a": 1}}, chat={"c1": {}, "c2": {}},
+                    provenance={"samplingApplied": {"c1": dict(_HEALTHY_APPLIED)}})
+    cand = _capture({"q1": {"a": 1}}, chat={"c1": {}, "c2": {}})
+    problems = _problems(base, cand)
+    hit = _has(problems, "baseline chatTurns/c2", "no entry in provenance.samplingApplied")
+    assert hit, problems
+    assert not _has(problems, "baseline chatTurns/c1", "no entry")
+
+
+def test_a_build_that_echoes_no_applied_sampling_fails_the_diff():
+    """The pre-PR-0b case: session_started omits all three keys, so the entry is all-null.
+
+    This must FAIL rather than read as "the run applied no override" — it is exactly the
+    situation `provenance.sampling` alone cannot distinguish, since the capture writes its
+    own request back regardless of what the backend did with it.
+    """
+    silent = {"c1": {"temperature": None, "top_p": None, "seed": None}}
+    base = _capture({"q1": {"a": 1}}, provenance={"samplingApplied": silent})
+    problems = _problems(base, _capture({"q1": {"a": 1}}))
+    hit = _has(problems, "baseline chatTurns/c1", "carried NO applied sampling")
+    assert hit, problems
+    assert "predating PR 0b" in hit[0]
+
+
+def test_applied_sampling_that_differs_between_the_two_sides_fails_the_diff():
+    hotter = {"c1": dict(_HEALTHY_APPLIED, temperature=0.7)}
+    problems = _problems(_capture({"q1": {"a": 1}}),
+                         _capture({"q1": {"a": 1}},
+                                  provenance={"samplingApplied": hotter}))
+    hit = _has(problems, "chatTurns/c1", "APPLIED different sampling")
+    assert hit, problems
+    assert "0.7" in hit[0] and "not a build difference" in hit[0]
+
+
+def test_matching_preconditions_produce_no_precondition_problem():
+    """The floor itself must be clean, or every assertion above proves nothing."""
+    result = wf.diff(_capture({"q1": {"a": 1}}), _capture({"q1": {"a": 1}}),
+                     _minimal_fixture({"queries.a": "exact"}))
+    assert result["health"] == {"ok": True, "problems": []}
+
+
+def test_applied_sampling_is_read_off_the_session_started_frame():
+    frames = wf.parse_sse_frames(
+        "event: session_started\n"
+        'data: {"sessionId":"s","samplingTemperature":0.0,"samplingTopP":0.8,'
+        '"samplingSeed":20260907}\n\n'
+        "event: done\n"
+        'data: {"finalResponse":"x"}\n\n'
+    )
+    assert wf.applied_sampling(frames) == {
+        "temperature": 0.0, "top_p": 0.8, "seed": 20260907}
+    # A key the backend omitted stays None — never defaulted to the requested value.
+    partial = wf.parse_sse_frames(
+        'event: session_started\ndata: {"sessionId":"s","samplingTemperature":0.0}\n\n')
+    assert wf.applied_sampling(partial) == {
+        "temperature": 0.0, "top_p": None, "seed": None}
+    # A build predating PR 0b emits the one-key payload: all three absent.
+    old = wf.parse_sse_frames('event: session_started\ndata: {"sessionId":"s"}\n\n')
+    assert wf.applied_sampling(old) == {
+        "temperature": None, "top_p": None, "seed": None}
+    assert wf.applied_sampling([]) == {
+        "temperature": None, "top_p": None, "seed": None}
+
+
+def test_run_chat_turn_returns_the_applied_sampling_beside_the_record():
+    """It rides NEXT TO the record, not inside it — an undeclared record key is a regression."""
+    stream = (
+        "event: session_started\n"
+        'data: {"sessionId":"s","samplingTemperature":0.0,"samplingSeed":7}\n\n'
+        'event: done\ndata: {"finalResponse":"x","iterationsUsed":2,"disposition":"COMPLETED"}\n\n'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=stream,
+                              headers={"Content-Type": "text/event-stream"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        turn = wf.run_chat_turn(client, {"id": "c01", "content": "x"})
+    assert turn.sampling_applied == {"temperature": 0.0, "top_p": None, "seed": 7}
+    assert turn.record["disposition"] == "COMPLETED"
+    for leaked in ("samplingApplied", "temperature", "samplingTemperature"):
+        assert leaked not in turn.record
+
+
+def test_pins_are_read_from_the_effective_config_endpoint():
+    """The shape is `resolvedConfig[] = {key, value, source, ordinal, detail, candidates}`.
+
+    `value` is a STRING and is OMITTED (not null) for a key no source supplied — the record
+    is `@JsonInclude(NON_NULL)` — so an unset `index.vector.exhaustive_search` must read as
+    MISSING, not as a value.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/debug/effective-config"
+        return httpx.Response(200, json={"schemaVersion": 1, "resolvedConfig": [
+            {"key": "justsearch.data.dir", "value": "F:/data", "source": "env_var",
+             "ordinal": 400, "candidates": []},
+            {"key": "index.vector.exhaustive_search", "value": "true", "source": "env_var",
+             "ordinal": 400, "detail": "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH",
+             "candidates": []},
+            {"key": "justsearch.llm.slots", "value": "1", "source": "jvm_arg",
+             "ordinal": 500, "candidates": []},
+            {"key": "justsearch.rerank.deadline_ms", "value": "5000", "source": "env_var",
+             "ordinal": 400, "candidates": []},
+            # No `value` key at all: nothing supplied one.
+            {"key": "justsearch.rerank.chunks.deadline_ms", "source": "none",
+             "ordinal": 0, "candidates": []},
+        ]})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        pins, sources = wf.read_config_pins(client)
+    assert pins == {"index.vector.exhaustive_search": "true",
+                    "justsearch.llm.slots": "1",
+                    "justsearch.rerank.deadline_ms": "5000"}
+    assert "justsearch.rerank.chunks.deadline_ms" not in pins    # valueless != a value
+    assert sources["justsearch.llm.slots"] == "jvm_arg"
+    assert "justsearch.data.dir" not in pins                     # only the four pins
+
+
+def test_an_absent_effective_config_endpoint_yields_empty_pins_not_an_exception():
+    """`/api/config/effective` is what the PR 0b pair run fetched — it 404s.
+
+    (`tmp/pr0b-pair/effective-config-1.json` is the NOT_FOUND body.) The capture must still
+    be written, and the diff built on it must then FAIL health rather than pass silently.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "No handler registered",
+                                         "errorCode": "NOT_FOUND"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        assert wf.read_config_pins(client) == ({}, {})
+    # A body with no `resolvedConfig` array is the same "cannot prove it" answer.
+    def no_block(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"schemaVersion": 1, "keys": []})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(no_block)) as client:
+        assert wf.read_config_pins(client) == ({}, {})
+
+    empty = _capture({"q1": {"a": 1}}, provenance={"pins": {}})
+    result = wf.diff(empty, empty, _minimal_fixture({"queries.a": "exact"}))
+    assert result["pass"] is False
+    assert _has(result["health"]["problems"], "provenance.pins is missing")
+
+
+def test_capture_records_the_pins_and_the_applied_sampling(tmp_path: Path):
+    """End to end: both blocks land in `provenance`, and neither becomes a diffed field."""
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    client_kwargs = {"transport": httpx.MockTransport(
+        _search_backend(_absolute_search_response(), roots=[_ROOT], chat=True))}
+    doc = _capture_with_transport(fixture, tmp_path / "out.json", client_kwargs)
+    prov = doc["provenance"]
+    assert prov["pins"] == {"index.vector.exhaustive_search": "true",
+                            "justsearch.llm.slots": "1",
+                            "justsearch.rerank.deadline_ms": "5000",
+                            "justsearch.rerank.chunks.deadline_ms": "5000"}
+    assert prov["pinSources"]["index.vector.exhaustive_search"] == "env_var"
+    assert prov["samplingApplied"] == {"c1": {"temperature": 0.0, "top_p": 0.8, "seed": 7}}
+    # The REQUESTED pin is still recorded separately — the two must be able to disagree.
+    assert prov["sampling"] == {"temperature": 0.0, "seed": 7}
+    assert "samplingApplied" not in doc["chatTurns"]["c1"]
+    assert "pins" not in doc["chatTurns"]["c1"]
+    # …and a capture written this way passes health against itself.
+    assert wf.diff(doc, doc, fixture)["health"] == {"ok": True, "problems": []}
 
 
 # ---------------------------------------------------------------------------
@@ -1001,11 +1597,19 @@ def test_chat_profile_is_absent_not_fatal_when_ai_is_offline():
 
 
 def test_chat_profile_requirement_is_recorded():
+    """The note must pin the profile requirement AND the per-turn completion evidence.
+
+    It used to assert "c02 in 6" — a measurement the next paired capture falsified: c02 ended
+    MAX_ITERATIONS at 8 on BOTH sides at temperature 0, which is why the question was
+    replaced (`test_c02_was_replaced_with_a_single_anchor_question`). The assertion now pins
+    c01's still-true figure and the note's honesty about c02 instead of a stale number.
+    """
     fixture = wf.load_fixture(DEFAULT_FIXTURE)
     notes = " ".join(fixture["notes"])
     assert "SAME CHAT PROFILE" in notes
     assert "compact" in notes and "11 GB" in notes
-    assert "c02 in 6" in notes
+    assert "c01 completes on compact in 3 iterations" in notes
+    assert "MAX_ITERATIONS at 8 in both captures" in notes
 
 
 def test_capture_derives_the_root_from_a_single_watched_root(tmp_path: Path):
@@ -1062,6 +1666,24 @@ def test_capture_run_requirements_are_recorded():
     assert "JUSTSEARCH_RERANK_DEADLINE_MS" in notes
     assert "JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS" in notes
     assert "ONE chat profile" in notes
+    # …and that the four are now OBSERVED, not merely asked for: the note must say the diff
+    # fails on a missing or disagreeing pin, or a reader will keep reading it as advice.
+    assert "THESE ARE NOW OBSERVED, NOT MERELY REQUESTED" in notes
+    assert "/api/debug/effective-config" in notes
+    assert "provenance.pins" in notes
+
+
+def test_the_applied_sampling_proof_is_recorded_in_the_notes():
+    """Requested vs applied is the whole mechanism — it must be written down, not implied."""
+    fixture = wf.load_fixture(DEFAULT_FIXTURE)
+    notes = " ".join(fixture["notes"])
+    assert "THE CAPTURE PROVES THE SAMPLING PIN WAS APPLIED, NOT JUST SENT" in notes
+    assert "provenance.samplingApplied" in notes
+    assert "samplingTemperature" in notes
+    assert "predating PR 0b" in notes
+    # The pinned keys the code reads and the note names must not drift apart.
+    for key in wf.PINNED_CONFIG_KEYS:
+        assert key in notes, key
 
 
 def test_chat_source_and_citation_paths_are_made_relative():
@@ -1126,7 +1748,7 @@ def test_run_chat_turn_cancels_and_records_the_session_outcome():
     calls: list[tuple[str, str]] = []
     with httpx.Client(base_url="http://127.0.0.1:33221",
                       transport=httpx.MockTransport(_cancel_backend(calls))) as client:
-        record = wf.run_chat_turn(
+        record, _applied = wf.run_chat_turn(
             client,
             {"id": "c03", "content": "…", "maxIterations": 3,
              "cancelAfterEvent": "session_started"},
@@ -1240,8 +1862,9 @@ def test_capture_sends_the_session_token_on_every_request(tmp_path: Path):
 
 
 def test_build_search_body_carries_the_fixture_spec():
+    """The spec's query/mode ride verbatim; `limit` is doubled (see the cutoff-group tests)."""
     body = wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})
-    assert body == {"query": "q", "limit": 10, "mode": "hybrid",
+    assert body == {"query": "q", "limit": 20, "mode": "hybrid",
                     "includeExcerpts": True, "debug": True}
 
 
@@ -1422,8 +2045,34 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
     }
 
 
-def _capture(queries: dict | None = None, chat: dict | None = None) -> dict:
-    """A healthy synthetic capture: every record carries httpStatus 200 (+ hitCount)."""
+#: A synthetic capture's healthy run PRECONDITIONS: the four boot-time pins as
+#: `/api/debug/effective-config` reports them (string values, as the real endpoint emits) and
+#: the applied sampling `session_started` echoes. Part of the health FLOOR, like httpStatus
+#: 200 — a test that is not about preconditions should not have to think about them.
+_HEALTHY_PINS = {
+    "index.vector.exhaustive_search": "true",
+    "justsearch.llm.slots": "1",
+    "justsearch.rerank.deadline_ms": "5000",
+    "justsearch.rerank.chunks.deadline_ms": "5000",
+}
+_HEALTHY_APPLIED = {"temperature": 0.0, "top_p": 0.8, "seed": 7}
+
+
+def _capture(
+    queries: dict | None = None,
+    chat: dict | None = None,
+    observed: dict | None = None,
+    provenance: dict | None = None,
+) -> dict:
+    """A healthy synthetic capture: every record carries httpStatus 200 (+ hitCount).
+
+    ``observed`` populates the NON-diffed ``observed.queries`` block (``scores``,
+    ``hitsCaptured``, ``hitsCompared``). Omitted entirely, the capture looks like one taken
+    before that block carried the counts — which the cutoff rule must fail closed on.
+
+    ``provenance`` overrides the healthy precondition floor (pins + applied sampling); a key
+    set to ``None`` there is DELETED, which is how a test says "this capture predates it".
+    """
     q: dict[str, dict] = {}
     for rid, rec in (queries or {"q1": {}}).items():
         merged = {"httpStatus": 200, "hitCount": 1}
@@ -1434,13 +2083,47 @@ def _capture(queries: dict | None = None, chat: dict | None = None) -> dict:
         merged = {"httpStatus": 200}
         merged.update(rec)
         c[rid] = merged
-    return {
+    prov: dict = {
+        "available": True,
+        "pins": dict(_HEALTHY_PINS),
+        "samplingApplied": {rid: dict(_HEALTHY_APPLIED) for rid in c},
+    }
+    for key, value in (provenance or {}).items():
+        if value is None:
+            prov.pop(key, None)
+        else:
+            prov[key] = value
+    doc = {
         "schema": wf.CAPTURE_SCHEMA,
         "fixture_id": "test-fixture",
         "fixture_version": 1,
-        "provenance": {"available": True},
+        "provenance": prov,
         "queries": q,
         "chatTurns": c,
+    }
+    if observed is not None:
+        doc["observed"] = {"queries": observed}
+    return doc
+
+
+def _response_with_scores(scores: list[float], ids: list[str] | None = None) -> dict:
+    """A `/api/knowledge/search` response whose results carry exactly these scores."""
+    names = ids or [f"h{i}" for i in range(len(scores))]
+    return {
+        "totalHits": len(scores),
+        "matchCount": len(scores),
+        "results": [
+            {
+                "id": name,
+                "score": score,
+                "fields": {"doc_id": name, "path": f"docs/{name}.md",
+                           "filename": f"{name}.md", "is_chunk": "true",
+                           "parent_doc_id": name, "chunk_index": "0"},
+                "matchedFields": [], "excerptRegions": [], "trace": [],
+            }
+            for name, score in zip(names, scores)
+        ],
+        "searchTrace": {"stages": [], "degradation": {}},
     }
 
 
@@ -1450,7 +2133,12 @@ def _full_snapshot(fixture: dict) -> dict:
         "schema": wf.CAPTURE_SCHEMA,
         "fixture_id": fixture["id"],
         "fixture_version": fixture["version"],
-        "provenance": {"available": True},
+        "provenance": {
+            "available": True,
+            "pins": dict(_HEALTHY_PINS),
+            "samplingApplied": {t["id"]: dict(_HEALTHY_APPLIED)
+                                for t in fixture["chatTurns"]},
+        },
         "queries": {q["id"]: wf.capture_query_record(_SEARCH_RESPONSE)
                     for q in fixture["queries"]},
         "chatTurns": {
@@ -1461,10 +2149,40 @@ def _full_snapshot(fixture: dict) -> dict:
     }
 
 
-def _search_backend(response: dict, roots: list[str] | None = None, status: int = 200):
-    """A mock backend serving /api/status, /api/indexing/roots and the search POST."""
+#: What the mock effective-config endpoint answers: the four pins, in the real
+#: `resolvedConfig[]` shape (`{key, value, source, ordinal, detail, candidates}`) with STRING
+#: values, as `EffectiveConfigEntry` serialises them.
+_EFFECTIVE_CONFIG_BODY = {"schemaVersion": 1, "resolvedConfig": [
+    {"key": key, "value": value, "source": "env_var", "ordinal": 400,
+     "detail": "JUSTSEARCH_" + key.upper().replace(".", "_"), "candidates": []}
+    for key, value in _HEALTHY_PINS.items()
+]}
+
+#: A `session_started`-first agent stream that echoes the APPLIED sampling (PR 0b).
+_APPLIED_SAMPLING_STREAM = (
+    "event: session_started\n"
+    'data: {"sessionId":"s1","samplingTemperature":0.0,"samplingTopP":0.8,"samplingSeed":7}\n\n'
+    "event: done\n"
+    'data: {"finalResponse":"x","iterationsUsed":2,"toolCallsExecuted":1,'
+    '"disposition":"COMPLETED","sources":[],"citations":[]}\n\n'
+)
+
+
+def _search_backend(response: dict, roots: list[str] | None = None, status: int = 200,
+                    chat: bool = False):
+    """A mock backend serving /api/status, /api/indexing/roots and the search POST.
+
+    ``chat=True`` also serves the agent stream and the effective-config endpoint, for the
+    tests that exercise the run PRECONDITIONS end to end.
+    """
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        if path == "/api/debug/effective-config":
+            return httpx.Response(200, json=_EFFECTIVE_CONFIG_BODY) if chat else (
+                httpx.Response(404, json={"errorCode": "NOT_FOUND"}))
+        if chat and path == "/api/chat/agent":
+            return httpx.Response(200, text=_APPLIED_SAMPLING_STREAM,
+                                  headers={"Content-Type": "text/event-stream"})
         if path == "/api/status":
             return httpx.Response(200, json={"service": "justsearch", "schema_version": 1,
                                              "worker": {"buildStamp": "abc"}})

@@ -416,6 +416,30 @@ with nothing changed). Grouping is over *consecutive* hits and the delivered ord
 score-sorted (`SearchResultMapper.java:133` applies freshness decay per hit without re-sorting), so
 the grouping is deliberately conservative: it under-permits, never over-permits.
 
+**`equal-score-order` covers the tie group straddling the rank-K cutoff, because equal-score hits
+beyond K are unobserved at K** (K = the query spec's `limit`, 10 in the shipped fixture). Measured
+on the 2026-09-07 paired capture: `q06` (tie-group score 0.121) and `q10` (0.236) each reported
+"tie group N is not a permutation" with *one* member of the bottom tie group differing — index-time
+GPU embedding jitter moved near-tied chunks across the rank-10 cutoff, so a swap with a member
+sitting at rank 11 read as a membership change. That is still "ordering of equal-score hits", now
+across the K boundary, so it stays in the existing class; **no fourth class was added**. Capture
+side: the request asks for `2 * K`, and `hits[]` stores the top K *plus* the remainder of the tie
+group holding rank K, dropping everything after that group. `hitCount` deliberately stays the
+**top-K** count (`min(returned, K)`) — it is diffed `exact`, and a legitimate 11-vs-12 cutoff-group
+size must not fail on it; `hitsCaptured` / `hitsCompared` go in the capture's non-diffed `observed`
+block for the same reason. Diff side: groups *above* the cutoff group keep the rules described
+above, and the cutoff group is compared as an unordered **set** over its full observed membership —
+any permutation allowed, a member absent from the other side's group is a regression, and the
+`extractionReasonCode` subset rule still applies to members present on both sides. It **fails
+closed** when the cutoff group runs to the end of a full 2K response (or an older capture records no
+`hitsCaptured`): the group may continue past what was observed, so its membership is unproven.
+
+**Consequence: captures taken at the old limit are not comparable to new ones.** `limit` also feeds
+the backend's candidate budget / collapse limit / rerank pool, so the top-K set at limit 2K is *not*
+guaranteed identical to the top-K set at limit K. Both sides of a pair use the same limit, so the
+diff itself stays sound — but a pair mixing a pre-change capture with a post-change one compares two
+request shapes, not two builds. Re-capture both sides.
+
 **One capture per fresh corpus.** The chat turns index their own agent history, so a second capture
 on the same stack sees a changed index (measured: `docCount` 91 → 102 across one capture's three
 turns; one query's `totalHits` moved 50 → 49 on the re-run). Inside a capture the search half runs
@@ -429,15 +453,25 @@ by construction; `maxIterations` is now 8, and capture-health raises `chat turn 
 MAX_ITERATIONS` for any non-cancelled turn that still truncates, so a truncated baseline is refused
 rather than stored. The cancelled turn is exempt — it is supposed to end early.
 
+`c02` was **replaced** for exactly this reason. Its IndexingPacing duty-cycle question still ended
+`MAX_ITERATIONS` at 8 in *both* captures of the paired run, at temperature 0 — a two-part question
+whose "which ADR" half has no single obvious anchor, so the agent kept searching. A looping turn is
+worse than a partial answer: its tool trajectory diverges as soon as retrieval does, so every
+`exact` field downstream of the trajectory (`toolNames`, `toolCallsExecuted`, `sourceRefs`,
+`citationTargets`) differs for a reason that is not a build difference. `c02` now asks what the
+three processes in the architecture are and which document describes them — `c01`'s shape, anchored
+on `docs/explanation/01-system-overview.md` ("The 3-Process Model"), with `maxIterations` still 8.
+
 **Both captures of a paired diff must be on the same chat profile.** The profile decides which
 model answered the chat turns, so a split-vs-single pair taken on different profiles compares two
 models, not two builds. `capture` records `provenance.chatProfile` and `provenance.aiRuntimeState`
 from `GET /api/ai/runtime/status` (non-diffed, and printed in the capture summary), reading the
 same fields the dev-MCP does. The 2026-09-07 baseline was taken on **`compact`** — the dev default
 — because the standard model's ~11 GB resident set on the dev machine tripped the harness's
-low-memory guard twice; with the narrowed `c01`/`c02` questions both ordinary turns complete on
-compact (`c01` in 3 iterations, `c02` in 6), so the profile choice does not cost the fixture its
-completion property.
+low-memory guard twice. `c01` completes on compact in 3 iterations; the *original* `c02` did not
+(see above), which is why it was replaced. Whether the replacement completes is what the next
+paired capture measures — capture-health refuses a `MAX_ITERATIONS` baseline either way, so a
+looping turn cannot be stored as one.
 
 **Generation is nondeterministic, and `citationTargets` is deliberately still `exact`.** Across two
 captures of one build, one turn's citation targets differed (`[]` vs two targets). The agent path is
@@ -445,7 +479,7 @@ captures of one build, one turn's citation targets differed (`[]` vs two targets
 (`ConversationEngine.java:1151` — that is the chat-completions path, not `POST /api/chat/agent`):
 an agent turn samples under `SamplingParams.AGENT`, temperature **0.7** / top_p **0.8**
 (`SamplingParams.java:175`), returned by `AgentLlmCaller.resolveAgentSampling`
-(`AgentLlmCaller.java:277-291`, which applies the run's optional override through `agentBaseSampling` at `:305-318`), which adds `tool_choice`/grammar on a forced-tool turn and
+(`AgentLlmCaller.java:282-295`, which applies the run's optional override through `agentBaseSampling` at `:310-322`), which adds `tool_choice`/grammar on a forced-tool turn and
 otherwise hands back that constant unchanged. PR 0b adds an optional top-level `sampling` object on
 the chat request — `{"temperature", "top_p", "seed"}`, each key optional, absent/null meaning no
 override — applied over that constant; the fixture declares the pin it wants (`temperature: 0.0` +
@@ -456,6 +490,35 @@ expect the chat `exact` fields to be the fixture's most fragile assumption and r
 a finding, not as licence to reclassify. The **cancelled** turn was fully stable across both
 captures (terminal event, `CANCELLED` error code, session state, disposition and cancel trigger all
 identical), so the cancellation half of the row is sound as it stands.
+
+**The capture records the *requested* pin and the *applied* one, and the difference is the point.**
+`provenance.sampling` is only what the capture asked for — it writes its own request back, so run
+the same fixture against a build predating the override and the artifact still reads as pinned while
+the backend silently ignored it. `provenance.samplingApplied` is what each run said it would
+*actually* use: the `session_started` frame echoes `samplingTemperature` / `samplingTopP` /
+`samplingSeed`, each key **omitted** when the backend resolved no value and **all three absent on a
+build predating PR 0b**. The capture reads them per turn and never defaults an absent key, because
+that absence is the signal. A pin that can only be asserted and never contradicted is not evidence;
+only these two records can disagree.
+
+**Both are capture-health checks, not diffed fields, and `diff` fails on them.** `capture_health`
+refuses a pair when either side's `provenance.pins` is absent or missing one of the four keys, when
+the two sides' pins disagree on any key, when `provenance.samplingApplied` is absent or missing a
+recorded turn, when a turn's applied sampling is entirely null (the pre-PR-0b build), or when the
+two sides applied different sampling for a turn. They are health problems rather than declared
+fields because they are not outputs either build produced — they are the conditions both runs were
+measured under, and a pair captured under different conditions is not a comparison of two builds at
+all, so the right verdict is "this diff is not evidence" rather than "field X differs".
+
+**The pins come from `GET /api/debug/effective-config`.** Its body carries a top-level
+`resolvedConfig` array of `{key, value, source, ordinal, detail, candidates[]}`; `value` is always a
+**string** and is *omitted* (the record is `@JsonInclude(NON_NULL)`) for a key no source supplied,
+so an unset `index.vector.exhaustive_search` — which has no registered default — reads as **missing**
+rather than as a value, and the health check fires. An unreachable endpoint yields empty pins rather
+than an exception: the capture is still written, and the diff built on it then fails. Note the route:
+the PR 0b pair run fetched `/api/config/effective`, which does not exist
+(`tmp/pr0b-pair/effective-config-1.json` is the `NOT_FOUND` body), so that run recorded no pins and
+could not have caught a pin mismatch.
 
 **The capture run is pinned at boot, not only in the request.** Both sides of a paired diff must be
 captured with the same four settings, the first three set at stack launch:
