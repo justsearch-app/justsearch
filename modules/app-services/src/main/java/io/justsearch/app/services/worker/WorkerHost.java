@@ -15,7 +15,7 @@ import java.io.Closeable;
  *
  * <p>One implementation exists on the live path: {@code io.justsearch.app.engine.EngineRoot},
  * which builds the index half inside this JVM. The legacy path — no host supplied, spawn a process
- * — is kept only until item A11 deletes {@code WorkerSpawner}.
+ * — was deleted at item A11 with {@code WorkerSpawner}. This is the only shape now.
  *
  * <p><b>Lifecycle.</b> {@link #start} is called once per bootstrap start attempt and must be safe
  * to call again after {@link #close}; {@code KnowledgeServerBootstrap.closeForUpgrade()} tears the
@@ -51,4 +51,36 @@ public interface WorkerHost extends Closeable {
   /** Stops the index half. Idempotent. */
   @Override
   void close();
+
+  /**
+   * Null Object for a bootstrap constructed without a host — test fixtures and isolated launchers
+   * that never call {@link KnowledgeServerBootstrap#start()}.
+   *
+   * <p>Item A11 made the host required rather than optional: before it, a null host meant "spawn a
+   * Worker process", and that fallback is gone. A null is a construction error now, but
+   * "constructed and never started" is still a legitimate shape, so it gets an explicit Null
+   * Object (the repo idiom — see {@code IndexingService.unavailable()} and
+   * {@code WorkerService.unavailable()}) rather than a null every caller has to remember about.
+   * Starting it fails loudly instead of silently composing nothing.
+   */
+  static WorkerHost unavailable() {
+    return new WorkerHost() {
+      @Override
+      public KnowledgeClient start(GpuSchedulingGauge gpuScheduling, IpcTelemetry telemetry) {
+        throw new IllegalStateException(
+            "No WorkerHost configured: this KnowledgeServerBootstrap was built without one, so"
+                + " there is no index half to start. Supply io.justsearch.app.engine.EngineRoot.");
+      }
+
+      @Override
+      public long ownerPid() {
+        return 0L;
+      }
+
+      @Override
+      public void close() {
+        // Nothing composed, nothing to close.
+      }
+    };
+  }
 }

@@ -70,16 +70,50 @@ class SupervisionContractTest {
 
   // --- (1) policy drift -----------------------------------------------------------------------
 
+  /**
+   * Lane F stage A item A11 retired the Worker entry: {@code SupervisionPolicy} was deleted with
+   * {@code WorkerSpawner}, so there is no live record to compare the declared block against.
+   *
+   * <p>The assertion is not dropped, it is <b>inverted into a pin on the retirement</b>: a retired
+   * entry must say so explicitly, and an entry that is NOT retired must still have its policy
+   * checked against code (which is what {@link #brainPolicyMatchesCode()} does, unchanged). Without
+   * this, deleting the equality check would leave the register free to drift back into claiming a
+   * contract nothing enforces — the exact vacuous green the register exists to prevent.
+   */
   @Test
-  @DisplayName("worker policy block equals SupervisionPolicy defaults")
-  void workerPolicyMatchesCode() throws IOException {
-    JsonNode pol = process(register(), "worker").get("policy");
-    SupervisionPolicy code = SupervisionPolicy.from(null); // null -> all DEFAULT_* values
-    assertEquals(code.maxRestartAttempts(), pol.get("maxRestartAttempts").asInt());
-    assertEquals(code.baseCooldownMs(), pol.get("baseCooldownMs").longValue());
-    assertEquals(code.maxCooldownMs(), pol.get("maxCooldownMs").longValue());
-    assertEquals(code.stabilityWindowMs(), pol.get("stabilityWindowMs").longValue());
-    assertEquals(code.hangUnhealthyThreshold(), pol.get("hangUnhealthyThreshold").asInt());
+  @DisplayName("the worker entry is retired, and a retired entry declares why")
+  void workerEntryIsRetired() throws IOException {
+    JsonNode worker = process(register(), "worker");
+    assertEquals(
+        "retired",
+        worker.path("status").asText(),
+        "the Worker is not a process any more (lane F stage A item A11); if this entry is live"
+            + " again, its policy block needs a live record to be checked against");
+    assertTrue(
+        worker.path("retiredNote").asText().contains("stage B"),
+        "a retired entry must name where the contract lands next, or the register loses the thread");
+  }
+
+  /**
+   * The complement: every entry that is NOT retired has its declared policy block checked against
+   * the live record. Today that is the Brain, whose check is {@link #brainPolicyMatchesCode()};
+   * this test fails if a third process is added without one, so the drift check cannot be skipped
+   * by omission.
+   */
+  @Test
+  @DisplayName("every live (non-retired) process has a policy-drift check in this class")
+  void everyLiveProcessHasADriftCheck() throws IOException {
+    Set<String> live = new HashSet<>();
+    for (JsonNode proc : register().get("processes")) {
+      if (!"retired".equals(proc.path("status").asText())) {
+        live.add(proc.get("id").asText());
+      }
+    }
+    assertEquals(
+        Set.of("brain"),
+        live,
+        "a live process without a policy-drift assertion in this class would declare a contract"
+            + " nothing enforces; add the assertion, then widen this set");
   }
 
   @Test
@@ -117,6 +151,9 @@ class SupervisionContractTest {
 
     Set<String> union = new HashSet<>();
     for (JsonNode proc : reg.get("processes")) {
+      // A retired process's fault modes are history: the guards that exercised them were deleted
+      // with the process. They still have to be IN the vocabulary (checked below), because the
+      // vocabulary is what stage B's supervisor will be declared against.
       Set<String> seen = new HashSet<>();
       for (JsonNode fm : proc.get("faultModes")) {
         String mode = fm.get("mode").asText();
@@ -143,6 +180,9 @@ class SupervisionContractTest {
     List<String> failures = new ArrayList<>();
     for (JsonNode proc : reg.get("processes")) {
       String pid = proc.get("id").asText();
+      if ("retired".equals(proc.path("status").asText())) {
+        continue;
+      }
       for (JsonNode fm : proc.get("faultModes")) {
         String mode = fm.get("mode").asText();
         JsonNode guards = fm.get("guards");

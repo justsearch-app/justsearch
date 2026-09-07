@@ -19,6 +19,14 @@ import org.slf4j.LoggerFactory;
  * KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary initialization
  * on ERROR→READY recovery transitions.
  *
+ * <p>Item A11 note: this class survives the Worker's deletion as a process because two of its
+ * three jobs are not process-shaped — the health poll that drives the worker component's
+ * READY/LOST transitions on {@code /api/health}, and the boot-recovery arm (an in-process start
+ * can still fail on a Lucene open, and the surface must say so). What it lost is every
+ * channel/port/process-shaped path: the post-resume reconnect, and the escalation from a lost
+ * worker to a respawn. A lost worker component now reports itself lost and stays that way until
+ * the user restarts the Engine — stage A §10 records that as a deliberate loss until stage B.
+ *
  * <p>Tempdoc 630 (latency-hardening): this periodic loop doubles as the Head-side <b>resume
  * detector</b>. Because it wakes every {@code pollIntervalMs}, an inter-tick wall-clock gap far
  * larger than that interval means the process was frozen — the machine suspended and resumed (see
@@ -214,9 +222,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   void tick() {
     try {
-      // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap, and eagerly
-      // re-validate the Worker surface BEFORE the health check (so a stale post-wake channel does
-      // not flip the capability to DEGRADED).
+      // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap and eagerly
+      // re-validate BEFORE the health check. Item A11 removed the channel half of that
+      // re-validation (there is no channel); the filesystem half is why this survives — a watcher
+      // frozen through a suspend missed every event in the window, and only a reconcile walk
+      // catches up. That is a property of the machine sleeping, not of a process boundary.
       long now = nowMs.getAsLong();
       long gap = ResumeDetector.resumeGapMs(lastTickWallMs, now, pollIntervalMs, RESUME_TOLERANCE_FACTOR);
       lastTickWallMs = now;
@@ -650,19 +660,17 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   /**
-   * Tempdoc 630: on a detected resume, eagerly close the two stale-after-suspend windows using the
-   * existing actuators — reconnect the gRPC channel ({@link KnowledgeClient#reconnect()}) and
-   * re-register watchers + kick a (freshness-skipping) reconcile walk ({@link
-   * KnowledgeClient#reindexPersistedRoots()}, which catches filesystem events missed while the
-   * watcher was frozen). Each step is best-effort and independently guarded so a transient failure
-   * never aborts the tick or the other step; the reactive paths (first-RPC reconnect, periodic sync)
-   * remain the backstop.
+   * Tempdoc 630: on a detected resume, close the stale-after-suspend window that survives one
+   * process — re-register watchers and kick a (freshness-skipping) reconcile walk ({@link
+   * KnowledgeClient#reindexPersistedRoots()}), which catches filesystem events missed while the
+   * watcher was frozen. Best-effort and guarded so a transient failure never aborts the tick; the
+   * periodic sync remains the backstop.
+   *
+   * <p>Item A11 removed the second actuator, a channel reconnect: there is no channel.
    */
   private void eagerlyRevalidateAfterResume(long gapMs) {
     log.info(
-        "Resume detected (process frozen ~{}ms); eagerly reconnecting gRPC + re-registering"
-            + " watchers and reconciling",
-        gapMs);
+        "Resume detected (process frozen ~{}ms); re-registering watchers and reconciling", gapMs);
     // Tempdoc 630: stamp the resume so /api/status can surface a brief "Catching up after sleep"
     // transient while the reconcile below runs (auto-clears after the notice window).
     bootstrap.markResumed(nowMs.getAsLong());
@@ -675,11 +683,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       log.debug("Post-resume re-validation skipped — worker client not available: {}", e.getMessage());
       return;
     }
-    try {
-      client.reconnect();
-    } catch (RuntimeException e) {
-      log.warn("Post-resume gRPC reconnect failed (will retry on next call): {}", e.getMessage());
-    }
+    // Item A11: the channel reconnect that used to run here is gone. It was a no-op from item A6
+    // (an in-process client has no connection to lose) and its only reason to exist was a stale
+    // post-wake socket.
     try {
       client.reindexPersistedRoots();
     } catch (RuntimeException e) {

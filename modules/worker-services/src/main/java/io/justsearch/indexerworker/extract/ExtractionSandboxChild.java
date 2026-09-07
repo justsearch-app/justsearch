@@ -29,7 +29,8 @@ import tools.jackson.databind.json.JsonMapper;
  *       corrupt a frame. (Shipped before this tempdoc; the serve loop preserves it.)
  *   <li><b>No orphan.</b> With {@code --parent-pid=<pid>} a daemon thread polls the parent handle
  *       and halts the JVM once it is gone — the PID-gate pattern from tempdoc 630. This is the
- *       reason no {@code WindowsJobObject} dependency has to be added to {@code worker-services}.
+ *       reason no Windows Job Object dependency had to be added to {@code worker-services}. (The helper
+ *       itself was deleted at lane F stage A item A11 with its only caller, the Worker spawner.)
  * </ul>
  */
 public final class ExtractionSandboxChild {

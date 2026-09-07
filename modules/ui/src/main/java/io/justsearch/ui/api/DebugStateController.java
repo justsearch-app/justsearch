@@ -111,11 +111,13 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
         var snapshot = knowledgeServer.client().getDebugWorkerState();
         ObjectNode snapNode = (ObjectNode) mapper.valueToTree(snapshot);
         worker.setAll(snapNode);
-        // Add worker process info
-        if (knowledgeServer.spawner() != null) {
-          worker.put("pid", knowledgeServer.spawner().getWorkerPid());
-          worker.put("port", knowledgeServer.spawner().getPort());
-        }
+        // Lane F stage A item A11 deleted the Worker process: the index half now runs inside this
+        // JVM, so the only pid there is to report is ours. `port` is gone rather than zeroed —
+        // there is no port at all now, and a debug surface emitting -1/0 for one would be stating
+        // a fact that no longer exists. `inProcess` says why it vanished instead of leaving a
+        // reader of /api/debug/state to guess.
+        worker.put("pid", ProcessHandle.current().pid());
+        worker.put("inProcess", true);
 
       } catch (Exception e) {
         worker.put("error", "Failed to fetch worker status: " + e.getMessage());
@@ -127,15 +129,19 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
           worker.put("reason", "Not configured");
       } else {
           worker.put("reason", "Not ready");
-          // Still try to get PID/port if spawner exists
-          if (knowledgeServer.spawner() != null) {
-            worker.put("pid", knowledgeServer.spawner().getWorkerPid());
-            worker.put("port", knowledgeServer.spawner().getPort());
+          // Item A11: the "if a spawner exists" guard becomes "if a client is bound" — the same
+          // question ("is there an index half at all?") now that the half is composed in-process.
+          // Same reasoning as the ready arm: our pid, and no `port` key.
+          if (knowledgeServer.hasClient()) {
+            worker.put("pid", ProcessHandle.current().pid());
+            worker.put("inProcess", true);
           }
       }
     }
 
-    // Worker log path (best-effort): WorkerSpawner redirects to <dataDir>/logs/worker.log
+    // Worker log path (best-effort): <dataDir>/logs/worker.log. Item A11 deleted WorkerSpawner,
+    // which is what used to redirect the child process's stdio here; the reported path is
+    // unchanged, so this stays a path advertisement rather than a claim about a writer.
     try {
       Path logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("worker.log");
       worker.put("log_path", logPath.toString());

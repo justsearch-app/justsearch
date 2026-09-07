@@ -97,11 +97,6 @@ io.justsearch.app.services.worker.KnowledgeServerBootstrap#tryIngestHelpFiles
 io.justsearch.app.services.worker.KnowledgeServerConfig#detectProductionMode
 io.justsearch.app.services.worker.KnowledgeServerConfig#envOrProperty
 io.justsearch.app.services.worker.KnowledgeServerConfig#resolveLibDir
-io.justsearch.app.services.worker.WorkerSpawner#buildCommand
-io.justsearch.app.services.worker.WorkerSpawner#isWindows
-io.justsearch.app.services.worker.WorkerSpawner#spawnWorker
-io.justsearch.app.services.worker.WorkerSpawner#workerJavaBinary
-io.justsearch.app.util.WindowsJobObject#isWindows
 io.justsearch.app.util.WindowsPowerStatus#isWindows
 io.justsearch.applauncher.Launcher#emitSmokeSummary
 io.justsearch.applauncher.Launcher#setIfBlank

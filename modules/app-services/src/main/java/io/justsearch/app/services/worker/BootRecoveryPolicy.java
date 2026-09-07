@@ -3,11 +3,12 @@ package io.justsearch.app.services.worker;
 
 /**
  * Declared BOOT-recovery policy for the Worker process (tempdoc 825) — the sibling of
- * {@link SupervisionPolicy}, for the one state supervision cannot reach: the worker NEVER started, so
+ * the Worker's former {@code SupervisionPolicy} (deleted at item A11), for the one state
+ * supervision could not reach: the worker NEVER started, so
  * there is no spawner holding a restart budget and no process to supervise.
  *
  * <p>The two policies are deliberately separate authorities over disjoint states, not two budgets for
- * the same one: {@link SupervisionPolicy} governs a worker that was running and faulted (the spawner
+ * the same one: {@code SupervisionPolicy} governed a worker that was running and faulted (the spawner
  * owns it), this one governs the Head re-attempting a bootstrap that failed. The handover between
  * them is a veto, not a shared counter — see {@link BootRecoveryDecision}.
  *

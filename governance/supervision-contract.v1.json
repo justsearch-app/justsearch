@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 627,
-  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel.",
+  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel. Lane F stage A item A11 retired the Worker entry (`status: \"retired\"`): the Worker is no longer a process, and the Engine's own supervisor contract lands at stage B (design 7.1). A retired entry is skipped by assertion (1) and still checked by (2) and (3).",
   "guardSentinels": [
     "dev-stack-smoke",
     "audit-verdict"
@@ -25,12 +25,13 @@
         "baseCooldownMs": 1000,
         "maxCooldownMs": 30000,
         "stabilityWindowMs": 300000,
-        "hangUnhealthyThreshold": 3
+        "hangUnhealthyThreshold": 3,
+        "note": "HISTORICAL as of A11: these were SupervisionPolicy.DEFAULT_* when the Worker was a process. Nothing asserts them against code any more because the record is deleted. Stage B declares the Engine supervisor's own numbers."
       },
       "faultModes": [
         {
           "mode": "clean-exit",
-          "detection": "1s death monitor (WorkerSpawner.checkWorkerHealth: !process.isAlive())",
+          "detection": "(historical, A11) 1s death monitor (WorkerSpawner.checkWorkerHealth: !process.isAlive())",
           "recovery": "respawn (no graceful stop — process already gone), shared restart budget",
           "terminalState": "capability DEGRADED + worker.restart_exhausted after cap",
           "guards": [
@@ -39,7 +40,7 @@
         },
         {
           "mode": "hang",
-          "detection": "gRPC health-failure streak (KnowledgeServerBootstrap.checkHealth -> WorkerSpawner.recordHealthResult, 10s poll, threshold 3) while the process is alive",
+          "detection": "(historical, A11) gRPC health-failure streak (KnowledgeServerBootstrap.checkHealth -> WorkerSpawner.recordHealthResult, 10s poll, threshold 3) while the process is alive",
           "recovery": "graceful signal-bus stop then respawn, shared restart budget",
           "terminalState": "capability DEGRADED + worker.restart_exhausted after cap",
           "guards": [
@@ -48,7 +49,7 @@
         },
         {
           "mode": "oom",
-          "detection": "1s death monitor (OOM exits the JVM non-zero -> seen as process death; -XX:+HeapDumpOnOutOfMemoryError dumps)",
+          "detection": "(historical, A11) 1s death monitor (OOM exits the JVM non-zero -> seen as process death; -XX:+HeapDumpOnOutOfMemoryError dumps)",
           "recovery": "respawn (OOM is not distinguished from clean death by the decision)",
           "terminalState": "capability DEGRADED + worker.restart_exhausted after cap (recurring OOM trips the cap)",
           "guards": [
@@ -59,7 +60,7 @@
         },
         {
           "mode": "zombie",
-          "detection": "worker-side heartbeat suicide-pact (MmfWorkerSignalBus.shouldDie, 5s stale, 15s grace) corroborated by Head-PID liveness (WorkerLivenessDecision, tempdoc 630) + Windows Job Object KILL_ON_JOB_CLOSE",
+          "detection": "(historical, A11) worker-side heartbeat suicide-pact (MmfWorkerSignalBus.shouldDie, 5s stale, 15s grace) corroborated by Head-PID liveness (WorkerLivenessDecision, tempdoc 630) + Windows Job Object KILL_ON_JOB_CLOSE",
           "recovery": "worker self-exits when the heartbeat is stale AND Head's PID is dead (or no PID signal — standalone/legacy); OS force-kills on Head crash (Windows). Heartbeat-only on Linux/macOS where the Job Object is absent.",
           "terminalState": "worker process exits (no orphan outliving a dead Head)",
           "livenessContinuity": "tempdoc 630: a stale heartbeat is only actionable if Head was continuously live during the measurement window. A stale beat ALONE no longer kills — it must be corroborated by Head-PID death (WorkerLivenessDecision.HeadLiveness != ALIVE), because an OS suspend/resume produces a benign stale beat while Head (its PID persisting across suspend) is alive. UNKNOWN (no PID forwarded — standalone/tests) preserves the pre-630 heartbeat-only behavior. Guard: WorkerLivenessDecisionTest.",
@@ -72,7 +73,7 @@
         },
         {
           "mode": "partial-boot",
-          "detection": "awaitPort timeout (spawned but never published gRPC port), or PID validation exhausting its window (PidValidationTimeoutException) — the confirmed 821 §O.4 signature",
+          "detection": "(historical, A11) awaitPort timeout (spawned but never published gRPC port), or PID validation exhausting its window (PidValidationTimeoutException) — the confirmed 821 §O.4 signature",
           "recovery": "initial boot: KnowledgeServerBootstrap.startWithRetry re-attempts transient failures (3 attempts, supervision-vetoed). If those are exhausted the bootstrap is NO LONGER discarded (tempdoc 825): KnowledgeServerHealthMonitor is constructed regardless of outcome and takes its boot-recovery arm — a bounded, backed-off re-attempt sequence under BootRecoveryPolicy (4 attempts, 10s doubling to 60s) decided by the pure BootRecoveryDecision, holding the capability at RECOVERING for the arc so a boot that ultimately succeeds narrates no flap. On success the monitor performs the HeadAssembly/LocalApiServer handover. Restart path: doRestart reaps the port-less orphan (stopProcess graceful); next supervision tick restarts or gives up from a clean slate.",
           "terminalState": "capability DEGRADED + worker.spawn_recovery_exhausted once the boot-recovery budget is spent (distinct from supervision's worker.restart_exhausted, which boot recovery may never supersede — see recoveryAuthorityBoundary); no port-less zombie holding the data-dir lock",
           "recoveryAuthorityBoundary": "Tempdoc 825 §D5 decision 2: BootRecoveryDecision governs ONLY the never-started state and stands down — without narrating — when supervision engaged during the failing attempt (KnowledgeServerBootstrap.supervisionEngagedOnLastAttempt) or already declared worker.restart_exhausted. So the two authorities never both hold the restart budget, and supervision's terminal verdict stays terminal.",
@@ -83,7 +84,10 @@
           ],
           "note": "BootRecoveryDecisionTest pins the decision law (budget, backoff, both vetoes, narrate-once); KnowledgeServerBootRecoveryTest drives a real bootstrap against an empty temp dir through the monitor's arm. The orphan reap lives in WorkerSpawner.doRestart's failure path; exercising THAT needs a real spawn that never publishes a port — still a dev-stack smoke."
         }
-      ]
+      ],
+      "status": "retired",
+      "retiredAt": "lane-F/stage-A/A11 (2026-09-07)",
+      "retiredNote": "retired at lane F stage A: the Worker is no longer a process; the Engine's supervisor contract lands at stage B (design 7.1). The row is kept rather than deleted so the register still records what the split gave and what stage A deliberately gave up (stage A §10: no crash detection, no restart budget, no cooldown, no stability window; a crashed Engine stays down until the user restarts it). Its `authority` (SupervisionPolicy) and `decisionSeam` (SupervisionDecision) were deleted with WorkerSpawner at A11, so SupervisionContractTest skips the live-policy equality check for a retired entry — the Brain's check is unaffected and still runs. When stage B gives the Engine a supervisor, this entry is replaced (not un-retired): the supervised thing is a different thing."
     },
     {
       "id": "brain",

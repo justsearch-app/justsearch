@@ -53,7 +53,8 @@ public final class AotTraining {
     touch("io.justsearch.ui.HeadlessApp");
     touch("io.justsearch.ui.api.LocalApiServer");
     touch("io.justsearch.configuration.resolved.ConfigStore");
-    touch("io.justsearch.app.services.worker.WorkerSpawner");
+    // Item A11 removed the WorkerSpawner touch: the class is deleted, so warming it warmed
+    // nothing. Item A13 folds the (former) Worker cache's remaining touches in here.
     touch("io.justsearch.telemetry.LocalTelemetry");
     touch("io.justsearch.app.api.UiSettings");
     touch("io.justsearch.app.services.settings.UiSettingsStore");

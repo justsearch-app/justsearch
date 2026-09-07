@@ -2118,23 +2118,24 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // Worker restart and smoke test
   // ---------------------------------------------------------------------------
 
-  /** @return true when the worker was actually restarted; false when absent or the restart threw */
+  /**
+   * @return always false since lane F stage A item A11: there is no worker process to restart.
+   *
+   * <p>This used to replace the Worker child process so a freshly installed model was picked up
+   * without the user doing anything. The index half runs in this process now, so the equivalent is
+   * an Engine restart — the user's action, not the installer's. The method is kept (rather than
+   * having its two call sites drop the step silently) so the FALSE it returns keeps flowing into
+   * the install status the surface already renders: the caller reports "a restart is required"
+   * instead of claiming the model is live. Stage A §10, "restart-as-reload".
+   */
   private boolean tryRestartWorkerBestEffort() {
-    if (knowledgeServer == null || knowledgeServer.spawner() == null) return false;
-    try {
-      knowledgeServer.spawner().restart();
-      long expectedPid = knowledgeServer.spawner().getWorkerPid();
-      try {
-        knowledgeServer.client().reconnect(expectedPid);
-        knowledgeServer.client().resetCircuitBreaker();
-      } catch (Exception e) {
-        log.debug("Worker client reconnect failed (best-effort)", e);
-      }
-      return true;
-    } catch (Exception e) {
-      log.warn("Worker restart failed (best-effort): {}", e.getMessage());
+    if (knowledgeServer == null || !knowledgeServer.hasClient()) {
       return false;
     }
+    log.info(
+        "AI install complete; an Engine restart is required to load the new model ({})",
+        io.justsearch.app.services.worker.RestartRequiredException.CODE);
+    return false;
   }
 
   /**

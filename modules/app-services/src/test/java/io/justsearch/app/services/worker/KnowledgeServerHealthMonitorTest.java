@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
@@ -124,7 +125,6 @@ final class KnowledgeServerHealthMonitorTest {
     monitor.tick(); // first tick: no prior wall stamp → never a resume
 
     verify(bootstrap, never()).client();
-    verify(client, never()).reconnect();
     verify(client, never()).reindexPersistedRoots();
   }
 
@@ -148,8 +148,15 @@ final class KnowledgeServerHealthMonitorTest {
     verify(client, never()).reindexPersistedRoots();
   }
 
+  /**
+   * Lane F stage A item A11: the post-resume actuator used to be two calls, a channel reconnect
+   * and a watcher re-register + reconcile. There is no channel, so the reconnect is gone. The
+   * assertion is not weakened by dropping it — it is REPLACED by its negative, because "a resume
+   * must not try to reconnect anything" is now the property, and a silent no-op call would satisfy
+   * a test that only checked the reconcile.
+   */
   @Test
-  void largeGapTriggersEagerReconnectAndReconcile() {
+  void largeGapTriggersReconcileAndNoReconnect() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
@@ -164,8 +171,9 @@ final class KnowledgeServerHealthMonitorTest {
     clock[0] += 3_600_000L; // a 1-hour gap → suspend/resume
     monitor.tick();
 
-    verify(client, times(1)).reconnect();
     verify(client, times(1)).reindexPersistedRoots();
+    verify(client, never()).reconnect();
+    verifyNoMoreInteractions(client);
   }
 
   @Test

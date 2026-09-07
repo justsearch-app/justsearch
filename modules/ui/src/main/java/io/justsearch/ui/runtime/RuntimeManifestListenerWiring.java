@@ -59,11 +59,6 @@ public final class RuntimeManifestListenerWiring {
    *     {@code hasClient()}
    * @param knowledgeServerStartError reason string when the bootstrap did not connect, else
    *     {@code null}
-   * @param latestKnowledgeServer supplier that re-reads the *current*
-   *     knowledge-server reference at re-attainment time — when the
-   *     worker is restarted by the health monitor, the gRPC port may
-   *     change; the listener must read it fresh, not from a captured
-   *     snapshot
    * @param indexBasePathSupplier supplier returning the current index
    *     base path (read each time a publish call is composed so config
    *     changes propagate)
@@ -73,7 +68,6 @@ public final class RuntimeManifestListenerWiring {
       HeadAssembly bootstrap,
       KnowledgeServerBootstrap knowledgeServer,
       String knowledgeServerStartError,
-      Supplier<KnowledgeServerBootstrap> latestKnowledgeServer,
       Supplier<Path> indexBasePathSupplier,
       String modeIntent) {
     final InferenceCapability infCap = bootstrap.capabilities().inference();
@@ -114,13 +108,11 @@ public final class RuntimeManifestListenerWiring {
       String lifecycleStr = ls.name();
       // Tempdoc 825: a non-null bootstrap no longer implies a CONNECTED one — a failed boot now
       // keeps its (restartable) instance so the health monitor's recovery arm can re-attempt it.
-      // Branch on the client, which is what "worker ready" actually means here; otherwise a bricked
-      // boot would publish worker.state=ready with a null gRPC port.
+      // Branch on the client, which is what "worker ready" actually means here.
       if (knowledgeServer != null && knowledgeServer.hasClient()) {
-        Integer grpcPort = readGrpcPort(knowledgeServer);
         Path idx = indexBasePathSupplier.get();
         publisher.publishWorkerReady(
-            grpcPort, idx != null ? idx.toString() : null, lifecycleStr);
+            null, idx != null ? idx.toString() : null, lifecycleStr);
       } else {
         String reason =
             knowledgeServerStartError != null && !knowledgeServerStartError.isBlank()
@@ -138,10 +130,9 @@ public final class RuntimeManifestListenerWiring {
           try {
             LifecycleState ls = LifecycleProjection.derive(workCap, infCap);
             if (curr == CapabilityHealth.READY) {
-              Integer grpcPort = readGrpcPort(latestKnowledgeServer.get());
               Path idx = indexBasePathSupplier.get();
               publisher.publishWorkerReady(
-                  grpcPort, idx != null ? idx.toString() : null, ls.name());
+                  null, idx != null ? idx.toString() : null, ls.name());
             } else if (curr == CapabilityHealth.OFFLINE
                 || curr == CapabilityHealth.DEGRADED
                 || curr == CapabilityHealth.RECOVERING) {
@@ -216,15 +207,10 @@ public final class RuntimeManifestListenerWiring {
     return "retrieval-only";
   }
 
-  private static Integer readGrpcPort(KnowledgeServerBootstrap ks) {
-    if (ks == null) {
-      return null;
-    }
-    try {
-      int p = ks.signalBus().readPort();
-      return p > 0 ? p : null;
-    } catch (Exception e) {
-      return null;
-    }
-  }
+  // Lane F stage A item A11: readGrpcPort() is gone with the memory-mapped signal bus it read from.
+  // The index half is composed inside this JVM by EngineRoot — there is no worker process, no port
+  // and no channel — so the manifest's `worker.grpcPort` is published as null (the field is already
+  // declared nullable, see RuntimeManifestPublisher#publishWorkerReady) rather than as a fabricated
+  // 0/-1. Nothing here reports a pid either: the manifest's own `pid` is this process's, and
+  // RuntimeManifestPublisher already takes it from ProcessHandle.current().
 }

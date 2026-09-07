@@ -17,6 +17,7 @@ import io.justsearch.app.api.status.InferenceGpuView;
 import io.justsearch.app.api.status.InferenceStatusResponseBuilder;
 import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.RestartRequiredException;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.app.api.EnterprisePolicyService;
 import java.util.ArrayList;
@@ -82,9 +83,9 @@ final class InferenceHandlers {
 
   /**
    * Tempdoc 825 §D5 decision 4: binds the ONE worker-recovery authority (the health monitor), so
-   * {@code POST /api/worker/restart} has an answer in the state where it used to 503 — the worker
-   * never started, so there is no spawner to restart. Nullable: test seams and standalone launchers
-   * that build the API without a monitor keep the old 503 behaviour.
+   * {@code POST /api/worker/restart} has an answer in the state where it used to 503 — the index
+   * half never came up, so there is nothing bound to ask. Nullable: test seams and standalone
+   * launchers that build the API without a monitor keep the old 503 behaviour.
    */
   void setWorkerRecovery(
       io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery) {
@@ -625,17 +626,25 @@ final class InferenceHandlers {
   }
 
   /**
-   * Handles POST /api/worker/restart - restarts the Knowledge Server worker process.
+   * Handles POST /api/worker/restart.
    *
-   * <p>Used for "apply embedding config" flows so the worker sees updated environment/config
-   * without restarting the whole backend.
+   * <p><b>Lane F stage A item A11 / design §10 "restart-as-reload".</b> There is no Worker process
+   * any more: the index half is composed inside this JVM by {@code EngineRoot}, so "restart the
+   * worker" has no referent that is smaller than the application. The route and the operation stay
+   * registered — a client that asks must get a real answer — but the answer is now a 409 carrying
+   * {@link RestartRequiredException#CODE}: the state is a genuine conflict (the request is
+   * well-formed and the service is healthy; it simply cannot be served in-process) and the one
+   * remedy is restarting JustSearch. The "apply embedding config without restarting the backend"
+   * flow this endpoint was written for died with the process boundary it depended on.
    */
   void handleRestartWorker(Context ctx) {
-    // Tempdoc 825 §D5 decision 4: both 503 arms below are reachable in EXACTLY the state an operator
-    // reaches for this endpoint — the worker never started, so there is neither a bootstrap bound
-    // here nor a spawner to restart. Route them through the one recovery authority instead of
-    // telling the operator that the thing they can see is broken is "not configured".
-    if (knowledgeServer == null || knowledgeServer.spawner() == null) {
+    // Tempdoc 825 §D5 decision 4, still live: the state an operator actually reaches for this
+    // endpoint is "the index half never came up". That is the boot-recovery authority's business —
+    // an in-process re-composition is something the product CAN still do — so it keeps first
+    // refusal. A11 only changes the predicate: "is there a spawner?" becomes "is a client bound?",
+    // which is the same question ("is there an index half at all?") now that the half has no
+    // process of its own.
+    if (knowledgeServer == null || !knowledgeServer.hasClient()) {
       if (routeToRecoveryAuthority(ctx)) {
         return;
       }
@@ -656,34 +665,22 @@ final class InferenceHandlers {
                   ApiErrorHandler.routeOf(ctx)));
       return;
     }
-    if (knowledgeServer.spawner() == null) {
-      ctx.status(503)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Worker spawner unavailable", telemetry, ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-
-    try {
-      int port = knowledgeServer.spawner().restart();
-      long expectedPid = knowledgeServer.spawner().getWorkerPid();
-      // Reconnect existing client to the new port and validate PID.
-      try {
-        knowledgeServer.client().reconnect(expectedPid);
-        knowledgeServer.client().resetCircuitBreaker();
-      } catch (Exception e) {
-        // Best-effort: client has its own reconnect logic; surface as warning but keep response 200.
-        log.warn(
-            "Worker restarted, but client reconnect failed (will retry on next call): {}",
-            e.getMessage());
-      }
-      ctx.json(Map.of("success", true, "port", port));
-    } catch (Exception e) {
-      log.error("Failed to restart worker", e);
-      String msg = e.getMessage();
-      if (msg == null || msg.isBlank()) {
-        msg = e.toString();
-      }
-      ctx.status(500).json(ApiErrorHandler.toResponse(ApiErrorCode.WORKER_RESTART_FAILED, msg, telemetry, ApiErrorHandler.routeOf(ctx)));
-    }
+    // A11: the spawn/reconnect path is gone — there is no process to re-spawn, no port to reconnect
+    // to and no channel whose circuit breaker could need resetting. What is left is the honest
+    // answer, in the file's error-envelope idiom so the errorClass/retryable/i18nKey contract the
+    // frontend renders is unchanged: PERMANENT and not retryable, because no number of retries
+    // reloads an in-process index half. `code` carries the machine-readable handle a caller keys
+    // off; the message carries the one remedy that works.
+    Map<String, Object> body =
+        new java.util.LinkedHashMap<>(
+            ApiErrorHandler.toResponse(
+                ApiErrorCode.INVALID_STATE,
+                "The index half now runs inside JustSearch itself, so it cannot be restarted on"
+                    + " its own — restart JustSearch to apply the change",
+                telemetry,
+                ApiErrorHandler.routeOf(ctx)));
+    body.put("code", RestartRequiredException.CODE);
+    ctx.status(409).json(body);
   }
 
   /**
@@ -737,8 +734,10 @@ final class InferenceHandlers {
                     ApiErrorHandler.routeOf(ctx)));
         return true;
       }
-      // A worker IS bound after all (it came up between the checks) — fall through to the ordinary
-      // spawner restart path rather than answering from the recovery authority.
+      // An index half IS bound after all (it came up between the checks) — fall through to the
+      // ordinary answer rather than answering from the recovery authority. Post-A11 that answer is
+      // the 409 restart_required, because a bound in-process half has no smaller restart than the
+      // application's.
       case NOT_APPLICABLE -> {
         return false;
       }

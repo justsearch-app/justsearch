@@ -24,12 +24,11 @@ public final class InferenceWiring {
    * the registered listener (so the caller can remove it on shutdown), or null when there is no
    * KnowledgeServerBootstrap.
    *
-   * <p>Lane F item A5: the authority is now the in-process {@code GpuSchedulingGauge}
+   * <p>Lane F item A5: the authority is the in-process {@code GpuSchedulingGauge}
    * ({@code KnowledgeServerBootstrap.gpuScheduling()}), which is where the merged Engine reads
-   * {@code main_gpu_active} from. The memory-mapped byte is written in addition, for exactly as long
-   * as the Worker is a separate process (item A10 deletes it). The signal bus is therefore read per
-   * event rather than captured once: it is null before the integration starts, and a missing bus is
-   * no longer a reason to skip the in-process publication.
+   * {@code main_gpu_active} from. Item A11 removed the second publication — a memory-mapped byte
+   * written for a Worker process that no longer exists — so the gauge write below is now the whole
+   * broadcast, and there is one writer and one reader in one address space.
    */
   public static io.justsearch.app.api.ModeChangeListener wireGpuStatusBroadcast(
       InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
@@ -42,7 +41,6 @@ public final class InferenceWiring {
         (from, to) -> {
           boolean gpuActive = (to == io.justsearch.app.api.Mode.ONLINE);
           gauge.setMainGpuActive(gpuActive);
-          publishToSignalBus(knowledgeServer, gpuActive);
           log.info(
               "GPU status broadcast: {} (mode: {} -> {})",
               gpuActive ? "ACTIVE" : "FREE", from, to);
@@ -50,28 +48,9 @@ public final class InferenceWiring {
     manager.addModeChangeListener(listener);
     boolean initialGpuActive = manager.isOnline();
     gauge.setMainGpuActive(initialGpuActive);
-    publishToSignalBus(knowledgeServer, initialGpuActive);
     log.debug("Initial GPU status set: {}", initialGpuActive ? "ACTIVE" : "FREE");
     log.info("GPU status broadcast wired to the GPU-scheduling gauge");
     return listener;
-  }
-
-  /**
-   * The transitional half: the memory-mapped {@code main_gpu_active} byte the separate Worker
-   * process reads. Best-effort and non-fatal — the in-process gauge has already been written, so a
-   * bus that is absent (not started yet) or failing cannot lose the signal for the merged Engine.
-   */
-  private static void publishToSignalBus(KnowledgeServerBootstrap knowledgeServer, boolean active) {
-    var signalBus = knowledgeServer.signalBus();
-    if (signalBus == null) {
-      log.debug("No MainSignalBus available; GPU status published in-process only");
-      return;
-    }
-    try {
-      signalBus.writeGpuActive(active);
-    } catch (Exception e) {
-      log.warn("Failed to broadcast GPU status to the Worker process", e);
-    }
   }
 
   /**

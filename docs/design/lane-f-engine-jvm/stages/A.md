@@ -419,6 +419,13 @@ The named non-compiling window is **A6 through A13** — from the first port tha
 through `RemoteKnowledgeClient` until the wire is gone. Items A1-A5 and A14-A20 each leave the
 branch green.
 
+**Superseded in delivery (2026-09-07).** The branch was delivered green after every item, not red
+across A6-A13: the in-process path was added first, consumers retyped, and the wire deleted behind
+them. The one ordering consequence is recorded in §11.1 and applies here — **A11 lands before A10**,
+because `WorkerSpawner` (group S, A11) is constructed with a `MainSignalBus` (group M, A10) and
+calls `signalBus.*` 17 times, so deleting the bus first cannot compile. The item letters keep their
+meaning; only the order in the commit log changes. Confirmed by the owner 2026-09-07.
+
 ### A1 — `modules/app-engine` skeleton (green)
 
 Create `modules/app-engine`, package `io.justsearch.app.engine`, added to

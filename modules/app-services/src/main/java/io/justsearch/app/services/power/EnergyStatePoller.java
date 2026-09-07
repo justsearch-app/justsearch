@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p><b>Why it moved.</b> The energy poll has nothing to do with spawning a process — it was hosted
  * there only because the spawner already owned a scheduler and the memory-mapped signal file. Item
- * A11 deletes {@code WorkerSpawner}; the poll has to outlive it, so it becomes a small component the
+ * A11 deleted {@code WorkerSpawner}; the poll had to outlive it, so it became a small component the
  * composition root owns. Today {@code KnowledgeServerBootstrap} (the root-to-be on the Head side)
  * constructs and starts it, which keeps it running in the current split build; at A6 the
  * {@code app-engine} root takes it over unchanged.

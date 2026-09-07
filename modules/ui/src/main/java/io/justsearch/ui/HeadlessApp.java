@@ -931,9 +931,7 @@ public class HeadlessApp {
       knowledgeServerStartError = workerResult.startError();
 
       // Tempdoc 501 Phase 29 + Phase 33: manifest-listener wiring extracted into
-      // RuntimeManifestListenerWiring. The live-worker supplier reads
-      // bootstrap.currentKnowledgeServer() so health-monitor-driven worker
-      // restarts are reflected in the worker.grpcPort projection.
+      // RuntimeManifestListenerWiring.
       // Tempdoc 657: the install/runtime intent is a launch-time config value
       // (-Djustsearch.mode / JUSTSEARCH_MODE), read once here and projected onto the
       // manifest's mode.intent by the listener wiring.
@@ -941,26 +939,18 @@ public class HeadlessApp {
           io.justsearch.configuration.model.InstallIntent.fromConfig(
                   EnvRegistry.MODE.get().orElse(null))
               .id();
-      // Tempdoc 825 review F3: the supplier falls back to the boot-time instance. The worker
-      // listener fires on the READY transition, which happens INSIDE a recovery attempt — before
-      // the handover has populated HeadAssembly's reference — so a currentKnowledgeServer()-only
-      // supplier published worker.state=ready with a null gRPC port after every boot recovery. The
-      // fallback is the same object the monitor is recovering, and by the time READY fires its
-      // signal bus is live and carries the real port, so the manifest is correct AT the event
-      // rather than corrected after it.
-      final KnowledgeServerBootstrap bootTimeKnowledgeServer = knowledgeServer;
-      final HeadAssembly assemblyForManifest = bootstrap;
-      java.util.function.Supplier<KnowledgeServerBootstrap> liveKnowledgeServer =
-          () -> {
-            KnowledgeServerBootstrap connected = assemblyForManifest.currentKnowledgeServer();
-            return connected != null ? connected : bootTimeKnowledgeServer;
-          };
+      // Lane F stage A item A11: the live-knowledge-server supplier that used to be threaded in
+      // here is gone with the thing it existed for. Tempdoc 825 review F3 added it so the worker
+      // listener could re-read the CURRENT bootstrap at re-attainment time and publish the gRPC
+      // port a restarted Worker had just been given. There is no worker process, no restart and no
+      // port now — the index half is composed in this JVM — so the only reader of that supplier
+      // (RuntimeManifestListenerWiring#readGrpcPort) went with it, and passing a supplier nothing
+      // reads would be residue, not caution.
       io.justsearch.ui.runtime.RuntimeManifestListenerWiring.wire(
           manifestPublisher,
           bootstrap,
           knowledgeServer,
           knowledgeServerStartError,
-          liveKnowledgeServer,
           () -> configStore.get().paths().indexBasePath(),
           modeIntent);
 
@@ -1179,9 +1169,12 @@ public class HeadlessApp {
       log.error("=== KNOWLEDGE SERVER FAILED TO START ===");
       log.error("Indexing and search features will be UNAVAILABLE.");
       log.error("Cause:", e);
-      log.error(
-          "To fix: {}",
-          io.justsearch.app.services.worker.WorkerStartFailures.operatorHint(e));
+      // Lane F stage A item A11: the "To fix: <hint>" line is gone with WorkerStartFailures. Every
+      // hint it produced named a process-start symptom — a missing worker JAR, a signal file that
+      // never carried a port, a pid that failed validation — and none of those can occur now that
+      // the index half is composed in this JVM. Nothing replaces it: the line above already logs
+      // the exception's own message, and the sentence the user is shown is startErrorFor()'s,
+      // which prefers the bootstrap's latched index-fatal reason over the symptom seen here.
       log.error("Stack trace:", e);
       return new KnowledgeServerStartResult(bootstrap, startErrorFor(bootstrap, e));
     }

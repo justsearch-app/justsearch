@@ -102,7 +102,8 @@ final class LlamaServerOps {
    * Generations of {@code logs/llama-server.log} kept across launches (the live file plus two
    * archived ones). A constant, not a config key: retention of a diagnostic the app writes about
    * its own child process is a product decision, and the number matches the app's other supervised
-   * process log ({@code WorkerSpawner}'s {@code worker.log} → {@code .1} → {@code .2}).
+   * process log (the Worker's {@code worker.log} → {@code .1} → {@code .2}, until lane F stage A
+   * item A11 deleted that process).
    */
   private static final int RETAINED_LOG_GENERATIONS = 3;
 
@@ -965,7 +966,7 @@ final class LlamaServerOps {
    * not to us, and which can therefore carry prompt-shaped diagnostics.
    *
    * <p>Rotate-on-start (rather than a size cap) mirrors the policy the app already runs for its
-   * other supervised process log — {@code WorkerSpawner}'s {@code worker.log} → {@code .1} →
+   * other supervised process log — the Worker's {@code worker.log} → {@code .1} →
    * {@code .2}, itself mirroring the Shell's {@code lib.rs} rotation — so the app has ONE retention
    * story for process logs instead of two. It also keeps the useful property for free: the previous
    * launch's output survives exactly one restart, which is what post-mortem reading needs.

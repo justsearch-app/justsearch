@@ -624,20 +624,18 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     }
   }
 
+  /**
+   * Lane F stage A item A11: there is no worker process to restart. The import used to replace the
+   * Worker child process so the imported pack was picked up immediately; the index half runs in
+   * this process now, so the equivalent is an Engine restart — the user's action. Logged with the
+   * stable code rather than dropped silently, so the import's own log says why the pack is not
+   * live yet. Stage A §10, "restart-as-reload".
+   */
   private void tryRestartWorkerBestEffort() {
-    try {
-      if (knowledgeServer != null && knowledgeServer.spawner() != null) {
-        knowledgeServer.spawner().restart();
-        long expectedPid = knowledgeServer.spawner().getWorkerPid();
-        try {
-          knowledgeServer.client().reconnect(expectedPid);
-          knowledgeServer.client().resetCircuitBreaker();
-        } catch (Exception e) {
-          log.debug("Worker client reconnect failed (best-effort)", e);
-        }
-      }
-    } catch (Exception e) {
-      log.warn("Worker restart failed (best-effort): {}", e.getMessage());
+    if (knowledgeServer != null && knowledgeServer.hasClient()) {
+      log.info(
+          "Pack import complete; an Engine restart is required to load it ({})",
+          io.justsearch.app.services.worker.RestartRequiredException.CODE);
     }
   }
 

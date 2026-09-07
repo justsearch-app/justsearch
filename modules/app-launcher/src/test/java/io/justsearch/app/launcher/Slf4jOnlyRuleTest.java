@@ -45,7 +45,6 @@ class Slf4jOnlyRuleTest {
           // Crash reporter — SLF4J may itself be in a failed state when this fires.
           "CrashReporter",
           // Worker IPC handshake / port emission — stdout is the contract with the Head.
-          "WorkerSpawner",
           "WorkerProcessMain",
           // Build-time tool output (diagnostic-only mains):
           "RunMatrixPrinter",
