@@ -156,6 +156,71 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   written under exactly the same condition, so live behaviour is unchanged. `energyState()`'s
   `WorkerSpawner` mention in `PowerStatusView.java:9` was stale and was corrected in the same commit.
 
+- **A6.** The item's acceptance — "every consumer compiles against `SearchPort`/`IndexingService`
+  only; `git grep -c RemoteKnowledgeClient -- 'modules/**/src/main/**'` is 0" — is **half
+  achievable, and the achievable half was done**. The grep is 0 outside the wire stack (survivors:
+  `RemoteKnowledgeClient.java` itself, `KnowledgeServerBootstrap`'s legacy branch, and javadoc in
+  `IpcTelemetry`, `AgentToolErrors`, `WorkerServiceCalls`, `GrpcMessageLimits`, `GrpcTestClient` —
+  all A9-A11 deletions). The first half cannot hold: the ~27 consumers call ~90 methods
+  (`fetchDocuments`, `retrieveContext`, `getHealthCheck`, `prepareUpgrade`, `scanRoot`, the VDU
+  calls…), of which `SearchPort` declares **one** and `IndexingService` declares **none**, and most
+  return proto types neither contract module can name — `ipc-common` has `api(project(":modules:app-api"))`
+  (`modules/ipc-common/build.gradle.kts`), so the edge cannot be reversed to widen either interface.
+  917 §1 already recorded this as real work ("extract the interface … today `SearchPort`+`IndexingService`
+  are two separate interfaces the class satisfies, not one unified `KnowledgeClient`"). Resolution:
+  `io.justsearch.app.services.worker.KnowledgeClient`, an **abstract class** that IS a `SearchPort`
+  and an `IndexingService`, in the lowest module both `ui` and `app-engine` see. Not a stop-rule
+  trigger (§11): no new consumer category, no second transport, no `ui` dependency on worker
+  internals.
+- **A6 (composition).** `KnowledgeServer` is in `indexer-worker`, not `worker-services`, so
+  `app-engine` needed a **main-source** `implementation(project(":modules:indexer-worker"))` — the
+  A4 note that the edge was "test-only and goes at A9" is superseded: A9 deletes the drift-pin
+  test, not the edge. `implementation` keeps `io.justsearch.indexerworker..` off `ui`'s compile
+  classpath, so rule 6b's allowance does not leak upward. `ui` gains
+  `implementation(project(":modules:app-engine"))`; both lockfiles regenerated.
+- **A6 (the suicide pact is the reason the signal bus had to be injected).**
+  `KnowledgeServer.start()` hard-wired `new MmfWorkerSignalBus(signalPath, headPid)`. In one JVM
+  that bus reads a heartbeat nobody writes and `shouldDie()` goes true — the sentinel thread would
+  terminate the Engine. `KnowledgeServer` gains a second constructor taking a `WorkerSignalBus`;
+  `InProcessWorkerSignalBus` (`worker-core`) answers the two GPU-scheduling signals from the shared
+  `GpuSchedulingGauge` and answers heartbeat/shutdown/`shouldDie` with the only honest in-process
+  answer. Port publication becomes a recorded no-op. `WorkerConfig.load()` is now public: the root
+  is a legitimate second caller and it reads the same `ConfigStore.global()` the Head resolved, so
+  "one config, no worker snapshot" needed no new mechanism.
+- **A6 (the executor seam was the real blocker, not the facade).** The ops layer
+  (`SearchRpcOps`, `MigrationOps`, `VduOps`, `SyncOps`, `RootLifecycleOps`) is reached through
+  `SearchRpcExecutor` / `IngestRpcExecutor`, which were typed on
+  `Function<SearchServiceGrpc.SearchServiceBlockingStub, T>` — a generated class only a `Channel`
+  can produce. That single type is why 1 300 lines of non-network logic were reachable only over
+  the wire. Retyping it to `SearchServiceCalls` / `IngestServiceCalls` / `HealthServiceCalls`
+  (generated from `indexing.proto`: 10 + 36 + 1 unary methods, same names, same signatures) left
+  every `stub -> stub.foo(request)` lambda compiling verbatim. The two streaming RPCs are NOT on
+  those interfaces — a stream is not a `Resp m(Req)` call — and get their own seams.
+- **A6 (deadline).** A3's carry-over is closed. `EngineKnowledgeClient.Budget` schedules a cancel at
+  `category.apply(deadlineMs)`, flips the `CallContext.CancelSignal` the A3 services already poll,
+  and raises `WorkerServiceException.Status.DEADLINE_EXCEEDED` if the call returns after the budget
+  elapsed. That status and `CANCELLED` were absent at A3 for want of a producer; A6 is the producer,
+  and `WorkerServiceCalls.toStatus` maps both so the wire cannot re-label them INTERNAL.
+- **A6 (what A7/A8 inherit).** A6 wires both streams in-process but does **not** bound them: the
+  `IndexingJobsStream` handle stops production on close, and `executeScanRoot` forwards progress
+  directly. The bound, its policy and the cancellation-within-one-tick test are A7's and A8's, as
+  the items say. `RemoteIndexingJobsBridge` was retyped onto a one-method `IndexingJobsSource` rather
+  than onto the whole client, which is what keeps its two tests (and the `ui` substrate integration
+  test) exercising real proto frames over a real in-process gRPC server.
+- **A6 (`WorkerAppServices` must not be cached).** `KnowledgeServer` REPLACES its `appServices` on a
+  deferred-runtime upgrade and on dev hot-reload (`reconstructAppServices`), so
+  `EngineKnowledgeClient` holds a `Supplier<WorkerAppServices>` and re-reads per call. A cached
+  reference would keep calling services bound to a closed runtime — silent, and only after an
+  upgrade.
+- **A6 (registers, Q6).** Option (a) held: the adapter is typed on the ports and the proto DTOs and
+  imports neither `SearchTrace` nor `IndexingJobView`, so `execution-surfaces.v1.json` and
+  `operation-surfaces.v1.json` are untouched. Verified by grep of `app-engine`'s imports before the
+  commit, not after a gate red.
+- **A6 (dead-code store).** The A1/A4 prediction held exactly: giving `EngineRoot` and
+  `ForegroundLoadGate` callers retired both accepted entries on their own (20 -> 18, committed with
+  the change). `RemoteKnowledgeClient` did **not** become a new violation, because the bootstrap's
+  legacy branch still constructs it — so A6 opens no accepted red at all; A11 does.
+
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
 Read from each module's `build.gradle.kts` `dependencies` block and `settings.gradle.kts:113-147`:
