@@ -396,8 +396,8 @@ gate:
   model files, upgrades to the next release and asserts they survive
   (`docs/how-to/verify-update-preserves-models.md`). The
   `check-update-preserves-models` script is only the static half.
-- `prepare-winget-manifests.yml` and `sign-vendored-mirrors.yml` are release-cut
-  steps documented in `docs/how-to/cut-a-release.md`.
+- `sign-vendored-mirrors.yml` is a release-cut step documented in
+  `docs/how-to/cut-a-release.md`.
 - `onramp-smoke.yml` for the model-less Tier 0 first-success proof;
   `ci-walltime-trend.yml` for CI wall-time trend reporting.
 
