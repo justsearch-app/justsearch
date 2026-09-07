@@ -17,6 +17,10 @@ permissions:
 
 env:
   NODE_VERSION: "24.14.0"
+  # The WinGet CLI release the manifests are validated with (must know the ManifestVersion
+  # in packaging/winget/package.v1.json) and the PowerShell module that installs it.
+  WINGET_VERSION: "v1.29.290"
+  WINGET_CLIENT_MODULE_VERSION: "1.29.280"
 
 concurrency:
   group: prepare-winget-${{ inputs.releaseTag }}
@@ -45,6 +49,29 @@ jobs:
       - name: Test the deterministic generator
         shell: pwsh
         run: node --test scripts/release/winget-manifests.test.mjs
+
+      # The runner image ships the inbox App Installer, which predates the manifest schema
+      # version the generator emits. An unknown ManifestVersion makes `winget validate` fall
+      # back to the newest schema it knows, warn "schema header URL does not match the expected
+      # pattern" for every file, and exit 0x8A150028 (validation succeeded with warnings), which
+      # the strict validate step below treats as failure (run 34098386285). Pin the CLI the
+      # manifests are validated against instead of trusting the image, and assert the pin took.
+      - name: Install the pinned WinGet CLI
+        shell: pwsh
+        run: |
+          Install-Module `
+            -Name Microsoft.WinGet.Client `
+            -RequiredVersion $env:WINGET_CLIENT_MODULE_VERSION `
+            -Repository PSGallery `
+            -Scope CurrentUser `
+            -Force
+          Import-Module Microsoft.WinGet.Client -RequiredVersion $env:WINGET_CLIENT_MODULE_VERSION -Force
+          Repair-WinGetPackageManager -Version $env:WINGET_VERSION -Force
+
+          $version = (winget --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -cne $env:WINGET_VERSION) {
+            throw "Expected WinGet $env:WINGET_VERSION; found '$version'"
+          }
 
       - name: Resolve immutable release input
         shell: pwsh
