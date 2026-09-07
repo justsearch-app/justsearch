@@ -73,9 +73,9 @@ final class DevReloadManager {
       rewireModels(newServices, modelCtx);
 
       // 6. Swap gRPC delegates (volatile write — atomic for new requests)
-      server.searchWrapper.setDelegate(newServices.grpcSearchService());
-      server.ingestWrapper.setDelegate(newServices.grpcIngestService());
-      server.healthWrapper.setDelegate(newServices.grpcHealthService());
+      server.searchWrapper.setDelegate(newServices.searchService());
+      server.ingestWrapper.setDelegate(newServices.ingestService());
+      server.healthWrapper.setDelegate(newServices.healthService());
 
       // 7. Update KnowledgeServer's appServices reference
       server.appServices = newServices;

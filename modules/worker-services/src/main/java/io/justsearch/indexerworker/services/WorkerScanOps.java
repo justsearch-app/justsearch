@@ -40,8 +40,8 @@ import org.slf4j.LoggerFactory;
  *   <li>No prune phase (callers ask for a focused walk; pruning remains a separate concern).</li>
  *   <li>No user-activity throttling — scan intent is operator-driven, not periodic-sync.</li>
  *   <li>Optional caller-supplied glob excludes layered on top of the standard skip set.</li>
- *   <li>Streams progress to a {@link Consumer} so the gRPC handler can map onto
- *       {@code StreamObserver.onNext}.</li>
+ *   <li>Streams progress to a {@link Consumer} sink supplied by the caller, which decides where
+ *       each frame goes.</li>
  * </ul>
  */
 final class WorkerScanOps {
@@ -81,8 +81,8 @@ final class WorkerScanOps {
 
   /**
    * Constructor with cancellation + backpressure hooks but the real cloud-placeholder
-   * detector. Used by {@link GrpcIngestService} so the Worker-owned scan honours
-   * {@link io.grpc.stub.ServerCallStreamObserver#isCancelled()} and the live queue depth.
+   * detector. Used by {@link WorkerIngestService} so the Worker-owned scan honours the call's
+   * cancellation signal ({@link CallContext#cancelled()}) and the live queue depth.
    */
   WorkerScanOps(
       JobQueue jobQueue,
@@ -175,7 +175,7 @@ final class WorkerScanOps {
     String collection = request.collection();
     // Tempdoc 821 §3-C3: a FORCE_REINDEX scan marks every path it admits forced, so the batch
     // extractor bypasses its unchanged-check and actually re-runs extraction + enrichment.
-    // Same sink GrpcIngestService#submitBatch already uses for ForceReindex on the batch API —
+    // Same sink WorkerIngestService#submitBatch already uses for ForceReindex on the batch API —
     // no new mechanism, just the arm that never consulted request.mode().
     boolean forceReindex = request.mode() == ScanMode.FORCE_REINDEX;
     // Tempdoc 812 D2: every job this walk admits remembers the scan that admitted it, so the Head
@@ -280,7 +280,7 @@ final class WorkerScanOps {
 
   /**
    * Sink for paths a FORCE_REINDEX scan admits (tempdoc 821 §3-C3). Production wiring is {@code
-   * IndexingLoop::markForced} — the same set {@code GrpcIngestService#submitBatch} feeds for the
+   * IndexingLoop::markForced} — the same set {@code WorkerIngestService#submitBatch} feeds for the
    * batch API's {@code force_reindex} flag.
    */
   @FunctionalInterface
@@ -395,7 +395,7 @@ final class WorkerScanOps {
    * Caller-side request DTO so this class doesn't depend on the proto types.
    *
    * <p>Tempdoc 419 / T2: {@code scanId} is allocated by the gRPC entry point ({@link
-   * GrpcIngestService#scanRoot}) and stamped on every emitted {@link ScanRootProgress}. The
+   * WorkerIngestService#scanRoot}) and stamped on every emitted {@link ScanRootProgress}. The
    * worker {@link WorkerScanOps} reads it but does not generate it.
    */
   record ScanRequest(

@@ -83,7 +83,7 @@
       "kind": "grep-present",
       "pattern": "setCitationScorer|isCitationScorerActive|matchCitations",
       "paths": [
-        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/GrpcSearchService.java"
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java"
       ]
     },
     {
@@ -93,7 +93,7 @@
       "kind": "grep-present",
       "pattern": "(citationMatchOps\\.execute\\(|citationMatchOps\\.setCitationScorer\\()",
       "paths": [
-        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/GrpcSearchService.java"
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java"
       ],
       "expect": 2
     },

@@ -1045,7 +1045,7 @@ on the leak clause independently of the R@10 noise floor (0.0068). The single po
   F-052 observation implied, because the mechanism it feared (GPU load → silent quality loss)
   does not exist under pre-check semantics. The knob's name and docs should say "pre-check".
 - **The defect that matters more: `DEADLINE_EXCEEDED` is a mislabel.**
-  `GrpcSearchService.java:487` stamps it on ANY `RerankedResult.skipped()` including the
+  `WorkerSearchService.java:487` stamps it on ANY `RerankedResult.skipped()` including the
   `catch (OrtException)` (`CrossEncoderReranker.java:318-332`): in the W2 wide-window arms,
   199/200 "deadline misses" were actually BFCArena OOM (`Available memory … smaller than
   requested 629145600`; arena 2048 default vs batch-64×512 buckets) — deadline 2000/4000 ms
@@ -1504,7 +1504,7 @@ above)*
   drift.
 - **The invariant, pinned:** header number *n* ⇔ `sections[n-1]` ⇔ `chunks[n-1]` (the array the FE
   renders as `sources`) — nested class `NumberingContract` (:679) in
-  `modules/worker-services/src/test/.../GrpcSearchServiceRetrieveContextTest.java`, test
+  `modules/worker-services/src/test/.../WorkerSearchServiceRetrieveContextTest.java`, test
   `headerNumberMatchesSectionAndCitationPosition` (:711). Its fixtures deliberately index chunks
   **5/6/7** of their parents, so a header numbered from `chunkIndex` would print `[6]` where the
   contract requires `[1]` — the test distinguishes the right reason from a passing coincidence.

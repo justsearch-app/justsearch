@@ -352,7 +352,7 @@ final class WorkerScanOpsTest {
   /**
    * Tempdoc 419 / T2 — every emitted {@link ScanRootProgress} carries the same {@code scan_id}
    * value supplied via the {@link WorkerScanOps.ScanRequest}. The gRPC entry point
-   * ({@code GrpcIngestService.scanRoot}) allocates a UUID per RPC; this test pins the
+   * ({@code WorkerIngestService.scanRoot}) allocates a UUID per RPC; this test pins the
    * propagation contract end-to-end at the WorkerScanOps level.
    */
   @Test

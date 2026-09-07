@@ -25,7 +25,7 @@ record FileFreshnessSnapshot(
     Objects.requireNonNull(path, "path");
     Path absolute = path.toAbsolutePath().normalize();
     // The one derivation of this key, shared with every site that MARKS a path by it
-    // (WorkerScanOps, GrpcIngestService#submitBatch). See PathNormalizer#normalizeKey.
+    // (WorkerScanOps, WorkerIngestService#submitBatch). See PathNormalizer#normalizeKey.
     String key = PathNormalizer.normalizeKey(absolute);
     BasicFileAttributes attrs =
         Files.readAttributes(absolute, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);

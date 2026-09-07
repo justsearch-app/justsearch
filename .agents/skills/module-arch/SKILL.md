@@ -165,9 +165,9 @@ The Head and Body run in separate OS processes with gRPC IPC:
 HEAD PROCESS                      | WORKER PROCESS
 ----------------------------------|---------------------------------
 ui                                | indexer-worker
-app-services                      |   - GrpcSearchService
-                                  |   - GrpcIngestService
-app-search (gRPC client)          |   - GrpcHealthService
+app-services                      |   - WorkerSearchService
+                                  |   - WorkerIngestService
+app-search (gRPC client)          |   - WorkerHealthService
 app-indexing (gRPC client)        |   - EmbeddingService
                                   |   - LuceneIndexRuntime
     v                             |
@@ -268,9 +268,9 @@ Located in `build-logic/`:
 
 | Service | Proto | Implementation | Module |
 |---------|-------|----------------|--------|
-| SearchService | indexing.proto | `GrpcSearchService` | indexer-worker |
-| IngestService | indexing.proto | `GrpcIngestService` | indexer-worker |
-| HealthService | indexing.proto | `GrpcHealthService` | indexer-worker |
+| SearchService | indexing.proto | `WorkerSearchService` | indexer-worker |
+| IngestService | indexing.proto | `WorkerIngestService` | indexer-worker |
+| HealthService | indexing.proto | `WorkerHealthService` | indexer-worker |
 
 ## Port/Adapter Pattern
 

@@ -54,7 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Status reporting helper for {@link GrpcIngestService}.
+ * Status reporting helper for {@link WorkerIngestService}.
  *
  * <p>Builds the {@link StatusResponse} for the {@code indexStatus} RPC, encapsulating
  * compatibility checking, fingerprint comparison, queue health aggregation, and all

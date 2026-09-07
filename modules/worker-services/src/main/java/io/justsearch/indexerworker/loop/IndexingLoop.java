@@ -159,7 +159,7 @@ public class IndexingLoop implements Closeable {
 
   /**
    * Loop state, exposed for system test observability and the worker-state wire emitter
-   * ({@code GrpcHealthService.workerStateSupplier} via
+   * ({@code WorkerHealthService.workerStateSupplier} via
    * {@code DefaultWorkerAppServices.indexingLoopState()}). Wire-string identity is
    * preserved through {@link Enum#name()} — every consumer that pinned the literal
    * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code ChaosSuiteTest} and
@@ -1047,7 +1047,7 @@ public class IndexingLoop implements Closeable {
    * <p>Backed by {@link LoopState}; new callers should prefer {@link #loopState()} for
    * type safety. This String accessor is retained for the worker-state wire emission
    * path ({@code ChaosSuiteTest}, {@code WorkerAppServices.indexingLoopState()},
-   * existing Mockito stubs in the {@code GrpcIngestService*} test family) where the
+   * existing Mockito stubs in the {@code WorkerIngestService*} test family) where the
    * String form crosses a process or test-mock boundary.
    *
    * @deprecated since tempdoc 516 Slice 2 — prefer {@link #loopState()} for typed

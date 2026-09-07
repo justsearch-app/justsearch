@@ -21,9 +21,9 @@ import io.justsearch.indexerworker.loop.IndexingPipelineMetricCatalog;
 import io.justsearch.indexerworker.loop.IngestionOutcomeMetricCatalog;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerService;
-import io.justsearch.indexerworker.services.GrpcHealthService;
-import io.justsearch.indexerworker.services.GrpcIngestService;
-import io.justsearch.indexerworker.services.GrpcSearchService;
+import io.justsearch.indexerworker.services.WorkerHealthService;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
@@ -59,9 +59,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * from its only producer.
    */
   private final IndexingPacing indexingPacing;
-  private final GrpcSearchService searchService;
-  private final GrpcIngestService ingestService;
-  private final GrpcHealthService healthService;
+  private final WorkerSearchService searchService;
+  private final WorkerIngestService ingestService;
+  private final WorkerHealthService healthService;
   // W7.2: shared registry held by both IndexingLoop and SearchOrchestrator.
   private final EncoderBindings encoderBindings;
   // Tempdoc 418 Phase B — Worker-side filesystem watcher. Owned by appServices so its lifecycle
@@ -160,18 +160,19 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.indexingLoop = null;
     }
 
-    // 2. gRPC search service (null embedding — wired by deferred init).
+    // 2. Search service (null embedding — wired by deferred init). Lane F item A3 converted it
+    // off the generated ImplBase; the gRPC wire reaches it through DelegatingSearchService.
     // Works against DeferredRuntime (read ops only) or RunningRuntime.
     // W7.2: shares the encoderBindings instance with IndexingLoop.
     this.searchService =
-        new GrpcSearchService(ctx.searchLifecycleSupplier().get(), null, encoderBindings);
+        new WorkerSearchService(ctx.searchLifecycleSupplier().get(), null, encoderBindings);
 
-    // 3. gRPC ingest service. GrpcIngestService is null-tolerant for
+    // 3. gRPC ingest service. WorkerIngestService is null-tolerant for
     // ingestLifecycle/indexingLoop — write methods return UNAVAILABLE when
     // either is null. KS reconstructs this with non-null values after
     // DeferredRuntime.upgradeWriter() and swaps the wrapper.
     this.ingestService =
-        new GrpcIngestService(
+        new WorkerIngestService(
             ctx.jobQueue(),
             indexingLoop,
             ctx.signalBus(),
@@ -197,11 +198,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.searchService.setActiveGenerationSupplier(
         this.ingestService.activeGenerationSupplier());
 
-    // 4. gRPC health service
+    // 4. Health service (also converted off the ImplBase; reached through DelegatingHealthService).
     List<WorkerModelDiscovery.DiscoveredModel> discoveredModels =
         WorkerModelDiscovery.discoverAll();
     this.healthService =
-        new GrpcHealthService(
+        new WorkerHealthService(
             ctx.config().serviceVersion(),
             ctx.jobQueue(),
             ctx.searchLifecycleSupplier().get().indexCountOps(),
@@ -276,17 +277,17 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   // ==================== Service accessors ====================
 
   @Override
-  public GrpcSearchService grpcSearchService() {
+  public WorkerSearchService searchService() {
     return searchService;
   }
 
   @Override
-  public GrpcIngestService grpcIngestService() {
+  public WorkerIngestService ingestService() {
     return ingestService;
   }
 
   @Override
-  public GrpcHealthService grpcHealthService() {
+  public WorkerHealthService healthService() {
     return healthService;
   }
 

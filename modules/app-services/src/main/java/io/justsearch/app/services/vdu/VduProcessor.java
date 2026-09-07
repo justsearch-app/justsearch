@@ -74,7 +74,7 @@ public class VduProcessor {
      * </ol>
      *
      * @see io.justsearch.ui.api.SummaryController#MAX_CONTENT_CHARS 6K summarization limit
-     * @see io.justsearch.indexerworker.services.GrpcSearchService#MAX_CONTENT_CHARS 200K transport
+     * @see io.justsearch.indexerworker.services.WorkerSearchService#MAX_CONTENT_CHARS 200K transport
      */
     private static final int MAX_CONTEXT_CHARS = 8000;
 

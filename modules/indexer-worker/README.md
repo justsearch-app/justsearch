@@ -6,7 +6,7 @@ This document defines the critical constraints, execution flows, and operational
 -----------------------------------------
 
 Concurrency & Ownership:
-- Lucene Write Access: The Lucene IndexWriter is NOT thread-safe for concurrent commits from multiple components. It is owned exclusively by the IndexingLoop. No other service (e.g., GrpcIngestService) should attempt to write to the index directly.
+- Lucene Write Access: The Lucene IndexWriter is NOT thread-safe for concurrent commits from multiple components. It is owned exclusively by the IndexingLoop. No other service (e.g., WorkerIngestService) should attempt to write to the index directly.
 - Job Queue Locking: The JobQueue uses a ReentrantLock to serialize access to the SQLite database. While SQLite supports some concurrency, this application-level lock prevents "database locked" errors during heavy contention between ingestion (writes) and polling (reads).
 - Native Memory Lifecycle: The EmbeddingService manages an ONNX Runtime embedding backend. ONNX sessions hold off-heap memory that must be explicitly closed via the try-with-resources pattern or the shutdown hook to prevent memory leaks.
 
@@ -46,7 +46,7 @@ Blocking Policy:
 
 Flow 1: File Ingestion (Batch)
 Trigger: Main process sends BatchRequest via gRPC.
-1. GrpcIngestService.submitBatch() receives list of paths.
+1. WorkerIngestService.submitBatch() receives list of paths.
 2. Paths are sanitized (traversal checks, existence checks).
 3. JobQueue.enqueue() acquires lock, writes PENDING rows to SQLite.
 4. Returns accepted count to client immediately (Non-blocking).
@@ -70,7 +70,7 @@ Trigger: IndexingLoop wakes up (IDLE -> RUNNING).
 
 Flow 3: Vector Search
 Trigger: User queries "contract 2024".
-1. GrpcSearchService.search() receives query.
+1. WorkerSearchService.search() receives query.
 2. EmbeddingService.embed(query) -> Generates query vector (CPU).
 3. LuceneIndexRuntime.search() -> Performs KNN vector search + Boolean filtering.
    - Uses Reciprocal Rank Fusion (RRF) to merge Text (BM25) and Vector results.
@@ -110,7 +110,7 @@ Trigger: User queries "contract 2024".
 -----------------------------
 
 Self-Checks:
-- Health Check: GrpcHealthService provides deep health status.
+- Health Check: WorkerHealthService provides deep health status.
   Command: gRPC call to Health/Check.
   Success Criteria: Returns SERVING status, queue depth, and "isHealthy: true".
 - Startup: Check logs for "KnowledgeServer started on port X".

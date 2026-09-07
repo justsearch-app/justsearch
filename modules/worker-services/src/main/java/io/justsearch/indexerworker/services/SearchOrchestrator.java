@@ -21,7 +21,7 @@ import java.util.function.Supplier;
  *
  * <p>The class formerly known as the "1,919-LOC mega-class" — now a thin facade that
  * wires four collaborators (capture → plan → execute → respond) and exposes the
- * remaining deferred-injection setters that {@code GrpcSearchService} continues to call.
+ * remaining deferred-injection setters that {@code WorkerSearchService} continues to call.
  *
  * <p>Tempdoc 516 P3 / Slice 5 (W7.2) cut: the {@code SpladeEncoder} and {@code
  * BgeM3Encoder} volatile slots that 517 itself flagged as "Phase 2 SearchCollaboratorsHolder
@@ -110,7 +110,7 @@ public final class SearchOrchestrator {
         encoderBindings.bgeM3Encoder());
   }
 
-  // === Deferred-injection setters (preserved for GrpcSearchService wiring) ===
+  // === Deferred-injection setters (preserved for WorkerSearchService wiring) ===
   // 516 P3 / W7.2: setSpladeEncoder + setBgeM3Encoder removed — encoderBindings.bindX() now.
 
   public void setActiveGenerationSupplier(Supplier<String> supplier) {

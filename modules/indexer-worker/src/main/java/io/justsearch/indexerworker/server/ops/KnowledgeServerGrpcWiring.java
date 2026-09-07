@@ -37,15 +37,15 @@ public final class KnowledgeServerGrpcWiring {
 
     // Wrap concrete services in delegates and register with gRPC server
     DelegatingHealthService healthWrapper =
-        new DelegatingHealthService(appServices.grpcHealthService());
+        new DelegatingHealthService(appServices.healthService());
     builder.addService(healthWrapper);
 
     DelegatingIngestService ingestWrapper =
-        new DelegatingIngestService(appServices.grpcIngestService());
+        new DelegatingIngestService(appServices.ingestService());
     builder.addService(ingestWrapper);
 
     DelegatingSearchService searchWrapper =
-        new DelegatingSearchService(appServices.grpcSearchService());
+        new DelegatingSearchService(appServices.searchService());
     builder.addService(searchWrapper);
 
     return new GrpcWiringResult(builder.build(), searchWrapper, ingestWrapper, healthWrapper);

@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Test;
  * with no live backend:
  *
  * <pre>
- * in-process gRPC server          (stand-in for worker's GrpcIngestService)
+ * in-process gRPC server          (stand-in for worker's WorkerIngestService)
  *      ↓ frames
  * RemoteIndexingJobsBridge        (head-side translator)
  *      ↓ Delta events

@@ -7,9 +7,9 @@ import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerService;
-import io.justsearch.indexerworker.services.GrpcHealthService;
-import io.justsearch.indexerworker.services.GrpcIngestService;
-import io.justsearch.indexerworker.services.GrpcSearchService;
+import io.justsearch.indexerworker.services.WorkerHealthService;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
 import io.justsearch.reranker.CrossEncoderReranker;
@@ -31,11 +31,11 @@ public interface WorkerAppServices extends Closeable {
 
   // --- Concrete service accessors (used by GrpcWiring for delegate wrapping) ---
 
-  GrpcSearchService grpcSearchService();
+  WorkerSearchService searchService();
 
-  GrpcIngestService grpcIngestService();
+  WorkerIngestService ingestService();
 
-  GrpcHealthService grpcHealthService();
+  WorkerHealthService healthService();
 
   // --- Indexing loop lifecycle ---
 
@@ -99,7 +99,7 @@ public interface WorkerAppServices extends Closeable {
    */
   default void wireStageEnabled(boolean embedding, boolean splade, boolean ner) {}
 
-  /** 360: Wires the search reranker (GPU-capable) to GrpcSearchService and RagContextOps. */
+  /** 360: Wires the search reranker (GPU-capable) to WorkerSearchService and RagContextOps. */
   void wireSearchReranker(CrossEncoderReranker reranker);
 
   /**

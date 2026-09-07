@@ -2,7 +2,6 @@ package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -44,7 +43,7 @@ final class SearchOrchestratorComposablePathTest {
     void sparseDenseNoEmbedding() throws Exception {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
         // No embedding service set → dense leg fails with NO_EMBEDDING_SERVICE
 
         SearchResponse response =
@@ -74,7 +73,7 @@ final class SearchOrchestratorComposablePathTest {
     void sparseDenseEmbeddingBlocked() throws Exception {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
         EmbeddingCompatibilityController controller =
             new EmbeddingCompatibilityController(Map::of, () -> 1L);
         forceEmbeddingCompatState(controller, State.BLOCKED_LEGACY, "LEGACY_INDEX_NO_FINGERPRINT");
@@ -110,7 +109,7 @@ final class SearchOrchestratorComposablePathTest {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
         EmbeddingService embeddingService = embeddingServiceAvailableButNullEmbed();
-        var service = new GrpcSearchService(lifecycle, embeddingService);
+        var service = new WorkerSearchService(lifecycle, embeddingService);
 
         SearchResponse response =
             invokeSearch(
@@ -139,7 +138,7 @@ final class SearchOrchestratorComposablePathTest {
     void denseOnlyCompatBlocked() throws Exception {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
         EmbeddingCompatibilityController controller =
             new EmbeddingCompatibilityController(Map::of, () -> 1L);
         forceEmbeddingCompatState(controller, State.BLOCKED_LEGACY, "LEGACY_INDEX_NO_FINGERPRINT");
@@ -168,7 +167,7 @@ final class SearchOrchestratorComposablePathTest {
     void sparseSpladeNoEncoder() throws Exception {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
         // No SPLADE encoder available → SPLADE leg fails
 
         SearchResponse response =
@@ -197,7 +196,7 @@ final class SearchOrchestratorComposablePathTest {
     void allThreeNoEmbeddingNoSplade() throws Exception {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
         // No embedding service, no SPLADE encoder → both dense and SPLADE fail
 
         SearchResponse response =
@@ -234,7 +233,7 @@ final class SearchOrchestratorComposablePathTest {
     void sparseOnlyReturnsResults() throws Exception {
       String prevConfig = System.getProperty("justsearch.config");
       try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
 
         SearchResponse response =
             invokeSearch(
@@ -256,31 +255,10 @@ final class SearchOrchestratorComposablePathTest {
     }
   }
 
-  // ---- Test infrastructure (duplicated from GrpcSearchServiceReasonCodeContractTest) ----
+  // ---- Test infrastructure (duplicated from WorkerSearchServiceReasonCodeContractTest) ----
 
-  private static SearchResponse invokeSearch(GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-
-    assertNull(errorRef.get(), () -> "search() errored: " + errorRef.get());
-    SearchResponse response = responseRef.get();
+  private static SearchResponse invokeSearch(WorkerSearchService service, SearchRequest request) {
+    SearchResponse response = service.search(request, CallContext.none());
     assertNotNull(response);
     return response;
   }

@@ -96,7 +96,7 @@ KEY_THRESHOLD = "JUSTSEARCH_CHUNKING_SWEEP_THRESHOLD_CHARS"
 KEY_EVIDENCE = "JUSTSEARCH_SPLADE_EVIDENCE_PATH"
 # `EnvRegistry.java:758` RERANK_DEADLINE_MS. Resolved on the HEAD
 # (`ResolvedConfigBuilder.java:1351`), sent to the Worker on the wire in
-# `RerankRequest.deadline_ms` (`SearchRpcOps.java:390` -> `GrpcSearchService.java:484`)
+# `RerankRequest.deadline_ms` (`SearchRpcOps.java:390` -> `WorkerSearchService.java:484`)
 # AND carried into the worker snapshot at ordinal 450 -- both legs were proven live
 # before the campaign's first arm and are recorded in F-057. The one-off probe was
 # removed with the temporary binding.

@@ -10,12 +10,12 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOps;
-import io.justsearch.indexerworker.services.GrpcIngestService;
+import io.justsearch.indexerworker.services.WorkerIngestService;
 
 @AnalyzeClasses(packages = "io.justsearch.indexerworker", importOptions = ImportOption.DoNotIncludeTests.class)
 class IndexerWorkerGuardrailsTest {
   // `indexerWorkerMustNotReadEnvOrSystemProperties` and its five exemptions (DevReloadManager,
-  // IndexStatusOps, GrpcHealthService, TikaOcrRuntime, ExtractionSandboxCommand) were retired in
+  // IndexStatusOps, WorkerHealthService, TikaOcrRuntime, ExtractionSandboxCommand) were retired in
   // tempdoc 883 decision 5. The single repo-wide replacement is
   // io.justsearch.deadcode.SystemAccessFunnelTest (modules/dead-code-audit); each exemption is now
   // a line in gates/config-surface/sysaccess-allowlist.txt, a ratchet that only shrinks. The
@@ -152,7 +152,7 @@ class IndexerWorkerGuardrailsTest {
    * above is trivially bypassed: a rescue can skip the {@code maybeAutoStartRebuildFor*} family and
    * flip the state machine straight through {@code onForcedReindexRequested}.
    *
-   * <p>{@code GrpcIngestService} is deliberately legal — it triggers on a user-initiated forced
+   * <p>{@code WorkerIngestService} is deliberately legal — it triggers on a user-initiated forced
    * reindex, where the re-embed work comes from the surrounding ingest request that rewrites
    * documents to PENDING, not from the flag flip. That is the criterion for any future addition
    * here: real pending work must already be guaranteed by the caller's own context.
@@ -160,7 +160,7 @@ class IndexerWorkerGuardrailsTest {
   private static final DescribedPredicate<JavaCall<?>> FORCED_REINDEX_TRIGGER_OUTSIDE_ALLOWLIST =
       new DescribedPredicate<>(
           "call EmbeddingCompatibilityController.onForcedReindexRequested from outside"
-              + " EmbeddingRecoveryOps / GrpcIngestService") {
+              + " EmbeddingRecoveryOps / WorkerIngestService") {
         @Override
         public boolean test(JavaCall<?> call) {
           if (!call.getTargetOwner()
@@ -174,7 +174,7 @@ class IndexerWorkerGuardrailsTest {
           String origin = call.getOriginOwner().getName();
           return !origin.equals(EmbeddingRecoveryOps.class.getName())
               && !origin.equals(EmbeddingCompatibilityController.class.getName())
-              && !origin.equals(GrpcIngestService.class.getName());
+              && !origin.equals(WorkerIngestService.class.getName());
         }
       };
 
@@ -203,7 +203,7 @@ class IndexerWorkerGuardrailsTest {
           .callMethodWhere(FORCED_REINDEX_TRIGGER_OUTSIDE_ALLOWLIST)
           .because(
               "tempdoc 726 F3 — onForcedReindexRequested only flips the state machine; it queues no"
-                  + " re-embed work. It is safe from GrpcIngestService because a user-initiated"
+                  + " re-embed work. It is safe from WorkerIngestService because a user-initiated"
                   + " forced reindex rides an ingest request that rewrites documents to PENDING"
                   + " itself. Anywhere else it is the same unsound shortcut as calling the"
                   + " auto-rescue entry points directly: use"
@@ -213,8 +213,8 @@ class IndexerWorkerGuardrailsTest {
 
   // NOTE — a third tempdoc-517 rule ("encoder imports confined to input-capture")
   // was considered but dropped. Peer classes outside the search-execution
-  // scope (CitationMatchOps for citation embeddings; GrpcHealthService for
-  // readiness probes; RagContextOps for RAG embeddings; GrpcSearchService for
+  // scope (CitationMatchOps for citation embeddings; WorkerHealthService for
+  // readiness probes; RagContextOps for RAG embeddings; WorkerSearchService for
   // gRPC-level wiring) legitimately depend on EmbeddingProvider/SPLADE/BGE-M3
   // for their own concerns. The narrower rules above (planner / responder no IO)
   // enforce what tempdoc 517's design actually requires — namely that the

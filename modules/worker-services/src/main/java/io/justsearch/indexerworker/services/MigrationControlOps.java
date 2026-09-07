@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.ipc.IndexGcRequest;
 import io.justsearch.ipc.IndexGcResponse;
@@ -16,11 +15,16 @@ import io.justsearch.ipc.MigrationRollbackResponse;
 import io.justsearch.ipc.MigrationStartRequest;
 import io.justsearch.ipc.MigrationStartResponse;
 /**
- * Migration lifecycle control helper for {@link GrpcIngestService}.
+ * Migration lifecycle control helper for {@link WorkerIngestService}.
  *
  * <p>Encapsulates the 6 migration control RPCs (start, cutover, pause, resume, rollback, GC) that
  * all gate on {@link IndexGenerationManager} and manage migration state transitions. Extracted to
  * reduce the size of the service class.
+ *
+ * <p>Lane F stage A item A3: every method here answers with a response on both the success and the
+ * failure path — a refusal rides in the response's {@code accepted=false} + {@code error} fields,
+ * never as a transport status. So the conversion is a pure return-instead-of-onNext, and no
+ * {@link WorkerServiceException} is thrown from this class.
  */
 final class MigrationControlOps {
 
@@ -32,19 +36,15 @@ final class MigrationControlOps {
     this.restartWorkerCallback = restartWorkerCallback;
   }
 
-  void startMigration(
-      MigrationStartRequest request, StreamObserver<MigrationStartResponse> responseObserver) {
+  MigrationStartResponse startMigration(MigrationStartRequest request) {
     String reason = request.getReason();
     boolean restart = request.getRestartWorker();
     try {
       if (indexGenerationManager == null) {
-        responseObserver.onNext(
-            MigrationStartResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Index generation manager not available")
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationStartResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Index generation manager not available")
+            .build();
       }
       IndexGenerationManager.State next =
           indexGenerationManager.startMigration(reason.isBlank() ? "manual" : reason.trim());
@@ -54,7 +54,7 @@ final class MigrationControlOps {
           next == null || next.building_generation() == null ? "" : next.building_generation();
       String ms = next == null || next.migration_state() == null ? "" : next.migration_state();
 
-      responseObserver.onNext(
+      MigrationStartResponse response =
           MigrationStartResponse.newBuilder()
               .setAccepted(true)
               .setError("")
@@ -62,8 +62,7 @@ final class MigrationControlOps {
               .setActiveGenerationId(active)
               .setBuildingGenerationId(building)
               .setRestartScheduled(restart && restartWorkerCallback != null)
-              .build());
-      responseObserver.onCompleted();
+              .build();
 
       if (restart && restartWorkerCallback != null) {
         // Best-effort: restart after responding.
@@ -79,28 +78,22 @@ final class MigrationControlOps {
                 "migration-start-restart")
             .start();
       }
+      return response;
     } catch (Exception e) {
-      responseObserver.onNext(
-          MigrationStartResponse.newBuilder()
-              .setAccepted(false)
-              .setError(e.getMessage() == null ? "Failed to start migration" : e.getMessage())
-              .build());
-      responseObserver.onCompleted();
+      return MigrationStartResponse.newBuilder()
+          .setAccepted(false)
+          .setError(e.getMessage() == null ? "Failed to start migration" : e.getMessage())
+          .build();
     }
   }
 
-  void requestCutover(
-      MigrationCutoverRequest request,
-      StreamObserver<MigrationCutoverResponse> responseObserver) {
+  MigrationCutoverResponse requestCutover(MigrationCutoverRequest request) {
     try {
       if (indexGenerationManager == null) {
-        responseObserver.onNext(
-            MigrationCutoverResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Index generation manager not available")
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationCutoverResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Index generation manager not available")
+            .build();
       }
       // Force SWITCHING (best-effort). Cutover monitor will handle the rest.
       if (request.getForceSwitching()) {
@@ -108,130 +101,95 @@ final class MigrationControlOps {
             IndexGenerationManager.MigrationState.SWITCHING);
       }
       IndexGenerationManager.State s = indexGenerationManager.readStateBestEffort();
-      responseObserver.onNext(
-          MigrationCutoverResponse.newBuilder()
-              .setAccepted(true)
-              .setError("")
-              .setMigrationState(
-                  s == null || s.migration_state() == null ? "" : s.migration_state())
-              .build());
-      responseObserver.onCompleted();
+      return MigrationCutoverResponse.newBuilder()
+          .setAccepted(true)
+          .setError("")
+          .setMigrationState(s == null || s.migration_state() == null ? "" : s.migration_state())
+          .build();
     } catch (Exception e) {
-      responseObserver.onNext(
-          MigrationCutoverResponse.newBuilder()
-              .setAccepted(false)
-              .setError(
-                  e.getMessage() == null ? "Failed to request cutover" : e.getMessage())
-              .build());
-      responseObserver.onCompleted();
+      return MigrationCutoverResponse.newBuilder()
+          .setAccepted(false)
+          .setError(e.getMessage() == null ? "Failed to request cutover" : e.getMessage())
+          .build();
     }
   }
 
-  void pauseMigration(
-      MigrationPauseRequest request, StreamObserver<MigrationPauseResponse> responseObserver) {
+  MigrationPauseResponse pauseMigration(MigrationPauseRequest request) {
     try {
       if (indexGenerationManager == null) {
-        responseObserver.onNext(
-            MigrationPauseResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Index generation manager not available")
-                .setMigrationPaused(false)
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationPauseResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Index generation manager not available")
+            .setMigrationPaused(false)
+            .build();
       }
       IndexGenerationManager.State s = indexGenerationManager.readStateBestEffort();
       String ms = s == null || s.migration_state() == null ? "" : s.migration_state();
       if ("SWITCHING".equalsIgnoreCase(ms)) {
-        responseObserver.onNext(
-            MigrationPauseResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Cannot pause during SWITCHING")
-                .setMigrationPaused(false)
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationPauseResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Cannot pause during SWITCHING")
+            .setMigrationPaused(false)
+            .build();
       }
       IndexGenerationManager.State next =
           indexGenerationManager.setMigrationPaused(
               true, request == null ? "" : request.getReason());
-      responseObserver.onNext(
-          MigrationPauseResponse.newBuilder()
-              .setAccepted(true)
-              .setError("")
-              .setMigrationPaused(next != null && Boolean.TRUE.equals(next.migration_paused()))
-              .build());
-      responseObserver.onCompleted();
+      return MigrationPauseResponse.newBuilder()
+          .setAccepted(true)
+          .setError("")
+          .setMigrationPaused(next != null && Boolean.TRUE.equals(next.migration_paused()))
+          .build();
     } catch (Exception e) {
-      responseObserver.onNext(
-          MigrationPauseResponse.newBuilder()
-              .setAccepted(false)
-              .setError(
-                  e.getMessage() == null ? "Failed to pause migration" : e.getMessage())
-              .setMigrationPaused(false)
-              .build());
-      responseObserver.onCompleted();
+      return MigrationPauseResponse.newBuilder()
+          .setAccepted(false)
+          .setError(e.getMessage() == null ? "Failed to pause migration" : e.getMessage())
+          .setMigrationPaused(false)
+          .build();
     }
   }
 
-  void resumeMigration(
-      MigrationResumeRequest request, StreamObserver<MigrationResumeResponse> responseObserver) {
+  MigrationResumeResponse resumeMigration(MigrationResumeRequest request) {
     try {
       if (indexGenerationManager == null) {
-        responseObserver.onNext(
-            MigrationResumeResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Index generation manager not available")
-                .setMigrationPaused(false)
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationResumeResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Index generation manager not available")
+            .setMigrationPaused(false)
+            .build();
       }
       IndexGenerationManager.State next = indexGenerationManager.setMigrationPaused(false, null);
-      responseObserver.onNext(
-          MigrationResumeResponse.newBuilder()
-              .setAccepted(true)
-              .setError("")
-              .setMigrationPaused(next != null && Boolean.TRUE.equals(next.migration_paused()))
-              .build());
-      responseObserver.onCompleted();
+      return MigrationResumeResponse.newBuilder()
+          .setAccepted(true)
+          .setError("")
+          .setMigrationPaused(next != null && Boolean.TRUE.equals(next.migration_paused()))
+          .build();
     } catch (Exception e) {
-      responseObserver.onNext(
-          MigrationResumeResponse.newBuilder()
-              .setAccepted(false)
-              .setError(
-                  e.getMessage() == null ? "Failed to resume migration" : e.getMessage())
-              .setMigrationPaused(false)
-              .build());
-      responseObserver.onCompleted();
+      return MigrationResumeResponse.newBuilder()
+          .setAccepted(false)
+          .setError(e.getMessage() == null ? "Failed to resume migration" : e.getMessage())
+          .setMigrationPaused(false)
+          .build();
     }
   }
 
-  void rollbackMigration(
-      MigrationRollbackRequest request,
-      StreamObserver<MigrationRollbackResponse> responseObserver) {
+  MigrationRollbackResponse rollbackMigration(MigrationRollbackRequest request) {
     boolean restart = request.getRestartWorker();
     try {
       if (indexGenerationManager == null) {
-        responseObserver.onNext(
-            MigrationRollbackResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Index generation manager not available")
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationRollbackResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Index generation manager not available")
+            .build();
       }
       IndexGenerationManager.State next = indexGenerationManager.rollbackToPreviousGeneration();
       if (next == null) {
-        responseObserver.onNext(
-            MigrationRollbackResponse.newBuilder()
-                .setAccepted(false)
-                .setError("No index state available")
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return MigrationRollbackResponse.newBuilder()
+            .setAccepted(false)
+            .setError("No index state available")
+            .build();
       }
-      responseObserver.onNext(
+      MigrationRollbackResponse response =
           MigrationRollbackResponse.newBuilder()
               .setAccepted(true)
               .setError("")
@@ -240,8 +198,7 @@ final class MigrationControlOps {
               .setPreviousGenerationId(
                   next.previous_generation() == null ? "" : next.previous_generation())
               .setRestartScheduled(restart && restartWorkerCallback != null)
-              .build());
-      responseObserver.onCompleted();
+              .build();
 
       if (restart && restartWorkerCallback != null) {
         new Thread(
@@ -256,51 +213,42 @@ final class MigrationControlOps {
                 "migration-rollback-restart")
             .start();
       }
+      return response;
     } catch (Exception e) {
-      responseObserver.onNext(
-          MigrationRollbackResponse.newBuilder()
-              .setAccepted(false)
-              .setError(
-                  e.getMessage() == null ? "Failed to rollback migration" : e.getMessage())
-              .build());
-      responseObserver.onCompleted();
+      return MigrationRollbackResponse.newBuilder()
+          .setAccepted(false)
+          .setError(e.getMessage() == null ? "Failed to rollback migration" : e.getMessage())
+          .build();
     }
   }
 
-  void runIndexGc(IndexGcRequest request, StreamObserver<IndexGcResponse> responseObserver) {
+  IndexGcResponse runIndexGc(IndexGcRequest request) {
     try {
       if (indexGenerationManager == null) {
-        responseObserver.onNext(
-            IndexGcResponse.newBuilder()
-                .setAccepted(false)
-                .setError("Index generation manager not available")
-                .setMarkedCount(0)
-                .setPrunedCount(0)
-                .build());
-        responseObserver.onCompleted();
-        return;
+        return IndexGcResponse.newBuilder()
+            .setAccepted(false)
+            .setError("Index generation manager not available")
+            .setMarkedCount(0)
+            .setPrunedCount(0)
+            .build();
       }
       int keepLatest = request == null ? 0 : request.getKeepLatest();
       boolean pruneMarkedOnly = request != null && request.getPruneMarkedOnly();
       IndexGenerationManager.GcResult r =
           indexGenerationManager.gcBestEffort(keepLatest, pruneMarkedOnly);
-      responseObserver.onNext(
-          IndexGcResponse.newBuilder()
-              .setAccepted(true)
-              .setError("")
-              .setMarkedCount(r == null ? 0 : r.markedCount())
-              .setPrunedCount(r == null ? 0 : r.prunedCount())
-              .build());
-      responseObserver.onCompleted();
+      return IndexGcResponse.newBuilder()
+          .setAccepted(true)
+          .setError("")
+          .setMarkedCount(r == null ? 0 : r.markedCount())
+          .setPrunedCount(r == null ? 0 : r.prunedCount())
+          .build();
     } catch (Exception e) {
-      responseObserver.onNext(
-          IndexGcResponse.newBuilder()
-              .setAccepted(false)
-              .setError(e.getMessage() == null ? "Failed to run GC" : e.getMessage())
-              .setMarkedCount(0)
-              .setPrunedCount(0)
-              .build());
-      responseObserver.onCompleted();
+      return IndexGcResponse.newBuilder()
+          .setAccepted(false)
+          .setError(e.getMessage() == null ? "Failed to run GC" : e.getMessage())
+          .setMarkedCount(0)
+          .setPrunedCount(0)
+          .build();
     }
   }
 }

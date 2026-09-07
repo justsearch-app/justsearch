@@ -126,7 +126,7 @@ final class JobBatchExtractorForcedPathTest {
   }
 
   /**
-   * The derivation {@code GrpcIngestService#submitBatch} used before tempdoc 821 §P/P3: absolutize
+   * The derivation {@code WorkerIngestService#submitBatch} used before tempdoc 821 §P/P3: absolutize
    * but never {@link Path#normalize()}. Kept here ONLY as the negative control below.
    */
   private static String preP3Key(Path file) {

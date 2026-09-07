@@ -1510,7 +1510,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * <p>This makes the {@code retrieval} composite a faithful projection of the Worker's own issuance
    * predicate {@code denseServiceable = allowQueryEmbeddings()(==COMPATIBLE) && embeddingProvider.isAvailable()}
    * — reconstructed here from {@code embeddingCompatState} + {@code embeddingReady} (which equals
-   * {@code isAvailable()} on the Worker, GrpcHealthService) — so the search banner stops claiming "fully
+   * {@code isAvailable()} on the Worker, WorkerHealthService) — so the search banner stops claiming "fully
    * semantic" while AUTO has degraded to keyword. It does NOT fire for {@code BLOCKED_*} (handled by
    * {@link #compatBlockedReason} with the rebuild remedy), {@code REBUILDING} (handled by
    * {@link #embeddingRebuildReason}, whose remedy is to wait), or an UNKNOWN/empty compat or {@code null}

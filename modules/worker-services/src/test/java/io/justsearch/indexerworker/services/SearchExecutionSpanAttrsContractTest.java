@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -31,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -127,7 +125,7 @@ final class SearchExecutionSpanAttrsContractTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -158,7 +156,7 @@ final class SearchExecutionSpanAttrsContractTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-2", "Lorem ipsum")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -193,7 +191,7 @@ final class SearchExecutionSpanAttrsContractTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-3", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -300,29 +298,12 @@ final class SearchExecutionSpanAttrsContractTest {
   // test-isolation pattern established in tempdoc 517 §B.4 (no shared base).
   // ============================================================
 
-  private static SearchResponse invokeSearch(GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-    if (errorRef.get() != null) {
-      throw new RuntimeException("search() errored", errorRef.get());
+  private static SearchResponse invokeSearch(WorkerSearchService service, SearchRequest request) {
+    try {
+      return service.search(request, CallContext.none());
+    } catch (WorkerServiceException e) {
+      throw new RuntimeException("search() errored", e);
     }
-    return responseRef.get();
   }
 
   private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)

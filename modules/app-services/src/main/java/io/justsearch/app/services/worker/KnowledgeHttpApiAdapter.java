@@ -121,7 +121,7 @@ public final class KnowledgeHttpApiAdapter {
 
   /**
    * Tempdoc 811 (C-2a) — single-file ingest with an explicit collection tag. The tag rides
-   * {@code BatchRequest.target_collection} to {@code GrpcIngestService.submitBatch}, which passes it
+   * {@code BatchRequest.target_collection} to {@code WorkerIngestService.submitBatch}, which passes it
    * to {@code JobQueue.enqueue} and from there to {@code IndexingDocumentOps}'s {@code collection}
    * field write. A {@code null}/blank collection preserves the pre-811 untagged behaviour.
    */

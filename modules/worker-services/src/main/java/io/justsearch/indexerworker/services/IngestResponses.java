@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Static response builders and switch-buffer payload helpers for {@link GrpcIngestService}.
+ * Static response builders and switch-buffer payload helpers for {@link WorkerIngestService}.
  *
  * <p>All methods are pure static with no instance state. Extracted to reduce the size of the
  * service class while keeping response-construction logic centralized and auditable.
@@ -238,7 +238,7 @@ final class IngestResponses {
     return RecoverVduProcessingResponse.newBuilder().setRecoveredCount(recoveredCount).build();
   }
 
-  // ==================== VDU retry decision (shared by GrpcIngestService + IngestSwitchBufferOps) ====================
+  // ==================== VDU retry decision (shared by WorkerIngestService + IngestSwitchBufferOps) ====================
 
   record MarkVduRetryDecision(boolean maxRetriesExceeded, int retryCount) {}
 

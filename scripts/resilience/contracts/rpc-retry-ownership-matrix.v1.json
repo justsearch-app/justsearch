@@ -196,7 +196,7 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchRpcOps.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/gpl/GplJobCoordinator.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/GrpcSearchServiceListAllDocumentIdsTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceListAllDocumentIdsTest.java"
       ],
       "protoFile": "modules/ipc-common/src/main/proto/indexing.proto",
       "service": "io.justsearch.ipc.SearchService",

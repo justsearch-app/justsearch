@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.grpc;
 
 import io.grpc.stub.StreamObserver;
+import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.ipc.BatchRequest;
 import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.ClearFailedJobsRequest;
@@ -50,24 +51,37 @@ import io.justsearch.ipc.UpgradeQuiescenceResponse;
 import java.util.Objects;
 
 /**
- * Delegating wrapper for IngestService that enables runtime service swapping.
+ * gRPC adapter for {@link WorkerIngestService}, and the seam that enables runtime service
+ * swapping.
  *
  * <p>Registered once with the gRPC server. All RPC calls are forwarded to a {@code volatile}
- * delegate that can be swapped without restarting the gRPC server. The delegate is typed as the
- * generated ImplBase to support cross-classloader hot-reload (Phase 2, tempdoc 305).
+ * delegate that can be swapped without restarting the gRPC server (hot reload, tempdoc 305).
+ *
+ * <p>Lane F stage A item A3: the delegate is the converted service, which returns its response
+ * instead of writing to a {@code StreamObserver}; this wrapper builds the {@link
+ * io.justsearch.indexerworker.services.CallContext} from the two worker-core interceptors, does the
+ * {@code onNext} / {@code onCompleted}, and maps {@code WorkerServiceException} back onto the
+ * identical status code — so the wire behaviour is unchanged. Deleted at item A9.
+ *
+ * <p>The two server-streaming RPCs take different helpers on purpose. {@code scanRoot} finishes
+ * when the service method returns (every frame has been emitted), so it gets
+ * {@code streamThenComplete}. {@code subscribeIndexingJobs} registers a change-feed subscription
+ * and returns with the stream still live — completing it there would kill the Library SSE fan-out
+ * after its first snapshot frame — so it gets {@code streamOpen}, which leaves the call open and
+ * lets cancellation end it.
  *
  * <p>Non-RPC operations (model wiring, GPU diagnostics) are routed through
  * {@code WorkerAppServices}, not through this wrapper.
  */
 public final class DelegatingIngestService extends IngestServiceGrpc.IngestServiceImplBase {
 
-  private volatile IngestServiceGrpc.IngestServiceImplBase delegate;
+  private volatile WorkerIngestService delegate;
 
-  public DelegatingIngestService(IngestServiceGrpc.IngestServiceImplBase delegate) {
+  public DelegatingIngestService(WorkerIngestService delegate) {
     this.delegate = Objects.requireNonNull(delegate);
   }
 
-  public void setDelegate(IngestServiceGrpc.IngestServiceImplBase delegate) {
+  public void setDelegate(WorkerIngestService delegate) {
     this.delegate = Objects.requireNonNull(delegate);
   }
 
@@ -75,22 +89,26 @@ public final class DelegatingIngestService extends IngestServiceGrpc.IngestServi
 
   @Override
   public void submitBatch(BatchRequest req, StreamObserver<BatchResponse> obs) {
-    delegate.submitBatch(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.submitBatch(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void indexStatus(StatusRequest req, StreamObserver<StatusResponse> obs) {
-    delegate.indexStatus(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.indexStatus(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void deleteByPath(DeleteByPathRequest req, StreamObserver<DeleteByPathResponse> obs) {
-    delegate.deleteByPath(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.deleteByPath(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void deleteById(DeleteByIdRequest req, StreamObserver<DeleteByIdResponse> obs) {
-    delegate.deleteById(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.deleteById(req, WorkerServiceCalls.callContext(obs)));
   }
 
   /** Tempdoc 811 (C-2a) — removal route for collection-tagged ad-hoc ingests. */
@@ -98,164 +116,191 @@ public final class DelegatingIngestService extends IngestServiceGrpc.IngestServi
   public void deleteByCollection(
       io.justsearch.ipc.DeleteByCollectionRequest req,
       StreamObserver<io.justsearch.ipc.DeleteByCollectionResponse> obs) {
-    delegate.deleteByCollection(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.deleteByCollection(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @SuppressWarnings("deprecation")
   @Override
   public void pruneMissing(PruneRequest req, StreamObserver<PruneResponse> obs) {
-    delegate.pruneMissing(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.pruneMissing(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void syncDirectory(SyncDirectoryRequest req, StreamObserver<SyncDirectoryResponse> obs) {
-    delegate.syncDirectory(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.syncDirectory(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void updateVduResult(
       UpdateVduResultRequest req, StreamObserver<UpdateVduResultResponse> obs) {
-    delegate.updateVduResult(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.updateVduResult(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void queryPendingVdu(
       QueryPendingVduRequest req, StreamObserver<QueryPendingVduResponse> obs) {
-    delegate.queryPendingVdu(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.queryPendingVdu(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void markVduProcessing(
       MarkVduProcessingRequest req, StreamObserver<MarkVduProcessingResponse> obs) {
-    delegate.markVduProcessing(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.markVduProcessing(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void recoverVduProcessing(
       RecoverVduProcessingRequest req, StreamObserver<RecoverVduProcessingResponse> obs) {
-    delegate.recoverVduProcessing(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.recoverVduProcessing(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void startMigration(
       MigrationStartRequest req, StreamObserver<MigrationStartResponse> obs) {
-    delegate.startMigration(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.startMigration(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void requestCutover(
       MigrationCutoverRequest req, StreamObserver<MigrationCutoverResponse> obs) {
-    delegate.requestCutover(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.requestCutover(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void pauseMigration(
       MigrationPauseRequest req, StreamObserver<MigrationPauseResponse> obs) {
-    delegate.pauseMigration(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.pauseMigration(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void resumeMigration(
       MigrationResumeRequest req, StreamObserver<MigrationResumeResponse> obs) {
-    delegate.resumeMigration(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.resumeMigration(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void rollbackMigration(
       MigrationRollbackRequest req, StreamObserver<MigrationRollbackResponse> obs) {
-    delegate.rollbackMigration(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.rollbackMigration(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void runIndexGc(IndexGcRequest req, StreamObserver<IndexGcResponse> obs) {
-    delegate.runIndexGc(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.runIndexGc(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void settleIndex(SettleIndexRequest req, StreamObserver<SettleIndexResponse> obs) {
-    delegate.settleIndex(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.settleIndex(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void prepareUpgrade(
       UpgradeQuiescenceRequest req, StreamObserver<UpgradeQuiescenceResponse> obs) {
-    delegate.prepareUpgrade(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.prepareUpgrade(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void upgradeStatus(
       UpgradeQuiescenceRequest req, StreamObserver<UpgradeQuiescenceResponse> obs) {
-    delegate.upgradeStatus(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.upgradeStatus(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void cancelUpgrade(
       UpgradeQuiescenceRequest req, StreamObserver<UpgradeQuiescenceResponse> obs) {
-    delegate.cancelUpgrade(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.cancelUpgrade(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void updateDocumentPaths(UpdatePathsRequest req, StreamObserver<UpdatePathsResponse> obs) {
-    delegate.updateDocumentPaths(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.updateDocumentPaths(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void listFailedJobs(
       ListFailedJobsRequest req, StreamObserver<ListFailedJobsResponse> obs) {
-    delegate.listFailedJobs(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.listFailedJobs(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void countJobsByPathPrefix(
       io.justsearch.ipc.CountJobsByPathPrefixRequest req,
       StreamObserver<io.justsearch.ipc.CountJobsByPathPrefixResponse> obs) {
-    delegate.countJobsByPathPrefix(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.countJobsByPathPrefix(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void listFailedJobsByPathPrefix(
       io.justsearch.ipc.ListFailedJobsByPathPrefixRequest req,
       StreamObserver<ListFailedJobsResponse> obs) {
-    delegate.listFailedJobsByPathPrefix(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.listFailedJobsByPathPrefix(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void clearFailedJobs(
       ClearFailedJobsRequest req, StreamObserver<ClearFailedJobsResponse> obs) {
-    delegate.clearFailedJobs(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.clearFailedJobs(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void resetIndex(ResetIndexRequest req, StreamObserver<ResetIndexResponse> obs) {
-    delegate.resetIndex(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.resetIndex(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void getSessionPolicies(
       io.justsearch.ipc.SessionPoliciesRequest req,
       StreamObserver<io.justsearch.ipc.SessionPoliciesResponse> obs) {
-    delegate.getSessionPolicies(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.getSessionPolicies(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void reloadRuntime(
       io.justsearch.ipc.ReloadRuntimeRequest req,
       StreamObserver<io.justsearch.ipc.ReloadRuntimeResponse> obs) {
-    delegate.reloadRuntime(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.reloadRuntime(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void recentIngestionEvents(
       io.justsearch.ipc.RecentIngestionEventsRequest req,
       StreamObserver<io.justsearch.ipc.RecentIngestionEventsResponse> obs) {
-    delegate.recentIngestionEvents(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.recentIngestionEvents(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void ingestionOutcomeSummary(
       io.justsearch.ipc.IngestionOutcomeSummaryRequest req,
       StreamObserver<io.justsearch.ipc.IngestionOutcomeSummaryResponse> obs) {
-    delegate.ingestionOutcomeSummary(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.ingestionOutcomeSummary(req, WorkerServiceCalls.callContext(obs)));
   }
 
   // Tempdoc 419 / T5.3 (ADR-0028) — scoped reverse-lookup forward.
@@ -263,7 +308,8 @@ public final class DelegatingIngestService extends IngestServiceGrpc.IngestServi
   public void lookupPathByHash(
       io.justsearch.ipc.LookupPathByHashRequest req,
       StreamObserver<io.justsearch.ipc.LookupPathByHashResponse> obs) {
-    delegate.lookupPathByHash(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.lookupPathByHash(req, WorkerServiceCalls.callContext(obs)));
   }
 
   // Tempdoc 418 Phase A — Worker-owned filesystem traversal forwards.
@@ -272,21 +318,24 @@ public final class DelegatingIngestService extends IngestServiceGrpc.IngestServi
   public void scanRoot(
       io.justsearch.ipc.ScanRootRequest req,
       StreamObserver<io.justsearch.ipc.ScanRootProgress> obs) {
-    delegate.scanRoot(req, obs);
+    WorkerServiceCalls.streamThenComplete(
+        obs, () -> delegate.scanRoot(req, obs::onNext, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void watchRoot(
       io.justsearch.ipc.WatchRootRequest req,
       StreamObserver<io.justsearch.ipc.WatchRootResponse> obs) {
-    delegate.watchRoot(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.watchRoot(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void unwatchRoot(
       io.justsearch.ipc.UnwatchRootRequest req,
       StreamObserver<io.justsearch.ipc.UnwatchRootResponse> obs) {
-    delegate.unwatchRoot(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.unwatchRoot(req, WorkerServiceCalls.callContext(obs)));
   }
 
   // Slice 445 — Job-queue TABULAR Resource forwards.
@@ -295,20 +344,26 @@ public final class DelegatingIngestService extends IngestServiceGrpc.IngestServi
   public void subscribeIndexingJobs(
       io.justsearch.ipc.SubscribeIndexingJobsRequest req,
       StreamObserver<io.justsearch.ipc.IndexingJobsFrame> obs) {
-    delegate.subscribeIndexingJobs(req, obs);
+    // streamOpen, NOT streamThenComplete: the call returns with the change-feed subscription
+    // still live and further frames arriving from the feed's threads.
+    WorkerServiceCalls.streamOpen(
+        obs,
+        () -> delegate.subscribeIndexingJobs(req, obs::onNext, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void cancelIndexingJob(
       io.justsearch.ipc.CancelIndexingJobRequest req,
       StreamObserver<io.justsearch.ipc.CancelIndexingJobResponse> obs) {
-    delegate.cancelIndexingJob(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.cancelIndexingJob(req, WorkerServiceCalls.callContext(obs)));
   }
 
   @Override
   public void retryIndexingJob(
       io.justsearch.ipc.RetryIndexingJobRequest req,
       StreamObserver<io.justsearch.ipc.RetryIndexingJobResponse> obs) {
-    delegate.retryIndexingJob(req, obs);
+    WorkerServiceCalls.unary(
+        obs, () -> delegate.retryIndexingJob(req, WorkerServiceCalls.callContext(obs)));
   }
 }

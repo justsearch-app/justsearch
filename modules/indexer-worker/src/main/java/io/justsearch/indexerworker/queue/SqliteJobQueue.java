@@ -2145,7 +2145,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /**
    * Slice 445: accessor for the change-stream so the gRPC layer
-   * ({@code GrpcIngestService.subscribeIndexingJobs}) can subscribe to
+   * ({@code WorkerIngestService.subscribeIndexingJobs}) can subscribe to
    * snapshot+delta frames. Returns {@code null} if the queue is closed or
    * not yet opened.
    */

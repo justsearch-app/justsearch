@@ -84,7 +84,7 @@ Contract tests are the authoritative source for API schema expectations:
 | `LifecycleContractTest` | `/api/status` response shape, field presence, HTTP semantics |
 | `TelemetryHealthContractTest` | `/api/telemetry/health` response shape and field types |
 | `SchemaMismatchStatusContractTest` | Schema mismatch status reporting contract |
-| `GrpcSearchServiceReasonCodeContractTest` | gRPC search reason code allowlist |
+| `WorkerSearchServiceReasonCodeContractTest` | gRPC search reason code allowlist |
 
 Proto files: `modules/ipc-common/src/main/proto/`
 Route definitions: `modules/ui/src/main/java/.../routes/*.java`

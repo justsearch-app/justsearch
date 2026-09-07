@@ -268,7 +268,7 @@ public final class KnowledgeServer implements Closeable {
    *   <li><b>Query handlers</b> (tempdoc 397 §14.28 U3) — wired via
    *       {@link io.justsearch.indexerworker.server.WorkerAppServices#wireModelReadyLatch}
    *       in {@link #initDeferredModels()}, consumed by
-   *       {@code GrpcSearchService.awaitModelsReady(...)} on entry of
+   *       {@code WorkerSearchService.awaitModelsReady(...)} on entry of
    *       {@code search}/{@code retrieveContext}/{@code rerank}/{@code matchCitations}.
    *       Closes a boot-race regression where queries arriving before init completed
    *       silently missed reranker + citation wiring.</li>
@@ -1128,12 +1128,12 @@ public final class KnowledgeServer implements Closeable {
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     // 343: Wire resolved config supplier for search config status reporting.
-    svc.grpcIngestService()
+    svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
 
     // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
 
-    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so GrpcSearchService's query handlers
+    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so WorkerSearchService's query handlers
     // can await encoder wiring before first use.
     svc.wireModelReadyLatch(() -> modelReadyLatch);
 
@@ -1145,7 +1145,7 @@ public final class KnowledgeServer implements Closeable {
     // Tempdoc 406 — wire the runtime reload trigger so POST /api/admin/runtime/reload
     // can drive a holder swap on the active ingest runtime. Captures the active
     // index path lazily at trigger time so post-cutover paths swap correctly.
-    svc.grpcIngestService()
+    svc.ingestService()
         .setRuntimeReloadTrigger(
             reason ->
                 swapRuntime(
@@ -1160,7 +1160,7 @@ public final class KnowledgeServer implements Closeable {
     // recent-job-queue-depth trend. Late-bound supplier handles the LocalTelemetry-pre-init
     // path safely (returns null → empty array on the receiver side).
     if (telemetry instanceof LocalTelemetry lt) {
-      svc.grpcIngestService().setRrdStoreSupplier(lt::getRrdStore);
+      svc.ingestService().setRrdStoreSupplier(lt::getRrdStore);
     }
 
     // Tempdoc 819: the ECC is now resolved BEFORE the first appServices reconstruction
@@ -1190,13 +1190,13 @@ public final class KnowledgeServer implements Closeable {
     WorkerAppServices newServices = newAppServices();
     wireAppServicesPostConstruction(newServices);
     if (searchWrapper != null) {
-      searchWrapper.setDelegate(newServices.grpcSearchService());
+      searchWrapper.setDelegate(newServices.searchService());
     }
     if (ingestWrapper != null) {
-      ingestWrapper.setDelegate(newServices.grpcIngestService());
+      ingestWrapper.setDelegate(newServices.ingestService());
     }
     if (healthWrapper != null) {
-      healthWrapper.setDelegate(newServices.grpcHealthService());
+      healthWrapper.setDelegate(newServices.healthService());
     }
     this.appServices = newServices;
     newServices.startIndexingLoop();
@@ -1385,8 +1385,8 @@ public final class KnowledgeServer implements Closeable {
         appServices.wireNerService(nerService);
         var nerModelPath = nerConfig.modelPath().toString();
         var nerGpuEnabled = nerConfig.gpuEnabled();
-        appServices.grpcIngestService().setNerModelPathSupplier(() -> nerModelPath);
-        appServices.grpcIngestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled);
+        appServices.ingestService().setNerModelPathSupplier(() -> nerModelPath);
+        appServices.ingestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled);
       } else if (nerConfig.isReady()) {
         log.info("NER: surface returned no assembly; NER will be unavailable.");
       }
@@ -1480,13 +1480,13 @@ public final class KnowledgeServer implements Closeable {
       // term-stats, IndexSearcher) so the first real user query after boot doesn't pay the
       // Lucene/ICU JIT + class-load cold-start penalty (measured ~870ms cold vs ~12ms warm).
       // Runs after all encoders above are wired, so the synthetic pass exercises the same
-      // production search stack a real query would. Calls GrpcSearchService.warmUpSearchPath()
+      // production search stack a real query would. Calls WorkerSearchService.warmUpSearchPath()
       // directly (in-process, below the gRPC boundary) — see its Javadoc + SearchOrchestrator
       // .warmUp()'s Javadoc for why this can't leak into /api/status search telemetry or the
       // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
       try {
         long searchWarmStart = System.nanoTime();
-        boolean searchWarmed = appServices.grpcSearchService().warmUpSearchPath();
+        boolean searchWarmed = appServices.searchService().warmUpSearchPath();
         long searchWarmMs = (System.nanoTime() - searchWarmStart) / 1_000_000;
         if (searchWarmed) {
           log.info("Search path ready (warm-up={}ms)", searchWarmMs);
@@ -1566,7 +1566,7 @@ public final class KnowledgeServer implements Closeable {
       // wired (embedding + ECC + SPLADE + BGE-M3 + disambiguation + NER + reranker +
       // citation). This closes both (a) the SPLADE timing gap from 312 — migration
       // enumerator now waits until sparse vectors are available — and (b) the query-
-      // handler boot-race — GrpcSearchService.awaitModelsReady unblocks here. See the
+      // handler boot-race — WorkerSearchService.awaitModelsReady unblocks here. See the
       // modelReadyLatch field Javadoc for the full consumer list before changing the
       // release point.
       modelReadyLatch.countDown();

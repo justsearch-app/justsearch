@@ -319,7 +319,7 @@ public final class CommitOps {
   /**
    * Starts a periodic commit timer that commits when {@code pendingDocs > 0} and no explicit commit
    * has occurred recently. This is the universal safety net that catches writes from any code path
-   * (GrpcIngestService, backfill ops, etc.) even when IndexingLoop is idle.
+   * (WorkerIngestService, backfill ops, etc.) even when IndexingLoop is idle.
    *
    * <p>Call after the runtime is fully started and the writer is available. Only call in read-write
    * mode — read-only runtimes have no writer and no pending writes.

@@ -261,7 +261,7 @@ final class AgentSessionGroundingTest {
   @DisplayName("868 §B.3: paths differing only in case are ONE document — the index folds case before every fetch")
   void readOfACaseVariantPath_doesNotReMint() {
     var session = session();
-    // The Worker lowercases a docId before looking it up (GrpcSearchService.fetchDocumentSlice →
+    // The Worker lowercases a docId before looking it up (WorkerSearchService.fetchDocumentSlice →
     // PathNormalizer.normalizePath), so `/A.md` and `/a.md` cannot name two documents as far as any
     // fetch is concerned. Keying them apart here would mint a second source for a document the index
     // itself cannot distinguish — a duplicate row with no fact behind it.

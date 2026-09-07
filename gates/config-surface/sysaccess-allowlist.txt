@@ -25,7 +25,7 @@
 # Reasons carried over from the retired rules' inline exemptions:
 #   - indexerworker.server.DevReloadManager — dev-only build-stamp updater (tempdoc 371).
 #   - indexerworker.services.IndexStatusOps — reads the stamp via EnvRegistry indirection (371).
-#   - indexerworker.services.GrpcHealthService — JUSTSEARCH_WORKER_HEALTH_SYNTHETIC_DELAY_MS, a
+#   - indexerworker.services.WorkerHealthService — JUSTSEARCH_WORKER_HEALTH_SYNTHETIC_DELAY_MS, a
 #     test-only synthetic-delay hook, default 0/off (374 alpha.25 R13-A).
 #   - workerservices/indexerworker extract.TikaOcrRuntime — native-resource DISCOVERY (locating the
 #     bundled/system Tesseract binary and tessdata via PATH/APPDATA/LOCALAPPDATA/TESSERACT_PATH/
@@ -123,7 +123,7 @@ io.justsearch.indexerworker.extract.TikaOcrRuntime#findTessdataDirectory
 io.justsearch.indexerworker.extract.TikaOcrRuntime#localAppDataHome
 io.justsearch.indexerworker.extract.TikaOcrRuntime#resolve
 io.justsearch.indexerworker.server.DevReloadManager#updateBuildStampFromReloadFile
-io.justsearch.indexerworker.services.GrpcHealthService#parseLongEnv
+io.justsearch.indexerworker.services.WorkerHealthService#parseLongEnv
 io.justsearch.indexerworker.services.IndexStatusOps#buildStamp
 io.justsearch.ort.GpuAutoDetection#isWindows
 io.justsearch.ort.GpuDriverApiProbe#probe

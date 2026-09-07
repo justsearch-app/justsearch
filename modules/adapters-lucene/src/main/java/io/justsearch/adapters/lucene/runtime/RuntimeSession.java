@@ -161,7 +161,7 @@ final class RuntimeSession implements AutoCloseable {
    * Monotonic counter of BULK deletions submitted to the writer — {@code deleteByPathPrefix} and
    * {@code deleteAll} (tempdoc 809 finding 3). Removing a watched root lands here as a
    * {@code deleteByPathPrefix} on the worker (Head {@code RootLifecycleOps.removeWatchedPath} →
-   * {@code deleteByPath} RPC → {@code GrpcIngestService.deleteByPath} →
+   * {@code deleteByPath} RPC → {@code WorkerIngestService.deleteByPath} →
    * {@link IndexingCoordinator#deleteByPathPrefix}), so this is the removal signal itself rather
    * than a parallel flag mirroring it.
    *

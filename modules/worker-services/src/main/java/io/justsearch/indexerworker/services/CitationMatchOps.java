@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Citation matching logic extracted from {@link GrpcSearchService}.
+ * Citation matching logic extracted from {@link WorkerSearchService}.
  *
  * <p>Manages the lazy-initialized {@link CitationScorer} (CPU-only ONNX cross-encoder)
  * and provides an embedding-based cosine similarity fallback path.

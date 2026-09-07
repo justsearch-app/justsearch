@@ -4,10 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -23,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -77,7 +75,7 @@ final class FacetQuerySyntaxCouplingTest {
   void luceneSyntaxMultiLegCountsMatchTheRetrievedPopulation() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(service, hybridWithMimeFacet(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE));
 
@@ -119,7 +117,7 @@ final class FacetQuerySyntaxCouplingTest {
   void luceneSyntaxMultiLegWithoutFacetsCountsTheRetrievedPopulation() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchRequest noFacets =
           SearchRequest.newBuilder()
               .setQuery(DIVERGING_QUERY)
@@ -156,7 +154,7 @@ final class FacetQuerySyntaxCouplingTest {
   void simpleSyntaxMultiLegIsUnchanged() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse simple =
           invokeSearch(service, hybridWithMimeFacet(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE));
       SearchResponse lucene =
@@ -191,7 +189,7 @@ final class FacetQuerySyntaxCouplingTest {
   void luceneQuotedPhraseIsPhraseMatchedNotTokenOred() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
 
       // "alpha shared" is an in-order adjacent phrase in doc-a only. A token OR (the SIMPLE parse
       // of the same text, quotes escaped) matches all 3 docs via `shared`.
@@ -227,11 +225,11 @@ final class FacetQuerySyntaxCouplingTest {
   void malformedLuceneQueryDegradesLikeTheSparseShortcut() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
 
       // The reference behaviour: the sparse-only shortcut has always signalled a bad LUCENE parse
       // as INVALID_ARGUMENT rather than answering 0 hits (SearchExecutor:156).
-      Throwable sparseError =
+      WorkerServiceException sparseError =
           invokeSearchExpectingError(
               service,
               SearchRequest.newBuilder()
@@ -240,21 +238,19 @@ final class FacetQuerySyntaxCouplingTest {
                   .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
                   .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true).build())
                   .build());
-      assertEquals(
-          io.grpc.Status.Code.INVALID_ARGUMENT, io.grpc.Status.fromThrowable(sparseError).getCode());
+      assertEquals(WorkerServiceException.Status.INVALID_ARGUMENT, sparseError.status());
 
       // Tempdoc 821 §P: now that the multi-leg lexical leg parses LUCENE too, it must fail the same
       // way — a silent 0-hit answer would hide a malformed query behind "no results".
-      Throwable multiLegError =
+      WorkerServiceException multiLegError =
           invokeSearchExpectingError(
               service, multiLeg(MALFORMED_LUCENE_QUERY, SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE));
       assertEquals(
-          io.grpc.Status.Code.INVALID_ARGUMENT,
-          io.grpc.Status.fromThrowable(multiLegError).getCode(),
+          WorkerServiceException.Status.INVALID_ARGUMENT,
+          multiLegError.status(),
           "the multi-leg path must mirror the sparse shortcut, not degrade silently");
       assertTrue(
-          String.valueOf(io.grpc.Status.fromThrowable(multiLegError).getDescription())
-              .startsWith("Invalid query syntax"),
+          String.valueOf(multiLegError.getMessage()).startsWith("Invalid query syntax"),
           "same message shape as the sparse shortcut");
 
       // The same malformed text under SIMPLE is just literal text — it must still answer normally.
@@ -273,7 +269,7 @@ final class FacetQuerySyntaxCouplingTest {
   void malformedLuceneSignalsEvenWithoutALexicalLeg() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
 
       // An explicit query vector makes this a MultiLegDecision(DenseOnly) — no lexical leg runs, so
       // an "only probe when a lexical leg exists" gate would let this through. But
@@ -289,10 +285,10 @@ final class FacetQuerySyntaxCouplingTest {
                   PipelineConfig.newBuilder().setSparseEnabled(false).setDenseEnabled(true).build())
               .build();
 
-      Throwable error = invokeSearchExpectingError(service, denseOnly);
+      WorkerServiceException error = invokeSearchExpectingError(service, denseOnly);
       assertEquals(
-          io.grpc.Status.Code.INVALID_ARGUMENT,
-          io.grpc.Status.fromThrowable(error).getCode(),
+          WorkerServiceException.Status.INVALID_ARGUMENT,
+          error.status(),
           "a leg-less LUCENE parse failure must still be signalled, not answered with a 0 count");
 
       // Control: the same dense-only request with a WELL-FORMED LUCENE query ANSWERS instead of
@@ -334,56 +330,19 @@ final class FacetQuerySyntaxCouplingTest {
         .build();
   }
 
-  private static SearchResponse invokeSearch(GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-    assertNull(errorRef.get(), () -> "search() errored: " + errorRef.get());
-    SearchResponse response = responseRef.get();
+  private static SearchResponse invokeSearch(WorkerSearchService service, SearchRequest request) {
+    SearchResponse response = service.search(request, CallContext.none());
     assertNotNull(response);
     return response;
   }
 
-  /** Same call shape as {@link #invokeSearch}, but the error is the assertion subject. */
-  private static Throwable invokeSearchExpectingError(
-      GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-    assertNull(responseRef.get(), "search() answered instead of signalling the malformed query");
-    Throwable error = errorRef.get();
-    assertNotNull(error, "search() neither answered nor errored");
-    return error;
+  /** Same call shape as {@link #invokeSearch}, but the failure is the assertion subject. */
+  private static WorkerServiceException invokeSearchExpectingError(
+      WorkerSearchService service, SearchRequest request) {
+    return assertThrows(
+        WorkerServiceException.class,
+        () -> service.search(request, CallContext.none()),
+        "search() answered instead of signalling the malformed query");
   }
 
   private static RunningRuntime newLifecycleWithPdfDocs(Map<String, String> docs) throws Exception {

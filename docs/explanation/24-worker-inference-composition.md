@@ -300,7 +300,7 @@ consumers:
   files so the `IndexingLoop` does not process docs before SPLADE /
   embedding exist.
 - The **query handlers** (tempdoc 397 §14.28 U3) —
-  `GrpcSearchService.awaitModelsReady(...)` — block `search` /
+  `WorkerSearchService.awaitModelsReady(...)` — block `search` /
   `retrieveContext` / `rerank` / `matchCitations` until the latch
   releases, closing a boot-race where queries arriving during init
   silently missed the reranker + citation wiring.

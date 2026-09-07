@@ -438,7 +438,7 @@ Query building is centralized in `buildSimpleContentQuery()`, shared by both dir
 
 ### 5.4 Search Correction Pipeline
 
-When a SIMPLE-mode query returns zero hits, `GrpcSearchService` applies a two-stage correction pipeline:
+When a SIMPLE-mode query returns zero hits, `WorkerSearchService` applies a two-stage correction pipeline:
 
 1. **Zero-hit retry:** `buildFuzzyTextQuery()` resolves each query token to the closest indexed term via `resolveClosestTerm()` (Levenshtein distance + docFreq tiebreaker), then pipes the resolved terms through `buildSimpleContentQuery()` for score parity with normal queries.
 2. **Per-term correction:** When total hits > 0 but some individual terms have zero `docFreq`, `buildPerTermFuzzyQuery()` replaces only the missing terms with their closest resolved equivalents, preserving exact terms.

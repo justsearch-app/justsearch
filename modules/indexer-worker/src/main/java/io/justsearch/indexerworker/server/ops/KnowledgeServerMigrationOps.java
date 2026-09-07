@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.server.ops;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
@@ -20,7 +19,9 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
-import io.justsearch.indexerworker.services.GrpcIngestService;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.RecoverVduProcessingRequest;
 import io.justsearch.ipc.RecoverVduProcessingResponse;
@@ -537,8 +538,8 @@ public final class KnowledgeServerMigrationOps {
         case "VDU_RECOVER_PROCESSING" -> {
           if (context.ingestLifecycle() != null) {
             try {
-              GrpcIngestService tmp =
-                  new GrpcIngestService(
+              WorkerIngestService tmp =
+                  new WorkerIngestService(
                       context.jobQueue(),
                       null,
                       context.signalBus(),
@@ -550,35 +551,22 @@ public final class KnowledgeServerMigrationOps {
                       null,
                       0L,
                       null);
-              AtomicReference<RecoverVduProcessingResponse> resp = new AtomicReference<>();
-              AtomicReference<Throwable> err = new AtomicReference<>();
-              tmp.recoverVduProcessing(
-                  RecoverVduProcessingRequest.getDefaultInstance(),
-                  new StreamObserver<>() {
-                    @Override
-                    public void onNext(RecoverVduProcessingResponse value) {
-                      resp.set(value);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                      err.set(t);
-                    }
-
-                    @Override
-                    public void onCompleted() {}
-                  });
-              if (err.get() != null) {
+              RecoverVduProcessingResponse resp;
+              try {
+                resp =
+                    tmp.recoverVduProcessing(
+                        RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none());
+              } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
                     .log()
                     .warn(
                         "Failed to replay buffered VDU_RECOVER_PROCESSING (will retry later): key={} err={}",
                         op.key(),
-                        err.get().getMessage());
+                        wse.getMessage());
                 break;
               }
-              int recovered = resp.get() == null ? 0 : resp.get().getRecoveredCount();
+              int recovered = resp == null ? 0 : resp.getRecoveredCount();
               if (recovered > 0) {
                 mutatedLucene = true;
               }
@@ -726,8 +714,8 @@ public final class KnowledgeServerMigrationOps {
                 break;
               }
 
-              GrpcIngestService tmp =
-                  new GrpcIngestService(
+              WorkerIngestService tmp =
+                  new WorkerIngestService(
                       context.jobQueue(),
                       null,
                       context.signalBus(),
@@ -742,38 +730,20 @@ public final class KnowledgeServerMigrationOps {
               SyncDirectoryRequest req =
                   SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
 
-              AtomicReference<SyncDirectoryResponse> resp = new AtomicReference<>();
-              AtomicReference<Throwable> err = new AtomicReference<>();
-
-              tmp.syncDirectory(
-                  req,
-                  new StreamObserver<>() {
-                    @Override
-                    public void onNext(SyncDirectoryResponse value) {
-                      resp.set(value);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                      err.set(t);
-                    }
-
-                    @Override
-                    public void onCompleted() {}
-                  });
-
-              if (err.get() != null) {
+              SyncDirectoryResponse r;
+              try {
+                r = tmp.syncDirectory(req, CallContext.none());
+              } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
                     .log()
                     .warn(
                         "Failed to replay buffered SYNC_ROOT (will retry later): key={} err={}",
                         op.key(),
-                        err.get().getMessage());
+                        wse.getMessage());
                 break;
               }
 
-              SyncDirectoryResponse r = resp.get();
               if (r != null && !r.getError().isBlank()) {
                 allApplied = false;
                 context

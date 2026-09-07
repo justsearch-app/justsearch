@@ -51,7 +51,7 @@ The two approaches are **complementary, not mutually exclusive**. When both fire
 **Key files:**
 - Prompt engineering: `InferenceLifecycleManager.java`, `summary.rag.v1.mustache`, `summary.refine.v1.mustache`
 - Cross-encoder: `modules/reranker/CitationScorer.java`, `CitationScorerConfig.java`
-- Integration: `GrpcSearchService.matchCitations()`, `SummaryController` (SSE events)
+- Integration: `WorkerSearchService.matchCitations()`, `SummaryController` (SSE events)
 - Frontend: `useAppAI.ts` (`onCitationMatches`, `injectCitationMarkers`), `CitationHoverCard.tsx`, `MarkdownRenderer.tsx`
 
 ## Alternatives Considered
@@ -78,7 +78,7 @@ Use llama.cpp GBNF grammars to force citation syntax in the output. **Deferred**
 **Trigger check 2026-09-02** (decision-review lane B, tempdoc 884). **Neither trigger has
 fired; the decision is unchanged.** Both prongs are still wired — probes
 `adr-0006-citation-scorer-wired` and `adr-0006-citation-match-ops-wired` hold against
-`GrpcSearchService`, which owns the `CitationScorer` and reaches it through `CitationMatchOps`
+`WorkerSearchService`, which owns the `CitationScorer` and reaches it through `CitationMatchOps`
 on the search path.
 
 Two things the check surfaced:

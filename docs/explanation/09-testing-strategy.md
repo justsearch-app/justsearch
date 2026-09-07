@@ -29,16 +29,16 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
     *   `LlamaServerPropsParsingTest` (robust `/props` parsing for `n_ctx` / `model_alias`)
     *   `LocalApiCorsPolicyTest` (regression for loopback-only CORS allowlist / local bind safety)
     *   `LuceneIndexRuntimeTest` (regressions for user-safe query parsing, facets, and cursor-based `searchAfter` paging)
-    *   `GrpcSearchServiceSearchPayloadTest` (ensures interactive search hits do not ship `content`)
+    *   `WorkerSearchServiceSearchPayloadTest` (ensures interactive search hits do not ship `content`)
     *   `VduEligibilityPdfFixturesTest` (real PDF fixtures → correct `vdu_status` marking without llama-server)
     *   `TimeboxedContentExtractorTest` (deterministic extraction timeout guardrail)
     *   `ContextBudgeterTest` (strict character budgeting logic for RAG context assembly)
-    *   `GrpcSearchServiceRetrieveContextTest` (retrieveContext respects `maxChars` via strict budgeting)
-    *   `GrpcSearchServiceReasonCodeContractTest` (allowlisted reason codes for vector/hybrid fallback and RAG retrieval mode/reason)
+    *   `WorkerSearchServiceRetrieveContextTest` (retrieveContext respects `maxChars` via strict budgeting)
+    *   `WorkerSearchServiceReasonCodeContractTest` (allowlisted reason codes for vector/hybrid fallback and RAG retrieval mode/reason)
     *   `RemoteDocumentServiceContextBudgetTest` (fallback full-doc context retrieval is budgeted)
     *   `SummaryControllerRagSectionTruncationTest` (head-side truncation filters citations/sections consistently)
     *   `ChunkDocumentWriterTest` (chunk regeneration consistency: offsets + metadata)
-    *   `GrpcIngestServiceChunkRegenerationTest` (VDU update path regenerates chunks without drift)
+    *   `WorkerIngestServiceChunkRegenerationTest` (VDU update path regenerates chunks without drift)
 
 ## Tier 2.5: Guardrails & Contract Tests (Fast/Medium, drift prevention)
 
@@ -97,7 +97,7 @@ retired TS e2e tier described below:
 * **Frontend unit tests (Vitest)** — see Tier 1 above; run via `npm run test:unit:run` from
   `modules/ui-web`. Covers SSE framing, HTTP client behavior, and (per file) component/state logic.
 * **Java module/system-test suites** — see Tiers 1-3 above. HTTP-contract-level coverage
-  (`LocalApiCorsPolicyTest`, `HttpPagingCursorE2ETest`, `GrpcSearchServiceSearchPayloadTest`, etc.)
+  (`LocalApiCorsPolicyTest`, `HttpPagingCursorE2ETest`, `WorkerSearchServiceSearchPayloadTest`, etc.)
   exercises the same `/api/*` contracts the retired tier drove through a browser, at a faster,
   more deterministic layer.
 * **Visual/measurement verification (`jseval ui-shot` / `ui-check`)** — a **live, Python**

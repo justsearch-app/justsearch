@@ -75,7 +75,7 @@ public final class EncoderRuntimeExplainer {
 
   /**
    * Maps the JSON policy key (uppercase enum-name shape per {@code
-   * GrpcIngestService.getSessionPolicies}) to its {@link EncoderRole}; returns {@code null} if the
+   * WorkerIngestService.getSessionPolicies}) to its {@link EncoderRole}; returns {@code null} if the
    * key isn't a known role (defensive — shouldn't happen given Worker's serialiser).
    */
   public static EncoderRole parseRole(String key) {

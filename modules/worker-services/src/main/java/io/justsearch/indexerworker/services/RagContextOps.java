@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
- * RAG context retrieval logic extracted from {@link GrpcSearchService}.
+ * RAG context retrieval logic extracted from {@link WorkerSearchService}.
  *
  * <p>Manages chunk search (BM25/hybrid), cross-encoder reranking with deadline and GPU
  * arbitration, MMR/position diversification, and token-aware context budgeting.
@@ -449,7 +449,7 @@ final class RagContextOps {
       boolean allowQueryEmbeddings,
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks) {
-    // stage_id is cleaned up by the outer MdcContext.request() scope in GrpcSearchService
+    // stage_id is cleaned up by the outer MdcContext.request() scope in WorkerSearchService
     MDC.put("stage_id", "retrieve");
     commitOps.maybeRefresh();
     long startTime = System.currentTimeMillis();

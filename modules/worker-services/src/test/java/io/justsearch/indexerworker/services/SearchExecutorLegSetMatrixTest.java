@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -62,7 +61,7 @@ final class SearchExecutorLegSetMatrixTest {
   void emptyQueryDecision() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -90,7 +89,7 @@ final class SearchExecutorLegSetMatrixTest {
   void blockedDecisionViaCompat() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       EmbeddingCompatibilityController controller =
           new EmbeddingCompatibilityController(Map::of, () -> 1L);
       forceEmbeddingCompatState(controller, State.BLOCKED_LEGACY, "LEGACY_INDEX_NO_FINGERPRINT");
@@ -126,7 +125,7 @@ final class SearchExecutorLegSetMatrixTest {
   void sparseShortcutDecision() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -156,7 +155,7 @@ final class SearchExecutorLegSetMatrixTest {
   void multiLegBm25OnlyViaDegradedHybrid() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-2", "Lorem ipsum")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       // Hybrid request with no embedding service → vector encoding fails → degraded BM25-only.
       SearchResponse response =
           invokeSearch(
@@ -186,27 +185,8 @@ final class SearchExecutorLegSetMatrixTest {
   // Helpers (duplicated per tempdoc §B.4 — copy-paste pattern for test isolation)
   // ============================================================
 
-  private static SearchResponse invokeSearch(GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-    assertFalse(errorRef.get() != null, () -> "search() errored: " + errorRef.get());
-    SearchResponse response = responseRef.get();
+  private static SearchResponse invokeSearch(WorkerSearchService service, SearchRequest request) {
+    SearchResponse response = service.search(request, CallContext.none());
     assertNotNull(response);
     return response;
   }

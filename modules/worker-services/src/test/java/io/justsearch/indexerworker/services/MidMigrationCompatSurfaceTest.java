@@ -19,11 +19,9 @@ import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.StatusRequest;
 import io.justsearch.ipc.StatusResponse;
-import io.grpc.stub.StreamObserver;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,7 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
  * from the stale-shape Blue was described as fine. Live validation observed it twice, in two
  * independent arms.
  *
- * <p>This is a wiring test on purpose: it drives a real {@link GrpcIngestService} with two DIFFERENT
+ * <p>This is a wiring test on purpose: it drives a real {@link WorkerIngestService} with two DIFFERENT
  * runtimes rather than handing {@code IndexStatusOps} the values under test, because supplying them
  * by hand is exactly the mistake — the defect was never in the comparison, it was in which index the
  * comparison was pointed at.
@@ -141,11 +139,11 @@ final class MidMigrationCompatSurfaceTest {
     when(jobQueue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     when(jobQueue.pendingBytes()).thenReturn(JobQueue.PendingBytes.EMPTY);
 
-    GrpcIngestService service =
-        new GrpcIngestService(
+    WorkerIngestService service =
+        new WorkerIngestService(
             jobQueue,
             null,
-            // Non-null: buildCore reads the heartbeat unguarded, and GrpcIngestService turns any
+            // Non-null: buildCore reads the heartbeat unguarded, and WorkerIngestService turns any
             // RuntimeException into a blank ERROR payload - which would make every assertion below
             // fail on an empty string instead of on the value under test.
             mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
@@ -158,25 +156,6 @@ final class MidMigrationCompatSurfaceTest {
             0L,
             null);
 
-    AtomicReference<StatusResponse> out = new AtomicReference<>();
-    service.indexStatus(
-        StatusRequest.newBuilder().build(),
-        new StreamObserver<>() {
-          @Override
-          public void onNext(StatusResponse value) {
-            out.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            throw new AssertionError("indexStatus failed", t);
-          }
-
-          @Override
-          public void onCompleted() {
-            // no-op
-          }
-        });
-    return out.get();
+    return service.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
   }
 }

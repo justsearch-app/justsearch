@@ -9,7 +9,7 @@ description: 'Degradation signaling contract for gRPC and `rag_meta`.'
 
 JustSearch surfaces explicit mode + reason metadata so clients can distinguish “keyword-only”, “semantic”, and fallback behavior without log-grepping or guesswork.
 
-Worker-emitted reason codes are treated as a contract: they are allowlisted by `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/GrpcSearchServiceReasonCodeContractTest.java`. Head-side fallback reasons are Head-owned (not emitted by the Worker).
+Worker-emitted reason codes are treated as a contract: they are allowlisted by `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java`. Head-side fallback reasons are Head-owned (not emitted by the Worker).
 
 ## Interactive search (`SearchService.Search`)
 
@@ -36,7 +36,7 @@ Used by VECTOR block and HYBRID fallback paths:
 - `REBUILD_COMPLETED`: rebuild completed and fingerprint stamped
 - `REBUILD_FAILED_NO_VECTORS`: rebuild drained (`pending_embedding == 0`) without a single successful embedding; the fingerprint was **refused**, not stamped, so vector/hybrid stays blocked. Terminal for the boot — the embedding runtime must be fixed and the worker restarted
 
-### Search degradation reason codes (`GrpcSearchService`)
+### Search degradation reason codes (`WorkerSearchService`)
 
 Used when HYBRID cannot run as requested (may also appear for VECTOR when the compatibility controller is absent):
 
@@ -136,7 +136,7 @@ The **search-degradation** vocabularies (`SearchReasonCode.java`, `CrossEncoderS
 
 `check-readiness-reason-codes.mjs` additionally enforces a **producer direction** (tempdoc 837): every `LifecycleReasonCode` member must be referenced by at least one `modules/**/src/main` Java source outside the enum's own file — by enum name or quoted code string, matched after comment-stripping. A code nothing can emit is a phantom: its wording row is unreachable UI and the vocabulary claims a state the system cannot report. The direction runs with no exemption list; adding a code with no emit site fails the build. Honest limit: a *reference* is not an *emission*, so the check catches the zero-reference class rather than proving every code is reachable.
 
-**Case convention:** Java source uses `UPPER_CASE` IDs; FE/wire equivalents use `lower_snake_case` (`no_embedding_service` ↔ `NO_EMBEDDING_SERVICE`). The mapping is a trivial case-fold. The contract test allowlists in `GrpcSearchServiceReasonCodeContractTest` serve as the compile-time safety net.
+**Case convention:** Java source uses `UPPER_CASE` IDs; FE/wire equivalents use `lower_snake_case` (`no_embedding_service` ↔ `NO_EMBEDDING_SERVICE`). The mapping is a trivial case-fold. The contract test allowlists in `WorkerSearchServiceReasonCodeContractTest` serve as the compile-time safety net.
 
 **Category design:** the search-routing partition has seven codes: five execution failures and two
 planner-owned dense-skip decisions. The embedding-compatibility partition covers lifecycle states

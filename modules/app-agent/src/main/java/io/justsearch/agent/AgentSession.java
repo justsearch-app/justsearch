@@ -499,7 +499,7 @@ final class AgentSession {
    * cannot spell the same document differently.
    *
    * <p>Case-folded on every platform, not just Windows. The Worker lowercases paths before it looks
-   * a document up ({@code GrpcSearchService.fetchDocumentSlice} → {@code
+   * a document up ({@code WorkerSearchService.fetchDocumentSlice} → {@code
    * PathNormalizer.normalizePath}), so two spellings that differ only in case ARE one document as
    * far as every fetch is concerned; keying them apart here would let the case-variant mint a
    * duplicate source for a document the index cannot even distinguish.

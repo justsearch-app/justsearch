@@ -2,11 +2,11 @@ package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.fixtures.TestDocumentBuilder;
-import io.justsearch.indexerworker.services.GrpcSearchService;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.SearchMode;
@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,7 +26,7 @@ final class OfficeMarkerSearchabilityTest {
   @TempDir Path tempDir;
 
   @Test
-  @DisplayName("DOCX marker is searchable via GrpcSearchService.search")
+  @DisplayName("DOCX marker is searchable via WorkerSearchService.search")
   void docxMarkerIsSearchable() throws Exception {
     assertFixtureSearchable(
         "/fixtures/office/office-marker.docx",
@@ -36,7 +35,7 @@ final class OfficeMarkerSearchabilityTest {
   }
 
   @Test
-  @DisplayName("XLSX marker is searchable via GrpcSearchService.search")
+  @DisplayName("XLSX marker is searchable via WorkerSearchService.search")
   void xlsxMarkerIsSearchable() throws Exception {
     assertFixtureSearchable(
         "/fixtures/office/office-marker.xlsx",
@@ -45,7 +44,7 @@ final class OfficeMarkerSearchabilityTest {
   }
 
   @Test
-  @DisplayName("PPTX marker is searchable via GrpcSearchService.search")
+  @DisplayName("PPTX marker is searchable via WorkerSearchService.search")
   void pptxMarkerIsSearchable() throws Exception {
     assertFixtureSearchable(
         "/fixtures/office/office-marker.pptx",
@@ -80,7 +79,7 @@ final class OfficeMarkerSearchabilityTest {
               .open();
       try {
         var runtime = lifecycle;
-        var service = new GrpcSearchService(lifecycle);
+        var service = new WorkerSearchService(lifecycle);
 
         Path file = copyResourceToTemp(resourcePath, fileName);
         var extractor = new ContentExtractor();
@@ -137,33 +136,14 @@ final class OfficeMarkerSearchabilityTest {
     }
   }
 
-  private static SearchResponse callSearch(GrpcSearchService service, String query) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-
-    service.search(
+  private static SearchResponse callSearch(WorkerSearchService service, String query) {
+    return service.search(
         SearchRequest.newBuilder()
             .setQuery(query)
             .setLimit(10)
             .setMode(SearchMode.SEARCH_MODE_TEXT)
             .build(),
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-
-    assertNull(errorRef.get(), () -> "search() errored: " + errorRef.get());
-    return responseRef.get();
+        CallContext.none());
   }
 
   private static IndexDocument buildIndexDocument(Path filePath, ExtractionResult extraction)

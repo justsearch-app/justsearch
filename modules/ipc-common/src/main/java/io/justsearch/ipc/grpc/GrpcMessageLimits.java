@@ -22,7 +22,7 @@ public final class GrpcMessageLimits {
    * (tempdoc 885 item 6 [R6b]).
    *
    * <p>Shared for the same reason as the size limit above: the producer trims to it
-   * ({@code GrpcSearchService}) and the Head's pager sizes its batches by it
+   * ({@code WorkerSearchService}) and the Head's pager sizes its batches by it
    * ({@code BoundedDocumentFetch}), so a change on one side that the other did not see would put
    * the byte budget quietly back over the transport ceiling — the exact drift class this class was
    * created for.
