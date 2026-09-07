@@ -9,10 +9,11 @@
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
 import { parseSseBuffer, parseSseBufferJson } from './sse';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
-// Tempdoc 941 — the app's ONE client-originated message channel (559 Authority III). Imported for
-// the same reason `liveChannelBudget` is: the seam is a plain function over a document event, with
-// no chrome dependency, so the stream can report through it without acquiring a view dependency.
-import { emitEphemeralToast } from '../shell-v0/components/advisory/ephemeralToast.js';
+// Tempdoc 941 — what the app DOES when one of our per-event handlers throws (reader notice +
+// diagnostics ring). The POLICY lives in shell-v0 beside the message-class vocabulary it names,
+// not here: this module's job is to detect the throw and keep the stream alive. Imported for the
+// same reason `liveChannelBudget` is — a plain function, no chrome dependency.
+import { reportStreamHandlerFailure } from '../shell-v0/state/streamFailureNotice.js';
 
 // ==================== Stream Event Types ====================
 
@@ -615,42 +616,6 @@ export const REPLAY_TRUNCATED_EVENT = 'replay_truncated';
 /** The SSE event name carrying a run's identity triple (`runId`, `shapeId`, `conversationId`). */
 export const RUN_STARTED_EVENT = 'run_started';
 
-/**
- * Tempdoc 941 — report a per-event handler throw without letting it kill the stream.
- *
- * The throw must not abort the stream: one broken consumer (a citations handler, a reasoning
- * handler) must not cost the reader the rest of an answer that is still arriving. But it was
- * previously only `console.warn`ed, which means the APP never learned anything — and the whole
- * point of 847 F-12 is that the user-visible result of a throwing evidence handler is
- * indistinguishable from a backend that sent nothing. A console line is not a channel: nobody has
- * devtools open, and the turn renders as though the missing part was never sent.
- *
- * So it goes out through the app's ONE client-originated message channel
- * ({@link emitEphemeralToast} — 559 Authority III), the same seam every other client-side notice
- * uses. The wording is about the consequence the reader can actually observe (part of the response
- * is missing), not about the exception: `handlerError` stays on the console line for the person
- * who can act on it.
- *
- * Deduped per stream per EVENT NAME, because the failure mode is systematic, not incidental: a
- * `chunk` handler that throws once throws on every token, and one bug must not become several
- * hundred toasts. First occurrence per event name is the signal; the rest are the same fact.
- */
-function reportHandlerFailure(
-  eventName: string,
-  handlerError: unknown,
-  alreadyReported: Set<string>,
-): void {
-  console.warn(`[stream] handler for "${eventName}" threw`, handlerError);
-  if (alreadyReported.has(eventName)) return;
-  alreadyReported.add(eventName);
-  emitEphemeralToast({
-    message:
-      'Part of this response could not be displayed — the rest of it is still arriving. ' +
-      'See the browser console for the failure detail.',
-    severity: 'warning',
-  });
-}
-
 export async function consumeShapeStream(
   url: string,
   body: unknown,
@@ -754,7 +719,11 @@ export async function consumeShapeStream(
         try {
           onEvent(ev.event, payload);
         } catch (handlerError) {
-          reportHandlerFailure(ev.event, handlerError, reportedHandlerEvents);
+          // The throw must not abort the stream: one broken consumer must not cost the reader the
+          // rest of an answer that is still arriving. Reporting it is `streamFailureNotice`'s job
+          // — including the decision NOT to toast on `error`, where `errorFromEvent` above already
+          // guarantees the caller gets a real one.
+          reportStreamHandlerFailure(ev.event, handlerError, reportedHandlerEvents);
         }
       });
     }

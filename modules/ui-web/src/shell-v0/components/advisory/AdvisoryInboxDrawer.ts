@@ -15,6 +15,8 @@ import '../Button.js';
 import '../StatusBadge.js';
 import '../FilterChip.js';
 import { present } from '../../display/present.js';
+// Tempdoc 941 — the same template-parameter authority AdvisoryToastHost uses for an advisory body.
+import { interpolateMessage } from '../../../i18n/resourceCatalog.js';
 import { unavailableBecause } from '../../state/availability.js';
 // Tempdoc 586 P-1c — shared relative-time formatter (replaces verbose toLocaleTimeString()).
 import { formatRelativeIso } from '../../../utils/relativeTime.js';
@@ -599,8 +601,15 @@ export class AdvisoryInboxDrawer extends JfElement {
                       `health-events.<id>.message` that `bodyI18nKey` always names. Same
                       resolution the toast body uses (one authority in AdvisoryClassChrome). */ ''}
                 ${(() => {
+                  // Tempdoc 941 review — interpolated through the SAME authority the toast body
+                  // uses. A catalog sentence is a TEMPLATE (`{name}` placeholders), and
+                  // `classExtras` are its parameters; skipping this step here would let the drawer
+                  // render a brace the toast declines to. `interpolateMessage` returns null on an
+                  // unresolved placeholder, which falls through to the generic key below rather
+                  // than showing a half-filled sentence.
                   const reasonBody = healthAdvisoryReasonBody(record.event.classId, extras);
-                  if (reasonBody) return html`<div>${reasonBody}</div>`;
+                  const filled = reasonBody ? interpolateMessage(reasonBody, extras) : null;
+                  if (filled) return html`<div>${filled}</div>`;
                   return record.event.bodyI18nKey
                     ? html`<div>
                         ${present({ kind: 'resource', key: record.event.bodyI18nKey }).label}

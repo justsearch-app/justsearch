@@ -6527,6 +6527,36 @@ describe('UnifiedChatView resumed-thread shape provenance (tempdoc 941)', () => 
     view.remove();
   });
 
+  it('941 review — the conversation-level shape narrows through the same authority (workflow-run)', async () => {
+    // The hand-rolled four-arm narrowing this replaced predated `core.workflow-run` (565 §15.C)
+    // and never gained it, so a resumed workflow conversation fell through to `core.free-chat` —
+    // an `ungrounded-llm` class — for every turn the record did not individually stamp.
+    vi.mocked(resumeConversation).mockResolvedValue({
+      sessionId: 'uc-wf',
+      shapeId: 'core.workflow-run',
+      messages: [{ role: 'user', content: 'run the brief', id: 'm1' }] as never,
+    });
+    const view = mountView();
+    await view.updateComplete;
+    // @ts-expect-error — private method.
+    await view.loadConversation('uc-wf', 'core.workflow-run');
+    expect(view.thread[0]?.shapeId).toBe('core.workflow-run');
+    view.remove();
+  });
+
+  it('941 review — a resumed EXTRACT turn keeps its verbatim render (isExtract)', async () => {
+    // Extract renders verbatim (`transform`), not as markdown. The record carries no per-turn
+    // `isExtract`, so both rebuild paths derive it from the turn's shape — the unified-thread path
+    // already did; resume set the shape and not the flag, so one turn rendered two ways depending
+    // on which path rebuilt it.
+    const view = await loadResumed([
+      { role: 'assistant', content: 'extracted', id: 'm1', shapeId: 'core.extract' },
+      { role: 'assistant', content: 'chatted', id: 'm2', shapeId: 'core.free-chat' },
+    ]);
+    expect(view.thread.map((m) => m.isExtract)).toEqual([true, false]);
+    view.remove();
+  });
+
   it('carries a resumed turn’s standaloneQuestion onto the thread', async () => {
     const view = await loadResumed([
       {

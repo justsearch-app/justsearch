@@ -86,6 +86,27 @@ export const LOCAL_MESSAGE_CLASSES = {
     defaultSeverity: 'error',
     locality: 'window',
   },
+  // Tempdoc 941 — a per-event handler inside `consumeShapeStream` threw, so part of the response
+  // is missing from the render while the stream itself continues (`api/streams.ts`).
+  //
+  // `supersede: true`: the emitter already dedupes per stream per EVENT NAME, but one bug commonly
+  // breaks several handlers of the same turn (an evidence handler and the citations handler read
+  // the same malformed payload) — and stacking three overlays that all say "part of this response
+  // is missing" tells the reader nothing the first one did not, while burying the answer they are
+  // reading. Latest wins; the per-event detail lives in the diagnostics ring
+  // (`api/streamHandlerTelemetry.ts`), not in a pile of toasts.
+  //
+  // `defaultSeverity: 'info'`: deliberately NOT `warning`. Severity is the input to the
+  // announcement-politeness projection above — `warning` resolves to `live: 'alert'`, an ASSERTIVE
+  // screen-reader interruption. Cutting across an answer that is still streaming, to say a part of
+  // it is missing, is worse for the reader who most needs the stream to keep reading cleanly.
+  // `info` is the polite `status` role: it is announced at the next graceful opportunity.
+  'core.stream.partial-failure': {
+    renderHint: 'EPHEMERAL',
+    supersede: true,
+    defaultSeverity: 'info',
+    locality: 'window',
+  },
 } as const satisfies Record<string, LocalMessageClassPolicy>;
 
 export type LocalMessageClass = keyof typeof LOCAL_MESSAGE_CLASSES;

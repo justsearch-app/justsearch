@@ -620,6 +620,65 @@ describe('AdvisoryInboxDrawer', () => {
     );
   });
 
+  /**
+   * Tempdoc 941 review — the drawer interpolates the reason sentence through the same authority
+   * the toast body uses. A catalog sentence is a TEMPLATE and `classExtras` are its parameters;
+   * two renderers of one string must not disagree about whether to fill it.
+   */
+  it('941 — interpolates the reason sentence, and declines a half-filled one', async () => {
+    seedResourceCatalog({
+      'health-events.index.unavailable.message': 'The indexer is unavailable.',
+      'health-events.index.unavailable.reason.WorkerStarting.message':
+        'The Worker for {subject} is starting up.',
+    });
+    const store = new StubAdvisoryStore();
+    const el = make(store as unknown as AdvisoryStore);
+    el.open = true;
+
+    const record = (extras: Record<string, unknown>): AdvisoryRecord => ({
+      key: 'health.recoverable:index.unavailable',
+      event: {
+        classId: 'health.recoverable',
+        id: 'health.recoverable:index.unavailable',
+        occurredAt: '2026-05-15T10:00:00Z',
+        renderHint: 'PERSISTED',
+        diagnosticsLink: null,
+        provenance: null,
+        primaryAction: null,
+        bodyI18nKey: 'health-events.index.unavailable.message',
+        classExtras: extras,
+      },
+      acknowledged: false,
+      sourceRenderHint: 'PERSISTED',
+      origin: 'stream',
+    });
+
+    store.push({
+      advisories: [
+        record({ conditionId: 'index.unavailable', reason: 'WorkerStarting', subject: 'worker.index' }),
+      ],
+      unreadCount: 1,
+    });
+    await el.updateComplete;
+    (el.shadowRoot?.querySelector('.item') as HTMLElement).click();
+    await el.updateComplete;
+    let detail = el.shadowRoot?.querySelector('.item-detail')?.textContent ?? '';
+    expect(detail).toContain('The Worker for worker.index is starting up.');
+    expect(detail).not.toContain('{subject}');
+
+    // No `subject` parameter: the template cannot be filled, so the drawer falls back to the
+    // generic sentence rather than rendering a brace at the user altitude. Same record key, so the
+    // item stays expanded — clicking again would toggle it shut and assert on an empty string.
+    store.push({
+      advisories: [record({ conditionId: 'index.unavailable', reason: 'WorkerStarting' })],
+      unreadCount: 1,
+    });
+    await el.updateComplete;
+    detail = el.shadowRoot?.querySelector('.item-detail')?.textContent ?? '';
+    expect(detail).not.toContain('{subject}');
+    expect(detail).toContain('The indexer is unavailable.');
+  });
+
   it('slice 496 — chip count reflects advisory count per value', async () => {
     const store = new StubAdvisoryStore();
     const el = make(store as unknown as AdvisoryStore);

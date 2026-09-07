@@ -262,6 +262,28 @@ describe('conversationListStore branching', () => {
       expect(resumed.messages.every((m) => m.shapeId === undefined)).toBe(true);
     });
 
+    it('941 review — returns the TRIMMED value, so a padded shapeId still narrows', async () => {
+      // The blankness test already trims; returning the raw value meant `" core.rag-ask "` passed
+      // the guard here and then failed the exact-match narrowing in `asKnownShape` — accepted at
+      // one end, silently dropped at the other.
+      mockFetch(() =>
+        jsonResponse({
+          messages: [
+            { role: 'user', content: 'q', id: 'm1', shapeId: '  core.rag-ask\n' },
+            {
+              role: 'assistant',
+              content: 'a',
+              id: 'm2',
+              attributes: { 'rag.standaloneQuestion': '  padded question  ' },
+            },
+          ],
+        }),
+      );
+      const resumed = await resumeConversation('c', 'core.free-chat');
+      expect(resumed.messages[0]?.shapeId).toBe('core.rag-ask');
+      expect(resumed.messages[1]?.standaloneQuestion).toBe('padded question');
+    });
+
     it('carries rag.standaloneQuestion when the record has it, under either spelling', async () => {
       mockFetch(() =>
         jsonResponse({

@@ -598,7 +598,10 @@ export interface ResumeOptions {
  */
 function firstString(...values: readonly unknown[]): string | undefined {
   for (const v of values) {
-    if (typeof v === 'string' && v.trim().length > 0) return v;
+    // 941 review — return the TRIMMED value, not the raw one. The blankness test already trims, so
+    // returning `v` meant `" core.rag-ask "` passed the guard and then failed the exact-match
+    // narrowing in `asKnownShape` — accepted here, silently dropped there.
+    if (typeof v === 'string' && v.trim().length > 0) return v.trim();
   }
   return undefined;
 }

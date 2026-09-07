@@ -2111,13 +2111,13 @@ export class UnifiedChatView extends JfElement {
       void loadConversations();
       return;
     }
-    const resolvedShape: ShapeId =
-      resumed.shapeId === 'core.rag-ask' ||
-      resumed.shapeId === 'core.extract' ||
-      resumed.shapeId === 'core.free-chat' ||
-      resumed.shapeId === 'core.agent-run'
-        ? resumed.shapeId
-        : 'core.free-chat';
+    // Tempdoc 941 review — the conversation-level shape narrows through the SAME authority the
+    // per-message one does. The hand-rolled four-arm test this replaces predated
+    // `core.workflow-run` (565 §15.C) and never gained it, so a resumed workflow conversation fell
+    // through to `core.free-chat` — an `ungrounded-llm` class — for every turn the record did not
+    // individually stamp. One narrowing function means a shape added to `CORE_INTERACTION_SHAPES`
+    // cannot be recognised on one path and silently dropped on the other.
+    const resolvedShape: ShapeId = asKnownShape(resumed.shapeId) ?? 'core.free-chat';
     // Slice 513 — if this is a branch, find the index of the branch point in
     // the resolved message list. All messages up to and including that index
     // were inherited from the parent.
@@ -2138,14 +2138,23 @@ export class UnifiedChatView extends JfElement {
     // half of the fact `recordShapeId` already reads on the live path; the same fallback applies
     // (a row written before 863, or one declaring a shape this build does not know, keeps the
     // conversation-level answer, which is the only fact available for it).
-    this.thread = resumed.messages.map((m, idx) => ({
-      role: m.role,
-      content: m.content,
-      shapeId: asKnownShape(m.shapeId) ?? resolvedShape,
-      id: m.id,
-      inheritedFromParent: idx <= inheritedThrough,
-      ...(m.standaloneQuestion ? { standaloneQuestion: m.standaloneQuestion } : {}),
-    }));
+    this.thread = resumed.messages.map((m, idx) => {
+      const shapeId = asKnownShape(m.shapeId) ?? resolvedShape;
+      return {
+        role: m.role,
+        content: m.content,
+        shapeId,
+        // Tempdoc 941 review — an EXTRACT turn renders verbatim (`transform`), not as markdown, and
+        // the record carries no per-turn `isExtract` flag, so it is derived from the turn's shape.
+        // The unified-thread record path already derives it this way (621 review fix); the resume
+        // path set the shape and not the flag, so the same turn rendered differently depending on
+        // which path rebuilt it. Derive it from the SAME per-message shape resolved just above.
+        isExtract: shapeId === 'core.extract',
+        id: m.id,
+        inheritedFromParent: idx <= inheritedThrough,
+        ...(m.standaloneQuestion ? { standaloneQuestion: m.standaloneQuestion } : {}),
+      };
+    });
     // Slice 515 FIX-8 — capture parent preview for the branch banner.
     this.parentFirstMessagePreview = resumed.parentFirstUserMessage ?? null;
     // Tempdoc 610 Phase B — record this conversation's fork pointers so the
