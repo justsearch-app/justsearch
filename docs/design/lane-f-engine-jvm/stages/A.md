@@ -109,6 +109,47 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   `ServerCallStreamObserver`, so the live path is unchanged, but the failure mode moved from
   `ClassCastException` to a silently non-cancellable call.
 
+- **A4.** The item's "re-homed" reads as a move; it is not. `ForegroundLoad` stays in
+  `worker-services` — what A4 adds is a **second producer** in `app-engine` (`ForegroundLoadGate`)
+  for the nine calls the interceptor covers, wired at A6. The interceptor's set is nine **full gRPC
+  method names** (`io.justsearch.ipc.SearchService/Search`, …), which do not survive the wire, so the
+  gate mirrors them as bare method names and the drift test compares the two after stripping the
+  service prefix. The pin needs a **test-only** `app-engine -> indexer-worker` dependency (the
+  interceptor lives in `indexer-worker`, which `app-engine` does not otherwise depend on);
+  `LayeringEnforcementTest` imports with `DoNotIncludeTests`, so rule 6b is unaffected, and the line
+  goes with the interceptor at A9. Adding it changed `modules/app-engine/gradle.lockfile` by 6 lines
+  (`resolveAndLockAll --write-locks`, no drift elsewhere). The shared-instance requirement is met by
+  constructor injection only: `KnowledgeServer.foregroundLoad` (`:166`) is **private with no
+  accessor**, so A6's real handle is `IndexingPacing.foregroundLoad()`
+  (`.../loop/pacing/IndexingPacing.java:130`), which `app-engine` can already see — or the root
+  constructs the gauge and passes it down. The gate is unreferenced by main code until A6 and joins
+  `EngineRoot` in the dead-code accepted store; new violations are **not** auto-added by
+  `allowStoreUpdate=true` (verified: the run failed and left the store untouched), so the entry is a
+  deliberate edit, and the store's shrink direction retires both once A6 gives them callers.
+- **A5.** The item says "replace `WorkerSignalBus`'s two gauge methods"; they are **kept**, so the
+  seven read sites compile unchanged, and only the *composition rule* moves into the gauge
+  (`GpuSchedulingGauge.shouldYield`) with the interface default delegating to it — one rule, so A10
+  cannot leave a drifting copy. Home: `modules/core` (`io.justsearch.core.scheduling`), the lowest
+  module with no project dependency of its own that both halves already see — `app-services`
+  `api(project(":modules:core"))` (`modules/app-services/build.gradle.kts:23`) and, on the worker
+  side, `worker-core`'s `api(":modules:adapters-lucene")` (`modules/worker-core/build.gradle.kts:9`)
+  re-exporting `api(":modules:core")` (`modules/adapters-lucene/build.gradle.kts:13`). **No new
+  module edge in either direction**; the `app-services -> worker-core` candidate was rejected because
+  §1's "`app-services` has no `worker-*` edge" is load-bearing. `WorkerSpawner.pollEnergyState` is at
+  `:709-729` as the item says, but **there was no existing test of it, nor of
+  `MainSignalBus.writeEnergyReduced`, to retarget** — the poll's only pins were the MMF offset
+  (`MmfWorkerSignalLayoutV1Test`) and the yield composition (`WorkerSignalBusEnergyTest`, extended
+  here). The new `EnergyStatePoller` (`io.justsearch.app.services.power`, owned and started by
+  `KnowledgeServerBootstrap`) is covered for the first time, and it must be **restartable**: the
+  bootstrap resets `started` in `closeForUpgrade()` (`KnowledgeServerBootstrap.java:1015`) and boot
+  recovery restarts the same instance. One behaviour note carried to A6: the poll now starts after
+  `spawner.start()` returns rather than inside it (step 5b), i.e. after port discovery instead of
+  before — sub-second, and the gauge is written before the MMF sink so a bus failure can no longer
+  lose the in-process signal. `InferenceWiring` now reads the signal bus per event instead of
+  capturing it once, so a null bus no longer disables the broadcast entirely; the MMF byte is still
+  written under exactly the same condition, so live behaviour is unchanged. `energyState()`'s
+  `WorkerSpawner` mention in `PowerStatusView.java:9` was stale and was corrected in the same commit.
+
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
 Read from each module's `build.gradle.kts` `dependencies` block and `settings.gradle.kts:113-147`:
