@@ -16,8 +16,14 @@ export interface AdvisoryClassChromeEntry {
   readonly toneClass: string;
 }
 
-/** The advisory class a health condition with a recovery affordance projects into. */
-export const HEALTH_RECOVERABLE_CLASS_ID = 'health.recoverable';
+/**
+ * The advisory class a health condition with a recovery affordance projects into.
+ *
+ * Module-private: its one reader is {@link healthAdvisoryReasonBody} below. Exporting it would be
+ * a speculative surface — the two renderers ask this module the QUESTION ("what body copy does
+ * this advisory have?") rather than the class id, which is what keeps the resolution in one place.
+ */
+const HEALTH_RECOVERABLE_CLASS_ID = 'health.recoverable';
 
 const CHROME_MAP: Record<string, AdvisoryClassChromeEntry> = {
   'operation.completed': {
