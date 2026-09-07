@@ -27,8 +27,36 @@ import org.junit.jupiter.api.io.TempDir;
  * every path into it went through a spawned Worker. These tests run in
  * {@code :modules:app-engine:test} now, so the counts are scaled to a unit tier — 400 search
  * iterations, 4 open/close cycles, a 30-second sustained run. The <em>shape</em> of each property is
- * unchanged; what is lost is sensitivity to a very slow leak, which a nightly tier was the right
- * place for and this one is not. Nothing else was dropped.
+ * unchanged.
+ *
+ * <p><b>What was actually lost.</b> An earlier draft of this comment said "nothing else was
+ * dropped", which was wrong: the iteration counts are the smallest of the changes, and the oracles
+ * themselves were substituted (see the next paragraph). Stated plainly, four sensitivities are
+ * gone, and none of them is recovered by any other test in the repo:
+ *
+ * <ul>
+ *   <li><b>Slow leaks.</b> 400 iterations instead of 5 000, 30 seconds instead of 10 minutes. A
+ *       leak small enough to need thousands of iterations to clear a threshold now passes.
+ *   <li><b>Native memory.</b> {@code NmtMemoryTracker} measured the JVM's native footprint; the
+ *       replacement measures used heap after a forced collection. Off-heap growth — ORT session
+ *       arenas, Lucene {@code MMapDirectory} mappings, direct byte buffers — is invisible to a heap
+ *       oracle. This is the substitution most likely to matter, because the index and encoder stacks
+ *       are exactly where native allocation lives.
+ *   <li><b>Handles nothing re-opens.</b> The retired detector enumerated a PID's open files, so it
+ *       saw every leaked handle. The reopen-succeeds check only catches a handle on a path a later
+ *       cycle opens again. A descriptor leaked on, say, a rotated log or a one-shot temp file is no
+ *       longer detectable here.
+ *   <li><b>Process-boundary restart.</b> 20 real Worker restarts became 4 in-process open/close
+ *       cycles. Anything that only manifests when the OS tears a process down — native library
+ *       re-initialisation, a lock released by process exit rather than by {@code close()} — is out
+ *       of reach. The trade is not one-directional: statics now survive a cycle instead of being
+ *       reset by a fresh process, so state that should be cleared on close and is not will be
+ *       caught here and would have been missed before.
+ * </ul>
+ *
+ * <p>Recovering the first three needs an out-of-process tier, which is what
+ * {@code IsolatedBackendFixture} exists for; recording that here rather than implying this file is
+ * a like-for-like replacement.
  *
  * <p><b>Why neither {@code HandleLeakDetector} nor {@code NmtMemoryTracker} was copied across.</b>
  * Both instruments take a <em>PID</em> and shell out to another program about it —
