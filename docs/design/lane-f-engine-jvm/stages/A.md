@@ -3,7 +3,7 @@ title: "Lane F stage A — spine and unplug: implementation checklist"
 stage: A
 created: 2026-09-07
 base: fe19df0d5
-status: "IN PROGRESS (stage started 2026-09-07 on worktree-lane-F-A from the PR 0 head; A1-A2 landed; corrections in section 0.1)"
+status: "IN PROGRESS (stage started 2026-09-07 on worktree-lane-F-A from the PR 0 head; A1-A3 landed; corrections in section 0.1)"
 ---
 
 # Lane F stage A — spine and unplug: implementation checklist
@@ -70,6 +70,22 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   (`WorkerAppServices`, `DefaultWorkerAppServices`, `KnowledgeServerMigrationOps`), which is what makes
   the green non-vacuous. `LayeringEnforcementTest` imports with `DoNotIncludeTests`, so 6b reads
   production bytecode only.
+- **A3.** Line counts at this base are 1143 / 2284 / 329 (not 1017 / 2198 / 329). Five more files
+  carried `StreamObserver` than the item names (`IndexSettleOps`, `SyncDirectoryOps`,
+  `MigrationControlOps`, `IngestSwitchBufferOps`, and `WorkerScanOps` javadoc); all converted. The
+  status vocabulary actually emitted is seven codes (INVALID_ARGUMENT 22 sites, INTERNAL 18,
+  ABORTED 2, FAILED_PRECONDITION 2, UNAVAILABLE 2, RESOURCE_EXHAUSTED 1, UNIMPLEMENTED 1); NOT_FOUND,
+  DEADLINE_EXCEEDED and CANCELLED have no producer and were not seeded. Ten refusal sites needed a
+  `catch (WorkerServiceException e) { throw e; }` ahead of a broad catch, or the conversion would
+  have re-labelled them silently (`IngestSwitchBufferOps.bufferDuringSwitchingOrThrow` was the
+  sharpest). Interim streaming signatures: `scanRoot(Req, Consumer<ScanRootProgress>, CallContext)`
+  and `subscribeIndexingJobs(Req, Consumer<IndexingJobsFrame>, CallContext)`, bridged by the
+  `Delegating*Service` adapters through `WorkerServiceCalls`. **Carried to A9:**
+  `SearchExecutor.java:117,266,568` reads `TracingServerInterceptor.currentOtelContext()` (a
+  worker-core class); A9 deletes that interceptor and must thread the OTel parent context through
+  `SearchOrchestrator` instead. `WorkerSearchServiceDocumentSliceWireTest` moved to `indexer-worker`
+  (it needs a real Netty server, now the adapter's). `scripts/resilience/contracts/rpc-retry-ownership-matrix.v1.json:199`
+  had an evidence path under the wrong module; corrected.
 
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
