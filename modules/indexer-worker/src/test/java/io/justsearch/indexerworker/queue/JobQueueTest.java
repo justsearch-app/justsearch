@@ -773,6 +773,73 @@ final class JobQueueTest {
     }
   }
 
+  /**
+   * Tempdoc 941 round 19 (F2): a maintenance re-enqueue must not erase the row's owning scan and
+   * collection. The periodic {@code syncDirectory} walk re-enqueues every file it cannot find in
+   * the index — which is exactly what a permanently FAILED file looks like — through the untagged
+   * {@code enqueueEntries(batch)} overload ({@code SyncDirectoryOps} lines 365/370). The single
+   * write path is {@code INSERT OR REPLACE}, so an unstated column was reset: the failed row's
+   * {@code collection} and {@code scan_id} went blank behind the user's back, and the failed-files
+   * drawer's "Scan &lt;id&gt;" line silently stopped rendering.
+   *
+   * <p>The contract: a caller that STATES a collection/scan id overwrites; a caller that states
+   * neither preserves what the row already knows. "Not supplied" is not the same as "cleared" for
+   * these two columns — unlike {@code size_bytes}, where a re-enqueue restats the file and its
+   * silence really does mean unknown.
+   */
+  @Test
+  void maintenanceReenqueuePreservesCollectionAndScanId() {
+    Path corrupt = Path.of("/reenq/alpha/corrupt.pdf");
+    String prefix = Path.of("/reenq/alpha").toAbsolutePath().toString();
+
+    // Scan A admits the file with a collection and a scan id; extraction fails permanently.
+    jobQueue.enqueueEntries(
+        List.of(JobQueue.EnqueueEntry.ofUnknownSize(corrupt)), "default", "scan-A");
+    driveToFailed(corrupt);
+
+    JobQueue.FailedJobInfo afterScanA = pick(jobQueue.listFailedJobsByPathPrefix(prefix, 100), "corrupt.pdf", "byPrefix");
+    assertEquals("scan-A", afterScanA.scanId(), "precondition: the scan id is recorded");
+    assertEquals("default", afterScanA.collection(), "precondition: the collection is recorded");
+
+    // The periodic sync walk re-enqueues the still-unindexed file, stating neither fact.
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(corrupt)));
+    driveToFailed(corrupt);
+
+    JobQueue.FailedJobInfo afterSync = pick(jobQueue.listFailedJobsByPathPrefix(prefix, 100), "corrupt.pdf", "byPrefix");
+    assertEquals(
+        "scan-A",
+        afterSync.scanId(),
+        "an untagged maintenance re-enqueue must not erase the row's owning scan");
+    assertEquals(
+        "default",
+        afterSync.collection(),
+        "an untagged maintenance re-enqueue must not erase the row's collection");
+
+    // A real rescan DOES state a new scan, and that overwrites: preserve-on-silence is not
+    // freeze-forever.
+    jobQueue.enqueueEntries(
+        List.of(JobQueue.EnqueueEntry.ofUnknownSize(corrupt)), "notes", "scan-B");
+    driveToFailed(corrupt);
+
+    JobQueue.FailedJobInfo afterScanB = pick(jobQueue.listFailedJobsByPathPrefix(prefix, 100), "corrupt.pdf", "byPrefix");
+    assertEquals("scan-B", afterScanB.scanId(), "a stated scan id must overwrite the old one");
+    assertEquals("notes", afterScanB.collection(), "a stated collection must overwrite the old one");
+
+    // The global listing reads the same row, so it must agree — the two endpoints disagreeing was
+    // the reported symptom.
+    JobQueue.FailedJobInfo global = pick(jobQueue.listFailedJobs(100), "corrupt.pdf", "all");
+    assertEquals(afterScanB.scanId(), global.scanId(), "both listings project the same row");
+    assertEquals(afterScanB.collection(), global.collection(), "both listings project the same row");
+  }
+
+  /** Drives one path through the retry ladder until it reaches a terminal failed state. */
+  private void driveToFailed(Path path) {
+    for (int i = 0; i < 6; i++) {
+      jobQueue.pollPending(10);
+      jobQueue.markFailed(path, "permanent");
+    }
+  }
+
   private static JobQueue.FailedJobInfo pick(
       List<JobQueue.FailedJobInfo> jobs, String fileName, String method) {
     return jobs.stream()
