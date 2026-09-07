@@ -487,6 +487,25 @@ String cursor = SEARCH_AFTER_CURSOR_PREFIX +
 | `PATH_ASC` | docId ASC | - |
 | `PATH_DESC` | docId DESC | - |
 
+The `docId` tie-breaker above is the **stored** `doc_id` field, not Lucene's internal ordinal, and
+on a whole-document row it is the normalized absolute path — deterministic across index builds.
+
+**Chunk rows need a different tie-breaker.** A chunk's `doc_id` is `ChunkIds.newChunkDocId()` =
+`"chunk:" + UUID.randomUUID()`, minted fresh per ingest and deliberately not derived from the parent
+or the chunk index. It is unique within one index and uncorrelated between two, so breaking a score
+tie on it gives an order that is stable per index and random per build. The bare chunk searches in
+`ChunkSearchOps` therefore sort by score, then `parent_doc_id` (the parent's normalized absolute
+path), then `chunk_index`, then `doc_id` as the final total-order comparator
+(`LuceneRuntimeUtils#buildChunkTieBreakSort`). Two ingests of the same corpus agree on that key.
+
+**The cost, accepted deliberately.** A sorted search runs on `TopFieldCollector`, which cannot set a
+minimum competitive score when the score comparator is followed by others. So the chunk BM25 and
+SPLADE legs lose the top-score bulk-scorer pruning `TopScoreDocCollector` applies past the 1000-hit
+threshold, and their `totalHits` becomes an exact count rather than a `GREATER_THAN_OR_EQUAL_TO`
+lower bound past 1000 matches. The whole-document read path has always paid exactly this
+(`ReadPathOps#search`), and the fused `totalHits` the API reports is the union of these legs'
+counts — a count that means the same thing on every leg is worth more than the pruning.
+
 ### 6.3 Lookahead Strategy
 
 Request `limit + 1` documents to determine `hasMore` without extra query:
