@@ -597,11 +597,20 @@
     {
       "id": "adr-0048-foreground-gauge-is-worker-local",
       "adr": "0048",
-      "premise": "ForegroundLoad is a worker-services type so it survives a Head/Worker merge; the gRPC interceptor that feeds it is the throwaway adapter. This test pins the gauge's balance across ok/error/cancel closes, which is the property the duty cycle depends on.",
+      "premise": "NARROWED by the ADR's 2026-09-07 amendment. ForegroundLoad is a worker-services type, so the TYPE survives a Head/Worker merge -- but its producer does not, and a re-homed producer is a new integration rather than a move. This test pins the gauge's BALANCE across ok/error/cancel closes: every increment has a decrement. That is a real property and it is not the one that broke, because an always-balanced counter that is never incremented is perfectly balanced. The 'is it fed at all' half is adr-0048-foreground-gauge-has-a-live-producer.",
       "kind": "test",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
       "test": "io.justsearch.app.engine.ForegroundLoadGateTest#eachForegroundOperationIncrementsAndDecrements",
       "note": "RETARGETED, not weakened, by lane F stage A item A9 (2026-09-07). The premise is unchanged and is now MORE true: ADR-0048 predicted that the interceptor was the throwaway adapter and that the gauge would survive the Head/Worker merge, and A9 is where the adapter was thrown away. The named file moved with the producer — ForegroundLoadInterceptorTest went with the interceptor; ForegroundLoadGateTest pins the same balance property (ok / exception / cancellation / Error, plus never-negative under concurrency) on ForegroundLoadGate, which is now the gauge's only producer. Per this register's own amendment rule the probe was not edited to make a violation pass: the violation is that the pin's SUBJECT was deleted by a decision this ADR anticipated."
+    },
+    {
+      "id": "adr-0048-foreground-gauge-has-a-live-producer",
+      "adr": "0048",
+      "premise": "The duty cycle needs the gauge to be FED, not merely balanced. Between lane F item A6 and the 2026-09-07 fix it was not: ForegroundLoadGate mirrored the interceptor's gRPC method names while the executor seam passes lower-camel operation labels, so the gauge read zero on every call and indexing never yielded to a waiting search. Both existing suites stayed green because both fed the gate the vocabulary the gate itself declared. A gauge probe that does not enter through the seam's real caller tests the gauge against itself.",
+      "kind": "test",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
+      "test": "io.justsearch.app.engine.EngineRootInProcessPortsTest#ingestAndSearchThroughTheInProcessPorts",
+      "note": "Added by the lane F stage A A6-A9 review (2026-09-07). The pinned assertion is that a real client.search(...) through EngineRoot moves ForegroundLoad.startedTotal. It lives inside the full boot test deliberately: the defect was that the seam's real caller never reached the gate, and a test that builds its own gate cannot observe that. This is the assertion that failed 'expected: <1> but was: <0>' on its first run."
     },
     {
       "id": "adr-0048-retry-exhausted-terminal",
