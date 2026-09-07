@@ -6312,3 +6312,152 @@ describe('Tempdoc 848 — the turn keeps its thinking after done, and after a re
     expect(view.shadowRoot!.querySelectorAll('[data-testid="chat-turn-reasoning"]')).toHaveLength(1);
   });
 });
+
+/**
+ * Tempdoc 941 round 19 finding F4 — a RELOADED turn is framed by the TURN's shape, not by the
+ * window's current mode.
+ *
+ * Observed: a Documents-rung (`core.rag-ask`) answer rendered live as "Based on your documents"
+ * with five source cards. After a four-process cold restart and reopening the conversation from
+ * history, the same answer text and the same five sources came back from the record — but the card
+ * now read "Model answer - this mode does not search your documents". The evidence survived; the
+ * epistemic frame did not.
+ *
+ * Mechanism: `renderUnifiedItemBody`'s record arm stamped `enriched.shapeId = this.currentShapeId()`
+ * — a read of `this.affordance`, i.e. which mode the window is in RIGHT NOW. A cold restart drops
+ * the affordance back to `'none'`, so every reloaded turn was re-declared `core.free-chat`, whose
+ * `declaredGroundingClass` is `ungrounded-llm`. The frame authority then framed correctly the shape
+ * it was handed; it was handed the wrong shape.
+ *
+ * The turn's own shape IS on the record (tempdoc 863 §4.A.5 F1 — `FileConversationStore.enrichMessage`
+ * stamps `shapeId` per message and `InteractionThreadController.chatTurn` puts it on
+ * `attributes.shapeId`), and `sv3-record.ts`'s `declaredShapeOf` already reads it. This window did not.
+ */
+describe('UnifiedChatView reloaded-turn shape provenance (tempdoc 941 F4)', () => {
+  /** The real wire shape of a persisted RAG source: `RetrievalCitation` under `attributes.citations`. */
+  function ragSource(n: number): Record<string, unknown> {
+    return {
+      parentDocId: `f:/docs/doc-${n}.md`,
+      chunkIndex: n,
+      chunkTotal: 5,
+      startChar: 0,
+      endChar: 120,
+      score: 0.8,
+      excerpt: `excerpt ${n}`,
+      startLine: 1,
+      endLine: 4,
+      headingText: '',
+      headingLevel: 0,
+    };
+  }
+
+  /**
+   * The `GET /api/thread/{id}` rows for the observed conversation, built from the producing code —
+   * `InteractionThreadController.toWireRow` (id/occurredAt/kind/originator/content/attributes) over
+   * `chatTurn`, which emits `attributes.citations` (the retrieval sources) and `attributes.shapeId`
+   * (the dispatching shape, 863 F1). Deliberately NO `attributes.sources` key: that is the ACTION
+   * plane's discriminator, and this is an answer-plane RAG turn.
+   */
+  function ragRecord(): unknown[] {
+    return [
+      {
+        id: 'u1',
+        occurredAt: '2026-01-01T00:00:01Z',
+        kind: 'USER_MESSAGE',
+        originator: 'user',
+        content: 'What does the Worker own?',
+        attributes: { shapeId: 'core.rag-ask' },
+      },
+      {
+        id: 'a1',
+        occurredAt: '2026-01-01T00:00:02Z',
+        kind: 'ASSISTANT_MESSAGE',
+        originator: 'agent',
+        content: 'The Worker owns all index I/O.',
+        attributes: {
+          shapeId: 'core.rag-ask',
+          citations: [ragSource(0), ragSource(1), ragSource(2), ragSource(3), ragSource(4)],
+        },
+      },
+    ];
+  }
+
+  it('F4: a reloaded core.rag-ask turn keeps its grounded frame after a cold restart drops the affordance', async () => {
+    const view = mountView();
+    await view.updateComplete;
+    // The cold-restart state: `unifiedChatState` died with the process, so the window lands on the
+    // default affordance. The user reopens the conversation from history — `loadConversation` never
+    // sets an affordance, so `currentShapeId()` answers `core.free-chat`.
+    (view as unknown as { affordance: string }).affordance = 'none';
+    const v = view as unknown as { unifiedEvents: unknown[]; thread: unknown[] };
+    v.unifiedEvents = ragRecord();
+    // The reload-durability case: `loadConversation` rebuilds role/content/id only, so the live
+    // thread carries NO evidence and `attachLiveMatch` leaves the record to render.
+    v.thread = [];
+    view.requestUpdate();
+    await view.updateComplete;
+
+    const turn = view.shadowRoot!.querySelector('.message.assistant[data-item-id="a1"]');
+    expect(turn, 'the reloaded turn renders from the record').not.toBeNull();
+    // The five persisted sources are still there — that half never broke.
+    const panel = turn!.querySelector('jf-citations-panel') as unknown as {
+      sources?: unknown[];
+    } | null;
+    expect(panel?.sources).toHaveLength(5);
+
+    const text = (turn!.textContent ?? '').replace(/\s+/g, ' ');
+    // The frame must state the provenance the record carries…
+    expect(text).toContain('Based on your documents');
+    // …and must NOT re-declare a Documents-rung answer an ungrounded model answer.
+    expect(text).not.toContain('this mode does not search your documents');
+    view.remove();
+  });
+
+  it('F4: the reloaded turn shape tag names the shape that answered, not the window mode', async () => {
+    const view = mountView();
+    await view.updateComplete;
+    (view as unknown as { affordance: string }).affordance = 'none';
+    const v = view as unknown as { unifiedEvents: unknown[]; thread: unknown[] };
+    v.unifiedEvents = ragRecord();
+    v.thread = [];
+    view.requestUpdate();
+    await view.updateComplete;
+
+    const tag = view.shadowRoot!.querySelector(
+      '.message.assistant[data-item-id="a1"] .message-shape-tag',
+    );
+    expect(tag?.textContent?.trim()).toBe(SHAPE_LABELS['core.rag-ask']);
+    view.remove();
+  });
+
+  it('F4: a record turn that declares NO shape still falls back to the window mode (pre-863 rows)', async () => {
+    // No backfill exists for messages written before 863 stamped `shapeId`, so the legacy class must
+    // keep the only answer available to it — the window's current mode — rather than degrade to a
+    // hardcoded default.
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'documents';
+    const v = view as unknown as { unifiedEvents: unknown[]; thread: unknown[] };
+    v.unifiedEvents = [
+      {
+        id: 'u1', occurredAt: '2026-01-01T00:00:01Z', kind: 'USER_MESSAGE',
+        originator: 'user', content: 'q', attributes: {},
+      },
+      {
+        id: 'a1', occurredAt: '2026-01-01T00:00:02Z', kind: 'ASSISTANT_MESSAGE',
+        originator: 'agent', content: 'The Worker owns all index I/O.',
+        attributes: { citations: [ragSource(0)] },
+      },
+    ];
+    v.thread = [];
+    view.requestUpdate();
+    await view.updateComplete;
+
+    const text = (
+      view.shadowRoot!.querySelector('.message.assistant[data-item-id="a1"]')!.textContent ?? ''
+    ).replace(/\s+/g, ' ');
+    expect(text).toContain('Based on your documents');
+    expect(text).not.toContain('this mode does not search your documents');
+    view.remove();
+  });
+});
