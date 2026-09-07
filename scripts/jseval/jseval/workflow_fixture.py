@@ -206,6 +206,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from pathlib import Path, PurePath
 from typing import Any, Iterable, NamedTuple
 
@@ -2754,6 +2755,45 @@ def capture_health(
                         "a baseline"
                     )
     return {"ok": not problems, "problems": problems}
+
+
+#: A side's capture files are EXACTLY ``capture-<digits>.json``. Anchored at both ends, because
+#: the bug this replaces was a `capture-*.json` shell glob: the cycle script writes its
+#: diagnostics into the same directory, and `capture-1-ai-status.json` matched. The gate then
+#: reported "captures per side: baseline=6" for three real captures and marked the three
+#: diagnostic files UNHEALTHY (`chatProfile None`) — a verdict computed over files that are not
+#: captures. Nothing else in the directory may be mistaken for one.
+_CAPTURE_FILENAME_RE = re.compile(r"^capture-(\d+)\.json$")
+
+
+def select_side_captures(directory: str | Path) -> list[Path]:
+    """The one side's captures in ``directory``, primary first, in CYCLE-NUMBER order.
+
+    Sorted numerically rather than lexicographically, so ``capture-10.json`` follows
+    ``capture-9.json`` instead of ``capture-1.json``. The first element is the primary
+    (``capture-1.json``); the rest are that side's same-build noise captures.
+
+    Lives here rather than in the shell so the rule has ONE definition and a test can point a
+    decoy at it. Raises :class:`WorkflowFixtureError` — not a silent empty list — when the
+    directory is absent or holds no primary, because a gate that quietly compares nothing is
+    the failure this whole instrument exists to prevent.
+    """
+    path = Path(directory)
+    if not path.is_dir():
+        raise WorkflowFixtureError(f"{path} is not a directory")
+    numbered: list[tuple[int, Path]] = []
+    for entry in path.iterdir():
+        match = _CAPTURE_FILENAME_RE.match(entry.name)
+        if match and entry.is_file():
+            numbered.append((int(match.group(1)), entry))
+    numbered.sort()
+    captures = [entry for _, entry in numbered]
+    if not captures or captures[0].name != "capture-1.json":
+        raise WorkflowFixtureError(
+            f"{path} holds no capture-1.json (the primary); found "
+            f"{[c.name for c in captures]}. Run fixture-pair.sh for this side."
+        )
+    return captures
 
 
 def _load_capture(value):

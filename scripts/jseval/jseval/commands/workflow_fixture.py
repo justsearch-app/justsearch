@@ -218,4 +218,26 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
     sys.exit(0 if result["pass"] else 1)
 
 
+@workflow_fixture_group.command("side-captures")
+@click.argument("directory", type=click.Path(file_okay=False, resolve_path=True))
+def side_captures_cmd(directory):
+    """Print one side's capture files, primary first, one absolute path per line.
+
+    `fixture-gate.sh` used a `capture-*.json` shell glob and so also picked up the cycle
+    script's per-capture diagnostics (`capture-1-ai-status.json`), reporting six captures per
+    side for three and marking the three non-captures UNHEALTHY. The selection rule now has one
+    definition, in `workflow_fixture.select_side_captures`, where a test can point a decoy at
+    it — a shell glob cannot be unit-tested and had already drifted once.
+    """
+    # Imported inside the command, as the other two are: the module pulls in httpx.
+    from .. import workflow_fixture as wf
+    try:
+        captures = wf.select_side_captures(directory)
+    except wf.WorkflowFixtureError as exc:
+        click.echo(f"workflow-fixture side-captures: {exc}", err=True)
+        sys.exit(2)
+    for capture in captures:
+        click.echo(str(capture))
+
+
 COMMANDS = [workflow_fixture_group]

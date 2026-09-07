@@ -2326,6 +2326,94 @@ def _capture_with_ai(online, *, activation_state="failed") -> dict:
 _ABSENT = object()
 
 
+def _side_dir(tmp_path: Path, names) -> Path:
+    directory = tmp_path / "side"
+    directory.mkdir(exist_ok=True)
+    for name in names:
+        (directory / name).write_text("{}", encoding="utf-8")
+    return directory
+
+
+def test_side_capture_selection_ignores_everything_that_is_not_a_numbered_capture(tmp_path):
+    """The acceptance re-run's regression, pinned.
+
+    `fixture-gate.sh` selected a side with a `capture-*.json` shell glob. The cycle script
+    writes its per-capture AI diagnostics into the same directory, so
+    `capture-1-ai-status.json` was read AS a capture: a three-cycle side reported "captures per
+    side: baseline=6" and the three non-captures came back UNHEALTHY with `chatProfile None` --
+    a verdict computed over files that are not captures. Every decoy below is a real file that
+    directory holds.
+    """
+    directory = _side_dir(tmp_path, [
+        "capture-1.json", "capture-2.json", "capture-3.json",
+        # The exact decoys that caused it, and the renamed ones that replaced them.
+        "capture-1-ai-status.json", "capture-2-ai-activate.json",
+        "diag-1-ai-status.json", "diag-2-ai-activate.json",
+        # The rest of what fixture-pair.sh leaves in a side directory.
+        "cleanup-before-1.json", "cleanup-after-1.json", "effective-config-1.json",
+        "stop-1.json", "noise-diff.json", "dev-runner-1.log", "pair.log",
+        # Near-misses on the pattern itself: no digits, extra suffix, wrong extension.
+        "capture-.json", "capture-x.json", "capture-1.json.bak", "capture-1.txt",
+        "recapture-1.json",
+    ])
+    # Falsifier: the glob this replaces really does match the decoys, so the assertion below
+    # distinguishes the fixed rule from the broken one rather than passing on an empty set.
+    assert len(list(directory.glob("capture-*.json"))) > 3
+    assert [c.name for c in wf.select_side_captures(directory)] == [
+        "capture-1.json", "capture-2.json", "capture-3.json"]
+
+
+def test_fixture_gate_selects_through_the_python_rule_and_holds_no_capture_glob(tmp_path):
+    """The shell is what regressed, and it has no test harness of its own.
+
+    Everything above tests `select_side_captures`; none of it would notice `fixture-gate.sh`
+    going back to globbing. This does, and it is the whole reason the rule was moved into
+    python: a bash glob cannot be unit-tested, and this one had already drifted once.
+    """
+    gate = (Path(__file__).resolve().parents[2] / "jseval/lane-f/fixture-gate.sh").read_text(
+        encoding="utf-8")
+    assert "workflow-fixture side-captures" in gate
+    code = [line for line in gate.splitlines() if not line.lstrip().startswith("#")]
+    assert not [line for line in code if "capture-*.json" in line],         "fixture-gate.sh globs capture-*.json again — that matches the cycle diagnostics"
+
+
+def test_side_captures_are_ordered_by_cycle_number_not_lexicographically(tmp_path):
+    """capture-10 follows capture-9. A lexicographic sort would put it second, which silently
+    makes the wrong file the primary once a side runs ten cycles."""
+    directory = _side_dir(tmp_path, [f"capture-{n}.json" for n in (1, 2, 9, 10, 11)])
+    assert [c.name for c in wf.select_side_captures(directory)] == [
+        "capture-1.json", "capture-2.json", "capture-9.json",
+        "capture-10.json", "capture-11.json"]
+
+
+def test_a_side_with_only_diagnostics_is_refused_not_silently_empty(tmp_path):
+    """The direction that matters: a gate that quietly compares nothing must not report PASS."""
+    directory = _side_dir(tmp_path, ["diag-1-ai-status.json", "pair.log"])
+    with pytest.raises(wf.WorkflowFixtureError, match="capture-1.json"):
+        wf.select_side_captures(directory)
+    with pytest.raises(wf.WorkflowFixtureError, match="not a directory"):
+        wf.select_side_captures(directory / "missing")
+
+
+def test_side_captures_cli_prints_only_the_numbered_captures(tmp_path):
+    """The path `fixture-gate.sh` actually takes, decoys and all."""
+    directory = _side_dir(tmp_path, [
+        "capture-1.json", "capture-2.json",
+        "capture-1-ai-status.json", "diag-1-ai-activate.json", "noise-diff.json"])
+    result = CliRunner().invoke(main, ["workflow-fixture", "side-captures", str(directory)])
+    assert result.exit_code == 0, result.output
+    printed = [Path(line).name for line in result.output.splitlines() if line.strip()]
+    assert printed == ["capture-1.json", "capture-2.json"]
+
+
+def test_side_captures_cli_exits_2_when_a_side_has_no_primary(tmp_path):
+    """A usage exit, like every other refusal in this CLI -- not a traceback, not a 0."""
+    directory = _side_dir(tmp_path, ["capture-2.json", "diag-1-ai-status.json"])
+    result = CliRunner().invoke(main, ["workflow-fixture", "side-captures", str(directory)])
+    assert result.exit_code == 2
+    assert "capture-1.json" in result.output
+
+
 #: The Head-side enum whose drop members `CROSS_ENCODER_DROP_REASONS` mirrors.
 _SKIP_REASON_JAVA = (
     Path(__file__).resolve().parents[3]

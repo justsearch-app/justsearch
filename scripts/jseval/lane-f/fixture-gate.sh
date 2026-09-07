@@ -42,20 +42,32 @@ report=${3:-}
 baseline_abs=$(cd "$baseline_dir" && pwd) || exit 2
 candidate_abs=$(cd "$candidate_dir" && pwd) || exit 2
 
-# capture-1 is the primary; EVERY other capture-*.json in the directory is a noise capture, so
-# adding a cycle to fixture-pair.sh automatically deepens the gate with no change here.
+# capture-1 is the primary; every other capture-<digits>.json in the directory is a noise
+# capture, so adding a cycle to fixture-pair.sh automatically deepens the gate with no change
+# here. The selection is `workflow-fixture side-captures`, NOT a shell glob: the glob was
+# `capture-*.json`, which also matched the cycle script's per-capture diagnostics
+# (`capture-1-ai-status.json`) sitting in the same directory. The gate then reported "captures
+# per side: baseline=6" for three real captures and marked the three diagnostic files UNHEALTHY
+# with `chatProfile None` -- a verdict computed over files that are not captures. One definition
+# of the rule, in python, where a test can point a decoy at it.
 args=()
 for side in baseline candidate; do
   if [[ $side == baseline ]]; then dir=$baseline_abs; else dir=$candidate_abs; fi
-  primary="$dir/capture-1.json"
-  if [[ ! -f $primary ]]; then
-    echo "fixture-gate: missing $primary — run fixture-pair.sh for the $side side" >&2
+  # Run bare and keep the status in a variable: a pipe here would report the PIPE's status
+  # and swallow the refusal, and a later $? read would be stale.
+  listing=$( (cd scripts/jseval && python -m jseval workflow-fixture side-captures "$dir") 2>&1 )
+  rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "fixture-gate: $listing" >&2
     exit 2
   fi
-  args+=(--"$side" "$primary")
+  # click writes CRLF on Windows and `mapfile -t` strips only the LF, so the CR would ride
+  # into the path and the differ would reject a file that exists.
+  listing=$(printf '%s' "$listing" | tr -d '\r')
+  mapfile -t captures <<< "$listing"
+  args+=(--"$side" "${captures[0]}")
   n=0
-  for f in "$dir"/capture-*.json; do
-    [[ -f $f && $f != "$primary" ]] || continue
+  for f in "${captures[@]:1}"; do
     args+=(--"$side"-noise "$f")
     n=$((n + 1))
   done

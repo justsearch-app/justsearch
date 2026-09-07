@@ -598,9 +598,14 @@ reads as healthy is exactly how the half-enriched side passed the four-capture a
 
 What made the failed activation itself is *not* established. Each cycle tears its data dir down
 with `--clean hard`, which takes the activation status file and the head log with it, so the
-`errorCode` from those six runs is gone. That is why the script now writes `capture-N-ai-activate.json` and
-`capture-N-ai-status.json` beside each capture — per capture, since a side runs N cycles into one
-directory: the next occurrence is diagnosable from the artifact.
+`errorCode` from those six runs is gone. That is why the script now writes `diag-N-ai-activate.json` and `diag-N-ai-status.json` beside
+each capture — per capture, since a side runs N cycles into one directory: the next occurrence is
+diagnosable from the artifact. The `diag-` prefix is not cosmetic. `fixture-gate.sh` used to
+select a side with a `capture-*.json` shell glob, so the first naming (`capture-N-ai-status.json`)
+was read AS a capture: the acceptance re-run reported "captures per side: baseline=6" for three
+real captures and marked the three diagnostics UNHEALTHY with `chatProfile None`. Selection now
+goes through `workflow-fixture side-captures`, which matches `capture-<digits>.json` exactly and
+orders by cycle number; the prefix is the second, independent reason the collision cannot recur.
 
 **Per-side noise fractions include `noisy-both`.** A field unstable on both sides is unstable on
 each, so it counts towards both fractions. Counting only a side's exclusive noise understated

@@ -39,7 +39,13 @@ out_abs=$(cygpath -w "$(cd "$(dirname "$out")" && pwd)/$(basename "$out")" 2>/de
 out_dir=$(cd "$(dirname "$out")" && pwd)
 # ...and a per-capture prefix for them. fixture-pair.sh runs N cycles into ONE directory, so a
 # fixed name would leave only the last cycle's diagnostics and silently discard the failing one.
-out_stem="$out_dir/$(basename "$out" .json)"
+#
+# `diag-`, NOT the capture's own stem. These files sit beside the captures, and the gate used to
+# select a side with a `capture-*.json` glob -- so `capture-1-ai-status.json` was read AS a
+# capture, and a three-cycle side reported six. The gate now selects `capture-<digits>.json`
+# through `workflow-fixture side-captures`; this prefix is the second, independent reason the
+# collision cannot come back.
+out_stem="$out_dir/diag-$(basename "$out" .json | sed 's/^capture-//')"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 # The Worker yields GPU backfill while the LLM is active (main_gpu_active, ADR-0048), so an
