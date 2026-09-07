@@ -121,7 +121,7 @@ declarations leave the build files (its item A14), and `check-readiness-reason-c
 producer direction that the deleted Worker classes satisfy today, so stage A carries a holding
 allowlist for the orphaned `WORKER_*` codes until D1 re-cuts the vocabulary (its item A17).
 
-**Owner items from the first live fixture captures (2026-09-07, PR 0).** Four captures on one
+**Findings from the first live fixture captures (2026-09-07, PR 0), decided.** Four captures on one
 build (`evidence/baseline/fixture/`): two on one index, then two on two fresh ingests of the same
 91 documents. Every capture agreed on the cancelled turn's outcome and on the rank order of the
 hits both sides returned; they disagreed on three things 16 calls deterministic, none of them
@@ -138,16 +138,24 @@ completed in 3 iterations in one capture and hit the iteration cap in the next, 
 key or request field carries a temperature or seed; citation targets, sources, tool counts and
 disposition all follow from it. 16 lists evidence selection and citation targets among the
 byte-equal fields and 17.7 names "generative text under a fixed seed" as a class, on the premise
-that both are deterministic across two runs. Neither is. The fixture keeps those fields `exact`
-and records the instability; the choices are the owner's (17.6, a gate row), before the first
-paired capture at stage E: for (b) a fixture-only retrieval pin (raise `hnsw.ef_search` to the
-chunk count for both captures, or an exact-scan flag added for the fixture) versus a margin
-rule on the last ranks; for (c) a backend sampling override for the fixture (temperature 0 plus
-a seed on the chat request, small, in stage D2's request-time paths or a PR 0 follow-up) versus
-moving the chat `exact` fields under `generative-text`. The orchestrator recommends the two
-pins, since they keep 16's relation and the class list unchanged. Until then the split-side
-baseline capture stands as taken (compact profile; the standard model's 11 GB resident set
-tripped the dev machine's memory guard), with its stability diff beside it.
+that both are deterministic across two runs. Neither is. **Decided (orchestrator, 2026-09-07, with the owner's agreement):** two pins, so
+16's relation and the three-class list stay unchanged. For (b) the fixture captures with the
+dense leg made exhaustive (`index.vector.hnsw.ef_search` raised to the vector count for both
+captures, or an exact-scan switch if `ef_search` does not reach exhaustiveness in the code) and
+for (c) an optional `sampling` field on the chat request (temperature 0 plus a seed) honoured
+through the agent loop to llama-server, absent by default so nothing else changes. Both land on
+`main` as one small follow-up to PR 0 ("PR 0b") before stage A merges, because the split side
+of every paired row must be captured under them; the baseline fixture capture is retaken with
+the pins on, and stage E captures both sides with them. Until PR 0b lands the capture in
+`evidence/baseline/` stands as taken (compact profile; the standard model's 11 GB resident set
+tripped the dev machine's memory guard), with its stability diff beside it, and PR 0b's
+acceptance is two fresh-corpus captures on one build diffing clean on every `exact` field.
+
+**Decision authority (owner, 2026-09-07).** After PR 0 the owner delegated every remaining
+decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
+and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the
+orchestrator decides it and records the decision, dated, in this section with its reasoning.
+The merge go-aheads (17.6, handoff rule 1) are unchanged.
 
 ## 0.1 Forces that shaped the design
 
@@ -1680,7 +1688,9 @@ picks it up:
 - **Design errors found mid-stage.** The design is amended in place with a dated line in
   section 0 naming the stage that found the error and what changed. An amendment inside a
   decided line (a mechanism detail, a citation) proceeds; a change to a decision (15), a gate
-  row (16) or the stage table (17.3) waits for the owner's word before the stage continues.
+  row (16) or the stage table (17.3) is decided by the implementation orchestrator and recorded
+  in section 0 with its reasoning (owner delegation, 2026-09-07; it previously waited for the
+  owner's word). Merge go-aheads are not delegated.
 - **Drift.** `git merge origin/main` weekly and once more before stage E; never a rebase of the
   pushed branch (`agent-lessons.md`). With development halted, PR 0 is the only expected source
   of conflict.
@@ -1722,7 +1732,7 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 | failed-unit default at activation: `index.migration.cutover.max_failed_jobs` moves from -1 (unlimited, today) to 0, or the owner names another value | 7.4, 17.9 | **0**: today's value activates with documents missing and nobody told; with gaps reported and replay cheap, refusing is right and the row above is the escape hatch | D1 |
 | which readiness representation survives as the authority's name (`LifecycleSnapshotV1` or `ReadinessEnvelopeView`) and which becomes its projection | 7.6, 17.9 | **the envelope**, whose ten dimensions are already component-shaped; the lifecycle snapshot becomes its projection | D1 |
 | `UseCompactObjectHeaders` in the Engine's flag set (the Worker carries it today, the Head does not) | 8, 17.9 | gate run, with the collector | E |
-| deterministic capture for the workflow fixture: a retrieval pin for the dense leg (`hnsw.ef_search` at the chunk count, or an exact-scan flag) and a sampling override (temperature 0 plus seed on the chat request), or the affected fields move under a margin rule / `generative-text` | 16, 0 (PR 0 owner items) | **open**: orchestrator recommends the two pins; neither control exists today (`ChunkSearchOps.java:546`, `ConversationEngine.java:1154`) | E, before the first paired capture |
+| deterministic capture for the workflow fixture | 16, 0 (PR 0 findings) | **decided 2026-09-07 (orchestrator, owner agreed)**: a retrieval pin (exhaustive dense leg for the capture) and a `sampling` request override (temperature 0 plus seed), both on `main` as PR 0b before stage A merges; both sides captured under them | PR 0b, before the baseline is retaken |
 
 ### 17.8 What would re-cut this sequencing
 
