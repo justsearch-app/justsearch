@@ -47,6 +47,12 @@ dependencies {
   implementation(project(":modules:app-config"))
   implementation(project(":modules:app-util"))
   runtimeOnly(project(":modules:ui"))
+  // Lane F stage A item A1: the Engine composition root. `runtimeOnly` on purpose — it puts
+  // app-engine's bytecode on the ArchUnit test classpath so `@AnalyzeClasses(packages =
+  // "io.justsearch")` in LayeringEnforcementTest/BoundaryRulesTest sees it, WITHOUT giving the
+  // launcher a compile path into it (BoundaryRulesTest#launcherMayOnlyDependOnAppApi forbids
+  // exactly that).
+  runtimeOnly(project(":modules:app-engine"))
   // JavaFX UI dependencies removed - using web UI instead
   implementation(libs.jackson.core)
   implementation(libs.jackson.databind)

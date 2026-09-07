@@ -1,5 +1,6 @@
 class io.justsearch.adapters.lucene.commit.RequiredFieldsCommitMetadataValidator is unreferenced across the whole program
 class io.justsearch.aibackend.backend.BackendRegistry is unreferenced across the whole program
+class io.justsearch.app.engine.EngineRoot is unreferenced across the whole program
 class io.justsearch.app.observability.InfraHealthController is unreferenced across the whole program
 class io.justsearch.app.services.registry.emitter.URLOperationEmitter is unreferenced across the whole program
 class io.justsearch.app.services.registry.emitter.URLSurfaceEmitter is unreferenced across the whole program

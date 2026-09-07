@@ -27,7 +27,7 @@ node scripts/architecture/module-deps.mjs --check-canonical
 ### A1. Gradle project inventory
 
 **Included in `settings.gradle.kts`:**
-- `:modules:*` (34 JVM projects)
+- `:modules:*` (35 JVM projects)
 
 **Not Gradle projects (invoked by the build):**
 - `modules/ui-web` (Lit/Vite/TailwindCSS frontend)
@@ -57,8 +57,9 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`
 - `:modules:app-api-tck` -> `:modules:ai-backend`
 - `:modules:app-config` -> `:modules:configuration`
+- `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
-- `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
+- `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
 - `:modules:app-observability` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-util`, `:modules:configuration`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:prompt-support`
 - `:modules:app-services` -> `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`
 - `:modules:app-util` -> `:modules:configuration`
@@ -106,6 +107,13 @@ graph TD
   app-api --> configuration
   app-api-tck --> ai-backend
   app-config --> configuration
+  app-engine --> app-api
+  app-engine --> app-services
+  app-engine --> configuration
+  app-engine --> core
+  app-engine --> telemetry
+  app-engine --> worker-core
+  app-engine --> worker-services
   app-inference --> app-api
   app-inference --> configuration
   app-inference --> core-contracts
@@ -114,6 +122,7 @@ graph TD
   app-launcher --> app-agent
   app-launcher --> app-api
   app-launcher --> app-config
+  app-launcher --> app-engine
   app-launcher --> app-services
   app-launcher --> app-util
   app-launcher --> configuration
@@ -224,6 +233,6 @@ graph TD
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
 | `worker-services` | 12 |  |
 | `indexer-worker` | 11 | Worker process runtime, includes AI bridge + Lucene + gRPC |
-| `app-launcher` | 9 | CLI/distribution wiring; pulls in most runtime modules |
+| `app-launcher` | 10 | CLI/distribution wiring; pulls in most runtime modules |
 | `app-observability` | 8 |  |
 <!-- GENERATED:MODULE_DEPS:END -->
