@@ -118,7 +118,11 @@ jobs:
             releaseId = [long]$release.id
             tag = $tag
             version = $version
-            publishedAt = [string]$release.published_at
+            # pwsh 7 ConvertFrom-Json turns the ISO-8601 published_at into a [datetime]; [string]
+            # would render it culture-formatted (first run 34096946647 on v0.3.0 failed the
+            # generator with "release.publishedAt must be a UTC ISO-8601 timestamp"). Re-emit it
+            # explicitly as the UTC wire form the generator and the WinGet ReleaseDate expect.
+            publishedAt = ([datetime]$release.published_at).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", [cultureinfo]::InvariantCulture)
             draft = [bool]$release.draft
             prerelease = [bool]$release.prerelease
             checksumManifest = [ordered]@{
