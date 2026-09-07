@@ -319,6 +319,22 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   SSL handshake here), the third needs a built installer. What WAS verified is the load-bearing
   half: the trimmed jar is produced, at the same size, with the same contents. A packaging change
   nobody ran is a claim, and it is recorded as one.
+- **A13 (CI could not close that gap either — accepted and dated, 2026-09-07).** The obvious answer
+  to an unverifiable packaging change is "let CI build it", and it was tried: `build-installer.yml`
+  was dispatched on this branch **twice** and failed **before its first step**, with no log. The
+  cause is structural, not transient — the workflow declares `environment: release-signing`, and
+  that environment's deployment branch protection rejects any ref that is not `main`. A branch
+  therefore cannot produce an installer at all, by policy, which is the correct policy for a
+  signing environment and an inherent gap for a lane that rewrites packaging on a branch.
+  **So the packaging half of A13 stays unverified until the first installer run after the merge.**
+  That is an accepted, dated gap rather than a passing check: what stands behind it is the local
+  verification that did run (`stageTrimmedOnnxRuntimeGpu` produces a 5.8 MB jar from the 371 MB
+  original, containing exactly the win-x64 core trio + JNI shim + TensorRT provider, Linux natives
+  and the CUDA EP DLL excluded — byte-policy-identical to pre-A13), plus the reasoning in the
+  double-paying bullet above. First post-merge installer run is the checkpoint; if it reds, the
+  cause is in this commit's `bundleSidecarResources` / `smokeSidecarBundle` /
+  `verify-installer-nsis-win.ps1` and nowhere else, because nothing else in stage A touches
+  packaging.
 
 - **A7.** The item says "a bounded buffer … drop-oldest or block, your call, justified". **Block,
   never drop**, with a timeout that fails the flow — and the justification is a property of these
@@ -1150,6 +1166,15 @@ From 17.3's "branch state after" column, read strictly:
    stage-B item that restores it.
 3. **`core.restart-worker` returns `restart required`** rather than restarting anything.
 4. The chaos/system tests of group C, for exactly as long as A12 is open — green by A13.
+5. **The installer bundle's packaging steps, unverified rather than red (added 2026-09-07).** Not a
+   failure — an unrunnable check. `bundleSidecarResources`, `smokeSidecarBundle` and
+   `verify-installer-nsis-win.ps1` changed at A13 and cannot be exercised on a branch: the local
+   build needs a jlink runtime plus network downloads that fail here, and `build-installer.yml`
+   declares `environment: release-signing`, whose deployment branch protection refuses every ref
+   but `main` — so the workflow fails before its first step, with no log, however many times it is
+   dispatched. This is the one item in this list that is NOT restored by a stage-B change; it is
+   closed by the first installer run after the merge, and until then the honest statement is
+   "changed, locally reasoned, never executed". See the A13 bullets in §0.1 for what WAS measured.
 
 **Not allowed red (a defect of the stage, not a deliberate loss):**
 - the full unit suite, `spotlessCheck`, `pmdAll`, `./gradlew.bat build -x test`
