@@ -37,6 +37,9 @@ out_abs=$(cygpath -w "$(cd "$(dirname "$out")" && pwd)/$(basename "$out")" 2>/de
 # the final runtime status). $out_abs is a Windows path for python's benefit; these are written
 # by the shell, so they need the shell's view.
 out_dir=$(cd "$(dirname "$out")" && pwd)
+# ...and a per-capture prefix for them. fixture-pair.sh runs N cycles into ONE directory, so a
+# fixed name would leave only the last cycle's diagnostics and silently discard the failing one.
+out_stem="$out_dir/$(basename "$out" .json)"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 # The Worker yields GPU backfill while the LLM is active (main_gpu_active, ADR-0048), so an
@@ -112,10 +115,10 @@ else
   log "activate $profile"
   # The activate response is KEPT: a 4xx/5xx here used to vanish into /dev/null, so a refused
   # activation was indistinguishable from a slow one.
-  act=$(curl -s -m 30 -o "$out_dir/ai-activate.json" -w '%{http_code}' "${hdr[@]}" -X POST \
+  act=$(curl -s -m 30 -o "$out_stem-ai-activate.json" -w '%{http_code}' "${hdr[@]}" -X POST \
     -d "{\"variantId\":\"cuda12\",\"chatProfile\":\"$profile\"}" \
     "$base/api/ai/runtime/activate")
-  log "activate -> HTTP $act $(head -c 200 "$out_dir/ai-activate.json" 2>/dev/null)"
+  log "activate -> HTTP $act $(head -c 200 "$out_stem-ai-activate.json" 2>/dev/null)"
   for ((i = 0; i < 90; i++)); do
     st=$(ai_status)
     if echo "$st" | ai_ready "$profile"; then break; fi
@@ -123,12 +126,12 @@ else
   done
 fi
 
-echo "$st" > "$out_dir/ai-status.json"
+echo "$st" > "$out_stem-ai-status.json"
 act_state=$(echo "$st" | grep -o '"state":"[a-z_]*"' | head -1)
 log "ai: engine=$(echo "$st" | ai_ready "$profile" && echo online || echo OFFLINE) profile=$(echo "$st" | grep -o '"chatProfile":"[a-z]*"' | head -1) last-activation-procedure=$act_state"
 if ! echo "$st" | ai_ready "$profile"; then
   log "the inference engine is not online on profile '$profile' -- REFUSING to capture chat"
-  log "turns no model answered. Status written to $out_dir/ai-status.json"
+  log "turns no model answered. Status written to $out_stem-ai-status.json"
   exit 4
 fi
 

@@ -598,8 +598,9 @@ reads as healthy is exactly how the half-enriched side passed the four-capture a
 
 What made the failed activation itself is *not* established. Each cycle tears its data dir down
 with `--clean hard`, which takes the activation status file and the head log with it, so the
-`errorCode` from those six runs is gone. That is why the script now writes `ai-activate.json` and
-`ai-status.json` beside each capture: the next occurrence is diagnosable from the artifact.
+`errorCode` from those six runs is gone. That is why the script now writes `capture-N-ai-activate.json` and
+`capture-N-ai-status.json` beside each capture — per capture, since a side runs N cycles into one
+directory: the next occurrence is diagnosable from the artifact.
 
 **Per-side noise fractions include `noisy-both`.** A field unstable on both sides is unstable on
 each, so it counts towards both fractions. Counting only a side's exclusive noise understated
