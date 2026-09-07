@@ -303,10 +303,16 @@ public final class ReadPathOps {
   }
 
   /**
-   * The ONE site that builds a {@link KnnFloatVectorQuery} — the doc-level dense leg (both
-   * overloads above) and the chunk dense leg ({@code ChunkSearchOps#searchChunkVector}) all come
-   * through here, so {@code index.vector.exhaustive_search} cannot be honoured at one site and
-   * silently skipped at another (lane F PR 0b).
+   * The one site that builds a {@link KnnFloatVectorQuery} ON THE PRODUCT READ PATH — the doc-level
+   * dense leg (both overloads above) and the chunk dense leg
+   * ({@code ChunkSearchOps#searchChunkVector}) all come through here, so
+   * {@code index.vector.exhaustive_search} cannot be honoured at one site and silently skipped at
+   * another (lane F PR 0b).
+   *
+   * <p>Two BENCHMARK harnesses build their own query and deliberately bypass this factory —
+   * {@code EngineVectorIndexBench} (a sentinel recall probe) and {@code VectorQuantizationGate} —
+   * because each pins its own {@code k} and is measuring the approximation itself. They are not a
+   * gap: a bench that inherited a global exact-search switch would stop measuring HNSW.
    *
    * <p>Default (switch off) is byte-identical to the three inline constructions it replaced:
    * {@code k = resolveVectorQueryK(limit)} and the caller's own filter, which for a null filter is
@@ -324,6 +330,13 @@ public final class ReadPathOps {
     if (!session.vectorExhaustiveSearch) {
       return new KnnFloatVectorQuery(field, queryVector, queryK, filter);
     }
+    // This reads maxDoc from a searcher acquired HERE, and the search below acquires a second one.
+    // An NRT reopen between the two would leave k sized for the older reader: still >= that
+    // reader's maxDoc, so the query stays exact over everything the first reader saw, but a
+    // document added in between could in principle fall outside k. Deliberately not held across
+    // both — pinning one searcher for the whole call would mean bypassing the reopen-on-demand
+    // seam that every other read goes through. Harmless for the switch's purpose: a deterministic
+    // capture runs against a quiesced index, which is a precondition the fixture already states.
     int maxDoc;
     try {
       maxDoc = withSearcher(searcher -> searcher.getIndexReader().maxDoc());

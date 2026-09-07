@@ -1370,6 +1370,12 @@ public enum EnvRegistry {
      * ({@code SearchExecutor#isCandidateBudgetSaturated}), so the chunk-retry branch fires on
      * exactly the same queries it did with the switch off.
      *
+     * <p>ONE display-only number does move with it: {@code RagContextOps} reports the dense leg's
+     * {@code totalHits} (plus the union leg's size) as the RAG meta's {@code chunks_found}
+     * ({@code RAGContext.java:355}), so in exhaustive mode that field reads as the whole
+     * vector-bearing corpus. It is already documented as a composite that "may exceed the returned
+     * chunks list" and nothing branches on it — {@code chunks_used} is the number that matters.
+     *
      * <p>Cost is O(vectors) per query. It is a capture/diagnostic knob, not a production default.
      */
     INDEX_VECTOR_EXHAUSTIVE_SEARCH("index.vector.exhaustive_search",
