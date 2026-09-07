@@ -322,24 +322,6 @@ Owner-only steps (require repo permissions):
 > shipped **v0.1.0** app has no MCP endpoint (its backend is 2026-04-28 jars); the MCPB bundle
 > and the README's MCP sections are meaningful only from the next release onward.
 
-### Post-release WinGet projection
-
-After a stable Release is published, dispatch the standalone projection workflow:
-
-```bash
-gh workflow run prepare-winget-manifests.yml --ref main -f releaseTag=v<version>
-gh run download <run-id> -n winget-manifests-v<version>
-```
-
-It authenticates the published installer's canonical URL and GitHub-reported SHA-256, downloads
-`SHA256SUMS`, authenticates that file against its own GitHub asset digest, and requires the
-installer entry to agree with the installer asset digest. It generates schema 1.12 manifests in
-the upstream-ready `manifests/e/eliasjustus/JustSearch/<version>/` hierarchy plus a PR body, runs
-the repository semantic/determinism checker and `winget validate`, and uploads the result. It does
-not mutate the Release or submit upstream. The owner reviews the artifact and opens the
-`microsoft/winget-pkgs` PR; installation/Sandbox evidence is recorded separately from manifest
-validation.
-
 ## Pre-release verification (sandbox silent-install)
 
 Beyond the whole-product Sandbox round in the release loop, a narrow automated check confirms the

@@ -191,8 +191,6 @@ jobs:
         run: |
           node --test scripts/release/release-changelog.test.mjs
           node scripts/release/release-changelog.mjs check
-          node --test scripts/release/winget-manifests.test.mjs
-          node scripts/release/winget-manifests.mjs check --metadata packaging/winget/package.v1.json --release packaging/winget/releases/v0.2.0.json --output packaging/winget/manifests/e/eliasjustus/JustSearch/0.2.0
 
       - name: Model-promotion planner tests
         run: python -m unittest discover -s scripts/models/tests -p "test_*.py" -v
