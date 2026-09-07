@@ -368,8 +368,41 @@ public final class ReadPathOps {
       Set<String> projectionFields,
       RuntimeSearchSort sort,
       String cursorToken) {
+    return search(query, limit, projectionFields, sort, cursorToken, null);
+  }
+
+  /**
+   * {@link #search} with an explicit Lucene {@link Sort}, overriding the one
+   * {@code RuntimeSearchSort} would build (lane F PR 0b).
+   *
+   * <p>The chunk kNN leg needs this. {@code buildRuntimeSort(RELEVANCE, idField)} breaks a score
+   * tie on {@code doc_id}, and on a CHUNK row that is {@code ChunkIds.newChunkDocId()} =
+   * {@code "chunk:" + UUID.randomUUID()} — stable within one index, uncorrelated between two. The
+   * bare chunk searches were fixed to sort on {@code parent_doc_id} then {@code chunk_index}, but
+   * the dense leg reaches Lucene through THIS method and kept the doc-level sort, so it still
+   * ordered its ties by the per-ingest UUID. Under {@code index.vector.exhaustive_search} that is
+   * at its worst: the leg returns the whole corpus, so every exact-score tie it can have (chunks
+   * with identical vectors — duplicated text — tie exactly) is in the result.
+   *
+   * <p>A cursor is REFUSED alongside an override: {@code decodeSearchAfterCursor} decodes the
+   * cursor against the {@code RuntimeSearchSort}, so a cursor decoded under one sort and applied
+   * under another would silently page through the wrong order. No caller needs both — the chunk
+   * legs do not paginate — so this fails loudly rather than defining the combination.
+   */
+  SearchResult search(
+      Query query,
+      int limit,
+      Set<String> projectionFields,
+      RuntimeSearchSort sort,
+      String cursorToken,
+      Sort sortOverride) {
     if (query == null) {
       return new SearchResult(List.of(), 0, 0, null);
+    }
+    if (sortOverride != null && cursorToken != null && !cursorToken.isBlank()) {
+      throw new IllegalArgumentException(
+          "a search-after cursor cannot be combined with an explicit Sort override: the cursor is "
+              + "encoded against the RuntimeSearchSort and would be decoded under a different order");
     }
     final int effectiveLimit = limit <= 0 ? 10 : limit;
     RuntimeSearchSort effectiveSort = sort == null ? RuntimeSearchSort.RELEVANCE : sort;
@@ -378,7 +411,8 @@ public final class ReadPathOps {
     try {
       return withSearcher(
           searcher -> {
-            Sort luceneSort = buildRuntimeSort(effectiveSort, idField);
+            Sort luceneSort =
+                sortOverride != null ? sortOverride : buildRuntimeSort(effectiveSort, idField);
             long requestedLong = (long) effectiveLimit + 1L;
             int requested = (int) Math.min(Integer.MAX_VALUE, Math.max(1L, requestedLong));
             org.apache.lucene.search.ScoreDoc after =
@@ -480,8 +514,11 @@ public final class ReadPathOps {
             }
 
             String nextCursor = null;
+            // An overridden Sort also suppresses the OUTBOUND cursor, for the same reason the
+            // inbound one is refused: the encoder is keyed on effectiveSort, so a cursor minted
+            // here would describe a position in an order these hits were not in.
             boolean hasMore = topDocs.scoreDocs.length > effectiveLimit;
-            if (hasMore && !hits.isEmpty()) {
+            if (hasMore && !hits.isEmpty() && sortOverride == null) {
               // Use the last returned hit (not the lookahead doc) to construct the next cursor.
               org.apache.lucene.search.ScoreDoc last = topDocs.scoreDocs[take - 1];
               nextCursor =

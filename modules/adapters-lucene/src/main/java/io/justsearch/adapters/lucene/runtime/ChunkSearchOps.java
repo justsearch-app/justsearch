@@ -67,7 +67,11 @@ public final class ChunkSearchOps {
   }
 
   /**
-   * Runs a bare (non-kNN) CHUNK search under a tie-break that is stable across index builds:
+   * Runs a bare (postings-based) CHUNK search under a tie-break that is stable across index
+   * builds. The kNN chunk leg needs the same sort and gets it separately, by handing this same
+   * {@code buildChunkTieBreakSort} to {@code ReadPathOps.search} (see
+   * {@link #searchChunkVector}) — it reaches Lucene through the read path rather than through
+   * this helper. The order is:
    * score DESC, then {@code parent_doc_id}, then {@code chunk_index}, then the doc id
    * ({@code LuceneRuntimeUtils#buildChunkTieBreakSort}, which explains why the doc id alone is not
    * enough on a chunk row — it is a fresh {@code UUID.randomUUID()} per ingest).
@@ -600,8 +604,13 @@ public final class ChunkSearchOps {
     KnnFloatVectorQuery knnQuery =
         readPathOps.buildKnnQuery(SchemaFields.CHUNK_VECTOR, queryVector, effectiveLimit, filter);
 
+    // Lane F PR 0b: the CHUNK tie-break, not the document one. This leg reaches Lucene through
+    // ReadPathOps.search, whose RELEVANCE sort breaks ties on doc_id — a per-ingest UUID on a
+    // chunk row. Exhaustive mode makes it acute: the leg returns the whole corpus, so every
+    // identical-vector tie is present and every one of them was ordered at random per build.
     return readPathOps.search(knnQuery, effectiveLimit, null,
-        RuntimeSearchSort.RELEVANCE, null);
+        RuntimeSearchSort.RELEVANCE, null,
+        LuceneRuntimeUtils.buildChunkTieBreakSort(idField));
   }
 
   /**

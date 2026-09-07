@@ -493,10 +493,18 @@ on a whole-document row it is the normalized absolute path — deterministic acr
 **Chunk rows need a different tie-breaker.** A chunk's `doc_id` is `ChunkIds.newChunkDocId()` =
 `"chunk:" + UUID.randomUUID()`, minted fresh per ingest and deliberately not derived from the parent
 or the chunk index. It is unique within one index and uncorrelated between two, so breaking a score
-tie on it gives an order that is stable per index and random per build. The bare chunk searches in
-`ChunkSearchOps` therefore sort by score, then `parent_doc_id` (the parent's normalized absolute
+tie on it gives an order that is stable per index and random per build. Every chunk search in
+`ChunkSearchOps` therefore sorts by score, then `parent_doc_id` (the parent's normalized absolute
 path), then `chunk_index`, then `doc_id` as the final total-order comparator
 (`LuceneRuntimeUtils#buildChunkTieBreakSort`). Two ingests of the same corpus agree on that key.
+
+That covers both shapes of chunk search, which reach Lucene by different routes. The postings-based
+legs (BM25, SPLADE, the doc-scoped variants) share `ChunkSearchOps#searchChunksWithStableTieBreak`.
+The dense leg (`searchChunkVector`) does not: it builds a `KnnFloatVectorQuery` and goes through
+`ReadPathOps#search`, so it passes the same `Sort` explicitly through that method's
+`sortOverride` parameter. An overriding `Sort` and a search-after cursor are mutually exclusive
+there — `SearchAfterCursorHelper` encodes and decodes against the `RuntimeSearchSort`, so an
+inbound cursor is refused and no outbound one is minted.
 
 **Pruning is retained; only a `totalHits` margin moves.** A leading score comparator does not cost
 WAND/block-max pruning. `TopFieldCollector`'s constructor sets `scoreMode = TOP_SCORES` and
