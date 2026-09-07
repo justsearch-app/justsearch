@@ -63,8 +63,9 @@ not say. Read `design.md` sections 0, 15, 16 and 17 first, then this file, then
   722). 17.6 already requires re-verification at each stage start; these seven are where to
   look first. `contracts/wire/knowledge.proto` and `status.proto` gained one line each.
 - **The design is not a tempdoc.** No size cap, no append-only convention, and no tempdoc
-  gate runs on it. `docs-validate` does not cover `docs/design/` either. The prose sweep at
-  stage F is what keeps it honest; nothing automated does.
+  gate runs on it. `docs-validate` does cover `docs/design/` (it walks `docs/**` and exempts
+  only tempdocs; corrected at PR 0), but only for front matter, headings and links. The prose
+  sweep at stage F is what keeps the content honest; nothing automated does.
 - **Two registers must be loaded before the work and updated before the lane closes**:
   `/search-quality` and `/inference-runtime` (CLAUDE.md, Skills). Stage D2's request-time
   paths and stage E's measurements touch both.

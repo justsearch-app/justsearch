@@ -1,0 +1,7 @@
+scripts/dev/dev-runner.cjs:731:    // Lane F PR 0 (design 17.2): one flag set with or without the AOT cache. TieredStopAtLevel=1
+scripts/dev/dev-runner.cjs:733:    // measured, and it conflicted with the AOT cache); MetaspaceSize=128m stops the
+scripts/dev/dev-runner.cjs:736:    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:-UsePerfData',
+scripts/dev/dev-runner.cjs:1731:        // Head startup flags: SerialGC (small heap, no throughput need), MetaspaceSize=128m,
+modules/shell/src-tauri/src/lib.rs:742:        // phase, 917 Derisk 1). Lane F PR 0: TieredStopAtLevel=1 dropped and MetaspaceSize=128m
+modules/shell/src-tauri/src/lib.rs:748:        .arg("-XX:+UseSerialGC")
+modules/shell/src-tauri/src/lib.rs:749:        .arg("-XX:MetaspaceSize=128m")

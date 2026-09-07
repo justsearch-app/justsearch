@@ -177,3 +177,40 @@ Three read-only audits; every citation below was re-read by the orchestrator.
   `SqlitePathResolutionStore.java:68`) open a file path only (10, 17.3 row D2).
 - `/api/debug/state`, `/infra/capabilities` and `RegistrySnapshotExporter` each carry a slice
   of runtime state; none lists components (10).
+
+## Re-verification at `76871d924` (2026-09-07, PR 0 start)
+
+Every citation above was re-opened at `main` `76871d924` (the PR 0 base) by a read-only audit whose
+load-bearing rows the orchestrator spot-checked. Facts hold unless listed here.
+
+**Moved citations (fact unchanged):**
+
+- `NativeSessionHandle.java`: `new Semaphore(1)` is at `:116`; `acquire()` takes it at `:285`
+  (method at `:271`); `releaseGpu()` at `:326` takes it at `:331`. These were off at `b96cd999`
+  too (the file did not change).
+- `SqliteJobQueue.java`: `checkpointForUpgrade()` is at `:2200-2213` (`PRAGMA wal_checkpoint(FULL)`
+  at `:2205`), still the only checkpoint.
+- `DocumentService.java`: the bare `supplyAsync` is at `:85` (a default method was inserted above).
+- `IndexingLoop.java`: `commitOps.commitAndTrack` at `:712`, `journal.drainPending()` at `:723`.
+- `contracts/wire/indexing.proto` is `modules/ipc-common/src/main/proto/indexing.proto`; the count
+  is unchanged (10 + 38 + 1 = 49).
+
+**Changed facts:**
+
+- `CoreSurfaceCatalog.java:148-149` registers only `core.head-log`
+  (`new DiagnosticChannelRef("core.head-log")`). No `core.worker-log` channel is registered
+  anywhere; the name occurs only as a Javadoc example (`DiagnosticChannelRef.java:11`) and in FE
+  test fixtures. The section 6 collapse row is therefore one registered channel renamed to
+  `core.engine-log` plus the Worker log stream folded into it, and the surface altitude derives
+  from `core.head-log` alone. Wrong at `b96cd999` as well.
+- 91 Java files under `modules` import `io.grpc` (`git grep -l "import io.grpc" -- "modules/**/*.java"`),
+  not 102; 90 at `b96cd999`. The `adr-0002-grpc-present` probe conclusion (17.4) is unaffected.
+- Launch flags after PR 0 (17.2): both Head spawn sites carry
+  `-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:-UsePerfData`, no `TieredStopAtLevel`, the same set
+  with or without the AOT cache (`lib.rs` spawn block; `dev-runner.cjs` `buildHeadJavaOpts`, pinned
+  by `scripts/dev/test-dev-runner-head-java-opts.mjs`). `WorkerSpawner.java:550` still adds
+  `-XX:+UseCompactObjectHeaders` to the Worker; three spawn sites remain until stage A.
+
+**Not re-derived** (no line citation; stage C1/D1 re-verify at their start): the 33-method count of
+`IndexingService`, the ten bare common-pool sites and 58 executor construction sites, the ten
+dimensions of `ReadinessEnvelopeView`.

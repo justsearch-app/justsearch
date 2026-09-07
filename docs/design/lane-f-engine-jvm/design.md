@@ -19,7 +19,7 @@ related:
   - docs/decisions/0048-extraction-isolation-and-indexing-pacing.md
 ---
 
-# Lane F: one Engine JVM
+# Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain
 
 Worktree `.claude/worktrees/lane-F`, branch `worktree-lane-F`, base `b96cd999` (#687). This
 document is the lane's contract: the design and the considerations that shaped it. The PR cut
@@ -101,6 +101,19 @@ must run from `ready`, its supervisor now meets boot failures the Head never bud
 hang detection shares a heap with indexing; 7.1's budget row carries the re-cut, marked
 *(re-cut 2026-09-07, lock)*. From here, a change inside a decided line proceeds with a dated
 line here; a change to 15, 16 or 17.3 waits for the owner's word (17.6).
+
+**PR 0 (2026-09-07, implementation orchestrator).** Two mechanism-level corrections found while
+starting PR 0, inside decided lines (17.6). (a) `docs-validate` does cover `docs/design/`: it walks
+`docs/**` and exempts only `docs/tempdocs/`, so the H1 here was aligned with the front-matter title
+and `handoff.md` corrected. (b) The stage-start re-verification of `verified-facts.md` against
+`main` at `76871d924` found five citations moved and two claims wrong at the original base:
+`core.worker-log` is not a registered diagnostic channel (only `core.head-log` is; the name
+appears in a Javadoc example and FE test fixtures), and 91 Java files under `modules` import
+`io.grpc`, not 102. `verified-facts.md` carries the corrections with citations. Neither changes
+15, 16 or 17.3; the section 6 row "the two channels collapse" reads as one registered channel
+renamed plus the worker log stream folded into it. The 917 Derisk 1 procedure is now
+`scripts/jseval/lane-f/head-flag-run.sh` (analysed by `analyze-head-run.cjs` beside it), and PR 0's
+before/after record lives under `evidence/pr0/`.
 
 ## 0.1 Forces that shaped the design
 

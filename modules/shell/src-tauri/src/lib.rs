@@ -738,10 +738,15 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         // Cap Head heap — the UI host is lightweight (REST API + SSE + static files).
         // Without this, the JVM defaults to 1/4 physical RAM which is excessive.
         .arg("-Xmx512m")
-        // SerialGC: small heap, no throughput need. TieredStopAtLevel=1: faster JIT warmup.
+        // SerialGC: small heap, no throughput need (the Head heap is >= 85 % empty at every
+        // phase, 917 Derisk 1). Lane F PR 0: TieredStopAtLevel=1 dropped and MetaspaceSize=128m
+        // added, because every full GC in the measured run was a Metaspace or CodeCache
+        // threshold (the C1-only 48 MiB code cache), not heap pressure, and C1-only also
+        // conflicted with the AOT cache below. Both spawn sites (this and dev-runner.cjs) carry
+        // the same set; the test in scripts/dev/test-dev-runner-head-java-opts.mjs pins it.
         // -XX:-UsePerfData: skip hsperfdata temp file (avoids Defender scan on Windows).
         .arg("-XX:+UseSerialGC")
-        .arg("-XX:TieredStopAtLevel=1")
+        .arg("-XX:MetaspaceSize=128m")
         .arg("-XX:-UsePerfData")
         .arg("--sun-misc-unsafe-memory-access=warn")
         // FFM downcalls (NVML, the Windows job object, the GPU driver probe); JDK 25 warns without this, a later JDK (JEP 472) refuses.

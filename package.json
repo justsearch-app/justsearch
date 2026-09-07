@@ -14,7 +14,7 @@
     "test:agent-analytics": "node scripts/agent-analytics/run-all-tests.mjs",
     "test:governance": "node scripts/governance/run-all-tests.mjs",
     "test:dev-tool-usage": "node scripts/agent-analytics/dev-tool-usage.test.mjs",
-    "test:dev-runner": "node scripts/dev/test-dev-runner-runtime-resolution.mjs",
+    "test:dev-runner": "node scripts/dev/test-dev-runner-runtime-resolution.mjs && node scripts/dev/test-dev-runner-head-java-opts.mjs",
     "test:resolve-jdk": "node scripts/dev/test-resolve-jdk.mjs",
     "lint:scripts": "eslint scripts packaging --max-warnings=0",
     "lint:ps1": "node scripts/ci/check-ps1-warning-comments.mjs",
