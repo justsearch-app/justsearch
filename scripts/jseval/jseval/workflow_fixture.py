@@ -337,6 +337,11 @@ OPTIONAL_CONFIG_PINS = (
     "justsearch.splade.gpu_enabled",
     "justsearch.ner.gpu_enabled",
     "justsearch.rerank.gpu.enabled",
+    # The CHUNK reranker's own GPU switch (JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED,
+    # EnvRegistry.java:258). Separate from `justsearch.rerank.gpu.enabled` and separately
+    # defaulted, so a pair whose two stacks disagree on it reranks chunks on different hardware
+    # -- and the chunk leg is where this fixture's queries live.
+    "justsearch.rerank.chunks.gpu.enabled",
     "justsearch.bgem3.gpu_enabled",
     "justsearch.onnxruntime.intra_op_threads",
 )
@@ -1824,7 +1829,8 @@ def capture(
         # set, because the capture writes its own request back. Only `samplingApplied` can
         # contradict it, so only `samplingApplied` can prove the pin took.
         "samplingApplied": sampling_applied,
-        # The four BOOT-TIME settings, observed from /api/debug/effective-config. The capture
+        # The BOOT-TIME settings (PINNED_CONFIG_KEYS), observed from
+        # /api/debug/effective-config. The capture
         # cannot set these — the orchestrator does, at stack launch — so it records them and
         # `capture_health` refuses a pair that ran under different ones.
         "pins": pins,
@@ -2323,7 +2329,8 @@ def _provenance(doc: dict) -> dict:
 
 
 def _pin_problems(baseline: dict, candidate: dict) -> list[str]:
-    """The four BOOT-TIME pins must be present on both sides and must AGREE.
+    """Every BOOT-TIME pin in :data:`PINNED_CONFIG_KEYS` must be present on both sides and
+    must AGREE.
 
     A health problem rather than a diffed field, and the distinction is the point: these are
     not things either build produced, they are the conditions the two runs were performed
@@ -2344,7 +2351,7 @@ def _pin_problems(baseline: dict, candidate: dict) -> list[str]:
                 "/api/debug/effective-config, or the setting was never set: a stack launched "
                 "without JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true resolves "
                 "index.vector.exhaustive_search to no value at all (it has no default). "
-                "Re-capture with the four pins set at stack launch."
+                "Re-capture with every pin in PINNED_CONFIG_KEYS set at stack launch."
             )
     for key in PINNED_CONFIG_KEYS:
         before = pins["baseline"].get(key)
@@ -2680,7 +2687,7 @@ def capture_health(
     half-captured fixture) diffs clean and reads as "no semantic regression". The health
     block is part of the verdict, not a warning: a diff whose health fails does not pass.
 
-    It also asserts the two runs' PRECONDITIONS — the four boot-time pins and the sampling
+    It also asserts the two runs' PRECONDITIONS — the boot-time pins and the sampling
     each turn actually applied (:func:`_pin_problems`, :func:`_applied_sampling_problems`).
     Those are health problems rather than declared fields because they are not outputs either
     build produced; they are the conditions under which both were measured. A pair captured

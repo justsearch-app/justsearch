@@ -1682,7 +1682,7 @@ def test_pins_are_read_from_the_effective_config_endpoint():
                     "justsearch.rerank.deadline_ms": "5000"}
     assert "justsearch.rerank.chunks.deadline_ms" not in pins    # valueless != a value
     assert sources["justsearch.llm.slots"] == "jvm_arg"
-    assert "justsearch.data.dir" not in pins                     # only the four pins
+    assert "justsearch.data.dir" not in pins                     # only the declared pins
 
 
 def test_an_absent_effective_config_endpoint_yields_empty_pins_not_an_exception():
@@ -2326,6 +2326,55 @@ def _capture_with_ai(online, *, activation_state="failed") -> dict:
 _ABSENT = object()
 
 
+#: The Head-side enum whose drop members `CROSS_ENCODER_DROP_REASONS` mirrors.
+_SKIP_REASON_JAVA = (
+    Path(__file__).resolve().parents[3]
+    / "modules/app-api/src/main/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReason.java"
+)
+
+
+def _java_drop_reasons() -> set[str]:
+    """The members `CrossEncoderSkipReason.isDrop()` returns true for, read from the source.
+
+    Parsed rather than restated: a restated list is the drift this test exists to catch.
+    """
+    source = _SKIP_REASON_JAVA.read_text(encoding="utf-8")
+    body = source[source.index("public boolean isDrop()"):]
+    arm = body[body.index("case "):body.index("-> true;")]
+    return {token.strip() for token in arm[len("case "):].split(",") if token.strip()}
+
+
+def test_the_python_drop_set_matches_the_java_enums_drop_members():
+    """The capture-health refusal and the enum that defines a drop must not drift apart.
+
+    `_cross_encoder_problems` refuses a capture whose cross-encoder was DROPPED, and the whole
+    weight of that refusal rests on this set naming the same members `isDrop()` does. A code
+    that moved from by-design to drop, or a new drop member, would otherwise leave the capture
+    silently accepting a degraded pipeline — the failure mode pair run 3 already produced once,
+    where every query had `cross-encoder: skipped / INFERENCE_FAILED` and the diff read as
+    "nearly clean" because both sides degraded together.
+    """
+    java = _java_drop_reasons()
+    assert java, "failed to parse isDrop() — the enum's shape changed, so this check is blind"
+    assert wf.CROSS_ENCODER_DROP_REASONS == java, (
+        "CROSS_ENCODER_DROP_REASONS and CrossEncoderSkipReason.isDrop() disagree: "
+        f"only in python {sorted(wf.CROSS_ENCODER_DROP_REASONS - java)}, "
+        f"only in java {sorted(java - set(wf.CROSS_ENCODER_DROP_REASONS))}"
+    )
+
+
+def test_the_java_enum_parse_would_notice_a_by_design_member():
+    """Falsifier: the parse must return the drop arm, not every member of the enum.
+
+    A parse that accidentally returned all constants would make the test above pass for any
+    python set that happened to be a subset — so pin that a by-design skip is NOT in it.
+    """
+    java = _java_drop_reasons()
+    assert "NAVIGATIONAL_QUERY" not in java
+    assert "FUSION_CONFIDENT" not in java
+    assert "INFERENCE_FAILED" in java
+
+
 def test_capture_health_refuses_a_capture_whose_engine_was_offline():
     """Chat turns taken with no engine did not measure a model, whatever they recorded."""
     doc = _capture_with_ai(False)
@@ -2803,7 +2852,7 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
     }
 
 
-#: A synthetic capture's healthy run PRECONDITIONS: the four boot-time pins as
+#: A synthetic capture's healthy run PRECONDITIONS: the boot-time pins as
 #: `/api/debug/effective-config` reports them (string values, as the real endpoint emits) and
 #: the applied sampling `session_started` echoes. Part of the health FLOOR, like httpStatus
 #: 200 — a test that is not about preconditions should not have to think about them.
@@ -2949,7 +2998,7 @@ def _full_snapshot(fixture: dict) -> dict:
     }
 
 
-#: What the mock effective-config endpoint answers: the four pins, in the real
+#: What the mock effective-config endpoint answers: every declared pin, in the real
 #: `resolvedConfig[]` shape (`{key, value, source, ordinal, detail, candidates}`) with STRING
 #: values, as `EffectiveConfigEntry` serialises them.
 _EFFECTIVE_CONFIG_BODY = {"schemaVersion": 1, "resolvedConfig": [

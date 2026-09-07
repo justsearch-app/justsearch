@@ -1226,11 +1226,6 @@ public final class ResolvedConfigBuilder {
    * in tempdoc 397 §14.24 FB; replaces the {@code System.getenv} reads previously embedded in
    * {@link io.justsearch.ort.SessionOptionsApplier}.
    */
-  /** {@code value} when it is a positive thread count, else null (leave ORT's default). */
-  private static Integer positiveOrNull(Integer value) {
-    return value != null && value > 0 ? value : null;
-  }
-
   private ResolvedConfig.Ai.Profiling buildProfiling() {
     return new ResolvedConfig.Ai.Profiling(
         resolvePath("justsearch.ort.profiling_dir", null),
@@ -1239,6 +1234,11 @@ public final class ResolvedConfigBuilder {
         // today's behaviour byte for byte. A positive value pins it; a non-positive one is
         // ignored rather than passed to ORT, which rejects it.
         positiveOrNull(resolveNullableInt("justsearch.onnxruntime.intra_op_threads")));
+  }
+
+  /** {@code value} when it is a positive thread count, else null (leave ORT's default). */
+  private static Integer positiveOrNull(Integer value) {
+    return value != null && value > 0 ? value : null;
   }
 
   private ResolvedConfig.Ai.BgeM3 buildBgeM3() {

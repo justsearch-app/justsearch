@@ -21,7 +21,7 @@
 # BOTH sides two-capture pairs, on one build. Two draws under-sample -- a field can agree once and
 # disagree on the next -- so the pair reported stability it had not established.
 #
-# The withdrawal is bounded: `maxNoisyFraction` (fixture key, 0.10) refuses the whole run when a
+# The withdrawal is bounded: `maxNoisyFraction` (fixture key, 0.05) refuses the whole run when a
 # side noise pair moves more than that share of compared fields. Without it a pipeline degraded on
 # BOTH sides -- a dropped reranker, an unfinished enrichment -- would present as a very quiet diff
 # with most fields silently excluded, and "almost nothing was compared" would read as "nothing

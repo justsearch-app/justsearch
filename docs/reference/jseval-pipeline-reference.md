@@ -638,8 +638,10 @@ score near `0.26` (~`1e-7`) and above the smallest gap actually observed. `0.001
 fixture declares. Going lower buys nothing measurable: at `0.0001` no observed pair is fused at all,
 which is the same as switching the class off.
 
-**The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four boot-time pins
-above, a capture sets `JUSTSEARCH_RERANK_TOP_K=100`,
+**The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four
+determinism pins above (exhaustive kNN, one LLM slot, the two rerank deadlines), a capture sets
+`JUSTSEARCH_RERANK_TOP_K=40` and `JUSTSEARCH_RERANK_GPU_MEM_MB=4096` — the window and the arena
+that has to hold it, which move together or the reranker dies (see above) —
 `JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000`,
 `JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50`,
 `JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false` and
@@ -737,7 +739,8 @@ that absence is the signal. A pin that can only be asserted and never contradict
 only these two records can disagree.
 
 **Both are capture-health checks, not diffed fields, and `diff` fails on them.** `capture_health`
-refuses a pair when either side's `provenance.pins` is absent or missing one of the four keys, when
+refuses a pair when either side's `provenance.pins` is absent or missing one of the keys in
+`PINNED_CONFIG_KEYS` (ten today), when
 the two sides' pins disagree on any key, when `provenance.samplingApplied` is absent or missing a
 recorded turn, when a turn's applied sampling is entirely null (the pre-PR-0b build), or when the
 two sides applied different sampling for a turn. They are health problems rather than declared

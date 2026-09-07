@@ -334,16 +334,6 @@ public final class LuceneRuntimeUtils {
   // ==========================================================================
 
   /**
-   * Builds a Lucene Sort for the given RuntimeSearchSort.
-   *
-   * <p>Always includes a stable tie-breaker (idField) unless the sort is already purely by doc_id.
-   *
-   * @param sort the search sort to build
-   * @param idField the document ID field to use as tie-breaker
-   * @return the Lucene Sort instance
-   * @throws NullPointerException if sort or idField is null
-   */
-  /**
    * The relevance sort a CHUNK-level search must use: score, then the chunk's identity expressed
    * in fields that are stable ACROSS index builds (lane F PR 0b).
    *
@@ -385,6 +375,16 @@ public final class LuceneRuntimeUtils {
         new SortField(idField, SortField.Type.STRING, false));
   }
 
+  /**
+   * Builds a Lucene Sort for the given RuntimeSearchSort.
+   *
+   * <p>Always includes a stable tie-breaker (idField) unless the sort is already purely by doc_id.
+   *
+   * @param sort the search sort to build
+   * @param idField the document ID field to use as tie-breaker
+   * @return the Lucene Sort instance
+   * @throws NullPointerException if sort or idField is null
+   */
   public static Sort buildRuntimeSort(RuntimeSearchSort sort, String idField) {
     if (sort == null) {
       throw new NullPointerException("sort must not be null");

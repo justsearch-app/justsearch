@@ -43,7 +43,21 @@ regressions, 7 noisy fields per side (3.2 percent, ceiling 5 percent)**. The noi
 hit lists of 7 of 12 queries at the tie level (a hit within the cross-encoder epsilon of a neighbour
 swapping with one at the rerank-window boundary) and one chat turn's four source fields on one
 side; the other two turns (one cancelled) and every other field were identical across all six
-captures. That is the measured noise floor of split mode under the pins; `round-*-raw-pair-diff.json`
+captures.
+
+**Read the PASS for what it is: on ONE build, it is the noise withdrawal by construction.** Both
+sides of this record are the same tree, so the only correct verdict is "no difference", and the
+gate reaches it partly by *excluding* fields rather than by finding them equal. Without the noise
+mask the same six captures give **5 raw cross-side regressions** — `queries.hits[]` on q02, q04,
+q05, q09 and q12 — every one of which is withdrawn because the side's own same-build captures
+already move it. That is the mechanism working exactly as designed, and it is also the reason the
+run cannot certify more than it does: 5 of the 12 query hit-lists are outside the verdict, so a
+real regression in one of them would land in the same blind spot. What the PASS establishes is
+that the 210 fields the pins DID make deterministic are deterministic. Narrowing that blind spot
+is a matter of removing noise sources (the index-time GPU embedding jitter upstream of every
+candidate budget), not of tuning the mask.
+
+That is the measured noise floor of split mode under the pins; `round-*-raw-pair-diff.json`
 are the raw two-capture diffs of the five pin rounds that preceded it (37, 5, 11, 2, 2, 5
 regressions), and `two-per-side-gate-with-stale-side-b.json` is the run that showed two captures
 per side under-sample the noise. The capture before PR 0b (`fixture/`) is kept for the record and
