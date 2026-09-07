@@ -1378,16 +1378,14 @@ describe('the chat column caps on one token, not three literals', () => {
  * the first case re-checks that the sheet still derives those bases from the same primitives, so a
  * palette change cannot leave this arithmetic quietly describing a window that no longer exists.
  *
- * SCOPE, stated up front (review F1, corrected by the measured audit 2026-09-07): the two ratio
- * cases below assert the TOKEN AT FULL ALPHA, which is a property of the token and NOT a state the
- * composer paints. `.glass::after` paints three arms — resting (45% of the token), focused (the
- * border re-points to `--ring`), and invalid (`--destructive`) — and full alpha would need
- * `--composer-rest: 0` without `:focus-visible`, which the shipped Chromium engine never produces
- * (a focused textarea always matches `:focus-visible` there, measured). So the only PAINTED state
- * this token governs is the resting edge, and it is still below the floor: see the KNOWN-OPEN case
- * at the bottom of this block. 1.4.11 is not closed for this component.
+ * SCOPE. `.glass::after` paints three arms: RESTING, FOCUSED (the border re-points to `--ring`, so
+ * this token is uninvolved) and INVALID (`--destructive`). Since the owner decision of 2026-09-07
+ * (tempdoc 948) removed tempdoc 864 Layer 1(d)'s 55% resting fade, the resting arm takes this token
+ * at FULL alpha — so the token's own ratio and the ratio of the state a reader actually meets are
+ * now the same number, and the resting case at the bottom of this block asserts it on the surfaces
+ * that state really composites over.
  */
-describe('859: the composer outline token meets WCAG 1.4.11 at full alpha in both themes', () => {
+describe('859: the composer outline meets WCAG 1.4.11 in both themes', () => {
   const WCAG_NON_TEXT = 3;
 
   /** Live-measured sRGB of the two page bases (see the block comment for why they are pinned). */
@@ -1433,7 +1431,7 @@ describe('859: the composer outline token meets WCAG 1.4.11 at full alpha in bot
     expect(lightBlock).toContain('--card: var(--color-white)');
   });
 
-  it('dark: the token at FULL ALPHA clears 3:1 against BOTH adjacent colours (5% white was 1.21:1)', () => {
+  it('dark: the ENGAGED edge clears 3:1 against BOTH adjacent colours (5% white was 1.21:1)', () => {
     const glass = mix(DARK_PAGE, WHITE, 0.96); // --composer-glass-surface
     const edge = over(WHITE, alphaOf(darkBlock), glass);
     // The OUTSIDE — the failure the audit reported, at 1.21:1.
@@ -1446,7 +1444,7 @@ describe('859: the composer outline token meets WCAG 1.4.11 at full alpha in bot
     expect(contrastRatio(over(WHITE, 0.05, glass), DARK_PAGE)).toBeCloseTo(1.215, 3);
   });
 
-  it('light: the token at FULL ALPHA clears 3:1 against both, which 8% black did not either', () => {
+  it('light: the ENGAGED edge clears 3:1 against both, which 8% black did not either', () => {
     const card = WHITE; // --composer-glass-surface: var(--card) → --color-white
     const edge = over(BLACK, alphaOf(lightBlock), card);
     expect(contrastRatio(edge, LIGHT_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
@@ -1457,61 +1455,61 @@ describe('859: the composer outline token meets WCAG 1.4.11 at full alpha in bot
   });
 
   /**
-   * THE KNOWN-OPEN HALF, and the only state this token actually paints (review F1; numbers corrected
-   * by the measured audit 2026-09-07). The two cases above read the raw token, so the suite would
-   * have stayed green over a resting edge nobody can see. The failure is therefore pinned AS a
-   * failure — measured, attributed, and impossible to fix by accident.
+   * THE RESTING EDGE — the state a reader meets before touching anything, and the one 1.4.11 is
+   * really about. This is the case the whole item turns on, so it asserts the composite rather than
+   * the token: the two cases above would stay green over a resting edge nobody could see.
    *
-   * TWO surfaces, named because the first cut conflated them: the resting border composites over the
+   * TWO surfaces, named because an earlier cut conflated them: the resting border composites over the
    * RESTING glass, not the engaged one. `--composer-rest-surface` mixes the glass 35% back toward the
    * page while `--composer-rest` is 1, so the backdrop is rgb(14,14,14) dark / rgb(253,253,253)
-   * light, not the rgb(20,20,20) / rgb(255,255,255) the full-alpha cases use. Compositing over the
-   * engaged glass is what produced the earlier 1.71 dark figure.
+   * light, not the rgb(20,20,20) / rgb(255,255,255) the engaged cases use.
    *
-   * The mechanism is `.glass::after`'s `border-color: color-mix(… var(--composer-outline)
-   * calc(100% - 55% * var(--composer-rest)) …)` — tempdoc 864 Layer 1(d)'s RESTING KNOB, which
-   * spends 55% of the token's alpha back while the field does not hold focus. That was an OWNER
-   * DECISION about the resting affordance, not an oversight, so it is not something a token sheet
-   * gets to overturn on its own: 864 chose the surface lift as the de-emphasis precisely because it
-   * "spends no TEXT contrast", and the outline fade it added alongside is the half that does spend
-   * NON-text contrast. Closing it means either dropping the fade from the border (leaving the
-   * de-emphasis entirely on the surface, as 864's own rationale would suggest) or clamping the spend
-   * at the 3:1 floor — both design calls, both owner's.
+   * WHAT CHANGED (owner decision 2026-09-07, tempdoc 948). Tempdoc 864 Layer 1(d) shipped TWO derived
+   * declarations off `--composer-rest`: the material (the surface lift) and the frame, whose
+   * `border-color` "fades to 45% of `--composer-outline` at rest". The frame half is removed; the
+   * material half is untouched. 864's own principle is what decides it — that layer "deliberately
+   * spends no text contrast", and the frame fade was the half spending NON-text contrast, which is
+   * what 1.4.11 measures. The de-emphasis survives on the surface lift plus the `--ring` hand-off at
+   * focus (9.69:1 dark / 5.84:1 light against this edge's 3.25 / 3.32), so resting-versus-focused is
+   * still a colour change AND a material change.
    */
-  it('KNOWN OPEN: the RESTING edge — the one painted state — is still below 3:1 (864 knob)', () => {
-    // `--composer-rest: 1` while the field is unfocused: the border keeps 45% of the token alpha…
-    const restSpend = 1 - 0.55;
+  it('the RESTING edge clears 3:1 against the page AND the resting glass, in both themes', () => {
+    // The frame no longer reads the knob at all: full token alpha in every unfocused state.
+    const composer = styleTextOf(Sv3Composer).replace(/\s+/g, ' ');
     expect(
-      styleTextOf(Sv3Composer).replace(/\s+/g, ' '),
-      'the resting knob moved — re-measure before trusting the numbers below',
-    ).toContain('var(--composer-outline) calc(100% - 55% * var(--composer-rest))');
-    // …and it sits on the RESTING glass, which is mixed 35% back toward the page by the same knob.
-    expect(styleTextOf(Sv3Composer).replace(/\s+/g, ' ')).toContain(
-      'var(--composer-glass-surface) calc(100% - 65% * var(--composer-rest))',
-    );
+      composer,
+      'the 864 frame fade is back — the resting edge would drop under the floor again',
+    ).not.toContain('var(--composer-outline) calc(100% - 55% * var(--composer-rest))');
+    // …while the SURFACE half of the same knob is deliberately still there. Removing both would have
+    // taken the resting affordance with it, which is not what was decided.
+    expect(composer).toContain('var(--composer-glass-surface) calc(100% - 65% * var(--composer-rest))');
 
     const restGlassDark = mix(mix(DARK_PAGE, WHITE, 0.96), DARK_PAGE, 0.35);
     const restGlassLight = mix(WHITE, LIGHT_PAGE, 0.35);
-    const restingDark = over(WHITE, alphaOf(darkBlock) * restSpend, restGlassDark);
-    const restingLight = over(BLACK, alphaOf(lightBlock) * restSpend, restGlassLight);
+    const restingDark = over(WHITE, alphaOf(darkBlock), restGlassDark);
+    const restingLight = over(BLACK, alphaOf(lightBlock), restGlassLight);
 
-    // Against the PAGE — the "can a reader find the box on the screen" question. Live canvas-resolved
-    // measurement reported 1.57 dark / 1.61 light; this arithmetic gives 1.59 / 1.60, the ~0.02 gap
-    // being `--glass-opacity` and the backdrop blur, which this model does not simulate. Both sit far
-    // enough under the floor that the conclusion does not depend on which number you take.
-    expect(contrastRatio(restingDark, DARK_PAGE)).toBeCloseTo(1.59, 2);
-    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeCloseTo(1.6, 2);
-    expect(contrastRatio(restingDark, DARK_PAGE)).toBeLessThan(WCAG_NON_TEXT);
-    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeLessThan(WCAG_NON_TEXT);
-    // Against the RESTING GLASS — the inside half of the same boundary, also short.
-    expect(contrastRatio(restingDark, restGlassDark)).toBeLessThan(WCAG_NON_TEXT);
-    expect(contrastRatio(restingLight, restGlassLight)).toBeLessThan(WCAG_NON_TEXT);
+    // Against the PAGE — "can a reader find the box on the screen".
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    // Against the RESTING GLASS — the inside half of the same boundary. 1.4.11 is about the adjacent
+    // colours, plural, and this half is the one the resting surface lift makes hardest.
+    expect(contrastRatio(restingDark, restGlassDark)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
+    expect(contrastRatio(restingLight, restGlassLight)).toBeGreaterThanOrEqual(WCAG_NON_TEXT);
 
-    // The token change was not a no-op on this state: it is the one painted arm it moved.
-    expect(contrastRatio(over(WHITE, 0.05 * restSpend, restGlassDark), DARK_PAGE)).toBeLessThan(1.1);
-    expect(contrastRatio(over(BLACK, 0.08 * restSpend, restGlassLight), LIGHT_PAGE)).toBeLessThan(
-      1.1,
+    // The measured numbers, so a re-tune that still technically clears the floor cannot quietly walk
+    // the margin down to nothing.
+    expect(contrastRatio(restingDark, DARK_PAGE)).toBeCloseTo(3.25, 2);
+    expect(contrastRatio(restingLight, LIGHT_PAGE)).toBeCloseTo(3.32, 2);
+
+    // Anti-vacuity: with the 864 fade in place these same surfaces were under the floor, so the
+    // assertions above are testing the removal and not the arithmetic's own generosity.
+    expect(contrastRatio(over(WHITE, alphaOf(darkBlock) * 0.45, restGlassDark), DARK_PAGE)).toBeLessThan(
+      WCAG_NON_TEXT,
     );
+    expect(
+      contrastRatio(over(BLACK, alphaOf(lightBlock) * 0.45, restGlassLight), LIGHT_PAGE),
+    ).toBeLessThan(WCAG_NON_TEXT);
   });
 
   it('the FOCUSED edge is --ring, so this token never governs it (measured audit)', () => {

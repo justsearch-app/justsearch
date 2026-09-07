@@ -1,7 +1,7 @@
 ---
 title: "948 — Parallel audits during lane F: delegation-economics falsifier, 921 thirty-merge audit"
 type: tempdocs
-status: "DONE (2026-09-07) — falsifier judged FLAT and applied; 921 audit run (retirement not met, one owner decision routed); pre-merge table row added"
+status: "DONE (2026-09-07) — falsifier judged FLAT and applied; 921 audit run; follow-on PRs #710 #711 #713 merged; owner-delegated decisions in section 4"
 created: 2026-09-07
 updated: 2026-09-07
 lane: agent tooling / publication process (parallel to lane F, outside its blast radius)
@@ -237,3 +237,28 @@ observed against 35 real defects landed. The separation contract stays.
 pre-merge table named only `StoreCatalog.java` and store construction sites. The row now also
 names both `governance/store-{recoverability,corruption-policies}.v1.json`.
 `check-premerge-table` and `check-always-loaded-budget` pass.
+
+## 4. Follow-on work and decisions (2026-09-07, same day)
+
+The survey's remaining parallel-safe items shipped as three more PRs, each with an independent
+reviewer distinct from the implementer and a verified managed review record: #710 (tempdoc 935
+D2 and D4; D1's hook was already retired by 930 row 4, D3 is designed and not run), #711 (five
+941 frontend carry-forwards), #713 (eight 859 Search v3 defects, closed by an independent
+measured audit in both themes; the two backend items on that list stay with app-agent).
+
+Decisions the owner delegated after reading the routed items:
+
+- **No required publication check.** The gateway fixed the common path (every PR from #688 on
+  is clean) and the owner merges only through it, so the check would buy insurance against side
+  paths not in use. 921 section 21.2's deferral is closed as "not worth it".
+- **Composer resting edge (859 item 8): drop the outline half of tempdoc 864's resting fade.**
+  864 chose the surface lift as the de-emphasis because it spends no text contrast; the outline
+  fade is the half that spends non-text contrast and breaks WCAG 1.4.11. With the outline at
+  full alpha the resting edge clears 3:1 in both themes and the focused edge stays `--ring`, so
+  the hierarchy survives.
+- **Phantom health-event keys: delete.** `health-events.en.properties` is not on lane F's path
+  (its stage A touches `registry-diagnostic.en.properties`); residue with no producer is swept.
+- **`skipCause`: pin the enum in the SSOT schema** and make the frontend map `satisfies` the
+  generated union, so a fifth backend cause is a type error rather than neutral copy forever.
+- **Knip test-as-consumer blind spot: leave it, document it** in the dead-code enforcer header.
+  Export-for-testing seams are a house pattern; tightening would ratchet an unasked backlog.

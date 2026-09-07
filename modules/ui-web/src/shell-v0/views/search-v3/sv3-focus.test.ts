@@ -611,8 +611,16 @@ describe('tempdoc 864 Layer 1(d) — the resting composer says it is not focused
     const derived = rulesOf(composerSheet()).filter(([, block]) =>
       /var\(--composer-rest\)/.test(block),
     );
-    // The material, in two places: the surface the box is made of, and the frame around it.
-    expect(derived.map(([selector]) => selector).sort()).toEqual(['.glass', '.glass::after']);
+    // The MATERIAL, and only the material. 864 Layer 1(d) shipped two derivations — the surface and
+    // the frame's alpha — and the owner decision of 2026-09-07 (tempdoc 948) removed the frame half:
+    // it was the one spending NON-text contrast, and it put the resting boundary under WCAG 1.4.11's
+    // 3:1 (1.59:1 dark / 1.60:1 light, measured). The surface half is the whole de-emphasis now, and
+    // this list is what says so — a second derivation reappearing here is that decision being undone.
+    expect(derived.map(([selector]) => selector).sort()).toEqual(['.glass']);
+    // The frame explicitly does NOT read the knob: full token alpha in every unfocused state.
+    expect(
+      rulesOf(composerSheet()).find(([s]) => s === '.glass::after')?.[1] ?? '',
+    ).not.toContain('--composer-rest');
     for (const [selector, block] of derived) {
       // Whitespace-normalised: both derivations are wrapped across lines at this width.
       expect(block.replace(/\s+/g, ' '), `${selector} derives without color-mix`).toContain(
@@ -665,6 +673,9 @@ describe('tempdoc 864 Layer 1(d) — the resting composer says it is not focused
 
   it('animates the change only where motion is welcome', () => {
     const sheet = composerSheet();
+    // Both still transition, but for two reasons now: `.glass` hands off the resting SURFACE, and
+    // `.glass::after` hands off `border-color` from `--composer-outline` to `--ring` at the focus arm
+    // (tempdoc 948 removed the alpha fade, not the transition — the state change must not be a cut).
     for (const selector of ['.glass', '.glass::after']) {
       const block = rulesOf(sheet).find(([s]) => s === selector)?.[1] ?? '';
       expect(block, `${selector} declares no transition`).toContain(
