@@ -238,6 +238,27 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   onto the whole client, which is why its 7 tests and the `ui` substrate integration test still
   exercise real proto frames over a real in-process gRPC server after both changes.
 
+- **A8.** `ScanProgressRegistry` and `ScanProgressController` keep their shape exactly; what changed
+  is which thread calls them — `WorkerScanOps` emits one frame per 100 files straight into its sink,
+  so before A8 the registry write (and every SSE writer behind it) ran inside `Files.walkFileTree`.
+  Reuses A7's `BoundedHandoff`, with one addition the item does not name and that a bound makes
+  necessary: **`drainAndClose`**. A scan's producer ends on its own, so closing the flow when
+  `scanRoot` returns would discard the tail of the walk — the terminal event among it — which is the
+  exact silent loss the block policy exists to prevent. It waits on accepted-vs-delivered counters,
+  not "queue empty and consumer idle", because that pair has a window between the delivery loop
+  taking a frame and marking itself busy. The scan's deadline became a **cancel** rather than a
+  retro-thrown status (a stream that outruns its budget must stop; the walker's own terminal event
+  is the answer), and A6's extra synthetic `CLIENT_CANCELLED` event was removed — the walker already
+  stamps that reason code, so the synthetic one was a second terminal event for one scan.
+  **What the test found.** The first cut used 1 500 files and failed with "15 frames, the whole
+  tree". That is not a cancellation defect, it is the hand-off working: the consumer no longer runs
+  inside the walk, so a tree the walker finishes in milliseconds is walked out before the first
+  frame is handed over — "cancel within one progress tick" is measurable only against a walk long
+  enough to interrupt. With 20 000 files the measured answer is **19 frames, 2 000 of 20 000 files**;
+  the assertions are set from that with ~3x headroom rather than from a round number. Worth
+  recording because the naive reading of that failure was "cancellation is broken" and the naive fix
+  was "assert less".
+
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
 Read from each module's `build.gradle.kts` `dependencies` block and `settings.gradle.kts:113-147`:
