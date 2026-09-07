@@ -420,6 +420,16 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   §7's split assumed 17.4's compose-and-delete-as-one-checkpoint, where the branch was red across
   A6-A13 and order did not matter; under green-after-every-item the dependency binds. Full reasoning
   in §11.1; §3 carries the dated line.
+- **A11 delivered the spawner/supervision/restart-required/governance half; A13 owns the entry
+  point.** Owner decision (2026-09-07). `IndexerWorker.main`, the `application`/`installDist`
+  wiring, `modules/app-services/build.gradle.kts`'s `dependsOn(indexer-worker:installDist)`, the
+  Worker `logback.xml` and the worker AOT training class + its two Gradle cache tasks are folded
+  into A13. The reason is one Gradle edit, not scope preference: `application` + `mainClass` +
+  `installDist` is a single wiring, and A13 already has to collapse the spawn paths and the AOT
+  caches, so splitting it across two items would have meant editing the same block twice and
+  leaving the branch with an entry point that builds a distribution nothing launches. Standing rule
+  from the same decision: **when two items share an edit, it goes in the later one and the move is
+  recorded** — which is what this bullet is.
 - **A11 (the item lists did not name `WindowsJobObject`, and it had to go).** Crash-safe Windows
   process containment whose only caller was the spawner — `ExtractionSandboxChild` explicitly
   declined the dependency and llama-server never took it — so it went unreferenced across the whole
