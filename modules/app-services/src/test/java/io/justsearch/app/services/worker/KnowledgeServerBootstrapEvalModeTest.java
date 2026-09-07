@@ -113,7 +113,6 @@ final class KnowledgeServerBootstrapEvalModeTest {
         /* deadlineMs */ 5_000L,
         /* portDiscoveryTimeoutMs */ 15_000L,
         /* maxRetries */ 3,
-        /* workerHeapSize */ "256m",
         /* workerShutdownTimeoutMs */ 5_000L,
         /* pidValidationTimeoutMs */ 5_000L,
         /* stabilityWindowMs */ 300_000L,

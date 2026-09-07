@@ -204,12 +204,10 @@ Scope:
 
 | Env Variable | System Property | Type | Description |
 | :--- | :--- | :--- | :--- |
-| **JVM & Worker** | | | |
-| `JUSTSEARCH_WORKER_HEAP` | `justsearch.worker.heap` | String | Worker JVM max heap size (default `1g`; raised from `512m` on measured evidence, tempdoc 682). The spawner pins `-Xms` = `-Xmx`, so the full amount is resident from boot. Example: `1g`, `2048m`. |
+| **JVM & index half** | | | |
 | `JUSTSEARCH_WORKER_DEADLINE_MS` | `justsearch.worker.deadline_ms` | Long | Base Head->Worker RPC deadline; per-RPC categories multiply it (default 15000 ms; raised from 5000 in tempdoc 882 per tempdoc 251). |
-| `JUSTSEARCH_JVM_OPTS` | N/A | String | Custom JVM options passed to worker process. Useful for GC logging (`-Xlog:gc*`), NMT (`-XX:NativeMemoryTracking=summary`), or profiling. Multiple options separated by whitespace. **Limitation:** Options are split on whitespace; file paths with spaces are not supported. |
 | **Dev Hot-Reload** | | | |
-| `JUSTSEARCH_DEV_HOTRELOAD` | `justsearch.dev.hotreload` | Bool | Enables dev hot-reload: JDWP agent on Worker + `DevReloadManager` for service reconstruction on signal. Use with MCP `start(hotReload: true)` or set env var before starting the dev stack. Default `false`. |
+| `JUSTSEARCH_DEV_HOTRELOAD` | `justsearch.dev.hotreload` | Bool | Enables dev hot-reload: JDWP agent on the Engine + `DevReloadManager` for service reconstruction when the request file appears. Use with MCP `start(hotReload: true)` or set env var before starting the dev stack. Default `false`. |
 | `JUSTSEARCH_DEV_DEBUG_PORT` | *(none — launcher input)* | Int | JDWP debug port for the Engine. Read by the **dev-runner**, which puts `-agentlib:jdwp` on the Engine's launch flags; HotSwapPush connects to it. An operator override: the dev-runner otherwise picks the first free port in 5005-5024. It has no system property because a launch flag cannot be read back by the JVM it launched — lane F item A11 deleted the `EnvRegistry` entry that implied otherwise, along with the Worker child whose command line used to carry the flag. |
 | **Indexing & Storage** | | | |
 | `JUSTSEARCH_INDEX_BASE_PATH` | `justsearch.index.base_path` | Path | Overrides the effective index root (contains `state.json` and `indices/`). |

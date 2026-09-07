@@ -50,7 +50,6 @@ final class KnowledgeSearchControllerIngestCollectionTest {
             5_000L,
             15_000L,
             3,
-            "256m",
             5_000L,
             5_000L,
             300_000L,

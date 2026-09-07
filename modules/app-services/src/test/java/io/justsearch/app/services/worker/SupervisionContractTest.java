@@ -209,10 +209,26 @@ class SupervisionContractTest {
     }
   }
 
-  // --- (4) tempdoc 630: the time-based zombie suicide-pact declares liveness-continuity ----------
+  // --- (4) tempdoc 630's liveness-continuity clause survives the A11 retirement ------------------
 
+  /**
+   * The Head/Worker suicide pact is GONE. Lane F stage A item A11 merged the Worker into the Head
+   * JVM, so there is exactly one process and nothing left for it to die with: {@code
+   * MmfWorkerSignalBus.shouldDie} (the pact's only production reader) and {@code
+   * WorkerLivenessDecision} were deleted with it, and the register's {@code worker} entry is now
+   * {@code status: "retired"} with every fault mode marked {@code (historical, A11)}. No running
+   * code reads a heartbeat to decide whether to self-exit any more.
+   *
+   * <p>What this test asserts is therefore a record-keeping property of that RETIRED row, not a
+   * live mechanism: the {@code zombie} fault mode must still carry a non-blank {@code
+   * livenessContinuity} clause. The row was retired-in-place rather than deleted so the register
+   * still records what the two-process split bought, and tempdoc 630's hardest-won detail is
+   * exactly the part a stage-B Engine supervisor needs to inherit: a stale beat ALONE must never be
+   * read as a dead peer, because an OS suspend/resume produces one benignly. Blanking the clause
+   * while retiring the row would lose that silently; this fails the build instead.
+   */
   @Test
-  @DisplayName("worker zombie fault-mode declares a livenessContinuity clause (tempdoc 630)")
+  @DisplayName("retired worker/zombie row keeps its livenessContinuity clause (tempdoc 630)")
   void zombieDeclaresLivenessContinuity() throws IOException {
     JsonNode worker = process(register(), "worker");
     JsonNode zombie = null;
@@ -226,9 +242,11 @@ class SupervisionContractTest {
     JsonNode lc = zombie.get("livenessContinuity");
     assertTrue(
         lc != null && !lc.asText().isBlank(),
-        "the zombie suicide-pact is time-based (stale-heartbeat); it must declare a "
-            + "livenessContinuity clause (tempdoc 630) describing how a benign OS-resume stale "
-            + "beat is corroborated against Head liveness rather than misread as a Head death");
+        "the retired worker/zombie row must KEEP its livenessContinuity clause (tempdoc 630). "
+            + "The heartbeat suicide-pact itself went with the Worker process at A11 — one JVM "
+            + "cannot die with itself — but the record of how a benign OS-resume stale beat was "
+            + "corroborated against peer liveness, rather than misread as a peer death, must "
+            + "survive the retirement for stage B's Engine supervisor to inherit");
   }
 
   /** True if {@code fqcn} resolves to a *.java under any module's test/integrationTest/systemTest. */

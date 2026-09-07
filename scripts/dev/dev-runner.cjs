@@ -1121,12 +1121,15 @@ async function maybeGracefulBackendShutdown(apiPort, pid, markerPath = null) {
     if (markerPath) { try { await fsp.rm(markerPath, { force: true }); } catch (_) { /* best-effort */ } }
     return { outcome: 'failed', reason: null, requested: true, httpStatus: post.status, error: post.error, waitedMs: Date.now() - startedAt };
   }
-  // Measured on this machine (tempdoc 819 §D live verification): Head acks the POST with 202
-  // immediately, then runs its ordered close on a daemon thread — manifest, API server, health
-  // monitor, HeadAssembly, then knowledgeServer.closeForUpgrade(), which gracefully stops the
-  // Worker subprocess. The Worker's "shutdown signal received" landed ~5.5s after the POST and the
-  // JVM exited shortly after, so a 5s budget reported `timeout` and force-killed a JVM that was
-  // mid-clean-shutdown — destroying the finalizeShutdownCommit() stamp this path exists to
+  // Measured on this machine (tempdoc 819 §D live verification, taken while the Worker was still a
+  // child process): Head acks the POST with 202 immediately, then runs its ordered close on a
+  // daemon thread — manifest, API server, health monitor, HeadAssembly, then
+  // knowledgeServer.closeForUpgrade(). Since lane F stage A item A11 that last step is an ordered
+  // close of the IN-PROCESS worker host (`workerHost.close()`), not a child-process termination, so
+  // GRACEFUL is the only outcome it can report. The "shutdown signal received" line landed ~5.5s
+  // after the POST and the JVM exited shortly after, so a 5s budget reported `timeout` and
+  // force-killed a JVM that was mid-clean-shutdown — destroying the
+  // finalizeShutdownCommit() stamp this path exists to
   // preserve. The shell's 8s (lib.rs:149) would have cleared it with almost no margin; 15s keeps
   // the same bounded-poll contract with room for a slower machine. Cost is paid only when the
   // backend genuinely hangs, and the taskkill fallback is unchanged.
@@ -1164,12 +1167,15 @@ async function fetchConfirmedIndexBasePath(apiPort) {
   return null;
 }
 
-// "Ready" here means the HEAD is up (`/api/status` returns 200) — NOT that the Worker is ready. The
-// Worker connects/warms up a beat later, and until it is available the WorkerCapability before-handler
-// returns 503 ("Knowledge Server not ready") on `/api/knowledge/*`. Consumers that hit worker endpoints
-// immediately after "stack up" must tolerate that transient 503 — see stage-reference-corpus.mjs
-// stageAndVerify's ingest retry (tempdoc 656 §J/§K.5). (The MCP dev server exposes a separate
-// worker-ready readiness level for callers that need it.)
+// "Ready" here means the Engine's HTTP API is up (`/api/status` returns 200) — NOT that its
+// knowledge/index half is ready. Lane F stage A item A11 deleted the Worker child process, so
+// nothing "connects" any more; what still lags is the in-process knowledge-server start, which
+// HeadlessApp forks asynchronously (`CompletableFuture.supplyAsync(tryStartKnowledgeServer)`,
+// HeadlessApp.java:981) so it runs in PARALLEL with API construction. Until that fork drives
+// WorkerCapability to READY, `/api/knowledge/*` answers 503 ("Knowledge Server not ready").
+// Consumers that hit those endpoints immediately after "stack up" must tolerate that transient
+// 503 — see stage-reference-corpus.mjs stageAndVerify's ingest retry (tempdoc 656 §J/§K.5). (The
+// MCP dev server exposes a separate worker-ready readiness level for callers that need it.)
 async function waitForBackendReady(apiPort, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   const url = `http://127.0.0.1:${apiPort}/api/status`;
@@ -1709,8 +1715,9 @@ async function cmdStart(opts) {
       env: {
         ...process.env,
         ...aiEnv,
-        // Tempdoc 696: pin a >= 24 JDK for the Head JVM (ui.bat prefers JAVA_HOME); the
-        // Worker and inference processes the Head spawns inherit this env.
+        // Tempdoc 696: pin a >= 24 JDK for the Engine JVM (ui.bat prefers JAVA_HOME). Since lane F
+        // stage A item A11 deleted the Worker child, that is now the only JVM the pin has to cover;
+        // the inference process the Engine still spawns inherits this env.
         JAVA_HOME: resolveJdkHome(),
         JUSTSEARCH_API_PORT: String(apiPortRequested),
         JUSTSEARCH_DATA_DIR: dataDir,
@@ -1719,7 +1726,8 @@ async function cmdStart(opts) {
         // always wins (effectiveChatProfile already checked process.env first); the dev default
         // is "compact" even when --chat-profile is omitted entirely.
         JUSTSEARCH_CHAT_PROFILE: effectiveChatProfile,
-        // The Worker's shipped default for the io.justsearch logger is INFO, so query text
+        // The Engine's shipped default for the io.justsearch logger is INFO (modules/ui's
+        // logback.xml:136 — the Worker's own logback went with the child process), so query text
         // (logged at DEBUG) stays out of diagnostics exports, which bundle logs/ with
         // path-only redaction. Dev has no such exposure and wants the verbose lines, so the
         // dev-runner opts back in — honour an explicit override if the caller set one.

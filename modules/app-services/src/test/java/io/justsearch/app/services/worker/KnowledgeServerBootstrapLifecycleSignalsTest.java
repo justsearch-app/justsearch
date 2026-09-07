@@ -23,7 +23,7 @@ final class KnowledgeServerBootstrapLifecycleSignalsTest {
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
         false, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 15_000L, 3, "256m", 5_000L, 5_000L, 300_000L, 100, 0L, 0);
+        5_000L, 15_000L, 3, 5_000L, 5_000L, 300_000L, 100, 0L, 0);
   }
 
   @Test

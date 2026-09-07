@@ -41,7 +41,7 @@
 # (javac's `lambda$foo$3` is normalised to `foo`), because the index shifts on unrelated edits and a
 # ratchet that cries wolf gets deleted.
 #
-# ---- entries (104 as of 2026-09-02) ----
+# ---- entries (95 as of 2026-09-08) ----
 io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard#allowMismatch
 io.justsearch.aibackend.local.DeterminismProfile#from
 io.justsearch.app.inference.BrainSupervisionPolicy#defaults

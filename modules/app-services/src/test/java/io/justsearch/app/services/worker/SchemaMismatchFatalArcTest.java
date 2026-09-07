@@ -43,7 +43,7 @@ final class SchemaMismatchFatalArcTest {
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
         false, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 1_000L, 3, "256m", 1_000L, 1_000L, 300_000L, 100, 0L, 0);
+        5_000L, 1_000L, 3, 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 
   private static final BootRecoveryPolicy NO_WAIT = new BootRecoveryPolicy(2, 0, 0);
