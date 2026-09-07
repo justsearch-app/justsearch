@@ -20,6 +20,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.slf4j.Logger;
@@ -56,6 +57,13 @@ import org.slf4j.LoggerFactory;
 public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private static final Logger log = LoggerFactory.getLogger(EngineKnowledgeClient.class);
+
+  /**
+   * How long a finished scan waits for its already-accepted progress frames to reach the consumer.
+   * Generous on purpose: the alternative to waiting is dropping the terminal event, and a scan ends
+   * once.
+   */
+  private static final long SCAN_DRAIN_TIMEOUT_MS = 30_000L;
 
   private final java.util.function.Supplier<WorkerAppServices> services;
   private final ForegroundLoadGate foregroundLoad;
@@ -97,12 +105,28 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   /**
-   * A call's budget: a cancellation signal that flips when the deadline elapses, plus the means to
-   * tell afterwards whether it did.
+   * The in-process equivalent of what {@code WorkerServiceCalls.callContext} read off the two
+   * server interceptors. Caller and callee share the thread here, so the OTel span and the logging
+   * MDC are already current — there is nothing to propagate across, only to read in place.
+   */
+  private static String currentTraceId() {
+    io.opentelemetry.api.trace.SpanContext spanCtx =
+        io.opentelemetry.api.trace.Span.current().getSpanContext();
+    return spanCtx.isValid() ? spanCtx.getTraceId() : null;
+  }
+
+  /** See {@link #currentTraceId()}. */
+  private static String currentRequestId() {
+    return org.slf4j.MDC.get("request_id");
+  }
+
+  /**
+   * A unary call's deadline: a cancellation signal that flips when the budget elapses, plus the
+   * means to tell afterwards whether it did. The streaming calls do not use this — their deadline
+   * is a cancel with no retro-thrown status, wired through {@link FlowCancelSignal}.
    */
   private final class Budget implements AutoCloseable {
     private final AtomicBoolean expired = new AtomicBoolean(false);
-    private final AtomicBoolean cancelledByCaller = new AtomicBoolean(false);
     private volatile Runnable cancelHandler;
     private final ScheduledFuture<?> alarm;
     private final long budgetMs;
@@ -123,35 +147,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               TimeUnit.MILLISECONDS);
     }
 
-    /** Wires an external {@link CancelToken} so caller-abandonment reaches the same signal. */
-    void bind(CancelToken token) {
-      if (token == null) {
-        return;
-      }
-      token.onCancel(
-          () -> {
-            if (cancelledByCaller.compareAndSet(false, true)) {
-              Runnable handler = cancelHandler;
-              if (handler != null) {
-                handler.run();
-              }
-            }
-          });
-    }
-
     CallContext context() {
-      // The in-process equivalent of the two server interceptors WorkerServiceCalls.callContext
-      // reads: caller and callee share the thread, so the OTel span and the logging MDC are
-      // already current — there is nothing to propagate across, only to read in place.
-      io.opentelemetry.api.trace.SpanContext spanCtx =
-          io.opentelemetry.api.trace.Span.current().getSpanContext();
       return new CallContext(
-          spanCtx.isValid() ? spanCtx.getTraceId() : null,
-          org.slf4j.MDC.get("request_id"),
+          currentTraceId(),
+          currentRequestId(),
           new CallContext.CancelSignal() {
             @Override
             public boolean isCancelled() {
-              return expired.get() || cancelledByCaller.get();
+              return expired.get();
             }
 
             @Override
@@ -166,10 +169,6 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
     boolean expired() {
       return expired.get();
-    }
-
-    boolean cancelledByCaller() {
-      return cancelledByCaller.get();
     }
 
     long budgetMs() {
@@ -225,31 +224,74 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected ScanRootProgress executeScanRoot(
       ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer) {
-    try (Budget budget = new Budget(deadline(RpcDeadlineCategory.LONG_RUNNING))) {
-      budget.bind(cancelToken);
-      ScanRootProgress[] last = {null};
+    // Item A8: the same bounded hand-off item A7 built, between the WALKER thread and the SSE
+    // fan-out. `WorkerScanOps` emits one progress frame per 100 files straight into the sink, so
+    // without it a `ScanProgressRegistry` write (and every SSE writer behind it) runs inside
+    // `Files.walkFileTree` — the walk would be paced by the slowest connected browser.
+    AtomicReference<ScanRootProgress> last = new AtomicReference<>();
+    AtomicReference<Throwable> deliveryFailure = new AtomicReference<>();
+    BoundedHandoff<ScanRootProgress> flow =
+        new BoundedHandoff<>(
+            "scan-root-flow",
+            event -> {
+              last.set(event);
+              progressConsumer.accept(event);
+            },
+            deliveryFailure::set,
+            streamThreads);
+
+    // Cancellation, in the shape WorkerScanOps already polls: it checks `ctx.cancelled()` per file
+    // and per directory, so a cancel lands within a file — well inside the 100-file progress tick
+    // the item asks for.
+    FlowCancelSignal cancel = new FlowCancelSignal();
+    flow.onClose(cancel::cancel);
+    if (cancelToken != null) {
+      cancelToken.onCancel(cancel::cancel);
+      if (cancelToken.isCancelled()) {
+        cancel.cancel();
+      }
+    }
+
+    // The scan's deadline is a cancel, not a retro-thrown status: a stream that outruns its budget
+    // has to STOP, and the terminal event the walker then emits is the honest answer. This is the
+    // same LONG_RUNNING category the wire applied.
+    ScheduledFuture<?> alarm =
+        deadlines.schedule(
+            cancel::cancel, deadline(RpcDeadlineCategory.LONG_RUNNING), TimeUnit.MILLISECONDS);
+    try {
       services
           .get()
           .ingestService()
           .scanRoot(
               request,
               event -> {
-                last[0] = event;
-                progressConsumer.accept(event);
+                if (!flow.publish(event)) {
+                  // The consumer stopped draining, or the caller closed the flow: stop walking.
+                  cancel.cancel();
+                }
               },
-              budget.context());
-      if (budget.cancelledByCaller()) {
-        ScanRootProgress cancelled = scanCancelledEvent();
-        progressConsumer.accept(cancelled);
-        return cancelled;
-      }
-      if (last[0] == null) {
-        ScanRootProgress empty = scanEmptyStreamEvent();
-        progressConsumer.accept(empty);
-        return empty;
-      }
-      return last[0];
+              new CallContext(currentTraceId(), currentRequestId(), cancel));
+    } finally {
+      alarm.cancel(false);
+      // The walk has ended; let the frames it already handed over reach the consumer before the
+      // flow closes, or the terminal event is exactly what gets dropped.
+      flow.drainAndClose(SCAN_DRAIN_TIMEOUT_MS);
     }
+
+    Throwable failed = deliveryFailure.get();
+    if (failed != null) {
+      throw WorkerServiceException.internal("scanRoot progress delivery failed: " + failed);
+    }
+    ScanRootProgress terminal = last.get();
+    if (terminal != null) {
+      // The worker already stamps CLIENT_CANCELLED on its own terminal event when it observes the
+      // cancel, so a synthetic one here would be a second terminal event for the same scan.
+      return terminal;
+    }
+    ScanRootProgress synthesised =
+        cancel.isCancelled() ? scanCancelledEvent() : scanEmptyStreamEvent();
+    progressConsumer.accept(synthesised);
+    return synthesised;
   }
 
   @Override

@@ -5,6 +5,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -76,6 +77,16 @@ final class BoundedHandoff<T> implements AutoCloseable {
   private final Consumer<Throwable> onError;
   private final String name;
 
+  /**
+   * Accepted and delivered counts, compared by {@link #drainAndClose}. Two monotonic counters
+   * rather than "is the queue empty and is the consumer idle?": that pair has a window between the
+   * delivery loop taking a frame off the queue and marking itself busy, in which a drain would
+   * conclude the flow was finished and close over an in-flight frame. Counters have no such window.
+   */
+  private final AtomicLong accepted = new AtomicLong();
+
+  private final AtomicLong delivered = new AtomicLong();
+
   BoundedHandoff(String name, Consumer<T> sink, Consumer<Throwable> onError, Executor deliveryThread) {
     this(name, sink, onError, deliveryThread, DEFAULT_CAPACITY, DEFAULT_OFFER_TIMEOUT_MS);
   }
@@ -107,6 +118,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
     }
     try {
       if (queue.offer(frame, offerTimeoutMs, TimeUnit.MILLISECONDS)) {
+        accepted.incrementAndGet();
         return true;
       }
     } catch (InterruptedException e) {
@@ -127,6 +139,44 @@ final class BoundedHandoff<T> implements AutoCloseable {
             name + ": flow bound of " + queue.remainingCapacity() + "+" + queue.size()
                 + " frames held for " + offerTimeoutMs + "ms"));
     return false;
+  }
+
+  /**
+   * Waits for every accepted frame to reach the consumer, then closes.
+   *
+   * <p>The finite counterpart of {@link #close()}, for a flow whose producer ends on its own — a
+   * scan that finished walking. Closing immediately would discard the tail of the walk, the
+   * terminal event among it, which is the failure mode a bound introduces if the shutdown is not
+   * thought about: those frames were <em>accepted</em>, so dropping them here would be exactly the
+   * silent loss the block policy exists to prevent.
+   *
+   * @return true if the flow drained fully; false if the timeout elapsed first
+   */
+  boolean drainAndClose(long timeoutMs) {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    boolean drained = false;
+    while (System.currentTimeMillis() < deadline) {
+      if (closed.get() || delivered.get() >= accepted.get()) {
+        drained = true;
+        break;
+      }
+      try {
+        Thread.sleep(1L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    if (!drained) {
+      log.warn(
+          "{}: {} of {} frames still undelivered after {}ms; closing anyway",
+          name,
+          accepted.get() - delivered.get(),
+          accepted.get(),
+          timeoutMs);
+    }
+    close();
+    return drained;
   }
 
   /** Reports a producer-side failure to the consumer and closes the flow. */
@@ -190,6 +240,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
       }
       try {
         sink.accept(frame);
+        delivered.incrementAndGet();
       } catch (RuntimeException e) {
         log.warn("{}: consumer threw on delivery; closing the flow", name, e);
         fail(e);
