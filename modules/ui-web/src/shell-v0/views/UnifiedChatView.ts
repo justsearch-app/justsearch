@@ -1821,6 +1821,50 @@ export class UnifiedChatView extends JfElement {
     this.observeQueryContainer();
     // (Search Thread S2 note: the landing→docked transition is CSS-only — the composer never
     // re-parents, so no focus restoration is needed; see the stable-slot rule in renderAnswerPlane.)
+    this.pinConversationTail();
+  }
+
+  /**
+   * Tempdoc 941 round 19 (F1) — does the transcript follow its newest turn?
+   *
+   * <p>`#run-conversation` is this surface's scroll region (§D3), and nothing ever scrolled it. On a
+   * conversation short enough to fit the column that is invisible; on a long-running one it is
+   * indistinguishable from the answer being lost. Observed: a Structured turn dispatched into a
+   * conversation that already held a Document-Q&A answer returned 200, persisted
+   * `{"phrase":"quick brown fox"}` to the record, and the shell refetched both `/history` and
+   * `/api/thread` (200) — yet the reader saw the PREVIOUS card, unchanged, and an empty composer.
+   * The turn had rendered; it rendered below the fold. The fresh-shell control passed for the one
+   * reason a fresh shell differs here: an empty conversation has no scroll offset to be stranded at.
+   *
+   * <p>True while the reader is at (or near) the tail, and re-armed by their own submit — a reader
+   * who has scrolled up to re-read is deliberately behind and must not be yanked forward.
+   */
+  private followTail = true;
+
+  /** Slack (px) that still counts as "at the tail" — a sub-line rounding gap, not a scrolled-away reader. */
+  private static readonly TAIL_SLACK_PX = 24;
+
+  private conversationScroller(): HTMLElement | null {
+    return (this.shadowRoot?.querySelector('.conversation') as HTMLElement | null) ?? null;
+  }
+
+  /** The reader moved the column: follow the tail only while they are still at it. */
+  private readonly onConversationScroll = (): void => {
+    const el = this.conversationScroller();
+    if (!el) return;
+    const slack = el.scrollHeight - el.scrollTop - el.clientHeight;
+    this.followTail = slack <= UnifiedChatView.TAIL_SLACK_PX;
+  };
+
+  /** Keep the newest turn in view after a render that grew the column. */
+  private pinConversationTail(): void {
+    if (!this.followTail) return;
+    const el = this.conversationScroller();
+    if (!el) return;
+    // The tail is `scrollHeight - clientHeight` (what the browser clamps to), not `scrollHeight`:
+    // comparing against the latter would re-assign on every update and fight a reader at the end.
+    const tail = el.scrollHeight - el.clientHeight;
+    if (el.scrollTop < tail) el.scrollTop = tail;
   }
 
   /**
@@ -2676,6 +2720,7 @@ export class UnifiedChatView extends JfElement {
           id="run-conversation"
           tabindex="0"
           class="conversation ${spineShown ? 'spine-scrolled jf-scrollbar-none' : ''}"
+          @scroll=${this.onConversationScroll}
         >
           ${/* Tempdoc 577 Goal 3 (§3.2) — the retrieve base tier renders the ephemeral hit-list IN
                 the window; it owns no thread history. Escalation (Ask/Delegate) promotes to a turn. */ ''}
@@ -6074,6 +6119,9 @@ export class UnifiedChatView extends JfElement {
     }
 
     this.thread = [...this.thread, { role: 'user', content: text, shapeId }];
+    // Tempdoc 941 R19-F1 — the reader just asked for this turn, so re-arm tail-following even if
+    // they were scrolled up re-reading: their own submit is the request to be shown the result.
+    this.followTail = true;
     this.showResumePrompt = false;
     if (this.thread.length === 1) {
       // Tempdoc 562: record the session POINTER only — the preview is later derived from the lock-safe
@@ -6132,6 +6180,7 @@ export class UnifiedChatView extends JfElement {
         const donePayload = payload as
           | {
               promptTokens?: number;
+              finalResponse?: string;
               contextBreakdown?: { system?: number; conversation?: number; retrieved?: number };
             }
           | null;
@@ -6175,8 +6224,27 @@ export class UnifiedChatView extends JfElement {
         // Tempdoc 603 C2 — pin the decontextualized question onto the committed turn so the
         // "Interpreted as: …" line persists past the live stream (mirrors citations/ragMeta).
         if (this.rewriteNote) msg.standaloneQuestion = this.rewriteNote.standalone;
-        if (this.streamingText.trim()) {
+        // Tempdoc 941 R19-F1 — the `done` payload carries the substrate's authoritative answer
+        // (`ConversationEngine.emitDone` -> `finalResponse`). Streamed `chunk` text is the same
+        // text arriving incrementally, so prefer it when we have it; but when no chunk text
+        // accumulated in this view (a handler throw is swallowed by `consumeShapeStream`, a
+        // reconnect drops the chunk frames, or the shape answers in one shot) the turn used to be
+        // dropped at the `streamingText.trim()` guard below: no message, no notice, no error, and
+        // the composer already cleared. Read the contract field instead of losing the answer —
+        // same house pattern as `AgentSessionController.onDone`.
+        const settledText = this.streamingText.trim()
+          ? this.streamingText
+          : (donePayload?.finalResponse ?? '');
+        msg.content = settledText;
+        if (settledText.trim()) {
           this.thread = [...this.thread, msg];
+        } else if (!this.errorMessage) {
+          // Nothing streamed and nothing in the payload: the dispatch completed with no answer.
+          // Say so — a silently cleared composer is the defect, not an acceptable no-op. Guarded on
+          // `errorMessage` so a stream that already reported a REAL cause (an `error` event before
+          // its terminal) keeps it; this generic line is for the case that reported nothing.
+          this.errorMessage =
+            'The model returned no result for that request. Nothing was added to the conversation — try again, or rephrase the prompt.';
         }
         this.streamingText = '';
         this.isStreaming = false;
