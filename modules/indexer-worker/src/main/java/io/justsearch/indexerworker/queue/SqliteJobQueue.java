@@ -387,10 +387,27 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // error_message, the last-outcome columns AND first_failed_at — which is exactly what makes a
       // rescan (or a watcher event on an mtime/size change) revive a RETRY_EXHAUSTED row with a
       // fresh retry window, with no separate "reset" statement to keep in sync.
+      //
+      // Tempdoc 941 round 19 (F2): collection and scan_id are the two columns that must NOT ride
+      // that reset, so each is carried through the row's own prior value when the caller states
+      // nothing. They describe where the file BELONGS and which scan admitted it — facts a
+      // maintenance re-enqueue does not know and therefore cannot restate. The periodic
+      // syncDirectory walk re-enqueues every file missing from the index (SyncDirectoryOps: the
+      // untagged enqueueEntries(batch)), and a permanently FAILED file is missing from the index
+      // forever — so a corrupt PDF's collection and owning scan were blanked on every sync cycle,
+      // and the failed-files drawer's "Scan <id>" line stopped rendering. The watcher and the
+      // retry RPC re-enqueue the same way. NULL now means "I have nothing to say about this
+      // column", not "clear it"; a caller that HAS something to say (a real scan) still
+      // overwrites. size_bytes deliberately keeps the restate-or-lose-it rule from 813 Slice B:
+      // there, the re-enqueue re-stats the file, so its silence really does mean unknown.
       String sql = """
           INSERT OR REPLACE INTO jobs
             (path, state, attempts, last_updated, collection, size_bytes, scan_id)
-          VALUES (?, 'PENDING', 0, ?, ?, ?, ?)
+          VALUES (
+            ?, 'PENDING', 0, ?,
+            COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
+            ?,
+            COALESCE(?, (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?)))
           """;
 
       long now = System.currentTimeMillis();
@@ -410,12 +427,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           stmt.setString(1, normalizedPath);
           stmt.setLong(2, now);
           stmt.setString(3, col);
+          stmt.setString(4, normalizedPath); // carry-forward lookup for collection
           if (entry.sizeBytes() >= 0) {
-            stmt.setLong(4, entry.sizeBytes());
+            stmt.setLong(5, entry.sizeBytes());
           } else {
-            stmt.setNull(4, java.sql.Types.INTEGER);
+            stmt.setNull(5, java.sql.Types.INTEGER);
           }
-          stmt.setString(5, scan);
+          stmt.setString(6, scan);
+          stmt.setString(7, normalizedPath); // carry-forward lookup for scan_id
           stmt.addBatch();
           count++;
         }

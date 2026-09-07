@@ -84,6 +84,9 @@
           "resumed" : {
             "type" : "boolean"
           },
+          "skipCause" : {
+            "type" : [ "string", "null" ]
+          },
           "skipReason" : {
             "type" : [ "string", "null" ]
           },

@@ -1821,6 +1821,50 @@ export class UnifiedChatView extends JfElement {
     this.observeQueryContainer();
     // (Search Thread S2 note: the landing→docked transition is CSS-only — the composer never
     // re-parents, so no focus restoration is needed; see the stable-slot rule in renderAnswerPlane.)
+    this.pinConversationTail();
+  }
+
+  /**
+   * Tempdoc 941 round 19 (F1) — does the transcript follow its newest turn?
+   *
+   * <p>`#run-conversation` is this surface's scroll region (§D3), and nothing ever scrolled it. On a
+   * conversation short enough to fit the column that is invisible; on a long-running one it is
+   * indistinguishable from the answer being lost. Observed: a Structured turn dispatched into a
+   * conversation that already held a Document-Q&A answer returned 200, persisted
+   * `{"phrase":"quick brown fox"}` to the record, and the shell refetched both `/history` and
+   * `/api/thread` (200) — yet the reader saw the PREVIOUS card, unchanged, and an empty composer.
+   * The turn had rendered; it rendered below the fold. The fresh-shell control passed for the one
+   * reason a fresh shell differs here: an empty conversation has no scroll offset to be stranded at.
+   *
+   * <p>True while the reader is at (or near) the tail, and re-armed by their own submit — a reader
+   * who has scrolled up to re-read is deliberately behind and must not be yanked forward.
+   */
+  private followTail = true;
+
+  /** Slack (px) that still counts as "at the tail" — a sub-line rounding gap, not a scrolled-away reader. */
+  private static readonly TAIL_SLACK_PX = 24;
+
+  private conversationScroller(): HTMLElement | null {
+    return (this.shadowRoot?.querySelector('.conversation') as HTMLElement | null) ?? null;
+  }
+
+  /** The reader moved the column: follow the tail only while they are still at it. */
+  private readonly onConversationScroll = (): void => {
+    const el = this.conversationScroller();
+    if (!el) return;
+    const slack = el.scrollHeight - el.scrollTop - el.clientHeight;
+    this.followTail = slack <= UnifiedChatView.TAIL_SLACK_PX;
+  };
+
+  /** Keep the newest turn in view after a render that grew the column. */
+  private pinConversationTail(): void {
+    if (!this.followTail) return;
+    const el = this.conversationScroller();
+    if (!el) return;
+    // The tail is `scrollHeight - clientHeight` (what the browser clamps to), not `scrollHeight`:
+    // comparing against the latter would re-assign on every update and fight a reader at the end.
+    const tail = el.scrollHeight - el.clientHeight;
+    if (el.scrollTop < tail) el.scrollTop = tail;
   }
 
   /**
@@ -2676,6 +2720,7 @@ export class UnifiedChatView extends JfElement {
           id="run-conversation"
           tabindex="0"
           class="conversation ${spineShown ? 'spine-scrolled jf-scrollbar-none' : ''}"
+          @scroll=${this.onConversationScroll}
         >
           ${/* Tempdoc 577 Goal 3 (§3.2) — the retrieve base tier renders the ephemeral hit-list IN
                 the window; it owns no thread history. Escalation (Ask/Delegate) promotes to a turn. */ ''}
@@ -5133,8 +5178,9 @@ export class UnifiedChatView extends JfElement {
 
   /**
    * Tempdoc 577 §2.12 Move 3 — the current mode's conversation shape id (the inverse of the
-   * shape→affordance preset). The answer-frame authority keys on this to decide a shape's declared
-   * grounding class. A record-side answer belongs to the conversation's current shape.
+   * shape→affordance preset). This answers "what shape would a turn dispatched RIGHT NOW have?" —
+   * a fact about the LIVE window, and the only honest answer for a turn that declares nothing
+   * (see {@link recordShapeId}). It is not an answer about a past turn.
    */
   private currentShapeId(): CoreInteractionShapeId {
     switch (this.affordance) {
@@ -5147,6 +5193,39 @@ export class UnifiedChatView extends JfElement {
       default:
         return 'core.free-chat';
     }
+  }
+
+  /**
+   * Tempdoc 941 round 19 (F4) — the shape THIS recorded turn was dispatched by, read off the turn.
+   *
+   * <p>The frame authority ({@link answerFrame}) decides a turn's epistemic class from its shape's
+   * declared grounding class, so handing it the window's CURRENT mode makes a past answer's honesty
+   * a function of where the reader happens to be standing. Observed: a `core.rag-ask` answer that
+   * rendered "Based on your documents" over five sources came back after a cold restart — same text,
+   * same five sources, still on the record — labelled "Model answer — this mode does not search your
+   * documents", because the restarted window's affordance was `'none'` and `currentShapeId()`
+   * therefore said `core.free-chat` (an `ungrounded-llm` class). The evidence survived the restart;
+   * the claim about it did not. Same class as `panelSpeaks` (847 §6) and `recordsToThread` (863
+   * §4.A.5 F1): gate a fact on itself, never on a correlate.
+   *
+   * <p>The turn's own shape IS persisted — {@code FileConversationStore.enrichMessage} stamps
+   * `shapeId` per message and {@code InteractionThreadController.chatTurn} carries it onto
+   * `attributes.shapeId` (both 863 F1); `sv3-record.ts`'s `declaredShapeOf` is the sibling reader.
+   * The comment this replaces called per-message shape "the documented backend gap" — 863 closed it,
+   * and this window kept reading around it.
+   *
+   * <p>Falls back to {@link currentShapeId} when the record declares nothing: rows written before
+   * 863 carry no `shapeId` and there is deliberately no backfill, so the window's mode remains the
+   * only fact available for that class. A row declaring a shape this build does not know (a
+   * downgrade, or a shape retired from {@link CORE_INTERACTION_SHAPES}) falls back the same way
+   * rather than being cast into the union.
+   */
+  private recordShapeId(it: UnifiedTurnItem): CoreInteractionShapeId {
+    const declared = it.attributes.shapeId;
+    return typeof declared === 'string' &&
+      (CORE_INTERACTION_SHAPES as readonly string[]).includes(declared)
+      ? (declared as CoreInteractionShapeId)
+      : this.currentShapeId();
   }
 
   /**
@@ -5332,8 +5411,11 @@ export class UnifiedChatView extends JfElement {
           // Tempdoc 577 Move 3 / 603 D-4 — even a sourced agent answer carries a frame: full coverage →
           // grounded (no banner); partial → partially-grounded; document-level (no chunk identity) →
           // `sourced` (provenance, no per-sentence verification). One authority decides.
+          // Tempdoc 941 F4 — the TURN's shape (from the record), not the window's current mode; a
+          // reloaded delegate answer must keep the frame it earned. See `recordShapeId`.
+          const recordShape = this.recordShapeId(it);
           const frame = this.frameFor(
-            this.currentShapeId(),
+            recordShape,
             agentSources.length,
             cites,
             it.content,
@@ -5342,7 +5424,7 @@ export class UnifiedChatView extends JfElement {
             // `ctrl.streamingText`, not this branch), so a zero-cite chunk-precise answer frames `sourced`.
             true,
           );
-          const degraded = groundingDegraded(this.currentShapeId(), agentSources.length);
+          const degraded = groundingDegraded(recordShape, agentSources.length);
           const partsA = this.recordFloorParts(it.id);
           // Search Thread S7 (tempdoc decision 6) — the receipt tail: duration best-effort from the
           // nearest preceding user item's ts (no persisted per-turn timing yet); model name read live
@@ -5395,15 +5477,21 @@ export class UnifiedChatView extends JfElement {
         // floor parts from `floorFrameParts(id, idx)` — identical to the former `recordFloorParts(id)` — and
         // omits the thread-coupled action bar when `idx < 0` (matching the former `recordActionBar`).
         const idx = this.thread.findIndex((m) => m.id === it.id);
-        const shapeId = this.currentShapeId();
+        // Tempdoc 941 F4 — the TURN's own shape, read off the record (`recordShapeId`), not the
+        // window's current mode. This drives the shape tag, the `isExtract` render form AND — through
+        // `renderMessage` → `frameFor` → `declaredGroundingClass` — the answer's epistemic frame, so a
+        // reloaded Documents-rung answer stays "Based on your documents" instead of being re-declared
+        // an ungrounded model answer by a restarted window that happens to sit on no affordance.
+        const shapeId = this.recordShapeId(it);
         const ragSources = Array.isArray(it.attributes.citations)
           ? (it.attributes.citations as RetrievalCitation[])
           : [];
         // Tempdoc 621 Phase 4-full — FORWARD-COMPAT read: the decontextualized "Interpreted as…" question is
         // delivered LIVE via the `rag.rewrite` SSE event but is NOT persisted on the assistant record
         // (`ConversationEngine.persistedAssistant` stores only citations/calibration/claimMatches), so this is
-        // ABSENT today and the note does not render on reload — a backend follow-up (persist it on the record),
-        // the sibling of the per-message `shapeId` gap. Wired now so it lights up the day the record carries it.
+        // ABSENT today and the note does not render on reload — a backend follow-up (persist it on the record).
+        // Wired now so it lights up the day the record carries it. (Its former sibling, the per-message
+        // `shapeId` gap, was closed by 863 F1 and is read here now — see `recordShapeId`.)
         const standalone =
           typeof it.attributes['rag.standaloneQuestion'] === 'string'
             ? (it.attributes['rag.standaloneQuestion'] as string)
@@ -5417,14 +5505,20 @@ export class UnifiedChatView extends JfElement {
         const recordReasoning = reasoningBlocksFromRecord(it.attributes.reasoning);
         const enriched: ThreadMessage = {
           ...base,
-          // Tempdoc 621 Phase 4-full — the turn's shape on the record path is the window's CURRENT shape
-          // (`currentShapeId()`), NOT the reloaded thread's `shapeId`: the auto-restore seeds the thread
-          // with a placeholder `core.free-chat` (per-message shape is not persisted — the documented
-          // backend gap), so inheriting it mislabels a reloaded Document-Q&A turn as "Chat". This mirrors
-          // the former record branch (which framed via `currentShapeId()`); now it also drives the shape tag.
+          // Tempdoc 621 Phase 4-full — the turn's shape on the record path is NOT the reloaded thread's
+          // `shapeId`: the auto-restore seeds the thread with a placeholder `core.free-chat`, so
+          // inheriting it mislabels a reloaded Document-Q&A turn as "Chat".
+          //
+          // Tempdoc 941 F4 — the replacement 621 chose, `currentShapeId()`, had the same defect one
+          // level up: it read the WINDOW's mode, so a cold restart (affordance back to `'none'`)
+          // re-declared every reloaded turn `core.free-chat` — mislabelling the shape tag AND, worse,
+          // downgrading a grounded answer's frame to "Model answer — this mode does not search your
+          // documents" over evidence still on screen. `recordShapeId` reads the turn's own persisted
+          // shape (863 F1) and keeps `currentShapeId()` only as the pre-863 fallback.
           shapeId,
-          // Tempdoc 621 review fix — a reloaded EXTRACT turn must keep its verbatim (`transform`) render, not
-          // re-render as markdown. Extract carries no per-turn flag on the record, so derive it from the mode.
+          // Tempdoc 621 review fix — a reloaded EXTRACT turn must keep its verbatim (`transform`) render,
+          // not re-render as markdown. Extract carries no per-turn `isExtract` flag on the record, so it is
+          // derived from the turn's shape (941 F4: the turn's own, no longer the window's).
           isExtract: shapeId === 'core.extract',
           sources: ragSources,
           claims: claimsFromRecord(it.attributes.claimMatches),
@@ -6025,6 +6119,9 @@ export class UnifiedChatView extends JfElement {
     }
 
     this.thread = [...this.thread, { role: 'user', content: text, shapeId }];
+    // Tempdoc 941 R19-F1 — the reader just asked for this turn, so re-arm tail-following even if
+    // they were scrolled up re-reading: their own submit is the request to be shown the result.
+    this.followTail = true;
     this.showResumePrompt = false;
     if (this.thread.length === 1) {
       // Tempdoc 562: record the session POINTER only — the preview is later derived from the lock-safe
@@ -6083,6 +6180,7 @@ export class UnifiedChatView extends JfElement {
         const donePayload = payload as
           | {
               promptTokens?: number;
+              finalResponse?: string;
               contextBreakdown?: { system?: number; conversation?: number; retrieved?: number };
             }
           | null;
@@ -6126,8 +6224,27 @@ export class UnifiedChatView extends JfElement {
         // Tempdoc 603 C2 — pin the decontextualized question onto the committed turn so the
         // "Interpreted as: …" line persists past the live stream (mirrors citations/ragMeta).
         if (this.rewriteNote) msg.standaloneQuestion = this.rewriteNote.standalone;
-        if (this.streamingText.trim()) {
+        // Tempdoc 941 R19-F1 — the `done` payload carries the substrate's authoritative answer
+        // (`ConversationEngine.emitDone` -> `finalResponse`). Streamed `chunk` text is the same
+        // text arriving incrementally, so prefer it when we have it; but when no chunk text
+        // accumulated in this view (a handler throw is swallowed by `consumeShapeStream`, a
+        // reconnect drops the chunk frames, or the shape answers in one shot) the turn used to be
+        // dropped at the `streamingText.trim()` guard below: no message, no notice, no error, and
+        // the composer already cleared. Read the contract field instead of losing the answer —
+        // same house pattern as `AgentSessionController.onDone`.
+        const settledText = this.streamingText.trim()
+          ? this.streamingText
+          : (donePayload?.finalResponse ?? '');
+        msg.content = settledText;
+        if (settledText.trim()) {
           this.thread = [...this.thread, msg];
+        } else if (!this.errorMessage) {
+          // Nothing streamed and nothing in the payload: the dispatch completed with no answer.
+          // Say so — a silently cleared composer is the defect, not an acceptable no-op. Guarded on
+          // `errorMessage` so a stream that already reported a REAL cause (an `error` event before
+          // its terminal) keeps it; this generic line is for the case that reported nothing.
+          this.errorMessage =
+            'The model returned no result for that request. Nothing was added to the conversation — try again, or rephrase the prompt.';
         }
         this.streamingText = '';
         this.isStreaming = false;

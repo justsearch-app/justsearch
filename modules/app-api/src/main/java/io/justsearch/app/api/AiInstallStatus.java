@@ -91,13 +91,19 @@ public final class AiInstallStatus {
   public long remainingSeconds = -1L;
 
   /**
-   * True only when state == "completed" AND no packages were skipped/failed
-   * AND all required runtime config keys were written. Distinguishes
-   * "installed cleanly" from "installed with limitations" without breaking
-   * the existing state enum. Tempdoc 374 sandbox round 2 finding #8.
+   * True only when state == "completed" AND no package failed AND no package was skipped for a
+   * reason that LIMITS the install AND all required runtime config keys were written. Distinguishes
+   * "installed cleanly" from "installed with limitations" without breaking the existing state enum.
+   * Tempdoc 374 sandbox round 2 finding #8.
    *
    * <p>When false but state == "completed", the message field describes which
    * limitations apply (e.g. "Installed with limitations: chat (no CUDA).").
+   *
+   * <p><b>Not every skip is a limitation</b> ({@code SkipCause.limitsInstall}, tempdoc 941 round 19
+   * F3). Counting all of them made this flag unsatisfiable by any install on any machine: one
+   * {@code devOnly} registry package the planner excludes from every user plan was enough to hold
+   * it false forever, under a message blaming the user's hardware. Only a HARDWARE skip is a
+   * limitation; a packaging exclusion, a mode exclusion and the user's own decline are not.
    */
   public boolean installedFully;
 
@@ -298,6 +304,24 @@ public final class AiInstallStatus {
     public long bytesDownloaded;
     public long bytesTotal;
     public String skipReason = "";
+
+    /**
+     * The planner's TYPED reason this package was skipped, as {@code SkipCause}'s kebab-case id:
+     * {@code hardware} | {@code intent} | {@code user-declined} | {@code dev-only}. Empty for a
+     * package that was not skipped, and for a skip whose cause is unknown (tempdoc 941 round 19,
+     * F3).
+     *
+     * <p>{@link #skipReason} is prose for display; this is what logic reads. The completion message
+     * used to hardcode "skipped on this hardware" for every skip, so a package the PACKAGER excluded
+     * ({@code chat-compact}, {@code devOnly}) and a component the USER declined were both reported
+     * to the user as limitations of their machine — the prose-as-classification defect this
+     * codebase removed elsewhere, arriving instead as prose-as-assumption.
+     *
+     * <p>Unknown is empty, never a guess: a consumer must fail closed onto the hardware verdict
+     * rather than read an unclassified skip as harmless.
+     */
+    public String skipCause = "";
+
     public String error = "";
 
     /**
@@ -356,6 +380,7 @@ public final class AiInstallStatus {
       c.bytesDownloaded = bytesDownloaded;
       c.bytesTotal = bytesTotal;
       c.skipReason = skipReason;
+      c.skipCause = skipCause;
       c.error = error;
       c.resumed = resumed;
       c.functionalStatus = functionalStatus;
