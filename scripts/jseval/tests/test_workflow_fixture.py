@@ -2152,15 +2152,22 @@ def test_capture_records_the_sampling_pin_in_provenance(tmp_path: Path):
     assert not [e for e in result["fields"] if "sampling" in e["field"]]
 
 
-def test_chat_profile_falls_back_to_the_top_level_field():
-    """`active.chatProfile ?? chatProfile` — the dev-MCP reads both shapes (server.mjs:2376)."""
+def _ai_runtime(status: dict) -> dict:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"chatProfile": "standard",
-                                         "activation": {"state": "activating"}})
+        return httpx.Response(200, json=status)
 
     with httpx.Client(base_url="http://127.0.0.1:33221",
                       transport=httpx.MockTransport(handler)) as client:
-        assert wf.read_ai_runtime(client) == ("standard", "activating")
+        return wf.read_ai_runtime(client)
+
+
+def test_chat_profile_falls_back_to_the_top_level_field():
+    """`active.chatProfile ?? chatProfile` — the dev-MCP reads both shapes (server.mjs:2376)."""
+    ai = _ai_runtime({"chatProfile": "standard", "activation": {"state": "activating"}})
+    assert ai["chatProfile"] == "standard"
+    assert ai["activationState"] == "activating"
+    # Nothing under `active`, so nothing says the engine is up.
+    assert ai["online"] is False
 
 
 def test_chat_profile_is_absent_not_fatal_when_ai_is_offline():
@@ -2170,7 +2177,92 @@ def test_chat_profile_is_absent_not_fatal_when_ai_is_offline():
 
     with httpx.Client(base_url="http://127.0.0.1:33221",
                       transport=httpx.MockTransport(handler)) as client:
-        assert wf.read_ai_runtime(client) == (None, None)
+        ai = wf.read_ai_runtime(client)
+    assert ai["chatProfile"] is None and ai["activationState"] is None
+    # TRI-STATE: unreadable is None, not False. Nothing was observed, so nothing may be
+    # concluded — `capture_health` must not read this as either healthy or broken.
+    assert ai["online"] is None
+
+
+def test_engine_online_is_read_from_active_not_from_the_activation_state():
+    """The exact shape all six captures of the 2026-09-07 acceptance were taken under.
+
+    `activation.state` was "failed" on every one of them while the engine was demonstrably
+    answering (their chat turns terminated `done`). It is the last activation PROCEDURE's
+    outcome; `active.modelPath` is projected only while the engine is online, which is the
+    signal the dev-MCP reads for the same reason (server.mjs:2680-2687).
+    """
+    ai = _ai_runtime({
+        "active": {"modelPath": "F:/models/qwen3-4b.gguf", "chatProfile": "compact"},
+        "activation": {"state": "failed"},
+    })
+    assert ai["online"] is True
+    assert ai["onlineSignal"] == "active.modelPath"
+    assert ai["activationState"] == "failed"   # recorded, not used as the liveness verdict
+    assert ai["chatProfile"] == "compact"
+    # Basename only — the artifact must not carry a machine-specific absolute model path.
+    assert ai["modelFile"] == "qwen3-4b.gguf"
+
+
+def test_engine_online_also_accepts_a_completed_activation():
+    """The other disjunct: an activation that DID run and completed, with a realized variant."""
+    ai = _ai_runtime({
+        "active": {"activeVariantId": "cuda12", "chatProfile": "compact"},
+        "activation": {"state": "completed"},
+    })
+    assert ai["online"] is True
+    assert ai["onlineSignal"] == "activation.completed+active.activeVariantId"
+    assert ai["modelFile"] is None
+
+
+def test_engine_is_not_online_when_neither_signal_is_present():
+    """A completed activation with nothing realized under `active` is not an online engine."""
+    ai = _ai_runtime({"active": {"chatProfile": "compact"}, "activation": {"state": "completed"}})
+    assert ai["online"] is False
+    assert ai["onlineSignal"] is None
+
+
+def _capture_with_ai(online, *, activation_state="failed") -> dict:
+    """A minimal capture carrying one chat turn and the given liveness provenance."""
+    doc = {
+        "provenance": {"chatProfile": "compact", "aiRuntimeState": activation_state},
+        "queries": {},
+        "chatTurns": {"c01": {"httpStatus": 200, "terminalEvent": "done"}},
+    }
+    if online is not _ABSENT:
+        doc["provenance"]["aiRuntimeOnline"] = online
+    return doc
+
+
+_ABSENT = object()
+
+
+def test_capture_health_refuses_a_capture_whose_engine_was_offline():
+    """Chat turns taken with no engine did not measure a model, whatever they recorded."""
+    doc = _capture_with_ai(False)
+    result = wf.capture_health(doc, doc, [])
+    assert result["ok"] is False
+    assert sum("was not online" in p for p in result["problems"]) == 2  # both sides named
+
+
+def test_capture_health_refuses_a_capture_that_never_recorded_liveness():
+    """Unknown is not healthy — the same tri-state trap the enrichment guard exists for."""
+    doc = _capture_with_ai(_ABSENT)
+    result = wf.capture_health(doc, doc, [])
+    assert result["ok"] is False
+    assert sum("aiRuntimeOnline is absent" in p for p in result["problems"]) == 2
+
+
+def test_capture_health_accepts_a_live_engine_despite_a_failed_activation():
+    """The observed shape must PASS: a failed activation procedure beside a live engine."""
+    doc = _capture_with_ai(True, activation_state="failed")
+    assert not wf._ai_runtime_problems(doc, doc)
+
+
+def test_capture_health_ignores_liveness_for_a_search_only_capture():
+    """`--skip-chat` measures search alone; an offline engine is irrelevant to it."""
+    doc = {"provenance": {"aiRuntimeOnline": False}, "queries": {"q1": {}}, "chatTurns": {}}
+    assert not wf._ai_runtime_problems(doc, doc)
 
 
 def test_chat_profile_requirement_is_recorded():
@@ -2660,6 +2752,17 @@ _HEALTHY_ENRICHMENT = {
     "incompleteReasons": [],
 }
 
+#: A capture with chat turns must show the engine was ONLINE when it was taken, so every
+#: synthetic healthy capture declares it. `aiRuntimeState` is deliberately the FAILED value the
+#: 2026-09-07 acceptance recorded: these fixtures then also pin that a failed activation
+#: procedure beside a live engine is healthy, which is the whole point of separating the two.
+_HEALTHY_AI_RUNTIME = {
+    "chatProfile": "compact",
+    "aiRuntimeState": "failed",
+    "aiRuntimeOnline": True,
+    "aiRuntimeOnlineSignal": "active.modelPath",
+}
+
 
 def _capture(
     queries: dict | None = None,
@@ -2692,6 +2795,7 @@ def _capture(
         "pins": dict(_HEALTHY_PINS),
         "samplingApplied": {rid: dict(_HEALTHY_APPLIED) for rid in c},
         "enrichment": dict(_HEALTHY_ENRICHMENT),
+        **_HEALTHY_AI_RUNTIME,
     }
     for key, value in (provenance or {}).items():
         if value is None:
@@ -2744,6 +2848,7 @@ def _full_snapshot(fixture: dict) -> dict:
             "samplingApplied": {t["id"]: dict(_HEALTHY_APPLIED)
                                 for t in fixture["chatTurns"]},
             "enrichment": dict(_HEALTHY_ENRICHMENT),
+            **_HEALTHY_AI_RUNTIME,
         },
         "queries": {q["id"]: wf.capture_query_record(_SEARCH_RESPONSE)
                     for q in fixture["queries"]},

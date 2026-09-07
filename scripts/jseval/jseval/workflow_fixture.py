@@ -203,7 +203,7 @@ import hashlib
 import json
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Iterable, NamedTuple
 
 import httpx
@@ -1241,34 +1241,76 @@ def read_doc_count(client: httpx.Client) -> tuple[Any, str | None]:
     return None, None
 
 
-def read_ai_runtime(client: httpx.Client) -> tuple[Any, Any]:
-    """``(chatProfile, activationState)`` from ``GET /api/ai/runtime/status``.
+def read_ai_runtime(client: httpx.Client) -> dict:
+    """What ``GET /api/ai/runtime/status`` says about the inference engine.
 
-    The profile decides which model answered the chat turns, so a paired diff is only
-    meaningful when both captures were taken on the SAME one — recorded here (non-diffed)
-    so a mismatched pair is legible after the fact rather than showing up as unexplained
-    chat regressions.
+    Returns ``chatProfile``, ``activationState``, and — the point of this function — whether
+    the engine is actually ONLINE, which is a different question from what the activation
+    state machine last reported.
 
-    Field names follow the dev-MCP's own reader:
-    ``scripts/dev/justsearch-dev-mcp/server.mjs:2376`` takes
-    ``st?.active?.chatProfile ?? st?.chatProfile`` and ``:2373`` reads
-    ``st?.activation?.state``. Both halves are best-effort — an AI-offline backend answers
-    nothing useful here and that must not fail a search-only capture.
+    ``activation.state`` is the outcome of the last activation PROCEDURE, not liveness. All six
+    captures of the 2026-09-07 acceptance recorded ``failed`` while the engine was demonstrably
+    answering: their chat turns terminated ``done`` with per-turn ``samplingApplied`` read off
+    ``session_started``. The backend's own invariant is the other way round — realized identity
+    (``active.modelPath``) is projected ONLY while the engine is online — and the dev-MCP reads
+    it exactly that way after the same false negative bit it
+    (``scripts/dev/justsearch-dev-mcp/server.mjs:2680-2687``, tempdoc 842 review D3/N1):
+    online is ``activation.state == "completed" and active.activeVariantId``, OR
+    ``active.modelPath`` present at all — the second disjunct covering an engine brought up by
+    AI autostart, for which the activation state machine never ran.
+
+    ``online`` is TRI-STATE. ``None`` means the status could not be read (offline backend,
+    non-JSON body) — an unknown, which ``capture_health`` must not treat as healthy.
+
+    Field names follow the dev-MCP's reader: ``server.mjs:2376`` takes
+    ``st?.active?.chatProfile ?? st?.chatProfile``.
     """
     try:
         resp = client.get("/api/ai/runtime/status", timeout=30.0)
         resp.raise_for_status()
         doc = resp.json()
     except (httpx.HTTPError, ValueError):  # pragma: no cover - live-only path
-        return None, None
+        return _AI_RUNTIME_UNKNOWN.copy()
     if not isinstance(doc, dict):
-        return None, None
+        return _AI_RUNTIME_UNKNOWN.copy()
     active = doc.get("active") if isinstance(doc.get("active"), dict) else {}
     profile = active.get("chatProfile")
     if profile is None:
         profile = doc.get("chatProfile")
     activation = doc.get("activation") if isinstance(doc.get("activation"), dict) else {}
-    return profile, activation.get("state")
+    activation_state = activation.get("state")
+    model_path = active.get("modelPath") or active.get("llmModelPath")
+    variant_id = active.get("activeVariantId")
+
+    if model_path:
+        signal = "active.modelPath"
+    elif activation_state == "completed" and variant_id:
+        signal = "activation.completed+active.activeVariantId"
+    else:
+        signal = None
+    return {
+        "chatProfile": profile,
+        "activationState": activation_state,
+        "online": signal is not None,
+        "onlineSignal": signal,
+        "activeVariantId": variant_id,
+        # Basename only: which model answered, without pinning a machine-specific path into
+        # an artifact that two different worktrees produce.
+        "modelFile": PurePath(str(model_path)).name if model_path else None,
+    }
+
+
+#: What :func:`read_ai_runtime` reports when the status endpoint could not be read at all.
+#: ``online`` is ``None``, not ``False``: nothing was observed, and an unknown must not be
+#: allowed to read as either healthy or broken.
+_AI_RUNTIME_UNKNOWN = {
+    "chatProfile": None,
+    "activationState": None,
+    "online": None,
+    "onlineSignal": None,
+    "activeVariantId": None,
+    "modelFile": None,
+}
 
 
 #: The enrichment fields recorded verbatim into ``provenance.enrichment``. Chosen because they
@@ -1594,8 +1636,11 @@ def capture(
             log.warning(
                 "enrichment INCOMPLETE at capture start: %s — this capture will be refused by "
                 "capture_health", enrichment["incompleteReasons"])
-        chat_profile, ai_runtime_state = read_ai_runtime(client)
-        log.info("chat profile %s (ai runtime %s)", chat_profile, ai_runtime_state)
+        ai_runtime = read_ai_runtime(client)
+        chat_profile = ai_runtime["chatProfile"]
+        log.info("chat profile %s (engine online %s via %s; last activation procedure %s)",
+                 chat_profile, ai_runtime["online"], ai_runtime["onlineSignal"],
+                 ai_runtime["activationState"])
         # SEARCH BEFORE CHAT, and this order is load-bearing, not incidental: the chat turns
         # index their own agent history (measured: docCount 91 -> 102 across one capture's
         # three turns), so running them first would move the index under the queries.
@@ -1661,7 +1706,16 @@ def capture(
         # `capture_health` — see `read_enrichment`.
         "enrichment": enrichment,
         "chatProfile": chat_profile,
-        "aiRuntimeState": ai_runtime_state,
+        # BOTH signals, because they answer different questions and the acceptance run proved
+        # they disagree: `aiRuntimeState` is what the last activation PROCEDURE reported (all
+        # six captures of 2026-09-07 say "failed"), `aiRuntimeOnline` is whether the engine was
+        # actually up (it was — the turns completed). Only the second is a health precondition;
+        # the first is kept because a failed activation beside a live engine is worth seeing.
+        "aiRuntimeState": ai_runtime["activationState"],
+        "aiRuntimeOnline": ai_runtime["online"],
+        "aiRuntimeOnlineSignal": ai_runtime["onlineSignal"],
+        "aiRuntimeVariantId": ai_runtime["activeVariantId"],
+        "aiRuntimeModelFile": ai_runtime["modelFile"],
         # The sampling override sent on every chat turn (PR 0b), recorded for the same
         # reason chatProfile is: it decides what the model produced, so a pair captured
         # under two different pins compares two samplers, not two builds. Never diffed.
@@ -2457,6 +2511,51 @@ def _enrichment_problems(baseline: dict, candidate: dict) -> list[str]:
     return problems
 
 
+def _ai_runtime_problems(baseline: dict, candidate: dict) -> list[str]:
+    """Refuse a capture whose chat turns cannot be shown to have had a live engine.
+
+    The 2026-09-07 six-capture acceptance recorded ``aiRuntimeState: "failed"`` on every one of
+    them, and nobody could say from the artifact whether that meant the chat turns had been
+    answered by a model or by an error path — the turns happened to have completed, but the
+    capture recorded the wrong field to prove it. ``activation.state`` is the last activation
+    PROCEDURE's outcome; liveness is ``provenance.aiRuntimeOnline`` (see
+    :func:`read_ai_runtime`).
+
+    Only a capture that ran chat turns is held to this. A ``--skip-chat`` capture measures
+    search alone and an offline engine is irrelevant to it.
+
+    An ABSENT flag is refused, not waved through: this is the same tri-state trap
+    :func:`_enrichment_problems` exists for. A capture that did not record liveness cannot
+    demonstrate it, and treating "unknown" as "healthy" is exactly how the half-enriched side
+    passed the four-capture acceptance.
+    """
+    problems: list[str] = []
+    for label, doc in (("baseline", baseline), ("candidate", candidate)):
+        if not _records(doc, "chatTurns"):
+            continue
+        prov = _provenance(doc)
+        online = prov.get("aiRuntimeOnline")
+        if online is True:
+            continue
+        if "aiRuntimeOnline" not in prov:
+            problems.append(
+                f"{label}: provenance.aiRuntimeOnline is absent — this capture predates the "
+                "engine-liveness probe and so cannot show that a model answered its chat "
+                "turns. It records provenance.aiRuntimeState "
+                f"{prov.get('aiRuntimeState')!r}, which is the last ACTIVATION PROCEDURE's "
+                "outcome, not liveness. Re-capture with a build that records it."
+            )
+            continue
+        problems.append(
+            f"{label}: the inference engine was not online when this capture was taken "
+            f"(aiRuntimeOnline={online!r}, activation state "
+            f"{prov.get('aiRuntimeState')!r}, chat profile {prov.get('chatProfile')!r}). Its "
+            "chat turns did not measure a model. fixture-cycle.sh now exits 4 rather than "
+            "capturing this state."
+        )
+    return problems
+
+
 def capture_health(
     baseline: dict, candidate: dict, declared_not_captured: list[str]
 ) -> dict:
@@ -2478,6 +2577,7 @@ def capture_health(
     problems.extend(_applied_sampling_problems(baseline, candidate))
     problems.extend(_cross_encoder_problems(baseline, candidate))
     problems.extend(_enrichment_problems(baseline, candidate))
+    problems.extend(_ai_runtime_problems(baseline, candidate))
     for section in ("queries", "chatTurns"):
         if not _records(baseline, section) and not _records(candidate, section):
             problems.append(

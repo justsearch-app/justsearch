@@ -19,6 +19,10 @@
 # Steps: ingest docs/explanation + docs/reference by absolute path, wait for every enrichment
 # stage, activate the requested chat profile, run `workflow-fixture capture`.
 #
+# Exits: 0 captured; 2 a usage/backend error from `capture`; 3 enrichment did not complete in
+# time; 4 the inference engine was not online on the requested profile. 3 and 4 are both
+# "the preconditions for a capture were not met" -- the artifact is refused, not degraded.
+#
 # Usage (repo root): bash scripts/jseval/lane-f/fixture-cycle.sh <out.json> [profile] [api-port]
 set -u
 out=${1:?out.json}
@@ -29,6 +33,10 @@ hdr=(-H "Host: 127.0.0.1:$port" -H "Content-Type: application/json")
 root=$(pwd)
 root_win=$(cygpath -w "$root" 2>/dev/null || echo "$root")
 out_abs=$(cygpath -w "$(cd "$(dirname "$out")" && pwd)/$(basename "$out")" 2>/dev/null || echo "$out")
+# POSIX-side directory for the diagnostics written beside the capture (the activate response and
+# the final runtime status). $out_abs is a Windows path for python's benefit; these are written
+# by the shell, so they need the shell's view.
+out_dir=$(cd "$(dirname "$out")" && pwd)
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 # The Worker yields GPU backfill while the LLM is active (main_gpu_active, ADR-0048), so an
@@ -60,14 +68,69 @@ if [[ $wait_rc -ne 0 ]]; then
   exit 3
 fi
 
-log "activate $profile"
-curl -s -m 30 -X POST "${hdr[@]}" -d "{\"variantId\":\"cuda12\",\"chatProfile\":\"$profile\"}" "$base/api/ai/runtime/activate" > /dev/null
-for ((i = 0; i < 90; i++)); do
-  st=$(curl -s -m 5 -H "Host: 127.0.0.1:$port" "$base/api/ai/runtime/status")
-  if echo "$st" | grep -q "\"state\":\"completed\"" && echo "$st" | grep -q "\"chatProfile\":\"$profile\""; then break; fi
-  sleep 2
-done
-log "ai: $(echo "$st" | grep -o '"state":"[a-z]*"' | head -1) $(echo "$st" | grep -o '"chatProfile":"[a-z]*"' | head -1)"
+# --- bring the engine up, and PROVE it is up ------------------------------------------------
+# What this used to do, and why all six captures of the 2026-09-07 acceptance recorded
+# `aiRuntimeState: "failed"`: it fired activate unconditionally, discarded the response, and
+# then polled `activation.state == "completed"`. That field is the last activation PROCEDURE's
+# outcome, NOT liveness. The engine was in fact online every time — the chat turns terminated
+# `done` with per-turn samplingApplied — so the poll simply ran to its 180s expiry on a healthy
+# stack and the script captured anyway. A genuinely dead engine would have produced a capture
+# on exactly the same path.
+#
+# Liveness is the realized identity under `active`, which the backend projects only while the
+# engine is online. The dev-MCP reads it that way for the same reason
+# (scripts/dev/justsearch-dev-mcp/server.mjs:2680-2687, tempdoc 842 review D3/N1): an engine
+# brought up by AI AUTOSTART never runs the activation state machine at all.
+#
+# The pre-check is also what keeps the deactivate above from racing autostart: if autostart
+# brought the engine back during the ingest+enrichment wait ON THE PROFILE WE WANT, activating
+# again would tear a healthy engine down and re-run a GPU self-test for nothing. A DIFFERENT
+# profile still activates -- that is a real profile switch.
+ai_status() { curl -s -m 10 -H "Host: 127.0.0.1:$port" "$base/api/ai/runtime/status"; }
+# Online AND on the requested profile. Reads the JSON with the same predicate the capture's
+# `read_ai_runtime` uses, so the gate and the artifact cannot disagree.
+ai_ready() {
+  node -e '
+    let raw = "";
+    process.stdin.on("data", d => raw += d);
+    process.stdin.on("end", () => {
+      let st;
+      try { st = JSON.parse(raw); } catch { process.exit(1); }
+      const active = st && typeof st.active === "object" && st.active ? st.active : {};
+      const online = active.modelPath != null
+        || (st?.activation?.state === "completed" && active.activeVariantId);
+      const profile = active.chatProfile ?? st?.chatProfile;
+      process.exit(online && profile === process.argv[1] ? 0 : 1);
+    });
+  ' "$1"
+}
+
+st=$(ai_status)
+if echo "$st" | ai_ready "$profile"; then
+  log "ai: already online on $profile — not re-activating (a needless GPU self-test + restart)"
+else
+  log "activate $profile"
+  # The activate response is KEPT: a 4xx/5xx here used to vanish into /dev/null, so a refused
+  # activation was indistinguishable from a slow one.
+  act=$(curl -s -m 30 -o "$out_dir/ai-activate.json" -w '%{http_code}' "${hdr[@]}" -X POST \
+    -d "{\"variantId\":\"cuda12\",\"chatProfile\":\"$profile\"}" \
+    "$base/api/ai/runtime/activate")
+  log "activate -> HTTP $act $(head -c 200 "$out_dir/ai-activate.json" 2>/dev/null)"
+  for ((i = 0; i < 90; i++)); do
+    st=$(ai_status)
+    if echo "$st" | ai_ready "$profile"; then break; fi
+    sleep 2
+  done
+fi
+
+echo "$st" > "$out_dir/ai-status.json"
+act_state=$(echo "$st" | grep -o '"state":"[a-z_]*"' | head -1)
+log "ai: engine=$(echo "$st" | ai_ready "$profile" && echo online || echo OFFLINE) profile=$(echo "$st" | grep -o '"chatProfile":"[a-z]*"' | head -1) last-activation-procedure=$act_state"
+if ! echo "$st" | ai_ready "$profile"; then
+  log "the inference engine is not online on profile '$profile' -- REFUSING to capture chat"
+  log "turns no model answered. Status written to $out_dir/ai-status.json"
+  exit 4
+fi
 
 log "capture -> $out_abs"
 (cd scripts/jseval && python -m jseval workflow-fixture capture --base-url "$base" --out "$out_abs" --corpus-root "$root_win" 2>&1 | grep -v " INFO ")

@@ -135,24 +135,43 @@ cycle() { # n
   return "$cycle_rc"
 }
 
-# One retry from a hard clean, then give up. The failure this exists for is an enrichment wait
-# that times out (fixture-cycle.sh exit 3) -- observed once on side A cycle 1 of the four-capture
-# acceptance, where ingest at 19:18 was still not enriched at 19:33 while every other cycle of
-# that run finished in about two minutes. That looks like a stuck first ingest rather than a
-# corpus that genuinely needs 15 minutes, so a second attempt on a freshly cleaned data dir is
-# worth one try. It is NOT retried indefinitely: a corpus that reliably needs longer than the
-# wait is a real finding about the corpus, not a flake to paper over.
+# One retry from a hard clean, then give up. The failures this exists for are the two
+# PRECONDITION refusals: an enrichment wait that times out (fixture-cycle.sh exit 3) -- observed
+# once on side A cycle 1 of the four-capture acceptance, where ingest at 19:18 was still not
+# enriched at 19:33 while every other cycle of that run finished in about two minutes -- and an
+# inference engine that never came online on the requested profile (exit 4). Both look like a
+# stuck first attempt rather than a corpus or a machine that genuinely cannot do it, so a second
+# attempt on a freshly cleaned data dir is worth one try. Neither is retried indefinitely: a
+# precondition that reliably fails is a real finding, not a flake to paper over.
+cycle_rc_name() { # rc
+  case "$1" in
+    2) echo "capture error" ;;
+    3) echo "enrichment did not complete" ;;
+    4) echo "inference engine not online on the requested profile" ;;
+    *) echo "stack or runner failure" ;;
+  esac
+}
+
 cycle_with_retry() { # n
   local n=$1
-  if cycle "$n"; then
+  local rc
+  # `cycle` inside an `if` condition, then reading $? after the `fi`, always reported 0: with no
+  # branch taken bash sets $? from the compound command, not from the condition. So the failure
+  # reason -- the one thing this log line exists to carry -- was erased. Run it bare and keep rc.
+  cycle "$n"
+  rc=$?
+  if [[ $rc -eq 0 ]]; then
     return 0
   fi
-  log "cycle $n FAILED (rc=$?) -- retrying once from a hard clean"
-  if cycle "$n"; then
+  log "cycle $n FAILED (rc=$rc: $(cycle_rc_name "$rc")) -- retrying once from a hard clean"
+  cycle "$n"
+  rc=$?
+  if [[ $rc -eq 0 ]]; then
     log "cycle $n succeeded on the retry"
     return 0
   fi
-  log "cycle $n failed twice -- giving up; no capture was written for this cycle"
+  log "cycle $n failed twice (rc=$rc: $(cycle_rc_name "$rc")) -- giving up; no capture was " \
+      "written for this cycle"
   return 1
 }
 

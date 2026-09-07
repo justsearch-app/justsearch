@@ -566,6 +566,38 @@ capture check. This gap is why the first four-capture acceptance passed with 0 r
 side captured a half-enriched index, disagreed with *itself* on 11 of 12 queries, and every
 disagreement was withdrawn as noise.
 
+**A capture whose chat turns had no live engine is refused, and liveness is not
+`activation.state`.** All six captures of the 2026-09-07 acceptance recorded
+`provenance.aiRuntimeState: "failed"` while the engine was demonstrably answering — their chat
+turns terminated `done` with per-turn `samplingApplied` read off `session_started`. The field was
+simply the wrong one. `activation.state` is the outcome of the last activation **procedure**;
+liveness is the realized identity under `active`, which the backend projects only while the engine
+is online. The dev-MCP reads it that way after the same false negative bit it
+(`scripts/dev/justsearch-dev-mcp/server.mjs:2680-2687`, tempdoc 842 review D3/N1): an engine
+brought up by AI **autostart** never runs the activation state machine at all, so
+activation-completed alone is a false negative there.
+
+Three things follow, and all three are now in place. `fixture-cycle.sh` **pre-checks** before
+firing `activate` — if the engine is already online on the requested profile it does not
+re-activate, which both avoids tearing down a healthy engine for a needless GPU self-test and
+closes the race in which autostart brings the engine back during the ingest wait after the
+script's own opening `deactivate`. It then polls on engine-online **and** profile-match rather
+than on `activation.state == "completed"`, keeps the `activate` response (a 4xx there used to
+vanish into `/dev/null`, making a refused activation indistinguishable from a slow one), and
+**exits 4** rather than capturing chat turns no model answered — the same shape as the
+enrichment refusal above, and `fixture-pair.sh` retries it once from a hard clean. The capture
+records **both** signals (`aiRuntimeState` beside `aiRuntimeOnline` / `aiRuntimeOnlineSignal` /
+`aiRuntimeVariantId` / `aiRuntimeModelFile`), because a failed activation procedure standing
+beside a live engine is worth seeing. And `capture_health` refuses a capture that ran chat turns
+without engine-online evidence — including one that never recorded it, since an unknown that
+reads as healthy is exactly how the half-enriched side passed the four-capture acceptance. A
+`--skip-chat` capture is exempt: it measures search alone.
+
+What made the failed activation itself is *not* established. Each cycle tears its data dir down
+with `--clean hard`, which takes the activation status file and the head log with it, so the
+`errorCode` from those six runs is gone. That is why the script now writes `ai-activate.json` and
+`ai-status.json` beside each capture: the next occurrence is diagnosable from the artifact.
+
 **Per-side noise fractions include `noisy-both`.** A field unstable on both sides is unstable on
 each, so it counts towards both fractions. Counting only a side's exclusive noise understated
 every side sharing an unstable field with the other — the same acceptance measured baseline 9
