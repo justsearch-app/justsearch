@@ -554,6 +554,93 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   declare `status: "retired"` and name where the contract lands next, and a second new test asserts
   every NON-retired process has a drift check in the class — so a third process cannot be added
   without one. The Brain's check is untouched.
+- **A12 (the mapping table, and the two things it corrects about A12's own commit body).** §4 asks
+  A12 to carry a deleted-class → replacement table; it went into the commit body, which is not
+  where a reader looks. It is reproduced below, re-derived from the files rather than from the
+  body — and re-deriving it found the body wrong twice.
+
+  **Correction 1 — "21" and "22" are different populations.** `git show --diff-filter=D
+  --name-only 5f720a108` deletes **22** files: 18 top-level test classes and 4 test-support
+  classes. The "21" in the item title is the count of *other* classes referencing
+  `WorkerProcessManager` (`git grep -l WorkerProcessManager 5f720a108^ -- 'modules/**/*.java'` =
+  22, minus the manager itself). Three of those 21 were **kept**, not retired. The body's
+  "six retired / fourteen converted" only sums if `ChaosSuiteTest`'s three retired arms are
+  counted individually, which contradicts counting `ChaosSuiteTest` as one item. The table is
+  built from the deletions.
+
+  **Correction 2 — four things A12's body says it kept were deleted two commits later.**
+  `ExtractionSandboxChaosTest`, `WorkerProcessManager`, `GrpcTestClient` and `MmfTestHarness` are
+  all deleted in `2302fac33` (A14-A17). Reading A12's body alone gives the wrong picture of the
+  tree.
+
+  **Non-executability proof.** Where a row says "already non-executable since A9", the mechanism
+  is: A9 (`f494b1176`) removed `signalBus.writePort(boundPort)` and made `getPort()` return `-1`
+  unconditionally, so any test entering through `MmfTestHarness.awaitPort(...)` blocks to timeout.
+  Verified per class — all 18 deleted test classes call it at least once. Two arms are the
+  exception and are marked as such.
+
+  | deleted | replacement |
+  |---|---|
+  | `process/CompleteIndexingWorkflowE2ETest` (8) | `app-engine/…/EngineIndexingWorkflowTest.java:75` — 8 one-for-one (`:188 :244 :273 :310 :338 :375 :406 :450`) |
+  | `process/SyncDirectoryIntegrationTest` (10) | `app-engine/…/EngineSyncDirectoryTest.java:57` — 10 one-for-one |
+  | `process/GrpcDataIntegrationTest` (11) | `app-engine/…/EngineDocumentFetchAndContextTest.java:65` — 11 one-for-one |
+  | `process/MigrationControlE2ETest` | `app-engine/…/EngineMigrationLifecycleTest.java:71` |
+  | `process/RollbackE2ETest` | `app-engine/…/EngineMigrationLifecycleTest.java:129` |
+  | `process/PauseResumeMigrationE2ETest` | `app-engine/…/EngineMigrationLifecycleTest.java:187` |
+  | `process/SwitchingFenceBufferingE2ETest` | `app-engine/…/EngineSwitchingFenceBufferingTest.java:73` |
+  | `process/CorruptionRebuildE2ETest` | `app-engine/…/EngineCorruptionRebuildTest.java:74` |
+  | `process/IndexBasePathLockE2ETest` | `app-engine/…/EngineIndexBasePathLockTest.java:58` |
+  | `process/FormatCapabilityMatrixE2ETest` | `app-engine/…/EngineFormatCapabilityMatrixTest.java:199` + `:189` |
+  | `vdu/VduRecoverySystemTest` (3) | `app-engine/…/EngineVduRecoveryTest.java:88 :120 :131` |
+  | `torture/ReadWhileWriteTest` | `app-engine/…/EngineReadWhileWriteTest.java:107` — **strengthened**; the original's only assertion was `successCount > 100` on `isHealthy()` |
+  | `torture/WindowsTortureTest` | `app-engine/…/EngineFileLockContentionTest.java:96, :128` — **`@Tag("stress")`, so outside the default suite** (see §10) |
+  | `torture/FileIntruder` (support) | `app-engine/…/FileIntruder.java:42` — behaviour verbatim, plus a bounded join before handle release (`:151`) |
+  | `soakTest/SoakSuiteTest` (3 nested) | `app-engine/…/EngineSoakTest.java:133` (5 000→400 iters; `avgIterationMs < 50` deliberately dropped), `:176` (20 process restarts→4 in-process cycles), `:237` (10 min→30 s). Four lost sensitivities enumerated at `EngineSoakTest.java:32-59` |
+  | `process/GrpcCommunicationTest` (5) | already non-executable since A9; property now covered by `EngineDocumentFetchAndContextTest.java:149, :179, :291` and `worker-services/…/WorkerHealthServiceTest.java:20, :110`. The gRPC *framing* half is retired with the wire |
+  | `process/ConfigPropagationTest` (2) | **property deliberately gone.** It asserted the Head→Worker config snapshot (`ORDINAL_WORKER_SNAPSHOT = 450`, deleted at A19). One `ResolvedConfig` in one JVM cannot disagree with itself |
+  | `process/WorkerSpawnTest` (3) | **property gone with its subject** — spawn/PID/MMF-port/graceful-shutdown of a second process. Already non-executable since A9 |
+  | `chaos/HandleLeakDetector` (support) | deliberately not ported; rationale `EngineSoakTest.java:61-78`. Substituted oracle: reopen-succeeds + named-thread-pool count |
+  | `soak/NmtMemoryTracker` (support) | `EngineSoakTest.java:237` (heap after forced GC). Loss stated at `EngineSoakTest.java:40-44` — off-heap growth is now invisible |
+  | `soak/SoakTestRunner` (support) | `EngineSoakTest.java:100` — the iterate/snapshot/threshold rig inlined into the three tests |
+  | `ChaosSuiteTest` (7 nested) | split — see below |
+
+  `ChaosSuiteTest`'s seven arms did not share a fate, so collapsing them into one row would hide
+  three properties that no longer exist:
+
+  | arm | replacement |
+  |---|---|
+  | `TimeLordTests` `:307` | `app-engine/…/EngineForegroundPacingTest.java:114`. This is ADR-0048's chaos witness; the probe moved with it (`governance/adr-probes.v1.json:582-588`) |
+  | `ProtocolStressTests` `:775` | `app-engine/…/EngineReadWhileWriteTest.java:198`, named as its successor at `:37` |
+  | `DisconnectorTests` `:662` | `EngineSoakTest.java:176` via `EngineTestHarness.restart()` (`EngineTestHarness.java:104`) |
+  | `DisconnectorTests` `:603` | **gone** — "client detects worker death via gRPC failure" is a pure wire property |
+  | `WatchdogTests` `:222` (2) | **gone** — the heartbeat suicide pact. Its mechanism (`WorkerSignalBus.readHeartbeat/shouldDie`, `WorkerLivenessDecision`) died at A10; inside one JVM "did the other half die?" has one answer |
+  | `SignalNoiseTests` `:483` | **gone** — MMF byte fuzzing across a process boundary; the layout classes are deleted |
+  | `StalePortTests` `:540` (2), `HarnessUnitTests` `:854` (2) | **gone** — and these four are the exception to the A9 claim: they spawn nothing and *would* still have run. They died with their subject (the MMF layout, `WorkerProcessManager.isProcessAlive`), not with the server |
+
+- **A18 (the trigger was already re-homed; what was missing was anyone checking it).** The item's
+  own text called out that `server.mjs` wrote "byte 29" as a literal instead of importing
+  `OFFSET_RELOAD_SIGNAL`, so the two halves could drift silently. Review S2 re-homed the trigger onto
+  `<dataDir>/runtime/dev-reload.request` — and reproduced the same defect in a new medium: the Node
+  writer spells the path out because it cannot import a Java constant. Renaming
+  `RELOAD_REQUEST_FILENAME` would break hot reload completely and red nothing, which is the third
+  occurrence of this exact failure on this branch (A6 killed the trigger, A11 killed the JDWP
+  listener, both silently). Closed with `DevReloadManagerTriggerTest`: the consumer half
+  (`performReload` deletes the request, so the one-second sentinel poll does not re-fire) plus a
+  cross-language pin asserting `server.mjs` still names the Java constant's value. The bus protocol
+  itself was already covered by `InProcessWorkerSignalBusReloadTest`.
+  The doc sweep found `mcp-dev-tools.md` still describing a Worker process at eight places,
+  including one claim — `stop_backend` "sweeps for an orphan Worker JVM" — that is not merely stale
+  but false: `grep -n orphan` over `dev-runner.cjs` and `server.mjs` returns nothing, and there is
+  no second JVM to orphan. `check-dev-mcp-doc-sync` could not have caught any of it; it compares
+  tool names and endpoint maps, not prose.
+- **A20 (what the gate table verifies, and what it cannot).** All of §9's gates are green, plus
+  `regen-all --check --except notices` (7 generated file sets) and `run-ui-web-gates` (27/27).
+  `wire` needs `npm install` in `scripts/wire-contract` first or it fails on a missing dependency
+  rather than on a contract violation — worth knowing before reading a red as a finding. The honest
+  limit: these gates are structural. They confirm no register references a deleted symbol and no
+  generated file has drifted from its source; none of them executes the Engine. The live half of
+  stage A's evidence is `evidence/A/a13-live-check.txt`, and the packaging half remains the dated
+  gap recorded in §10 row 5.
 
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
@@ -987,8 +1074,52 @@ individually compile; the branch is asserted green at A13 and at A20.
 
 Stage A produces no measurement (E does). It must not make a row *unmeasurable*:
 
-- **positive benefit** — stage A produces the deletion count itself (§7 totals). Record it in
-  `docs/design/lane-f-engine-jvm/evidence/A/`.
+- **positive benefit** — stage A produces the deletion count itself. §7 is the *forecast* made at
+  `fe19df0d5`; below is the **measured** result, base → HEAD, with the command behind each number.
+  Also recorded at `docs/design/lane-f-engine-jvm/evidence/A/a-deletion-counts.md`.
+
+  Base = `git merge-base main HEAD` = `76871d924`.
+
+  **Convention, stated because it changes the headline.** `git diff --diff-filter=D` and
+  `git diff -M --diff-filter=D` both return 105, so no deletion is reclassified as a rename — but
+  there are **35 separate renames** (24 of them `Grpc*ServiceTest` → `Worker*ServiceTest`). Under
+  the alternative convention where a rename counts as a deletion plus an addition, the totals are
+  **140 deleted / 161 added**. Every figure below uses the rename-aware convention (**105 deleted /
+  126 added**), which is the smaller and less flattering of the two.
+
+  | area | files deleted |
+  |---|---|
+  | gRPC / proto plumbing | 42 |
+  | worker process, spawner, supervision | 25 |
+  | system / chaos / soak / torture tests | 22 |
+  | MMF / shared-memory bus | 9 |
+  | config-snapshot tier | 5 |
+  | logging (the second log tier) | 2 |
+  | **total** | **105** |
+
+  Cross-checked by source set: main java 38 + main resources 1 + test 38 + systemTest 19 +
+  soakTest 1 + integrationTest 3 + docs 1 + scripts 4 = 105.
+
+  | quantity | measured | how |
+  |---|---|---|
+  | gRPC RPCs removed | **51** | 49 from `indexing.proto` (`SearchService` 10, `IngestService` 38, `HealthService` 1) + 2 from the deleted `infra_diagnostics.proto`. `indexing.proto` has 0 `rpc` at HEAD |
+  | proto `service` blocks removed | **4** | the three in `indexing.proto` + `InfraDiagnosticsService` |
+  | MMF fields removed | **10 named data fields** (12 addressable slots, 2 of them reserved); 18 `public static final` declarations across the layout + header classes | `MmfWorkerSignalLayoutV1` 12 constants / 9 `OFFSET_*`; `MmfWorkerSignalHeaderV1` 6 / 3 |
+  | argv builders removed | **4** as §7 enumerates; **6** counting the dispatcher override and the abstract declaration | production `WorkerSpawner.buildCommand()`; test rig `WorkerProcessManager.create{Jar,Script,JavaWithArgfile}ProcessBuilder`; the +2 are `WorkerProcessManager.createProcessBuilder()` and `ManagedProcess.createProcessBuilder()` |
+  | config ordinal removed | **yes — `ORDINAL_WORKER_SNAPSHOT = 450`** | present at `ResolvedConfigBuilder.java:59` at base, absent at HEAD, zero references left in `modules/` or `scripts/` |
+  | log file removed | **yes — `worker.log`**; `headless-backend.log` renamed to `engine.log` | `indexer-worker/…/logback.xml` deleted; `ui/…/logback.xml:45` now emits `logs/engine.log`. The 7 surviving `worker.log` mentions in `scripts/` are all labelled history |
+  | test classes deleted vs replaced | **31 outright / 29 replaced** of 60 deleted `*Test.java` | see the rule below |
+
+  **The outright/replaced rule, because this is the number most easily inflated.** A deleted test
+  counts as REPLACED only when a specific successor class exists in the current tree *and* the
+  successor relationship is asserted by a primary source — the successor's own javadoc, a stage-A
+  commit body, or a governance probe. Name similarity alone does not qualify. Three entries are
+  defensibly borderline (`RemoteKnowledgeClientHealthDeadlineTest`, `KnowledgeServerIntegrationTest`
+  at 2 of 6 tests, `ChaosSuiteTest` at 2 of 7 arms); counting those as outright gives **34 / 26**.
+  Two further deletions have a non-JUnit successor and are counted OUTRIGHT because the rule
+  requires a test class: `WorkerSpawnerJvmFlagsTest` → `scripts/dev/test-dev-runner-head-java-opts.mjs`,
+  and `GrpcSearchServiceDocumentSliceWireTest` → pre-existing `worker-services` slice tests.
+  Eight deleted files are test *support*, not test classes, and are excluded from the 60.
 - **semantic non-regression** — the `SearchTrace` shape per query must be byte-identical across the
   port change. A6/A3 are where it could silently move; the `execution-surface` register (§8) is the
   structural half and a fixture diff is the behavioural half.
@@ -1083,6 +1214,14 @@ per-run stamps `:1869-1916,2189,2399`), `scripts/dev/justsearch-dev-mcp/server.m
 
 ### Totals
 
+> **This is the forecast, made at `fe19df0d5` before the code was written. It is not the result.**
+> The measured counts are in §6's positive-benefit row and in
+> `evidence/A/a-deletion-counts.md`; where the two disagree, the measurement wins. The forecast
+> undercounted throughout — 65 files against a measured 105, 49 RPCs against 51, 9 MMF fields
+> against 10, 2 argv builders against 4 — mostly because the group-S test tail it defers ("enumerated
+> at stage start") turned out to be large. Kept as written so the size of the estimating error is
+> visible rather than quietly overwritten.
+
 | group | files deleted |
 |---|---|
 | W — wire | 22 (+3 converted, 3 544 lines) |
@@ -1094,7 +1233,8 @@ per-run stamps `:1869-1916,2189,2399`), `scripts/dev/justsearch-dev-mcp/server.m
 | **total, files** | **65 deleted outright**, before the group-S test tail |
 | **contracts removed** | 49 RPCs (10 Search + 38 Ingest + 1 Health), 3 gRPC service registrations, 1 Netty server, 9 MMF fields / 64-byte region, 2 argv builders (1 production + 1 chaos class with 3 methods), 1 config ordinal, 1 log file |
 
-Record this table in `evidence/A/` as the input to 16's positive-benefit row.
+Recorded, as this row asks, at `evidence/A/a-deletion-counts.md` — but as the *measured* table, not
+this one.
 
 ---
 
@@ -1171,8 +1311,9 @@ declared `:381-395`, listed `:338`), its catalog entry (`CoreSurfaceCatalog.java
 handler registration (`.../bootstrap/phases/OperationHandlerRegistrations.java:89`), the HTTP route
 `POST /api/worker/restart` (`modules/ui/.../api/routes/InferenceRoutes.java:26`, handler
 `InferenceHandlers.java:628`) and the FE client (`modules/ui-web/src/api/domains/inference.ts:242-243`)
-all survive; the **handler's body** changes to answer `restart required`, matching the stage-A row's
-"config-apply, AI install and pack import exit with a `restart required` code". D1 retires the
+all survive; the **handler's body** changes to answer `restart required`. Note the corrected §10
+row 2: the process does **not** exit and there is no restart exit code — the answer is
+`RestartRequiredException.CODE` surfaced as HTTP 409, and the Engine keeps serving. D1 retires the
 operation.
 The `operation-surface` gate tolerates this: the register scans for referencers of
 `IndexingJobView`/`ActionEvent`, not for the *reachability* of a registered operation, and its
@@ -1183,18 +1324,51 @@ gate at A17**, not by this reasoning alone.
 
 ## 10. What is allowed to be red after stage A, and nothing else
 
-From 17.3's "branch state after" column, read strictly:
+This section was written from 17.3's "branch state after" column **before the code existed**. The
+review pass re-read it against the landed branch and three of its five rows did not survive contact:
+rows 1 and 2 forecast losses that did not happen (and, in row 1's case, asserted a "no producer"
+state that a two-second grep contradicts), and row 4 has since closed. A forecast left standing
+after the thing it forecast has happened is exactly the false authority `retire-with-a-sweep` is
+about, so the rows below are now statements about the branch, each with the file that backs it.
 
 **Allowed red / deliberately lost until B:**
-1. **Supervision.** No crash detection, no restart budget, no cooldown, no stability window. A
-   crashed Engine stays down until the user restarts it. `WORKER_RECOVERING` /
-   `WORKER_RESTART_EXHAUSTED` paths have no producer.
-2. **Restart-as-reload.** Config-apply, AI install and pack import **exit the process with a
-   `restart required` code**; the dev-runner observes the exit and **does not** restart. Any test
-   asserting "the setting applied without a restart" is expected red and must be marked with the
-   stage-B item that restores it.
+
+1. **Crash detection and restart-under-budget of a *running* Engine.** Corrected 2026-09-08. The
+   original row claimed supervision was gone entirely and that `WORKER_RECOVERING` /
+   `WORKER_RESTART_EXHAUSTED` "have no producer". Both halves are false:
+
+   - The **boot-recovery arm survived**. `KnowledgeServerBootstrap` still retries a failed boot under
+     a budget and still reports exhaustion (`KnowledgeServerBootstrap.java:445`, `:731`), and
+     `KnowledgeServerHealthMonitor` still emits `WORKER_RECOVERING` (`:421`) and
+     `WORKER_RESTART_EXHAUSTED` (`:343`, `:500`). These are production call sites, not tests.
+   - There is consequently **no `awaitingRecut` allowlist**, and never was one — `git grep
+     awaitingRecut` returns zero hits repo-wide. It was invented by the forecast.
+
+   What is genuinely lost is narrower and worth stating precisely: there is no longer a second
+   process whose *exit* can be observed, so an Engine that dies mid-run takes the whole application
+   with it and nothing survives to notice, count, or restart it. Recovery now covers failures that
+   happen **during** boot, not failures that happen **after** it. A crashed Engine stays down until
+   the user starts it again.
+
+2. **Restart-as-reload — but by answer, not by exit.** Corrected 2026-09-08. The original row said
+   config-apply, AI install and pack import "exit the process with a `restart required` code" and
+   that the dev-runner observes that exit. Neither happens. There is **no distinct restart exit
+   code** (the only `System.exit` calls on the Head path are `HeadlessApp.java:899`/`:1127` = 1 and
+   `:953` = 2, all plain boot failures), and the dev-runner is not involved at all. What actually
+   happens is an API refusal: `RestartRequiredException.CODE = "restart_required"`
+   (`RestartRequiredException.java:31`), surfaced to the caller as HTTP 409
+   (`InferenceHandlers.java:739`, `RestartWorkerHandler.java:69`). The process keeps running and
+   serving; the operation is declined with a reason. A test asserting "the setting applied without a
+   restart" is still expected red, and still needs its stage-B item — the loss is real, the
+   mechanism in the forecast was not.
+
 3. **`core.restart-worker` returns `restart required`** rather than restarting anything.
-4. The chaos/system tests of group C, for exactly as long as A12 is open — green by A13.
+   (`RestartWorkerHandler.java:69` — the one row of the original three that was right.)
+
+4. ~~The chaos/system tests of group C, for exactly as long as A12 is open — green by A13.~~
+   **Closed as forecast.** A13 landed and group C is green; this is no longer an allowed red, and
+   leaving it on the list would license a red that is now a defect.
+
 5. **The installer bundle's packaging steps, unverified rather than red (added 2026-09-07).** Not a
    failure — an unrunnable check. `bundleSidecarResources`, `smokeSidecarBundle` and
    `verify-installer-nsis-win.ps1` changed at A13 and cannot be exercised on a branch: the local
@@ -1204,6 +1378,22 @@ From 17.3's "branch state after" column, read strictly:
    dispatched. This is the one item in this list that is NOT restored by a stage-B change; it is
    closed by the first installer run after the merge, and until then the honest statement is
    "changed, locally reasoned, never executed". See the A13 bullets in §0.1 for what WAS measured.
+
+**What "the full unit suite is green" does and does not cover (added 2026-09-08).** Stated because
+stage A moved two of its own A12 conversions into a tier the default suite does not run, and a
+green suite would otherwise be read as covering them:
+
+- `stress` is excluded from **every** module's default `test` task, along with `evidence` and
+  `experiment` (`build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt:100-109`).
+  Opt in with `-PincludeStress=true`. Two A12 conversions carry the tag —
+  `EngineExtractionSandboxChaosTest.java:112` and `EngineFileLockContentionTest.java:73` — so the
+  properties they assert are **not** exercised by `./gradlew.bat test`.
+- `load-sensitive` is excluded from `app-services`' test tasks
+  (`modules/app-services/build.gradle.kts:153, :168`) and run by a dedicated task (`:185, :201`).
+- The exclusion is not a stage-A change and not a defect; the tags predate this work and the
+  reasons are sound (a test that wedges a parser for a whole timeout has no place in an inner
+  loop). What is new is that stage A put *replacement* assertions behind it. Any claim that A12's
+  conversions are verified must name the stress runner, not the unit suite.
 
 **Not allowed red (a defect of the stage, not a deliberate loss):**
 - the full unit suite, `spotlessCheck`, `pmdAll`, `./gradlew.bat build -x test`
