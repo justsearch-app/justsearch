@@ -354,37 +354,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     /** Releases whatever the transport holds. Called from {@link #close()}. */
     protected abstract void closeTransport();
 
-    /**
-     * Re-establishes the connection to the index half, validating the owning process id.
-     *
-     * <p>A no-op by default, and that default is the honest answer for an in-process client: there
-     * is no connection to lose, no port to re-discover and no process whose identity could have
-     * changed under it. The worker-restart callers (AI install, pack import,
-     * {@code core.restart-worker}, post-resume revalidation) keep calling it so the wire path is
-     * unchanged; stage A §10 records that "restart-as-reload" becomes a {@code restart required}
-     * answer, and D1 retires the operation.
-     *
-     * @param expectedPid the pid the caller expects to be serving, or a non-positive value to skip
-     *     the check
-     */
-    public void reconnect(long expectedPid) {
-        // Nothing to reconnect: see the javadoc.
-    }
-
-    /** {@link #reconnect(long)} without a pid check. */
-    public void reconnect() {
-        reconnect(-1);
-    }
-
-    /**
-     * Returns a tripped circuit breaker to CLOSED.
-     *
-     * <p>A no-op by default: the circuit breaker is a property of the channel (stage A §2) and an
-     * in-process call has nothing to trip. Deleted with the breakers at item A10.
-     */
-    public void resetCircuitBreaker() {
-        // Nothing to reset: see the javadoc.
-    }
+    // Review S6: reconnect(long), reconnect() and resetCircuitBreaker() were here, as documented
+    // no-ops, so that the wire path kept compiling through items A6-A9. A11 deleted their last
+    // production caller along with the spawner, and a no-op method that names a capability is
+    // worse than a missing one: it answers "yes, handled" to a question nobody is entitled to ask
+    // any more. Reconnecting is not a thing an in-process client can do — there is no connection
+    // to lose, no port to rediscover, no process whose identity could change underneath it — and
+    // the circuit breaker was a property of the channel (stage A §2). Restart-as-reload is a
+    // "restart required" answer now; see RestartRequiredException.
 
     /** Handle on a live {@code SubscribeIndexingJobs} flow. */
     public interface IndexingJobsStream extends AutoCloseable {
@@ -702,9 +679,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     /**
      * Checks if the Knowledge Server is healthy.
      *
-     * <p>Like every health RPC this goes through {@link #executeHealthRpc}, which calls
-     * {@link #reconnect()} — a no-op unless the signal bus reports a DIFFERENT port, in which case
-     * the channel genuinely must be rebuilt. The existing connection is reused otherwise.
+     * <p>Like every health check this goes through {@link #executeHealthRpc}, which in the Engine
+     * is a direct call to the index half under a deadline. (It used to re-discover the worker's
+     * port through the signal bus first; there is no port.)
      *
      * @return true if serving
      */

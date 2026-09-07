@@ -187,6 +187,17 @@ final class WorkerScanOps {
         new SimpleFileVisitor<Path>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+            // Review S5. Before this, the ONLY cancel poll in the whole walk was inside the
+            // batch-flush branch below — so a scan only noticed a cancel once it had admitted a
+            // full batch of files. Over a tree whose files are all excluded, skipped, or cloud
+            // placeholders, no batch ever fills, so the walk was not cancellable at all: the user
+            // pressed stop, the flow closed, and the walker kept traversing the disk to the end.
+            // Two polls fix it, and this is the one that bounds the pathological case, because a
+            // directory is the unit of work that has no other exit.
+            if (isCancelled.getAsBoolean()) {
+              cancelled[0] = true;
+              return FileVisitResult.TERMINATE;
+            }
             String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
             if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
               return FileVisitResult.SKIP_SUBTREE;
@@ -197,6 +208,14 @@ final class WorkerScanOps {
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+            // Review S5, the second poll: a directory of a million files is one preVisitDirectory
+            // call, so the per-directory poll alone still leaves a long uncancellable stretch. The
+            // read is a volatile load against per-file work that already includes an isReadable
+            // syscall and a skip-policy match, so it is not measurable here.
+            if (isCancelled.getAsBoolean()) {
+              cancelled[0] = true;
+              return FileVisitResult.TERMINATE;
+            }
             counters[0]++; // walked
             if (!attrs.isRegularFile() || !Files.isReadable(file)) {
               counters[2]++;

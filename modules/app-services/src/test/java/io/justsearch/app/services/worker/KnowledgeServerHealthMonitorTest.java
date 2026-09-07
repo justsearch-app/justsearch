@@ -143,17 +143,22 @@ final class KnowledgeServerHealthMonitorTest {
     clock[0] += 10_500L; // a normal ~10s tick (with jitter), under the 30s threshold
     monitor.tick();
 
+    // Review S6: a `verify(client, never()).reconnect()` stood here. The method is gone, and the
+    // property it asserted is stronger on the line above it — the monitor never even asks the
+    // bootstrap for a client, so there is nothing it could have called on one.
     verify(bootstrap, never()).client();
-    verify(client, never()).reconnect();
     verify(client, never()).reindexPersistedRoots();
   }
 
   /**
    * Lane F stage A item A11: the post-resume actuator used to be two calls, a channel reconnect
-   * and a watcher re-register + reconcile. There is no channel, so the reconnect is gone. The
-   * assertion is not weakened by dropping it — it is REPLACED by its negative, because "a resume
-   * must not try to reconnect anything" is now the property, and a silent no-op call would satisfy
-   * a test that only checked the reconcile.
+   * and a watcher re-register + reconcile. There is no channel, so the reconnect is gone.
+   *
+   * <p>A11 replaced the dropped assertion with its negative, {@code verify(client,
+   * never()).reconnect()}. Review S6 then deleted the method itself, which makes that negative
+   * unwritable — and unnecessary: {@code verifyNoMoreInteractions} below asserts the same thing
+   * over the whole client surface rather than one method of it, so "a resume must do the reconcile
+   * and nothing else" survives the deletion in a stronger form than it had.
    */
   @Test
   void largeGapTriggersReconcileAndNoReconnect() {
@@ -172,7 +177,6 @@ final class KnowledgeServerHealthMonitorTest {
     monitor.tick();
 
     verify(client, times(1)).reindexPersistedRoots();
-    verify(client, never()).reconnect();
     verifyNoMoreInteractions(client);
   }
 

@@ -110,10 +110,42 @@ final class EngineIndexingJobsFlowTest {
 
     // Closing stops production: the worker's change-feed subscription is closed through the
     // FlowCancelSignal, so nothing further can arrive however much the queue drains afterwards.
+    //
+    // Review S9: this assertion is negative, and a negative assertion about a stream is satisfied
+    // by everything being broken. If the submit below silently enqueued nothing — a path outside
+    // the roots, a queue that rejected it, a change feed that had already fallen over — the closed
+    // flow would see no frames for a reason that has nothing to do with closing it, and the test
+    // would pass while proving nothing. That is the unreachable-seed-green shape.
+    //
+    // So a SECOND subscription is opened over the same submit. It is the positive control: it must
+    // see the delta, which is what makes the first flow's silence attributable to its close.
     int atClose = frames.size();
-    Files.writeString(tempDir.resolve("after-close.txt"), "not observed");
-    client.submitBatch(List.of(tempDir.resolve("after-close.txt")));
-    Thread.sleep(2_000);
+
+    CountDownLatch controlDelta = new CountDownLatch(1);
+    AtomicReference<Throwable> controlError = new AtomicReference<>();
+    KnowledgeClient.IndexingJobsStream control =
+        client.subscribeIndexingJobs(
+            frame -> {
+              if (frame.hasDelta()) {
+                controlDelta.countDown();
+              }
+            },
+            controlError::set,
+            () -> {});
+    try {
+      Path afterClose = tempDir.resolve("after-close.txt");
+      Files.writeString(afterClose, "observed by the control, not by the closed flow");
+      client.submitBatch(List.of(afterClose));
+
+      assertTrue(
+          controlDelta.await(60, TimeUnit.SECONDS),
+          "the positive control must observe the submit — without it, the assertion below is"
+              + " satisfied by a change feed that stopped working for any reason at all");
+      assertTrue(controlError.get() == null, "the control flow must not have failed: " + controlError.get());
+    } finally {
+      control.close();
+    }
+
     assertFalse(
         frames.size() > atClose,
         "a closed flow must deliver nothing further; saw " + (frames.size() - atClose) + " frames");

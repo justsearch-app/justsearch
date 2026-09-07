@@ -192,8 +192,10 @@ public final class RemoteKnowledgeClient extends KnowledgeClient {
 
     /**
      * Reconnects using the signal bus to discover the current port.
+     *
+     * <p>No longer an override: review S6 deleted the facade's no-op declaration, because nothing
+     * calls it. This whole class goes at item A10.
      */
-    @Override
     public void reconnect() {
         reconnect(-1);  // No PID validation
     }
@@ -208,7 +210,6 @@ public final class RemoteKnowledgeClient extends KnowledgeClient {
      * @param expectedPid if &gt; 0, validates the worker PID matches after connecting
      * @throws IllegalStateException if no valid port or PID mismatch detected
      */
-    @Override
     public void reconnect(long expectedPid) {
         int newPort = signalBus.readPort();
         if (newPort <= 0) {
@@ -267,7 +268,6 @@ public final class RemoteKnowledgeClient extends KnowledgeClient {
      * Resets the circuit breaker to CLOSED state.
      * Intended for use after worker restart.
      */
-    @Override
     public void resetCircuitBreaker() {
         circuitBreaker.reset();
     }

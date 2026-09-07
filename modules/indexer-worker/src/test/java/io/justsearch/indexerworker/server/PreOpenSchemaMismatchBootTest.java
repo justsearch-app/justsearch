@@ -146,7 +146,12 @@ final class PreOpenSchemaMismatchBootTest {
 
     server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
-    assertTrue(server.isRunning(), "the Worker comes up on the rebuilt index");
+    // Review S7: this asserted `isRunning()`, which after item A9 is two booleans start() sets —
+    // it no longer means "a socket is accepting", so it reads as a much stronger claim than it
+    // makes. `appServices()` is the claim the test actually wants: start() ran to completion and
+    // the service surface was built on the rebuilt index. (Its sibling below already asserts both.)
+    assertNotNull(
+        server.appServices(), "the Worker comes up on the rebuilt index with its services built");
 
     Path backup = soleSiblingWithSuffix(layout.activePath(), ".bak-");
     assertNotNull(
