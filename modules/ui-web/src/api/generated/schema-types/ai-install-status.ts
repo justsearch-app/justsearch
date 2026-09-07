@@ -37,6 +37,7 @@ export interface AiInstallStatus {
     necessity?: string | null;
     packageId?: string | null;
     resumed?: boolean;
+    skipCause?: string | null;
     skipReason?: string | null;
     stage?: string | null;
     state?: string | null;
@@ -93,6 +94,7 @@ export const aiInstallStatusSchema = z.strictObject({
     "necessity": z.string().nullable().optional(),
     "packageId": z.string().nullable().optional(),
     "resumed": z.boolean().optional(),
+    "skipCause": z.string().nullable().optional(),
     "skipReason": z.string().nullable().optional(),
     "stage": z.string().nullable().optional(),
     "state": z.string().nullable().optional(),

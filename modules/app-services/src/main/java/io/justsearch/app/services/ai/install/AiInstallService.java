@@ -1494,12 +1494,28 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   void applyCompletionState(InstallCompleteness diskTruth) {
     long failedCount = countPackagesByState("failed");
     long skippedCount = countPackagesByState("skipped");
+    // The skips that actually LIMIT the install — the only ones `installedFully` may count and the
+    // only ones the "skipped on this hardware" banner may name (tempdoc 941 round 19, F3). A skip is
+    // a limitation iff its typed cause says so (`SkipCause.limitsInstall`); an unclassified skip
+    // fails closed onto the hardware verdict, so every pre-fix caller's answer is unchanged.
+    List<AiInstallStatus.PackageStatus> limitingSkips =
+        status.packages.stream()
+            .filter(ps -> "skipped".equals(ps.state))
+            .filter(
+                ps -> {
+                  SkipCause cause = SkipCause.fromId(ps.skipCause);
+                  return cause == null || cause.limitsInstall();
+                })
+            .toList();
+    long limitingSkippedCount = limitingSkips.size();
     long totalCount = status.packages.size();
-    // installedFully is true only when every package actually reached "installed" — computed from
-    // the positive state rather than "no failed && no skipped", so a package left in a non-terminal
-    // state (pending/downloading/verifying, e.g. a loop that aborted early) can never read as a
-    // clean install. The download loop terminalizes every package today, so this is defense in depth.
-    boolean fullyInstalled = countPackagesByState("installed") == totalCount;
+    // installedFully is true only when every package actually reached "installed" (or was skipped
+    // for a reason that is not a limitation) — computed from the positive states rather than "no
+    // failed && no skipped", so a package left in a non-terminal state (pending/downloading/
+    // verifying, e.g. a loop that aborted early) can never read as a clean install. The download
+    // loop terminalizes every package today, so this is defense in depth.
+    boolean fullyInstalled =
+        countPackagesByState("installed") + (skippedCount - limitingSkippedCount) == totalCount;
 
     // The message must come from the SAME authority as installedFully, or the two contradict each
     // other on the round-16 wedge: a package whose only casualty was an optional file is "failed" in
@@ -1535,12 +1551,17 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
               + " failed"
               + optionalNote
               + ").");
-    } else if (skippedCount > 0) {
+    } else if (limitingSkippedCount > 0) {
       // Partial-success path: state is still "completed" (Install AI ran to
       // termination), but installedFully is false so the Brain UI can show
       // a "Installed with limitations" banner. Tempdoc 374 finding #8.
-      String skippedLabels = status.packages.stream()
-          .filter(ps -> "skipped".equals(ps.state))
+      //
+      // Only the LIMITING skips are named. This sentence blames the user's machine, and it used to
+      // be printed for every skip regardless of cause — so a package the packager excluded, and a
+      // component the user themselves declined, were both reported as things this hardware could
+      // not run (tempdoc 941 round 19, F3). A skip the user chose or the packager made is recorded
+      // per-package (`skipReason` + `skipCause`); it is not a limitation of the install.
+      String skippedLabels = limitingSkips.stream()
           .map(ps -> ps.label != null && !ps.label.isBlank() ? ps.label : ps.packageId)
           .collect(java.util.stream.Collectors.joining(", "));
       updateState(
@@ -1577,9 +1598,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         // must not read red (round 16 — one 872-byte metadata file, SPLADE serving on CUDA).
         boolean requiredMissing = diskTruth.repairNeeded();
         status.repairNeeded = requiredMissing;
-        // A hardware/policy skip still means "installed with limitations", never "installed
-        // cleanly" (tempdoc 374 finding #8) — disk cannot speak to a package it never planned.
-        status.installedFully = !requiredMissing && skippedCount == 0;
+        // A HARDWARE skip still means "installed with limitations", never "installed cleanly"
+        // (tempdoc 374 finding #8) — disk cannot speak to a package it never planned. A skip the
+        // packager, the mode or the user decided is NOT a limitation, and counting it here made
+        // `installedFully:true` unreachable on every machine while a devOnly package sat in the
+        // registry (tempdoc 941 round 19, F3).
+        status.installedFully = !requiredMissing && limitingSkippedCount == 0;
         for (InstallCompleteness.OptionalGap gap : diskTruth.optionalGaps()) {
           status.optionalGaps.add(
               new AiInstallStatus.OptionalGap(gap.packageId(), gap.fileName()));
@@ -2370,6 +2394,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     // Skipped
     for (var sk : plan.skipped()) {
+      // A devOnly package (tempdoc 842) is not a component of a USER install: it is never planned,
+      // never declinable, and the user has no decision about it. Listing it here made it one — it
+      // became a `skipped` row, and `installedFully` (which counted skipped rows) could then never
+      // be true on ANY machine, while the completion message blamed the user's hardware for a
+      // packaging decision (tempdoc 941 round 19, F3). The plan-preview loop above already filters
+      // it on exactly this reasoning; run bookkeeping now agrees with the preview.
+      if (sk.cause() == SkipCause.DEV_ONLY) {
+        continue;
+      }
       var ps = new AiInstallStatus.PackageStatus();
       ps.packageId = sk.packageId();
       ModelPackage pkg = registry.findPackage(sk.packageId());
@@ -2379,6 +2412,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       ps.stage = stageId(pkg);
       ps.state = "skipped";
       ps.skipReason = sk.reason();
+      // The planner already decided WHY, with a typed cause; carry it rather than let a consumer
+      // re-derive it from the prose (or, as the completion message did, assume it).
+      ps.skipCause = sk.cause() == null ? "" : sk.cause().id();
       status.packages.add(ps);
     }
   }
