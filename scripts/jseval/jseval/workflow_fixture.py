@@ -61,7 +61,8 @@ of three (design.md 17.7):
     now across the K boundary, so it stays inside THIS class — no fourth class is introduced.
     Two halves:
 
-    * CAPTURE asks the backend for ``2 * K`` and stores the top K PLUS the remainder of the
+    * CAPTURE asks the backend for ``K * captureLimitMultiplier`` (the fixture declares it;
+      4 today) and stores the top K PLUS the remainder of the
       tie group holding rank K, dropping everything after that group (it was never part of
       the top-K contract). ``hitCount`` keeps its meaning — the TOP-K count,
       ``min(returned, K)``. Making it the compared-slice length would turn a legitimate
@@ -74,13 +75,15 @@ of three (design.md 17.7):
       SET over its full observed membership — any permutation is allowed; a member absent
       from the other side's group is a REGRESSION, and the ``new-reason-code`` subset rule
       still applies to members present on both sides. It FAILS CLOSED when the cutoff group
-      ran to the end of a FULL 2K response, or when an older capture records no
+      ran to the end of a FULL response (as many hits back as were requested), or when an
+      older capture records no
       ``hitsCaptured``: the group may continue past what was observed, so its membership is
       unproven and a set difference must not be waved through.
 
-    **Consequence a reader must know: the capture now asks the backend for 2K, and ``limit``
-    feeds the backend's candidate budget / collapse limit / rerank pool — so the top-K set at
-    limit 2K is NOT guaranteed identical to the top-K set at limit K.** Both sides of a pair
+    **Consequence a reader must know: the capture asks the backend for a MULTIPLE of K, and
+    ``limit`` feeds the backend's candidate budget / collapse limit / rerank pool — so the
+    top-K set at the widened limit is NOT guaranteed identical to the top-K set at limit K.**
+    Both sides of a pair
     use the same limit, so the diff itself stays sound; but captures taken at the old limit
     are **not** comparable to new ones.
 
@@ -901,7 +904,8 @@ def compared_slice(
 ) -> list[dict]:
     """The top ``limit`` hits PLUS the remainder of the tie group holding rank ``limit``.
 
-    The capture asks the backend for ``2 * limit`` so that this group can be observed WHOLE;
+    The capture asks the backend for ``capture_limit`` — ``limit`` times the fixture's
+    ``captureLimitMultiplier`` — so that this group can be observed WHOLE;
     everything after it is dropped, because it was never part of the top-K contract. Without
     this the group is only PARTLY observed at K and a swap with a member sitting at K+1 reads
     as a membership change rather than the tie permutation it is (measured live on q06 / q10,
@@ -999,7 +1003,7 @@ def capture_query_record(
     than declared, so it can never be compared by accident.
 
     ``limit`` is K — the query spec's declared limit, and the number of hits that are under
-    contract. The request asked for ``2 * K``, so ``hits[]`` carries the COMPARED SLICE (top
+    contract. The request asked for a multiple of K, so ``hits[]`` carries the COMPARED SLICE (top
     K plus the remainder of the tie group holding rank K; see :func:`compared_slice`) while
     ``hitCount`` stays the TOP-K count. The defaults reproduce the pre-cutoff behaviour for
     existing callers: at ``epsilon=0.0`` only byte-equal scores group, so with fewer than K
@@ -1200,7 +1204,8 @@ def capture_limit(spec: dict, fixture: dict | None = None) -> int:
     wide enough that the CROSS-ENCODER WINDOW clears the compared K by a margin. The window is
     the request limit (``searchLimit = max(requestedLimit, rerankConfig.topK())``,
     ``KnowledgeSearchEngine.java:625-629``; window = ``min(topK, results.size())``, ``:969-970``),
-    so at 2K the window ended exactly at the captured set and a chunk whose FUSION rank jittered
+    so at a multiplier of 2 the window ended exactly at the captured set and a chunk whose
+    FUSION rank jittered
     across rank 20 was reranked on one build and not the other — the three unmatched hits at
     ranks 7-8 of pair run 4. At 4K the window is four times the compared K, so a hit near
     compared rank 10 has to move ~30 fusion ranks to fall out of it.
@@ -1221,7 +1226,8 @@ def _build_search_body(spec: dict, fixture: dict | None = None) -> dict:
     K (the spec's declared ``limit``) is still what the capture COMPARES; the extra K is what
     makes the tie group straddling the rank-K cutoff observable whole (see
     :func:`compared_slice`). CAVEAT, recorded because it is not free: ``limit`` also feeds the
-    backend's candidate budget / collapse limit / rerank pool, so the top-K set at limit 2K is
+    backend's candidate budget / collapse limit / rerank pool, so the top-K set at the widened
+    limit is
     not guaranteed identical to the top-K set at limit K. Both sides of a pair use the same
     limit so the diff stays sound — but a capture taken at the old limit is NOT comparable to
     one taken now.
@@ -1255,7 +1261,8 @@ def observed_query_scores(response: dict) -> list:
 def observed_query_counts(response: dict, record: dict) -> dict:
     """The per-query numbers the differ never compares, for the same ``observed`` block.
 
-    ``hitsCaptured`` is how many hits the backend returned for the ``2 * K`` request;
+    ``hitsCaptured`` is how many hits the backend returned for the widened request
+    (``capture_limit``: K times the fixture's ``captureLimitMultiplier``);
     ``hitsCompared`` is how many landed in the compared slice (top K plus the rest of the
     cutoff tie group). NEITHER may go in the query record: ``diff`` treats every field in
     ``queries``/``chatTurns`` as declared-or-regression, and both of these legitimately
@@ -1264,8 +1271,10 @@ def observed_query_counts(response: dict, record: dict) -> dict:
     diffed fields would manufacture the false positive this change removes.
 
     The differ still READS ``hitsCaptured`` (never compares it): a cutoff group that ran to
-    the end of a full 2K response may continue past what was observed, and that is the case
-    the cutoff rule fails closed on.
+    the end of a FULL response — as many hits back as were requested — may continue past what
+    was observed, and that is the case the cutoff rule fails closed on. It compares against the
+    DECLARED request size, not a hard-coded ``2 * K``: with the multiplier at 4 a 12-hit request
+    answered with 6 is a short response, which is positive evidence that the group ended.
     """
     trace = response.get("searchTrace") or {}
     stages = list(trace.get("stages") or [])
@@ -1983,15 +1992,23 @@ class CutoffContext(NamedTuple):
     """What the differ needs to apply the cutoff-group rule to one query's ``hits[]``.
 
     ``limit`` is K, read from the query spec (``diff`` already has the fixture and the record
-    id, exactly as it already does for ``epsilon``). The two ``hits_captured`` figures are
-    read from each capture's NON-diffed ``observed`` block — read, never compared — and are
-    what tells the differ whether the cutoff group could still extend past what was observed.
-    ``None`` on either side means an older capture that did not record it, which fails closed.
+    id, exactly as it already does for ``epsilon``). ``requested`` is how many hits the capture
+    ASKED the backend for — ``capture_limit``, i.e. ``K * captureLimitMultiplier`` — which is a
+    different number from K and not a fixed multiple of it. It was hard-coded as ``2 * limit``
+    while the shipped fixture declared a multiplier of 4, so the "did the response run out?"
+    test compared a 40-hit request against a 20-hit threshold and could call a group unproven
+    on a response that had demonstrably ended.
+
+    The two ``hits_captured`` figures are read from each capture's NON-diffed ``observed``
+    block — read, never compared — and are what tells the differ whether the cutoff group could
+    still extend past what was observed. ``None`` on either side means an older capture that
+    did not record it, which fails closed.
     """
 
     limit: int
     baseline_hits_captured: int | None = None
     candidate_hits_captured: int | None = None
+    requested: int | None = None
 
 
 def _cutoff_group_index(
@@ -2016,19 +2033,23 @@ def _cutoff_group_index(
 
 
 def _cutoff_membership_unproven(
-    hits_captured: int | None, compared: int, limit: int
+    hits_captured: int | None, compared: int, requested: int
 ) -> bool:
     """True when the cutoff group may extend past what the backend actually returned.
 
-    The capture asks for ``2 * limit``. If the compared slice runs to the LAST hit returned
-    **and** the backend returned the full ``2 * limit`` it was asked for, the tie group can
-    continue past rank 2K and its membership is unproven — a member "absent from the other
-    side" may simply be one this capture never saw. An older capture with no ``hitsCaptured``
-    is unproven for the same reason: there is no evidence either way. Both fail CLOSED.
+    The capture asks for ``requested`` hits (``capture_limit``: K times the fixture's
+    ``captureLimitMultiplier``). If the compared slice runs to the LAST hit returned **and**
+    the backend returned the full ``requested`` it was asked for, the tie group can continue
+    past what was seen and its membership is unproven — a member "absent from the other side"
+    may simply be one this capture never saw. A response SHORTER than the request is proof the
+    other way: the backend had nothing more to give, so the group ends where it appears to.
+
+    An older capture with no ``hitsCaptured`` is unproven for the same reason: there is no
+    evidence either way. Both fail CLOSED.
     """
     if not isinstance(hits_captured, int) or isinstance(hits_captured, bool):
         return True
-    return compared >= hits_captured and hits_captured >= 2 * limit
+    return compared >= hits_captured and hits_captured >= requested
 
 
 def _compare_cutoff_group(
@@ -2045,6 +2066,9 @@ def _compare_cutoff_group(
 
     Returns ``(ok, reason, gained_codes)``.
     """
+    # `requested` is what the capture asked the backend for. An older CutoffContext that does
+    # not carry it falls back to the pre-PR-0b 2*K, which is what those captures were taken at.
+    requested = cutoff.requested if cutoff.requested else 2 * cutoff.limit
     b_keys = [_split_member(m) for m in baseline]
     c_keys = [_split_member(m) for m in candidate]
     b_set = {key for key, _ in b_keys}
@@ -2052,9 +2076,9 @@ def _compare_cutoff_group(
     if b_set != c_set:
         unproven = (
             _cutoff_membership_unproven(
-                cutoff.baseline_hits_captured, compared_b, cutoff.limit)
+                cutoff.baseline_hits_captured, compared_b, requested)
             or _cutoff_membership_unproven(
-                cutoff.candidate_hits_captured, compared_c, cutoff.limit)
+                cutoff.candidate_hits_captured, compared_c, requested)
         )
         reason = (
             f"the cutoff tie group (the group holding rank {cutoff.limit}) is not the same "
@@ -2062,7 +2086,7 @@ def _compare_cutoff_group(
             f"{sorted(b_set - c_set)[:3]}; only in the candidate {sorted(c_set - b_set)[:3]}"
         )
         if unproven:
-            # FAIL CLOSED. The group ran to the end of a full 2K response (or the capture
+            # FAIL CLOSED. The group ran to the end of a full response (or the capture
             # does not record how many hits it saw), so it may continue past what was
             # observed and the set difference cannot be told apart from an unseen member.
             if not isinstance(cutoff.baseline_hits_captured, int) or not isinstance(
@@ -2077,7 +2101,7 @@ def _compare_cutoff_group(
                     f"the group runs to the end of what was captured (baseline "
                     f"{cutoff.baseline_hits_captured}, candidate "
                     f"{cutoff.candidate_hits_captured} hits for a request of "
-                    f"{2 * cutoff.limit})"
+                    f"{requested})"
                 )
             reason += (
                 f" — and {cause}, so its membership past the capture is UNPROVEN and this "
@@ -2448,6 +2472,7 @@ def _noise_side_status(
     klass: str,
     epsilon: float,
     limit: int | None,
+    requested: int | None = None,
 ) -> bool:
     """True when ANY TWO of a side's same-build captures disagree on this field.
 
@@ -2480,6 +2505,7 @@ def _noise_side_status(
                     int(limit),
                     _observed_hits_captured(cap_a, record_id),
                     _observed_hits_captured(cap_b, record_id),
+                    requested,
                 )
             status, _ = compare_field(klass, val_a, val_b, epsilon, cutoff)
             if status == STATUS_REGRESSION:
@@ -2798,6 +2824,14 @@ def diff(
         for spec in fixture.get("queries") or []
         if isinstance(spec, dict) and spec.get("id")
     }
+    # What the capture ASKED for, per query. Derived from the same `capture_limit` the capture
+    # used, so the "did the response run out?" test cannot drift from the request that produced
+    # the response it is testing.
+    query_requested = {
+        spec["id"]: capture_limit(spec, fixture)
+        for spec in fixture.get("queries") or []
+        if isinstance(spec, dict) and spec.get("id")
+    }
 
     entries: list[dict] = []
     captured_paths: set[str] = set()
@@ -2811,6 +2845,7 @@ def diff(
                     int(query_limits[record_id]),
                     _observed_hits_captured(base, record_id),
                     _observed_hits_captured(cand, record_id),
+                    query_requested.get(record_id),
                 )
             b_rec = b_recs.get(record_id)
             c_rec = c_recs.get(record_id)
@@ -2845,7 +2880,8 @@ def diff(
                         )
                         if noise
                         and _noise_side_status(
-                            [primary] + noise, section, record_id, name, klass, epsilon, limit)
+                            [primary] + noise, section, record_id, name, klass, epsilon,
+                            limit, query_requested.get(record_id))
                     ]
                     if noisy_sides:
                         # The cross-side verdict is kept for the reader -- it is what the gate

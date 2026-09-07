@@ -559,22 +559,24 @@ def test_new_reason_code_on_a_hit_is_allowed_and_a_lost_one_is_not():
 # The cutoff tie group (the group straddling rank K)
 # ---------------------------------------------------------------------------
 #
-# Every fixture here declares limit 3, so K = 3 and the capture would have asked the backend
-# for 6. The compared slice therefore ends on a tie-group boundary — hits `c` and `d` below
-# are one group whose FIRST member sits at rank 3, i.e. the cutoff group.
+# Every fixture here declares limit 3, so K = 3, and each declares its `captureLimitMultiplier`
+# explicitly so the request size these tests reason about is stated rather than assumed. The
+# compared slice ends on a tie-group boundary — hits `c` and `d` below are one group whose FIRST
+# member sits at rank 3, i.e. the cutoff group.
 
-def _cutoff_fixture(limit: int = 3) -> dict:
+def _cutoff_fixture(limit: int = 3, multiplier: int = 2) -> dict:
     fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
     fixture["queries"][0]["limit"] = limit
+    fixture["captureLimitMultiplier"] = multiplier
     return fixture
 
 
 def _cutoff_capture(tagged, *, hits_captured: int | None = 6) -> dict:
     """A capture whose q1 carries ``tagged`` as its compared slice.
 
-    ``hits_captured`` is what the backend returned for the 2K request, recorded where the
-    real capture records it: the non-diffed ``observed`` block. ``None`` omits the whole
-    block, i.e. an older capture.
+    ``hits_captured`` is what the backend returned for the ``K * captureLimitMultiplier``
+    request, recorded where the real capture records it: the non-diffed ``observed`` block.
+    ``None`` omits the whole block, i.e. an older capture.
     """
     observed = None
     if hits_captured is not None:
@@ -703,12 +705,8 @@ def test_a_change_in_a_group_above_the_cutoff_is_a_regression_exactly_as_today()
     assert "cutoff tie group" not in reason       # …not the cutoff rule
 
 
-def test_a_cutoff_group_that_ran_off_the_end_of_a_full_2k_response_fails_closed():
-    """The group may continue past rank 2K, so a set difference cannot be told from an unseen
-    member. Fail closed, and say why."""
-    fixture = _cutoff_fixture()
-    # 6 compared out of 6 captured, and 6 == 2 * K: the group ran to the end of a FULL
-    # response, so nothing proves where it really ends.
+def _six_hit_cutoff_pair() -> tuple[dict, dict]:
+    """Six hits, the last of which differs — the cutoff group runs to the last hit captured."""
     base = _cutoff_capture(_tagged([
         (0.900, _hit("a")), (0.800, _hit("b")),
         (0.500, _hit("c")), (0.499, _hit("d")), (0.498, _hit("e")), (0.497, _hit("f")),
@@ -717,11 +715,37 @@ def test_a_cutoff_group_that_ran_off_the_end_of_a_full_2k_response_fails_closed(
         (0.900, _hit("a")), (0.800, _hit("b")),
         (0.500, _hit("c")), (0.499, _hit("d")), (0.498, _hit("e")), (0.497, _hit("g")),
     ]), hits_captured=6)
-    result = wf.diff(base, cand, fixture)
+    return base, cand
+
+
+def test_a_cutoff_group_that_ran_off_the_end_of_a_full_response_fails_closed():
+    """The group may continue past the last hit captured, so a set difference cannot be told
+    from an unseen member. Fail closed, and say why."""
+    # 6 compared out of 6 captured, and 6 == the full 3 * 2 requested: the group ran to the end
+    # of a FULL response, so nothing proves where it really ends.
+    base, cand = _six_hit_cutoff_pair()
+    result = wf.diff(base, cand, _cutoff_fixture(multiplier=2))
     assert result["pass"] is False
     reason = _entry(result, "queries.hits[]")["reason"]
     assert "UNPROVEN" in reason
-    assert "runs to the end of what was captured" in reason   # the 2K cause, named
+    assert "runs to the end of what was captured" in reason
+    assert "request of 6" in reason              # the request size, derived not assumed
+
+
+def test_the_end_of_response_test_uses_the_declared_multiplier_not_two():
+    """The same six hits under a multiplier of 4 are a SHORT response, and that is proof.
+
+    The threshold was hard-coded `2 * limit` while the shipped fixture declared 4, so a
+    12-hit request that came back with 6 was read as "the response ran out" — and every set
+    difference in a cutoff group was then withdrawn as unproven on evidence that said the
+    opposite. A response shorter than the request is the backend saying it had nothing more.
+    """
+    base, cand = _six_hit_cutoff_pair()
+    result = wf.diff(base, cand, _cutoff_fixture(multiplier=4))
+    assert result["pass"] is False                       # still a regression: the set differs
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "UNPROVEN" not in reason
+    assert "not the same SET on both sides" in reason
 
 
 def test_a_capture_without_hits_captured_fails_closed_too():
