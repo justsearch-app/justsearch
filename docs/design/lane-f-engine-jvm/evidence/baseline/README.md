@@ -44,9 +44,10 @@ turn cancelled.
 capture on a second fresh ingest of the same documents, same build and profile, diffed under
 the fixture's relation. Result: FAIL, 190 equal, 19 allowed, 37 regressions, all with a named
 cause and none caused by code: `totalHits` moved by one on q03, q07, q09, q10 and one tie-group
-member was replaced on q02 and q10 (the dense leg's HNSW candidate set differs between two
-index builds), and both ordinary chat turns hit the iteration cap this time (generation at
-temperature 0.8 decides the tool trajectory). These are the owner items in design section 0 and
+member was replaced on q02 and q10 (the chunk BM25 and SPLADE legs search without a sort, so
+equal scores break on Lucene's internal docId, which differs per index build; corrected from the
+first HNSW reading by the PR 0b investigation), and both ordinary chat turns hit the iteration
+cap this time (the agent samples at temperature 0.7 with no seed, `AgentLlmCaller.java:277-288`). These are the owner items in design section 0 and
 17.7; the fixture instrument itself behaved as specified (the differ named each cause, the
 health check refused the looping turns as a baseline).
 
@@ -81,8 +82,8 @@ Four captures on one build. Stable across all of them: the cancelled turn's outc
 order of every hit both sides returned. Unstable: scores (GPU float jitter, max delta 0.0094;
 the fixture groups ties within 0.01 and does not diff the score), the index itself when chat
 turns run (agent history is indexed, doc count 96 to 97; one capture per fresh corpus, search
-half first), top-10 membership at the margin across two index builds (HNSW), and the chat
-trajectory (no temperature or seed control; `ConversationEngine.java:1154`). Two open-ended chat
+half first), top-10 membership at the margin across two index builds (unsorted chunk-leg ties on internal docId), and the chat
+trajectory (no temperature or seed control on the agent path; `AgentLlmCaller.java:277-288`). Two open-ended chat
 questions were replaced by narrow single-document ones because they exhausted eight iterations
 on both profiles. Design section 0 carries the owner items; the fixture keeps the affected
 fields `exact` and no class was added after a diff was seen.
