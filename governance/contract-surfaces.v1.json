@@ -54,9 +54,10 @@
         "modules/ui-web/src/shell-v0/utils/aiInstallPoll.ts",
         "modules/ui-web/src/shell-v0/state/installComponents.ts",
         "modules/ui-web/src/shell-v0/substrates/ai/aiInstallBridge.ts",
-        "modules/ui-web/src/shell-v0/substrates/tasks/aiInstallTasksBridge.ts"
+        "modules/ui-web/src/shell-v0/substrates/tasks/aiInstallTasksBridge.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.ts"
       ],
-      "note": "The last three were flagged by contract-projection/undeclared-consumer and are genuine parse boundaries: each carries 'import type { AiInstallStatus } from .../schema-types/ai-install-status.js' (installComponents.ts:35, aiInstallBridge.ts:19, aiInstallTasksBridge.ts:21). Registered by tempdoc 884 lane B PR 2 as ADR-0038 register drift on the generated side."
+      "note": "installComponents.ts, aiInstallBridge.ts and aiInstallTasksBridge.ts were flagged by contract-projection/undeclared-consumer and are genuine parse boundaries: each carries 'import type { AiInstallStatus } from .../schema-types/ai-install-status.js' (installComponents.ts:35, aiInstallBridge.ts:19, aiInstallTasksBridge.ts:21). Registered by tempdoc 884 lane B PR 2 as ADR-0038 register drift on the generated side. BrainSurface.ts imports the generated skipCause union so its cause maps `satisfies` the wire enum (tempdoc 948 section 4, 2026-09-07)."
     },
     {
       "name": "FolderBrowseResponse",
