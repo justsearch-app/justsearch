@@ -110,7 +110,7 @@ public final class ForegroundLoadGate {
     return FOREGROUND_OPERATIONS;
   }
 
-  /** Whether {@code operation} is one of the nine the user waits on. */
+  /** Whether {@code operation} is one of the ten the user waits on. */
   public static boolean isForeground(String operation) {
     return FOREGROUND_OPERATIONS.contains(operation);
   }

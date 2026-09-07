@@ -3,6 +3,7 @@ package io.justsearch.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -216,5 +217,48 @@ final class HeadlessAppOrtNativePackTest {
 
     assertEquals(OrtNativePackStatus.DIR_ABSENT, decision.status());
     assertNull(System.getProperty(ORT_PROP));
+  }
+
+  /** {@code HeadlessApp.java}, read as text, resolved from the module the test runs in. */
+  private static final Path HEADLESS_APP_SOURCE =
+      Path.of("src", "main", "java", "io", "justsearch", "ui", "HeadlessApp.java");
+
+  @Test
+  @DisplayName("boot still CALLS applyOrtNativePack — the defect was an absent call, not a broken one")
+  void bootStillCallsApplyOrtNativePack() throws Exception {
+    // Every other test in this file exercises applyOrtNativePack directly, so all of them stay
+    // green if someone deletes the one line in resolveConfig that invokes it — which is precisely
+    // the shape of the original B2 defect: the helper was fine, nothing called it, and ORT silently
+    // ran on CPU. A test that can only fail when the helper misbehaves cannot see that. This one
+    // reads the boot path's source and asserts the call is still there, in the right place.
+    assertTrue(
+        Files.isRegularFile(HEADLESS_APP_SOURCE),
+        "HeadlessApp.java not found at " + HEADLESS_APP_SOURCE.toAbsolutePath()
+            + " — if the file moved, this pin must follow it rather than silently checking nothing");
+    String src = Files.readString(HEADLESS_APP_SOURCE);
+
+    int rebuildAt = src.indexOf("effectiveConfig = rebuildAfterPostBuildWrites(");
+    int callAt = src.indexOf("applyOrtNativePack(effectiveConfig);");
+
+    assertTrue(
+        callAt >= 0,
+        "nothing on the boot path calls applyOrtNativePack(effectiveConfig). ORT then falls back to "
+            + "the CPU natives bundled in the jar, every encoder runs on CPU, and no log line and no "
+            + "other test in this file says so. Restore the call in resolveConfig.");
+    assertTrue(
+        rebuildAt >= 0,
+        "rebuildAfterPostBuildWrites is gone from the boot path; applyOrtNativePack reads the "
+            + "config it produces, so this pin's ordering check no longer means anything. Re-derive "
+            + "both sides before editing this assertion away.");
+    // Belt and braces, and honestly weaker than it looks: because the call takes effectiveConfig by
+    // name, javac already rejects moving it above the declaration (verified — the reordering
+    // mutation fails compilation, not this assertion). The assertion that does real work is callAt
+    // >= 0 above, which also catches the subtler edit of passing the PRE-rebuild resolvedConfig:
+    // that changes the literal, so the search misses and this test reds.
+    assertTrue(
+        callAt > rebuildAt,
+        "applyOrtNativePack must run AFTER the post-build-writes rebuild: the CUDA variant it keys "
+            + "off is one of the values that rebuild folds in, so calling it earlier reads a config "
+            + "that predates the variant selection and points ORT at the wrong pack (or none).");
   }
 }
