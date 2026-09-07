@@ -256,6 +256,21 @@ SAMPLING_KEYS = frozenset({"temperature", "top_p", "seed"})
 #: the fixture claims 8 — an unpinned run that reads as a pinned one.
 CHAT_TURN_KEYS = frozenset({"id", "content", "maxIterations", "cancelAfterEvent"})
 
+#: The CLOSED top-level key set of a fixture definition. Validated for the same reason
+#: :data:`CHAT_TURN_KEYS` is: the loader reads exactly these and silently ignores anything else,
+#: so `maxNoisyFractoin: 0.02` or `scoreTieEpsilion: 0.001` would leave the run on the DEFAULT
+#: while the fixture reads as if it had tightened the gate. A typo in a gate's own threshold is
+#: the worst kind: it is invisible, and it always errs towards passing.
+#:
+#: `description`, `corpus` and `notes` carry no behaviour — they are the fixture's prose — but
+#: they are listed rather than allowed as a free-form tail, because "unknown keys are fine if
+#: they look like documentation" is not a rule a validator can apply.
+FIXTURE_KEYS = frozenset({
+    "schema", "version", "id", "description", "corpus",
+    "scoreTieEpsilon", "captureLimitMultiplier", "maxNoisyFraction",
+    "sampling", "notes", "queries", "chatTurns", "fields",
+})
+
 #: The ``session_started`` payload keys carrying the sampling the run will ACTUALLY use, mapped
 #: to the names ``provenance.samplingApplied`` records them under (the fixture's own
 #: :data:`SAMPLING_KEYS` vocabulary, so requested and applied are directly comparable).
@@ -412,6 +427,66 @@ def validate_sampling(sampling: Any) -> dict:
     return dict(sampling)
 
 
+#: Upper bound on a fixture's `maxNoisyFraction`. Half the compared fields withdrawn as noise
+#: is already a broken measurement, not a strict-enough gate: past that the run is deciding a
+#: verdict on a minority of what it declared. The bound is not a tuning knob — it is the point
+#: beyond which the noise mask stops being a mask and becomes the answer.
+MAX_NOISY_FRACTION_CEILING = 0.5
+
+
+def _validate_max_noisy_fraction(fixture: dict) -> None:
+    """A ceiling of 0 or 1 is not a ceiling.
+
+    `diff` used to read this with a bare ``float(fixture.get(...))``: ``"0.05"`` as a string
+    worked by accident, ``0`` disabled every noise pair (no side may move ANY field, so the
+    first jittering score fails the run outright), and ``1.0`` withdrew everything and made the
+    gate incapable of failing. All three are configuration errors that present as a strange
+    verdict rather than as an error.
+    """
+    if "maxNoisyFraction" not in fixture:
+        return
+    value = fixture["maxNoisyFraction"]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise WorkflowFixtureError(
+            f"`maxNoisyFraction` must be a number, got {value!r}. It is a FRACTION of the "
+            "compared fields, read straight into the verdict."
+        )
+    if not 0 < value <= MAX_NOISY_FRACTION_CEILING:
+        raise WorkflowFixtureError(
+            f"`maxNoisyFraction` is {value!r}, outside (0, {MAX_NOISY_FRACTION_CEILING}]. At 0 "
+            "no side may move a single field, so the first jittering score fails the run; "
+            f"above {MAX_NOISY_FRACTION_CEILING} more than half the compared fields can be "
+            "withdrawn as noise, and a gate deciding on a minority of what it declared cannot "
+            "fail for the right reason."
+        )
+
+
+def _validate_capture_limit_multiplier(fixture: dict) -> None:
+    """The request breadth must actually exceed the compared K.
+
+    At 1 the request limit IS the compared K, which puts the cross-encoder window exactly at the
+    captured set — the configuration that produced the three unmatched hits of pair run 4 (see
+    :func:`capture_limit`). Below 1 the capture would request fewer hits than it compares and
+    every query would come up short. So 2 is the floor, and it must be a whole number: the
+    limit is an integer request and ``int(2.9)`` silently truncates to 2.
+    """
+    if "captureLimitMultiplier" not in fixture:
+        return
+    value = fixture["captureLimitMultiplier"]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise WorkflowFixtureError(
+            f"`captureLimitMultiplier` must be an integer, got {value!r}. It multiplies a hit "
+            "limit, and a fractional one is silently truncated by `int()`."
+        )
+    if value < 2:
+        raise WorkflowFixtureError(
+            f"`captureLimitMultiplier` is {value!r}; the floor is 2. At 1 the request limit is "
+            "the compared K, which puts the cross-encoder window exactly at the captured set "
+            "and lets a hit whose fusion rank jitters across the cutoff be reranked on one "
+            "build and not the other."
+        )
+
+
 def validate_fixture(fixture: dict) -> dict[str, str]:
     """Return the declaration table, raising unless the fixture is well-formed.
 
@@ -427,6 +502,14 @@ def validate_fixture(fixture: dict) -> dict[str, str]:
     if schema != FIXTURE_SCHEMA:
         raise WorkflowFixtureError(
             f"fixture schema is {schema!r}, expected {FIXTURE_SCHEMA!r}")
+    unknown = sorted(set(fixture) - FIXTURE_KEYS)
+    if unknown:
+        raise WorkflowFixtureError(
+            f"fixture declares unknown top-level key(s) {unknown}; a fixture carries exactly "
+            f"{sorted(FIXTURE_KEYS)} and the loader reads nothing else. A misspelt threshold "
+            "leaves the run on the default while the fixture reads as if it had been set, and "
+            "that error always errs towards passing."
+        )
     fields = fixture.get("fields")
     if not isinstance(fields, dict) or not fields:
         raise WorkflowFixtureError("fixture declares no `fields` table")
@@ -437,6 +520,8 @@ def validate_fixture(fixture: dict) -> dict[str, str]:
             "score tie. Scores are not byte-stable (GPU float nondeterminism), so exact "
             "equality would make the equal-score-order class inert."
         )
+    _validate_max_noisy_fraction(fixture)
+    _validate_capture_limit_multiplier(fixture)
     validate_sampling(fixture.get("sampling"))
     for path, klass in fields.items():
         if klass == EXACT:
@@ -1121,9 +1206,13 @@ def capture_limit(spec: dict, fixture: dict | None = None) -> int:
     compared rank 10 has to move ~30 fusion ranks to fall out of it.
     """
     k = spec.get("limit", 10)
+    # Validated here as well as at load, so the read site is safe for a caller that built the
+    # fixture dict in memory rather than through `load_fixture`. The bare `int(multiplier)` this
+    # replaces would have turned "4" into 4 and 2.9 into 2 without saying so.
+    _validate_capture_limit_multiplier(fixture or {})
     multiplier = (fixture or {}).get(
         "captureLimitMultiplier", DEFAULT_CAPTURE_LIMIT_MULTIPLIER)
-    return max(k, int(k) * int(multiplier))
+    return max(k, int(k) * multiplier)
 
 
 def _build_search_body(spec: dict, fixture: dict | None = None) -> dict:
@@ -2689,6 +2778,10 @@ def diff(
     """
     declarations = validate_fixture(fixture)
     epsilon = float(fixture["scoreTieEpsilon"])
+    # Bare `float(...)` here would have accepted a string, a 0 and a 1.0 alike; the fixture is
+    # validated by `validate_fixture` on load, and this stays a float() only to normalise an
+    # integer 1 -> 1.0 for the arithmetic below.
+    _validate_max_noisy_fraction(fixture)
     max_noisy_fraction = float(fixture.get("maxNoisyFraction", DEFAULT_MAX_NOISY_FRACTION))
     base = _load_capture(baseline)
     cand = _load_capture(candidate)

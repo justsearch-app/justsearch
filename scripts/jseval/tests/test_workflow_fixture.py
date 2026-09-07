@@ -1093,12 +1093,15 @@ def test_a_dropped_cross_encoder_fails_capture_health():
         "a by-design skip is not a drop"
 
 
-def _noise_fixture(max_noisy_fraction: float = 1.0) -> dict:
-    """A two-field fixture whose noise CEILING is off by default.
+def _noise_fixture(max_noisy_fraction: float = wf.MAX_NOISY_FRACTION_CEILING) -> dict:
+    """A two-field fixture whose noise ceiling is as HIGH as a fixture may legally set it.
 
-    These fixtures are tiny, so one noisy field is already 20% of the compared set and the
+    These fixtures are tiny, so one noisy field is already 50% of the compared set and the
     default 10% ceiling would fire in every classification test. The ceiling has its own tests;
-    everything else sets it out of the way so it is testing the property it names.
+    everything else pushes it to the top of its legal range so it is testing the property it
+    names. It cannot be pushed out of the way entirely — `validate_fixture` refuses anything
+    above `MAX_NOISY_FRACTION_CEILING`, because a gate that withdraws more than half its
+    compared fields is not a strict gate with a wide tolerance, it is not a gate.
     """
     return dict(_minimal_fixture({"queries.a": "exact", "queries.b": "exact"}),
                 maxNoisyFraction=max_noisy_fraction)
@@ -1167,13 +1170,60 @@ def test_a_noise_pair_louder_than_the_ceiling_fails_the_run():
 
 
 def test_the_ceiling_is_read_from_the_fixture():
-    """Raising the declared ceiling admits the same run — the number is the fixture, not code."""
-    fixture = _noise_fixture(max_noisy_fraction=1.0)
-    result = wf.diff(_q("x", "y"), _q("x", "y"), fixture,
-                     baseline_noise=[_q("p", "q")], candidate_noise=[_q("x", "y")])
-    assert result["counts"]["noisy"] == 2
+    """Raising the declared ceiling admits the same run — the number is the fixture, not code.
+
+    One of the two fields is noisy, which is exactly 50%: refused at the shipped 0.05 and
+    admitted at the highest a fixture may declare. The refusal is `>`, not `>=`, so a run
+    sitting exactly ON its declared ceiling passes.
+    """
+    baseline, candidate = _q("x", "y"), _q("x", "y")
+    noise = ([_q("p", "y")], [_q("x", "y")])   # only field `a` moves within the baseline pair
+
+    strict = wf.diff(baseline, candidate, _noise_fixture(max_noisy_fraction=0.05),
+                     baseline_noise=noise[0], candidate_noise=noise[1])
+    assert strict["counts"]["noisy"] == 1
+    assert strict["pass"] is False
+
+    result = wf.diff(baseline, candidate,
+                     _noise_fixture(max_noisy_fraction=wf.MAX_NOISY_FRACTION_CEILING),
+                     baseline_noise=noise[0], candidate_noise=noise[1])
+    assert result["counts"]["noisy"] == 1
     assert result["pass"] is True, result["health"]["problems"]
-    assert result["maxNoisyFraction"] == 1.0
+    assert result["maxNoisyFraction"] == wf.MAX_NOISY_FRACTION_CEILING
+
+
+def test_a_fixture_may_not_declare_an_unknown_top_level_key():
+    """A misspelt threshold silently leaves the run on the default, erring towards passing."""
+    fixture = dict(_minimal_fixture({"queries.a": "exact"}), maxNoisyFractoin=0.02)
+    with pytest.raises(wf.WorkflowFixtureError) as exc:
+        wf.validate_fixture(fixture)
+    assert "maxNoisyFractoin" in str(exc.value)
+
+
+@pytest.mark.parametrize("value", [0, 0.0, -0.1, 0.6, 1.0, "0.05", True, None])
+def test_max_noisy_fraction_is_bounded(value):
+    """0 makes the first jittering score fail the run; >0.5 makes the gate unable to fail."""
+    fixture = dict(_minimal_fixture({"queries.a": "exact"}), maxNoisyFraction=value)
+    with pytest.raises(wf.WorkflowFixtureError) as exc:
+        wf.validate_fixture(fixture)
+    assert "maxNoisyFraction" in str(exc.value)
+
+
+@pytest.mark.parametrize("value", [1, 0, -2, 2.5, "4", True, None])
+def test_capture_limit_multiplier_is_a_whole_number_of_at_least_two(value):
+    """At 1 the cross-encoder window ends exactly at the captured set; 2.5 truncates in silence."""
+    fixture = dict(_minimal_fixture({"queries.a": "exact"}), captureLimitMultiplier=value)
+    with pytest.raises(wf.WorkflowFixtureError) as exc:
+        wf.validate_fixture(fixture)
+    assert "captureLimitMultiplier" in str(exc.value)
+
+
+def test_the_bounded_values_the_shipped_fixture_declares_are_accepted():
+    """The falsifier for the four tests above: the real fixture must still load."""
+    shipped = wf.load_fixture(DEFAULT_FIXTURE)
+    assert 0 < shipped["maxNoisyFraction"] <= wf.MAX_NOISY_FRACTION_CEILING
+    assert isinstance(shipped["captureLimitMultiplier"], int)
+    assert shipped["captureLimitMultiplier"] >= 2
 
 
 def test_a_noise_capture_under_different_pins_fails_health():
