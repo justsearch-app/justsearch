@@ -119,6 +119,26 @@ class ConfigWiringTest {
     assertEquals(16, readPrivateInt(format, "maxConn"));
     assertEquals(200, readPrivateInt(format, "beamWidth"));
     assertNull(a.vectorEfSearchOverrideOrNull()); // default: no override
+    // Lane F PR 0b — index.vector.exhaustive_search defaults OFF, so the kNN factory keeps
+    // building today's approximate query. Asserted at the SET-SITE, not just at the config record.
+    assertFalse(a.vectorExhaustiveSearch(), "exhaustive_search must default to false");
+    r.close();
+  }
+
+  @Test
+  void vectorExhaustiveSearchReachesTheRuntimeSessionWhenSet() throws Exception {
+    Path base = dataDir();
+    String yaml = "app:\n  data_dir: " + base.toString().replace("\\", "\\\\") + "\n" +
+        "index:\n" +
+        "  collections:\n    - name: vecExhaustive\n      roots: ['ignored']\n" +
+        "  vector:\n    dimension: 768\n    exhaustive_search: true\n";
+    Path cfg = writeConfig(yaml);
+    System.setProperty("justsearch.config", cfg.toString());
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var a = new LifecycleTestAccessor(r);
+    assertTrue(
+        a.vectorExhaustiveSearch(),
+        "index.vector.exhaustive_search must reach RuntimeSession, which is what the kNN factory reads");
     r.close();
   }
 

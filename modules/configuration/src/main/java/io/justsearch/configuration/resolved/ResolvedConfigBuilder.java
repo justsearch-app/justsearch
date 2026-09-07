@@ -396,6 +396,7 @@ public final class ResolvedConfigBuilder {
     putYamlInt("index.vector.hnsw.m", root, "index.vector.hnsw.m");
     putYamlInt("index.vector.hnsw.ef_construction", root, "index.vector.hnsw.ef_construction");
     putYamlInt("index.vector.ef_search", root, "index.vector.ef_search");
+    putYamlBoolean("index.vector.exhaustive_search", root, "index.vector.exhaustive_search");
     putYamlBoolean("index.vector.quantization.enabled", root,
         "index.vector.quantization.enabled");
     putYamlBoolean("index.auto_recovery", root, "index.auto_recovery");
@@ -1551,6 +1552,10 @@ public final class ResolvedConfigBuilder {
         resolveNullableInt("index.vector.hnsw.m"),
         resolveNullableInt("index.vector.hnsw.ef_construction"),
         resolveNullableInt("index.vector.ef_search"),
+        // Lane F PR 0b — the exact-kNN capture switch. Resolved here (not read as a raw sysprop
+        // inside the Worker) so it reaches the Worker through the ordinal-450 config snapshot,
+        // the same channel index.commit.timer_interval_ms uses.
+        resolveBoolean("index.vector.exhaustive_search", false),
         resolveNullableBoolean("index.vector.quantization.enabled"),
         resolveBoolean("index.auto_recovery", false),
         normalizeSchemaMismatchPolicy(

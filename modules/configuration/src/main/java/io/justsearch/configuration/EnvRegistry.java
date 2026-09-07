@@ -1348,7 +1348,32 @@ public enum EnvRegistry {
         "index.identity.deletion_grace_ms",
         "JUSTSEARCH_INDEX_IDENTITY_DELETION_GRACE_MS",
         "2592000000",
-        LifecycleStage.PERMANENT);
+        LifecycleStage.PERMANENT),
+
+    // ============ Exact kNN capture switch (lane F PR 0b) ============
+
+    /**
+     * Make every kNN query EXACT instead of approximate (default false — today's behaviour).
+     *
+     * <p>Lane F PR 0b, the deterministic-capture switch. HNSW is approximate, and Lucene 10.4's
+     * {@code AbstractKnnVectorQuery.getLeafResults} has NO exact path for an UNFILTERED query at
+     * any {@code k}: raising {@code index.vector.ef_search} widens the beam but cannot pin the
+     * result, so two index builds of the same corpus can return different neighbours at the
+     * top-k margin. With a filter present the query takes {@code exactSearch} when the filter's
+     * cost is within the per-leaf top-k, which {@code k >= reader.maxDoc()} guarantees for every
+     * leaf. So this switch does two things at {@code ReadPathOps}'s one kNN factory: raises
+     * {@code k} to at least {@code maxDoc} and supplies a {@code MatchAllDocsQuery} filter when
+     * the caller had none.
+     *
+     * <p>Only the APPROXIMATION changes, not the pipeline's branches: in this mode the dense
+     * leg's inflated {@code totalHits} is excluded from the candidate-budget saturation test
+     * ({@code SearchExecutor#isCandidateBudgetSaturated}), so the chunk-retry branch fires on
+     * exactly the same queries it did with the switch off.
+     *
+     * <p>Cost is O(vectors) per query. It is a capture/diagnostic knob, not a production default.
+     */
+    INDEX_VECTOR_EXHAUSTIVE_SEARCH("index.vector.exhaustive_search",
+        "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

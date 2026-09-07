@@ -567,9 +567,8 @@ public final class ChunkSearchOps {
       }
     }
 
-    int queryK = readPathOps.resolveVectorQueryK(effectiveLimit);
     KnnFloatVectorQuery knnQuery =
-        new KnnFloatVectorQuery(SchemaFields.CHUNK_VECTOR, queryVector, queryK, filter);
+        readPathOps.buildKnnQuery(SchemaFields.CHUNK_VECTOR, queryVector, effectiveLimit, filter);
 
     return readPathOps.search(knnQuery, effectiveLimit, null,
         RuntimeSearchSort.RELEVANCE, null);

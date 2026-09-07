@@ -128,6 +128,14 @@ final class RuntimeSession implements AutoCloseable {
   volatile java.util.function.BooleanSupplier foregroundActive;
   volatile KnnVectorsFormat knnVectorsFormat;
   volatile Integer vectorEfSearchOverrideOrNull;
+
+  /**
+   * Lane F PR 0b — {@code index.vector.exhaustive_search}: make every kNN query EXACT rather than
+   * approximate. Read once from the resolved config in {@code applyComponents}, exactly like
+   * {@link #vectorEfSearchOverrideOrNull}; {@code ReadPathOps}'s kNN factory is the single consumer.
+   */
+  volatile boolean vectorExhaustiveSearch;
+
   volatile String softDeleteField;
   String uidField;
   String hardDeleteField;
@@ -276,6 +284,7 @@ final class RuntimeSession implements AutoCloseable {
     this.foregroundActive = () -> true;
     this.knnVectorsFormat = null;
     this.vectorEfSearchOverrideOrNull = null;
+    this.vectorExhaustiveSearch = false;
     this.softDeleteField = SchemaFields.SOFT_DELETE;
     this.uidField = SchemaFields.DOC_UID;
     this.hardDeleteField = SchemaFields.HARD_DELETE;
@@ -338,6 +347,7 @@ final class RuntimeSession implements AutoCloseable {
     // after it. The other knobs are config-derived and are overwritten again by applyComponents.
     this.softDeleteField = SchemaFields.SOFT_DELETE;
     this.vectorEfSearchOverrideOrNull = null;
+    this.vectorExhaustiveSearch = false;
 
     // Mode → readOnly flag passed through to ComponentsFactory.build.
     boolean openReadOnly = (mode == Mode.READ_ONLY) || (mode == Mode.DEFERRED);
@@ -392,6 +402,12 @@ final class RuntimeSession implements AutoCloseable {
             : null;
     this.vectorEfSearchOverrideOrNull =
         (explicitEfSearch != null && explicitEfSearch > 0) ? explicitEfSearch : null;
+    // Lane F PR 0b — index.vector.exhaustive_search, read here beside ef_search because both are
+    // boot-time kNN knobs the read path must see as one snapshot, not two independent reads.
+    this.vectorExhaustiveSearch =
+        resolvedConfig != null
+            && resolvedConfig.index() != null
+            && resolvedConfig.index().vectorExhaustiveSearch();
 
     SearcherBridge bridge = new SearcherBridge(this);
 
@@ -693,7 +709,8 @@ final class RuntimeSession implements AutoCloseable {
     // === Not released — config knobs (no resources; GC reclaims with the session) ===
     //   resolvedConfig, commitMetadataEnabled, validationMode, maxQueueDepth,
     //   nrtTargetMaxStaleMs, nrtHardMaxStaleMs, knnVectorsFormat,
-    //   vectorEfSearchOverrideOrNull, softDeleteField, uidField, hardDeleteField,
+    //   vectorEfSearchOverrideOrNull, vectorExhaustiveSearch, softDeleteField, uidField,
+    //   hardDeleteField,
     //   indexPath, fallbackIndexPath, prebuiltComponents, indexOpenGuard, draining
     //
     // === Not released — atomic counters (left for post-close inspection) ===

@@ -605,7 +605,10 @@
                                                                                           "ef_search":  {
                                                                                                             "type":  "integer",
                                                                                                             "minimum":  1
-                                                                                                        }
+                                                                                                        },
+                                                                                          "exhaustive_search":  {
+                                                                                                                    "type":  "boolean"
+                                                                                                                }
                                                                                       }
                                                                    },
                                                         "similarity":  {

@@ -244,6 +244,19 @@ KnnFloatVectorQuery query = new KnnFloatVectorQuery(
 );
 ```
 
+**With `index.vector.exhaustive_search`** (exact, not approximate):
+
+`ReadPathOps#buildKnnQuery` is the one site that builds every `KnnFloatVectorQuery` — both
+document-level overloads and the chunk dense leg. `ef_search` widens the HNSW beam but cannot make
+the result exact: `AbstractKnnVectorQuery.getLeafResults` has no exact branch for an *unfiltered*
+query at any `k`. With a filter present it takes `exactSearch` once the filter's cost is within the
+per-leaf top-k, so this switch raises `k` to at least `reader.maxDoc()` and substitutes a
+`MatchAllDocsQuery` when the caller supplied no filter. Cost is O(vectors) per query — a
+capture/diagnostic knob for reproducible runs, not a production default. In that mode the dense
+leg's inflated `totalHits` is excluded from the chunk branch's candidate-budget saturation test
+(`SearchExecutor#isCandidateBudgetSaturated`), so only the approximation changes, not which
+branches the pipeline takes.
+
 ### 3.3 Field Separation Strategy
 
 JustSearch uses separate vector fields to avoid filter overhead:
@@ -262,6 +275,7 @@ For current HNSW tuning parameters (M, efConstruction, efSearch), see [`docs/exp
 | Parameter | Purpose |
 |-----------|---------|
 | `index.vector.ef_search` | Query-time search breadth (oversampling k) |
+| `index.vector.exhaustive_search` | Make every kNN query exact instead of approximate (default off) |
 | `index.vector.hnsw.m` | Max connections per HNSW node |
 | `index.vector.hnsw.ef_construction` | Build-time beam width |
 | `index.vector.quantization.enabled` | Enable Int8 quantization |

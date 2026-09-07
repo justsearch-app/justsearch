@@ -287,9 +287,8 @@ public final class ReadPathOps {
       throw new IllegalArgumentException("queryVector must not be null or empty");
     }
     int effectiveLimit = limit <= 0 ? 10 : limit;
-    int queryK = resolveVectorQueryK(effectiveLimit);
     KnnFloatVectorQuery knnQuery =
-        new KnnFloatVectorQuery(SchemaFields.VECTOR, queryVector, queryK);
+        buildKnnQuery(SchemaFields.VECTOR, queryVector, effectiveLimit, null);
     return search(knnQuery, effectiveLimit, null, RuntimeSearchSort.RELEVANCE, null);
   }
 
@@ -298,10 +297,47 @@ public final class ReadPathOps {
       throw new IllegalArgumentException("queryVector must not be null or empty");
     }
     int effectiveLimit = limit <= 0 ? 10 : limit;
-    int queryK = resolveVectorQueryK(effectiveLimit);
     KnnFloatVectorQuery knnQuery =
-        new KnnFloatVectorQuery(SchemaFields.VECTOR, queryVector, queryK, filter);
+        buildKnnQuery(SchemaFields.VECTOR, queryVector, effectiveLimit, filter);
     return search(knnQuery, effectiveLimit, null, RuntimeSearchSort.RELEVANCE, null);
+  }
+
+  /**
+   * The ONE site that builds a {@link KnnFloatVectorQuery} — the doc-level dense leg (both
+   * overloads above) and the chunk dense leg ({@code ChunkSearchOps#searchChunkVector}) all come
+   * through here, so {@code index.vector.exhaustive_search} cannot be honoured at one site and
+   * silently skipped at another (lane F PR 0b).
+   *
+   * <p>Default (switch off) is byte-identical to the three inline constructions it replaced:
+   * {@code k = resolveVectorQueryK(limit)} and the caller's own filter, which for a null filter is
+   * exactly what Lucene's 3-arg constructor does ({@code this(field, target, k, null)}).
+   *
+   * <p>Switch on, the query is made EXACT. Lucene 10.4's {@code AbstractKnnVectorQuery
+   * .getLeafResults} has no exact branch for an unfiltered query at any {@code k}; with a filter it
+   * takes {@code exactSearch} once the filter's cost is within the per-leaf top-k, so this raises
+   * {@code k} to at least {@code reader.maxDoc()} (which bounds every leaf) and substitutes a
+   * {@code MatchAllDocsQuery} when the caller supplied no filter. The extra reader acquisition is
+   * paid only in that mode.
+   */
+  KnnFloatVectorQuery buildKnnQuery(String field, float[] queryVector, int limit, Query filter) {
+    int queryK = resolveVectorQueryK(limit);
+    if (!session.vectorExhaustiveSearch) {
+      return new KnnFloatVectorQuery(field, queryVector, queryK, filter);
+    }
+    int maxDoc;
+    try {
+      maxDoc = withSearcher(searcher -> searcher.getIndexReader().maxDoc());
+    } catch (IOException e) {
+      throw new IndexRuntimeIOException(
+          LuceneRuntimeUtils.classifyIOException(e),
+          "Failed to read maxDoc for exhaustive vector search",
+          e);
+    }
+    return new KnnFloatVectorQuery(
+        field,
+        queryVector,
+        Math.max(queryK, Math.max(1, maxDoc)),
+        filter != null ? filter : new org.apache.lucene.search.MatchAllDocsQuery());
   }
 
   int resolveVectorQueryK(int limit) {

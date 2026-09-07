@@ -656,6 +656,12 @@ public record ResolvedConfig(
    * @param vectorHnswM HNSW M parameter
    * @param vectorHnswEfConstruction HNSW ef_construction parameter
    * @param vectorEfSearch ef_search parameter
+   * @param vectorExhaustiveSearch when true, every kNN query is made EXACT rather than approximate
+   *     — {@code ReadPathOps}'s kNN factory raises {@code k} to at least {@code reader.maxDoc()}
+   *     and supplies a {@code MatchAllDocsQuery} filter when the caller had none, which is the
+   *     only branch Lucene 10.4 exposes with an exact path (lane F PR 0b, the deterministic-capture
+   *     switch). Default false = today's approximate HNSW behaviour. O(vectors) per query: a
+   *     capture/diagnostic knob, not a production default.
    * @param vectorQuantizationEnabled whether vector quantization is enabled
    * @param indexAutoRecovery whether auto-recovery is enabled for corrupted index
    * @param schemaMismatchPolicy schema mismatch handling policy
@@ -699,6 +705,7 @@ public record ResolvedConfig(
       Integer vectorHnswM,
       Integer vectorHnswEfConstruction,
       Integer vectorEfSearch,
+      boolean vectorExhaustiveSearch,
       Boolean vectorQuantizationEnabled,
       boolean indexAutoRecovery,
       String schemaMismatchPolicy,
