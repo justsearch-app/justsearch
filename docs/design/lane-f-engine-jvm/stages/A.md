@@ -75,10 +75,18 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   `MigrationControlOps`, `IngestSwitchBufferOps`, and `WorkerScanOps` javadoc); all converted. The
   status vocabulary actually emitted is seven codes (INVALID_ARGUMENT 22 sites, INTERNAL 18,
   ABORTED 2, FAILED_PRECONDITION 2, UNAVAILABLE 2, RESOURCE_EXHAUSTED 1, UNIMPLEMENTED 1); NOT_FOUND,
-  DEADLINE_EXCEEDED and CANCELLED have no producer and were not seeded. Ten refusal sites needed a
-  `catch (WorkerServiceException e) { throw e; }` ahead of a broad catch, or the conversion would
-  have re-labelled them silently (`IngestSwitchBufferOps.bufferDuringSwitchingOrThrow` was the
-  sharpest). Interim streaming signatures: `scanRoot(Req, Consumer<ScanRootProgress>, CallContext)`
+  DEADLINE_EXCEEDED and CANCELLED have no producer and were not seeded. **Eleven** refusal sites
+  needed a `catch (WorkerServiceException e) { throw e; }` ahead of a broad catch, or the conversion
+  would have re-labelled them silently — `WorkerSearchService.java:793,980`;
+  `WorkerIngestService.java:578,927,979,1042,1102,1650,2026,2083`; `IngestSwitchBufferOps.java:100`
+  (the sharpest: `bufferDuringSwitchingOrThrow`, where a buffer-write failure would have been
+  re-labelled from "Switch buffer write failed during migration" to the different "Migration is
+  switching"). Two further counts, both grep-verified against the A3 commit rather than estimated:
+  **43** `completed`-flag assertions were dropped (a returning method IS the completion; the
+  adapter's `onNext`-then-`onCompleted` ordering is asserted once, in `WorkerServiceCallsTest`), and
+  **26** `asException()` sites became `asRuntimeException()` through the adapters (search 18, ingest
+  6, switch-buffer 2) — indistinguishable on the wire, code and description preserved.
+  Interim streaming signatures: `scanRoot(Req, Consumer<ScanRootProgress>, CallContext)`
   and `subscribeIndexingJobs(Req, Consumer<IndexingJobsFrame>, CallContext)`, bridged by the
   `Delegating*Service` adapters through `WorkerServiceCalls`. **Carried to A9:**
   `SearchExecutor.java:117,266,568` reads `TracingServerInterceptor.currentOtelContext()` (a
@@ -86,6 +94,20 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   `SearchOrchestrator` instead. `WorkerSearchServiceDocumentSliceWireTest` moved to `indexer-worker`
   (it needs a real Netty server, now the adapter's). `scripts/resilience/contracts/rpc-retry-ownership-matrix.v1.json:199`
   had an evidence path under the wrong module; corrected.
+  **Carried to A6 — the deadline still has no in-process owner.** `CallContext` deliberately carries
+  no deadline: no worker-side code reads one today, because the transport enforces it (the Head's
+  `RpcDeadlineCategory` sets it and gRPC cancels the call, which the services observe only as the
+  cancellation signal). A9 deletes that transport, and with it the deadline-to-cancel path — after
+  which nothing converts an exceeded budget into a cancellation. Every in-process caller today
+  supplies `CancelSignal.NEVER` (`WorkerIngestService.java:1172` in `reconcileRoot`, and
+  `KnowledgeServerMigrationOps.java:558,735` replaying buffered switch-buffer ops), so the port has
+  no live cancellation source at all off the wire. **A6 owes the deadline/work-budget re-home that
+  design §6 requires** ("none may vanish with the channel"); seeding an unread field at A3 would
+  have been residue, not re-homing. Related: `WorkerServiceCalls.callContext` probes
+  `instanceof ServerCallStreamObserver` and falls back to `CancelSignal.NEVER`, where the
+  pre-conversion `subscribeIndexingJobs` cast hard — production always supplies a
+  `ServerCallStreamObserver`, so the live path is unchanged, but the failure mode moved from
+  `ClassCastException` to a silently non-cancellable call.
 
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 

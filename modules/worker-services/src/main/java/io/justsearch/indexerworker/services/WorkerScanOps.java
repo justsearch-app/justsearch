@@ -394,9 +394,9 @@ final class WorkerScanOps {
   /**
    * Caller-side request DTO so this class doesn't depend on the proto types.
    *
-   * <p>Tempdoc 419 / T2: {@code scanId} is allocated by the gRPC entry point ({@link
-   * WorkerIngestService#scanRoot}) and stamped on every emitted {@link ScanRootProgress}. The
-   * worker {@link WorkerScanOps} reads it but does not generate it.
+   * <p>Tempdoc 419 / T2: {@code scanId} is allocated by {@link WorkerIngestService#scanRoot} and
+   * stamped on every emitted {@link ScanRootProgress}. The worker {@link WorkerScanOps} reads it
+   * but does not generate it.
    */
   record ScanRequest(
       Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId) {

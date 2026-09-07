@@ -7,11 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.indexerworker.services.WorkerServiceException;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -26,6 +25,13 @@ import org.junit.jupiter.params.provider.CsvSource;
  * the identical status code and description. Every enum constant is covered here, not just the
  * three the search service happens to emit, because the mapping is the contract — an unmapped
  * constant added later must fail here, not in production.
+ *
+ * <p>The nested classes pin the second contract of this file: the two server-streaming helpers are
+ * <b>not</b> interchangeable. {@code streamThenComplete} ends the call; {@code streamOpen} leaves it
+ * open for frames that arrive after the service method has returned. Using the wrong one at a call
+ * site is a silent, compiling mistake — it would either truncate the indexing-jobs SSE feed after
+ * its first frame or leave {@code scanRoot} hanging forever. These tests pin the helpers'
+ * semantics; {@code DelegatingIngestServiceDelegationTest} pins which helper each RPC uses.
  */
 @DisplayName("WorkerServiceCalls — status mapping across the still-live wire")
 final class WorkerServiceCallsTest {
@@ -42,7 +48,7 @@ final class WorkerServiceCallsTest {
   })
   @DisplayName("a thrown WorkerServiceException reaches onError with the same code and description")
   void mapsEveryStatusOntoTheWire(String workerStatus, String grpcCode) {
-    CapturingObserver<String> observer = new CapturingObserver<>();
+    CapturingStreamObserver<String> observer = new CapturingStreamObserver<>();
 
     WorkerServiceCalls.unary(
         observer,
@@ -51,9 +57,9 @@ final class WorkerServiceCallsTest {
               WorkerServiceException.Status.valueOf(workerStatus), "msg");
         });
 
-    assertTrue(observer.values.isEmpty(), "a failed call must not deliver a response");
-    assertEquals(0, observer.completedCount, "a failed call must not complete the stream");
-    Throwable error = observer.error;
+    assertTrue(observer.values().isEmpty(), "a failed call must not deliver a response");
+    assertEquals(0, observer.completedCount(), "a failed call must not complete the stream");
+    Throwable error = observer.error();
     assertInstanceOf(io.grpc.StatusRuntimeException.class, error);
     Status status = Status.fromThrowable(error);
     assertEquals(Status.Code.valueOf(grpcCode), status.getCode());
@@ -63,39 +69,123 @@ final class WorkerServiceCallsTest {
   @Test
   @DisplayName("a normal return delivers onNext then onCompleted, and no error")
   void normalReturnDeliversNextThenCompleted() {
-    CapturingObserver<String> observer = new CapturingObserver<>();
+    CapturingStreamObserver<String> observer = new CapturingStreamObserver<>();
 
     WorkerServiceCalls.unary(observer, () -> "answer");
 
-    assertEquals(List.of("answer"), observer.values);
-    assertEquals(1, observer.completedCount);
-    assertNull(observer.error);
-    assertEquals(List.of("onNext", "onCompleted"), observer.order);
+    assertEquals(List.of("answer"), observer.values());
+    assertEquals(1, observer.completedCount());
+    assertNull(observer.error());
+    assertEquals(List.of("onNext", "onCompleted"), observer.order());
   }
 
-  /** Records what the adapter delivered, and in what order. */
-  private static final class CapturingObserver<T> implements StreamObserver<T> {
-    private final List<T> values = new ArrayList<>();
-    private final List<String> order = new ArrayList<>();
-    private Throwable error;
-    private int completedCount;
+  /**
+   * {@code streamThenComplete} is for a streaming method that has emitted every frame it will ever
+   * emit by the time it returns ({@code scanRoot}). Returning therefore means "done", and the
+   * helper must end the call.
+   */
+  @Nested
+  @DisplayName("streamThenComplete — the service method's return ENDS the call")
+  final class StreamThenComplete {
 
-    @Override
-    public void onNext(T value) {
-      values.add(value);
-      order.add("onNext");
+    @Test
+    @DisplayName("frames arrive in order, then onCompleted exactly once")
+    void deliversFramesInOrderThenCompletesExactlyOnce() {
+      CapturingStreamObserver<String> observer = new CapturingStreamObserver<>();
+
+      WorkerServiceCalls.streamThenComplete(
+          observer,
+          () -> {
+            observer.onNext("first");
+            observer.onNext("second");
+          });
+
+      assertEquals(List.of("first", "second"), observer.values(), "frames must arrive in order");
+      assertEquals(
+          1,
+          observer.completedCount(),
+          "streamThenComplete must complete the call exactly once when the body returns");
+      assertNull(observer.error());
+      assertEquals(List.of("onNext", "onNext", "onCompleted"), observer.order());
     }
 
-    @Override
-    public void onError(Throwable t) {
-      error = t;
-      order.add("onError");
+    @Test
+    @DisplayName("a thrown WorkerServiceException maps to onError, and the call never completes")
+    void failureMapsToOnErrorAndNeverCompletes() {
+      CapturingStreamObserver<String> observer = new CapturingStreamObserver<>();
+
+      WorkerServiceCalls.streamThenComplete(
+          observer,
+          () -> {
+            observer.onNext("emitted-before-the-failure");
+            throw WorkerServiceException.aborted("scan aborted");
+          });
+
+      assertEquals(
+          List.of("emitted-before-the-failure"),
+          observer.values(),
+          "no frame may be delivered after the failure");
+      assertEquals(
+          0, observer.completedCount(), "a failed stream must not also be completed normally");
+      Throwable error = observer.error();
+      assertInstanceOf(io.grpc.StatusRuntimeException.class, error);
+      assertEquals(Status.Code.ABORTED, Status.fromThrowable(error).getCode());
+      assertEquals("scan aborted", Status.fromThrowable(error).getDescription());
+      assertEquals(List.of("onNext", "onError"), observer.order());
+    }
+  }
+
+  /**
+   * {@code streamOpen} is for a streaming method that registers a subscription and returns with the
+   * stream still live ({@code subscribeIndexingJobs}). Completing on return would kill the Library
+   * SSE fan-out after its first snapshot frame, so the helper must leave the call open.
+   */
+  @Nested
+  @DisplayName("streamOpen — the service method's return LEAVES the call open")
+  final class StreamOpen {
+
+    @Test
+    @DisplayName("frames arrive, the call is never completed, and later frames still reach onNext")
+    void leavesTheStreamOpenForFramesEmittedAfterTheCallReturns() {
+      CapturingStreamObserver<String> observer = new CapturingStreamObserver<>();
+
+      WorkerServiceCalls.streamOpen(observer, () -> observer.onNext("snapshot"));
+
+      assertEquals(List.of("snapshot"), observer.values());
+      assertEquals(
+          0,
+          observer.completedCount(),
+          "streamOpen must NOT complete the call — the subscription is still live");
+      assertNull(observer.error());
+
+      // The property the SSE fan-out depends on: the feed's own thread pushes a delta after the
+      // registering call has returned, and it must still reach the wire.
+      observer.onNext("delta-after-return");
+
+      assertEquals(List.of("snapshot", "delta-after-return"), observer.values());
+      assertEquals(0, observer.completedCount(), "a live subscription is still not completed");
+      assertEquals(List.of("onNext", "onNext"), observer.order());
     }
 
-    @Override
-    public void onCompleted() {
-      completedCount++;
-      order.add("onCompleted");
+    @Test
+    @DisplayName("a thrown WorkerServiceException maps to onError, and the call never completes")
+    void failureMapsToOnErrorAndNeverCompletes() {
+      CapturingStreamObserver<String> observer = new CapturingStreamObserver<>();
+
+      WorkerServiceCalls.streamOpen(
+          observer,
+          () -> {
+            throw WorkerServiceException.unimplemented("job queue has no change feed");
+          });
+
+      assertTrue(observer.values().isEmpty(), "a failed subscription delivers no frame");
+      assertEquals(0, observer.completedCount(), "a failed stream must not be completed normally");
+      Throwable error = observer.error();
+      assertInstanceOf(io.grpc.StatusRuntimeException.class, error);
+      assertEquals(Status.Code.UNIMPLEMENTED, Status.fromThrowable(error).getCode());
+      assertEquals(
+          "job queue has no change feed", Status.fromThrowable(error).getDescription());
+      assertEquals(List.of("onError"), observer.order());
     }
   }
 }

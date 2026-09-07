@@ -28,7 +28,7 @@ public final class WorkerServiceException extends RuntimeException {
    */
   public enum Status {
     /**
-     * The request is malformed or self-contradictory. 21 sites, e.g. {@code SearchService.search}
+     * The request is malformed or self-contradictory. 22 sites, e.g. {@code SearchService.search}
      * on a Lucene parse failure and {@code IngestService.scanRoot} on a blank {@code root_path}.
      */
     INVALID_ARGUMENT,
@@ -58,11 +58,11 @@ public final class WorkerServiceException extends RuntimeException {
      * asked for the indexing-jobs change feed. */
     UNIMPLEMENTED,
 
-    /** An unexpected failure. 17 sites, the catch-all for a {@code RuntimeException} escape. */
+    /** An unexpected failure. 18 sites, the catch-all for a {@code RuntimeException} escape. */
     INTERNAL
   }
 
-  private final transient Status status;
+  private final Status status;
 
   public WorkerServiceException(Status status, String message) {
     super(message);

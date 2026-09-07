@@ -65,7 +65,9 @@ final class MigrationControlOps {
               .build();
 
       if (restart && restartWorkerCallback != null) {
-        // Best-effort: restart after responding.
+        // Best-effort. Since the A3 conversion this method RETURNS its response instead of
+        // writing it, so the restart is scheduled just BEFORE the adapter writes the response
+        // rather than just after; the 150 ms guard below covers the reorder.
         new Thread(
                 () -> {
                   try {

@@ -39,6 +39,13 @@ import java.util.Objects;
  * {@code onNext} / {@code onCompleted}, and maps {@code WorkerServiceException} back onto the
  * identical status code — so the wire behaviour is unchanged. Deleted at item A9.
  *
+ *
+ * <p><b>Why the concrete delegate type is safe.</b> Before item A3 the delegate was typed as
+ * the generated {@code ImplBase} to allow cross-classloader hot reload (tempdoc 305).
+ * {@code DevReloadManager.performReload} reconstructs the services in the SAME classloader
+ * after a JVMTI HotSwap, and no second classloader exists in these modules, so naming the
+ * concrete type here loses nothing. Item A18 re-homes reload; revisit this if it ever
+ * reintroduces a separate loader.
  * <p>Non-RPC operations (model wiring, GPU lifecycle) are routed through {@code WorkerAppServices},
  * not through this wrapper.
  */
