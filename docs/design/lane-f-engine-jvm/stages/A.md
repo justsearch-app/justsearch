@@ -3,7 +3,7 @@ title: "Lane F stage A — spine and unplug: implementation checklist"
 stage: A
 created: 2026-09-07
 base: fe19df0d5
-status: "DRAFT (written before PR 0 merged; re-verify at stage start)"
+status: "IN PROGRESS (stage started 2026-09-07 on worktree-lane-F-A from the PR 0 head; A1-A2 landed; corrections in section 0.1)"
 ---
 
 # Lane F stage A — spine and unplug: implementation checklist
@@ -50,6 +50,26 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
    this gate for stage A.
 
 ---
+
+### 0.1 Corrections found while implementing (appended per item)
+
+- **A1.** Adding a module also requires its `modules/app-engine/gradle.lockfile` (every module has one;
+  `resolveAndLockAll --write-locks`, zero drift elsewhere) and a regenerated
+  `docs/reference/architecture/module-deps.md` (`scripts/architecture/module-deps.mjs --update-canonical`;
+  `--check-canonical` is red otherwise). Dependency scope is load-bearing: `app-api` and `core` are
+  `api`, the rest `implementation`, so worker internals never reach `ui`'s compile classpath
+  transitively at A6. The placeholder `EngineRoot` is held in the dead-code accepted store with a
+  reason, not by a fake caller; the entry self-retires once A6 gives it a caller.
+- **A2.** The rule 6b falsification does not compile as written: `app-services` has no compile edge
+  to `worker-services` (`modules/app-services/build.gradle.kts:14-30`), so the probe needs a temporary
+  dependency plus `--write-locks`, both reverted (the compile failure is itself evidence the edge does
+  not exist). Javadoc-only hits into worker internals are four, not one: `ConversationApiAssembly.java:495`,
+  `inference/InferenceMetricCatalog.java:31`, `inference/InferenceTags.java:26`, `vdu/VduProcessor.java:77`;
+  none is a bytecode edge. The `io.justsearch.adapters..` allowance in rule 6b carries no traffic today
+  (forward-looking); the `io.justsearch.indexerworker..` allowance is load-bearing
+  (`WorkerAppServices`, `DefaultWorkerAppServices`, `KnowledgeServerMigrationOps`), which is what makes
+  the green non-vacuous. `LayeringEnforcementTest` imports with `DoNotIncludeTests`, so 6b reads
+  production bytecode only.
 
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
