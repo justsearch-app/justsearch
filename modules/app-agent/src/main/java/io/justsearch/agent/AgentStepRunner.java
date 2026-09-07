@@ -590,9 +590,13 @@ final class AgentStepRunner {
           if (agentState == AgentState.DECIDING) {
             // DECIDING: forced tool_choice=required so PRIMARY cannot produce text.
             // Direction D: suppress thinking-prompt on this mechanical commit turn.
+            // Lane F PR 0b: agentBaseSampling, not the raw AGENT constant — this forced turn must
+            // honour the run's sampling override or a pinned capture still drifts here.
             result = llmCaller.callLlmWithTools(
                 session, tools, sink,
-                SamplingParams.AGENT.withToolChoice("required").withEnableThinking(false));
+                AgentLlmCaller.agentBaseSampling(session)
+                    .withToolChoice("required")
+                    .withEnableThinking(false));
           } else {
             result = llmCaller.callLlmWithRetries(session, tools, sink);
           }
@@ -632,7 +636,8 @@ final class AgentStepRunner {
                       sink,
                       // Direction I: grammar as belt-and-suspenders; server omits when tools present.
                       // Direction D: suppress thinking-prompt on this forced-commit turn.
-                      SamplingParams.AGENT
+                      // Lane F PR 0b: the run's sampling override applies here too.
+                      AgentLlmCaller.agentBaseSampling(session)
                           .withToolChoice("required")
                           .withGrammar(AgentLoopService.TOOL_CALL_GRAMMAR)
                           .withEnableThinking(false));

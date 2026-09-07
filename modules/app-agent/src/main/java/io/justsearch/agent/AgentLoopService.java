@@ -483,6 +483,9 @@ public final class AgentLoopService implements AgentService {
     // reads it off the session to filter every search-tool call in this run. Empty = unscoped
     // (unchanged behavior).
     session.setDocIdsScope(request.docIds());
+    // Lane F PR 0b — the run's optional sampling override rides the request; every site that builds
+    // agent sampling reads it off the session. Null = SamplingParams.AGENT unchanged.
+    session.setSamplingOverride(request.sampling());
     if (background) {
       session.markBackground(); // Tempdoc 561 P-D: safe-by-default safety gate for unwatched runs
     }

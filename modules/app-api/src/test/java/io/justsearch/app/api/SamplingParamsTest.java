@@ -117,4 +117,54 @@ class SamplingParamsTest {
     assertEquals(base.temperature(), suppressed.temperature());
     assertEquals(base.topP(), suppressed.topP());
   }
+
+  // ==================== seed (lane F PR 0b) ====================
+
+  @Test
+  void seedIsNullOnEveryPreset() {
+    // Null = omit the field on the wire, which is what every caller got before the component
+    // existed. A preset that quietly carried a seed would make every shipped call reproducible-
+    // looking without anyone asking for it.
+    assertNull(SamplingParams.AGENT.seed());
+    assertNull(SamplingParams.THINKING.seed());
+    assertNull(SamplingParams.DETERMINISTIC.seed());
+    assertNull(SamplingParams.VDU.seed());
+    assertNull(SamplingParams.VDU_PROBE.seed());
+  }
+
+  @Test
+  void withSeedRoundTripsAndPreservesEveryOtherField() {
+    var base = SamplingParams.AGENT
+        .withToolChoice("required")
+        .withGrammar("root ::= \"ok\"")
+        .withEnableThinking(false)
+        .withResponseFormat(java.util.Map.of("type", "json_object"));
+    var seeded = base.withSeed(20260907L);
+
+    assertEquals(20260907L, seeded.seed());
+    assertEquals(base.temperature(), seeded.temperature());
+    assertEquals(base.topP(), seeded.topP());
+    assertEquals("required", seeded.toolChoice());
+    assertEquals("root ::= \"ok\"", seeded.grammar());
+    assertEquals(false, seeded.enableThinking());
+    assertEquals(java.util.Map.of("type", "json_object"), seeded.responseFormat());
+    assertNull(base.seed(), "Original must be unchanged");
+  }
+
+  @Test
+  void seedSurvivesTheOtherWithers() {
+    // The regression this pins: every with* rebuilds the record positionally, so one that forgot
+    // the new component would silently drop a pinned seed on the next forced-tool turn.
+    var seeded = SamplingParams.AGENT.withSeed(42L);
+    assertEquals(42L, seeded.withToolChoice("required").seed());
+    assertEquals(42L, seeded.withGrammar("root ::= \"x\"").seed());
+    assertEquals(42L, seeded.withEnableThinking(false).seed());
+    assertEquals(42L, seeded.withResponseFormat(java.util.Map.of("type", "json_object")).seed());
+  }
+
+  @Test
+  void backCompatConstructorLeavesSeedNull() {
+    var params = new SamplingParams(0.5, 0.9, null, null, null, null);
+    assertNull(params.seed());
+  }
 }

@@ -26,6 +26,11 @@ import java.util.Set;
  * @param responseFormat JSON schema for llama-server's response_format constraint (363). Mutually
  *     exclusive with grammar — if both are set, response_format takes precedence. Pass as {@code
  *     Map.of("type", "json_object", "schema", schemaMap)}.
+ * @param seed llama-server's RNG seed; null = omit the field, which is what every preset does and
+ *     what every caller got before this component existed (lane F PR 0b). A seed alone does not
+ *     make a completion reproducible — the server must also be running a single slot and the same
+ *     prompt — but without one it cannot be, which is why the workflow fixture pins it through the
+ *     request's optional {@code sampling} override rather than relying on temperature 0 alone.
  */
 public record SamplingParams(
     double temperature,
@@ -33,7 +38,8 @@ public record SamplingParams(
     String toolChoice,
     String grammar,
     Boolean enableThinking,
-    Map<String, Object> responseFormat) {
+    Map<String, Object> responseFormat,
+    Long seed) {
 
   private static final Set<String> VALID_TOOL_CHOICES = Set.of("auto", "required", "none");
 
@@ -49,6 +55,17 @@ public record SamplingParams(
       throw new IllegalArgumentException(
           "toolChoice must be null, \"auto\", \"required\", or \"none\", got \"" + toolChoice + "\"");
     }
+  }
+
+  /** Backward-compatible constructor (pre-lane-F-PR-0b, no seed) — delegates with seed null. */
+  public SamplingParams(
+      double temperature,
+      double topP,
+      String toolChoice,
+      String grammar,
+      Boolean enableThinking,
+      Map<String, Object> responseFormat) {
+    this(temperature, topP, toolChoice, grammar, enableThinking, responseFormat, null);
   }
 
   /** Backward-compatible constructor: enableThinking and responseFormat default to null. */
@@ -75,13 +92,13 @@ public record SamplingParams(
   /** Returns a copy with the given toolChoice override, preserving all other fields. */
   public SamplingParams withToolChoice(String toolChoice) {
     return new SamplingParams(
-        temperature, topP, toolChoice, grammar, enableThinking, responseFormat);
+        temperature, topP, toolChoice, grammar, enableThinking, responseFormat, seed);
   }
 
   /** Returns a copy with the given grammar override, preserving all other fields. */
   public SamplingParams withGrammar(String grammar) {
     return new SamplingParams(
-        temperature, topP, toolChoice, grammar, enableThinking, responseFormat);
+        temperature, topP, toolChoice, grammar, enableThinking, responseFormat, seed);
   }
 
   /**
@@ -92,13 +109,23 @@ public record SamplingParams(
    */
   public SamplingParams withEnableThinking(Boolean enableThinking) {
     return new SamplingParams(
-        temperature, topP, toolChoice, grammar, enableThinking, responseFormat);
+        temperature, topP, toolChoice, grammar, enableThinking, responseFormat, seed);
   }
 
   /** Returns a copy with the given responseFormat, preserving all other fields. (363) */
   public SamplingParams withResponseFormat(Map<String, Object> responseFormat) {
     return new SamplingParams(
-        temperature, topP, toolChoice, grammar, enableThinking, responseFormat);
+        temperature, topP, toolChoice, grammar, enableThinking, responseFormat, seed);
+  }
+
+  /**
+   * Returns a copy with the given llama-server RNG seed, preserving all other fields. {@code null}
+   * restores the default (omit the field). Lane F PR 0b — the agent chat request's optional
+   * {@code sampling} override is the only production caller.
+   */
+  public SamplingParams withSeed(Long seed) {
+    return new SamplingParams(
+        temperature, topP, toolChoice, grammar, enableThinking, responseFormat, seed);
   }
 
   /** Recommended for thinking/reasoning models (Qwen3.5 defaults: temp=0.7, top_p=0.8). */

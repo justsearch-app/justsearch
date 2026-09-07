@@ -301,6 +301,12 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
     boolean recordsToThread =
         Boolean.TRUE.equals(body.get(ConversationEngine.RECORDS_TO_THREAD_KEY));
 
+    // Lane F PR 0b — the optional per-run sampling override. Unlike `effort` (a rung NAME the
+    // backend sizes) these are the raw knobs, so they are VALIDATED rather than coerced: a client
+    // that sends `sampling: {"temperature": "hot"}` gets the same IllegalArgumentException 400 the
+    // `messages` checks above raise, not a silently ignored field.
+    AgentRequest.SamplingOverride sampling = extractSamplingOverride(body);
+
     return new AgentRequest(
         messages,
         selectedTools,
@@ -312,7 +318,62 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
         autonomyLevel,
         docIds,
         effort,
-        recordsToThread);
+        recordsToThread,
+        sampling);
+  }
+
+  /**
+   * Parses the body's optional {@code sampling} object (lane F PR 0b).
+   *
+   * <p>Absent or explicitly null ⇒ null (no override — byte-identical to the behaviour before the
+   * field existed). Present but not a JSON object, or carrying a non-numeric value for any of the
+   * three keys, is a malformed request and throws — {@code AgentController} turns that into the
+   * same {@code BAD_REQUEST} SSE error shape every other bad field produces. Unknown keys are
+   * ignored, matching how the rest of this opaque body is read.
+   */
+  private static AgentRequest.SamplingOverride extractSamplingOverride(Map<String, Object> body) {
+    Object raw = body.get("sampling");
+    if (raw == null) {
+      return null;
+    }
+    if (!(raw instanceof Map<?, ?> map)) {
+      throw new IllegalArgumentException("sampling must be a JSON object");
+    }
+    Double temperature = samplingDouble(map.get("temperature"), "sampling.temperature");
+    Double topP = samplingDouble(map.get("top_p"), "sampling.top_p");
+    // The same bounds SamplingParams enforces, checked HERE so an out-of-range value is a 400 at
+    // the boundary rather than an IllegalArgumentException thrown mid-run, several LLM calls in.
+    if (temperature != null && (temperature < 0.0 || temperature > 2.0)) {
+      throw new IllegalArgumentException("sampling.temperature must be 0.0-2.0, got " + temperature);
+    }
+    if (topP != null && (topP < 0.0 || topP > 1.0)) {
+      throw new IllegalArgumentException("sampling.top_p must be 0.0-1.0, got " + topP);
+    }
+    Number seedNumber = samplingNumber(map.get("seed"), "sampling.seed");
+    Long seed = seedNumber == null ? null : seedNumber.longValue();
+    return new AgentRequest.SamplingOverride(temperature, topP, seed);
+  }
+
+  private static Double samplingDouble(Object value, String field) {
+    Number n = samplingNumber(value, field);
+    return n == null ? null : n.doubleValue();
+  }
+
+  private static Number samplingNumber(Object value, String field) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number n) {
+      return n;
+    }
+    if (value instanceof String str) {
+      try {
+        return Double.valueOf(str.trim());
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(field + " must be a number, got \"" + str + "\"");
+      }
+    }
+    throw new IllegalArgumentException(field + " must be a number");
   }
 
   /** Tempdoc S7 — parse the body's optional {@code docIds} array; absent/malformed = empty (unscoped). */

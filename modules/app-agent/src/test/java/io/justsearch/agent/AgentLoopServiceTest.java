@@ -66,8 +66,156 @@ class AgentLoopServiceTest {
     assertEquals("Hello there", done.finalResponse());
     assertEquals(1, done.iterationsUsed());
     assertEquals(0, done.toolCallsExecuted());
-    // Agent loop must use AGENT sampling (balanced temp for tool calling + multi-step reasoning)
+    // Agent loop must use AGENT sampling (balanced temp for tool calling + multi-step reasoning).
+    // Lane F PR 0b: this doubles as the absent-override pin — no `sampling` field on the request
+    // must be byte-identical to the constant, not merely "close to" it.
     assertEquals(List.of(SamplingParams.AGENT), ai.recordedSampling);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lane F PR 0b — the request's optional sampling override
+  // ---------------------------------------------------------------------------
+
+  /** An AgentRequest carrying a sampling override, single-agent, everything else defaulted. */
+  private static AgentRequest requestWithSampling(
+      List<Map<String, Object>> messages,
+      int maxIterations,
+      List<AgentProfile> profiles,
+      String initialAgentId,
+      AgentRequest.SamplingOverride sampling) {
+    return new AgentRequest(
+        messages, List.of(), maxIterations, profiles, initialAgentId,
+        null, null, null, List.of(), null, false, sampling);
+  }
+
+  @Test
+  @DisplayName("PR 0b: the request's sampling override reaches the ordinary agent turn")
+  void samplingOverride_appliedToTheOrdinaryTurn() {
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("Hello there")));
+    var service = buildService(ai, new StubTool("search", RiskTier.LOW, "result"));
+
+    runWithRequest(
+        service,
+        requestWithSampling(
+            userMessage("hi"), 1, List.of(), null,
+            new AgentRequest.SamplingOverride(0.0, 0.5, 20260907L)));
+
+    assertEquals(1, ai.recordedSampling.size());
+    var used = ai.recordedSampling.get(0);
+    assertEquals(0.0, used.temperature(), 1e-9, "override temperature must reach the LLM call");
+    assertEquals(0.5, used.topP(), 1e-9, "override top_p must reach the LLM call");
+    assertEquals(20260907L, used.seed(), "override seed must reach the LLM call");
+  }
+
+  @Test
+  @DisplayName("PR 0b: a partial override keeps the AGENT preset's other knobs")
+  void samplingOverride_partialKeepsThePresetsOtherKnobs() {
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("ok")));
+    var service = buildService(ai, new StubTool("search", RiskTier.LOW, "r"));
+
+    runWithRequest(
+        service,
+        requestWithSampling(
+            userMessage("hi"), 1, List.of(), null,
+            new AgentRequest.SamplingOverride(null, null, 7L)));
+
+    var used = ai.recordedSampling.get(0);
+    assertEquals(SamplingParams.AGENT.temperature(), used.temperature(), 1e-9);
+    assertEquals(SamplingParams.AGENT.topP(), used.topP(), 1e-9);
+    assertEquals(7L, used.seed());
+  }
+
+  /**
+   * PR 0b — the override must reach the two turns whose sampling {@code AgentStepRunner} builds
+   * INLINE from {@code SamplingParams.AGENT}, not just the ones that go through {@code
+   * AgentLlmCaller.resolveAgentSampling}.
+   *
+   * <p>This run exercises the Direction F escalation retry (the inline site at the PRIMARY
+   * text-only handoff) alongside two ordinary PRIMARY turns and the Organizer's E0a forced turn.
+   * A version that threaded the override through {@code AgentLlmCaller} only would pass every
+   * other test in this file and still leave calls 2 and 3 unpinned — a capture would report a
+   * pinned seed while the forced turns kept drifting, which is exactly the drift PR 0b exists to
+   * remove.
+   */
+  @Test
+  @DisplayName("PR 0b: the override reaches the escalation retry and the E0a forced turn")
+  void samplingOverride_appliedToTheEscalationAndE0aForcedTurns() {
+    var profiles = List.of(
+        new AgentProfile("primary", "Primary", null, List.of("core_search_index")),
+        new AgentProfile("organizer", "Organizer", null, List.of("core_ingest_files")));
+    var ai = new ScriptedAiService(
+        ScriptedResponse.toolCall("sc-1", "core_search_index", "{\"query\":\"architecture\"}"),
+        ScriptedResponse.textOnly("Here are the top candidates: 01-system-overview.md"),
+        ScriptedResponse.toolCall(
+            "hc-1", "handoff_to_organizer", "{\"reason\":\"01-system-overview.md\"}"),
+        ScriptedResponse.toolCall(
+            "tc-1", "core_ingest_files", "{\"paths\":[\"01-system-overview.md\"]}"),
+        ScriptedResponse.textOnly("Ingested 01-system-overview.md."));
+    var service = buildService(
+        ai,
+        new StubTool("search_index", RiskTier.LOW, "{\"hits\":[]}"),
+        new StubTool("ingest_files", RiskTier.LOW, "ok"));
+
+    runWithRequest(
+        service,
+        requestWithSampling(
+            userMessage("Find and ingest the architecture overview"), 10, profiles, "primary",
+            new AgentRequest.SamplingOverride(0.0, null, 4242L)));
+
+    assertEquals(5, ai.recordedSampling.size(), "Expected 5 LLM calls");
+    // Precondition: this run really did take the two forced-turn branches, or the assertion below
+    // would be proving nothing about them.
+    assertEquals("required", ai.recordedSampling.get(2).toolChoice(),
+        "precondition: call 2 is the Direction F escalation retry (AgentStepRunner inline site)");
+    assertEquals("required", ai.recordedSampling.get(3).toolChoice(),
+        "precondition: call 3 is the Organizer's E0a forced turn");
+    for (int i = 0; i < ai.recordedSampling.size(); i++) {
+      var used = ai.recordedSampling.get(i);
+      assertEquals(4242L, used.seed(), "call " + i + " must carry the override seed");
+      assertEquals(0.0, used.temperature(), 1e-9,
+          "call " + i + " must carry the override temperature");
+      assertEquals(SamplingParams.AGENT.topP(), used.topP(), 1e-9,
+          "call " + i + " keeps the preset top_p (the override left it absent)");
+    }
+  }
+
+  /**
+   * PR 0b — the other inline {@code AgentStepRunner} site: the DECIDING commit turn. Same scenario
+   * as {@code budgetExhausted_decidingBypassesFinalizeAndProceedsToLlmCall}, which is the one setup
+   * in this file that reaches {@code AgentState.DECIDING}.
+   */
+  @Test
+  @DisplayName("PR 0b: the override reaches the DECIDING commit turn")
+  void samplingOverride_appliedToTheDecidingTurn() {
+    var profiles = List.of(
+        new AgentProfile("primary", "Primary", null, List.of("core_search_index")),
+        new AgentProfile("organizer", "Organizer", null, List.of("core_ingest_files")));
+    var ai = new ScriptedAiService(
+        ScriptedResponse.toolCall("sc-1", "core_search_index", "{\"query\":\"doc\"}")
+            .withUsage(45, 5),
+        ScriptedResponse.toolCall("sc-2", "core_search_index", "{\"query\":\"doc\"}")
+            .withUsage(55, 5),
+        ScriptedResponse.toolCall("sc-3", "core_search_index", "{\"query\":\"doc\"}")
+            .withUsage(95, 5),
+        ScriptedResponse.toolCall("hc-1", "handoff_to_organizer", "{\"reason\":\"doc.md\"}"),
+        ScriptedResponse.toolCall("ic-1", "core_ingest_files", "{\"paths\":[\"doc.md\"]}"),
+        ScriptedResponse.textOnly("Done."));
+    var service = buildServiceWithSmallBudgetAndProfiles(ai, 500);
+
+    runWithRequest(
+        service,
+        requestWithSampling(
+            userMessage("Ingest doc.md"), 10, profiles, "primary",
+            new AgentRequest.SamplingOverride(null, null, 99L)));
+
+    assertEquals(6, ai.recordedSampling.size(), "Expected 6 LLM calls");
+    assertEquals("required", ai.recordedSampling.get(3).toolChoice(),
+        "precondition: call 3 is the DECIDING commit turn (AgentStepRunner inline site)");
+    assertEquals(99L, ai.recordedSampling.get(3).seed(),
+        "the DECIDING turn must carry the override seed");
+    for (var used : ai.recordedSampling) {
+      assertEquals(99L, used.seed(), "every turn in the run must carry the override seed");
+    }
   }
 
   // ---------------------------------------------------------------------------
