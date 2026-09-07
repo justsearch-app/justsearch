@@ -385,7 +385,12 @@ $uninstallRegFound = Test-Path -LiteralPath $uninstallRegKey
 $roundStartUtc = $null
 $roundStartUnreadableReason = ""
 try {
-    $roundStartUtc = (Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
+    # LastBootUpTime is a LOCAL-kind DateTime; the artifact side of the
+    # comparison is CreationTimeUtc. PowerShell's -lt compares raw ticks and
+    # ignores Kind, so on any UTC+N sandbox a file created after boot still
+    # read as "predates boot" (941 round 19 H1: app data created 04:55Z vs
+    # boot 04:32Z printed "predates boot: True"). Normalize here, once.
+    $roundStartUtc = (Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime.ToUniversalTime()
 }
 catch {
     $roundStartUnreadableReason = $_.Exception.Message
@@ -434,11 +439,17 @@ function Get-ArtifactCreationTimeDisplay {
     }
 }
 
+# The exe's own CreationTimeUtc is NOT a freshness oracle: the installer
+# preserves the source file's creation time (941 round 19 H1: the exe read
+# 04:23:40Z, the CI build, on a sandbox booted at 04:32Z). The install
+# DIRECTORY is created by the installer at install time, so its creation
+# time is the timestamp that actually says when this install happened.
+$installedDirPath = Split-Path -Parent $installedExePath
 $exePredatesRound = $false
 $dataDirPredatesRound = $false
 if ($roundStartUtc) {
     if ($installedExeFound) {
-        $exePredatesRound = Test-ArtifactPredatesRoundStart -Path $installedExePath -RoundStartUtc $roundStartUtc
+        $exePredatesRound = Test-ArtifactPredatesRoundStart -Path $installedDirPath -RoundStartUtc $roundStartUtc
     }
     if ($dataDirFound) {
         $dataDirPredatesRound = Test-ArtifactPredatesRoundStart -Path $DataDir -RoundStartUtc $roundStartUtc
@@ -512,8 +523,10 @@ elseif ($installedExeFound -or $dataDirFound -or $uninstallRegFound) {
         $installStateLines += ("WARNING: JustSearch already appears to be installed on this system " +
             "(at least one signal above is FOUND). Branch that fired: $branchLabel.")
         $installStateLines += ("  Session boot time (Win32_OperatingSystem.LastBootUpTime): $bootDisplay")
-        $installStateLines += ("  Installed exe creation time: " +
-            "$(Get-ArtifactCreationTimeDisplay -Path $installedExePath) (predates boot: $exePredatesDisplay)")
+        $installStateLines += ("  Install dir creation time ($installedDirPath): " +
+            "$(Get-ArtifactCreationTimeDisplay -Path $installedDirPath) (predates boot: $exePredatesDisplay)")
+        $installStateLines += ("  Installed exe creation time (informational; installer-preserved, never compared): " +
+            "$(Get-ArtifactCreationTimeDisplay -Path $installedExePath)")
         $installStateLines += ("  App data dir creation time: " +
             "$(Get-ArtifactCreationTimeDisplay -Path $DataDir) (predates boot: $dataDirPredatesDisplay)")
         $installStateLines += ("  (Uninstall registry key timestamps are not exposed by Get-Item for a " +
