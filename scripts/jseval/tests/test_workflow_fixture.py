@@ -1222,7 +1222,9 @@ def test_a_noise_capture_missing_the_field_does_not_excuse_it():
 
 
 def test_the_shipped_fixture_declares_the_noise_ceiling():
-    assert wf.load_fixture(DEFAULT_FIXTURE)["maxNoisyFraction"] == 0.10
+    # ~10 fields of the shipped fixture's ~209 compared — roughly twice the 6 measured on pairs
+    # 4 and 5, so the gate notices a drift TOWARDS noise, not only a collapse into it.
+    assert wf.load_fixture(DEFAULT_FIXTURE)["maxNoisyFraction"] == 0.05
 
 
 def test_candidate_pool_counts_are_observed_only():

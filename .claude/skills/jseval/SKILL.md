@@ -578,8 +578,12 @@ the gate to real regressions in them forever — the class would swallow the sig
 Pinning the pipeline hard enough to silence them (CPU encoders) costs over an hour per cycle and
 stops measuring the shipping configuration.
 
-**The withdrawal is bounded.** `maxNoisyFraction` (fixture key, `0.10`) refuses the whole run when
-a side's noise pair moves more than that share of compared fields. Every noisy field leaves the
+**The withdrawal is bounded.** `maxNoisyFraction` (fixture key, `0.05`) refuses the whole run when
+a side's noise pair moves more than that share of compared fields. That is about 10 of the shipped
+fixture's ~209 compared fields — roughly twice the 6 that pairs 4 and 5 actually measured. At
+`0.10` the gate would tolerate about triple today's noise before objecting, which catches only a
+*collapse* into noise; at `0.05` it also notices a *drift towards* it, with clear headroom above
+what has been observed. Raise it only against a measurement, the same way `scoreTieEpsilon` is set. Every noisy field leaves the
 verdict, so without a ceiling a pipeline degraded on *both* sides — a dropped reranker, an
 unfinished enrichment — would present as a very quiet diff with most fields silently excluded, and
 "almost nothing was compared" would read as "nothing regressed". A noise capture whose `pins`,
