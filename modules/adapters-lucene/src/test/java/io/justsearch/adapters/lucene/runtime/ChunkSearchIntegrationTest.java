@@ -982,6 +982,103 @@ class ChunkSearchIntegrationTest {
   }
 
   /**
+   * Lane F PR 0b — the FIRST tie-break comparator, {@code parent_doc_id}, exercised on its own.
+   *
+   * <p>{@link #chunkBm25TiesBreakOnAKeyThatIsStableAcrossBuilds} uses one parent, so {@code
+   * chunk_index} alone decides it and a {@code parent_doc_id} comparator that silently did nothing
+   * — a missing docvalues column, a misspelled field — would still let it pass. Across parents
+   * that hole is real: every chunk's index is 0, so with {@code parent_doc_id} inert the order
+   * falls straight through to the per-ingest UUID, which is the defect this whole change exists to
+   * remove.
+   *
+   * <p>Both adversaries are forced again: the LATER parent's chunk is committed first (so the
+   * internal-docId order is b, a) and the two chunk ids are drawn until the LATER parent's sorts
+   * first lexicographically (so a {@code doc_id} tie-break also says b, a). Only an effective
+   * {@code parent_doc_id} comparator produces a, b.
+   */
+  @Test
+  @DisplayName("chunk BM25 ties break on parent_doc_id before chunk_index")
+  void chunkBm25TiesBreakOnTheParentPathAcrossParents() throws Exception {
+    runtime.close();
+    runtime = null;
+
+    List<List<String>> observed = new java.util.ArrayList<>();
+    for (int build = 0; build < 2; build++) {
+      observed.add(probeTwoParentTieOrder());
+    }
+    assertEquals(
+        List.of("tie-a", "tie-b"),
+        observed.get(0),
+        "a chunk tie across parents must order by the parent's deterministic path");
+    assertEquals(
+        observed.get(0),
+        observed.get(1),
+        "and two index builds with different chunk UUIDs must agree on it");
+  }
+
+  /**
+   * One parent-order probe: two parents, one identical-content chunk each at index 0, with the
+   * commit order and the minted ids both arranged to disagree with the parent-path order.
+   *
+   * @return the returned hits' {@code parent_doc_id} values, in the order the BM25 leg produced
+   */
+  private List<String> probeTwoParentTieOrder() throws Exception {
+    // Draw until the LATER parent's chunk id sorts FIRST, so a doc_id tie-break cannot produce the
+    // expected order by luck. One draw in two already satisfies it; the loop makes it certain.
+    String idForA;
+    String idForB;
+    int attempt = 0;
+    do {
+      idForA = ChunkIds.newChunkDocId();
+      idForB = ChunkIds.newChunkDocId();
+      attempt++;
+    } while (idForB.compareTo(idForA) >= 0 && attempt < 100);
+    assertTrue(
+        idForB.compareTo(idForA) < 0,
+        "fixture precondition: tie-b's chunk id must sort before tie-a's, or a doc_id tie-break "
+            + "would produce the expected order for the wrong reason");
+
+    RunningRuntime probe =
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    try {
+      // Commit tie-b's chunk FIRST so the internal-docId order is b, a.
+      for (String parentDocId : List.of("tie-b", "tie-a")) {
+        String sha = ChunkParentRevision.sha256Hex(TIE_CHUNK_TEXT);
+        Map<String, Object> parent = new LinkedHashMap<>();
+        parent.put(SchemaFields.DOC_ID, parentDocId);
+        parent.put(SchemaFields.DOC_UID, parentDocId + "#0");
+        parent.put(SchemaFields.CONTENT, TIE_CHUNK_TEXT);
+        parent.put(SchemaFields.PATH, parentDocId);
+        parent.put(SchemaFields.CONTENT_SHA256, sha);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(parent));
+
+        String chunkId = "tie-a".equals(parentDocId) ? idForA : idForB;
+        Map<String, Object> chunk = new LinkedHashMap<>();
+        chunk.put(SchemaFields.DOC_ID, chunkId);
+        chunk.put(SchemaFields.DOC_UID, chunkId + "#0");
+        chunk.put(SchemaFields.IS_CHUNK, "true");
+        chunk.put(SchemaFields.PARENT_DOC_ID, parentDocId);
+        chunk.put(SchemaFields.CHUNK_INDEX, "0");
+        chunk.put(SchemaFields.CHUNK_TOTAL, "1");
+        chunk.put(SchemaFields.CHUNK_CONTENT, TIE_CHUNK_TEXT);
+        chunk.put(SchemaFields.CHUNK_START_CHAR, "0");
+        chunk.put(SchemaFields.CHUNK_END_CHAR, String.valueOf(TIE_CHUNK_TEXT.length()));
+        chunk.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, sha);
+        chunk.put(SchemaFields.PATH, parentDocId);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(chunk));
+        probe.commitOps().commitAndTrack();
+      }
+      probe.commitOps().maybeRefreshBlocking();
+
+      return probe.chunkSearchOps().searchChunksText("tiebreakalpha", 10, null).hits().stream()
+          .map(h -> h.fields().get(SchemaFields.PARENT_DOC_ID))
+          .toList();
+    } finally {
+      probe.close();
+    }
+  }
+
+  /**
    * What one tie-break probe build observed. The chunk SPLADE leg ({@code searchChunksSplade}) and
    * the two other bare chunk searches share the one {@code searchChunksWithStableTieBreak} helper
    * this asserts, and the testing field catalog carries no {@code splade} FeatureField, so BM25 is
