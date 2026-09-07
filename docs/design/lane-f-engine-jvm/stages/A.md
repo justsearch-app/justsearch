@@ -259,6 +259,73 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   recording because the naive reading of that failure was "cancellation is broken" and the naive fix
   was "assert less".
 
+- **A9.** **Neither accepted red is red at A9**, and checking rather than assuming is the finding.
+  `adr-0002-grpc-present` is green and could not have been otherwise — it is `.kts`-scoped
+  (§0.1 correction 1), so deleting every Java `io.grpc` reference does not move it; it reds at A14.
+  `WholeProgramDeadCodeTest` is green because `KnowledgeServerBootstrap`'s legacy branch still
+  constructs `RemoteKnowledgeClient`, which keeps the whole wire client stack referenced — that red
+  belongs to A10/A11, not to A6 or A9. Full output, including two environment-only reds a later
+  reader must not mistake for A9's (`--gate wire` on a missing `buf` CLI; `regen-all --check` on a
+  missing Gradle license report), in `evidence/A/a9-accepted-reds.txt`.
+- **A9 (the item's delete-list was wrong in one place, and following it would have lost seven
+  assertions).** The item says to delete A4's `ForegroundLoadGateTest` with the interceptor. Only
+  **two** of its nine tests were the drift pin; the other seven pin the gauge's balance across a
+  normal return, an exception, a cancellation and an `Error`, the two exclusions, and never-negative
+  under concurrency — which is exactly what `adr-0048-foreground-gauge-is-worker-local` names, so
+  deleting the file also broke that probe. Kept the seven, removed the drift pin, and **retargeted
+  the probe** onto the surviving pin with a `note`. Not "editing the probe until it passes": the
+  probe failed because its named file was deleted by a decision ADR-0048 itself anticipated ("the
+  gRPC interceptor that feeds it is the throwaway adapter"), not because the property lapsed.
+- **A9 (A9, not A11, is where the separate-process path stops working).** Deleting the server
+  deletes the port the spawned Worker published, so `WorkerSpawner`'s port discovery can never
+  complete. `SchemaMismatchStatusContractTest` (`ui` integrationTest) went red and was **converted
+  to the in-process host**, not deferred: the property it pins (a schema mismatch surfaces on
+  `/api/status` as `reindexRequired`) is not a wire property, and it now runs without a second
+  process, without `:modules:indexer-worker:installDist` and without its Windows file-lock teardown.
+  A11's and A12's inventories should read "already unreachable since A9" rather than "still works".
+- **A9 (the OTel carry-over resolved differently from the suggested mechanism, deliberately).** The
+  item says thread the parent context "through `SearchOrchestrator`/the `CallContext`". The three
+  `SearchExecutor` sites read `io.opentelemetry.context.Context.current()` instead:
+  `WorkerSearchService.search` runs the orchestrator synchronously on the thread that called the
+  port, so the caller's span is already current and there is nothing to extract — the interceptor
+  existed only because the transport delivered headers on a thread with no context of its own.
+  Threading an OTel `Context` through `SearchInputs` would carry, by hand and across four classes, a
+  value the JVM already has on the thread. `CallContext` keeps carrying the trace id as a **string**,
+  which is what `openRequestMdc` needs and what `EngineKnowledgeClient` fills from `Span.current()`.
+- **A9 (`KnowledgeServer` needed a lifecycle that is not a socket).** `blockUntilShutdown()` awaited
+  the gRPC server's termination and `isRunning()` asked whether a `Server` object existed and was
+  not shut down. Both are now a `CountDownLatch` released by `initiateShutdown()`/`close()`.
+  `getPort()` returns -1 unconditionally, kept only until A13 removes the last caller. Under the
+  Engine none of the three is used: the composition root owns the lifecycle.
+- **A9 (hot reload, concretely).** `DevReloadManager.performReload` loses one step and keeps the
+  rest: it still clears the signal, awaits deferred model init, closes the old services,
+  reconstructs from the same `InfraContext`, re-wires models, publishes and starts the new loop —
+  ONNX encoders still loaded. The volatile write to `appServices` IS the delegate swap now, because
+  callers read the services per call through `KnowledgeServer.appServices()`
+  (`EngineKnowledgeClient` holds a supplier for exactly this reason). The **trigger** is still the
+  MMF reload byte and still dies at A10; Q1's replacement stays A18's.
+- **A9 (residue swept, per retire-with-a-sweep).** Sixteen files deleted plus
+  `GrpcMessageLimitsParityTest`, whose `assumeTrue` would have turned a half-deleted parity into a
+  silent skip. Every surviving reference to a deleted class corrected in place, including three
+  canonical docs (`02-process-coordination`, `08-observability`, `search-execution-spans`), two
+  governance registers (`consult-register`'s "add a forward in `DelegatingIngestService`" recipe
+  step, `operation-surfaces`' failed-jobs lineage), `common-workflows.md`, and `AotTraining`'s three
+  gRPC class touches.
+
+- **A9 (three defects an independent pass caught in my own edits).** The delegated conversion of
+  the five worker boot tests reported back two compile/doc defects I had introduced
+  (a dropped {@code java.util.Set} import; {@code KnowledgeServer.start()} javadoc still listing the
+  gRPC steps, plus an orphaned `getPort` javadoc block), and `UnreferencedCodeTest` caught a third
+  (`BoundedHandoff.isClosed()` lost its only main-source caller when the subscription moved to
+  `FlowCancelSignal`). Recorded because the *implementer did not find any of the three* — this is
+  the `independent-review-required` case working, on a mechanical item where it is easiest to skip.
+- **A9 (the join, not the halves).** `BoundedHandoffTest` pins the bound; `RemoteIndexingJobsBridgeTest`
+  pins the translation; neither says the two are CONNECTED. `EngineIndexingJobsFlowTest` (added at
+  A9, because A9 is where the last wire path this could accidentally have run on went away) boots a
+  real `KnowledgeServer`, subscribes through `EngineKnowledgeClient`, and asserts the snapshot frame
+  arrives from the SQLite change feed, that an ingest-port submission produces a delta, and that
+  close stops production. Without it A6/A7 were a substrate with no end-to-end consumer proof.
+
 ## 1. Dependency graph established (the shape `app-engine` must fit)
 
 Read from each module's `build.gradle.kts` `dependencies` block and `settings.gradle.kts:113-147`:
