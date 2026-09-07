@@ -82,6 +82,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - Settings labels no longer render as raw `settings.*` keys when the window boots while the backend is restarting, or after an upgrade with a cached catalog (#702)
 - A failed-file health event reads as a sentence naming the file and the error, instead of an unfilled template and an attribute dump (#702)
 - The notification shown when a folder is added during an index rebuild uses plain words and a relative time, not an internal condition id and a raw clock (#702)
+- The chat transcript follows its newest turn, so an answer to a long conversation no longer lands out of sight below the previous card; an answer that arrives only in the completion event is kept, and a dispatch that produced nothing says so instead of clearing the prompt silently (#PRNUM)
+- A failed file re-queued by the periodic folder sync keeps its scan id and collection, so the failed-files drawer keeps showing which scan it belongs to (#PRNUM)
+- A clean Install AI reports fully installed: development-only packages no longer count as skipped, and a skipped package now says why (`skipCause`) instead of always blaming the hardware (#PRNUM)
+- A reopened Documents answer keeps its "Based on your documents" frame after a restart instead of being relabelled as a model-only answer (#PRNUM)
 - Undoing an agent file operation no longer garbles non-ASCII text in the response; every JSON response now declares UTF-8
 - An agent transcript written while the index was restarting is indexed once the index is back, instead of being skipped forever
 
