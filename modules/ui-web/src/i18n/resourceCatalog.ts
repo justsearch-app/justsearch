@@ -46,7 +46,18 @@
 
 let coreCatalog: Record<string, string> = {};
 const pluginCatalogs = new Map<string, Record<string, string>>();
-let bootAttempted = false;
+/**
+ * Tempdoc 941 — did the `registry-resource` boot actually GET AN ANSWER (200 or 304)?
+ *
+ * Was `bootAttempted`, tested together with "`coreCatalog` is non-empty". That pair cannot tell
+ * the two cases apart: the boot seeds from the localStorage body BEFORE fetching, AND every
+ * sibling namespace (`registry-surface`, `health-events`, …) merges into this same object, so a
+ * `registry-resource` fetch that never landed still saw a non-empty catalog and was never
+ * retried. Success is recorded where success happens.
+ */
+let bootSucceeded = false;
+/** Shared in-flight boot, so a readiness-driven re-attempt joins the request rather than racing it. */
+let inFlightBoot: Promise<void> | null = null;
 let missingKeyLogged = new Set<string>();
 
 /**
@@ -116,8 +127,10 @@ function saveToStorage(body: Record<string, string>, etag: string): void {
 /**
  * Boot-time fetch of the registry-resource catalog from the backend.
  *
- * Call once during app boot (e.g., from `i18n.ts`). Subsequent calls are no-ops
- * unless the previous attempt failed and the catalog is empty.
+ * Call at app boot (from `i18n.ts`). Subsequent calls are no-ops once the backend has actually
+ * ANSWERED (200 or 304); until then every call re-attempts. That idempotence is what makes the
+ * whole boot list safe to re-run on the shell's backend-ready edge (`i18n.ts`
+ * `watchForBackendReady`, tempdoc 941).
  *
  * On success: in-memory `catalog` is populated; subsequent
  * `localizeResourceKey` calls resolve keys synchronously.
@@ -128,11 +141,15 @@ function saveToStorage(body: Record<string, string>, etag: string): void {
  * `localizeResourceKey` falls back to raw-key passthrough.
  */
 export async function bootResourceCatalog(baseUrl: string): Promise<void> {
-  if (bootAttempted && Object.keys(coreCatalog).length > 0) {
-    return;
-  }
-  bootAttempted = true;
+  if (bootSucceeded) return;
+  if (inFlightBoot) return inFlightBoot;
+  inFlightBoot = fetchResourceCatalog(baseUrl).finally(() => {
+    inFlightBoot = null;
+  });
+  return inFlightBoot;
+}
 
+async function fetchResourceCatalog(baseUrl: string): Promise<void> {
   const cached = loadFromStorage();
   if (cached) {
     // Tempdoc 565 §28 — MERGE, never replace `coreCatalog`. Every catalog boot
@@ -157,6 +174,8 @@ export async function bootResourceCatalog(baseUrl: string): Promise<void> {
     const response = await fetch(`${baseUrl}/api/messages/registry-resource/en`, { headers });
 
     if (response.status === 304) {
+      // The backend answered: the seeded body is current, and the boot is closed (941).
+      bootSucceeded = true;
       return;
     }
 
@@ -173,6 +192,7 @@ export async function bootResourceCatalog(baseUrl: string): Promise<void> {
       // §28 — merge, never replace (see the cache-seed note above): a cold-boot 200 here
       // must not clobber a sibling catalog (workflow/surface/operation) that already merged.
       Object.assign(coreCatalog, body.messages);
+      bootSucceeded = true;
       notifyCatalogUpdated();
       const etag = response.headers.get('ETag');
       if (etag) {
@@ -229,7 +249,33 @@ async function fetchCatalogMessages(
   return null;
 }
 
+/**
+ * Tempdoc 941 — namespaces whose fetch actually landed, and the in-flight boot per namespace.
+ *
+ * The retry ladder above is bounded: after ~32 s it gives up and "keys in this namespace render
+ * raw" for the life of the document. That is the right answer for a backend that is slow; it is
+ * the wrong one for a backend that was not running yet and came up a minute later. Recording
+ * which namespaces are still unresolved is what lets the shell's backend-ready re-attempt
+ * (`i18n.ts` `watchForBackendReady`) re-run only those.
+ */
+const succeededNamespaces = new Set<string>();
+const inFlightNamespaces = new Map<string, Promise<void>>();
+
 async function bootMessageCatalog(baseUrl: string, namespace: string): Promise<void> {
+  if (succeededNamespaces.has(namespace)) return;
+  const inFlight = inFlightNamespaces.get(namespace);
+  if (inFlight) return inFlight;
+  const run = fetchMessageCatalogWithRetries(baseUrl, namespace).finally(() => {
+    inFlightNamespaces.delete(namespace);
+  });
+  inFlightNamespaces.set(namespace, run);
+  return run;
+}
+
+async function fetchMessageCatalogWithRetries(
+  baseUrl: string,
+  namespace: string,
+): Promise<void> {
   if (!baseUrl) return;
   for (let attempt = 0; ; attempt++) {
     let messages: Record<string, string> | null = null;
@@ -240,6 +286,7 @@ async function bootMessageCatalog(baseUrl: string, namespace: string): Promise<v
     }
     if (messages) {
       Object.assign(coreCatalog, messages);
+      succeededNamespaces.add(namespace);
       notifyCatalogUpdated();
       return;
     }
@@ -441,7 +488,10 @@ export function unregisterCatalogEntries(keys: ReadonlyArray<string>): void {
 export function __resetForTest(): void {
   coreCatalog = {};
   pluginCatalogs.clear();
-  bootAttempted = false;
+  bootSucceeded = false;
+  inFlightBoot = null;
+  succeededNamespaces.clear();
+  inFlightNamespaces.clear();
   missingKeyLogged = new Set<string>();
   try {
     if (typeof localStorage !== 'undefined') {
@@ -457,6 +507,6 @@ export function __resetForTest(): void {
  *  use this AFTER mounting a consumer to simulate a late-arriving catalog boot (S2). */
 export function __seedForTest(messages: Record<string, string>): void {
   coreCatalog = { ...messages };
-  bootAttempted = true;
+  bootSucceeded = true;
   notifyCatalogUpdated();
 }

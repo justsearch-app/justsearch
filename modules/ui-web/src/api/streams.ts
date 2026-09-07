@@ -9,6 +9,11 @@
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
 import { parseSseBuffer, parseSseBufferJson } from './sse';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
+// Tempdoc 941 — what the app DOES when one of our per-event handlers throws (reader notice +
+// diagnostics ring). The POLICY lives in shell-v0 beside the message-class vocabulary it names,
+// not here: this module's job is to detect the throw and keep the stream alive. Imported for the
+// same reason `liveChannelBudget` is — a plain function, no chrome dependency.
+import { reportStreamHandlerFailure } from '../shell-v0/state/streamFailureNotice.js';
 
 // ==================== Stream Event Types ====================
 
@@ -675,6 +680,8 @@ export async function consumeShapeStream(
   let buffer = '';
   let errorFromEvent: (Error & { code?: string; errorClass?: string }) | null = null;
   let receivedTerminal = false;
+  /** Event names whose handler failure this stream has already reported (see the dedup note). */
+  const reportedHandlerEvents = new Set<string>();
 
   try {
     while (true) {
@@ -712,12 +719,11 @@ export async function consumeShapeStream(
         try {
           onEvent(ev.event, payload);
         } catch (handlerError) {
-          // Per-event handler errors are swallowed; they shouldn't abort the stream. But swallowing
-          // them SILENTLY made a throwing evidence handler indistinguishable from an event that
-          // never arrived (tempdoc 847 F-12: a live turn rendering no citation marks looks exactly
-          // like a backend that sent none). The stream still survives — the throw is reported, not
-          // rethrown — so a future live-path failure is visible in the console instead of invisible.
-          console.warn(`[stream] handler for "${ev.event}" threw`, handlerError);
+          // The throw must not abort the stream: one broken consumer must not cost the reader the
+          // rest of an answer that is still arriving. Reporting it is `streamFailureNotice`'s job
+          // — including the decision NOT to toast on `error`, where `errorFromEvent` above already
+          // guarantees the caller gets a real one.
+          reportStreamHandlerFailure(ev.event, handlerError, reportedHandlerEvents);
         }
       });
     }

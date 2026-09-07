@@ -371,4 +371,112 @@ describe('resourceCatalog', () => {
       unsubscribe();
     });
   });
+
+  /**
+   * Tempdoc 941 — a boot that never got an answer stays re-attemptable.
+   *
+   * The old guard was `bootAttempted && the catalog is non-empty`. Because the boot seeds from
+   * localStorage BEFORE fetching, and because every sibling namespace merges into the SAME
+   * `coreCatalog`, "non-empty" was true for a `registry-resource` fetch that had never landed —
+   * so the guard closed the boot permanently on data from a previous session or a previous
+   * VERSION of the app. Success is now recorded only where the backend actually answered.
+   */
+  describe('941 — re-attemptable boot', () => {
+    it('re-fetches after a failed boot, and stops once the backend answers', async () => {
+      const mod = await import('./resourceCatalog');
+      mod.__resetForTest();
+      const ok = {
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages: { 'registry-resource.late.label': 'Late' } }),
+        headers: { get: () => null },
+      };
+      const fetchMock = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('backend not up yet'))
+        .mockResolvedValue(ok);
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      await mod.bootResourceCatalog('http://localhost:33221');
+      expect(mod.localizeResourceKey('registry-resource.late.label'))
+        .toBe('registry-resource.late.label');
+
+      // The backend came up: the SAME entry point re-attempts (this is what the shell's
+      // backend-ready edge calls).
+      await mod.bootResourceCatalog('http://localhost:33221');
+      expect(fetchMock.mock.calls.length).toBe(2);
+      expect(mod.localizeResourceKey('registry-resource.late.label')).toBe('Late');
+
+      // …and a third call is a no-op now that the fetch has been answered.
+      await mod.bootResourceCatalog('http://localhost:33221');
+      expect(fetchMock.mock.calls.length).toBe(2);
+    });
+
+    it('a stale localStorage body no longer closes the boot (the one-shot trap)', async () => {
+      const mod = await import('./resourceCatalog');
+      mod.__resetForTest();
+      // A previous session cached a body. The boot seeds it, then the fetch fails.
+      localStorage.setItem(
+        'justsearch.resourceCatalog.en.body',
+        JSON.stringify({ 'registry-resource.stale.label': 'From the last session' }),
+      );
+      localStorage.setItem('justsearch.resourceCatalog.en.etag', '"stale-etag"');
+      const fetchMock = vi.fn().mockRejectedValue(new Error('backend not up yet'));
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      await mod.bootResourceCatalog('http://localhost:33221');
+      // Pre-941 this left a NON-EMPTY catalog + a set guard = permanently closed.
+      expect(mod.localizeResourceKey('registry-resource.stale.label'))
+        .toBe('From the last session');
+
+      await mod.bootResourceCatalog('http://localhost:33221');
+      expect(fetchMock.mock.calls.length).toBe(2);
+    });
+
+    it('re-attempts a namespace catalog that exhausted its retry budget', async () => {
+      const mod = await import('./resourceCatalog');
+      mod.__resetForTest();
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('down')) as unknown as typeof fetch;
+      vi.useFakeTimers();
+      try {
+        const boot = mod.bootSurfaceCatalog('http://localhost:33221');
+        await vi.advanceTimersByTimeAsync(60_000);
+        await boot;
+      } finally {
+        vi.useRealTimers();
+      }
+      const afterGiveUp = (globalThis.fetch as unknown as { mock: { calls: unknown[] } })
+        .mock.calls.length;
+      expect(afterGiveUp).toBeGreaterThan(1);
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages: { 'settings.group.general': 'General' } }),
+        headers: { get: () => null },
+      }) as unknown as typeof fetch;
+      await mod.bootSurfaceCatalog('http://localhost:33221');
+      // The abandoned namespace resolves on the re-attempt — the `settings.group.general`
+      // raw-key defect (941 round-18 F3) closes for a backend that came up LATE, not just slow.
+      expect(mod.localizeResourceKey('settings.group.general')).toBe('General');
+    });
+
+    it('concurrent boots share one request', async () => {
+      const mod = await import('./resourceCatalog');
+      mod.__resetForTest();
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages: { 'registry-resource.a.label': 'A' } }),
+        headers: { get: () => null },
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+      await Promise.all([
+        mod.bootResourceCatalog('http://localhost:33221'),
+        mod.bootResourceCatalog('http://localhost:33221'),
+        mod.bootResourceCatalog('http://localhost:33221'),
+      ]);
+      expect(fetchMock.mock.calls.length).toBe(1);
+    });
+  });
 });

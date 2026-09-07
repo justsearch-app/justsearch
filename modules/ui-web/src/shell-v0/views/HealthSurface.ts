@@ -26,6 +26,8 @@ import '../components/ErrorAlert.js';
 import '../components/CapabilityMap.js';
 import { parseSseBuffer } from '../../api/sse.js';
 import { summarizeWireDrift } from '../../api/wireDriftTelemetry.js';
+// Tempdoc 941 — the sibling FE-defect ring: which of OUR stream handlers threw, and how often.
+import { summarizeStreamHandlerFailures } from '../../api/streamHandlerTelemetry.js';
 import { icon } from '../components/Icon.js';
 import { renderAtRestCard } from './security/atRestCard.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -1458,7 +1460,14 @@ export class HealthSurface extends JfElement {
             operation-id="core.export-diagnostics"
             context="button"
             api-base=${this.apiBase}
-            .args=${{ feTelemetry: { wireDrift: summarizeWireDrift() } }}
+            .args=${{
+              feTelemetry: {
+                wireDrift: summarizeWireDrift(),
+                // Tempdoc 941 — an FE handler that threw mid-stream leaves the turn looking like a
+                // backend that sent nothing; the export carries the trace that tells them apart.
+                streamHandlerFailures: summarizeStreamHandlerFailures(),
+              },
+            }}
           ></jf-operation>
           <jf-operation
             operation-id="core.index-gc"

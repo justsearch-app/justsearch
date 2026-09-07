@@ -36,7 +36,22 @@
 
 /** Module-level catalog cache. Populated by `bootErrorCatalog`; empty until then. */
 let catalog: Record<string, string> = {};
-let bootAttempted = false;
+/**
+ * Tempdoc 941 — did a boot attempt actually GET AN ANSWER from the backend (200 or 304)?
+ *
+ * This used to be `bootAttempted`, and the re-attempt guard read `bootAttempted && catalog is
+ * non-empty`. That inference is wrong in the one case that matters: the boot seeds `catalog`
+ * from the localStorage body BEFORE it fetches, so a boot that raced an unanswering backend left
+ * the guard set AND the catalog non-empty — permanently closed, holding whatever the previous
+ * VERSION of the app had cached. Success is now recorded where success happens, so "we have not
+ * heard from the backend yet" can never be mistaken for "we are done".
+ */
+let bootSucceeded = false;
+/**
+ * The in-flight boot, so concurrent callers (app boot racing the backend-ready re-attempt) share
+ * one request instead of each opening their own.
+ */
+let inFlightBoot: Promise<void> | null = null;
 let missingKeyLogged = new Set<string>();
 
 const STORAGE_KEY_BODY = 'justsearch.errorCatalog.en.body';
@@ -108,8 +123,10 @@ function saveToStorage(body: Record<string, string>, etag: string): void {
 /**
  * Boot-time fetch of the error catalog from the backend.
  *
- * Call once during app boot (e.g., from `i18n.ts`). Subsequent calls are no-ops
- * unless the previous attempt failed and the catalog is empty.
+ * Call at app boot (from `i18n.ts`). Subsequent calls are no-ops once the backend has actually
+ * ANSWERED (200 or 304); until then every call re-attempts. That idempotence is what makes the
+ * whole boot list safe to re-run on the shell's backend-ready edge (`i18n.ts`
+ * `watchForBackendReady`, tempdoc 941) — the re-attempt IS calling this again.
  *
  * Conditional GET (per tempdoc 431 §F.5): if a previous boot persisted a body
  * + ETag in `localStorage`, the body is seeded as the in-memory catalog
@@ -125,11 +142,15 @@ function saveToStorage(body: Record<string, string>, etag: string): void {
  * empty and `localizeError` falls back to the raw `error.message` or key.
  */
 export async function bootErrorCatalog(baseUrl: string): Promise<void> {
-  if (bootAttempted && Object.keys(catalog).length > 0) {
-    return;
-  }
-  bootAttempted = true;
+  if (bootSucceeded) return;
+  if (inFlightBoot) return inFlightBoot;
+  inFlightBoot = fetchErrorCatalog(baseUrl).finally(() => {
+    inFlightBoot = null;
+  });
+  return inFlightBoot;
+}
 
+async function fetchErrorCatalog(baseUrl: string): Promise<void> {
   // Seed catalog from any previous-session cache. Resolves keys immediately
   // before the network round-trip completes, exercising the wire's ETag
   // contract on subsequent boots.
@@ -150,8 +171,10 @@ export async function bootErrorCatalog(baseUrl: string): Promise<void> {
     }
     const response = await fetch(`${baseUrl}/api/messages/errors/en`, { headers });
 
-    // 304 Not Modified: cached body is current. Nothing to do; we already seeded.
+    // 304 Not Modified: cached body is current. Nothing to do; we already seeded — and the
+    // backend ANSWERED, which is what closes the boot (941).
     if (response.status === 304) {
+      bootSucceeded = true;
       return;
     }
 
@@ -166,6 +189,7 @@ export async function bootErrorCatalog(baseUrl: string): Promise<void> {
     const body = (await response.json()) as ErrorCatalogResponse;
     if (body && typeof body === 'object' && body.messages && typeof body.messages === 'object') {
       catalog = body.messages;
+      bootSucceeded = true;
       const etag = response.headers.get('ETag');
       if (etag) {
         saveToStorage(body.messages, etag);
@@ -263,7 +287,8 @@ export function getErrorMessage(error: ErrorLike | null | undefined): string {
  */
 export function __resetForTest(): void {
   catalog = {};
-  bootAttempted = false;
+  bootSucceeded = false;
+  inFlightBoot = null;
   missingKeyLogged = new Set<string>();
   fallbackDerivationLogged.clear();
   try {
@@ -281,5 +306,5 @@ export function __resetForTest(): void {
  */
 export function __seedForTest(messages: Record<string, string>): void {
   catalog = { ...messages };
-  bootAttempted = true;
+  bootSucceeded = true;
 }
