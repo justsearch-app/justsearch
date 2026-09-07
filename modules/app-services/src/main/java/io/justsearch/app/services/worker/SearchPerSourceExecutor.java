@@ -18,16 +18,32 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 556 (F-C4.2): 385 per-source (federated) retrieval — extracted verbatim from {@code
- * KnowledgeHttpApiAdapter}. Issues N parallel meta_source-filtered gRPC calls and round-robin
- * interleaves the results, backfilling from unfiltered retrieval when insufficient. Stateless statics.
+ * KnowledgeHttpApiAdapter}. Issues N parallel meta_source-filtered searches through the knowledge
+ * port and round-robin interleaves the results, backfilling from unfiltered retrieval when
+ * insufficient. Stateless statics.
+ *
+ * <p>They were gRPC calls until lane F item A6; they are direct calls now, which is why the
+ * executor below had to start propagating trace context — see its javadoc.
  */
 final class SearchPerSourceExecutor {
 
   private static final Logger log = LoggerFactory.getLogger(SearchPerSourceExecutor.class);
 
-  /** 385: Virtual-thread executor for per-source parallel gRPC calls. */
+  /**
+   * 385: Virtual-thread executor for the per-source parallel calls.
+   *
+   * <p>Wrapped by {@code Context.taskWrapping} (lane F review S13), which propagates the calling
+   * thread's OpenTelemetry context onto each task. This became load-bearing at item A9. While the
+   * calls crossed a wire, the trace context travelled as W3C headers and the server interceptor
+   * re-established it on the far side, so it did not matter that a task started on a virtual thread
+   * with an empty context. In process there are no headers and no interceptor: {@code
+   * EngineKnowledgeClient} reads {@code Span.current()} on the thread that calls the port, which for
+   * these tasks is the virtual thread. Without the wrapper every per-source retrieval would produce
+   * a root span with no parent, so a federated search — the query shape most in need of a trace —
+   * would fan out into N unconnected traces plus the one that asked for them.
+   */
   private static final ExecutorService PER_SOURCE_EXECUTOR =
-      Executors.newVirtualThreadPerTaskExecutor();
+      io.opentelemetry.context.Context.taskWrapping(Executors.newVirtualThreadPerTaskExecutor());
 
   private SearchPerSourceExecutor() {}
 

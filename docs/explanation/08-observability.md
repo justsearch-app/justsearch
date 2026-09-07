@@ -559,7 +559,7 @@ We use a `TraceId` to link these disconnected events together in the logs.
 
 #### Worker Indexing Spans (OTel)
 
-The Worker has its own `TracingBootstrap` (initialized in `KnowledgeServer.start()` before service construction) that emits OTel spans for the indexing pipeline. Controlled by `JUSTSEARCH_INDEX_TRACING_LEVEL`:
+The indexing pipeline emits OTel spans from a `TracingBootstrap` initialized in `KnowledgeServer.start()` before service construction, controlled by `JUSTSEARCH_INDEX_TRACING_LEVEL`:
 
 | Level | Behavior |
 |-------|----------|
@@ -674,6 +674,14 @@ lossy for sub-ms encoder calls. Consumers should prefer `duration_ms` and fall
 back to `(end − start)` only for legacy `traces.ndjson` files produced
 before D-1 landed.
 
+**One SDK per JVM (lane F stage A).** `GlobalOpenTelemetry` can be registered once, and since
+item A6 the Head and the index half are one JVM, so the two levels above are no longer independent.
+The Head's bootstrap runs first (its API phase precedes `KnowledgeServer.start()`), so
+`JUSTSEARCH_HEAD_TRACING_LEVEL` governs both halves; `JUSTSEARCH_INDEX_TRACING_LEVEL` takes effect
+only when the head level is `none`. `KnowledgeServer` logs the skip at INFO naming the
+consequence rather than swallowing it. Collapsing the two keys into one belongs with stage B's
+re-cut of the worker projection, not to stage A.
+
 Application-level gating (`maybeSpan()` returning `Span.getInvalid()`) provides true zero-cost when off. The OTel sampler acts as a safety net, not the primary gate. Validated overhead: sub-10µs per batch (tempdoc 312 item 7). End-to-end verification (tempdoc 400 §23) measured no indexing throughput regression (22.5 → 23.2 d/s across 3 runs) with detailed tracing enabled.
 
 #### Local trace viewer (`otel-desktop-viewer`)
@@ -706,8 +714,15 @@ in-memory. Ideal for "do a thing, see the trace tree" debugging.
    - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces`
      (routes the BatchSpanProcessor fan-out to the viewer).
 4. Do a thing in the UI (search, chat, mode switch). Spans appear in
-   the viewer's browser tab, with head + worker spans stitched
-   automatically via the W3C TraceContext gRPC interceptors.
+   the viewer's browser tab. Head and index spans are one tree by
+   construction now rather than by stitching: item A9 deleted the
+   TraceContext interceptor pair, because the caller's context is
+   already current on the callee's thread inside one JVM. The one
+   place that is not automatic is a thread hand-off — a per-source
+   federated search fans out onto virtual threads, so
+   `SearchPerSourceExecutor` wraps its executor with
+   `Context.taskWrapping`; without that the sub-queries would each
+   start a new trace.
 
 **Why the viewer is ephemeral**: the canonical persistent store is
 still `<dataDir>/telemetry/traces.ndjson` (rotated locally). The

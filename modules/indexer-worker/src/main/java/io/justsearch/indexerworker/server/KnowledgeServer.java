@@ -83,18 +83,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Knowledge Server hosts gRPC services for search and indexing.
- *
- * <p>This is the main entry point for the isolated worker process that handles:
+ * The Knowledge Server owns the index half's infrastructure — Lucene runtimes, the job queue, the
+ * signal bus — and the application services built on top of it:
  * <ul>
- *   <li>Search queries via gRPC</li>
+ *   <li>Search queries</li>
  *   <li>Batch ingestion of file paths</li>
  *   <li>Background indexing loop</li>
  *   <li>Process coordination via MMF (memory-mapped file)</li>
  * </ul>
  *
- * <p>The server binds to an ephemeral port (port 0) and writes the actual bound
- * port to the signal bus for discovery by the main process.
+ * <p><b>It is not a server in the socket sense any more.</b> Until lane F stage A it hosted gRPC
+ * services for a second JVM: item A9 deleted the gRPC server, its interceptors and the ephemeral
+ * port it published to the signal bus, and item A11 deleted the worker process itself. Since item
+ * A6 this class is constructed and started in the Head JVM by
+ * {@code io.justsearch.app.engine.EngineRoot}, and callers reach its services as direct calls
+ * through {@link #appServices()}. The name is kept because every log line, metric and doc uses it.
  */
 public final class KnowledgeServer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServer.class);
@@ -151,8 +154,9 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Tempdoc 885 item 3: the foreground-load gauge and the duty-cycle policy that reads it. Both are
    * process-scoped and owned here rather than by {@code appServices}, because the app services are
-   * reconstructed (deferred-runtime upgrade, dev hot-reload) while the gRPC server — and therefore
-   * the single interceptor that feeds the gauge — is not. A per-appServices gauge would be orphaned
+   * reconstructed (deferred-runtime upgrade, dev hot-reload) while this server — and therefore the
+   * single producer that feeds the gauge ({@code ForegroundLoadGate} since item A9, the gRPC
+   * {@code ForegroundLoadInterceptor} before it) — is not. A per-appServices gauge would be orphaned
    * from its only producer on the first reconstruction and silently stop throttling.
    */
   private final ForegroundLoad foregroundLoad =
@@ -204,10 +208,11 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Set when this boot found a schema mismatch it has already tried to rebuild away
    * {@link IndexGenerationManager#MAX_AUTO_REBUILD_ATTEMPTS} times. The Worker then serves the
-   * existing index READ-ONLY and does not ingest: it must still finish starting, because a Worker
-   * that returns early from {@code start()} never binds gRPC, never writes its port, and exits with
-   * no explanation — the same silent dead-end the old FAIL_CLOSED default produced, which is the
-   * whole thing this brake exists to avoid (tempdoc 915 §C.8).
+   * existing index READ-ONLY and does not ingest: it must still finish starting, because a
+   * {@code start()} that returns early never publishes its services and leaves the caller with no
+   * explanation — the same silent dead-end the old FAIL_CLOSED default produced, which is the
+   * whole thing this brake exists to avoid (tempdoc 915 §C.8). Before item A9 the same dead-end
+   * read as "never binds gRPC, never writes its port".
    *
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
@@ -455,6 +460,16 @@ public final class KnowledgeServer implements Closeable {
 
       // 0b. Initialize tracing (must happen before service class loading at step 3b).
       // Read config directly from EnvRegistry — ConfigStore is not ready until step 3.
+      //
+      // Lane F review S13: there is ONE GlobalOpenTelemetry per JVM, and since item A6 the Head and
+      // the index half share one. Whichever bootstrap runs first wins, and the Head's runs first
+      // (its API phase precedes this start()). So in the Engine, JUSTSEARCH_INDEX_TRACING_LEVEL
+      // does not decide anything on its own — it decides only when the Head declined to register,
+      // which happens when JUSTSEARCH_HEAD_TRACING_LEVEL is 'none'. That coupling is real and
+      // stage A does not resolve it (the two levels become one key when the manifest's worker
+      // projection is re-cut in stage B); what it must not do is happen silently. The catch below
+      // used to log at DEBUG under the Worker's INFO threshold, so an operator who set the index
+      // level and saw no indexing spans had nothing to read.
       String tracingLevel = EnvRegistry.INDEX_TRACING_LEVEL
           .getString("none").toLowerCase(Locale.ROOT);
       if (!"none".equals(tracingLevel)) {
@@ -463,7 +478,13 @@ public final class KnowledgeServer implements Closeable {
               dataDir, ((LocalTelemetry) telemetry).getHealthState(), tracingLevel);
           log.info("Worker tracing initialized: level={}", tracingLevel);
         } catch (IllegalStateException e) {
-          log.debug("GlobalOpenTelemetry already set, skipping TracingBootstrap: {}", e.getMessage());
+          log.info(
+              "Index tracing level '{}' is not in effect: OpenTelemetry is already registered in"
+                  + " this JVM by the Head (JUSTSEARCH_HEAD_TRACING_LEVEL governs both halves of"
+                  + " the Engine). Indexing spans are emitted at the Head's level, or not at all if"
+                  + " that level is 'none'. ({})",
+              tracingLevel,
+              e.getMessage());
         }
       }
 
@@ -686,9 +707,9 @@ public final class KnowledgeServer implements Closeable {
         // Tempdoc 406 Phase 4a: deferred-writer mode is re-enabled. When the index
         // has existing segments, openDeferred() opens read-only first (fast); the
         // background initDeferredModels later calls DeferredRuntime.upgradeWriter()
-        // which returns a fresh RunningRuntime. KS reconstructs appServices and
-        // swaps the gRPC wrappers via reconstructAppServicesAfterDeferredUpgrade()
-        // so write methods become available without restarting the gRPC server.
+        // which returns a fresh RunningRuntime. KS reconstructs and republishes
+        // appServices via reconstructAppServicesAfterDeferredUpgrade() so write
+        // methods become available without restarting this server.
         // A detected mismatch is raised here for the two policies whose handling lives in the
         // catch below. REBUILD_BACKUP_FIRST is deliberately NOT raised: its backup-then-rebuild
         // recovery lives inside RuntimeSession.openComponentsWithRecovery and is the one
@@ -916,8 +937,8 @@ public final class KnowledgeServer implements Closeable {
 
       // 3.5 Construct application services via registry (models wired later via deferred init)
       // Tempdoc 419 / T5.1 (ADR-0028): construct PathResolutionStore against the same jobs.db
-      // already migrated by SqliteJobQueue. Threaded through InfraContext so the gRPC handler
-      // and IndexingLoop can both consume it without violating module dependency direction.
+      // already migrated by SqliteJobQueue. Threaded through InfraContext so the ingest/search
+      // services and IndexingLoop can both consume it without violating module dependency direction.
       this.pathResolutionStore =
           new io.justsearch.indexerworker.queue.SqlitePathResolutionStore(dbPath);
       this.infraCtx =
@@ -1143,8 +1164,8 @@ public final class KnowledgeServer implements Closeable {
     // can await encoder wiring before first use.
     svc.wireModelReadyLatch(() -> modelReadyLatch);
 
-    // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the GetSessionPolicies
-    // gRPC rpc can return Worker's authoritative snapshot.
+    // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the getSessionPolicies
+    // port can return the index half's authoritative snapshot.
     svc.wirePolicySnapshotSupplier(
         () -> inferenceSurface != null ? inferenceSurface.policies() : null);
 
@@ -1213,8 +1234,9 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Tempdoc 406 swap helper. Drains the current ingest runtime, opens a fresh one
    * via {@code opener}, atomically replaces the holder fields, and reconstructs
-   * the gRPC service wrappers so downstream consumers see the new runtime via
-   * supplier re-read. Returns the swap duration in milliseconds.
+   * the application services so downstream consumers see the new runtime via
+   * supplier re-read. Returns the swap duration in milliseconds. Before item A9 the
+   * reconstruction step also re-registered the gRPC service wrappers.
    *
    * <p>Synchronized so concurrent reload triggers serialize. Errors during open
    * leave the old runtime in place and re-throw — callers see a hard failure
@@ -1251,18 +1273,18 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Background model initialization — runs in a separate thread after gRPC is serving. Loads
-   * embedding, NER, SPLADE/BGE-M3, and disambiguation models. Opens deferred IndexWriter if
-   * applicable. Non-fatal: failures degrade capabilities but don't crash the server.
+   * Background model initialization — runs in a separate thread once the services are published
+   * and answering. Loads embedding, NER, SPLADE/BGE-M3, and disambiguation models. Opens deferred
+   * IndexWriter if applicable. Non-fatal: failures degrade capabilities but don't crash the server.
    */
   @SuppressWarnings("PMD.CognitiveComplexity")
   private ModelContext initDeferredModels() {
     long bgStart = System.nanoTime();
     try {
-      // Open IndexWriter (deferred from sync path for faster gRPC readiness).
+      // Open IndexWriter (deferred from sync path so reads are answerable sooner).
       // Phase types: DeferredRuntime.upgradeWriter() returns a fresh RunningRuntime;
-      // swap the holder fields, reconstruct appServices (which captured ops from the
-      // now-closed deferred session), and swap the gRPC wrappers. After this:
+      // swap the holder fields and reconstruct appServices (which captured ops from
+      // the now-closed deferred session), then republish it. After this:
       //   - search continues seamlessly via the upgraded runtime
       //   - write methods stop returning UNAVAILABLE; the indexing loop starts
       if (ingestLifecycle instanceof DeferredRuntime deferred) {
@@ -1473,7 +1495,7 @@ public final class KnowledgeServer implements Closeable {
       // Lucene/ICU JIT + class-load cold-start penalty (measured ~870ms cold vs ~12ms warm).
       // Runs after all encoders above are wired, so the synthetic pass exercises the same
       // production search stack a real query would. Calls WorkerSearchService.warmUpSearchPath()
-      // directly (in-process, below the gRPC boundary) — see its Javadoc + SearchOrchestrator
+      // directly, below the port boundary — see its Javadoc + SearchOrchestrator
       // .warmUp()'s Javadoc for why this can't leak into /api/status search telemetry or the
       // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
       try {
@@ -1814,8 +1836,8 @@ public final class KnowledgeServer implements Closeable {
               indexRuntimeCatalog));
     }
     // Tempdoc 885 item 19: the reopen-on-demand seam must fire for user-facing reads only.
-    // ForegroundLoad is the one component that knows a search-family RPC is in flight (item 3's
-    // gauge, fed by ForegroundLoadInterceptor); adapters-lucene cannot see it, so it arrives as
+    // ForegroundLoad is the one component that knows a search-family call is in flight (item 3's
+    // gauge, fed by ForegroundLoadGate since item A9); adapters-lucene cannot see it, so it arrives as
     // a predicate. Without this, enrichment-backfill document fetches reopened the searcher.
     builder.withForegroundActive(() -> foregroundLoad.inFlight() > 0);
     return builder;
@@ -2110,8 +2132,9 @@ public final class KnowledgeServer implements Closeable {
   /**
    * The process-scoped foreground-load gauge (tempdoc 885 item 3).
    *
-   * <p>Public since lane F stage A item A6: {@code ForegroundLoadGate} in the composition root is
-   * the second producer while the wire interceptor still exists, and it must feed THIS instance.
+   * <p>Public since lane F stage A item A6: {@code ForegroundLoadGate} in the composition root was
+   * the second producer alongside the wire interceptor, and since item A9 deleted that interceptor
+   * it is the only one. Either way it must feed THIS instance.
    * Reading the gauge off {@code indexingPacing().foregroundLoad()} instead would be wrong before
    * {@link #start()} has run — the field starts as {@code IndexingPacing.unthrottled()}, which
    * constructs a gauge of its own that nothing paces off.
