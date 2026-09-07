@@ -492,9 +492,14 @@ rather than stored. The cancelled turn is exempt — it is supposed to end early
 whose "which ADR" half has no single obvious anchor, so the agent kept searching. A looping turn is
 worse than a partial answer: its tool trajectory diverges as soon as retrieval does, so every
 `exact` field downstream of the trajectory (`toolNames`, `toolCallsExecuted`, `sourceRefs`,
-`citationTargets`) differs for a reason that is not a build difference. `c02` now asks what the
-three processes in the architecture are and which document describes them — `c01`'s shape, anchored
-on `docs/explanation/01-system-overview.md` ("The 3-Process Model"), with `maxIterations` still 8.
+`citationTargets`) differs for a reason that is not a build difference. `c02` now asks a
+single-document architecture question of `c01`'s shape, anchored on
+`docs/explanation/01-system-overview.md`, with `maxIterations` still 8. Read the question itself
+from the fixture (`scripts/jseval/lane-f-workflow-fixture.v1.json`), **not from here**: this file is
+inside the capture corpus (`docs/reference/**`), so restating a chat turn's distinctive wording
+would make this page a retrieval attractor for that very turn and put a document *about* the
+instrument into the evidence the instrument compares. `c01`'s wording appears nowhere in the corpus
+outside the documents that genuinely answer it, and `c02`'s must not either.
 
 **Both captures of a paired diff must be on the same chat profile.** The profile decides which
 model answered the chat turns, so a split-vs-single pair taken on different profiles compares two
