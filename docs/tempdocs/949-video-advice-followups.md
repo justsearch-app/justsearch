@@ -174,3 +174,25 @@ alone is 5.5% of the set and its content is already in two other places. Do not 
 shortens without reading each sentence. Do not run this measurement again until the relocate PR has
 landed and a new 30-day window has passed (935 §1: this was the sixth agent-waste investigation in
 two weeks).
+
+## 6. Relocate list applied (owner decision 2026-09-07: "do both")
+
+Applied as a follow-up PR on top of #712, with two evidence-based exceptions:
+
+| handle | action | where it went |
+|---|---:|---|
+| `verify-your-work` | **shortened, not relocated** | the §5 "section" unit (2,974 B) included three `keep` sub-rules (`use-every-verification-tier`, `audit-driven-fixes-need-test`, `critical-analysis-pass`); only the command bullets duplicated the Quick Commands table. Rule kept as one sentence pointing at Quick Commands. |
+| `fix-root-causes-not-symptoms` | **kept** | the relocate verdict rested on the false-enforcer finding; #712 wired the ratchet, so the rule's enforcer claim is now true. Parenthetical updated to say "in CI". |
+| `tempdoc-is-your-contract` | relocated | `/plan` skill, both harness copies (`.claude/skills/plan`, `.agents/skills/plan`) |
+| `stay-focused-on-assigned-work` | relocated | bullets 1–2 into `/plan`; bullet 3 (scoped diffs) kept as one line in `branch-safety.md` § Working on shared `main` |
+| `accepted-tracked-skills-no-removal` | relocated | `agent-postmortems.md` §30; `models/.gitignore` comment re-pointed |
+| `edit-reread-cross-root` | relocated | `agent-postmortems.md` §31; `signature-census.mjs` pavedPath re-pointed; handle added to the agent-lessons handle list |
+| `never-checkout-in-main` | deleted (dedup) | the same prohibition is already stated under "Enforced by native `permissions.deny`"; the surviving Hard Rule 3 now says the main checkout stays on `main` |
+| `one-branch-per-worktree` | deleted | git enforces it |
+| `bidirectional-pass` | shortened | one line plus the pointer it already was |
+
+Hard Rules renumbered 1–5. `AGENTS.md` carried none of the relocated prose (checked). Ceilings
+ratcheted down with `check-always-loaded-budget --rebalance` (total ceiling 63,171 → 59,908 B). Measured against
+origin/main: CLAUDE.md −1,402 B, branch-safety −483 B, agent-lessons −187 B, slice-execution −61 B =
+−2,133 B (4.3% of the 49,046 B Claude-loaded set). Smaller than §5's 6,630 B floor because the two
+exceptions above kept 3.6 KB in place, deliberately.

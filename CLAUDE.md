@@ -34,20 +34,13 @@ Failure mode to avoid: creating a new utility function when an identical one exi
 
 ### Fix Root Causes, Not Symptoms <!-- rule:fix-root-causes-not-symptoms -->
 
-**Never resolve a build or test failure by making the failure invisible instead of impossible** — deleting or commenting the failing code, weakening or disabling the test, suppressing the warning, broadening the catch, removing the validation "in the way". (The suppression subset is ratcheted by `check-suppression-ratchet.mjs`; the rest is review-caught.)
+**Never resolve a build or test failure by making the failure invisible instead of impossible** — deleting or commenting the failing code, weakening or disabling the test, suppressing the warning, broadening the catch, removing the validation "in the way". (The suppression subset is ratcheted in CI by `check-suppression-ratchet.mjs`; the rest is review-caught.)
 
 **If a test fails after your changes**, the test is probably right and your code is wrong. Investigate its intent; if you genuinely believe it's wrong, explain why and ask the user before modifying it.
 
 ### Verify Your Work <!-- rule:verify-your-work -->
 
-After implementing a change, confirm it actually works before moving on. Run compilation and relevant module tests — do not rely on "it should work."
-
-- **At minimum**: `./gradlew.bat build -x test` (compilation) + `./gradlew.bat :modules:<module>:test` for affected modules.
-- **After multi-module changes**: `./gradlew.bat test` for the full unit test suite.
-- **After frontend changes** (`modules/ui-web`): `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
-- **For visual verification**: `jseval ui-shot <step>` (load `/ui-check` skill for full reference).
-
-Do not declare a task complete if the build is broken or tests are failing.
+Confirm a change works before moving on: compile plus the affected modules' tests at minimum, the full suite after multi-module changes, the frontend typecheck + unit tests after `modules/ui-web` changes, `/ui-check` for visual work (commands: Quick Commands below). Never declare a task complete on a broken build or failing tests.
 
 **Use every verification tier available to you, including the LLM.** <!-- rule:use-every-verification-tier --> When verifying AI-facing features (chat surfaces, RAG, conversation shapes), do not stop at `AI_OFFLINE` and declare "verified up to the LLM boundary" — `ai_activate` loads the runtime in seconds; load the model, send a real query, confirm the full response renders. Compile + unit tests verify code; live-stack API tests verify plumbing; only end-to-end with a running model verifies feature correctness. Before declaring a verification tier unavailable, check whether a tool provides it. The compact chat profile (dev default) satisfies this for plumbing/feature-shape checks; quality-sensitive verification (RAG quality, prompt-format, VLM extraction, eval work) needs `ai_activate {chatProfile:"standard"}`. Handle: `ai-offline-isnt-a-wall` (see `docs/reference/contributing/agent-postmortems.md`).
 
@@ -72,18 +65,6 @@ YAGNI applies to speculative abstractions, not to known structural defects. One 
 ### Tempdocs Are Dated History, Not Current Truth <!-- rule:tempdocs-are-dated-history -->
 
 `docs/tempdocs/` is append-only design history, not canonical truth — a tempdoc reflects its writing date, and newer tempdocs and shipped code supersede older ones. Newer tempdocs have higher numbers; always check the highest-numbered tempdoc first to gauge how stale an older one really is. Before trusting a tempdoc's claim as current, check its frontmatter (`status`/`created`/`updated`) and verify against `main` + canonical docs. (`verify-don't-guess`, applied to docs.)
-
-### Tempdoc Is Your Contract <!-- rule:tempdoc-is-your-contract -->
-
-Every item marked for implementation is work the user already judged necessary — you do not get to decide remaining items are "not worth it", "too difficult", or "diminishing returns". Implement every item unless the user explicitly says skip; if an item looks infeasible, explain why and ask rather than silently skipping or summarizing-and-suggesting-closure. A tempdoc is complete when all its items are implemented, not when the impactful ones feel done.
-
-### Stay Focused on Your Assigned Work <!-- rule:stay-focused-on-assigned-work -->
-
-When asked "what should we do next?", consult the active tempdoc for remaining items first. Propose those before suggesting new work.
-
-- **Do not propose switching to a different tempdoc** unless the current one is fully complete.
-- **If nothing is left on the current tempdoc**, say so explicitly and let the user decide.
-- **Parallel agents share `main`** — untouched-code reformatting causes merge conflicts with other worktrees, so keep diffs scoped to your task.
 
 ### Route Out-of-Scope Findings, Don't Log Them <!-- rule:log-pre-existing-issues -->
 

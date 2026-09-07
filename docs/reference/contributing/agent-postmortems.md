@@ -213,3 +213,11 @@ Windows traps, both worth knowing: `.\gradlew.bat` inside a JS template literal 
 `.gradlew.bat`, since `\g` is not an escape sequence — build the command from an absolute path
 instead; and the same round found a *test* that survived its break because a null constructor
 argument routed it down a different branch, which is the same lesson one layer up.)
+
+## 30. `accepted-tracked-skills-no-removal` — PR #151, 2026-07
+
+The four orchestration skills tracked on public `main` (`.claude/skills/{design,plan,takeover,theorize}`) were leaked once by a `git add -A`, and the owner has since accepted them as tracked. Do not open a PR to remove them; repeated removal PRs (e.g. #151) are unwanted. The same `git add -A` move is why `models/.gitignore` ignores the weights explicitly. Relocated from `branch-safety.md` by tempdoc 949 §5 (0 citations in 30 days, no enforcer).
+
+## 31. `edit-reread-cross-root` — tempdoc 618 §11e / 727 F-7a
+
+A worktree copy and a main-checkout copy of the "same" file do not share the `Edit` tool's read-state. Re-read the exact worktree-qualified path before editing, not "a" copy with the same basename; the failure reads as "file has not been read yet" or "modified since the last Read" (`scripts/agent-analytics/signature-census.mjs` classifies it). Relocated from `agent-lessons.md` by tempdoc 949 §5 (0 citations in 30 days, no enforcer).
