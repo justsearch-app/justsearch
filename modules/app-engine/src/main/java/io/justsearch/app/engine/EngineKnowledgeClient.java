@@ -255,8 +255,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   public IndexingJobsStream subscribeIndexingJobs(
       Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted) {
-    AtomicBoolean closed = new AtomicBoolean(false);
-    CallContext ctx = new CallContext(null, null, closed::get);
+    // Item A7: a bounded hand-off between the change feed's dispatch thread and the SSE fan-out.
+    // Without it the fan-out would run ON the SQLite update-hook thread, so a slow HTTP client
+    // would pace the indexing loop — the backpressure the Netty send buffer used to absorb.
+    BoundedHandoff<IndexingJobsFrame> flow =
+        new BoundedHandoff<>("indexing-jobs-flow", onFrame, onError, streamThreads);
+    FlowCancelSignal cancel = new FlowCancelSignal();
+    flow.onClose(cancel::cancel);
+    CallContext ctx = new CallContext(null, null, cancel);
     streamThreads.execute(
         () -> {
           try {
@@ -266,21 +272,30 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                 .subscribeIndexingJobs(
                     SubscribeIndexingJobsRequest.newBuilder().build(),
                     frame -> {
-                      if (!closed.get()) {
-                        onFrame.accept(frame);
+                      if (!flow.publish(frame)) {
+                        // Closed, or the consumer stopped draining: stop the producer. The worker
+                        // reads this through ctx.cancelled() on its next delta and closes its
+                        // change-feed subscription.
+                        cancel.cancel();
                       }
                     },
                     ctx);
-            if (!closed.get()) {
-              onCompleted.run();
-            }
+            // subscribeIndexingJobs RETURNS WHILE THE STREAM IS STILL OPEN — it registers a
+            // change-feed subscription whose deltas arrive later, on the feed's own threads. So a
+            // normal return is NOT completion, and calling onCompleted here would tell the bridge
+            // the producer had closed the stream while frames were still arriving.
           } catch (RuntimeException e) {
-            if (!closed.get()) {
-              onError.accept(e);
-            }
+            flow.fail(e);
           }
         });
-    return () -> closed.set(true);
+    // onCompleted has no producer in process, deliberately: the change-feed subscription lives
+    // until it is cancelled, so "the producer closed the stream" is a wire-only event (a server
+    // shutting down its call). The caller's close() is the only way this flow ends, and the caller
+    // already knows it closed it.
+    return () -> {
+      flow.close();
+      cancel.cancel();
+    };
   }
 
   @Override
