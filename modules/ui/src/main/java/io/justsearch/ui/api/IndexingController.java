@@ -972,6 +972,10 @@ public class IndexingController {
    * and {@code IndexingService.FailedJobInfo} holds it. So {@code ""} here means what {@link
    * IndexingJobView} says it means — single-file ingest, watcher, or a pre-{@code scan_id} row —
    * rather than "this surface never looked".
+   *
+   * <p>{@code collection} defaults on BLANK, not just on null (tempdoc 941 round 19, F2): proto3
+   * has no null, so an untagged worker row arrives here as {@code ""} and the null-only check never
+   * fired — the drawer rendered an empty collection for a job that is in fact in {@code default}.
    */
   private static IndexingJobView toJobView(IndexingService.FailedJobInfo j) {
     return new IndexingJobView(
@@ -981,7 +985,7 @@ public class IndexingController {
         j.lastUpdatedMs(),
         j.errorMessage() == null ? "" : j.errorMessage(),
         0L,
-        j.collection() == null ? "default" : j.collection(),
+        j.collection() == null || j.collection().isBlank() ? "default" : j.collection(),
         j.scanId() == null ? "" : j.scanId());
   }
 

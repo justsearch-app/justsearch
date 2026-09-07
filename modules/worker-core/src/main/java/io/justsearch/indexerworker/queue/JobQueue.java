@@ -199,7 +199,15 @@ public interface JobQueue extends Closeable {
    * <p>It rides THIS signature — the single jobs-table write path (813 Slice B) — rather than a
    * parallel enqueue overload, for the same reason the size does: the insert is
    * {@code INSERT OR REPLACE}, so any column not supplied by the enqueue call is reset on every
-   * re-enqueue of the same path. One call states both facts, or one of them is silently lost.
+   * re-enqueue of the same path.
+   *
+   * <p>Tempdoc 941 round 19 (F2): {@code collection} and {@code scanId} are exempt from that reset.
+   * A null for either means "nothing to say", NOT "clear it" — an implementation that persists them
+   * must carry the row's existing value forward, and overwrite only when the caller states one.
+   * The maintenance re-enqueues (the periodic {@code syncDirectory} walk, a watcher event, the
+   * retry RPC) do not know which scan admitted a path or which collection owns it, so treating
+   * their silence as an erasure blanked both facts on every sync cycle for any file that stays
+   * unindexed — which is exactly what a permanently failed file is.
    *
    * <p>Default implementation drops the scan id and delegates to {@link #enqueueEntries(List,
    * String)} — NOT straight to {@link #enqueue(List, String)}: implementations that record sized
@@ -208,8 +216,10 @@ public interface JobQueue extends Closeable {
    * keep the pre-812 behaviour; their rows are keyless and fall back to adjacency grouping.
    *
    * @param entries paths plus their sizes ({@link #UNKNOWN_SIZE_BYTES} where unknown)
-   * @param collection collection tag for the indexed documents, or null for default
-   * @param scanId the enqueueing scan's id, or null when not part of a directory scan
+   * @param collection collection tag for the indexed documents, or null to keep whatever an
+   *     existing row already carries (default collection when there is no row)
+   * @param scanId the enqueueing scan's id, or null when not part of a directory scan — an existing
+   *     row keeps the scan it already recorded
    * @return number of jobs accepted
    */
   default int enqueueEntries(List<EnqueueEntry> entries, String collection, String scanId) {

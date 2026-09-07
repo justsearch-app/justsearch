@@ -94,7 +94,12 @@ class IndexingControllerFailedJobsWireContractTest {
               "notes",
               IndexingJobView.STATE_RETRY_EXHAUSTED,
               ""),
-          info(ROOT.resolve("c.txt").toString(), null, 1, null, "  ", null));
+          info(ROOT.resolve("c.txt").toString(), null, 1, null, "  ", null),
+          // Tempdoc 941 round 19 (F2): the shape a real worker row actually has when it carries no
+          // collection. proto3 has no null, so RemoteKnowledgeClient hands the Head "" — never the
+          // null the row above simulates. Only the null branch was defaulted, so an untagged job
+          // reached the drawer as an empty collection instead of "default".
+          info(ROOT.resolve("d.md").toString(), "unreadable", 2, "", "FAILED", ""));
 
   private static IndexingService stubService() {
     return new IndexingService() {
@@ -206,8 +211,8 @@ class IndexingControllerFailedJobsWireContractTest {
     assertConformsToSchema("GET /api/indexing-jobs/failed/by-prefix", body);
 
     JsonNode jobs = JSON.readTree(body).get("jobs");
-    assertEquals(3, jobs.size());
-    assertEquals(3, JSON.readTree(body).get("count").asInt());
+    assertEquals(4, jobs.size());
+    assertEquals(4, JSON.readTree(body).get("count").asInt());
     // The two facts the schema alone cannot state: the discriminator survives the projection, and
     // scanId is PRESENT (dropping it was what made the payload un-typeable in the first place).
     assertEquals("FAILED", jobs.get(0).get("state").asString());
@@ -223,6 +228,12 @@ class IndexingControllerFailedJobsWireContractTest {
     assertEquals("FAILED", jobs.get(2).get("state").asString());
     assertEquals("default", jobs.get(2).get("collection").asString());
     assertEquals("", jobs.get(2).get("errorMessage").asString());
+    // 941 F2: the blank the WIRE actually delivers defaults the same way the null does. Asserting
+    // only the null branch is how "collection": "" reached the drawer.
+    assertEquals(
+        "default",
+        jobs.get(3).get("collection").asString(),
+        "a blank worker collection must default like a null one, not reach the FE empty");
     // ADR-0028: raw paths never appear on this wire.
     assertTrue(!body.contains("a.pdf"), "raw paths must not appear on the substrate wire");
   }
@@ -232,7 +243,7 @@ class IndexingControllerFailedJobsWireContractTest {
   void substrateConformsToSchema() throws Exception {
     String body = startAndGet("/api/indexing-jobs/failed");
     assertConformsToSchema("GET /api/indexing-jobs/failed", body);
-    assertEquals(3, JSON.readTree(body).get("count").asInt());
+    assertEquals(4, JSON.readTree(body).get("count").asInt());
   }
 
   private static String sha256Hex(String value) throws Exception {
