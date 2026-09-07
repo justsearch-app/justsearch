@@ -144,8 +144,14 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   bootstrap resets `started` in `closeForUpgrade()` (`KnowledgeServerBootstrap.java:1015`) and boot
   recovery restarts the same instance. One behaviour note carried to A6: the poll now starts after
   `spawner.start()` returns rather than inside it (step 5b), i.e. after port discovery instead of
-  before — sub-second, and the gauge is written before the MMF sink so a bus failure can no longer
-  lose the in-process signal. `InferenceWiring` now reads the signal bus per event instead of
+  before, and the gauge is written before the MMF sink so a bus failure can no longer
+  lose the in-process signal. **Corrected at A6 (review #13): "sub-second" was wrong.**
+  `spawner.start()` blocks on port discovery for up to `DEFAULT_PORT_DISCOVERY_TIMEOUT_MS = 15_000`
+  (`KnowledgeServerConfig.java:67`), so behind it the first poll could be delayed by a full budget —
+  and a `spawner.start()` that *threw* meant the poll never started at all. A6 moves it to step 2c,
+  right after the signal bus is created and opened, which also required making `MainSignalBus.open()`
+  idempotent (`WorkerSpawner.start()` still calls it as its step 1, and a second mapping would leak
+  the first arena). `InferenceWiring` now reads the signal bus per event instead of
   capturing it once, so a null bus no longer disables the broadcast entirely; the MMF byte is still
   written under exactly the same condition, so live behaviour is unchanged. `energyState()`'s
   `WorkerSpawner` mention in `PowerStatusView.java:9` was stale and was corrected in the same commit.
@@ -584,6 +590,11 @@ Main (13): `app-services/.../worker/{RemoteKnowledgeClient,GrpcCircuitBreaker,Ci
 Main, worker side (6): `worker-core/.../grpc/{GrpcContextKeys,RequestMetadataInterceptor,TracingServerInterceptor}.java`;
 `indexer-worker/.../grpc/Delegating{Search,Ingest,Health}Service.java`;
 plus `indexer-worker/.../server/ops/{KnowledgeServerGrpcWiring,ForegroundLoadInterceptor}.java` (2).
+Also deleted with the interceptor at A9: `app-engine/src/test/.../ForegroundLoadGateTest.java` (the
+A4 drift pin, which exists only to compare the gate against the interceptor). The A4 test-only
+`app-engine -> indexer-worker` dependency does NOT go with it — A6 promoted that edge to a
+main-source `implementation` (EngineRoot composes `KnowledgeServer`), so A9 removes the pin test
+and leaves the edge.
 Test (5 of the 7 under `ipc-common/src/test`): `grpc/{GrpcCircuitBreakerTest,GrpcRetryServiceConfigTest,RequestIdClientInterceptorTest,TraceClientInterceptorTest}.java`
 and `IndexingProtoDeprecationsTest.java` (re-scope, since the proto's services go).
 Chaos (1): `system-tests/src/main/.../chaos/GrpcTestClient.java`.
@@ -700,7 +711,7 @@ Inject an `io.justsearch.app.services -> io.justsearch.indexerworker.services` e
 red, revert. Record both outputs under `evidence/A/`.
 
 **`WholeProgramDeadCodeTest` baseline.** The store is
-`modules/dead-code-audit/archunit_store/80a1aacf-0440-4387-81e6-b7636caaf0bf` (18 accepted entries
+`modules/dead-code-audit/archunit_store/80a1aacf-0440-4387-81e6-b7636caaf0bf` (20 accepted entries
 today) plus `stored.rules`. `archunit.properties` sets `allowStoreUpdate=true` (shrink direction)
 and `allowStoreCreation=false`, so removing dead classes rewrites the store automatically — the
 **rewritten store must be committed with the deletion commit**, or the next run shows an unexplained

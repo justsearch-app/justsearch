@@ -208,35 +208,61 @@ public final class MmfWorkerSignalBus implements WorkerSignalBus {
   /**
    * The in-process GPU-scheduling gauge this bus feeds (lane F item A5).
    *
-   * <p>Direction of travel: today the Head writes two memory-mapped bytes and this class copies them
-   * into the gauge on every read, so the gauge — not the file — is what every reader actually
-   * observes, and the composition rule has one owner. Item A6 hands the Engine root's single gauge
-   * in here instead of constructing one, and item A10 deletes the bytes and this class with them.
+   * <p>Direction of travel: while the Worker is a separate process the Head writes two
+   * memory-mapped bytes and this class copies them into the gauge on every read, so the composition
+   * rule has one owner. Item A6 supersedes this class on the live path — the Engine root passes
+   * {@code InProcessWorkerSignalBus} over its single gauge, with no file in between — and item A10
+   * deletes the bytes and this class with them.
+   *
+   * <p><b>Not handed out.</b> The gauge is this class's write-through cache, not its answer: see
+   * {@link #readGpuScheduling()} for why returning the live mutable object let two reader threads
+   * observe each other's refresh.
    */
   private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
       new io.justsearch.core.scheduling.GpuSchedulingGauge();
 
   /**
-   * The gauge, refreshed from the memory-mapped bytes. Reading through this is equivalent to the two
-   * accessors below and is the shape that survives the wire deletion.
+   * The two bytes, read once and answered from locals.
+   *
+   * <p><b>Why this does not return the gauge.</b> The first cut refreshed the shared mutable
+   * {@code gpuScheduling} on every read and handed it back. Two worker threads calling it
+   * concurrently would then race through one object: thread A refreshes (byte = 1), thread B
+   * refreshes (byte = 0), thread A reads — and gets B's value. The gauge is a write-through cache of
+   * a file two processes share, so the read must be a snapshot. Item A6 makes the whole question
+   * moot for the in-process bus ({@code InProcessWorkerSignalBus} reads the one real gauge, which
+   * has no file behind it), and A10 deletes this class.
    */
-  public io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling() {
+  private GpuSchedulingSnapshot readGpuScheduling() {
     ensureOpen();
-    gpuScheduling.setMainGpuActive(
-        segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE) == 1);
-    gpuScheduling.setEnergyReduced(
-        segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_ENERGY_REDUCED) == 1);
-    return gpuScheduling;
+    boolean mainGpuActive =
+        segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE) == 1;
+    boolean energyReduced =
+        segment.get(ValueLayout.JAVA_BYTE, MmfWorkerSignalLayoutV1.OFFSET_ENERGY_REDUCED) == 1;
+    // Keep the shared gauge current for anything reading it as the cache it is; the answer below
+    // comes from the locals, not from the object.
+    gpuScheduling.setMainGpuActive(mainGpuActive);
+    gpuScheduling.setEnergyReduced(energyReduced);
+    return new GpuSchedulingSnapshot(mainGpuActive, energyReduced);
   }
+
+  /** One consistent read of the two scheduling signals. */
+  private record GpuSchedulingSnapshot(boolean mainGpuActive, boolean energyReduced) {}
 
   @Override
   public boolean isMainGpuActive() {
-    return gpuScheduling().isMainGpuActive();
+    return readGpuScheduling().mainGpuActive();
   }
 
   @Override
   public boolean isEnergyReduced() {
-    return gpuScheduling().isEnergyReduced();
+    return readGpuScheduling().energyReduced();
+  }
+
+  @Override
+  public boolean shouldYieldGpuBackfill() {
+    GpuSchedulingSnapshot snapshot = readGpuScheduling();
+    return io.justsearch.core.scheduling.GpuSchedulingGauge.shouldYield(
+        snapshot.mainGpuActive(), snapshot.energyReduced());
   }
 
   @Override

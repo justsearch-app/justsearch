@@ -25,11 +25,13 @@ import java.util.function.Supplier;
  * covers will pass through at A6.
  *
  * <p><b>One instance, not two.</b> The gauge is process-scoped and owned by {@code KnowledgeServer}
- * (field at {@code KnowledgeServer.java:166}), which hands it to {@code IndexingPacing}
- * ({@code :1120}); {@code IndexingPacing.foregroundLoad()} is the accessor the root reads it back
- * through. This class deliberately has no no-arg constructor: a gate holding its own fresh
- * {@code ForegroundLoad} would be a second gauge that nothing paces off, which is the silent
- * failure mode {@code KnowledgeServer.java:160-165} already warns about for per-appServices gauges.
+ * (a {@code private final} field), which hands it to the {@code IndexingPacing} it builds during
+ * {@code start()}. The root reads it through {@code KnowledgeServer.foregroundLoad()}, the accessor
+ * onto that field — <b>not</b> through {@code IndexingPacing.foregroundLoad()}, which before
+ * {@code start()} answers from the {@code IndexingPacing.unthrottled()} placeholder and hands back a
+ * fresh gauge nothing paces off. This class deliberately has no no-arg constructor for the same
+ * reason: a gate holding its own {@code ForegroundLoad} is the silent failure mode
+ * {@code KnowledgeServer} already warns about for per-appServices gauges.
  *
  * <p><b>Not wired yet, on purpose.</b> A4 builds the gate and its drift test; item <b>A6</b> — the
  * in-process {@code SearchPort} adapter over {@code WorkerAppServices} — is what calls it. Until
@@ -38,9 +40,16 @@ import java.util.function.Supplier;
  * {@code ForegroundLoadGateTest}, so a rename or an added RPC cannot silently desynchronise the two
  * producers during the transition.
  *
- * <p>Thread-safe and reentrancy-safe: the gate holds no state of its own, and every increment is
+ * <p>Thread-safe and <b>balance-safe</b>: the gate holds no state of its own, and every increment is
  * paired with exactly one decrement in a {@code finally}, so a normal return, a thrown exception,
  * an {@link java.util.concurrent.CancellationException} and an {@link Error} all balance the gauge.
+ *
+ * <p><b>It is not reentrancy-safe, and must not be.</b> A nested gated call would count the same
+ * user-waiting operation twice — a {@code Search} that internally reranks would read as two
+ * foreground calls and over-throttle indexing. The gauge is a count of user-waiting operations, not
+ * of method entries, so the caller wraps at exactly ONE layer:
+ * {@code EngineKnowledgeClient.executeSearchRpc}, which is the boundary the deleted
+ * {@code ForegroundLoadInterceptor} sat on. Do not add a second wrap deeper in.
  */
 public final class ForegroundLoadGate {
 

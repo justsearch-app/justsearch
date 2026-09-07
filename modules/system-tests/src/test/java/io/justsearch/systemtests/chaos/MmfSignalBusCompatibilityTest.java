@@ -69,10 +69,11 @@ final class MmfSignalBusCompatibilityTest {
 
     try (MmfWorkerSignalBus worker = new MmfWorkerSignalBus(signalPath)) {
       worker.open();
-      // Lane F item A5: the readers observe the gauge, not the bytes. Until item A10 the bytes are
-      // still the transport, so the gauge must track them on every read.
-      assertFalse(worker.gpuScheduling().isMainGpuActive());
-      assertTrue(worker.gpuScheduling().isEnergyReduced());
+      // Lane F item A5: one rule, two reasons. Until item A10 the bytes are still the transport,
+      // so each read must reflect the current bytes. Item A6 stopped handing out the live gauge
+      // (two reader threads raced through it), so the assertions read the accessors.
+      assertFalse(worker.isMainGpuActive());
+      assertTrue(worker.isEnergyReduced());
       assertTrue(worker.shouldYieldGpuBackfill(), "energy alone is a reason to yield");
 
       try (MainSignalBus main = new MainSignalBus(signalPath)) {
@@ -81,8 +82,8 @@ final class MmfSignalBusCompatibilityTest {
         main.writeGpuActive(true);
       }
 
-      assertTrue(worker.gpuScheduling().isMainGpuActive(), "a later write must be picked up");
-      assertFalse(worker.gpuScheduling().isEnergyReduced());
+      assertTrue(worker.isMainGpuActive(), "a later write must be picked up");
+      assertFalse(worker.isEnergyReduced());
       assertTrue(worker.shouldYieldGpuBackfill(), "now the GPU reason holds");
 
       try (MainSignalBus main = new MainSignalBus(signalPath)) {

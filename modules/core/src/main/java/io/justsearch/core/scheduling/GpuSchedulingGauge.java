@@ -27,6 +27,15 @@ package io.justsearch.core.scheduling;
  * ({@code modules/adapters-lucene/build.gradle.kts:13}) re-exports it. No new module edge is needed
  * in either direction, so nothing about the ring structure or ArchUnit rule 6b moves.
  *
+ * <p><b>Two consumers of these signals, not one.</b> {@link #shouldYieldGpuBackfill()} is the
+ * unconditional rule the loop-level sites read. There is a <em>second</em>, provider-aware
+ * composition of the same pair: {@code LoopPacingPolicy.shouldRunBackfill}
+ * ({@code modules/worker-services/.../loop/ops/LoopPacingPolicy.java}), read by
+ * {@code BackfillScheduler} and {@code EmbeddingBackfillOps}, where energy always defers but the
+ * GPU signal defers only when {@code embeddingProvider.isUsingGpu()} — a CPU-backed backfill has no
+ * reason to yield VRAM it is not using. The two are deliberately NOT merged: they answer different
+ * questions. Named here so item A10's sweep of the MMF readers cannot miss the second one.
+ *
  * <p><b>Transitional state (until item A10).</b> While the split process still exists the MMF stays
  * the transport: the writers set this gauge <em>and</em> the byte, and the Worker's
  * {@code MmfWorkerSignalBus} feeds its own gauge from the byte on every read. The gauge is therefore

@@ -58,6 +58,13 @@ public final class MainSignalBus implements Closeable {
      * Creates the file if it doesn't exist.
      */
     public synchronized void open() throws IOException {
+        if (segment != null) {
+            // Idempotent since lane F item A5 review #14: the bootstrap opens the bus itself so it
+            // can republish the GPU-scheduling gauge into a freshly mapped file and start the
+            // energy poll before port discovery. WorkerSpawner.start() still calls open() as step 1,
+            // and a second mapping would leak the first arena and the first RandomAccessFile.
+            return;
+        }
         Files.createDirectories(signalPath.getParent());
 
         this.raf = new RandomAccessFile(signalPath.toFile(), "rw");
