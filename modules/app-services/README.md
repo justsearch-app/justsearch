@@ -11,10 +11,19 @@ This module is the integration "glue" of the application. It bridges the gap bet
 
 ## 🧠 Key Concepts
 
-1.  **The "Hollow" Shell**: The Main Process (UI) does *not* index or search directly. It spawns a `Worker Process`.
-2.  **Worker Spawning**: `WorkerSpawner` launches the worker process, injecting specific JVM flags (Vector API, AppCDS).
+> **Lane F stage A (tempdoc 936) has moved this ground.** Item A6 composes the index half
+> **in-process** (`modules/app-engine` → `EngineRoot`), and item A11 deleted the worker child
+> process, `WorkerSpawner` and its supervision. The gRPC client (`RemoteKnowledgeClient`) and the
+> memory-mapped signal bus below are still here — they go at item A10. Read every "process" and
+> "spawn" statement in this file as describing the pre-lane-F shape unless it says otherwise.
+
+1.  **The "Hollow" Shell**: The Main Process (UI) does *not* index or search directly. It used to
+    spawn a `Worker Process`; since item A6 it constructs the same Knowledge Server in its own JVM.
+2.  **Worker Spawning** *(retired at item A11)*: `WorkerSpawner` launched the worker process,
+    injecting specific JVM flags (Vector API, AppCDS). There is no child process to launch now.
 3.  **IPC Coordination**: `MainSignalBus` polling happens on dedicated thread.
-4.  **Self-Healing**: The `WorkerSpawner` performs pre-flight checks to cleanup stale locks from previous crashes.
+4.  **Self-Healing** *(retired at item A11)*: `WorkerSpawner` performed pre-flight checks to clean up
+    stale locks from previous crashes.
 
 ---
 
@@ -72,7 +81,7 @@ This module is the integration "glue" of the application. It bridges the gap bet
 | Goal | Architecture | Primary File(s) |
 | :--- | :--- | :--- |
 | **Update Worker IPC/Signaling** | Knowledge | `KnowledgeServerBootstrap.java`, `MainSignalBus.java` |
-| **Modify Worker Startup/Flags** | Knowledge | `WorkerSpawner.java` (Vector API, AppCDS, Stale Lock Cleanup) |
+| **Modify Worker Startup/Flags** | Knowledge | `modules/app-engine/.../EngineRoot.java` — the composition root. `WorkerSpawner.java` (Vector API, AppCDS, Stale Lock Cleanup) owned this until item A11 deleted it. |
 | **Change gRPC Client Logic** | Knowledge | `RemoteKnowledgeClient.java` |
 | **Edit Legacy Pipeline** | Legacy | `SearchRuntimeBootstrap.java`, `StageAdapterFactory` |
 | **Fix Local File Watching** | Legacy | `DefaultIndexingService.java` |
@@ -103,9 +112,10 @@ This module is the integration "glue" of the application. It bridges the gap bet
 
 ### 1. Worker Management (The "Knowledge Server")
 The core of the modern architecture. `app-services` acts as the **Process Manager** and **Client**:
-*   **Spawning**: `WorkerSpawner` launches `indexer-worker.jar` (or native image).
+*   **Spawning** *(retired at item A11; the composition root is `EngineRoot` in `app-engine`)*:
+    `WorkerSpawner` launched `indexer-worker.jar` (or native image).
     *   **Optimization**: Previously injected `--add-modules jdk.incubator.vector` for SIMD; removed to enable AOT Cache (see tempdoc 269 §D4a).
-    *   **Resilience**: Deletes stale `write.lock` files if the previous run crashed.
+    *   **Resilience**: Deleted stale `write.lock` files if the previous run crashed.
 *   **Discovery**: Uses `MainSignalBus` (Memory Mapped File) to discover the ephemeral gRPC port chosen by the worker.
 *   **Liveness**: Maintains a "Heartbeat" in the MMF; if this stops, the worker self-terminates (Suicide Pact).
 
@@ -133,8 +143,8 @@ The `DefaultAppFacade` provides the interface for the **Local/In-Process** stack
 
 | File | Purpose |
 | :--- | :--- |
-| `KnowledgeServerBootstrap.java` | **New Architecture Entry**. Spawns and manages the Knowledge Server process. |
-| `WorkerSpawner.java` | Handles process creation, JVM flags, self-healing, and dev/prod profile switching. |
+| `KnowledgeServerBootstrap.java` | **New Architecture Entry**. Starts and manages the Knowledge Server (a child process until item A11; in this JVM via `EngineRoot` since item A6). |
+| ~~`WorkerSpawner.java`~~ | Deleted at lane F stage A item A11. Handled process creation, JVM flags, self-healing, and dev/prod profile switching. |
 | `RemoteKnowledgeClient.java` | gRPC Client for Search/Ingest/Health. |
 | `MainSignalBus.java` | **IPC Layer**. Manages the Memory Mapped File (Signal Bus) for coordination. |
 

@@ -80,6 +80,9 @@ dependencies {
   // app-services already uses for its log-assertion tests.
   testImplementation(libs.logback.classic)
   testImplementation(libs.logback.core)
+  // Lane F stage A item A9 deleted the wire tests (WorkerSearchServiceDocumentSliceWireTest and
+  // friends) that needed a real Netty server; no test source here imports io.grpc any more.
+  // Retire with the standalone distribution at item A13.
   testImplementation(libs.grpc.netty.shaded)
 }
 

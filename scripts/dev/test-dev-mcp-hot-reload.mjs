@@ -617,13 +617,15 @@ const classpathPairingTests = [
 const moduleScopeTests = [
   ['M6: the layout the dev-runner records is the layout the reload tool parses back', () => {
     // The cross-side pin the Java test used to claim falsely (it restated WorkerSpawner's own
-    // implementation and never referenced this side). Here both ends are executable in one
-    // process: the writer's output must be exactly what the parser understands.
+    // implementation and never referenced this side; item A11 has since deleted WorkerSpawner
+    // and the Worker child process it launched). Here both ends are executable in one process:
+    // the writer's output must be exactly what the parser understands.
     const dir = devRunner.hotReloadClassesDir('F:/t');
     assert.equal(dir, 'F:/t/modules/worker-services/build/classes/java/main');
     assert.equal(devRunner.HOTRELOAD_MODULE, 'worker-services');
     assert.equal(reloadModuleFromClassesDir(dir), devRunner.HOTRELOAD_MODULE);
-    // …and WorkerSpawner's Java-side half is pinned to the same segment sequence.
+    // …and, at the time this was written, WorkerSpawner's Java-side half was pinned to the same
+    // segment sequence (WorkerSpawner itself is gone since item A11 — see the note above).
     const java = 'modules/worker-services/build/classes/java/main';
     assert.ok(dir.endsWith(java), `dev-runner must emit ${java}`);
   }],

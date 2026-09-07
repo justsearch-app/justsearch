@@ -1836,8 +1836,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // No sysprop write here (883 §C.5c residue, #605 review S1). The save above plus the rebuild
     // below already deliver this path at ordinal 300 (settings.json) through
     // ConfigStoreRebuilder.contributeUiSettings, and every reader takes it from ResolvedConfig —
-    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH is not in
-    // WorkerSpawner.WORKER_FORWARDED_PROPS, so no process boundary depends on the sysprop.
+    // InferenceConfig reads rc.ai().llmModelPath(), and LLM_MODEL_PATH was not in
+    // WorkerSpawner.WORKER_FORWARDED_PROPS, so no process boundary depended on the sysprop even
+    // before lane F stage A item A11 deleted that spawner and the boundary with it.
     // Writing it as well put a GUI/installer value at ordinal 500, which is the precedence lie
     // tempdoc 842 (S2) then needed a companion `.source` marker to un-tell: with the write gone the
     // marker has nothing to correct, and the installer's path classifies as STORED_SETTINGS —
@@ -1904,10 +1905,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       String absolute = modelDir.toAbsolutePath().toString();
       feature.setter().accept(absolute);
       // This sysprop write SURVIVES the 883 promotion retirement, and not by oversight (#605
-      // review S1). Unlike the chat model path it is load-bearing across a process boundary: the
-      // Worker is respawned immediately after this step (ConfigurationStage's restart gate), and
-      // WorkerSpawner forwards these five keys as `-D` args read via EnvRegistry.get(), i.e. from
-      // the HEAD'S SYSPROPS. The ordinal-450 worker snapshot cannot carry them instead, because
+      // review S1). Unlike the chat model path it is what the index half actually reads: these five
+      // keys reach it through EnvRegistry.get(), i.e. from THIS JVM'S SYSPROPS. Before lane F stage
+      // A the route was longer and the reason was the same — the Worker was respawned right after
+      // this step (ConfigurationStage's restart gate) and WorkerSpawner forwarded the five keys as
+      // `-D` args. Item A11 deleted the respawn and the forwarding; the read is now direct, so this
+      // write matters more, not less. The ordinal-450 worker snapshot cannot carry them instead, because
       // ResolvedConfig.toWorkerSnapshot is called exactly once, at boot (HeadlessApp.resolveConfig),
       // so the file on disk predates this install and knows nothing about the models it just
       // landed. Deleting this line would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker

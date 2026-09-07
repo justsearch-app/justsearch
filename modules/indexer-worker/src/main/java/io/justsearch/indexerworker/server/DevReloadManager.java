@@ -14,7 +14,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>On reload signal (MMF byte at offset 29): quiesces the IndexingLoop, reconstructs
  * {@link DefaultWorkerAppServices} from the same {@link InfraContext}, re-wires models,
- * swaps gRPC delegates, and starts the new indexing loop.
+ * publishes the new instance, and starts the new indexing loop. Until lane F stage A item A9 the
+ * publish step was two: re-point the three {@code Delegating*Service} gRPC delegates, then update
+ * the field. The delegates are gone, so the volatile write IS the swap — see
+ * {@link #performReload()}.
  *
  * <p>This works in tandem with JBR + HotSwapPush (Phase 1): class bytecode is updated by
  * HotSwap, then Phase 2 restarts services so constructors, static initializers, and field

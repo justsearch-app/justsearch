@@ -24,12 +24,14 @@ import java.io.Closeable;
  * application objects are created and wired.
  *
  * <p>{@link #close()} closes only the indexing loop (the sole owned background thread).
- * All other resources (gRPC server, Lucene runtimes, job queue, signal bus) are closed by
- * {@code KnowledgeServer} in its own shutdown sequence.
+ * All other resources (Lucene runtimes, job queue, signal bus) are closed by
+ * {@code KnowledgeServer} in its own shutdown sequence. Until lane F stage A item A9 that list
+ * also had a gRPC server at the head of it.
  */
 public interface WorkerAppServices extends Closeable {
 
-  // --- Concrete service accessors (used by GrpcWiring for delegate wrapping) ---
+  // --- Concrete service accessors. Item A9 deleted the gRPC wiring that used to wrap these in
+  // --- delegates; the Engine's port adapter now calls them straight through appServices(). ---
 
   WorkerSearchService searchService();
 

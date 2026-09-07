@@ -208,7 +208,7 @@ To prevent configuration leakage and ensure testability, environment access is r
 **Allowlisted classes (can access env via `EnvRegistry`):**
 - `HeadAssembly` (entrypoint)
 - `InferenceLifecycleManager`
-- `WorkerSpawner`
+- ~~`WorkerSpawner`~~ — deleted at lane F stage A item A11 with the worker process it launched
 - `KnowledgeServerConfig`
 
 ### Resource Ownership

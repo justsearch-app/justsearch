@@ -14,7 +14,10 @@ package io.justsearch.ipc.grpc;
 public final class GrpcMessageLimits {
   private GrpcMessageLimits() {}
 
-  /** Max inbound message size, in bytes, for both the Worker gRPC server and the Head client. */
+  /**
+   * Max inbound message size, in bytes. Read by both ends of the channel until item A9 deleted the
+   * server end; the Head's client is the only reader left, and it goes at item A10.
+   */
   public static final int MAX_INBOUND_MESSAGE_BYTES = 32 * 1024 * 1024;
 
   /**

@@ -27,13 +27,18 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ol>
  *   <li><b>Policy drift</b>: each process's declared {@code policy} block must equal the live policy
- *       record defaults ({@link SupervisionPolicy} for the Worker, {@link BrainSupervisionPolicy} for
- *       the Brain). A constant changed in code without the register fails here, and vice versa.</li>
+ *       record defaults ({@link BrainSupervisionPolicy} for the Brain; {@code SupervisionPolicy} for
+ *       the Worker until lane F stage A item A11 deleted it). A constant changed in code without the
+ *       register fails here, and vice versa. A <b>retired</b> entry has no live record left, so this
+ *       check is replaced for it by {@link #workerEntryIsRetired()} — see that method.</li>
  *   <li><b>Matrix completeness</b>: every declared fault mode is in the known vocabulary, no process
- *       repeats a mode, and the union of both processes' modes covers the full vocabulary.</li>
+ *       repeats a mode, and the union of both processes' modes covers the full vocabulary. Retired
+ *       entries are included: the vocabulary is what stage B will be declared against.</li>
  *   <li><b>Guard resolution</b>: every fault mode names at least one guard, and each guard is either an
  *       allowed sentinel ({@code dev-stack-smoke} / {@code audit-verdict}) or an FQCN that resolves to a
- *       real test file — so no row is silently un-guarded.</li>
+ *       real test file — so no row is silently un-guarded. Retired entries are <b>skipped</b>: their
+ *       guards were deleted with the code they pinned, so resolving them would fail the build for the
+ *       retirement itself. The register's {@code guardsNote} records which of those FQCNs are gone.</li>
  * </ol>
  */
 @DisplayName("supervision contract: register <-> live policies <-> guards")
@@ -72,7 +77,8 @@ class SupervisionContractTest {
 
   /**
    * Lane F stage A item A11 retired the Worker entry: {@code SupervisionPolicy} was deleted with
-   * {@code WorkerSpawner}, so there is no live record to compare the declared block against.
+   * {@code WorkerSpawner}, so there is no live record to compare the declared block against, and
+   * {@link #everyGuardResolves()} skips the entry for the same reason (its guards went too).
    *
    * <p>The assertion is not dropped, it is <b>inverted into a pin on the retirement</b>: a retired
    * entry must say so explicitly, and an entry that is NOT retired must still have its policy

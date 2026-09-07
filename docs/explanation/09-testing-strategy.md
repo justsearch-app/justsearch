@@ -24,7 +24,7 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
 *   **Example:** `BatchUpdateIntegrationTest` (Does it actually write to disk?).
 *   **Rule:** IO allowed. No networking/sockets if possible.
 *   **Examples (current):**
-    *   `KnowledgeServerIntegrationTest` (app-services ↔ worker wiring via real gRPC)
+    *   `EngineRootInProcessPortsTest` (app-engine ↔ worker wiring through the in-process ports). This replaced `KnowledgeServerIntegrationTest`, whose ingest-then-search cases it covers; lane F stage A item A11 deleted that class along with the worker process, port discovery and spawner it also pinned.
     *   `InferenceLifecycleManagerExternalServerTest` (adopting an already-running `llama-server` on the configured port)
     *   `LlamaServerPropsParsingTest` (robust `/props` parsing for `n_ctx` / `model_alias`)
     *   `LocalApiCorsPolicyTest` (regression for loopback-only CORS allowlist / local bind safety)

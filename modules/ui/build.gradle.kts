@@ -1137,7 +1137,8 @@ val generateWorkerAotCache by tasks.registering {
 // ============================================================================
 // Same two-step workflow as production but uses the system JDK instead of the
 // bundled JLink runtime. Caches are stored under build/aot-dev/ and used by
-// dev-runner's direct-launch path and WorkerSpawner in dev mode.
+// dev-runner's direct-launch path (and by WorkerSpawner in dev mode, until lane F stage A item A11
+// deleted it — the worker AOT cache below outlives it only until item A13 collapses the spawn paths).
 // Caches are UP-TO-DATE as long as the installDist JARs haven't changed.
 
 val devAotCacheDir = layout.buildDirectory.dir("aot-dev")

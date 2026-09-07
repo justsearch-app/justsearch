@@ -14,11 +14,14 @@ import java.util.function.BiConsumer;
 /**
  * Tracks the operational health of the Worker (Knowledge Server) capability.
  *
- * <p>Structurally acquired when the Worker first connects (health transitions from PENDING).
- * Health fluctuates thereafter as the Worker process crashes/restarts/recovers.
+ * <p>Structurally acquired when the Worker first becomes reachable (health transitions from
+ * PENDING). Health fluctuates thereafter as the Worker fails and recovers — until lane F stage A
+ * item A11 that meant a separate process crashing and being respawned; since A11 the index half
+ * runs in this JVM, so the remaining arc is a failed start recovered by
+ * {@code KnowledgeServerHealthMonitor}'s boot-recovery arm, or a LOST that stays lost.
  *
  * <p>The generation counter distinguishes first-connect from recovery: generation 0→1 is
- * first connect, 1→2+ is recovery after crash. Callers can use this to decide which
+ * first connect, 1→2+ is recovery after a failure. Callers can use this to decide which
  * initialization to re-run.
  */
 public final class WorkerCapability implements Capability {

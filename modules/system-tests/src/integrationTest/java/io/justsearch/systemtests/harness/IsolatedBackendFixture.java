@@ -51,8 +51,9 @@ import java.util.stream.Stream;
  * requests on Windows; both phases are required.
  *
  * <p>Cleanup uses {@link Process#destroyForcibly()} (~0.42&nbsp;s on Windows in the spike).
- * The spawned Head spawns its own Worker subprocess; killing the parent kills the child too
- * via the existing {@code WorkerSpawner} Job-Object cleanup. SQLite WAL files released
+ * The spawned Head used to spawn its own Worker subprocess, and killing the parent killed the child
+ * too via {@code WorkerSpawner}'s Job-Object cleanup; lane F stage A item A11 deleted both, so there
+ * is one process to kill. SQLite WAL files released
  * cleanly in the spike — the tempdir delete retry loop is defense-in-depth, not load-bearing.
  *
  * <p><strong>Known limitation:</strong> if the test JVM itself crashes, the spawned Head is

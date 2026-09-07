@@ -7,6 +7,12 @@
  * uses to build B1 (per-run worker.log preservation), B2 (stop-report exit-code/liveness), and
  * B3 (bounded head heap + heap-dump-on-OOM JVM args). See docs/tempdocs/730-worker-lifecycle-integrity.md
  * §PLAN Increment 4 for the acceptance criteria this test targets.
+ *
+ * Historical note (lane F item A11): the WorkerSpawner.java rotation this file's B1 tests
+ * simulate was written when a separate Worker JVM existed; item A11 later deleted WorkerSpawner
+ * and the Worker child process, removing the only known producer of worker.log. Whether anything
+ * still writes or rotates that path has not been verified — flagged for lane F item A13 to
+ * resolve. None of these tests' assertions have been weakened, skipped, or removed on that basis.
  */
 
 import assert from 'node:assert/strict';
@@ -79,11 +85,13 @@ async function testPreserveWorkerLogMissingCases() {
 
 /**
  * The exact regression tempdoc 730 §THEORIZE B reproduced: worker.log is a single file keyed to
- * the (persistent, cross-run) dataDir, rotated by WorkerSpawner.java on the NEXT worker spawn.
- * Simulate two runs against the SAME dataDir (mirroring restart-preserves-index): run A writes
- * "death run" content, is preserved at its own stop; a NEW run B then overwrites the shared
- * worker.log (simulating WorkerSpawner's rotation on the next start) and is preserved at ITS
- * stop. Assert run A's preserved copy survives run B's start UNCHANGED and distinct from run B's.
+ * the (persistent, cross-run) dataDir, and at the time this was written was rotated by
+ * WorkerSpawner.java on the NEXT worker spawn (see this file's head comment on item A11's
+ * deletion of WorkerSpawner). Simulate two runs against the SAME dataDir (mirroring
+ * restart-preserves-index): run A writes "death run" content, is preserved at its own stop; a
+ * NEW run B then overwrites the shared worker.log (simulating what was WorkerSpawner's rotation
+ * on the next start) and is preserved at ITS stop. Assert run A's preserved copy survives run
+ * B's start UNCHANGED and distinct from run B's.
  */
 async function testStartStopStartTwicePreservesDistinctLogs() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-workerlog-cycle-'));
@@ -101,7 +109,8 @@ async function testStartStopStartTwicePreservesDistinctLogs() {
     assert.equal(runAResult.preserved, true);
 
     // A NEW start (run B) rotates/overwrites the shared worker.log — the exact destructive
-    // event tempdoc 730 identified (WorkerSpawner.java:366-386 rotation on next spawn).
+    // event tempdoc 730 identified (WorkerSpawner.java:366-386 rotation on next spawn, back
+    // when WorkerSpawner existed; item A11 deleted it, see this file's head comment).
     fs.writeFileSync(sharedWorkerLog, 'run-B: 2026-07-14T16:06:00Z boot\n', 'utf8');
     const runBDir = path.join(tempRoot, 'runs', 'run-B');
     fs.mkdirSync(runBDir, { recursive: true });
@@ -125,7 +134,8 @@ async function testStartStopStartTwicePreservesDistinctLogs() {
  * Reap-after-restart ownership guard (tempdoc 730 Increment-4 review). Reproduces the exact
  * mislabel construction the review flagged: run A stamps worker.log at readiness (content A,
  * size sA at mtime mA); a NEW run B is spawned before run A's stop-time preserve() runs, and B's
- * spawn triggers WorkerSpawner's rotation of the shared path. A naive "current mtime >= stamp
+ * spawn triggered what was, at the time, WorkerSpawner's rotation of the shared path (item A11
+ * has since deleted WorkerSpawner; see this file's head comment). A naive "current mtime >= stamp
  * mtime" guard would treat B's fresh content as A's own "verified" log (it always is >= — mtime
  * only advances). The implemented guard instead requires monotonic SIZE (an append-only log never
  * shrinks while a run owns it) plus name-based rotation lookup (worker.log.1/.2), so:
@@ -137,7 +147,7 @@ async function testStartStopStartTwicePreservesDistinctLogs() {
  *     silent mislabel
  *
  * (Substitution note: the reviewed plan's first-choice guard was birthtime identity —
- * WorkerSpawner renaming worker.log -> worker.log.1 preserves birthtime while a fresh spawn's
+ * WorkerSpawner renaming worker.log -> worker.log.1 used to preserve birthtime while a fresh spawn's
  * file gets a new one. A live probe on this Windows/NTFS checkout disproved that: NTFS
  * file-system tunneling hands a freshly-created file at a just-vacated path the OLD file's
  * birthtime back, making the rotated and the fresh-replacement file indistinguishable by
@@ -174,9 +184,10 @@ async function testPreserveWorkerLogOwnershipGuard() {
     );
 
     // --- Case 2: rotated away, replaced by a fresh smaller file -> heuristic/rotated -------
-    // WorkerSpawner rotates by renaming worker.log -> worker.log.1 on the NEXT spawn; the new
-    // spawn's own worker.log starts fresh and small (below A's stamped size), which is the tell
-    // that the current path stopped being A's.
+    // At the time this was written, WorkerSpawner rotated by renaming worker.log -> worker.log.1
+    // on the NEXT spawn; the new spawn's own worker.log started fresh and small (below A's
+    // stamped size), which is the tell that the current path stopped being A's. (Item A11 has
+    // since deleted WorkerSpawner; see this file's head comment.)
     fs.renameSync(workerLog, workerLog1);
     fs.writeFileSync(workerLog, 'B\n', 'utf8'); // deliberately smaller than stampA.size
     assert.ok(fs.statSync(workerLog).size < stampA.size, 'test fixture: run B\'s fresh file must be smaller than the stamp');

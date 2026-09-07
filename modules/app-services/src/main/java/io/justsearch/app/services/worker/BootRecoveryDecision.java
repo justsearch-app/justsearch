@@ -3,10 +3,13 @@ package io.justsearch.app.services.worker;
 
 /**
  * The Head's BOOT-recovery authority (tempdoc 825): a <b>pure</b> function mapping the observed
- * post-boot state to what the one monitor authority must do next. Mirrors {@link SupervisionDecision}
- * deliberately — same shape, same testability posture, no IO / clock / process handles — for the one
- * state supervision structurally cannot cover: {@code KnowledgeServerBootstrap.start()} failed, so
- * there is no client, no spawner, and nothing supervising anything.
+ * post-boot state to what the one monitor authority must do next. It was modelled deliberately on
+ * {@code SupervisionDecision} — same shape, same testability posture, no IO / clock / process
+ * handles — for the one state supervision structurally could not cover:
+ * {@code KnowledgeServerBootstrap.start()} failed, so there is no client and nothing supervising
+ * anything. Lane F stage A item A11 deleted {@code SupervisionDecision} with the spawner, leaving
+ * this the only recovery authority; the shape is kept because stage B's supervisor is declared
+ * against it.
  *
  * <p>Law: while no client is bound, a failed boot resolves to a bounded re-{@code ATTEMPT} sequence
  * with exponential backoff and then to exactly one terminal {@code GIVE_UP}
@@ -205,8 +208,9 @@ public final class BootRecoveryDecision {
 
   /**
    * Exponential backoff for a 1-based attempt number, capped at the policy ceiling:
-   * {@code min(base << (attempt-1), max)}. Same schedule shape as
-   * {@link SupervisionDecision#backoffMs} so the two recovery authorities do not drift in feel.
+   * {@code min(base << (attempt-1), max)}. Same schedule shape the deleted
+   * {@code SupervisionDecision.backoffMs} used, so the two recovery authorities did not drift in
+   * feel while both existed.
    */
   public static long backoffMs(int nextAttempt, BootRecoveryPolicy policy) {
     long base = policy.baseBackoffMs();

@@ -28,14 +28,14 @@ import org.slf4j.LoggerFactory;
  * <p><b>Why it moved.</b> The energy poll has nothing to do with spawning a process — it was hosted
  * there only because the spawner already owned a scheduler and the memory-mapped signal file. Item
  * A11 deleted {@code WorkerSpawner}; the poll had to outlive it, so it became a small component the
- * composition root owns. Today {@code KnowledgeServerBootstrap} (the root-to-be on the Head side)
- * constructs and starts it, which keeps it running in the current split build; at A6 the
- * {@code app-engine} root takes it over unchanged.
+ * composition root owns. {@code KnowledgeServerBootstrap} constructs and starts it.
  *
- * <p><b>Two sinks, one transitional.</b> Every poll writes {@link GpuSchedulingGauge}, the
+ * <p><b>Two sinks, one already dead.</b> Every poll writes {@link GpuSchedulingGauge}, the
  * in-process authority. It also calls the optional {@link EnergyReducedSink} — the memory-mapped
- * {@code energy_reduced} byte the separate Worker process still reads. That sink is the half that
- * dies at A10; the gauge is the half that survives.
+ * {@code energy_reduced} byte a separate Worker process used to read. Since item A11 there is no
+ * such process and the only construction site passes {@code null} for it
+ * ({@code KnowledgeServerBootstrap}), so the sink has no producer left; it is deleted with the MMF
+ * bus at A10. The gauge is the half that survives.
  */
 public final class EnergyStatePoller implements Closeable {
 
@@ -45,8 +45,9 @@ public final class EnergyStatePoller implements Closeable {
   public static final long POLL_INTERVAL_MS = 15_000L;
 
   /**
-   * The transitional cross-process sink: the memory-mapped {@code energy_reduced} byte. Deleted with
-   * the MMF bus at item A10, after which the gauge is the only publication.
+   * The transitional cross-process sink: the memory-mapped {@code energy_reduced} byte. No live
+   * caller passes one since item A11 removed the reader; deleted with the MMF bus at item A10, after
+   * which the gauge is the only publication.
    */
   @FunctionalInterface
   public interface EnergyReducedSink {

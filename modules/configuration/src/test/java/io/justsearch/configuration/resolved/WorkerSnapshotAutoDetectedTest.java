@@ -18,8 +18,9 @@ import tools.jackson.databind.json.JsonMapper;
  * The Worker still receives {@code justsearch.gpu.layers} once the Head stops mirroring it into a
  * system property (tempdoc 883 decision 4 slice 2).
  *
- * <p>{@code WorkerSpawner.WORKER_FORWARDED_PROPS} forwards {@code -D} flags via
- * {@code EnvRegistry.get()}, which reads the sysprop then the env var — and after slice 2 neither
+ * <p>{@code WorkerSpawner.WORKER_FORWARDED_PROPS} forwarded {@code -D} flags via
+ * {@code EnvRegistry.get()} (the spawner was deleted at lane F stage A item A11; {@code EnvRegistry}
+ * now reads this JVM's own values), which reads the sysprop then the env var — and after slice 2 neither
  * carries a settings-sourced or auto-detected layer count. The value's actual route is the config
  * SNAPSHOT, which the Worker loads at ordinal 450. A static read of
  * {@link ResolvedConfig#toWorkerSnapshot} says every non-null resolution is written; this test is

@@ -3,8 +3,9 @@ package io.justsearch.indexerworker.loop;
 
 /**
  * The Worker's heartbeat-suicide decision authority (tempdoc 630): a <b>pure</b> function deciding
- * whether the Worker should self-terminate. Mirrors {@code
- * io.justsearch.app.services.worker.SupervisionDecision} (Head's recovery authority) and {@code
+ * whether the Worker should self-terminate. Modelled on {@code
+ * io.justsearch.app.services.worker.SupervisionDecision} (the Head's recovery authority, deleted at
+ * lane F stage A item A11) and {@code
  * io.justsearch.app.services.ai.PolledStateLiveness} — the project's pure-injectable-time idiom
  * ({@code nowMs} is a parameter, not a {@code Clock}), so the full truth table is unit-testable
  * without constructing a signal bus. Lives in worker-services next to {@link BackoffPolicy}, the

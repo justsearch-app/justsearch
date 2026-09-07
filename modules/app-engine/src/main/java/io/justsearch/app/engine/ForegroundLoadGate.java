@@ -12,17 +12,17 @@ import java.util.function.Supplier;
  * <p>{@code ForegroundLoad} (tempdoc 885 item 3) is the gauge of how many user-waiting calls are
  * executing right now. It paces indexing ({@code IndexingPacing}) and gates the reopen-on-demand
  * seam ({@code KnowledgeServer} passes {@code () -> foregroundLoad.inFlight() > 0} to
- * {@code LuceneRuntimeBuilder.withForegroundActive}). Today its <b>only</b> producer is
- * {@code ForegroundLoadInterceptor}, a gRPC {@code ServerInterceptor}; item A9 deletes that
- * interceptor together with the gRPC server, and this gate is what keeps the gauge fed once the
- * ports are direct calls.
+ * {@code LuceneRuntimeBuilder.withForegroundActive}). Until item A9 its only producer was
+ * {@code ForegroundLoadInterceptor}, a gRPC {@code ServerInterceptor}; A9 deleted that interceptor
+ * together with the gRPC server, and this gate is what keeps the gauge fed now that the ports are
+ * direct calls.
  *
  * <p><b>Why here and not in {@code ui} or {@code app-services}.</b> {@code ForegroundLoad} lives in
  * {@code io.justsearch.indexerworker.loop.pacing}, which ArchUnit rule 6b (item A2) closes to
  * everything outside {@code io.justsearch.app.engine..}, {@code io.justsearch.indexerworker..} and
  * {@code io.justsearch.adapters..}. The composition root is therefore the only place above the
- * worker half that may touch the gauge, which is also exactly where the nine calls the interceptor
- * covers will pass through at A6.
+ * worker half that may touch the gauge, and since item A6 it is also exactly where the nine calls
+ * the interceptor used to cover pass through.
  *
  * <p><b>One instance, not two.</b> The gauge is process-scoped and owned by {@code KnowledgeServer}
  * (a {@code private final} field), which hands it to the {@code IndexingPacing} it builds during
@@ -33,12 +33,13 @@ import java.util.function.Supplier;
  * reason: a gate holding its own {@code ForegroundLoad} is the silent failure mode
  * {@code KnowledgeServer} already warns about for per-appServices gauges.
  *
- * <p><b>Not wired yet, on purpose.</b> A4 builds the gate and its drift test; item <b>A6</b> — the
- * in-process {@code SearchPort} adapter over {@code WorkerAppServices} — is what calls it. Until
- * then the interceptor remains the live producer and {@link #foregroundOperations()} is pinned
- * against {@code ForegroundLoadInterceptor.foregroundMethods()} by
- * {@code ForegroundLoadGateTest}, so a rename or an added RPC cannot silently desynchronise the two
- * producers during the transition.
+ * <p><b>How it came to be wired.</b> A4 built the gate and its drift test; item <b>A6</b> — the
+ * in-process {@code SearchPort} adapter over {@code WorkerAppServices} — is what calls it. Between
+ * A4 and A6 the interceptor was still the live producer, so {@link #foregroundOperations()} was
+ * pinned against {@code ForegroundLoadInterceptor.foregroundMethods()} by
+ * {@code ForegroundLoadGateTest} to keep the two producers from desynchronising during the
+ * transition. Item A9 deleted the interceptor and with it that comparison; see
+ * {@code ForegroundLoadGateTest} for what guards the set now.
  *
  * <p>Thread-safe and <b>balance-safe</b>: the gate holds no state of its own, and every increment is
  * paired with exactly one decrement in a {@code finally}, so a normal return, a thrown exception,

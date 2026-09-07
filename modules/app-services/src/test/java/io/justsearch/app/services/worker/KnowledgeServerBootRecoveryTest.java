@@ -65,7 +65,9 @@ final class KnowledgeServerBootRecoveryTest {
 
   /**
    * The post-boot state after supervision gave up DURING the boot: the capability holds what
-   * {@code SupervisionEvents.onGaveUp} writes, and the start it was supervising then failed. The
+   * {@code SupervisionEvents.onGaveUp} used to write (deleted at lane F stage A item A11 — the
+   * fixture writes the same verdict by hand, which is why this arc is still reachable to pin), and
+   * the start it was supervising then failed. The
    * transition is the producer's own call, verbatim — what makes this the "real path" (review F1) is
    * the ORDER: the verdict is in the slot before {@code startWithRetry}'s final catch runs over it.
    */

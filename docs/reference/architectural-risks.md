@@ -215,11 +215,11 @@ See [Agent System Architecture](../explanation/22-agent-system-architecture.md) 
 
 **Reassess when:** A new production JVM spawn site is added, or the JDK changes the default for restricted native access again.
 
-**Instrument:** `test:modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerSpawnerJvmFlagsTest.java#argvEnablesNativeAccessWithNoAddOpensOrIncubatorVector`
+**Instrument:** none — see the note below. The Worker-spawn instrument, `WorkerSpawnerJvmFlagsTest#argvEnablesNativeAccessWithNoAddOpensOrIncubatorVector`, was deleted with `WorkerSpawner` at lane F stage A item A11. The surviving spawn site that this risk applies to is the extraction sandbox child, covered by `test:modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommandTest.java`.
 
-**Owner tempdoc:** tempdoc 882 item 4 (decision review, lane 0) — shipped.
+**Owner tempdoc:** tempdoc 882 item 4 (decision review, lane 0) — shipped. Re-instrumenting the remaining JVM spawn sites belongs to tempdoc 936 lane F (item A13, where the spawn paths are collapsed).
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-09-07 (lane F stage A sweep: the Worker is no longer a spawned JVM, so this row now covers only the inference and extraction-sandbox spawn sites).
 
 **Notes:** Closed by decision-review lane 0. Both production spawn sites now pass `--enable-native-access=ALL-UNNAMED`; the pre-Lucene-10 `--add-opens java.base/java.nio` line is gone (Lucene 10 no longer needs it); and the argv is pinned by the named test, which asserts the flag is present and that no `--add-opens` or `jdk.incubator.vector` argument survives. Kept as history because the instrument is what stops a new spawn site from re-opening it.
 
@@ -257,7 +257,7 @@ See [Agent System Architecture](../explanation/22-agent-system-architecture.md) 
 
 **Last reviewed:** 2026-09-02
 
-**Notes:** New row, 2026-09-02, opened by the decision review. The child entry point and the process sandbox both exist; what is missing is a shipped command, and the per-file JVM start is why nobody enabled it. Lane C's evidence also records that a nested Windows job object is blocked on a module-boundary change (`WindowsJobObject` lives in `app-util`, which `worker-services` does not depend on).
+**Notes:** New row, 2026-09-02, opened by the decision review. The child entry point and the process sandbox both exist; what is missing is a shipped command, and the per-file JVM start is why nobody enabled it. Lane C's evidence also recorded that a nested Windows job object was blocked on a module-boundary change (`WindowsJobObject` lived in `app-util`, which `worker-services` does not depend on). That obstacle is now different in kind rather than resolved: lane F stage A item A11 **deleted** `WindowsJobObject` outright, because its only caller was `WorkerSpawner` and a containment helper with no child to contain is residue. Anything that wants nested job objects for the sandbox child must restore it from history first.
 
 A second, independent obstacle was measured on 2026-09-02 while running the full suite for tempdoc 884 PR 2, and it is worth recording because it is not the one the row was opened for: **all six `ProcessExtractionSandboxTest` cases fail inside a deep worktree path** with `java.io.IOException: Cannot run program java.exe: CreateProcess error=206, The filename or extension is too long`. The sandbox passes the whole Worker classpath on the child's command line, so every entry inherits the checkout prefix; under `.claude/worktrees/<name>/...` the command line crosses the Windows 32k limit. It is not load-dependent (it reproduces isolated) and is expected to pass in the shorter main checkout, which is why it has not surfaced before. So the sandbox is unreachable for a second reason beyond the missing argv: as currently invoked it cannot start at all on a long path. Any fix that ships an argv must also shorten the child's command line (an argfile or a pathing jar). It was pinned meanwhile as `process-extraction-sandbox-classpath-too-long`; tempdoc 930 retired the expected-state pin mechanism, so this paragraph is now the record.
 

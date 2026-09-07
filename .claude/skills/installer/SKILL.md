@@ -84,7 +84,7 @@ Entry point: `modules/shell/src-tauri/src/lib.rs`
 ### 1.4 Knowledge Worker (background indexing + embeddings)
 
 - **Distribution**: `lib/worker/` directory (staged into the headless bundle by Gradle via `installDist`)
-- **Spawner**: `WorkerSpawner` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/WorkerSpawner.java`)
+- **Composition**: since lane F stage A item A6 the index half runs **inside the Head JVM**, composed by `EngineRoot` (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java`). Item A11 deleted `WorkerSpawner` and the worker child process it launched; the `lib/worker/` staging above outlives it only until item A13 collapses the standalone distribution.
 - **Logs**: `worker.log` under the app data logs directory (see “Logs” below).
 
 Embeddings (current):
@@ -276,12 +276,12 @@ Current scope: **24 assets, 9.08 GB total**, including ONNX `.onnx` files (embed
 
 ### 6.2 Worker receives embedding model path
 
-When the worker is spawned, `WorkerSpawner` forwards:
+Until lane F stage A item A11 the worker was a child process, and `WorkerSpawner` forwarded, at spawn time:
 
 - `JUSTSEARCH_MODEL_PATH` (if explicitly set in env), otherwise
 - uses `System.getProperty("justsearch.model.path")` (populated from UI settings) to set `JUSTSEARCH_MODEL_PATH` for the worker process.
 
-See: `modules/app-services/src/main/java/io/justsearch/app/services/worker/WorkerSpawner.java`
+That spawner is deleted. In one JVM there is nothing to forward across: the same two lookups happen in place through `EnvRegistry.get()`, against this process's own environment and system properties.
 
 ### 6.3 Embedding runtime uses ONNX Runtime
 

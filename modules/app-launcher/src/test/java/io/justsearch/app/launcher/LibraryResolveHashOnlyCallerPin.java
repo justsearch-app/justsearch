@@ -37,7 +37,8 @@ final class LibraryResolveHashOnlyCallerPin {
    * <ul>
    *   <li>{@code IndexingController} — owns {@code POST /api/library/resolve-hash} (the
    *       single approved HTTP entry point).
-   *   <li>{@code WorkerIngestService} — gRPC server-side handler for {@code LookupPathByHash}.
+   *   <li>{@code WorkerIngestService} — the index half's handler for {@code lookupPathByHash} (a
+   *       gRPC server-side handler until lane F stage A item A9; a direct port call since).
    *   <li>{@code IndexingLoop} — holds the store + Supplier wire to JobBatchExtractor.
    *   <li>{@code IndexingLoopOptions} — record field; the store is passed at ctor time
    *       by DWAS (tempdoc 516 P3 / W7.2 followup — startup-config setters moved to ctor).

@@ -93,8 +93,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    * Slice 445 producer scaffolding. Captures per-row INSERT/UPDATE/DELETE on the
    * {@code jobs} table via SQLite update + commit hooks and broadcasts typed
    * {@link IndexingJobsChangeStream.Delta} events to subscribers (e.g., the
-   * gRPC streaming RPC that backs the {@code core.indexing-jobs} TABULAR
-   * Resource). Lazily attached in {@link #open()}; detached in {@link #close()}.
+   * subscription that backs the {@code core.indexing-jobs} TABULAR Resource — a
+   * server-streaming RPC until lane F stage A item A7, a bounded in-process
+   * hand-off since). Lazily attached in {@link #open()}; detached in {@link #close()}.
    */
   private IndexingJobsChangeStream changeStream;
 
@@ -2144,7 +2145,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   /**
-   * Slice 445: accessor for the change-stream so the gRPC layer
+   * Slice 445: accessor for the change-stream so the ingest service
    * ({@code WorkerIngestService.subscribeIndexingJobs}) can subscribe to
    * snapshot+delta frames. Returns {@code null} if the queue is closed or
    * not yet opened.

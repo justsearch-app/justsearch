@@ -27,8 +27,10 @@ package io.justsearch.indexerworker.services;
  * transport enforces. Stage A item A6 re-homes it onto the port call, which is where it has a
  * reader; seeding an unread field here would be residue, not re-homing.
  *
- * <p>While the wire is still up (through A9) the {@code Delegating*Service} adapters build this
- * from the two worker-core interceptors, so production behaviour is byte-identical.
+ * <p>Between A3 and A9 the {@code Delegating*Service} adapters built this from the two worker-core
+ * interceptors, so production behaviour stayed byte-identical across the change. Item A9 deleted
+ * adapters and interceptors alike; {@code EngineKnowledgeClient} now fills the same two fields by
+ * reading the current span and MDC in place, on the caller's own thread.
  */
 public record CallContext(String traceId, String requestId, CancelSignal cancel) {
 

@@ -8,11 +8,12 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * IPC-focused telemetry helper for worker process lifecycle instrumentation.
+ * IPC-focused telemetry helper for worker lifecycle instrumentation.
  *
  * <p>Tempdoc 417 Phase 2e: thin façade over {@link IpcMetricCatalog}. Bridge holders
- * ({@code WorkerSpawner}, {@code GrpcCircuitBreaker}, {@code RemoteKnowledgeClient}) take
- * {@link IpcTelemetry} (not the catalog) and use {@link #noop()} when no telemetry is wired.
+ * ({@code GrpcCircuitBreaker}, {@code RemoteKnowledgeClient}; {@code WorkerSpawner} until lane F
+ * stage A item A11 deleted it) take {@link IpcTelemetry} (not the catalog) and use {@link #noop()}
+ * when no telemetry is wired.
  *
  * <p>Provides low-cardinality metrics for:
  * <ul>

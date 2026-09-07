@@ -21,9 +21,12 @@
 // second agent's bytecode silently lands in the first agent's Worker (§5.6 case (c)).
 // When <identityEntry> is given it must appear on the ATTACHED VM's own classpath, read
 // back over JDI (PathSearchingVirtualMachine) — i.e. the VM itself confirms it was launched
-// from the tree we are pushing from. The dev-runner records that entry in run.json and
-// WorkerSpawner puts the same absolute path first on the Worker classpath (R4), so the two
-// sides agree by construction. Anything else is refused before a single class is redefined.
+// from the tree we are pushing from. The dev-runner records that entry in run.json, and at the
+// time this was written WorkerSpawner put the same absolute path first on the Worker classpath
+// (R4), so the two sides agreed by construction. Item A11 later deleted WorkerSpawner along with
+// the Worker child process, so that second side no longer exists as described here; what (if
+// anything) re-establishes classpath identity on the current, merged process is not asserted by
+// this comment. Anything else is refused before a single class is redefined.
 //
 // (System properties would be the obvious identity channel, but JDI cannot read one without
 // invoking System.getProperty on a thread suspended BY AN EVENT — a debugger-grade dance this

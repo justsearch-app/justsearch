@@ -57,15 +57,16 @@ import org.slf4j.LoggerFactory;
  * In-process Search service supporting text, vector, and hybrid search.
  *
  * <p>Lane F stage A item A3: this is a plain service — it returns its response object and reports
- * failure by throwing {@link WorkerServiceException}. While the wire is still up (through A9) it is
- * reached, until item A9 deleted it, through a wire adapter that did the transport framing and
- * maps each failure back onto the identical status code.
+ * failure by throwing {@link WorkerServiceException}. Between A3 and A9 it was reached through a
+ * wire adapter that did the transport framing and mapped each failure back onto the identical
+ * status code; item A9 deleted that adapter, and callers now reach this instance directly through
+ * {@code WorkerAppServices.searchService()}.
  *
  * <p>Executes search queries against the Lucene index and returns results. Every method here is
- * <b>foreground</b>: a {@code ServerInterceptor} counts each call in the Worker's foreground-load
+ * <b>foreground</b>: {@code ForegroundLoadGate} counts each call in the Worker's foreground-load
  * gauge for its duration, and the indexing loop throttles itself to a minimum duty while any is in
  * flight (tempdoc 885 item 3). Search itself is never throttled — it is what indexing yields to.
- * The one exception is {@code ListAllDocumentIds}, whose caller is a background pager, not a user.
+ * The one exception is {@code listAllDocumentIds}, whose caller is a background pager, not a user.
  *
  * <p>Returned content is trimmed to {@link #MAX_CONTENT_CHARS} to prevent memory issues with very
  * large documents.

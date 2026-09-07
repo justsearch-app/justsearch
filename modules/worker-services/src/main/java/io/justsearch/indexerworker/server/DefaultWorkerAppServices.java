@@ -54,9 +54,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   /**
    * Tempdoc 885 item 3: the one pacing policy every indexing/backfill site throttles against.
    * Owned by {@code KnowledgeServer}, not by this class: the app services are reconstructed on a
-   * deferred-runtime upgrade and on dev hot-reload while the gRPC server (and therefore the
-   * interceptor that feeds the gauge) is not, so a per-instance gauge would be silently orphaned
-   * from its only producer.
+   * deferred-runtime upgrade and on dev hot-reload while the server — and therefore the producer
+   * that feeds the gauge, {@code ForegroundLoadGate} since item A9 and the gRPC
+   * {@code ForegroundLoadInterceptor} before it — is not, so a per-instance gauge would be
+   * silently orphaned from its only producer.
    */
   private final IndexingPacing indexingPacing;
   private final WorkerSearchService searchService;
@@ -65,7 +66,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   // W7.2: shared registry held by both IndexingLoop and SearchOrchestrator.
   private final EncoderBindings encoderBindings;
   // Tempdoc 418 Phase B — Worker-side filesystem watcher. Owned by appServices so its lifecycle
-  // matches the gRPC service set; closed during {@link #close()}.
+  // matches the service set's; closed during {@link #close()}.
   private final io.justsearch.indexerworker.services.WorkerMethvinWatcher workerWatcher;
 
   /**
@@ -168,10 +169,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.searchService =
         new WorkerSearchService(ctx.searchLifecycleSupplier().get(), null, encoderBindings);
 
-    // 3. gRPC ingest service. WorkerIngestService is null-tolerant for
-    // ingestLifecycle/indexingLoop — write methods return UNAVAILABLE when
+    // 3. Ingest service. WorkerIngestService is null-tolerant for
+    // ingestLifecycle/indexingLoop — write methods report UNAVAILABLE when
     // either is null. KS reconstructs this with non-null values after
-    // DeferredRuntime.upgradeWriter() and swaps the wrapper.
+    // DeferredRuntime.upgradeWriter(); item A9 deleted the wrapper it used to
+    // swap, so publishing the new appServices instance is the whole swap now.
     this.ingestService =
         new WorkerIngestService(
             ctx.jobQueue(),

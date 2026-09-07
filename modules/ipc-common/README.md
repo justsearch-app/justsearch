@@ -9,8 +9,8 @@ This module is the **shared home for Protobuf contracts** that define process bo
 - **Proto**: `src/main/proto/indexing.proto`
 - **Package**: `io.justsearch.ipc`
 - **What it is**: The live, versioned-by-repo contract used by:
-  - Head (HTTP API in `modules/ui`) → gRPC client
-  - Worker (gRPC server in `modules/indexer-worker`)
+  - Head (HTTP API in `modules/ui`) → gRPC client (`RemoteKnowledgeClient`; retires at lane F stage A item A10)
+  - Worker (`modules/indexer-worker`). Its gRPC **server** was deleted at lane F stage A item A9 and the worker process at item A11; the generated message types are still the shape the in-process ports pass, so this contract is live even though the transport under it is not.
 
 ### Versioned “v1” messages (in-process / tooling / infra)
 

@@ -28,8 +28,10 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li>Loads configuration</li>
  *   <li>Opens signal bus</li>
- *   <li>Spawns worker process</li>
- *   <li>Connects gRPC client</li>
+ *   <li>Starts the index half through the {@link WorkerHost} — since lane F stage A item A6 that is
+ *       {@code EngineRoot}, composing it in this JVM. Item A11 deleted the other implementation,
+ *       which spawned a worker process</li>
+ *   <li>Obtains a {@link KnowledgeClient} from the host (direct calls, not a gRPC channel)</li>
  *   <li>Provides health monitoring</li>
  * </ol>
  *

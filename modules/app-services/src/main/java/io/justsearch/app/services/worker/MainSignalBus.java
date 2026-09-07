@@ -61,8 +61,9 @@ public final class MainSignalBus implements Closeable {
         if (segment != null) {
             // Idempotent since lane F item A5 review #14: the bootstrap opens the bus itself so it
             // can republish the GPU-scheduling gauge into a freshly mapped file and start the
-            // energy poll before port discovery. WorkerSpawner.start() still calls open() as step 1,
-            // and a second mapping would leak the first arena and the first RandomAccessFile.
+            // energy poll before port discovery. WorkerSpawner.start() also called open() as step 1
+            // (item A11 deleted that second caller), and a second mapping would leak the first arena
+            // and the first RandomAccessFile — so idempotence stays, it is just no longer contested.
             return;
         }
         Files.createDirectories(signalPath.getParent());

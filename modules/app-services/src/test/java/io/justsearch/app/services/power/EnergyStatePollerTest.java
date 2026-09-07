@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
  * Item A5. {@code WorkerSpawner.pollEnergyState()} had no test of its own — the poll's only pins
  * were the MMF offset ({@code MmfWorkerSignalLayoutV1Test}) and the yield composition
  * ({@code WorkerSignalBusEnergyTest}). Moving it off the spawner is where that gap closes: these
- * cases pin what the poll publishes and what it does when the probe fails, so item A11's deletion of
- * {@code WorkerSpawner} cannot take the behaviour with it unnoticed.
+ * cases pin what the poll publishes and what it does when the probe fails, which is what stopped
+ * item A11's deletion of {@code WorkerSpawner} taking the behaviour with it unnoticed.
  */
 final class EnergyStatePollerTest {
 

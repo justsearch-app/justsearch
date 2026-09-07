@@ -19,9 +19,12 @@ import org.junit.jupiter.api.io.TempDir;
  * justsearch.eval.disable_breath_holding} was read with {@code Boolean.getBoolean} <i>inside the
  * Worker JVM</i> while the only setter was a system property on the <i>Head</i>. The key was absent
  * from {@code WorkerSpawner.WORKER_FORWARDED_PROPS}, was not an env var and was not an {@code
- * EnvRegistry} key, so the Worker could never see it and the hatch never fired.
+ * EnvRegistry} key, so the Worker could never see it and the hatch never fired. (Lane F stage A
+ * items A6/A11 removed that process boundary and deleted the spawner; this test keeps the proof
+ * because the config route below is what still carries the values, and item A19 is where the
+ * snapshot tier itself is decided.)
  *
- * <p>The two pacing keys therefore travel the channel that does cross the process boundary: they
+ * <p>The two pacing keys therefore travel the channel that did cross the process boundary: they
  * resolve onto {@link ResolvedConfig.Ai.BackfillPacing}, the Head writes every resolved value into
  * the worker config snapshot, and the Worker rebuilds its {@code ConfigStore} from that snapshot at
  * ordinal 450. This test walks that whole path rather than asserting a key exists.

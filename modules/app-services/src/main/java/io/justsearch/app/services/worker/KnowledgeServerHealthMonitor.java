@@ -15,9 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Background health monitor for the Worker process. Polls {@link
- * KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary initialization
- * on ERROR→READY recovery transitions.
+ * Background health monitor for the Worker (the index half, in-process since lane F stage A item
+ * A6). Polls {@link KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary
+ * initialization on ERROR→READY recovery transitions.
  *
  * <p>Item A11 note: this class survives the Worker's deletion as a process because two of its
  * three jobs are not process-shaped — the health poll that drives the worker component's

@@ -113,8 +113,8 @@ public final class AgentToolErrors {
   }
 
   /**
-   * The Worker outage that never reaches the transport. When the Worker process is being replaced,
-   * the Head's client re-discovers its port through the shared signal bus, and
+   * The Worker outage that never reaches the transport. When the Worker process was being replaced,
+   * the Head's client re-discovered its port through the shared signal bus, and
    * {@code RemoteKnowledgeClient.reconnect} throws a plain {@link IllegalStateException} before any
    * gRPC call exists to fail — so {@link #isWorkerUnreachable} (which looks for transport types)
    * cannot see it and the failure landed in {@code INTERNAL_ERROR}, with its internal invariant
@@ -125,6 +125,11 @@ public final class AgentToolErrors {
    * literals are the complete set {@code reconnect} can throw
    * ({@code RemoteKnowledgeClient.java:404} and its PID-validation sibling below it), both meaning
    * "the Worker is mid-restart".
+   *
+   * <p><b>Lane F stage A:</b> item A6 made {@code EngineKnowledgeClient} the live client and item
+   * A11 deleted the worker process, so nothing reconnects and this branch has no producer on the
+   * Engine path. It is kept until item A10 removes {@code RemoteKnowledgeClient}, which is still the
+   * declared thrower.
    */
   private static boolean isWorkerRestarting(Throwable cause) {
     if (!(cause instanceof IllegalStateException)) {

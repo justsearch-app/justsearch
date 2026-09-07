@@ -26,13 +26,16 @@ _LLM_HEALTH_TIMEOUT_SEC = 240.0  # 369: LLM model loading adds significant time
 
 # Tempdoc 711 item 4: fail-closed --clean.
 #
-# The Worker JVM is spawned by the Head's ProcessBuilder (WorkerSpawner.java) as a
-# grandchild of the `gradlew.bat runHeadlessEval` process jseval starts. `taskkill
-# /PID <head-pid> /T /F` kills the Gradle process tree, but the Worker JVM has been
-# observed to survive it (orphaned rather than reparented into the killed tree),
-# holding the Lucene index open and able to silently rewrite watched_roots.json —
-# which then makes the *next* run's ingest an idempotent no-op while stale docs
-# serve. `--clean` must therefore fail CLOSED: if a wipe cannot be verified
+# History: at the time this was written, the Worker JVM was spawned by the Head's
+# ProcessBuilder (WorkerSpawner.java) as a grandchild of the `gradlew.bat runHeadlessEval`
+# process jseval starts. `taskkill /PID <head-pid> /T /F` kills the Gradle process tree, but
+# the Worker JVM had been observed to survive it (orphaned rather than reparented into the
+# killed tree), holding the Lucene index open and able to silently rewrite watched_roots.json —
+# which then made the *next* run's ingest an idempotent no-op while stale docs serve.
+# Since lane F item A6, index execution runs inside the Head JVM rather than a separate Worker
+# JVM, so the grandchild-process/orphaning mechanism described above no longer applies as
+# written; whether an equivalent stale-lock risk still exists for the merged process has not
+# been verified here. `--clean` must therefore fail CLOSED: if a wipe cannot be verified
 # complete, raise rather than let the run proceed on a dirty dir.
 _LOCK_FILE_REL = Path("index") / "default.index.lock"
 _WORKER_LOG_REL = Path("logs") / "worker.log"

@@ -38,7 +38,10 @@ dependencies {
   implementation(libs.djl.tokenizers)
   // DJL API for DefaultVocabulary (SPLADE output → token mapping)
   implementation(libs.djl.api)
-  implementation(libs.grpc.netty.shaded)  // gRPC transport - uses NettyServerBuilder at compile time
+  // Lane F stage A item A9 deleted this module's gRPC server, so neither of these has a source
+  // consumer left here (`git grep io.grpc -- modules/indexer-worker/src` is empty). They are kept
+  // only until item A13 collapses the standalone distribution, which is what still packages them.
+  implementation(libs.grpc.netty.shaded)
   implementation(libs.grpc.stub)
   implementation(libs.jackson.databind)
   implementation(libs.slf4j.api)
@@ -187,7 +190,8 @@ tasks.named("installDist") {
 // Usage: ./gradlew :modules:indexer-worker:runWorkerStandalone [-PdataDir=...] [-PmodelsDir=...]
 //
 // This generates a minimal config snapshot and launches IndexerWorker directly.
-// The Worker binds to an ephemeral gRPC port and logs it on startup.
+// It binds no port: lane F stage A item A9 deleted the gRPC server, so this task now starts the
+// Knowledge Server's infrastructure and indexing loop and nothing else can call into it.
 // The MMF signal bus is safe without a Head (heartbeat defaults to zero → no suicide).
 //
 // All rootProject / project references are resolved at configuration time (not in doFirst)
@@ -268,8 +272,8 @@ run {
     }
 
     // Tempdoc 730 B3: this debug-only standalone task did not dump on OOM (unlike the production
-    // worker spawned by WorkerSpawner.java, which already does — WorkerSpawner.java:452-453,
-    //531-532). Mirror that: an always-on dump path under this dataDir's crashes/ dir. Tempdoc 730
+    // worker, which WorkerSpawner launched with an always-on dump path — that spawner was deleted
+    // at lane F stage A item A11). Keep the dump path here under this dataDir's crashes/ dir. 730
     // Increment-4 review: the heap cap (-Xmx) is opt-in ONLY (JUSTSEARCH_WORKER_HEAP) — no default
     // bound is emitted, since a default cap can itself induce an artifact OOM in the exact death
     // scenario this observability exists to diagnose (same principle as buildHeadJavaOpts in

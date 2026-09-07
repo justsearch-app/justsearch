@@ -67,7 +67,12 @@ dependencyAnalysis {
         exclude("org.junit.jupiter:junit-jupiter-api")
         // ArchUnit aggregator includes junit5 extension
         exclude("com.tngtech.archunit:archunit-junit5")
-        // worker-core uses io.grpc.Context/Metadata/ServerInterceptor from grpc-api (transitive of grpc-stub)
+        // worker-core used io.grpc.Context/Metadata/ServerInterceptor from grpc-api (transitive of
+        // grpc-stub) for its three interceptors. Lane F stage A item A9 deleted them, so nothing
+        // under worker-core imports io.grpc any more and this exclusion is now suppressing a
+        // genuinely unused dependency rather than a false positive. Both the exclusion and the
+        // declarations in modules/{worker-core,indexer-worker}/build.gradle.kts retire together at
+        // item A13, which collapses the standalone worker distribution that still packages them.
         exclude("io.grpc:grpc-stub")
         // RecordBuilder annotation processor generates *Builder classes from @RecordBuilder
         // annotations on app-api records. The plugin's bytecode analysis cannot detect

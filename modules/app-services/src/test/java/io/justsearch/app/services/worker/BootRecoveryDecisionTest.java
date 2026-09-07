@@ -14,10 +14,13 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The boot-recovery law (tempdoc 825 §D2 mechanism 2), pinned with no process, no clock and no IO —
- * the same posture as {@link SupervisionDecisionTest} for its sibling authority.
+ * the same posture {@code SupervisionDecisionTest} had for its sibling authority before lane F stage
+ * A item A11 deleted both.
  *
- * <p>The two vetoes are the load-bearing rows: they are what keeps ONE restart authority in a system
- * that now has two recovery loops. A regression in either is silent in production (the second loop
+ * <p>The two vetoes are the load-bearing rows: they are what kept ONE restart authority in a system
+ * that had two recovery loops. Since A11 there is only this one — the vetoes stay pinned because
+ * stage B reintroduces a supervisor, and a veto that silently stopped being exercised is how the
+ * second loop comes back unnoticed. A regression in either is silent in production (the second loop
  * just quietly doubles the declared restart intensity, or overwrites a terminal verdict with a
  * cheerier one), which is exactly the class of defect the tempdoc-627 review named.
  */
