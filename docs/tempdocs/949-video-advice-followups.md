@@ -1,7 +1,7 @@
 ---
 title: "949 — Follow-ups from the Claude Code interview analysis: fail-closed MCP validation, honest privacy and publication claims"
 type: tempdocs
-status: "PR 1 implemented 2026-09-07 (fail-closed validator, README/threat-model/MCP-doc wording); §4 open items routed"
+status: "PR #712 (2026-09-07): fail-closed validator, README/threat-model/MCP-doc wording, suppression ratchet wired; §5 measurement done, relocate list awaiting owner decision"
 created: 2026-09-07
 updated: 2026-09-07
 lane: MCP boundary / public claims (outside lane F's owned files)
@@ -82,7 +82,7 @@ Checks run: `check-privacy-claims`, `check-root-readme`, `check-readme-benchmark
 ## 4. Findings the first analysis did not draw — routed, not implemented
 
 1. **Hooks were measured and cut (930 row 4: 0 true / 11 false positives, 22 retired); prose rules
-   never were.** The always-loaded set is 62.5 KB (~15.6k tokens) per session. The ratchet holds
+   never were.** The always-loaded set is 62.5 KB including AGENTS.md (~15.6k tokens; the Claude-loaded subset measures 53.7 KB in §5) per session. The ratchet holds
    each file at its current size; it never forces reduction. Owner decision pending: one bounded
    session applying 930's method to every must/never line in `CLAUDE.md` + `.claude/rules/`
    (30-day transcript incident count per rule; zero → move to `agent-postmortems.md`). Deliverable
@@ -109,3 +109,68 @@ Checks run: `check-privacy-claims`, `check-root-readme`, `check-readme-benchmark
    descriptions carry none; the product agent's prompt composer (149 lines) has one incidental hit.
 8. **Full-document fallback passage carrier** (row 6 of §1) — still open; owner: the MCP
    delivery lane (tempdoc 725 / 735 W6 successors).
+
+## 5. Prose-rule measurement (§4 item 1, executed 2026-09-07)
+
+Owner approved one bounded pass. An opus subagent streamed all 61 transcripts in
+`~/.claude/projects/F--justsearch-public/` (112,155 records, 25,135 assistant-authored) once and
+matched each of the 45 tagged handles plus 2–4 distinctive phrases against assistant text only.
+The injected-CLAUDE.md echo was excluded and the exclusion proven (`one-branch-per-worktree` raw
+9 files → assistant 0; `never-checkout-in-main` 11 → 0; `docs-ride-along` 23 → 18). Enforcers were
+read from `governance/agent-hooks.v1.json`, `.claude/settings.json`, and the CI workflow; incidents
+from `agent-postmortems.md` and tempdocs 900–948. Full 45-row table, commands, and byte script:
+`tmp/949-rule-measurement.md` (gitignored; regenerable from the commands it records). The three
+findings below were re-verified by the orchestrator against the cited files.
+
+**Verdicts:** keep 19 · shorten 11 · relocate 9 · hard-invariant 6. Measured always-loaded set
+53,745 B. Safe measured savings 6,630 B (12.3%): 5,706 B relocate + 924 B fully-enforced shorten.
+
+**Relocate (0–2 citations, no incident, no enforcer) — owner decision, not applied:**
+
+| handle | bytes | destination |
+|---|---:|---|
+| `verify-your-work` (CLAUDE.md, 17 lines) | 2,974 | Quick Commands table + `agent-guide.md` already carry the commands |
+| `fix-root-causes-not-symptoms` | 641 | `agent-postmortems.md` |
+| `stay-focused-on-assigned-work` | 554 | `/plan` skill |
+| `tempdoc-is-your-contract` | 530 | `/plan` or `/present-status` skill |
+| `accepted-tracked-skills-no-removal` | 334 | `agent-postmortems.md` |
+| `edit-reread-cross-root` | 254 | `agent-postmortems.md` |
+| `bidirectional-pass` | 157 | already a pointer; fold into `slice-execution.md` |
+| `never-checkout-in-main` | 148 | `agent-postmortems.md` (same 0-true-positive evidence that retired its hook) |
+| `one-branch-per-worktree` | 114 | delete; git enforces it |
+
+**Shorten to a one-line pointer (fully enforced):** `never-force-push` (353 B → `permissions.deny`),
+`agent-spawn-session-end-reap` (316 B), `agent-spawn-build-hint` (255 B). Eight more are partially
+enforced (`delegating-to-subagents`, `before-appending-to-rules`, `explore-before-implementing`,
+`pre-merge-gradle-build`, `verify-worktree-base`, `after-compaction-verify`,
+`subagents-no-inheritance`, `log-pre-existing-issues`, `no-merge-without-authorization`): only the
+enforced clause can go, ~3–5 KB ceiling, needs per-sentence editing.
+
+**Findings that fell out:**
+
+1. `CLAUDE.md:37` claimed the suppression subset "is ratcheted by `check-suppression-ratchet.mjs`";
+   no workflow ran it. Verified: `grep -rn suppression-ratchet .github/` empty; script green on
+   `main` (1 file, 3 suppressions, baselined). **Fixed in this PR**: wired into the public-claims
+   job next to the always-loaded ratchet (same shape as 799 L.1).
+2. Citation frequency does not track importance: `docs-ride-along` (18/61) outranks every Hard
+   Invariant except `head-never-touches-lucene` (8).
+3. The two most-cited process rules, `independent-reviewer-required` (8) and `ux-audit-closure`
+   (5), had their gates retired (563/530); the prose now carries the whole load.
+4. Inverse case: `never-destructive-git-in-main` / `never-delete-untracked-in-main` have near-zero
+   citations and no enforcer since 930 row 4, yet postmortem §28 (tempdoc 882, 2026-09-01) records
+   three sibling edits lost to `git checkout --` inside a subagent, where the hook would not have
+   fired anyway. Corroborates §4 item 2.
+
+**Limits.** Citation measures salience, not compliance: a silently obeyed rule is uncited
+(`verify-your-work` at 0 is almost certainly obeyed constantly), and a cited rule may be cited
+while being violated. No true/false-positive split exists for prose. Subagent interiors were not
+scanned, under-counting the three subagent-facing rules. Upper-bound handles (generic phrases):
+`squash-merge-verify-content-not-ancestry`, `never-force-push`, `docs-ride-along`,
+`no-merge-without-authorization`, `ux-audit-closure`, `structural-defects-no-repeat`,
+`after-compaction-verify`. Lower-bound: `verify-your-work`, `fix-root-causes-not-symptoms`.
+
+**Recommendation.** Apply the relocate list as one PR after the owner reads it; `verify-your-work`
+alone is 5.5% of the set and its content is already in two other places. Do not apply the partial
+shortens without reading each sentence. Do not run this measurement again until the relocate PR has
+landed and a new 30-day window has passed (935 §1: this was the sixth agent-waste investigation in
+two weeks).
