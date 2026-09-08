@@ -120,7 +120,7 @@ change?" question, compare that `encoder_latency` block across runs and read
 the `cpu_fallback_counts` projection alongside it. See
 `docs/explanation/08-observability.md` §Contract Tiers + §Run Manifest.
 
-<!-- manually maintained Codex snapshot of the release scorecard -->
+<!-- generated:start — do not edit between markers; run: node scripts/docs/register-headline-sync.mjs -->
 
 ### Release Scorecard (projected — do not hand-edit)
 
@@ -151,7 +151,7 @@ the `cpu_fallback_counts` projection alongside it. See
 | mixed/miracl-de-2k | 133 | 125.6 | 34.1 | 2.02 |
 | mixed/miracl-fr-2k | 143 | 151.7 | 46.6 | 2.02 |
 
-<!-- end manually maintained Codex release-scorecard snapshot -->
+<!-- generated:end -->
 
 > **Reading the two numbers (tempdoc 623 ④ / C-4).** The **Release Scorecard** above is the
 > *production-default* (`hybrid`) result — a **projection** of one cohort-identical release, the number a
@@ -541,28 +541,6 @@ tempdoc citations that use P0/P1/P2 names.
 
 Settled empirical facts. Each was an open question that got answered.
 
-### Format breadth and duplicate prevalence (897, 2026-09-06)
-
-| Evidence | Finding | Scope |
-|---|---|---|
-| Ten deterministic format cases through installed Worker ingestion/search | Marker and structure assertions characterize support and explicit MIME/embedded-identity/flattening gaps | Capability characterization, not a prevalence or source-diverse robustness estimate |
-| CMU Enron eligible-body census, n=352,208 | Raw-body exact 77.009%; normalized-body exact 77.626% | Source-body proxy, not file-byte/Tika/personal-drive prevalence |
-| Frozen uniform Enron sample, n=5,000 | Selected threshold 0.90 yields 5.46% in non-singleton near-duplicate components; 95% component stability interval 4.506–6.391% | Model-assisted calibration/holdout; conditional sample result, not archive prevalence |
-| Legal production capture, n=199 | Zero byte/content-exact duplicates; final-hybrid redundancy: 0/200 affected queries, 0/2,000 redundant delivered hits@10 | Four modes ran comparably; redundancy aggregate describes final hybrid only; near duplicates remain undecided |
-| Production realdocs | Full campaign skipped under an explicit three-hour cap after enrichment repair and a bounded probe; production aggregate unmeasured | Ingest-only cohort; no query set |
-
-The new `duplicate-prevalence` instrument binds raw manifests, production extraction revisions and
-aggregate denominators. Its result-set component extends `staged_recall_accounting` with a private,
-collision-safe identity join; current query redundancy uses content-exact clusters only. It does not
-transfer the Enron near-duplicate threshold to another cohort. The separate 33-file format sibling has
-one source per format (16 EML/9 RTF/8 ZIP) and is excluded from prevalence headlines.
-
-Evidence and verification: tempdoc 897 §M and its `897-evidence/current-main-integration.md` record.
-Command contracts: [jseval Pipeline Reference](jseval-pipeline-reference.md).
-Keep product dedup deferred: no authorized personal-corpus prevalence plus query-visible evidence exists.
-ANN recall and any later product-collapse design remain with 639. No retrieval baseline changes.
-
-
 ### Corpus provenance note (2026-07-01, tempdoc 664 twelfth pass)
 
 `golden/needle-burial-v1`'s corpus content was **regenerated** on this date: the original generator had a
@@ -702,6 +680,37 @@ cohort under a host-title synthesizer (PR #297) and re-certified it end-to-end.
   self-consistent against their own embedded policy snapshot; they are dated history, not retracted.
   Any *claim-bearing* run must use the v2 cohort.
 
+### Format breadth and duplicate prevalence (897, 2026-09-06)
+
+| Evidence | Finding | Scope |
+|---|---|---|
+| Ten deterministic format cases through installed Worker ingestion/search | Marker and structure assertions characterize support and explicit MIME/embedded-identity/flattening gaps | Capability characterization, not a prevalence or source-diverse robustness estimate |
+| CMU Enron eligible-body census, n=352,208 | Raw-body exact 77.009%; normalized-body exact 77.626% | Source-body proxy, not file-byte/Tika/personal-drive prevalence |
+| Frozen uniform Enron sample, n=5,000 | Selected threshold 0.90 yields 5.46% in non-singleton near-duplicate components; 95% component stability interval 4.506–6.391% | Model-assisted calibration/holdout; conditional sample result, not archive prevalence |
+| Legal production capture, n=199 | Zero byte/content-exact duplicates; final-hybrid redundancy: 0/200 affected queries, 0/2,000 redundant delivered hits@10 | Four modes ran comparably; redundancy aggregate describes final hybrid only; near duplicates remain undecided |
+| Production realdocs | Full campaign skipped under an explicit three-hour cap after enrichment repair and a bounded probe; production aggregate unmeasured | Ingest-only cohort; no query set |
+
+The new `duplicate-prevalence` instrument binds raw manifests, production extraction revisions and
+aggregate denominators. Its result-set component extends `staged_recall_accounting` with a private,
+collision-safe identity join; current query redundancy uses content-exact clusters only. It does not
+transfer the Enron near-duplicate threshold to another cohort. The separate 33-file format sibling has
+one source per format (16 EML/9 RTF/8 ZIP) and is excluded from prevalence headlines.
+
+Evidence and verification: tempdoc 897 §M and its `897-evidence/current-main-integration.md` record.
+Command contracts: [jseval Pipeline Reference](jseval-pipeline-reference.md).
+Keep product dedup deferred: no authorized personal-corpus prevalence plus query-visible evidence exists.
+ANN recall and any later product-collapse design remain with 639. No retrieval baseline changes.
+
+### F-060: int8 scalar quantization (lane D PR-C1, `JustSearchCodecV2` + `dot_product`) is ranking-neutral on the registered corpora but does NOT ship as the write default — the pre-registered storage leg fails by construction: `Lucene104HnswScalarQuantizedVectorsFormat` keeps the raw float32 vectors beside the int8 copy, so a 20k × 768 index grew 25.1 % (62.8 → 78.5 MB) instead of shrinking, ANN recall@50 fell 0.994 → 0.974 (ratio 0.980, inside the 915 ratio but 0.020 absolute below float32), and query p50 rose 0.7 ms; paired fresh-index jseval arms moved ≤ 0.0015 nDCG@10 on scifact and were identical-or-better on enron (vector +0.0089), zero errors, arm identity proven from `vectorFormatActual` (2026-09-05, tempdoc 931 §D "C1 campaign" + `931-evidence/c1-quantization-campaign-2026-09-05.md`; draft #662 closed, Float32 stays)
+
+- **Conditions/caveats:** one machine (RTX 4070), one day, one arm per corpus per format; the two
+  arms did not share a merge state (expunge-only settle, 181 vs 1,044 deleted docs on scifact),
+  fixed for future pairs by #685; RSS was not instrumented. The synthetic ANN fixture (64 clustered
+  centroids, exact brute-force truth) is a recall instrument, not a corpus.
+- **What would reopen it:** a format that drops the raw vectors (or a resident-memory criterion
+  in place of on-disk bytes) plus an RSS instrument in `EngineVectorIndexBench` — re-register the
+  rule first; do not re-run against the same criteria.
+
 ### F-059: lane D PR-C2 (unstored chunk/entity text) is byte-exact and storage-real — legal stored fields −75.8 % (21.03 → 5.09 MB) with 4,122/4,122 chunk vectors intact — but the wave-3 campaign found two masked enrichment defects on the way (a non-converging flag-off chunk-SPLADE loop, and `rag.chunk_splade.enabled` honoured by one lane of three); with the flag made truly OFF, legal hybrid is 0.5776 = the 832 scorecard, and the −0.012 vs a same-day control is race-encoded chunk postings plus tombstone-inflated BM25 statistics, not C2 (2026-09-05, tempdoc 931 §D findings 5/5b/6, §E 8-11)
 
 - **What C2 does.** `chunk_content` stays analyzed/indexed but `stored:false`; every consumer
@@ -731,8 +740,8 @@ cohort under a host-title synthesizer (PR #297) and re-certified it end-to-end.
   index moved +0.011 in ten minutes; re-query before trusting a fresh hybrid delta ≤ ~0.015.
   (ii) Paired arms need equal merge state — tombstones inflate BM25 collection statistics
   (`chunk_content` docCount 6,734 vs 4,344) and moved hit counts 3–4 % with no code cause.
-- **Not measured.** C1 (quantization) quality/recall campaign — still owed before the C2+C1 draft
-  can undraft (915 §P3.F, 931 §B 3d).
+- **Measured the same night — see F-060.** The C1 (quantization) campaign ran on the C1-only
+  draft #662 and rejected the int8 write default (915 §P3.F).
 
 ### F-058: the language-agnostic dense skip (lane D PR-C0) is EFFECTIVELY OFF at its default — the field-local DF rule fired on 4 of 2,410 queries across six corpora (legal 2.0 %, five others 0.0 %), rates are comparable per language by construction, and paired fully-enriched arms show no quality loss (legal +0.0075 nDCG@10 inside the 2σ line, miracl-de identical to 4 dp); its benefit is locale invariance, its cost is that the retired English stop-word skip's savings are gone (2026-09-05, tempdoc 931 §D rows 3a-3b, lane D wave 3)
 
@@ -2979,7 +2988,7 @@ above)*
 
 - **Answer:** Deterministic tier (prefix/contains matching) handles 80%+ of filter mismatches at 0 ms. LLM grammar-constrained enum handles semantic gaps (~400–1200 ms GPU). Filter mismatch complaints dropped from 19 (Phase 4) to 1 (Phase 5+).
 - **Evidence:** tempdoc 366 Phase 5 (5a–5j). Hybrid validation: 6/8 cases at 0 ms. 50q eval: accuracy maintained (91.8% vs 92% baseline), cost -4%, turns -4%, duration -25%.
-- **Conditions/caveats:** Requires facet vocabulary snapshot (gRPC facet query). Empty vocabulary degrades to LLM-only (still works, just slower). CBS Sports semantic gap needs a more capable model.
+- **Conditions/caveats:** Requires facet vocabulary snapshot (facet query through the search port). Empty vocabulary degrades to LLM-only (still works, just slower). CBS Sports semantic gap needs a more capable model.
 
 ### F-021: GPL-trained LambdaMART reranking HURTS / is non-viable without real user-feedback labels
 
@@ -3542,8 +3551,12 @@ Questions — these are "we should eventually" not "we need to know."
 - **FW-005: Tika-specific ingestion tax** — ~~Answered.~~ Tika structured extraction on OHR-Bench PDFs: -16.2% nDCG. Comparable to GOT pre-extracted (-14.7%). **VLM extraction via existing chat model (Qwen 3.5) is the chosen path. Docling integration cancelled.** Source: tempdoc 252 verification (2026-03-20), F-009 updated recommendation.
 - **FW-006: English stemming evaluation** — **WON'T-DO (D-003 / ADR-0043 / tempdoc 581).** A per-language (English) stemmer is a per-language component the language-diversity invariant rejects. Also separately blocked: per tempdoc 223, analyzer-level content stemming breaks the fuzzy zero-hit correction (the analyzed query token diverges in edit distance from the stemmed index term). Distinct from the existing query-side SIMPLE-syntax "stemming" path, which is unaffected.
 - **FW-007: Token estimation calibration** — Hybrid char+word heuristic is intentionally conservative but lacks calibration across content types (URLs, code, JSON, minified JS). Source: RAG-002 (retired from issues/).
-- **FW-008: Vector quantization evidence** — **Implementation candidate updated 2026-09-03;
-  evidence remains open.** PR-C1 introduces the restart-safe `JustSearchCodecV2`, pins unsigned-byte
+- **FW-008: Vector quantization evidence** — **DECIDED 2026-09-05 (F-060): the int8 write default
+  does not ship; Float32 stays.** The campaign below ran on draft #662 and failed the storage leg
+  by construction (raw float32 retained beside the int8 copy, index +25 %) and the 0.01-absolute
+  recall@50 leg (−0.020), while ranking quality on scifact/enron was unaffected. #662 closed; the
+  codec work is reusable only if a raw-vector-dropping format or a resident-memory criterion is
+  pre-registered first. Earlier text (2026-09-03 candidate) kept for the rule as it was run:** PR-C1 introduces the restart-safe `JustSearchCodecV2`, pins unsigned-byte
   Int8, and makes quantization the unconfigured write default while retaining explicit Float32
   opt-out. Restart, mixed-segment, merge, and configuration tests are short-checkable, but they do
   not establish ranking quality or footprint. The default is not accepted or merge-ready until the
@@ -3560,9 +3573,9 @@ Questions — these are "we should eventually" not "we need to know."
 
 <!-- source: docs/explanation/23-search-pipeline-overview.md -->
 
-# 23. Search Pipeline Overview
+# Search Pipeline Overview
 
-JustSearch's search pipeline spans two processes (Head and Body) and is
+JustSearch's search pipeline spans the Engine's two halves (application and index) and is
 split into ingestion-time (offline, index-building) and query-time (online,
 search-serving) stages. This document traces the full path end-to-end.
 
@@ -3580,19 +3593,19 @@ For subsystem deep-dives, see:
 
 When a user types a query, the default `hybrid` preset activates BM25 +
 Dense KNN retrieval (with optional SPLADE), fused via CC (convex
-combination). The pipeline executes across two processes:
+combination). The pipeline executes across the two halves of the Engine, in one JVM:
 
-1. **Head** (Main process, `KnowledgeHttpApiAdapter`) resolves the
+1. **The application half** (`KnowledgeHttpApiAdapter`) resolves the
    `PipelineConfig` from a named preset or explicit flags, and optionally
-   starts an async LLM expansion call. It then sends a gRPC request to the
-   Worker.
+   starts an async LLM expansion call. It then makes the `search` port call
+   into the index half.
 
-2. **Worker** (Body process, `SearchOrchestrator`) runs retrieval. The
+2. **The index half** (`SearchOrchestrator`) runs retrieval. The
    enabled legs (BM25, Dense KNN, SPLADE) execute in parallel via virtual
    threads. Their results are fused (RRF by default). If the query yields
    zero hits, fuzzy correction retries. If chunks exist, a parallel chunk
    search is fused and collapsed by parent document. Match spans, excerpt
-   regions, and facets are computed. The response flows back over gRPC.
+   regions, and facets are computed. The response returns from the port call.
 
 3. **Head** (post-retrieval) merges any completed LLM expansion, then runs
    a reranking cascade: LambdaMART (fast, ~5 ms) followed by cross-encoder
@@ -3600,8 +3613,8 @@ combination). The pipeline executes across two processes:
    per-hit provenance metadata is assembled.
 
 The diagram below shows the complete flow. The three retrieval legs fan out
-in parallel from the dispatch stage. Dashed lines indicate the cross-process
-gRPC boundary.
+in parallel from the dispatch stage. Dashed lines indicate what used to be the
+cross-process gRPC boundary and is now the in-process port boundary (ADR-0049).
 
 ![Search Pipeline Overview](23-search-pipeline-overview.svg)
 
@@ -3685,7 +3698,7 @@ via virtual threads, then converge at the fusion stage.
 | #   | Stage                                 | What It Does                                                                                                                                                        |
 | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3   | **QPP Computation**                   | `maxIdf`, `avgIctf`, `queryScope`, field-local document count, and minimum analyzed-term document-frequency fraction; O(1) via IndexReader; the planner uses the field-local values for dense-skip routing |
-| 4   | **Filter Parsing + Entity Expansion** | gRPC filters → Lucene queries; entity facet filters expanded via disambiguation cluster snapshot                                                                    |
+| 4   | **Filter Parsing + Entity Expansion** | request-message filters → Lucene queries; entity facet filters expanded via disambiguation cluster snapshot                                                                    |
 | 5   | **Staged Retrieval Dispatch**         | Dispatches to enabled legs; standard combos use optimized methods (`searchHybrid`, `searchHybridSplade`); novel combos use pairwise RRF fusion via `fuseLegs()`     |
 | 6   | **BM25 Search** ‖                     | Lucene `Query`-based retrieval; fetches 10× limit for over-retrieval (capped at `candidate_limit_max`, default 100)                                                  |
 | 7   | **Dense KNN Search** ‖                | `KnnFloatVectorQuery`; fetches 10× limit (capped at 100); pre-filtered by runtime filters                                                                           |
@@ -3717,7 +3730,7 @@ RRF chunk merge.
 | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | 15  | **Expansion Merge**                   | If LLM expansion completed in budget, re-searches with expanded query (LUCENE syntax); otherwise uses base results |
 | 16  | **LambdaMART Reranking**              | 2 features (sparse + vector debug scores); fast (~5 ms); runs first in cascade. **Off by default** (requires a GPL-trained model). ⚠️ **GPL-trained LambdaMART is measured non-viable on real queries** (synthetic GPL training queries don't transfer) — see register **F-021**. Treat as present-but-inert substrate pending real user-feedback labels, *not* a current quality lever |
-| 17  | **Cross-Encoder Reranking**           | gte-multilingual-reranker-base (FP16 GPU, 306M params); Head sends `Rerank` gRPC RPC to Worker with query-focused snippets; deadline-budgeted; runs on LambdaMART's output (360) |
+| 17  | **Cross-Encoder Reranking**           | gte-multilingual-reranker-base (FP16 GPU, 306M params); Head makes the `rerank` port call into the index half with query-focused snippets; deadline-budgeted; runs on LambdaMART's output (360) |
 | 18  | **Result Trim + Provenance Assembly** | Trim to requested limit; structured provenance per hit (which legs contributed, fusion scores, CE scores)          |
 
 ---
@@ -3923,5 +3936,3 @@ when documents exceed the reranker's 512-token input — active model is
 Tests assert both the positive case (eligible config → feature applied) and
 negative cases (expansion blocked in HYBRID). See
 `KnowledgeHttpApiAdapterHarmfulCombinationsTest.java` for the full contract.
-
-<!-- end manually maintained Codex copy -->

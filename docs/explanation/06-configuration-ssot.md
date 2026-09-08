@@ -57,8 +57,8 @@ The `EnvRegistry` enum in `modules/configuration` is the **canonical** place whe
 | Ordinal | Source | Description |
 |---------|--------|-------------|
 | 500 | JVM `-D` system property | Highest priority. Used by launch scripts and tests. |
-| 450 | Worker snapshot | Propagated from Head to Worker subprocess. |
 | 400 | Environment variable | Used by Docker/OS. |
+| 350 | CI profile | CI profile overrides. |
 | 300 | `settings.json` | User preferences persisted via UI. |
 | 200 | `application.yaml` | Static YAML config file. |
 | 150 | Auto-detected hardware | `GpuAutoDetection.probe()` in `ort-common`. Filesystem probe for CUDA DLLs; contributes GPU config keys. |

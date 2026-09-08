@@ -18,12 +18,11 @@ option java_package = "io.justsearch.ipc";
 // still carry `SearchResponse`, `StatusResponse` and friends. Adding a `service` block back here
 // is not a way to add an API; it is a way to resurrect a deleted transport.
 //
-// Infra-health gRPC is a DIFFERENT contract and is still live: it is declared in
-// io/justsearch/ipc/v1/infra_diagnostics.proto in this same module, and
-// `protoc-gen-grpc-java` still runs over this source set for its sake. The Gradle protobuf plugin
-// has no per-file plugin selector, so the grpc generator is configured for the whole task
-// (modules/ipc-common/build.gradle.kts) — but it emits a `*Grpc.java` only for a file that
-// declares a service, so this file now yields messages and nothing else.
+// No gRPC code is generated in this module at all any more. Item A14 also deleted
+// io/justsearch/ipc/v1/infra_diagnostics.proto — the infra-health service that had been the one
+// remaining gRPC contract here — so `protoc-gen-grpc-java` had nothing left to generate and is no
+// longer resolved (modules/ipc-common/build.gradle.kts configures protoc only). This source set
+// yields messages and nothing else.
 
 // --- Search messages (formerly SearchService's request/response types) ---
 

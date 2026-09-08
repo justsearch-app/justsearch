@@ -45,7 +45,7 @@
 <g id="node24" class="node">
 <title>W1</title>
 <path fill="#ffffff" stroke="#444444" d="M1407,-938C1407,-938 1337,-938 1337,-938 1331,-938 1325,-932 1325,-926 1325,-926 1325,-914 1325,-914 1325,-908 1331,-902 1337,-902 1337,-902 1407,-902 1407,-902 1413,-902 1419,-908 1419,-914 1419,-914 1419,-926 1419,-926 1419,-932 1413,-938 1407,-938"/>
-<text text-anchor="middle" x="1372" y="-917.2" font-family="Helvetica,sans-Serif" font-size="11.00">gRPC Request</text>
+<text text-anchor="middle" x="1372" y="-917.2" font-family="Helvetica,sans-Serif" font-size="11.00">Port Request</text>
 </g>
 <!-- ANCH_WORK&#45;&gt;W1 -->
 <!-- LEGEND -->
@@ -246,7 +246,7 @@
 <g id="node18" class="node">
 <title>Q4</title>
 <path fill="#ffffff" stroke="#444444" d="M1031.5,-803C1031.5,-803 952.5,-803 952.5,-803 946.5,-803 940.5,-797 940.5,-791 940.5,-791 940.5,-779 940.5,-779 940.5,-773 946.5,-767 952.5,-767 952.5,-767 1031.5,-767 1031.5,-767 1037.5,-767 1043.5,-773 1043.5,-779 1043.5,-779 1043.5,-791 1043.5,-791 1043.5,-797 1037.5,-803 1031.5,-803"/>
-<text text-anchor="middle" x="992" y="-782.2" font-family="Helvetica,sans-Serif" font-size="11.00">gRPC to Worker</text>
+<text text-anchor="middle" x="992" y="-782.2" font-family="Helvetica,sans-Serif" font-size="11.00">To Index Half</text>
 </g>
 <!-- Q2&#45;&gt;Q4 -->
 <g id="edge19" class="edge">

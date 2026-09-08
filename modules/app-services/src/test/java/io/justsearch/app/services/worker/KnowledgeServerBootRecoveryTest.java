@@ -38,7 +38,7 @@ final class KnowledgeServerBootRecoveryTest {
   /** Mirrors {@code KnowledgeServerBootstrapRestartabilityTest.configFor}, with a tighter budget. */
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir.resolve("worker_signal.lock"),
+        false, dir, dir, dir,
         5_000L, 1_000L, 3, 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 

@@ -2,7 +2,7 @@
 title: Worker Inference Composition
 type: explanation
 status: stable
-description: "How the Worker process builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline."
+description: "How the index half builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline."
 ---
 
 # Worker Inference Composition

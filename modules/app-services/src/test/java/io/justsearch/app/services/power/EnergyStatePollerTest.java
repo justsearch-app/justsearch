@@ -34,25 +34,22 @@ final class EnergyStatePollerTest {
   }
 
   @Test
-  @DisplayName("a poll writes the in-process gauge and the transitional MMF sink")
-  void pollWritesBothSinks() {
+  @DisplayName("a poll writes the in-process gauge, in both directions")
+  void pollWritesTheGauge() {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
-    List<Boolean> published = new ArrayList<>();
     AtomicReference<EnergyState> probe = new AtomicReference<>(reduced());
 
     try (EnergyStatePoller poller =
-        new EnergyStatePoller(gauge, published::add, probe::get)) {
+        new EnergyStatePoller(gauge, probe::get)) {
       poller.poll();
       assertTrue(gauge.isEnergyReduced(), "the gauge is the in-process authority");
       assertTrue(gauge.shouldYieldGpuBackfill(), "energy alone is a reason to yield");
-      assertEquals(List.of(true), published, "the MMF byte still follows, until item A10");
       assertEquals(EnergyState.Intent.REDUCED, poller.energyState().intent());
 
       probe.set(full());
       poller.poll();
       assertFalse(gauge.isEnergyReduced());
       assertFalse(gauge.shouldYieldGpuBackfill());
-      assertEquals(List.of(true, false), published);
       assertEquals(EnergyState.Intent.FULL, poller.energyState().intent());
     }
   }
@@ -63,7 +60,7 @@ final class EnergyStatePollerTest {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
     gauge.setMainGpuActive(true);
 
-    try (EnergyStatePoller poller = new EnergyStatePoller(gauge, null, EnergyStatePollerTest::full)) {
+    try (EnergyStatePoller poller = new EnergyStatePoller(gauge, EnergyStatePollerTest::full)) {
       poller.poll();
     }
 
@@ -75,23 +72,21 @@ final class EnergyStatePollerTest {
   @DisplayName("energyState() is UNKNOWN — not null — before the first poll")
   void unknownBeforeFirstPoll() {
     try (EnergyStatePoller poller =
-        new EnergyStatePoller(new GpuSchedulingGauge(), null, EnergyStatePollerTest::full)) {
+        new EnergyStatePoller(new GpuSchedulingGauge(), EnergyStatePollerTest::full)) {
       assertEquals(EnergyState.Intent.UNKNOWN, poller.energyState().intent());
       assertFalse(poller.energyState().reduced(), "unknown must never read as reduced");
     }
   }
 
   @Test
-  @DisplayName("a failing probe leaves the last published state and gauge untouched")
+  @DisplayName("a failing probe leaves the last polled state and gauge untouched")
   void probeFailureIsBestEffort() {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
     AtomicReference<EnergyState> probe = new AtomicReference<>(reduced());
-    List<Boolean> published = new ArrayList<>();
 
     try (EnergyStatePoller poller =
         new EnergyStatePoller(
             gauge,
-            published::add,
             () -> {
               EnergyState next = probe.get();
               if (next == null) {
@@ -106,16 +101,15 @@ final class EnergyStatePollerTest {
       poller.poll(); // must not throw, must not flip the throttle
       assertTrue(gauge.isEnergyReduced(), "a transient probe failure cannot clear the throttle");
       assertEquals(EnergyState.Intent.REDUCED, poller.energyState().intent());
-      assertEquals(List.of(true), published, "no second publication on a failed poll");
     }
   }
 
   @Test
-  @DisplayName("a null MMF sink is allowed (the shape after item A10 deletes the bus)")
-  void nullSinkIsAllowed() {
+  @DisplayName("the single-argument constructor polls and writes the gauge")
+  void singleArgConstructorWritesTheGauge() {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
     try (EnergyStatePoller poller =
-        new EnergyStatePoller(gauge, null, EnergyStatePollerTest::reduced)) {
+        new EnergyStatePoller(gauge, EnergyStatePollerTest::reduced)) {
       poller.poll();
     }
     assertTrue(gauge.isEnergyReduced());
@@ -132,7 +126,6 @@ final class EnergyStatePollerTest {
     EnergyStatePoller poller =
         new EnergyStatePoller(
             gauge,
-            null,
             () -> {
               latch.get().countDown();
               return reduced();

@@ -968,9 +968,9 @@ public final class KnowledgeServer implements Closeable {
               pathResolutionStore,
               documentIdentityStore);
       // Tempdoc 885 item 3: build the duty-cycle policy from resolved config before the app
-      // services that consume it. The duty/cooldown arrive through the ordinal-450 worker config
-      // snapshot, not through a raw Worker sysprop — a key the Worker cannot see is the [R1]
-      // defect this item removes.
+      // services that consume it. The duty/cooldown come from the one resolved config in this JVM.
+      // They arrived through the ordinal-450 worker snapshot until item A19 deleted that tier; the
+      // [R1] defect it removed (a key the Worker could not see) needed two processes to exist.
       this.indexingPacing = buildIndexingPacing();
       log.info(
           "Indexing pacing: foreground duty {}%, cooldown {} ms",
@@ -1954,7 +1954,6 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Active index dir: {}", padRight(String.valueOf(activeIndexPath), 44) + "║");
     log.info("║ Build index dir:  {}", padRight(String.valueOf(buildingIndexPath), 44) + "║");
     log.info("║ Jobs DB path:     {}", padRight(dataDir.resolve("jobs.db").toString(), 44) + "║");
-    log.info("║ Signal bus path:  {}", padRight(dataDir.resolve("worker_signal.lock").toString(), 44) + "║");
     log.info("║ Host:             {}", padRight(config.host(), 44) + "║");
 
     // SSOT paths
@@ -2284,10 +2283,6 @@ public final class KnowledgeServer implements Closeable {
       }
     }
 
-    // Item A9: releasing the shutdown latch replaces stopping the gRPC server. Item A13 deleted the
-    // standalone entry point that parked on it, so this now only flips isRunning() to false.
-    shutdownLatch.countDown();
-
     // Stop migration enumerator thread (best-effort)
     if (migrationEnumeratorThread != null) {
       migrationEnumeratorThread.interrupt();
@@ -2380,7 +2375,33 @@ public final class KnowledgeServer implements Closeable {
       }
     }
 
+    // Stage-A checkpoint (re-review). This countdown used to sit ~90 lines earlier, where the gRPC
+    // server's termination used to be, and the comment there called it "releasing the shutdown
+    // latch". It marked a point in the MIDDLE of close(): the Lucene runtimes, the embedding
+    // service, the migration threads and the index root lock were all still to come. So the latch
+    // answered "close() got past step N", which is not a fact anyone wants.
+    //
+    // It is the last statement of close() now, so it means exactly one thing: this server ran its
+    // shutdown to completion. That is what EngineRoot.close() consults.
+    shutdownLatch.countDown();
     log.info("KnowledgeServer shutdown complete");
+  }
+
+  /**
+   * Blocks until {@link #close()} has run to completion, or the timeout elapses.
+   *
+   * <p>{@code true} means close() reached its final statement — every runtime closed, every thread
+   * joined or abandoned on its own timeout, the index root lock released. {@code false} means it
+   * did not: either close() was never called, or it threw partway and left resources open. A caller
+   * that then re-opens the same data directory is the one who finds out, via a held index lock.
+   *
+   * <p>This exists because the obvious predicate does not work. {@code isRunning()} is
+   * {@code running && latch > 0} and {@code close()} sets {@code running = false} in its FIRST
+   * statement, so reading {@code isRunning()} after {@code close()} returns is constant-false and
+   * can never report a problem.
+   */
+  public boolean awaitClosed(long timeoutMs) throws InterruptedException {
+    return shutdownLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
   }
 
   // Tempdoc 417 Phase 3c: registerOtelObservableCallbacks() removed — its 25 metrics now flow

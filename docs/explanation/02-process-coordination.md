@@ -2,7 +2,7 @@
 title: Process Coordination
 type: explanation
 status: stable
-description: 'MMF signaling, the "Suicide Pact", and the indexing duty cycle.'
+description: "Historical record of the Head/Worker process pair: MMF signalling, the suicide pact, and the indexing duty cycle. The duty cycle survives; the rest was deleted by ADR-0049."
 ---
 
 # Process Coordination

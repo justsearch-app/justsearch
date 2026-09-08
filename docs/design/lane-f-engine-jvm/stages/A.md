@@ -3,7 +3,7 @@ title: "Lane F stage A — spine and unplug: implementation checklist"
 stage: A
 created: 2026-09-07
 base: 2845d9e83
-status: "A1-A20 landed; checkpoint review pending"
+status: "A1-A20 landed; checkpoint fixes in review"
 updated: 2026-09-08
 ---
 
@@ -11,10 +11,10 @@ updated: 2026-09-08
 
 Written from the three inputs 17.6 requires: the stage's row in design.md 17.3,
 `verified-facts.md`, and a fresh read of the code at this worktree's HEAD
-(`fe19df0d5` = `worktree-lane-F`, which already carries PR 0's launch flags and the
+(the stage base is `2845d9e83`; the pre-implementation read was done at `fe19df0d5` = `worktree-lane-F`, which already carried PR 0's launch flags and the
 design contract; `main` is `76871d924`). Section numbers are design.md's.
 
-Every `file:line` below was opened at `fe19df0d5` during this pass. Nothing is cited
+Every `file:line` in the ORIGINAL text below was opened at `fe19df0d5` during the pre-implementation pass; citations added or corrected later name their own date and were re-opened then (the checkpoint re-read every one it touched). Nothing is cited
 from 917 or `verified-facts.md` without re-opening the file.
 
 ---
@@ -142,7 +142,8 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   (`MmfWorkerSignalLayoutV1Test`) and the yield composition (`WorkerSignalBusEnergyTest`, extended
   here). The new `EnergyStatePoller` (`io.justsearch.app.services.power`, owned and started by
   `KnowledgeServerBootstrap`) is covered for the first time, and it must be **restartable**: the
-  bootstrap resets `started` in `closeForUpgrade()` (`KnowledgeServerBootstrap.java:1015`) and boot
+  bootstrap resets `started` in `closeForUpgrade()` (`KnowledgeServerBootstrap.java:771`, the reset
+  at `:828` — the checkpoint found this cited as `:1015`, past the end of a 935-line file) and boot
   recovery restarts the same instance. One behaviour note carried to A6: the poll now starts after
   `spawner.start()` returns rather than inside it (step 5b), i.e. after port discovery instead of
   before, and the gauge is written before the MMF sink so a bus failure can no longer
@@ -540,12 +541,17 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   allowlist entry that outlived it (five stale `sysaccess-allowlist.txt` entries in total). Deleted
   rather than parked in the accepted store: a containment helper with no child to contain is
   residue, and stage B can restore it from history.
-- **A11 (keeping the health monitor is what kept the readiness vocabulary alive).** Q3's holding
-  action (an `awaitingRecut` allowlist) is **not needed** — `check-readiness-reason-codes` is green
-  because the boot-recovery arm still emits `WORKER_RECOVERING`/`WORKER_RESTART_EXHAUSTED` and the
-  bootstrap still emits `WORKER_STARTING`/`WORKER_SPAWN_FAILED`/`WORKER_LOST`. Deleting the monitor
-  (which §7 group S proposed) would have orphaned five codes and forced the allowlist. A17.1 is
-  therefore satisfied by a decision, not by a holding action.
+- **A11 (keeping the health monitor is what kept the readiness vocabulary alive — half true, and
+  the false half is the interesting one).** The monitor is kept, and deleting it (which §7 group S
+  proposed) would have orphaned five codes. But this bullet used to say the gate was green "because
+  the boot-recovery arm still emits `WORKER_RECOVERING`/`WORKER_RESTART_EXHAUSTED`", and that is
+  wrong for the second code: it has **no emission at all** — every main-source site is an
+  `.equals(...)` comparison or a log argument (§10 row 1 cites all four). The gate was green because
+  it only asked whether a code was *referenced*. So Q3's holding action was recorded as "not needed"
+  on the strength of a check that could not tell the difference, and stayed that way for three
+  items. The checkpoint strengthened the gate to require an emission and declared the code in
+  `awaitingProducer` with `owner: lane-F/B`. A17.1 is satisfied by a decision plus a now-visible
+  debt, not by a decision alone.
 - **A11 (one half of the post-resume actuator is not channel-shaped).** The brief bundled "post-resume
   eager revalidation" as one thing to delete. It was two: a channel reconnect (deleted — there is no
   channel) and a watcher re-register + reconcile (**kept** — a watcher frozen through a machine
@@ -1188,7 +1194,7 @@ Stage A produces no measurement (E does). It must not make a row *unmeasurable*:
 
 ---
 
-## 7. Deletion inventory (grep-verified at `fe19df0d5`)
+## 7. Deletion inventory (forecast, grep-verified at `fe19df0d5` — see §6 for the measured result)
 
 Counts are **files deleted**. Every group's membership was produced with `git grep -l` / `git ls-files`.
 
@@ -1248,6 +1254,16 @@ Reference counts today: `WorkerSpawner` 27 files, `SupervisionPolicy` 11,
 `torture/{ReadWhileWriteTest,WindowsTortureTest}`, `vdu/{VduBatchProcessorE2ETest,VduRecoverySystemTest}`.
 Two of these (`GrpcCommunicationTest`, `GrpcDataIntegrationTest`) test the wire itself and are
 **deleted outright**; the other 19 need replacement assertions (A12).
+
+> **Tense correction (checkpoint).** The paragraph above is a *forecast*, written in the present
+> tense — "are deleted outright", "need replacement assertions", "22 files" — and read for three
+> items as a description of the tree. What actually landed: A12 deleted 22 files but they are not
+> this list (see the §0.1 A12 mapping table for the file-derived set), `ExtractionSandboxChaosTest`
+> and three others named here were kept by A12 and deleted two commits later at A14-A17, and three
+> of the "21 consumers" (`ExtractionSandboxChaosTest`, `ai/SummarizationPipelineE2ETest`,
+> `vdu/VduBatchProcessorE2ETest`) were never in scope for deletion at all. Read this section as
+> "what was planned at `fe19df0d5`"; the mapping table and `evidence/A/a-deletion-counts.md` are
+> what happened.
 
 ### Group T — config-snapshot tier: **3 test files deleted, 4 main files edited**
 
@@ -1379,10 +1395,18 @@ gate at A17**, not by this reasoning alone.
 
 This section was written from 17.3's "branch state after" column **before the code existed**. The
 review pass re-read it against the landed branch and three of its five rows did not survive contact:
-rows 1 and 2 forecast losses that did not happen (and, in row 1's case, asserted a "no producer"
-state that a two-second grep contradicts), and row 4 has since closed. A forecast left standing
-after the thing it forecast has happened is exactly the false authority `retire-with-a-sweep` is
-about, so the rows below are now statements about the branch, each with the file that backs it.
+rows 1 and 2 forecast losses that did not happen and row 4 has since closed. A forecast left
+standing after the thing it forecast has happened is exactly the false authority
+`retire-with-a-sweep` is about, so the rows below are statements about the branch, each with the
+file that backs it.
+
+**Then the correction was itself corrected.** This preamble used to say row 1's "no producer" claim
+was refuted by "a two-second grep". That sentence is the error it was describing: a grep found four
+mentions of `WORKER_RESTART_EXHAUSTED` and they were all `.equals(...)` comparisons and log
+arguments, so the forecast was RIGHT about that code and the correction was wrong. Row 1 below is
+now written from the call sites, each one opened. The rule the checkpoint drew from this — never
+write a correction from a grep — is why every claim in this section names the file and line it was
+read at.
 
 **Allowed red / deliberately lost until B:**
 
@@ -1426,25 +1450,49 @@ about, so the rows below are now statements about the branch, each with the file
    The promotion is no longer followed by a false claim: the log says RESTART REQUIRED and names the
    promoted generation, and `MigrationStartResponse`/`MigrationRollbackResponse` carry
    `restart_required` (renamed from `restart_scheduled`, which asserted an action nothing performed).
-   **This red has a second, worse half: it is not observable through the API.** Every migration
-   status field derives from `state.json`, including `serving_search_generation_id`, which is
-   assigned from `stateSnapshot.active_generation()` (`IndexStatusOps.java:608-611`) despite its
-   name. Measured after a cutover: `migration_state=IDLE`, `active_gen`= the promoted id,
-   `servingSearch`= the promoted id — a completed cutover by every field, while the old generation
-   is being served. Cleared by **D1**, which owns the live generation swap; D1 must also source a
-   status field from the open runtime, or the fix will be as unobservable as the defect was.
+   **How observable it is — corrected at the re-review, because the first answer was too broad.**
+   The first pass concluded the divergence was invisible through the API. That was wrong, and the
+   way it was wrong is worth keeping: the three fields whose NAMES promise the answer all lie.
+   `active_generation_id`, `migration_state` and — worst — `serving_search_generation_id` are each
+   derived from `state.json`, the file the promotion just rewrote; the third is assigned from
+   `stateSnapshot.active_generation()` (`IndexStatusOps.java:608-611`) despite being called
+   *serving*. Measured after a cutover: `migration_state=IDLE`, `active_gen`= promoted,
+   `servingSearch`= promoted — a completed cutover by every field whose name you would check.
 
-2. **Restart-as-reload — but by answer, not by exit.** Corrected 2026-09-08. The original row said
-   config-apply, AI install and pack import "exit the process with a `restart required` code" and
-   that the dev-runner observes that exit. Neither happens. There is **no distinct restart exit
-   code** (the only `System.exit` calls on the Head path are `HeadlessApp.java:899`/`:1127` = 1 and
-   `:953` = 2, all plain boot failures), and the dev-runner is not involved at all. What actually
-   happens is an API refusal: `RestartRequiredException.CODE = "restart_required"`
-   (`RestartRequiredException.java:31`), surfaced to the caller as HTTP 409
-   (`InferenceHandlers.java:739`, `RestartWorkerHandler.java:69`). The process keeps running and
-   serving; the operation is declined with a reason. A test asserting "the setting applied without a
-   restart" is still expected red, and still needs its stage-B item — the loss is real, the
-   mechanism in the forecast was not.
+   But `activeDocCount` and `searchableDocCount` are counted on `searchCountOps`, the reader that
+   actually serves search (`IndexStatusOps.java:276-282`, `:300-305`), so they describe the
+   generation genuinely open. The first probe missed this because its fixture held ONE document, so
+   both generations held one and the counts agreed by coincidence — agreement was read as inability
+   to disagree. `EngineMigrationLifecycleTest.cutoverDoesNotChangeWhatThisProcessServesUntilItRestarts`
+   now asserts it on a two-document fixture with one source file removed before Green is filled:
+   before the restart the live Engine still counts Blue's documents while `state.json` names Green,
+   and the restart moves the count. The test guards its own non-vacuity — if the two generations
+   ever hold equal counts it fails rather than passing on a coincidence.
+
+   Cleared by **D1**, which owns the live generation swap. D1 should also fix
+   `serving_search_generation_id` to mean what it says, since a field named for the serving
+   generation that reports the pointer is how this stayed hidden.
+
+2. **Restart-as-reload — and there is no single mechanism.** Corrected 2026-09-08, then corrected
+   again at the re-review, which found the second version had flattened four different paths into
+   one. The original row said config-apply, AI install and pack import "exit the process with a
+   `restart required` code" observed by the dev-runner. Nothing exits: the only `System.exit` calls
+   on the Head path are `HeadlessApp.java:899`/`:1127` = 1 and `:953` = 2, all plain boot failures,
+   and the dev-runner is not involved. But "the answer is `restart_required` as HTTP 409" was only
+   true of one path. Read at the call sites:
+
+   | path | what actually happens |
+   |---|---|
+   | `core.restart-worker` | the only one that refuses. `RestartRequiredException` has **exactly one throw site** — `WorkerServiceImpl.java:57` — surfaced as HTTP 409 with `RestartRequiredException.CODE` (`InferenceHandlers.java:678-683`, `RestartWorkerHandler.java:69`). Asserted by `InferenceHandlersWorkerRestartTest`. |
+   | config-apply | does **not** refuse. Its `restartRequired` is a **telemetry tag** on `inference.config.apply_total` (`InferenceTags.java:163-172`, `ConfigApplyTags`) — a metric dimension, not an answer to the caller. The apply succeeds; whether a restart is needed is recorded, not returned. |
+   | AI install (`ConfigurationStage`) | succeeds and says so in its phase message: "Applied — restart JustSearch to use the new configuration". Copy, not a status code. |
+   | pack import (`AiPackImportService`) | the same shape, for the model. |
+   | migration start / rollback | a boolean `restart_required` field on the response (renamed from `restart_scheduled` at blocker 1). |
+
+   So "restart-as-reload" is a *situation*, not a contract: one path refuses, one records a metric,
+   two write prose, one sets a flag. A test asserting "the setting applied without a restart" is
+   still expected red and still needs its stage-B item — but a reader looking for one mechanism to
+   grep for will not find it, and that is worth knowing before D1 tries to unify them.
 
 3. **`core.restart-worker` returns `restart required`** rather than restarting anything.
    (`RestartWorkerHandler.java:69` — the one row of the original three that was right.)
@@ -1459,9 +1507,37 @@ about, so the rows below are now statements about the branch, each with the file
    build needs a jlink runtime plus network downloads that fail here, and `build-installer.yml`
    declares `environment: release-signing`, whose deployment branch protection refuses every ref
    but `main` — so the workflow fails before its first step, with no log, however many times it is
-   dispatched. This is the one item in this list that is NOT restored by a stage-B change; it is
+   dispatched.
+
+   **The documented exception was tried, 2026-09-08.** `docs/how-to/cut-a-release.md:19,32-34`
+   records a successful branch dispatch (2026-07-15) and describes the path: dispatch, then
+   *temporarily add that exact branch to the Environment's deployment policy, approve the one
+   pending run, and remove the policy*. Dispatched
+   (`gh workflow run build-installer.yml --ref worktree-lane-F-A`, run
+   [34177886296](https://github.com/justsearch-app/justsearch/actions/runs/34177886296)): the
+   dispatch itself is **accepted** — so "the workflow refuses to be dispatched" was too strong — and
+   the run then completed as **failure with 0 steps executed** (`Windows NSIS Installer` failed,
+   `Verify installer (packaged)` skipped). That is the Environment gate, exactly as documented. The
+   remaining half of the documented path is an **owner action in repository settings**, not
+   something this lane can perform or should attempt. So the gap stands, now with its boundary
+   measured rather than assumed: dispatch works, execution needs a human to open the Environment.
+
+   This is the one item in this list that is NOT restored by a stage-B change; it is
    closed by the first installer run after the merge, and until then the honest statement is
    "changed, locally reasoned, never executed". See the A13 bullets in §0.1 for what WAS measured.
+
+1c. **`WorkerBootRecoveryE2ETest` cannot exercise its property, and says so (found at the
+   re-review).** New named red, owner **lane-F/B**. Its countdown fault injector
+   (`justsearch.worker.boot.faultInjectAttempts`) threw on the first N **PID validations** of the
+   spawned Worker; A11 deleted the spawner, so nothing injects and the boot succeeds first try. The
+   test fails rather than passing vacuously — it asserts the READY it observes was the recovery
+   arm's doing — which is the `unreachable-seed-green` guard working. `bootFaultInjectAttempts` is
+   still resolved in `KnowledgeServerConfig` (`:44-55`, `:120`) with **zero consumers** outside that
+   record. A12 swept `src/systemTest`; this lives in `src/integrationTest`, which is how it was
+   missed. Not deleted and not quarantined: the property is real and the boot-recovery arm survived
+   (row 1) — what is gone is the injection point, and restoring it means giving the in-process start
+   a fault seam, which belongs with stage B's supervisor. Counts in
+   `evidence/A/a20-suite-and-gates.md`.
 
 **What "the full unit suite is green" does and does not cover (added 2026-09-08).** Stated because
 stage A moved two of its own A12 conversions into a tier the default suite does not run, and a
@@ -1566,7 +1642,7 @@ commit body.
 |---|---|---|---|
 | **Q1** (largest; blocks A18) | What replaces `DevReloadManager`'s trigger and delegate swap? It reads the MMF byte at `DevReloadManager.java:52` (written by `server.mjs:2840`) and swaps three gRPC delegates at `:76-78`; the `Delegating*Service` wrappers exist for nothing else. A10 deletes both halves. | (a) mutable `WorkerAppServices` holder in `app-engine` that reload rebuilds, triggered by a file under `<dataDir>/runtime/` or a dev HTTP route; (b) JDWP HotSwap only, structural changes reported unappliable; (c) `hotReload:false` in single mode, defer to B (917 Derisk 4's position) | **(a)**, file trigger — an HTTP route is a new API surface stage A does not otherwise add, and the file is a one-line `check-runtime-manifest-closure` sibling-allowlist entry. (c) contradicts the stage-A row's "hot reload re-homed"; (b) silently drops the capability `mcp-dev-tools.md:313-315` advertises |
 | **Q2** | Direct calls, or an in-process gRPC channel? 917 Derisk 4 chose `grpc-inprocess`; design 17.3 says "ports as direct calls" and deletes `RemoteKnowledgeClient` in the same change. | (a) direct calls (design); (b) `grpc-inprocess` as a one-stage bridge deleted at B | **(a)** — the design supersedes 917 here. (b) keeps `libs.grpc` in the `.kts` files, which keeps `adr-0002-grpc-present` green over a "deleted" wire (§0.1). If (a) proves infeasible at A6 that is a §0 amendment needing the owner's word, not a quiet fallback |
-| **Q3** | What holds `check-readiness-reason-codes` green from A11 to D1? (§0.5) | (a) delete the orphaned `WORKER_*` members and their `readinessNotice.ts` rows — pre-empts D1 and pulls `run-ui-web-gates.mjs` into stage A; (b) an `awaitingRecut` allowlist in `governance/readiness-reason-codes.v1.json`; (c) re-cut now (D1's item) | **(b)**, each entry carrying `"retiredBy": "lane-F/D1"` so F has a grep target. Predictable evasion to pre-empt in review: satisfying the grep with a comment — the gate's own note says a reference is not an emission, so that is the vacuous green it warns about |
+| **Q3** | What holds `check-readiness-reason-codes` green from A11 to D1? (§0.5) | (a) delete the orphaned `WORKER_*` members and their `readinessNotice.ts` rows — pre-empts D1 and pulls `run-ui-web-gates.mjs` into stage A; (b) an `awaitingRecut` allowlist in `governance/readiness-reason-codes.v1.json`; (c) re-cut now (D1's item) | **Resolved differently, and the `awaitingRecut` allowlist was NEVER CREATED** — the name appears only in this document (three hits, all forecast) and nowhere in the repo. What actually happened: the gate stayed green on its own because it accepted a *reference* as a producer, so no holding action was reached for. The checkpoint then strengthened it to require an emission and added an `awaitingProducer` list carrying `worker.restart_exhausted` with `owner: lane-F/B` — the same shape this row proposed, under a different name and for a sharper reason. The predictable evasion this row named (satisfying the grep with a comment) turned out to be understated: the gate was satisfied by real code that only ever COMPARED the value |
 | **Q4** | In-process form of the `FetchDocuments` byte budget? `BoundedDocumentFetch.java:11-30` exists only for the 32 MiB gRPC ceiling. | (a) delete it (loses a bound §6 says must not vanish); (b) keep the class, re-express as a per-call result-size cap on the port (`:52-62`); (c) defer to C1 admission | **(b)** — smallest change that keeps §6's promise, and `GplFetchDocumentsByteBudgetTest` retargets rather than dies |
 | **Q5** | `infra_diagnostics.proto` + `InfraHealthGrpcService`: 2 RPCs with **no production registration** (only `app-observability`'s unit test and `InfraHealthGrpcServiceIntegrationTest.java:64`); its sibling `InfraHealthController` is already in the dead-code accepted set. | (a) delete both with the wire; (b) leave — §6 names only Search/Ingest/Health; (c) leave, record in F's residue list | **(a)**, verified by the ratchet shrinking. If the owner wants minimal scope, (c) — not (b), which is how residue becomes false authority |
 | **Q6** | Does the A6 port adapter carry `SearchTrace` / `IndexingJobView` **by type**? Both registers auto-scan `modules/**/src/main/java/` for the imports (§9). | (a) type the adapter on `SearchPort`/`IndexingService` only, so no import is added; (b) register `app-engine` as a `carrier` with `exempt:opaque carrier` in both | **(a) as the target, (b) as the honest fallback** — decide by grepping the adapter's imports at A6 and running `--gate execution-surface` *before* the commit, not after |

@@ -1141,8 +1141,9 @@ public final class ResolvedConfigBuilder {
         resolveInt("justsearch.backfill.bge_m3_batch_size", 50),
         resolveInt("justsearch.backfill.bge_m3_interleave_batch_size", 10),
         // Tempdoc 885 item 3: foreground-contention duty cycle. Resolved here (not read as a raw
-        // EnvRegistry sysprop in the Worker) so the value reaches the Worker through the ordinal-450
-        // config snapshot — the [R1] defect was a Worker-side key that only ever existed on the Head.
+        // EnvRegistry sysprop at the point of use) so it stays on the declared config surface. It used
+        // to reach a separate Worker through the ordinal-450 snapshot — [R1] was a Worker-side key
+        // that only ever existed on the Head — but item A19 deleted that tier: one JVM, one config.
         resolveInt("justsearch.indexing.foreground_duty_pct", 20),
         resolveLong("justsearch.indexing.foreground_cooldown_ms", 500L));
   }
@@ -1496,9 +1497,9 @@ public final class ResolvedConfigBuilder {
         parseIndexSort(resolveString("index.sort", null)),
         parseBoosts(resolveString("index.boosts", null)),
         // Tempdoc 885 item 19: NRT/commit cadence candidate. Resolved here (not read as a raw
-        // sysprop in the Worker) so the values reach the Worker through the ordinal-450 config
-        // snapshot, the channel the item-3 forwarding defect [R1] proved is the only one that
-        // crosses the process boundary.
+        // sysprop at the point of use) so they stay on the declared config surface. The ordinal-450
+        // snapshot that used to carry them across the process boundary was deleted at item A19;
+        // there is no boundary left to cross.
         resolveString("index.nrt.mode", ResolvedConfig.Index.NRT_MODE_CONTINUOUS),
         resolveInt("index.nrt.background_reopen_ms", 2000),
         resolveInt("index.nrt.on_demand_max_stale_ms", 1000),

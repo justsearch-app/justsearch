@@ -13,12 +13,14 @@ If docs disagree, treat **canonical** docs as truth. If canonical docs are uncle
 This repo does not maintain an `llms-full.txt`. Use this file as the index and follow links into canonical docs.
 
 ## Summary
-JustSearch is a distributed system running on localhost. It splits responsibilities into three logical processes:
-1.  **Head (Main):** UI processing and API Gateway.
-2.  **Body (Worker):** Lucene indexing and Tika content extraction.
-3.  **Brain (Inference):** local LLM server for RAG and Chat.
+JustSearch runs entirely on localhost. Since ADR-0049 it is **one JVM plus one native process**:
+1.  **Engine:** the API gateway and the index half (Lucene, Tika extraction) in a single JVM. The
+    two halves are a module boundary reached through ports, not a process boundary.
+2.  **Brain (Inference):** a separate `llama-server` process for RAG and Chat — a different runtime
+    and toolchain, which is why it stays out of process.
 
-We strictly enforce "Inversion of Control" for configuration and use "Memory Mapped Files" for IPC coordination.
+We strictly enforce "Inversion of Control" for configuration. There is no memory-mapped IPC: the
+halves share objects.
 
 <!-- generated:start — do not edit between markers; run: node scripts/docs/llmstxt-generate.mjs -->
 
@@ -29,7 +31,7 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 
 ### Explanation (Understanding the Architecture)
 - [System Overview](explanation/01-system-overview.md): The Engine JVM, the process boundaries that survive, and the module roles behind them.
-- [Process Coordination](explanation/02-process-coordination.md): MMF signaling, the "Suicide Pact", and the indexing duty cycle.
+- [Process Coordination](explanation/02-process-coordination.md): Historical record of the Head/Worker process pair: MMF signalling, the suicide pact, and the indexing duty cycle. The duty cycle survives; the rest was deleted by ADR-0049.
 - [Knowledge Server](explanation/03-knowledge-server.md): Formatting logic, JobQueue, and Tika usage.
 - [Storage Engine](explanation/04-storage-engine.md): Lucene internals, schema (SSOT), and locking strategies.
 - [AI Architecture](explanation/05-ai-architecture.md): Hybrid Inference (CPU/GPU) and VRAM management.
@@ -48,7 +50,7 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 - [Agent System Architecture](explanation/22-agent-system-architecture.md): Agent loop, operation-substrate tool dispatch, token budget, durability, and MCP tool surface.
 - [23-runtime-manifest](explanation/23-runtime-manifest.md): Producer-published runtime manifest at <dataDir>/runtime/manifest.json (filesystem) and GET /api/runtime/manifest (HTTP). Canonical answer for "how does a non-JVM consumer find the running JustSearch instance?" — tempdoc 501 §6 closure rule.
 - [Search Pipeline Overview](explanation/23-search-pipeline-overview.md): End-to-end search pipeline: ingestion stages, query-time retrieval legs, fusion, correction, reranking, and response assembly.
-- [Worker Inference Composition](explanation/24-worker-inference-composition.md): How the Worker process builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline.
+- [Worker Inference Composition](explanation/24-worker-inference-composition.md): How the index half builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline.
 - [Service Lifecycle Pattern](explanation/25-service-lifecycle-pattern.md): Canonical pattern for long-lived resource owners in JustSearch. Identity is held by the consumer; each open period is a single-shot phase value with a clean AutoCloseable lifecycle. Restart is a consumer pattern (build new value, swap holder field, close old) — not a method on the value. Two forms: phase-typed (Form A) when multiple operating modes warrant compile-time distinction, single-shot single-class (Form B) when there's only one mode.
 - [The Extension Substrate](explanation/26-extension-substrate.md): How JustSearch is extended: one declaration model, one composer, four shared substrates, the host-owns-truth boundary, and trust-proportional isolation — the invariants every contributor (plugin, operation, resource, prompt, MCP tool, workflow, agent tool) shares.
 - [The Frontend Presentation Kernel](explanation/27-frontend-presentation-kernel.md): How the web frontend prevents presentation drift: single presentation authorities (tone, originator, layout, modality), a closed atom vocabulary, runtime-modality primitives, and catalog-projected gates — the Collapse > Generate > Gate prevention ladder that makes a re-authored badge/modal/transient unrepresentable rather than merely discouraged.
@@ -155,6 +157,8 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 ## Core Concepts for Agents
 
 *   **SSOT (Single Source of Truth):** We define schema in JSON, not code.
-*   **Zero-Shared-Nothing:** The Main process *never* touches Lucene files.
-*   **Ephemeral Ports:** The gRPC server runs on port 0; we find it via MMF.
+*   **Zero-Shared-Nothing:** Application code *never* touches Lucene files — index I/O belongs to
+    the index half, reached through a port (hard invariant 1, ADR-0049).
+*   **No internal wire:** there is no gRPC server and no port to discover. The index half is bound
+    in-process by `EngineRoot`; only the Brain is reached over a socket.
 *   **Local-only HTTP:** The Local API binds to loopback (`127.0.0.1`). The browser UI discovers it via URL/env overrides or by probing a narrow port range and validating `/api/status`.

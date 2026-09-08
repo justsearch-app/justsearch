@@ -239,11 +239,33 @@ const CONSUMER_AFTER = [/^\s*\.code\(\)\s*\.equals/, /^\s*\.code\(\)\s*==/, /^\s
  * conclusions about whether it had a producer and this gate certified both.
  *
  * <p><b>Honest limits, so nobody reads this as stronger than it is.</b> It is a syntactic
- * heuristic over comment-stripped source, not a dataflow analysis. A code produced only through a
- * helper this predicate cannot see would be misread as emitted (false GREEN), and a genuinely new
- * comparison idiom would be misread as an emission. It cannot prove the emission is *reachable* —
- * only that a value-position use exists. What it does buy is the specific class that occurred:
- * a vocabulary member that every reader treats as producible while nothing produces it.
+ * heuristic over comment-stripped source, not a dataflow analysis. It cannot prove the emission is
+ * *reachable* — only that a value-position use exists. Three specific false-GREEN shapes, named
+ * because a limit nobody can picture is not a limit anyone respects:
+ *
+ * <ol>
+ *   <li><b>Collection literals and lookup tables.</b> A code listed in a {@code Set.of(...)},
+ *       {@code Map.of(...)}, an array initialiser or a switch-expression ARM counts as a
+ *       value-position use, because syntactically it is one. But a table entry is only an emission
+ *       if something emits what the table returns, and this check never looks. A vocabulary
+ *       enumerated in a registry-style constant would pass wholesale while nothing emits any of it.
+ *       That is the likeliest way this gate goes quietly vacuous, and it is the shape to suspect
+ *       first if a code turns out to be a phantom despite a green.
+ *   <li><b>Logger detection is receiver-dependent.</b> The consumer pattern matches
+ *       {@code log.warn|info|debug|error|trace(...)}, i.e. a receiver literally named {@code log}.
+ *       A class using {@code LOG}, {@code logger}, {@code LOGGER}, a wrapped/structured logger, or
+ *       a static import would have its log arguments counted as EMISSIONS. This repo happens to be
+ *       uniform on {@code log}, which is why the predicate lands on one un-produced code rather
+ *       than none — the uniformity is load-bearing and undefended. A new logging convention
+ *       weakens this gate silently.
+ *   <li><b>Helper indirection.</b> A code passed to a project-specific emit helper, or returned
+ *       from a method whose result is emitted elsewhere, reads as an emission here without this
+ *       check knowing whether the helper emits anything.
+ * </ol>
+ *
+ * <p>All three fail toward GREEN, so this direction under-reports rather than over-reports: it
+ * catches codes nothing puts in a value position at all. What it buys is the specific class that
+ * occurred — a vocabulary member every reader treats as producible while nothing produces it.
  *
  * <p>`awaitingProducer` is the deliberate escape hatch: a code whose producer is scheduled but not
  * yet written stays declared, with an owner, so the debt is visible and dated instead of silently

@@ -51,6 +51,16 @@ public final class EngineRoot implements WorkerHost {
 
   private static final Logger log = LoggerFactory.getLogger(EngineRoot.class);
 
+  /**
+   * How long {@link #close()} waits for the index half to confirm it finished closing.
+   *
+   * <p>Zero would be almost right — {@code close()} is synchronous, so by the time it returns the
+   * latch is already down on the happy path. A small budget instead of zero because close() joins
+   * background threads on their own timeouts, and a shutdown that is merely slow should not be
+   * reported as a shutdown that failed.
+   */
+  private static final long CLOSE_COMPLETION_TIMEOUT_MS = 2_000L;
+
   private final Function<GpuSchedulingGauge, KnowledgeServer> serverFactory;
   private final long deadlineMs;
   private final int batchSize;
@@ -129,26 +139,29 @@ public final class EngineRoot implements WorkerHost {
       } catch (IOException e) {
         log.warn("Error closing the in-process index half", e);
       }
-      // Stage-A checkpoint, blocker 1. `isRunning()` had no main-source consumer: the cutover loop
-      // reads the raw `running` field (KnowledgeServer.java:2432, :2602), and the only other reader
-      // was the latch flip in the no-op `initiateShutdown` this checkpoint deleted. That left a
-      // public liveness predicate that six boot tests assert on and nothing in production
-      // consulted — so a regression in it could only ever be caught by the tests that also defined
-      // its meaning.
+      // Stage-A checkpoint. The first version of this block read `s.isRunning()` and warned if it
+      // was still true — which it never could be, because close() sets `running = false` in its
+      // FIRST line (KnowledgeServer.java:2163) and isRunning() is `running && latch > 0`. The
+      // check was constant-false after close() returned: a "production consumer" that could not
+      // fire, added to answer a review finding that isRunning() had no consumer. That is the same
+      // wrong-gate shape this checkpoint exists to remove, committed while removing it.
       //
-      // Deleting it was the alternative, and it is the wrong one: those six assertions
-      // (PreOpenSchemaMismatchBootTest, BrakeExhaustedWorkerServesReadOnlyTest,
-      // ResumedMigrationMismatchBootTest) use it as the "did the index half actually come up"
-      // oracle, and removing the method would delete the oracle, not the dead code.
-      //
-      // So it gets the consumer it should always have had: close() is not finished until the half
-      // it closed says it is no longer running. This converts "close() returned" into "close()
-      // completed", which is the property an ordered shutdown is supposed to give us.
-      if (s.isRunning()) {
-        log.warn(
-            "The in-process index half still reports isRunning() after close() returned. The"
-                + " shutdown was not clean; a subsequent open on the same data directory may find"
-                + " the index lock still held.");
+      // What is actually worth knowing here is whether close() RAN TO COMPLETION, so the latch was
+      // moved to close()'s last statement and that is what this awaits. `false` means close() threw
+      // partway and left runtimes, threads or the index root lock open — which the next open on
+      // this data directory would discover as a held lock, far from the cause.
+      try {
+        if (!s.awaitClosed(CLOSE_COMPLETION_TIMEOUT_MS)) {
+          log.warn(
+              "The in-process index half did not finish closing within {}ms. Its shutdown did not"
+                  + " run to completion, so Lucene runtimes, background threads or the index root"
+                  + " lock may still be held; a subsequent open on the same data directory can fail"
+                  + " with a lock error whose real cause is here.",
+              CLOSE_COMPLETION_TIMEOUT_MS);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        log.warn("Interrupted while confirming the index half finished closing");
       }
     }
   }

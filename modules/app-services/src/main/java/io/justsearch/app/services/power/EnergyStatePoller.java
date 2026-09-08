@@ -30,12 +30,13 @@ import org.slf4j.LoggerFactory;
  * A11 deleted {@code WorkerSpawner}; the poll had to outlive it, so it became a small component the
  * composition root owns. {@code KnowledgeServerBootstrap} constructs and starts it.
  *
- * <p><b>Two sinks, one already dead.</b> Every poll writes {@link GpuSchedulingGauge}, the
- * in-process authority. It also calls the optional {@link EnergyReducedSink} — the memory-mapped
- * {@code energy_reduced} byte a separate Worker process used to read. Since item A11 there is no
- * such process and the only construction site passes {@code null} for it
- * ({@code KnowledgeServerBootstrap}), so the sink has no producer left; it is deleted with the MMF
- * bus at A10. The gauge is the half that survives.
+ * <p><b>One sink.</b> Every poll writes {@link GpuSchedulingGauge}, the in-process authority.
+ * There used to be a second: an optional {@code EnergyReducedSink} carrying the memory-mapped
+ * {@code energy_reduced} byte to the separate Worker process. That interface's own javadoc said it
+ * "is deleted with the MMF bus at A10" — A10 landed and it was not, so it survived as a parameter
+ * with no implementation anywhere in the repo, the one production call site passing {@code null},
+ * and four of six test sites passing {@code null} too. The stage-A checkpoint deleted it. The gauge
+ * is the half that survives.
  */
 public final class EnergyStatePoller implements Closeable {
 
@@ -44,18 +45,7 @@ public final class EnergyStatePoller implements Closeable {
   /** OS energy-intent poll cadence. Energy state changes slowly (plug/unplug). */
   public static final long POLL_INTERVAL_MS = 15_000L;
 
-  /**
-   * The transitional cross-process sink: the memory-mapped {@code energy_reduced} byte. No live
-   * caller passes one since item A11 removed the reader; deleted with the MMF bus at item A10, after
-   * which the gauge is the only publication.
-   */
-  @FunctionalInterface
-  public interface EnergyReducedSink {
-    void publish(boolean reduced);
-  }
-
   private final GpuSchedulingGauge gauge;
-  private final EnergyReducedSink mmfSink;
   private final Supplier<EnergyState> probe;
   private final AtomicReference<EnergyState> latest = new AtomicReference<>(EnergyState.unknown());
   private ScheduledExecutorService scheduler;
@@ -63,17 +53,14 @@ public final class EnergyStatePoller implements Closeable {
 
   /**
    * @param gauge the in-process GPU-scheduling gauge this poller writes (required)
-   * @param mmfSink the transitional memory-mapped publication, or {@code null} once there is no
-   *     second process to publish to
    */
-  public EnergyStatePoller(GpuSchedulingGauge gauge, EnergyReducedSink mmfSink) {
-    this(gauge, mmfSink, EnergyStatePoller::probeHost);
+  public EnergyStatePoller(GpuSchedulingGauge gauge) {
+    this(gauge, EnergyStatePoller::probeHost);
   }
 
   /** Test seam: an injectable probe standing in for the host's {@code GetSystemPowerStatus}. */
-  EnergyStatePoller(GpuSchedulingGauge gauge, EnergyReducedSink mmfSink, Supplier<EnergyState> probe) {
+  EnergyStatePoller(GpuSchedulingGauge gauge, Supplier<EnergyState> probe) {
     this.gauge = Objects.requireNonNull(gauge, "gauge");
-    this.mmfSink = mmfSink;
     this.probe = Objects.requireNonNull(probe, "probe");
   }
 
@@ -109,10 +96,6 @@ public final class EnergyStatePoller implements Closeable {
       EnergyState state = probe.get();
       latest.set(state);
       gauge.setEnergyReduced(state.reduced());
-      EnergyReducedSink sink = mmfSink;
-      if (sink != null) {
-        sink.publish(state.reduced());
-      }
     } catch (Exception e) {
       log.debug("Energy-state poll failed (treated as unknown): {}", e.getMessage());
     }

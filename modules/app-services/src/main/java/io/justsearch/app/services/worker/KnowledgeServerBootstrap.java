@@ -106,7 +106,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         // Item A11: the second sink is gone. It wrote the OS energy-intent into the memory-mapped
         // signal file for a Worker process to read; there is no second process, and the gauge the
         // first argument writes is the one the indexing loop reads.
-        new io.justsearch.app.services.power.EnergyStatePoller(gpuScheduling, null);
+        new io.justsearch.app.services.power.EnergyStatePoller(gpuScheduling);
 
     /** Tempdoc 630: epoch-ms of the most recent OS-resume handled, for the "Catching up" notice. */
     private final java.util.concurrent.atomic.AtomicLong lastResumeEpochMs =

@@ -109,7 +109,6 @@ final class KnowledgeServerBootstrapEvalModeTest {
         /* dataDir */ dataDir,
         /* libDir */ dataDir, // unused by tryIngestHelpFiles
         /* workingDirectory */ workingDir,
-        /* signalFilePath */ dataDir.resolve("worker_signal.lock"),
         /* deadlineMs */ 5_000L,
         /* portDiscoveryTimeoutMs */ 15_000L,
         /* maxRetries */ 3,

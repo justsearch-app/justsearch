@@ -94,22 +94,9 @@ public class TestEnvironmentProvisioner implements BeforeAllCallback, AfterAllCa
 
   @Override
   public void beforeEach(ExtensionContext context) throws Exception {
-    // Clean up signal file to prevent reading stale data from previous tests
-    // Retry a few times to handle Windows file locking delays
-    Path signalFile = tempDir.resolve("worker_signal.lock");
-    for (int attempt = 0; attempt < 5; attempt++) {
-      try {
-        Files.deleteIfExists(signalFile);
-        break;
-      } catch (java.nio.file.FileSystemException e) {
-        if (attempt < 4) {
-          Thread.sleep(200);
-        } else {
-          log.warn("Could not delete signal file after 5 attempts: {}", e.getMessage());
-          // Don't throw - let the test decide if this is fatal
-        }
-      }
-    }
+    // The stale-signal-file cleanup that used to live here (a 5-attempt retry around
+    // deleteIfExists on worker_signal.lock, for Windows lock delays) is gone with the
+    // memory-mapped signal bus: lane F stage A left nothing that creates that file.
   }
 
   @Override
@@ -133,7 +120,7 @@ public class TestEnvironmentProvisioner implements BeforeAllCallback, AfterAllCa
 
   /**
    * Returns the temporary directory for this test class.
-   * Use for test data: worker_signal.lock, index data, etc.
+   * Use for test data: index data, job queue, etc.
    *
    * @throws IllegalStateException if called before initialization
    */

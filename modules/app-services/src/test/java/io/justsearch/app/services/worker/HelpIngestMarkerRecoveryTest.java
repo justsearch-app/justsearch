@@ -118,7 +118,6 @@ final class HelpIngestMarkerRecoveryTest {
         /* dataDir */ dataDir,
         /* libDir */ dataDir,
         /* workingDirectory */ workingDir,
-        /* signalFilePath */ dataDir.resolve("worker_signal.lock"),
         /* deadlineMs */ 5_000L,
         /* portDiscoveryTimeoutMs */ 15_000L,
         /* maxRetries */ 3,

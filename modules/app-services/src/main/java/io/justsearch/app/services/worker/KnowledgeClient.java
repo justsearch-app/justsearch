@@ -83,13 +83,10 @@ import org.slf4j.LoggerFactory;
  * everything that is a property of the <em>work</em> stays here, and the three call seams below
  * are what a transport supplies.
  *
- * <p>Two implementations exist during the stage-A transition:
- * <ul>
- *   <li>{@link KnowledgeClient} — the gRPC one, no longer constructed on the live path from
- *       A6 and deleted at A10;
- *   <li>{@code io.justsearch.app.engine.EngineKnowledgeClient} — the in-process one, which calls
- *       the converted worker services directly.
- * </ul>
+ * <p>One implementation remains: {@code io.justsearch.app.engine.EngineKnowledgeClient}, which
+ * calls the converted worker services directly in this JVM. The transport sibling that carried the
+ * calls over a channel was retired with the wire (items A6-A10); nothing extends this class on the
+ * live path except the in-process client.
  *
  * <p><b>The four operation contracts design §6 requires to survive the channel</b> are the four
  * things this class still carries, and each has a named owner here rather than in a transport:
@@ -104,7 +101,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     private static final Logger log = LoggerFactory.getLogger(KnowledgeClient.class);
 
     /**
-     * Deadline categories for gRPC operations.
+     * Deadline categories for port operations.
      *
      * <p>Centralizes the scattered deadline configurations:
      * <ul>
@@ -170,7 +167,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     // Last-known WorkerOperationalView, cached as a side-effect of getWorkerOperationalView().
     // Used by KnowledgeHttpApiAdapter to include index capabilities in search responses
-    // without making a per-search gRPC call (250 Phase 3).
+    // without making a per-search port call (250 Phase 3).
     private final AtomicReference<io.justsearch.app.api.status.WorkerOperationalView>
         cachedOperationalView = new AtomicReference<>(null);
 
@@ -636,7 +633,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     /**
-     * Returns the last-known WorkerOperationalView without making a gRPC call.
+     * Returns the last-known WorkerOperationalView without making a port call.
      *
      * <p>Updated as a side-effect of {@link #getWorkerOperationalView()}. Returns null if the
      * operational view has never been fetched (e.g., before the first status poll).
@@ -710,15 +707,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *
      * <p>Prefer this over {@link #isHealthy()} when you need details like {@code worker_state} or {@code pid}.
      *
-     * <p>Same connection handling as {@link #isHealthy()}: the shared health-RPC path re-reads the
-     * signal bus and rebuilds the channel only when the reported port has actually changed.
+     * <p>Same call handling as {@link #isHealthy()}: the shared health path is a direct call to the
+     * index half under a deadline. (It used to re-read the signal bus and rebuild the channel when
+     * the reported port changed; there is no bus and no port.)
      */
     public HealthCheckResponse getHealthCheck() {
         return getHealthCheck(deadline(RpcDeadlineCategory.STANDARD));
     }
 
     /**
-     * Health check with an explicit per-call gRPC deadline, for callers that own a total budget and
+     * Health check with an explicit per-call deadline, for callers that own a total budget and
      * must be able to spend it over several attempts.
      *
      * <p>Boot-time PID validation is the motivating caller: its whole window equals the STANDARD
@@ -726,7 +724,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * are expensive on first contact) consumed the entire budget and its retry loop never iterated.
      * Passing a per-attempt deadline keeps the retry loop a retry loop.
      *
-     * @param callDeadlineMs the gRPC deadline for this one call, in milliseconds
+     * @param callDeadlineMs the deadline for this one call, in milliseconds
      */
     public HealthCheckResponse getHealthCheck(long callDeadlineMs) {
         HealthCheckResponse response = executeHealthRpc(
@@ -787,12 +785,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         int limit = intent.limit();
         String cursorToken = intent.cursor() == null ? null : intent.cursor().token();
 
-        // Cursor support is TEXT-only in the Worker gRPC surface. When a cursor is provided, force TEXT pipeline.
+        // Cursor support is TEXT-only in the Worker's search surface. When a cursor is provided, force TEXT pipeline.
         io.justsearch.ipc.PipelineConfig pipeline = (cursorToken != null && !cursorToken.isBlank())
             ? PipelineConfigs.TEXT
             : PipelineConfigs.HYBRID;
 
-        // Execute via gRPC
+        // Execute through the search call seam
         SearchRequest.Builder req =
             SearchRequest.newBuilder().setQuery(queryText).setLimit(limit).setPipeline(pipeline);
         if (cursorToken != null && !cursorToken.isBlank()) {
@@ -840,8 +838,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * can be driven before the store is published; no excludes is the safe answer there.
      *
      * <p>Package-private so the tempdoc 883 slice-2 rewiring (settings.json at ordinal 300 instead
-     * of the promoted sysprop) has a direct test; {@code getExcludeMatcher} is unreachable without
-     * a live gRPC client.
+     * of the promoted sysprop) has a direct test; {@code getExcludeMatcher} is private and
+     * unreachable without a live client.
      */
     static String resolvedExcludePatterns() {
         var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
@@ -1018,9 +1016,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     /**
-     * Projects the Worker's gRPC quiescence message onto the app-api contract record.
+     * Projects the Worker's proto quiescence message onto the app-api contract record.
      *
-     * <p>The mapping lives here, at the single gRPC boundary, so the generated proto type never
+     * <p>The mapping lives here, at the single proto boundary, so the generated proto type never
      * reaches {@code ui.api} — see {@code UiApiGuardrailsTest} and {@link
      * io.justsearch.app.api.WorkerQuiescenceSnapshot}.
      */
@@ -1200,10 +1198,10 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     public Map<String, Object> getSessionPolicies() {
         io.justsearch.ipc.SessionPoliciesRequest req =
                 io.justsearch.ipc.SessionPoliciesRequest.newBuilder().build();
-        io.justsearch.ipc.SessionPoliciesResponse grpcResp;
+        io.justsearch.ipc.SessionPoliciesResponse ipcResp;
         Map<String, Object> response = new java.util.LinkedHashMap<>();
         try {
-            grpcResp = executeIngestRpc(
+            ipcResp = executeIngestRpc(
                     "getSessionPolicies", RpcDeadlineCategory.STANDARD,
                     stub -> stub.getSessionPolicies(req));
         } catch (RuntimeException e) {
@@ -1222,17 +1220,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             response.put("models", new java.util.TreeMap<>());
             return response;
         }
-        response.put("configStatus", grpcResp.getConfigStatus());
+        response.put("configStatus", ipcResp.getConfigStatus());
         try {
             tools.jackson.databind.ObjectMapper mapper =
                     new tools.jackson.databind.json.JsonMapper();
             Object runtime =
-                    grpcResp.getRuntimePolicyJson().isEmpty()
+                    ipcResp.getRuntimePolicyJson().isEmpty()
                             ? new java.util.LinkedHashMap<>()
-                            : mapper.readValue(grpcResp.getRuntimePolicyJson(), Object.class);
+                            : mapper.readValue(ipcResp.getRuntimePolicyJson(), Object.class);
             response.put("runtime", runtime);
             Map<String, Object> models = new java.util.TreeMap<>();
-            for (var entry : grpcResp.getModelPoliciesJsonMap().entrySet()) {
+            for (var entry : ipcResp.getModelPoliciesJsonMap().entrySet()) {
                 models.put(entry.getKey(), mapper.readValue(entry.getValue(), Object.class));
             }
             response.put("models", models);
@@ -1432,9 +1430,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * {@link io.justsearch.ipc.ScanRootProgress} to {@code progressConsumer} and returns the
      * terminal progress event (the one with {@code complete=true}).
      *
-     * <p>Cancellation is gRPC-native: the client may stop iterating to terminate the walk
-     * (the server-side {@code Files.walkFileTree} responds to the cancellation by returning
-     * TERMINATE on the next visitor call).
+     * <p>This overload wires no cancellation. Use the {@link CancelToken} overload below to
+     * terminate a walk in flight; the scan loop's {@code Files.walkFileTree} returns TERMINATE on
+     * the next visitor call once the signal is set.
      *
      * @param rootPath absolute root path; Worker validates it is a directory and emits a typed
      *     terminal event ({@code ROOT_NOT_DIRECTORY}) if not.
@@ -1456,9 +1454,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     /**
      * Tempdoc 419 / T3 — overload that accepts a {@link CancelToken}. Calling
-     * {@link CancelToken#cancel()} from any thread reaches the producer's cancellation signal:
-     * over the wire that is a gRPC {@code CANCELLED} status, and in process it is the
-     * {@code CallContext.CancelSignal} the scan loop polls. Either way the Worker's scan loop
+     * {@link CancelToken#cancel()} from any thread reaches the producer's cancellation signal —
+     * the {@code CallContext.CancelSignal} the scan loop polls, which the in-process client wires
+     * the token to. The Worker's scan loop
      * (tempdoc 418 B-H.3) terminates within the next batch. Closes the validation finding
      * (2026-04-26) where HTTP-client abort had no effect on the in-flight scan.
      *

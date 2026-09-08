@@ -167,6 +167,86 @@ final class EngineMigrationLifecycleTest {
         "the marker must still be findable on the new active generation");
   }
 
+  /**
+   * Stage-A checkpoint re-review — the cutover's effect IS observable, on the doc counts.
+   *
+   * <p>The first pass concluded the divergence was invisible through the API, having checked the
+   * fields whose names promise it — {@code active_generation_id}, {@code migration_state},
+   * {@code serving_search_generation_id} — and found all three derived from {@code state.json}. The
+   * conclusion was too broad. {@code activeDocCount} and {@code searchableDocCount} are counted on
+   * {@code searchCountOps}, the reader that SERVES search (IndexStatusOps.java:276-282, :300-305),
+   * so they describe the generation actually open. The earlier probe could not show it because the
+   * fixture held ONE document and both generations therefore held one: the counts agreed by
+   * coincidence, and agreement was read as inability to disagree.
+   *
+   * <p>So: two documents in Blue, one of them removed before the enumerator fills Green. The
+   * promoted generation then has a different count from the serving one, and the divergence is
+   * directly assertable — before the restart the live Engine reports Blue's count while
+   * {@code state.json} names Green, and after the restart it reports Green's.
+   */
+  @Test
+  @DisplayName("after a cutover the live Engine still counts the OLD generation; a restart moves it")
+  void cutoverDoesNotChangeWhatThisProcessServesUntilItRestarts(@TempDir Path tempDir)
+      throws Exception {
+    Path dataDir = tempDir.resolve("data");
+    Path docsDir = dataDir.resolve("count-docs");
+    Files.createDirectories(docsDir);
+
+    String markerA = "countmarkera" + System.nanoTime();
+    String markerB = "countmarkerb" + System.nanoTime();
+    Path fileA = docsDir.resolve("a.txt");
+    Path fileB = docsDir.resolve("b.txt");
+    Files.writeString(fileA, "hello " + markerA);
+    Files.writeString(fileB, "hello " + markerB);
+    writeWatchedRoots(dataDir, docsDir);
+
+    engine = EngineTestHarness.start(dataDir);
+    assertTrue(
+        engine.client().submitBatch(List.of(fileA, fileB)).getAcceptedCount() > 0,
+        "both files must be accepted for indexing");
+    assertTrue(engine.awaitIndexed(2, 120_000), "both documents must index");
+
+    long blueCount = engine.status().getMigration().getActiveDocCount();
+    assertEquals(2L, blueCount, "precondition: the serving generation holds both documents");
+
+    String activeBefore = engine.status().getMigration().getActiveGenerationId();
+    assertTrue(engine.client().startMigration("count_divergence"), "startMigration accepted");
+
+    // Remove one source file so the generation the enumerator builds differs from the one being
+    // served. This is what makes the assertion below non-vacuous: with equal counts it would pass
+    // whether or not the Engine reopened.
+    Files.delete(fileB);
+    engine.restart();
+
+    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted");
+    assertTrue(
+        awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
+        "the cutover must promote the building generation");
+
+    StatusResponse live = engine.status();
+    assertNotEquals(
+        activeBefore,
+        live.getMigration().getActiveGenerationId(),
+        "precondition: state.json names the promoted generation");
+    long liveCount = live.getMigration().getActiveDocCount();
+
+    engine.restart();
+    long afterRestartCount = engine.status().getMigration().getActiveDocCount();
+
+    assertNotEquals(
+        liveCount,
+        afterRestartCount,
+        "the whole point: if the live count and the post-restart count are equal, the two"
+            + " generations hold the same number of documents and this fixture proves nothing about"
+            + " which one was open. Fix the fixture rather than the assertion.");
+    assertEquals(
+        blueCount,
+        liveCount,
+        "before the restart the Engine must still be COUNTING the old generation, even though"
+            + " state.json already names the promoted one. This is the blocker-1 loss made"
+            + " observable: a cutover reports success and changes nothing this process serves.");
+  }
+
   @Test
   @DisplayName("rollback returns the active generation to the previous one and search still works")
   void rollbackRevertsTheGenerationPointer(@TempDir Path tempDir) throws Exception {

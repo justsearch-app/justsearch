@@ -25,14 +25,14 @@ For subsystem deep-dives, see:
 
 When a user types a query, the default `hybrid` preset activates BM25 +
 Dense KNN retrieval (with optional SPLADE), fused via CC (convex
-combination). The pipeline executes across two processes:
+combination). The pipeline executes across the two halves of the Engine, in one JVM:
 
-1. **Head** (Main process, `KnowledgeHttpApiAdapter`) resolves the
+1. **The application half** (`KnowledgeHttpApiAdapter`) resolves the
    `PipelineConfig` from a named preset or explicit flags, and optionally
    starts an async LLM expansion call. It then makes the `search` port call
    into the index half.
 
-2. **Worker** (Body process, `SearchOrchestrator`) runs retrieval. The
+2. **The index half** (`SearchOrchestrator`) runs retrieval. The
    enabled legs (BM25, Dense KNN, SPLADE) execute in parallel via virtual
    threads. Their results are fused (RRF by default). If the query yields
    zero hits, fuzzy correction retries. If chunks exist, a parallel chunk

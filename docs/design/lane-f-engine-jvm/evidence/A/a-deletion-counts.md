@@ -28,8 +28,9 @@ convention — 105 deleted / 126 added — which is the smaller of the two.
 | logging (the second log tier) | 2 |
 | **total** | **105** |
 
-Independent cross-check by source set: main java 38 + main resources 1 + test 38 + systemTest 19 +
-soakTest 1 + integrationTest 3 + docs 1 + scripts 4 = 105. Every one of the 105 paths landed in
+Independent cross-check by source set: main java 37 + main proto 1 + main resources 1 + test 38 +
+systemTest 19 + soakTest 1 + integrationTest 3 + docs 1 + scripts 4 = 105. (The proto is the
+deleted `infra_diagnostics.proto`, under `src/main/proto/`, not `src/main/java/`.) Every one of the 105 paths landed in
 exactly one area bucket; there were no unclassified paths.
 
 ## The other quantities

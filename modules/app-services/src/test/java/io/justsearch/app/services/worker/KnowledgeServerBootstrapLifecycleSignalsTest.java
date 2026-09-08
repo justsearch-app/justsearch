@@ -22,7 +22,7 @@ final class KnowledgeServerBootstrapLifecycleSignalsTest {
   /** Minimal config pointing at a temp dir (avoids KnowledgeServerConfig.load()'s lib-dir probe). */
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir.resolve("worker_signal.lock"),
+        false, dir, dir, dir,
         5_000L, 15_000L, 3, 5_000L, 5_000L, 300_000L, 100, 0L, 0);
   }
 

@@ -31,7 +31,7 @@ final class KnowledgeServerBootstrapRestartabilityTest {
   /** Mirrors {@code KnowledgeServerBootstrapLifecycleSignalsTest.configFor} (:20-25). */
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir.resolve("worker_signal.lock"),
+        false, dir, dir, dir,
         5_000L, 2_000L, 3, 2_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 

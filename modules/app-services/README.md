@@ -103,15 +103,15 @@ gRPC stub below were all deleted at items A9/A10; today `KnowledgeSearchControll
 ### Self-Checks
 1.  **Knowledge Health**: `InfraHealthController` (or `/api/knowledge/status`).
     *   *Verify*: "Engine State" should be `READY`.
-2.  **IPC Sanity**: Check `~/.justsearch/worker_signal.lock` timestamp.
-    *   *Verify*: Main process updates "Heartbeat" (bytes 8-15) every second.
+2.  **GPU scheduling sanity**: Read `GpuSchedulingGauge` (`modules/core`).
+    *   *Verify*: `mainGpuActive` / `energyReduced` reflect the current inference claim. There is no
+        IPC to check — the memory-mapped signal bus and its heartbeat went at item A10/A11.
 
 ### Log Patterns to Watch
 | Pattern | Meaning | Action |
 | :--- | :--- | :--- |
-| `Knowledge Server is READY on port` | Worker started & MMF port discovery succeeded. | ✅ Normal |
-| `Worker heartbeat expired` | "Suicide Pact" triggered; worker terminated. | ⚠️ Check Main Process pauses |
-| `Indexing paced by foreground load` | Indexing throttled to its minimum duty while search-family RPCs are in flight. | ✅ Normal (Throttling) |
+| `Knowledge Server is READY` | The index half finished composing in this JVM (`EngineRoot`). | ✅ Normal |
+| `Indexing paced by foreground load` | Indexing throttled to its minimum duty while search-family port calls are in flight. | ✅ Normal (Throttling) |
 | `Found stale Lucene write.lock` | Self-healing active; recovering from previous crash. | ℹ️ Recovery |
 | `Started watching /path` | Local file watcher active (Legacy Mode). | ℹ️ Legacy Context |
 
@@ -125,8 +125,12 @@ The core of the modern architecture. `app-services` acts as the **Process Manage
     `WorkerSpawner` launched `indexer-worker.jar` (or native image).
     *   **Optimization**: Previously injected `--add-modules jdk.incubator.vector` for SIMD; removed to enable AOT Cache (see tempdoc 269 §D4a).
     *   **Resilience**: Deleted stale `write.lock` files if the previous run crashed.
-*   **Discovery**: Uses `MainSignalBus` (Memory Mapped File) to discover the ephemeral gRPC port chosen by the worker.
-*   **Liveness**: Maintains a "Heartbeat" in the MMF; if this stops, the worker self-terminates (Suicide Pact).
+*   **Discovery** *(retired)*: there is no port to discover. The index half is composed into this
+    JVM by `EngineRoot` (`modules/app-engine`) and reached through the `KnowledgeClient` port;
+    `MainSignalBus` and the ephemeral-gRPC-port handoff went at item A10.
+*   **Liveness** *(retired)*: the MMF heartbeat and its "Suicide Pact" went with the child process
+    at item A11 — one JVM has no peer to outlive. The two signals that survived the bus are fields
+    on the in-process `GpuSchedulingGauge` (`modules/core`). Crash supervision is stage B's work.
 
 ### 2. Application Facade (Legacy/Local)
 The `DefaultAppFacade` provides the interface for the **Local/In-Process** stack.
@@ -136,7 +140,7 @@ The `DefaultAppFacade` provides the interface for the **Local/In-Process** stack
 
 ### 3. Bootstrapping Flow
 1.  **Config**: Loads `RuntimeConfig`.
-2.  **Worker**: `KnowledgeServerBootstrap` starts the child process and waits for `READY`.
+2.  **Index half**: `KnowledgeServerBootstrap` composes it in this JVM via `EngineRoot` and waits for `READY`.
 3.  **Legacy**: `HeadAssembly` initializes local Lucene resources (if enabled).
 
 ## File Directory & Purpose
@@ -163,7 +167,11 @@ The `DefaultAppFacade` provides the interface for the **Local/In-Process** stack
 
 | File | Purpose |
 | :--- | :--- |
-| `GrpcAiTranslatorService.java` | Client for AI services (Translation/Embedding). |
+| `install/AiInstallService.java` | Model acquisition, staging, validation and placement. |
+| `pack/AiPackImportService.java` | Offline AI-pack import (manifest validation, allowlist, staging). |
+| `preflight/AiPreflightService.java` | Pre-activation capability/space checks. |
+| `runtime/RuntimeActivationService.java` | Activates the inference runtime (`llama-server`). |
+| `PolledStateLiveness.java` | Shared stale-owner rule for the polled-state (install / pack-import) liveness model. |
 
 ### Indexing (`io.justsearch.app.services.indexing`)
 *Legacy/Local indexing implementation.*

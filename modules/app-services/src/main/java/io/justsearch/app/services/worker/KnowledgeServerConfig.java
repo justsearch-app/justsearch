@@ -23,7 +23,6 @@ public record KnowledgeServerConfig(
         Path dataDir,
         Path libDir,
         Path workingDirectory,
-        Path signalFilePath,
         long deadlineMs,
         long portDiscoveryTimeoutMs,
         int maxRetries,
@@ -86,7 +85,6 @@ public record KnowledgeServerConfig(
         Path dataDir = resolveDataDir();
         Path libDir = resolveLibDir();
         Path workingDir = resolveWorkingDirectory();
-        Path signalFile = dataDir.resolve("worker_signal.lock");
 
         long deadline = parseLong(
                 envOrProperty("JUSTSEARCH_WORKER_DEADLINE_MS", "justsearch.worker.deadline_ms"),
@@ -125,7 +123,6 @@ public record KnowledgeServerConfig(
                 dataDir,
                 libDir,
                 workingDir,
-                signalFile,
                 deadline,
                 portTimeout,
                 maxRetries,

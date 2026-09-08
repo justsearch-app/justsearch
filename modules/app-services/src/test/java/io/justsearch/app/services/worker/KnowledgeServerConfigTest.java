@@ -14,7 +14,6 @@ class KnowledgeServerConfigTest {
             KnowledgeServerConfig config = KnowledgeServerConfig.load();
             assertNotNull(config);
             assertNotNull(config.dataDir());
-            assertNotNull(config.signalFilePath());
             assertTrue(config.deadlineMs() > 0);
             assertTrue(config.maxRetries() >= 0);
         } catch (IllegalStateException e) {
@@ -28,9 +27,7 @@ class KnowledgeServerConfigTest {
             KnowledgeServerConfig config = KnowledgeServerConfig.load();
             assertTrue(config.deadlineMs() > 0, "Deadline should be positive");
             assertTrue(config.portDiscoveryTimeoutMs() > 0, "Port timeout should be positive");
-            assertNotNull(config.signalFilePath(), "Signal path should not be null");
-            assertTrue(config.signalFilePath().toString().contains("worker_signal"),
-                    "Signal path should contain worker_signal");
+            assertNotNull(config.workingDirectory(), "Working directory should not be null");
         } catch (IllegalStateException e) {
             // Skip if running outside repo
         }
