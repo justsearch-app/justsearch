@@ -15,6 +15,15 @@ edition = "2021"
 name = "shell_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Lane F stage B item B10 (stages/B.md Q2). The ACTUATOR half of design 7.1's supervisor contract:
+# `cargo test --lib` cannot see it, because this crate has no `tests/` directory and `--lib` means
+# `#[cfg(test)] mod tests` only — so the half that needs a real child ships as a binary the Node
+# conformance harness drives (`run.mjs --adapter tauri`). It includes `src/supervisor.rs` by path
+# rather than through `shell_lib`, so it links no Tauri runtime.
+[[bin]]
+name = "supervisor-conformance"
+path = "src/bin/supervisor_conformance.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

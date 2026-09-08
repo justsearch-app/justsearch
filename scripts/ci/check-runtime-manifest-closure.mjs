@@ -79,6 +79,14 @@ const SCAN_GLOBS = [
   'modules/**/src/main/**/*.java',
   'modules/**/src/main/**/*.kt',
   'modules/ui-web/src/**/*.{ts,tsx,js,mjs}',
+  // BOTH globs, and the second one is not redundant: the tiny glob translator below turns `**` into
+  // `.*` and then requires the following `/`, so `src/**/*.rs` matches `src/bin/foo.rs` and NEVER
+  // matches `src/lib.rs`. Every Rust file in this crate that mattered until now lived directly under
+  // `src/`, which means the Rust half of this check has been scanning nothing since it was written —
+  // and `lib.rs`'s SKIP_PATHS entry was hiding a file the scan could not have seen anyway. Found at
+  // lane F stage B item B10 by removing that entry, planting an unsanctioned artifact name, and
+  // watching the check stay green.
+  'modules/shell/src-tauri/src/*.rs',
   'modules/shell/src-tauri/src/**/*.rs',
   'scripts/**/*.{cjs,mjs,js}',
 ];
@@ -102,8 +110,14 @@ const SKIP_PATHS = [
   'modules/ui-web/vite.config.js',
   'scripts/lib/platform-paths.mjs',
   'scripts/prod/justsearch-mcp/discovery.mjs',
-  // Tauri shell reads manifest.json by name.
-  'modules/shell/src-tauri/src/lib.rs',
+  // modules/shell/src-tauri/src/lib.rs was skipped here with the justification "Tauri shell reads
+  // manifest.json by name". Lane F stage B item B10 made it a WRITER — the supervisor publishes
+  // supervisor.v1.json and the shutdown request — so the skip stopped being a description of a
+  // reader and became an exemption for a writer, which is the vacuous green this check exists to
+  // prevent. Removed rather than re-justified: its artifacts are on the allowlist above, and the
+  // write sites join `runtime` and the artifact name literally so this check can see them (a
+  // `runtime_dir()` helper would have hidden them just as effectively as the skip did).
+  //
   // This script itself.
   'scripts/ci/check-runtime-manifest-closure.mjs',
 ];

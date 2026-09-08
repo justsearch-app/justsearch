@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 627,
-  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel. Lane F stage A item A11 retired the Worker entry (`status: \"retired\"`): the Worker is no longer a process, and the Engine's own supervisor contract lands at stage B (design 7.1). A retired entry is skipped by assertions (1) and (3) and still checked by (2). It is skipped by (3) on purpose: the guards a retired row names were deleted with the thing they guarded, so resolving them would fail the build for the retirement itself — see the Worker entry's `guardsNote` for which of its FQCNs no longer exist. Lane F stage B item B7 added the `engine` row that replaces it, and two things about that row are different in kind rather than in degree. FIRST, the register is the AUTHORITY for it, not a declaration OF code: the Engine's supervisor is deliberately not a JVM (7.1's `never`), so both implementations READ these numbers at runtime — the dev-runner parses this file, the Tauri shell embeds it with include_str! — and the Java `EngineSupervisionPolicy` is a mirror kept honest by `EngineSupervisionPolicyTest`, which the row names in `driftCheck` because the module edge forbids `SupervisionContractTest` from importing it. SECOND, a guard may now be a repo-relative PATH as well as an FQCN, because the tests that exercise this row are a Node conformance harness and a Rust `#[cfg(test)]` table; the path still has to exist. The row also carries two things the older rows do not: `exitCodes` (a projection of `io.justsearch.app.engine.EngineExit`, drift-checked in both directions) and `conformanceCases` (the case list `scripts/supervisor-conformance/contract.mjs` reads and, from item B10, `modules/shell/src-tauri/src/supervisor.rs`'s decision-table tests read too, so 'one contract, two implementations' is a fact about one list rather than two lists that agree today).",
+  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel. Lane F stage A item A11 retired the Worker entry (`status: \"retired\"`): the Worker is no longer a process, and the Engine's own supervisor contract lands at stage B (design 7.1). A retired entry is skipped by assertions (1) and (3) and still checked by (2). It is skipped by (3) on purpose: the guards a retired row names were deleted with the thing they guarded, so resolving them would fail the build for the retirement itself — see the Worker entry's `guardsNote` for which of its FQCNs no longer exist. Lane F stage B item B7 added the `engine` row that replaces it, and two things about that row are different in kind rather than in degree. FIRST, the register is the AUTHORITY for it, not a declaration OF code: the Engine's supervisor is deliberately not a JVM (7.1's `never`), so both implementations READ these numbers at runtime — the dev-runner parses this file, the Tauri shell embeds it with include_str! — and the Java `EngineSupervisionPolicy` is a mirror kept honest by `EngineSupervisionPolicyTest`, which the row names in `driftCheck` because the module edge forbids `SupervisionContractTest` from importing it. SECOND, a guard may now be a repo-relative PATH as well as an FQCN, because the tests that exercise this row are a Node conformance harness and a Rust `#[cfg(test)]` table; the path still has to exist. The row also carries two things the older rows do not: `exitCodes` (a projection of `io.justsearch.app.engine.EngineExit`, drift-checked in both directions) and `conformanceCases` (the case list `scripts/supervisor-conformance/contract.mjs` and `modules/shell/src-tauri/src/supervisor.rs`'s decision-table tests BOTH read, so 'one contract, two implementations' is a fact about one list rather than two lists that agree today).",
   "guardSentinels": [
     "dev-stack-smoke",
     "audit-verdict"
@@ -156,7 +156,7 @@
       "role": "Engine (the one JVM: API, index, encoders)",
       "authority": "io.justsearch.app.engine.EngineSupervisionPolicy",
       "authorityNote": "The register is the AUTHORITY and the Java class is the MIRROR, which is the inverse of the brain row. The Engine's supervisor is deliberately not a JVM (design 7.1 'never'), so its two implementations read these numbers at runtime — the dev-runner through scripts/dev/lib/engine-supervisor.cjs, the Tauri shell through include_str! + serde in modules/shell/src-tauri/src/supervisor.rs. EngineSupervisionPolicy exists so the drift check has a subject on the Java side; it is a pure constant holder with no production caller, and saying that here is cheaper than letting a reader infer a consumer that does not exist.",
-      "decisionSeam": "scripts/dev/lib/engine-supervisor.cjs::decide + modules/shell/src-tauri/src/supervisor.rs::decide (the Rust half lands at item B10; until then the guards below name only the half that exists, because a guard that resolves to nothing is the vacuous green this register exists to prevent)",
+      "decisionSeam": "scripts/dev/lib/engine-supervisor.cjs::decide + modules/shell/src-tauri/src/supervisor.rs::decide",
       "driftCheck": "io.justsearch.app.engine.EngineSupervisionPolicyTest",
       "driftCheckNote": "Not in SupervisionContractTest, unlike the brain row, and the reason is a module edge: that test lives in app-services, and the dependency runs app-engine -> app-services (modules/app-engine/build.gradle.kts). A test-only edge back would invert it. SupervisionContractTest.everyLiveProcessHasADriftCheck therefore requires a live row to EITHER be checked in that class or name a resolvable driftCheck here, which keeps 'cannot be skipped by omission' without inverting the edge.",
       "policy": {
@@ -199,7 +199,8 @@
           "recovery": "classified by exit code (exitCodes above). REQUESTED stops supervising; TRANSIENT restarts after handle release plus the linear cooldown, counted; NON_TRANSIENT goes to `exhausted` at once with the reason.",
           "terminalState": "ENGINE_RESTART_EXHAUSTED in <dataDir>/runtime/supervisor.v1.json, with the last exit reason",
           "guards": [
-            "scripts/supervisor-conformance/contract.mjs"
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
           ]
         },
         {
@@ -208,7 +209,8 @@
           "recovery": "write <dataDir>/runtime/shutdown-request.v1.json with reason `hang` and a deadline (gracefulStopDeadlineMs); a JVM that still runs its watcher thread honours it (hang-soft). A whole-JVM wedge ignores it and is force-killed at the deadline (hang-hard). Either way the resulting exit takes the death path and is counted TRANSIENT.",
           "terminalState": "same as clean-exit once the budget is spent",
           "guards": [
-            "scripts/supervisor-conformance/contract.mjs"
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
           ],
           "note": "The two arms are separate conformance cases on purpose (design 16's `hang, graceful` and `hang, forced` rows): folding them would leave the forced-kill branch unexercised, and that branch is the one a wedged JVM actually needs."
         },
@@ -218,7 +220,8 @@
           "recovery": "TRANSIENT: restart under cooldown, counted. A recurring OOM therefore trips the budget and reaches the terminal state rather than looping.",
           "terminalState": "ENGINE_RESTART_EXHAUSTED with reason out_of_memory",
           "guards": [
-            "scripts/supervisor-conformance/contract.mjs"
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
           ]
         },
         {
@@ -237,7 +240,8 @@
           "recovery": "the same graceful-then-forced stop as a hang (request file with reason `hang`, then the deadline kill), after which the death path classifies the exit and counts it.",
           "terminalState": "ENGINE_RESTART_EXHAUSTED once the budget is spent",
           "guards": [
-            "scripts/supervisor-conformance/contract.mjs"
+            "scripts/supervisor-conformance/contract.mjs",
+            "modules/shell/src-tauri/src/supervisor.rs"
           ],
           "note": "The per-component start deadlines design 7.6 describes are D1's; this is the one number stage B needs for the `starting` -> `running` edge, and nothing here reads a component vector."
         },

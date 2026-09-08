@@ -1478,16 +1478,22 @@
       "reconciliation": "The live file is a claim about a process that may no longer exist, so it is never trusted across a supervisor's own lifetime: a supervisor rewrites it from `starting` on its first transition and every reader treats an absent file as UNSUPERVISED rather than as an error (stage B checklist Q7 (a) — the bare app-launcher shape of design 3.1 has no supervisor and must still boot). A corrupt file is deleted and rewritten by the next transition; nothing is recovered from it, because everything in it is re-derivable from the run that is happening now. The JSONL mirror is the exception and the reason it exists: the terminal `exhausted` record has to survive the moment the Engine and its supervisor are both gone, because the reader that needs it — the updater's dead-Engine path — arrives afterwards.",
       "status": "READY",
       "implementationSources": [
-        "scripts/dev/dev-runner.cjs"
+        "scripts/dev/dev-runner.cjs",
+        "modules/shell/src-tauri/src/lib.rs"
       ],
       "tests": [
-        "scripts/dev/test-dev-runner-supervisor.mjs"
+        "scripts/dev/test-dev-runner-supervisor.mjs",
+        "scripts/supervisor-conformance/adapters/tauri.mjs"
       ],
       "fixtures": [],
-      "note": "Added at lane F stage B item B8. TWO writers are declared by design 7.1 and only one of them exists at this commit: the Tauri shell joins as the second at item B10, which adds modules/shell/src-tauri/src/lib.rs to implementationSources. Listing it early would have been a claim about code that is not there. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one."
+      "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
     }
   ],
   "nonDurableWriteSites": [
+    {
+      "path": "modules/shell/src-tauri/src/bin/supervisor_conformance.rs",
+      "reason": "A conformance driver, not a product path: it writes the supervisor state file and the shutdown request into a THROWAWAY data directory the harness creates per case and deletes after (scripts/supervisor-conformance/adapters/tauri.mjs). The artifacts it produces are the ones `engine-supervisor-state` and `engine-shutdown-request` already classify; what this binary owns is the temp directory around them, and nothing in it survives the case that made it. It is discovered by the write-site scan because the scan reads modules/**/*.rs by construction — which is right, and the honest answer is this row rather than an exclusion."
+    },
     {
       "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBus.java",
       "reason": "Dev-only signal file, not a store: it deletes <dataDir>/runtime/dev-reload.request to consume a hot-reload poke written by an external dev tool. Nothing is ever written here (existence IS the signal) and nothing survives a restart, so there is no format, no version and nothing to recover. This is what is left of the memory-mapped signal bus lane F stage A item A10 deleted — the one signal that genuinely crossed a process boundary, re-homed from a byte onto a file."

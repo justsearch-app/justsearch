@@ -23,6 +23,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
+import { enginePlanFor } from '../contract.mjs';
+
 const require = createRequire(import.meta.url);
 
 export const name = 'dev-runner';
@@ -54,41 +56,6 @@ function freePort() {
   });
 }
 
-/**
- * The per-incarnation plan for each case.
- *
- * `exitAfterMs` is generous (1500 ms) on the incarnation that faults, and the reason is a real
- * constraint rather than padding: the dev-runner's `start` is synchronous for its caller, so an
- * Engine that dies before readiness fails the START rather than reaching the supervisor. Every case
- * here is about a supervised death, so incarnation 1 has to get as far as `running` first.
- */
-function planFor(testCase) {
-  const engine = testCase.engine ?? {};
-  const fault = { ...engine };
-  if (fault.exitAfterMs === undefined) fault.exitAfterMs = 1500;
-  if (fault.hangAfterMs === undefined && String(fault.mode).startsWith('hang')) fault.hangAfterMs = 1200;
-  const honour = { mode: 'honour', requestPollMs: 500 };
-  switch (testCase.id) {
-    case 'clean-exit-0-stops':
-    case 'requested-upgrade-stops':
-      return [{ ...fault, requestPollMs: 500 }];
-    case 'budget-exhausted-after-max-attempts':
-      // Sticky last entry: every incarnation crashes, so the budget is what has to stop it.
-      return [{ ...fault, exitAfterMs: 1500 }];
-    case 'non-transient-2-exhausts-at-once':
-      // Incarnation 1 must reach `running` for the death to be supervised at all, so the
-      // non-transient exit is incarnation 2's. What the case asserts is that it gives up THERE,
-      // with budget still unspent, rather than spending the remaining attempts on it.
-      return [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { ...fault, exitAfterMs: 200 }];
-    case 'requested-restart-is-not-counted':
-      return [{ mode: 'honour', requestPollMs: 500 }, honour];
-    case 'start-deadline-stops-a-partial-boot':
-      return [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { ...fault, requestPollMs: 500 }];
-    default:
-      return [fault, honour];
-  }
-}
-
 /** Poll `supervisor.v1.json` until `predicate` holds, recording every distinct state seen. */
 async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
   const deadline = Date.now() + timeoutMs;
@@ -112,7 +79,7 @@ async function driveCase({ testCase, policy, io }) {
   fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
   fs.mkdirSync(stateRoot, { recursive: true });
 
-  const planPath = io.writeEnginePlan(workDir, planFor(testCase));
+  const planPath = io.writeEnginePlan(workDir, enginePlanFor(testCase));
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
   const seen = new Map();

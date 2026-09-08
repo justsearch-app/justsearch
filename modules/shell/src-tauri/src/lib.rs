@@ -1,5 +1,8 @@
 mod binding;
 mod platform_paths;
+// Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
+// function over the register the dev-runner also reads; only the actuator lives in this file.
+mod supervisor;
 mod updater;
 
 use binding::{apply_manifest_observation, read_manifest_if_present, Binding, ManifestFields};
@@ -27,6 +30,28 @@ use tokio::sync::Notify;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const RESET_MARKER_FILE: &str = ".justsearch-reset-requested";
+
+/// The webview's signal that a NEW Engine incarnation is answering: everything it cached about the
+/// old one — above all the per-boot session token — is dead (tempdoc 805 G.1).
+///
+/// Lane F stage B item B10 explicitly does NOT touch it. Same emit site (`watch_manifest`, on an
+/// instanceId change), same `Option<u16>` payload, same subscriber
+/// (`modules/ui-web/src/api/backendRestart.ts`). The supervisor's own state is a SEPARATE event
+/// below, because the two answer different questions — "your binding is stale" and "here is what
+/// the supervisor is doing" — and folding them would make a webview that only wants the first
+/// re-resolve its binding on every cooldown tick. `backend_restart_event_is_untouched` pins it.
+pub(crate) const EVENT_BACKEND_RESTART: &str = "justsearch://backend-restart";
+
+/// The supervisor's state, forwarded to the webview (design 7.1's "visible state" row). Carries the
+/// contents of `<dataDir>/runtime/supervisor.v1.json`.
+pub(crate) const EVENT_SUPERVISOR_STATE: &str = "justsearch://supervisor-state";
+
+/// The `backend-restart` payload, as a function so a test can pin it. It is the new incarnation's
+/// port and nothing else: the webview re-resolves everything else from the manifest, and widening
+/// this payload would make the event a second discovery channel (tempdoc 501 §6).
+pub(crate) fn backend_restart_payload(manifest: &ManifestFields) -> Option<u16> {
+    manifest.api_port
+}
 
 #[derive(serde::Serialize)]
 struct FileMetadata {
@@ -205,6 +230,23 @@ impl BackendState {
             .expect("child mutex poisoned")
             .as_ref()
             .map(Child::id)
+    }
+
+    /// Lane F stage B item B10: the supervisor's death observation.
+    ///
+    /// Non-blocking, and it TAKES the handle when the child has exited — `reset_for_restart` refuses
+    /// to run while a child is recorded, so a supervisor that observed an exit without clearing the
+    /// slot could never start the replacement it just decided on.
+    fn try_reap_child(&self) -> Option<i32> {
+        let mut guard = self.child.lock().expect("child mutex poisoned");
+        let child = guard.as_mut()?;
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                guard.take();
+                Some(status.code().unwrap_or(1))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -963,10 +1005,16 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     Ok(())
 }
 
-/// Restart Head after an updater handoff fails after orderly shutdown.
+/// The **requested-restart leg** (design 7.1, lane F stage B item B10).
 ///
-/// This is intentionally crate-visible rather than a Tauri command: only the shell lifecycle
-/// coordinator may replace Head, never untrusted webview code.
+/// This was the updater's private helper — "restart Head after an updater handoff fails after
+/// orderly shutdown", one caller. It is now the one way this process replaces the Engine, shared by
+/// that caller and by the supervisor's restart path ([`ShellActuator::spawn_engine`]). The
+/// distinction the design draws is between a restart the supervisor ASKED for and a crash it
+/// observed; both end up here, and only the crash is charged to the budget.
+///
+/// Still intentionally crate-visible rather than a Tauri command: only the shell lifecycle
+/// coordinator may replace the Engine, never untrusted webview code.
 pub(crate) fn restart_headless_backend(
     app: &tauri::AppHandle,
     state: Arc<BackendState>,
@@ -982,6 +1030,238 @@ pub(crate) fn restart_headless_backend(
         return Err(error);
     }
     Ok(())
+}
+
+/// A loopback GET that answers only "did it reply 200 in time".
+///
+/// Hand-rolled for the same reason `request_head_shutdown` is: the supervision loop is a
+/// synchronous OS thread with no async runtime under it, and the case it exists for — a hung Engine
+/// — is a socket that is accepted and then silent, so the probe must have a TIMEOUT rather than a
+/// refusal to read.
+fn http_get_ok(port: u16, path: &str, timeout: Duration) -> bool {
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, timeout) else {
+        return false;
+    };
+    let _ = stream.set_write_timeout(Some(timeout));
+    let _ = stream.set_read_timeout(Some(timeout));
+    let request =
+        format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let _ = stream.flush();
+    let mut buffer = [0u8; 64];
+    match stream.read(&mut buffer) {
+        Ok(0) | Err(_) => false,
+        Ok(n) => String::from_utf8_lossy(&buffer[..n]).split_whitespace().nth(1) == Some("200"),
+    }
+}
+
+/// The production [`supervisor::Actuator`] (lane F stage B item B10).
+///
+/// The DECISIONS are `supervisor.rs`'s, and the loop is `supervisor::run_supervision` — the same
+/// loop the `supervisor-conformance` binary runs against the harness's fake engine. What is here is
+/// only the binding of each abstract step to this process's own child, its own manifest and its own
+/// webview.
+struct ShellActuator {
+    app: tauri::AppHandle,
+    state: Arc<BackendState>,
+    data_dir: PathBuf,
+}
+
+impl ShellActuator {
+    /// The runtime directory's artifacts are joined LITERALLY at each site rather than through a
+    /// `runtime_dir()` helper. That is not style: `check-runtime-manifest-closure` matches
+    /// `.join("runtime").join("<artifact>")`, and item B10 removes this file from that check's
+    /// SKIP_PATHS. A helper would hide both writes from the check the same commit stopped exempting
+    /// them from — an exemption replaced by an indirection is not a narrowing.
+    fn supervisor_state_path(&self) -> PathBuf {
+        self.data_dir.join("runtime").join("supervisor.v1.json")
+    }
+
+    fn shutdown_request_path(&self) -> PathBuf {
+        self.data_dir.join("runtime").join("shutdown-request.v1.json")
+    }
+
+    fn write_atomic(path: &std::path::Path, bytes: &str) -> Result<(), String> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+    }
+}
+
+impl supervisor::Actuator for ShellActuator {
+    fn spawn_engine(&mut self) -> Result<u32, String> {
+        // Through the requested-restart leg, not through a private path of its own: one way to
+        // replace the Engine in this process, shared with the updater's handoff.
+        restart_headless_backend(&self.app, self.state.clone())?;
+        Ok(self.state.child_pid().unwrap_or(0))
+    }
+
+    fn await_ready(&mut self, deadline_ms: u64) -> Result<supervisor::Ready, String> {
+        loop {
+            if self.state.has_spawn_error() {
+                return Err("the incarnation reported a spawn error".into());
+            }
+            if let Some(port) = self.state.get_port() {
+                if http_get_ok(port, "/api/status", Duration::from_millis(800)) {
+                    let binding = self.state.binding_snapshot();
+                    return Ok(supervisor::Ready {
+                        pid: self.state.child_pid(),
+                        api_port: Some(port),
+                        instance_id: binding.instance_id,
+                    });
+                }
+            }
+            if self.now_ms() >= deadline_ms {
+                return Err("the incarnation did not publish a port and answer in time".into());
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    fn poll_exit(&mut self) -> Option<i32> {
+        self.state.try_reap_child()
+    }
+
+    fn probe_health(&mut self) -> bool {
+        match self.state.get_port() {
+            Some(port) => http_get_ok(port, "/api/health", Duration::from_millis(1500)),
+            None => false,
+        }
+    }
+
+    fn observed_request_reason(&mut self) -> Option<String> {
+        let raw = std::fs::read_to_string(self.shutdown_request_path()).ok()?;
+        let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let reason = parsed.get("reason")?.as_str()?.to_string();
+        // An unknown reason is IGNORED, never guessed at: guessing from a file caught mid-write
+        // could stop the product, and the supervisor's own deadline covers the case where ignoring
+        // it was wrong.
+        matches!(reason.as_str(), "quit" | "restart" | "upgrade" | "hang").then_some(reason)
+    }
+
+    fn write_shutdown_request(
+        &mut self,
+        reason: &str,
+        deadline_epoch_ms: u64,
+    ) -> Result<(), String> {
+        let body = serde_json::json!({
+            "schemaVersion": 1,
+            "reason": reason,
+            "deadlineEpochMs": deadline_epoch_ms,
+            "issuedBy": "tauri-shell",
+        });
+        Self::write_atomic(
+            &self.shutdown_request_path(),
+            &format!("{body}\n"),
+        )
+    }
+
+    fn force_kill(&mut self) {
+        let Some(pid) = self.state.child_pid() else { return };
+        #[cfg(windows)]
+        {
+            // `/T` because the Engine owns children (llama-server, the extraction pool) whose
+            // handles are the reason the next incarnation's boot can fail. Item B12 replaces this
+            // blunt subtree kill with kill-by-identity once the child registry exists.
+            let _ = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = pid;
+        }
+        if let Some(mut child) = self.state.child.lock().expect("child mutex poisoned").take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    fn wait_for_handle_release(&mut self) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let child_gone = self.state.child_pid().is_none();
+            let log = self.data_dir.join("logs").join("engine.log");
+            let log_free = !log.exists()
+                || std::fs::OpenOptions::new().append(true).open(&log).is_ok();
+            if child_gone && log_free {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    fn sleep(&mut self, ms: u64) {
+        if ms > 0 {
+            thread::sleep(Duration::from_millis(ms));
+        }
+    }
+
+    fn now_ms(&mut self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }
+
+    fn publish_state(&mut self, record: &supervisor::StateRecord) {
+        let json = serde_json::to_string_pretty(record).unwrap_or_default();
+        let _ = Self::write_atomic(
+            &self.supervisor_state_path(),
+            &format!("{json}\n"),
+        );
+        // The webview gets the SAME record the file carries. A separate event from
+        // `backend-restart` on purpose: that one says "your binding is stale", this one says what
+        // the supervisor is doing, and a webview that only wants the first must not re-resolve its
+        // binding on every cooldown tick.
+        let _ = self.app.emit(EVENT_SUPERVISOR_STATE, record);
+    }
+
+    fn should_continue(&mut self) -> bool {
+        // `killed` is set by `kill_child`, i.e. by the quit path and by `Drop`. A supervisor that
+        // restarted the Engine while the shell was closing would resurrect it into an empty desktop.
+        !*self.state.killed.lock().expect("killed mutex poisoned")
+    }
+}
+
+/// Start supervising the Engine on an OS thread.
+///
+/// An OS thread, following the split this file already uses for the stdout drain and the manifest
+/// watcher: the loop blocks on sockets and on `try_wait`, and it must keep running while the async
+/// runtime is busy or winding down.
+pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>) {
+    let Ok(data_dir) = resolve_app_data_dir(app) else {
+        eprintln!("supervisor: no app data dir; the Engine will not be supervised");
+        return;
+    };
+    let mut actuator = ShellActuator { app: app.clone(), state, data_dir };
+    thread::spawn(move || {
+        let policy = supervisor::load_policy();
+        let mut sup = supervisor::Supervisor::new(policy);
+        let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
+        match outcome {
+            supervisor::Outcome::Exhausted { reason, .. } => {
+                // design 7.1's terminal state. Nothing else is emitted: the state file already
+                // carries it, and the updater's dead-Engine path (item B13) reads exactly that file
+                // because an Engine that cannot boot can answer no API.
+                eprintln!("supervisor: {reason}");
+            }
+            supervisor::Outcome::Stopped { reason, .. } => {
+                eprintln!("supervisor: the Engine stopped ({reason}); not restarting");
+            }
+            supervisor::Outcome::Cancelled => {}
+        }
+    });
 }
 
 /// Tempdoc 501 Phase 7: poll the runtime manifest and feed port + session
@@ -1020,7 +1300,7 @@ fn watch_manifest(state: Arc<BackendState>, manifest_path: PathBuf) {
             // port with the previous boot's token.
             if state.observe_manifest(&manifest, state.child_pid()) {
                 if let Some(app) = TRAY_CONTEXT.get() {
-                    let _ = app.emit("justsearch://backend-restart", manifest.api_port);
+                    let _ = app.emit(EVENT_BACKEND_RESTART, backend_restart_payload(&manifest));
                 }
             }
             // Tempdoc 501 Phase 17: drive the tray tooltip from the manifest's lifecycle
@@ -1417,6 +1697,14 @@ pub fn run() {
                 state.port_ready.notify_waiters();
                 state.session_token_ready.notify_waiters();
                 eprintln!("Failed to spawn headless backend: {err}");
+            } else {
+                // Lane F stage B item B10: from here the Engine is SUPERVISED (design 7.1). Before
+                // this, the shell spawned it once and only noticed a death that happened before a
+                // port was bound — a crash after startup left a dead product and a live window.
+                //
+                // Only on a successful spawn: a spawn that failed has no child to supervise, and the
+                // failure is already reported through `spawn_error` to everything waiting on it.
+                start_supervision(app.handle(), state.clone());
             }
             let reconciliation_app = app.handle().clone();
             let reconciliation_state = state.clone();
@@ -1593,6 +1881,56 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    /// Lane F stage B item B10 adds a SECOND shell event and this pins the first one against it.
+    ///
+    /// `justsearch://backend-restart` is a contract with the webview (tempdoc 805 G.1): it fires on
+    /// a new instanceId, carries the new port, and its subscriber drops the dead session token. The
+    /// hazard the supervisor introduces is not that someone breaks it deliberately — it is that a
+    /// later edit FOLDS the two events together, reasoning that "the supervisor already knows about
+    /// restarts". That would make every cooldown tick look like a stale binding to the webview and
+    /// every real rebind indistinguishable from a state update.
+    ///
+    /// Three things are pinned, because the event is three things: the NAME, the PAYLOAD, and the
+    /// SUBSCRIBER. The subscriber is checked by reading the TypeScript as text — the same move
+    /// `EngineExitTest` makes against `HeadlessApp.java` — since nothing else in this crate can see
+    /// across that boundary.
+    #[test]
+    fn backend_restart_event_is_untouched_by_the_supervisor() {
+        assert_eq!(EVENT_BACKEND_RESTART, "justsearch://backend-restart");
+        assert_eq!(EVENT_SUPERVISOR_STATE, "justsearch://supervisor-state");
+        assert_ne!(
+            EVENT_BACKEND_RESTART, EVENT_SUPERVISOR_STATE,
+            "the two events must stay distinct: one says the binding is stale, the other says what \
+             the supervisor is doing"
+        );
+
+        // The payload is the new incarnation's port and nothing else. Widening it would make the
+        // event a second discovery channel, which tempdoc 501 §6 closed.
+        let manifest = ManifestFields {
+            api_port: Some(40404),
+            session_token: Some("t".into()),
+            lifecycle: Some("READY".into()),
+            instance_id: Some("abc".into()),
+            pid: Some(7),
+        };
+        let payload: Option<u16> = backend_restart_payload(&manifest);
+        assert_eq!(payload, Some(40404));
+        assert_eq!(backend_restart_payload(&ManifestFields::default()), None);
+
+        let consumer = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../ui-web/src/api/backendRestart.ts");
+        let source = fs::read_to_string(&consumer)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", consumer.display()));
+        assert!(
+            source.contains(EVENT_BACKEND_RESTART),
+            "the webview subscriber no longer names {EVENT_BACKEND_RESTART}"
+        );
+        assert!(
+            source.contains("invalidateSessionToken"),
+            "the subscriber must still drop the dead per-boot token; that is what the event is FOR"
+        );
+    }
 
     #[test]
     fn test_validate_path_rejects_traversal() {

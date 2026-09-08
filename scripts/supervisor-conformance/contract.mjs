@@ -156,6 +156,48 @@ export function actuatorCases(row = engineRow()) {
   return allCases(row).filter((c) => (c.drives ?? []).includes('actuator'));
 }
 
+/**
+ * The fake engine's per-incarnation plan for a case — shared by BOTH adapters.
+ *
+ * Shared, and not copied into each adapter, for the same reason the case list is: two adapters with
+ * their own plans are two contracts that agree until someone edits one. What each adapter owns is
+ * how its implementation is started and observed; what the case means is the register's, and this
+ * is the last piece of that meaning that could not be expressed as data.
+ *
+ * `exitAfterMs` on the faulting incarnation is generous (1500 ms) because of a real constraint
+ * rather than padding: both supervisors have to reach `running` before the fault, or the case is
+ * exercising the START path and not the supervisor.
+ */
+export function enginePlanFor(testCase) {
+  const engine = testCase.engine ?? {};
+  const fault = { ...engine };
+  if (fault.exitAfterMs === undefined) fault.exitAfterMs = 1500;
+  if (fault.hangAfterMs === undefined && String(fault.mode).startsWith('hang')) fault.hangAfterMs = 1200;
+  // A slower request-file cadence on the Engine side widens the window the SUPERVISOR has to
+  // observe an out-of-band request in. It is a fixture cadence, not a subject one: the supervisor
+  // still has to read the file itself, and the real Engine's watcher interval is item B3's.
+  const honour = { mode: 'honour', requestPollMs: 500 };
+  switch (testCase.id) {
+    case 'clean-exit-0-stops':
+    case 'requested-upgrade-stops':
+      return [{ ...fault, requestPollMs: 500 }];
+    case 'budget-exhausted-after-max-attempts':
+      // Sticky last entry: every incarnation crashes, so the budget is what has to stop it.
+      return [{ ...fault, exitAfterMs: 1500 }];
+    case 'non-transient-2-exhausts-at-once':
+      // Incarnation 1 must reach `running` for the death to be supervised at all, so the
+      // non-transient exit is incarnation 2's. What the case asserts is that it gives up THERE,
+      // with budget still unspent, rather than spending the remaining attempts on it.
+      return [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { ...fault, exitAfterMs: 200 }];
+    case 'requested-restart-is-not-counted':
+      return [{ mode: 'honour', requestPollMs: 500 }, honour];
+    case 'start-deadline-stops-a-partial-boot':
+      return [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { ...fault, requestPollMs: 500 }];
+    default:
+      return [fault, honour];
+  }
+}
+
 /** The policy a case runs under: the loaded policy plus the case's own explicit override, if any. */
 export function policyForCase(testCase, policy) {
   if (!testCase.policyOverride) return policy;

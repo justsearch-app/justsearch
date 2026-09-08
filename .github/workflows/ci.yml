@@ -1224,6 +1224,29 @@ jobs:
         working-directory: modules/shell/src-tauri
         run: cargo test --lib --locked
 
+      # Lane F stage B item B10 (stages/B.md Q2, answer (a)). `cargo test --lib` above proves the
+      # supervisor's DECISIONS — supervisor.rs's table, read from the same register the Node harness
+      # reads. It cannot prove the actuator: this crate has no `tests/` directory, so `--lib` sees
+      # `#[cfg(test)] mod tests` only, and the one thing stage B §2 re-cut for Windows — a cooldown
+      # floored on the process handle closing rather than on a number — is invisible to any fake
+      # spawner. So the actuator ships as a [[bin]] the harness drives against a real child.
+      #
+      # One step in THIS lane rather than a job of its own, because the fact it proves is this job's:
+      # "the shell crate does what it says". A contract with one implementation's actuator never run
+      # is not one contract (ci.yml's own 745 lesson, two jobs down: a layer nothing invokes is dead
+      # regardless of quality).
+      - name: Setup Node (for the conformance harness)
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build the supervisor conformance driver
+        working-directory: modules/shell/src-tauri
+        run: cargo build --bin supervisor-conformance --locked
+
+      - name: Supervisor conformance (Tauri adapter)
+        run: node scripts/supervisor-conformance/run.mjs --adapter tauri
+
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone
   # (modules/system-tests/build.gradle.kts:297). The tier rotted unobserved as a result —
