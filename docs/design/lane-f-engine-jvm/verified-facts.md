@@ -267,3 +267,100 @@ dimensions of `ReadinessEnvelopeView`.
   completion; the former five-second abandonment was not native quiescence.
   These are source facts. Execution evidence and remaining limitations are in
   `evidence/B/writer-recovery-investigation.md`.
+
+## Stage C re-grounding (2026-09-09, at `be47faa40`)
+
+Corrections to the bullets above found by the code-verified pass that re-grounded `stages/C1.md`
+and `stages/C2.md` at the stage-B head. Each replaces the earlier sentence it names; the earlier
+text is left in place as history.
+
+- **Common-pool sites (Stage C bullet): twelve, not ten, and a different set.** Bare
+  `CompletableFuture.supplyAsync/runAsync` (no executor argument) in `modules/*/src/main`:
+  `DocumentService.java:85`, `LlamaServerOps.java:1276`, `OnlineModeOps.java:214`,
+  `GplJobCoordinator.java:209`, `RemoteDocumentService.java:89,137,181,232,296,552`,
+  `KnowledgeServer.java:1070`, `HeadlessApp.java:59`. `OnlineModeOps.java:251,395,712` pass
+  `vduExecutor` and are not bare. `ForkJoinPool.commonPool()`, `parallelStream()`, `.parallel()`,
+  `delayedExecutor` and every executor-less `*Async` combinator have zero occurrences, so a rule
+  keyed on the symbol passes vacuously (C1-6 keys on arity).
+- **Executors: 56 construction sites, not 58**, all through `Executors.new*`: 41
+  `newSingleThreadScheduledExecutor`, 8 `newSingleThreadExecutor`, 4 virtual-thread, 2 cached
+  (`OnlineModeOps.java:96`, `PersistentExtractionSandbox.java:172`), 1 fixed (`PdfOcrEngine.java:221`).
+  Forty-nine already have a thread count of one; none has a bounded queue (8).
+- **`ForegroundLoad`'s one producer** is `ForegroundLoadGate` (`app-engine`) at
+  `EngineKnowledgeClient.executeSearchRpc` (`:340-354`, wrap `:351`), built at `EngineRoot.java:210`,
+  keyed on a ten-label set (`ForegroundLoadGate.java:85-96`); the gauge is owned by
+  `KnowledgeServer.java:166-167`; rule 6b (`LayeringEnforcementTest.java:227-247`) lets only
+  `io.justsearch.app.engine..`, `io.justsearch.indexerworker..` and `io.justsearch.adapters..`
+  name the type. The single-wrap guard (`:48-53`) is prose (8, C1-10).
+- **The admission filter sees the search family.** `POST /api/knowledge/search` and the chat,
+  retrieve-context, match-citations, folders, folder-files and ingest routes
+  (`KnowledgeRoutes.java:27,32-46`) and `POST /mcp` (`LocalApiServer.java:649`) pass
+  `ApiSecurityFilters.setupOperationAdmission` (`:158-190`); it exempts GET/OPTIONS (`:163`) and
+  `/api/upgrade/*` (`:164`, B6). The foreground family's only GET is `/api/knowledge/suggest`
+  (`:33`). An earlier draft said searches were GETs; they are not (8).
+- **No "child's module" exists for the parser confinement**: child, router, in-process sandbox
+  and Tika parsers share `modules/worker-services/.../indexerworker/extract/`, and
+  `app-services/vdu/PdfImageRenderer.java:5-8` (`VduProcessor.java:201`) parses PDF in the Engine
+  with a first-class `pdfbox` dependency (`app-services/build.gradle.kts:41`) (6).
+- **The in-process fallback is three things**: the operator mode `Mode.IN_PROCESS`
+  (`ExtractionSandboxFactory.java:24-28,126`, env at `modules/worker-services/.../server/DefaultWorkerAppServices.java:513,518`),
+  the silent startup-probe fallback (`:539-556`, probe `ExtractionSandboxFactory.java:180-220`),
+  and the `IndexingLoop` constructor default (`:350-352`, a test seam). Only the probe fallback is
+  what 6 deletes (6, C1-14).
+- **`DurableGrantStore` has no provenance field**; its keys carry `SourceTier` (`:71,74`).
+  `InvocationProvenance` (`app-agent-api/.../registry/InvocationProvenance.java:54-60`) is a live
+  invocation-side provenance record with 25 referencing files (3.4, C1-1).
+- **`IndexingService`**: 33 instance methods (4 abstract, 29 `default` throwing), the Null Object
+  at `:527-609`, one implementor (`KnowledgeClient.java:100`), 40 referencing files.
+  `SearchPort.search(Query)` is single-argument (`SearchPort.java:13`); `Query.context`
+  (`Query.java:20`) and `SearchRequest.Context` (`SearchRequest.java:76`) are both translator
+  metadata with one reader (`SearchServiceImpl.java:68`) (3.4, C1-2/C1-3).
+- **`ApiErrorCode` parity exists under another name**: `ErrorMessagePropertiesContractTest.java:24-31`
+  and `ErrorCatalogJsonArtifactTest.java:28-38`; the enum has 130 members; the doc at
+  `ApiErrorCode.java:12-17` cites a renamed test and a deleted file (C1-8).
+- **The only `wal_checkpoint` is now `SqliteJobQueue.checkpointWal()` (`:2224`, pragma `:2229`),
+  called from `close()` at `:2137` and by the upgrade barrier** (B5 renamed `checkpointForUpgrade`;
+  the two earlier bullets naming it are history) (7.3 step 7).
+- **The journal has no commit sequence number.** `CommitOps.commit()` discards
+  `IndexWriter.commit()`'s `long` (`:110`), commit user data is a random UUID (`:89-90`),
+  `commitAndTrack` returns void (`:166`); the only sequence number is the in-memory NRT watermark
+  (`NrtReopenStats.java:34`), reset per session. `IndexingLoop`'s three commit-then-`drainPending()`
+  sites (`:655/:660`, `:713/:723`, `:812/:816`) are effect-before-record; the fail-closed
+  precedent is `SqliteJobQueue.putSwitchBuffer` (`:330-333`). The earlier bullet calling the
+  sequence number "the precedent for the completion-order stamp" is withdrawn (7.5, C2-2).
+- **`OperationInvocationRequest.idempotencyKey`** (`:28`, javadoc `:15-17`) is an HTTP body field,
+  not a proto field, dropped at `OperationsController.java:136` before dispatch (`:177`); zero
+  `.idempotencyKey()` call sites in code (7.6, C2-3).
+- **`jobs.db` in the recoverability register**: row `:601-657`, `owner: WORKER` `:609`,
+  `recoverability: DERIVED` `:617`, `currentVersion: 12` `:620` while `SqliteSchema.TARGET_VERSION`
+  is 13 (`:37`) — a drift no gate compares (C1-4 corrects it). The register already carries
+  `MIXED` (`entity-clusters`, `:747`) and six `EPHEMERAL` rows; only the six `catalogDirName` rows
+  are bound to the two-value Java enum (`check-store-recoverability.mjs:29,94-103`).
+- **The installed updater's closed-set rule** (`updater.rs:1003-1059`, register embedded at
+  `:31-32`): all 44 rows compared, count equality (`:1031-1033`), identity equality of
+  `owner`/`role`/`reconciliationStrategy` (`:1041-1049`), installed `currentVersion` must be
+  readable (`:1050-1058`); one Rust test (`:2281-2300`). The release table is emitted by
+  `scripts/release/app-release-assets.mjs:77-102`. Consequence recorded in design section 0
+  (2026-09-09): no store identity changes in lane F (C2-1).
+- **The cutover restarts the Engine, not the Worker** (B15): `CutoverContext.requestedRestartAction`
+  (`KnowledgeServerMigrationOps.java:74`, fired `:274-276`) → `EngineRoot.requestRestart`
+  `:219-224` → `HeadlessApp.localRestartAction` `:1486-1531` → exit 4. The Stage D bullet
+  "restarts the Worker" is history (7.4, C2-10).
+- **`OperationHistoryStore`** (`app-observability/.../operations/OperationHistoryStore.java:28`,
+  cap 200 `:31`, swap javadoc `:23-26`), routes `ResourceApiModule.java:475-476`, resource
+  `core.operation-history` (`OperationHistoryResourceCatalog.java:50-90`), proto
+  `contracts/wire/operation_history.proto` whose `OperationOutcome` lacks `UNDONE` (`:85-89`);
+  no row in `governance/operation-surfaces.v1.json` covers it (7.6, C2-4).
+- **`POST /api/settings/v2`** has a failure error-code channel (`SettingsController.java:106-109,133,150`)
+  and no revision on success (`:146`; `SettingsV2.java:11-16`); `UiModeIntent(clientId, sequence)`
+  (`:261`) orders `ui.mode` only (7.4, C2-6).
+- **Shutdown has ten ordered steps** (`HeadlessApp.orderedShutdownSteps` `:1332-1333`, names at
+  `:1347,1353,1359,1367,1373,1379,1390,1396,1402,1408`); step 1 is `"operation-admission"`
+  (`:1352-1357`, `freezeAdmission` `:1355`); `INDEX_HALF_STEP` at `:1390` closes the queue; no
+  checkpoint step exists (7.3, C2-7).
+- **`WORKER_RESTART_EXHAUSTED` was retired by B14** (`03c4e513b`); `engine.restart_exhausted` is
+  host-derived (`readiness-reason-codes.v1.json:55-57`, `readinessNotice.ts:77`) (7.6).
+- **`EngineExit`** (`app-engine/.../EngineExit.java`): 0 OK, 1 fatal-or-uncaught (transient),
+  2 data-dir locked, 3 OOM, 4 `REQUESTED_RESTART`; drift tests `EngineSupervisionPolicyTest.exitTableMatchesEngineExit`
+  `:168`, `contract.mjs:88-124`, `EngineExitTest.everyExitSiteUsesTheTable` `:78`; runtime
+  readers `supervisor.rs:33,195,262-263` and `engine-supervisor.cjs:95,115,125` (7.1).

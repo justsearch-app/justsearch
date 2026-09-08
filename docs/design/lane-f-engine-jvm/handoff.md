@@ -699,3 +699,19 @@ can start under 17.6. The subsequent checkpoint commit changes only these eviden
 the pre-consolidation chronology is preserved at `be47faa40`. Paired installer skills and their
 canonical source now label the old config snapshot as inert history. E explicitly owns any
 unproved supported-OS whole-Engine recovery coverage as well as signed installer/store proof.
+
+C1 and C2 grounded (2026-09-09, design orchestrator, branch `worktree-lane-F-design`): both
+checklists were re-grounded at `be47faa40` by a code-verified pass (investigation by two
+read-only agents, the design writing by the orchestrator). `stages/C1.md` and `stages/C2.md`
+now cite `design.md` by section and code by `file:line` at that commit; their §0 carries the
+corrections, §11 the decisions, and **§12 the implementation batches, which are the briefs**:
+one implementer per batch, sequential on the lane branch, read-only review after each, at most
+two review rounds before the orchestrator takes the diff. Three design amendments landed with
+them (17.3 rows C1 and C2, 17.9 row C2, 7.5's store sentence) and five dated rows in the section 0
+index. The one reversal to know: the operations table lives in its own `operations.db` and **no
+existing durable store changes owner, class or reconciliation in lane F**, because the installed
+updater compares every register row by count and identity; stage B's new rows already cost 0.3.0
+installs an in-place upgrade, and C2-1 lands the successor rule plus a release-descriptor
+baseline so that boundary is paid once. `verified-facts.md` has a dated correction section for
+everything the pass found. C1 starts with batch 1 of `stages/C1.md` §12 once PR 718's hosted
+correction is green; C2 starts after C1's batch 2 has landed and been reviewed.
