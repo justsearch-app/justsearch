@@ -40,3 +40,64 @@ falsified against Rust's implementation and withdrawn. It is not a finding and
 must not cause a replacement helper to be added. No build, service, or tracked-file
 mutation was performed by the reviewer. Packaged runtime behavior still requires
 the new binding tests and the stage-B checkpoint proof.
+
+## Production ownership repair evidence (2026-09-08)
+
+R1, R2, R4, R5 and R9 are implemented on `codex/lane-f-host-ownership` for a new
+independent review. `modules/shell/src-tauri/src/engine_host.rs` is the Tauri-free production core
+called by `lib.rs`; it owns the real `Child`, monotonic close, spawn generation, discovery phase,
+watcher handle and latest `StateRecord`. The regression suite uses real child processes for both
+close/spawn orderings and successor handoff. Manifest restart callbacks and initial launch-terminal
+publication are shared production seams. Replacement launch failure runs through
+`run_supervision` and the same host state writer used by `ShellActuator`.
+
+Focused verification uses a test-only Tauri resource override; package configuration is unchanged:
+`$env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --lib` — **59 passed, 0 failed,
+0 ignored** after the shared manifest/event/tooltip admission seam and launch-failure writer proof.
+`rustfmt --edition 2021 --check src/engine_host.rs` and `git diff --check` passed. The
+repository-wide `cargo fmt --all -- --check` remains red across untouched Rust files, so it is not
+claimed as a green acceptance check.
+
+The count reconciles exactly from the inherited **56**: seven `BackendState` tests that bypassed
+real child admission were removed, and ten `engine_host` production-core regressions replaced them,
+for **59**. The replacements cover the same binding rules through an installed child and add both
+close/spawn orderings, monotonic close, stdout generation, terminal publication, watcher ownership,
+self-cancel and tooltip admission/cache behavior.
+
+This batch intentionally excludes R3 request acceptance/deadline protocol, R6 UI installation, R7
+liveness/readiness semantics, R8 dev-runner teardown, B11/B13 managed-child/updater work and any
+updater overhaul. It does not change the shared exit policy or supervision register.
+
+Mutation checks were run against the actual shared production seams, then each mutation was
+restored before the final green run:
+
+```text
+mutation: suppress observe_manifest_with_sinks restart callback
+test engine_host::tests::real_reset_rejects_stale_manifests_and_emits_once_for_successor ... FAILED
+assertion `left == right` failed
+  left: 0
+ right: 1
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 58 filtered out
+
+mutation: suppress publish_initial_spawn_failure event callback
+test engine_host::tests::initial_launch_failure_uses_shared_terminal_disk_event_writer ... FAILED
+called `Option::unwrap()` on a `None` value
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 58 filtered out
+
+mutation: remove replacement-spawn transition to State::Exhausted in run_supervision
+test engine_host::tests::replacement_launch_failure_traverses_shared_loop_and_real_writer ... FAILED
+assertion `left == right` failed
+  left: "starting"
+ right: "exhausted"
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 58 filtered out
+
+restored final: cargo test --lib
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
+The final green used `TAURI_CONFIG={"bundle":{"resources":[]}}` only in the test process because
+the verified clean worktree does not contain the generated `resources/headless/**/*` payload. The
+first un-overridden attempt failed solely in `tauri-build` with `glob pattern
+resources/headless/**/* path not found`; no Cargo or package configuration was weakened. The unit
+suite executes the shared host core and writer but cannot instantiate Tauri's `run()` setup; the
+`run()` call into `publish_terminal_spawn_failure` remains source-reviewed production wiring.

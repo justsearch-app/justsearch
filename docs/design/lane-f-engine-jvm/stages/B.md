@@ -85,6 +85,24 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
 
 ### 0.1 Corrections found while implementing (appended per item)
 
+- **B10's production binding was not proved by the conformance adapter.** The adapter owns a
+  distinct fake actuator, so its real-child timing cannot prove the shell's child slot, close/spawn
+  admission, manifest event, stdout generation, watcher lifetime, or UI event writer. The follow-up
+  extracts those responsibilities into the Tauri-free `engine_host.rs` core used by `lib.rs` and
+  tests that core with real child handles. `Cargo.toml` now states the conformance boundary instead
+  of calling the adapter proof of the production actuator.
+- **A reaped child must close manifest admission before incarnation reset.** Merely checking the
+  discovery phase left a `Bound` phase able to accept the dead child's manifest after its handle was
+  removed. Reap/take now transitions to `AwaitingSuccessor`, and observation also requires the live
+  installed child's PID. The regression exercises the interval before reset as well as stale and
+  successor manifests.
+- **Watcher cancellation can originate on the watcher thread.** The manifest tick holds only a
+  temporary upgrade of a weak host reference, so its release can run fallback cleanup on that same
+  thread. Cancellation always wakes the condition variable; ordinary close joins, while a watcher
+  cancelling itself skips self-join. This keeps explicit close deterministic without making Drop a
+  circular termination dependency. The single watcher also retains the last tooltip projection so
+  identical manifest polls do not repeat the native tray mutation.
+
 - **Every B1-B6 citation re-checked at stage start; none was wrong, nine had drifted.** The
   branch moved between this draft (`58d889e78`) and the stage start (`dafc4a484`) — the
   checkpoint fixes plus two merges — so 22 load-bearing `file:line` citations were re-resolved

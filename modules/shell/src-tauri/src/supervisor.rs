@@ -640,9 +640,11 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                     match actuator.spawn_engine() {
                         Ok(pid) => current.pid = Some(pid),
                         Err(error) => {
-                            publish!(Some(format!("restart_failed:{error}")));
+                            supervisor.state = State::Exhausted;
+                            let terminal = format!("ENGINE_RESTART_EXHAUSTED:restart_failed:{error}");
+                            publish!(Some(terminal.clone()));
                             return Outcome::Exhausted {
-                                reason: format!("restart_failed:{error}"),
+                                reason: terminal,
                                 exit_code: 1,
                             };
                         }
