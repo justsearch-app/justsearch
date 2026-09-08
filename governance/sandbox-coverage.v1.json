@@ -58,7 +58,7 @@
   "claims": [
     { "claim": "The app exposes a private retrieval backend to AI agents over POST /mcp (loopback).", "source": "README.md (## Two ways to use it / MCP section)", "coversId": "cohort:mcp" },
     { "claim": "MCP tool set is available to external agents.", "source": "docs/reference/mcp-production-server.md; packaging/mcpb/README.md", "coversId": "cohort:mcp" },
-    { "claim": "Loopback-only, no analytics/telemetry exporter; documents never leave the machine.", "source": "README.md (## Privacy); docs/reference/security/threat-model.md", "coversId": "surface:core.security-surface" },
+    { "claim": "Loopback-only, no analytics/telemetry exporter; JustSearch itself never sends documents off the machine (a connected external MCP client receives passages as tool results — that egress is the client's).", "source": "README.md (## Privacy); docs/reference/security/threat-model.md", "coversId": "surface:core.security-surface" },
     { "claim": "Untrusted MCP-client actions are gated (TYPED_CONFIRM trust model).", "source": "docs/reference/mcp-production-server.md (## Trust Model)", "coversId": "cohort:mcp" }
   ],
   "mustWatch": [

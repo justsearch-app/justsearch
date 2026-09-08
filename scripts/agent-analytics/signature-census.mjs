@@ -91,7 +91,7 @@ export const SIGNATURES = [
     id: 'edit-not-read',
     description: 'Edit tool called on a file that was not Read first, or was modified since the last Read (cross-root worktree/main-checkout copy confusion is one cause).',
     regex: /has not been read yet|has (not been read|been modified) since/i,
-    pavedPath: 'The `edit-reread-cross-root` rule in .claude/rules/agent-lessons.md is the remedy: re-read the exact worktree-qualified path before editing, not "a" copy of the same basename.',
+    pavedPath: 'The `edit-reread-cross-root` case in docs/reference/contributing/agent-postmortems.md §31 is the remedy: re-read the exact worktree-qualified path before editing, not "a" copy of the same basename.',
   },
 ];
 

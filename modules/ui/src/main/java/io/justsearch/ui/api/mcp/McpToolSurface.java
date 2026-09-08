@@ -477,7 +477,14 @@ public final class McpToolSurface {
    * io.justsearch.app.services.registry.executor.OperationInputSchemaValidator} the Operations
    * pipeline uses. Returns a clean MCP tool error (never {@code null} on failure) instead of
    * letting a malformed argument reach a raw unchecked cast further down; returns {@code null}
-   * when the args validate.
+   * ONLY when the args were actually validated and passed.
+   *
+   * <p>Fails closed (tempdoc 949): if the validator itself cannot run — serialization of the
+   * schema/args maps throws, or the validator throws — the call is NOT dispatched. The previous
+   * behaviour returned {@code null} here, which the caller reads as "validated OK", so an
+   * unvalidated argument map reached dispatch and the unchecked casts this validation exists to
+   * guard. A substrate bug is still a reason to refuse the call, not to skip the guard; the
+   * {@link #callOperation} path already behaves this way (a throw there escapes before dispatch).
    */
   private Map<String, Object> validateArgsOrNull(
       String cacheKey, Map<String, Object> schema, Map<String, Object> arguments) {
@@ -491,10 +498,12 @@ public final class McpToolSurface {
                   ApiErrorCode.INVALID_REQUEST))
           .orElse(null);
     } catch (Exception e) {
-      // Serialization failure on our OWN schema/args maps would be a substrate bug, not a caller
-      // error — don't fail the call closed over it, just skip validation for this invocation.
       log.warn("MCP boundary validation failed to run for {}: {}", cacheKey, e.getMessage());
-      return null;
+      return errorContent(
+          "Argument validation could not run for "
+              + cacheKey
+              + "; the call was not dispatched. Retry, and report this if it persists.",
+          ApiErrorCode.INTERNAL_ERROR);
     }
   }
 

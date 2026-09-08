@@ -123,6 +123,8 @@ export class Control extends JfElement {
   private busyShowTimer: ReturnType<typeof setTimeout> | null = null;
   private busyHideTimer: ReturnType<typeof setTimeout> | null = null;
   private busyShownAt = 0;
+  /** Tempdoc 859 — the deferred accessible-name selfcheck's pending slot ({@link scheduleNameCheck}). */
+  private nameCheckTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Tempdoc 608 — the command-in-flight flag that arms the re-entrancy guard. DISTINCT from `busy` (the
    * VISUAL overlay): with spin-delay there is a window where a command is in flight but `busy` is still
@@ -385,6 +387,12 @@ export class Control extends JfElement {
       clearTimeout(this.busyHideTimer);
       this.busyHideTimer = null;
     }
+    // Tempdoc 859 — the deferred name check must not outlive the control either: a pending timer on a
+    // torn-down element is the stray-async-after-teardown shape the timers above already refuse.
+    if (this.nameCheckTimer !== null) {
+      clearTimeout(this.nameCheckTimer);
+      this.nameCheckTimer = null;
+    }
     this.busy = false;
     this.busyInFlight = false;
   }
@@ -401,6 +409,55 @@ export class Control extends JfElement {
     if (!el && this.hintOpen) this.hideHint();
     // 596 §16.5 — fire (or drop) a queued transient activation once the state has resolved.
     this.resolveQueued();
+    this.scheduleNameCheck();
+  }
+
+  /**
+   * The accessible name AS AN AT COMPUTES IT, not as one render frame happens to see it.
+   *
+   * <p>Two forms count beyond the declaration projection: the control's own light-DOM text, and text
+   * projected THROUGH its light DOM by an outer slot. The second is what {@link JfButton} builds —
+   * `<jf-control><slot></slot></jf-control>` — so the inner control's only light child is a `<slot>`
+   * element, whose `textContent` is empty even when the button reads "Save". `assignedNodes` with
+   * `flatten` resolves that chain the way the flat tree (and therefore the a11y tree) does.
+   */
+  private hasAccessibleName(): boolean {
+    if (this.resolvedName() !== '') return true;
+    if ((this.textContent ?? '').trim() !== '') return true;
+    const slot = this.renderRoot?.querySelector?.('slot') as HTMLSlotElement | null;
+    const assigned = slot?.assignedNodes?.({ flatten: true }) ?? [];
+    return assigned.some((node) => (node.textContent ?? '').trim() !== '');
+  }
+
+  /**
+   * 559 Authority V §11 — the typed seam at the Lit-template ceiling (557 §5): a control with no
+   * resolvable name (no operationId, no label, no slot text) is the bad form. This runtime dev
+   * signal (tree-shaken in production via `import.meta.env.DEV`) is the live check since the static
+   * `controls-a11y` build gate was retired (930 chunk H); measured axe covers the rendered surfaces.
+   *
+   * <p>Tempdoc 859 (live console, 2026-08-25) — it used to run INSIDE `render()`, where it measured
+   * a half-built element: a control whose `label` binding or slot text has not been committed yet
+   * (a first update reached the primitive before its own attribute parts landed) is nameless for
+   * exactly one frame, and the check shouted about it on every sv3 and unified-chat session even
+   * though nothing was actually nameless. Reproduced in-suite: the offenders were `jf-button`'s
+   * inner control (a name arriving through a slot) and a first-frame `<jf-control></jf-control>`
+   * in the composer. So the check is DEFERRED past the render that scheduled it and re-reads the
+   * name then — a control that is still nameless once the DOM has settled is the real defect, and
+   * that one still reports.
+   */
+  private scheduleNameCheck(): void {
+    if (!(import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) return;
+    if (this.nameCheckTimer !== null) return; // one pending check per control, not one per render
+    this.nameCheckTimer = setTimeout(() => {
+      this.nameCheckTimer = null;
+      // A control torn down before it settled never faced a reader; naming it would be noise.
+      if (!this.isConnected) return;
+      if (this.hasAccessibleName()) return;
+      console.error(
+        '[jf-control] no accessible name — set `operation-id`, a non-empty `label`, or slot text ' +
+          '(559 Authority V §11: a nameless control is unrepresentable through the primitive).',
+      );
+    }, 0);
   }
 
   private dispatchRemedy(remedy: NoticeRemedy): void {
@@ -554,21 +611,6 @@ export class Control extends JfElement {
 
   override render(): TemplateResult {
     const name = this.resolvedName();
-    // 559 Authority V §11 — the typed seam at the Lit-template ceiling (557 §5):
-    // a control with no resolvable name (no operationId, no label, no slot text)
-    // is the bad form. This runtime dev signal (tree-shaken in production via
-    // import.meta.env.DEV) is the live check since the static `controls-a11y` build
-    // gate was retired (930 chunk H); measured axe covers the rendered surfaces.
-    if (
-      (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV &&
-      !name &&
-      !(this.textContent ?? '').trim()
-    ) {
-      console.error(
-        '[jf-control] no accessible name — set `operation-id`, a non-empty `label`, or slot text ' +
-          '(559 Authority V §11: a nameless control is unrepresentable through the primitive).',
-      );
-    }
     const { hardDisabled, softReason } = this.effective();
     // The tooltip text is the block reason OR the degraded caveat (596 §16.4). aria-disabled tracks the
     // BLOCK only — a degraded control stays operable — but the reachable reason surface covers both.

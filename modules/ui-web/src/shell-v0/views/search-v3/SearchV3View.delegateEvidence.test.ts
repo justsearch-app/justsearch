@@ -704,6 +704,16 @@ describe('T11 — a truncated run says so, whatever its answer says', () => {
     // And the receipt tail carries the compact badge beside the outcome.
     expect(q(main, 'sv3-run-receipt')?.getAttribute('data-cut-short')).toBe('true');
     expect(q(main, 'sv3-run-receipt')?.textContent).toContain('cut short');
+
+    // Tempdoc 859 (live audit 2026-08-25, D1) — WHERE the notice lands, because its style rule's own
+    // comment used to claim the wrong surface: that it "sits on the same 8% --success wash" as
+    // `.run-prompt-fine`, and so failed contrast the same way. It does not. It renders inside the
+    // transcript turn, on `--background`; `.run-prompt` — the held-decision box that owns the wash —
+    // is a sibling of the feed and never contains it. The comment was corrected against this, so the
+    // measurement is pinned here rather than left as prose a later reader would reason from.
+    const cutShort = q(main, 'sv3-turn-cut-short') as HTMLElement;
+    expect(cutShort.closest('.turn'), 'the notice left the transcript turn').not.toBeNull();
+    expect(cutShort.closest('.run-prompt'), 'the notice is NOT on the --success wash').toBeNull();
   });
 
   it('discloses the ITERATION ceiling too — and blames the STEP limit, not the budget', async () => {

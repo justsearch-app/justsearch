@@ -307,7 +307,11 @@ increment — metadata parity only.
 document's identity (its absolute file path) and `excerpt` is the passage text; both are the user's own
 local data returned to the user's own local agent. This is the same identity `justsearch_search`
 already returns (its `path` field) and the desktop UI already shows. The `/mcp` endpoint is
-loopback-only (binds `127.0.0.1`; Hard Invariant #2), so nothing leaves the machine.
+loopback-only (binds `127.0.0.1`; Hard Invariant #2), so the *server* sends nothing off the machine.
+That bounds the endpoint, not the client: an MCP client running a cloud-hosted model forwards these
+tool results (paths + passages) to its model provider like any other tool output. The privacy claim is
+"JustSearch does not egress your documents"; what a connected client does with a response is the
+client's contract (see `threat-model.md` § What this model deliberately does not claim).
 
 ## Tool Selection
 

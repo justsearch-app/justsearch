@@ -40,6 +40,7 @@ import {
   type AiRuntimeStatus,
   type PackImportStatus,
 } from '../state/aiStateStore.js';
+import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import {
   enqueueUiModePersistence,
   UI_MODE_INTENT_HEADER,
@@ -352,6 +353,92 @@ export function repairRemedySub(remedy: RepairRemedy): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * Tempdoc 941 — why a package in the install status is NOT installed, for the per-package list.
+ *
+ * `PackageStatus.skipReason` (the planner's authored prose) and `PackageStatus.skipCause` (its
+ * typed `SkipCause` id) have both been on the wire since 840 Phase 2 / 941 round 19, and until now
+ * the frontend read neither: a skipped package rendered in the Models list exactly like an
+ * installed one — same name, a byte count for a download that never happened, and no statement
+ * anywhere that it is missing or why. The user's own decline looked identical to a machine that
+ * cannot run the package.
+ *
+ * The two fields are not redundant. `skipCause` is the CLASSIFICATION (what logic reads);
+ * `skipReason` is the SENTENCE the planner authored for display — it names the actual constraint
+ * ("Insufficient VRAM for chat-standard (6144 MB available, 7680 MB required)"), which no
+ * cause-derived copy could reconstruct. So: cause picks the short badge, prose carries the detail.
+ */
+export interface SkipExplanation {
+  /** Short status word for the row, in place of the download size. */
+  readonly badge: string;
+  /** The full sentence, or null when the record carries no prose and none can be derived. */
+  readonly detail: string | null;
+}
+
+/**
+ * Every `skipCause` the wire can carry, projected from the generated schema type rather than
+ * restated here: `SSOT/schemas/ai-install-status.v1.json` states the closed set (from the backend
+ * `SkipCause` enum, via `@WireEnumIds`), so this union tracks the backend automatically.
+ */
+type SkipCauseWire = NonNullable<NonNullable<AiInstallStatus['packages']>[number]['skipCause']>;
+
+/**
+ * The causes that carry a classification — the wire set minus `''`, the deliberate "unknown, never
+ * a guess" form. These are exactly the keys the copy maps below must cover, so a fifth backend
+ * cause fails the `satisfies` check at compile time instead of silently rendering the neutral
+ * fallback in the UI.
+ */
+type ClassifiedSkipCause = Exclude<SkipCauseWire, ''>;
+
+/**
+ * The badge per `SkipCause` id. An id this build does not recognise — and an EMPTY one, which the
+ * backend uses deliberately for "unknown, never a guess" — gets the neutral word.
+ *
+ * Deliberately neutral rather than fail-closed-onto-hardware: `SkipCause.limitsInstall` fails
+ * closed because it decides whether the install is SHORT, and being wrong there understates a
+ * problem. Copy is the opposite direction — telling a user their machine cannot run something when
+ * nothing said so is the prose-as-assumption defect 941 round 19 F3 removed from the completion
+ * message. "Not installed" is the true thing when the cause is unknown.
+ */
+const SKIP_BADGE: Readonly<Record<string, string>> = {
+  hardware: 'Unsupported here',
+  intent: 'Not in this mode',
+  'user-declined': 'Declined',
+  'dev-only': 'Development only',
+} satisfies Record<ClassifiedSkipCause, string>;
+
+/**
+ * The sentence to show when the record carries no authored prose. Keyed on the same typed cause,
+ * so a skip whose cause IS known still says something, and one whose cause is not says only what
+ * is known.
+ */
+const SKIP_FALLBACK_DETAIL: Readonly<Record<string, string>> = {
+  hardware: 'This component was skipped because this machine cannot run it.',
+  intent: 'This component is not part of the install mode you chose.',
+  'user-declined': 'You chose not to install this component.',
+  'dev-only': 'This component ships for development stacks only and is never part of an install.',
+} satisfies Record<ClassifiedSkipCause, string>;
+
+/**
+ * Explain a per-package install status, or `null` when the package was not skipped.
+ *
+ * Pure and exported so the copy is testable without mounting the surface (the same shape as
+ * {@link repairRemedyHeadline} / {@link repairRemedySub} above).
+ */
+export function skipExplanation(pkg: {
+  state?: string | null;
+  skipReason?: string | null;
+  skipCause?: string | null;
+}): SkipExplanation | null {
+  if (pkg.state !== 'skipped') return null;
+  const cause = (pkg.skipCause ?? '').trim();
+  const prose = (pkg.skipReason ?? '').trim();
+  return {
+    badge: SKIP_BADGE[cause] ?? 'Not installed',
+    detail: prose || SKIP_FALLBACK_DETAIL[cause] || null,
+  };
 }
 
 /** One row of the install consent dialog's terms list — a package the install will pull. */
@@ -2705,16 +2792,32 @@ export class BrainSurface extends JfElement {
                 Detailed are mutually exclusive, so it is never on screen twice). */ ''}
           ${this.renderComponentList()} ${this.renderTierBreakdown()}
           ${this.installStatus?.packages?.length
-            ? this.installStatus.packages.map(
-                (p) => html`
-                  <div class="data-row">
+            ? this.installStatus.packages.map((p) => {
+                // Tempdoc 941 — a skipped package says so, and says why. Its byte count is the
+                // size of a download that never ran, so showing it in place of the reason made a
+                // component that is absent read exactly like one that is present.
+                const skip = skipExplanation(p);
+                return html`
+                  <div class="data-row" data-testid="package-row-${p.packageId ?? ''}">
                     <span>${p.label || p.packageId || 'package'}</span>
                     <span style="color: var(--text-secondary); font-family: monospace"
-                      >${p.bytesTotal ? formatBytes(p.bytesTotal) : '—'}</span
+                      >${skip
+                        ? skip.badge
+                        : p.bytesTotal
+                          ? formatBytes(p.bytesTotal)
+                          : '—'}</span
                     >
                   </div>
-                `,
-              )
+                  ${skip?.detail
+                    ? html`<div
+                        class="package-skip-detail"
+                        style="font-size: var(--font-size-xs); color: var(--text-secondary)"
+                      >
+                        ${skip.detail}
+                      </div>`
+                    : nothing}
+                `;
+              })
             : this.planPreview
               ? nothing
               : html`<div style="color: var(--text-secondary); padding: 0.5rem 0">

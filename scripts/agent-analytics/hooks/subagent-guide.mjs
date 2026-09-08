@@ -13,8 +13,17 @@
  */
 
 import { hardInvariants } from '../lib/hard-invariants.mjs';
+import { isDirectRun } from '../lib/hook-base.mjs';
 
-function buildGuidance(input = {}) {
+/**
+ * Self-imposed budget for the brief's `additionalContext` (no harness-enforced
+ * cap is documented; ~10K is the house limit tempdoc 935 D2 cites). The brief is
+ * deliberately minimal; the constant exists so the budget is asserted by a test
+ * rather than only by a comment nobody re-measures after adding a line.
+ */
+export const GUIDANCE_CHAR_CAP = 10000;
+
+export function buildGuidance(input = {}) {
   const sessionId = typeof input.session_id === 'string' && input.session_id.trim()
     ? input.session_id.trim()
     : null;
@@ -103,6 +112,11 @@ function buildGuidance(input = {}) {
     '- Format: `./gradlew.bat spotlessApply` after Java edits.',
     '- Pipeline profiling: `python -m jseval` (NEVER raw `gradlew runHeadless &` + `sleep` loops).',
     '- Don\'t use bare `sleep` to wait on a backend; use a bounded condition-poll, or jseval for backend lifecycle.',
+    // Execution hygiene (tempdoc 935 D2) — each line targets an observed subagent
+    // rerun of an expensive command. Keep to three; the brief is deliberately minimal.
+    '- A command piped into `tail`/`head`/`grep` reports the PIPE\'s exit status, not the command\'s. Run it bare or `set -o pipefail` the first time — never rerun a long build/test just to recover its exit status.',
+    '- Search with `rg` or `git grep` (both gitignore-aware); never `grep -r` or `find` from the repo root — they walk build output, node_modules and model blobs, and that walk is the cost.',
+    '- Send an expensive tool\'s output to an explicit absolute path, then read that file and its actual schema before parsing — guessing field names and re-running the tool is the most expensive rerun there is.',
   );
 
   sections.push(
@@ -141,4 +155,6 @@ async function main() {
   }));
 }
 
-main().catch(() => process.exit(0));
+// Direct-run guard so the test can import `buildGuidance` without main() parking
+// on an stdin that the test runner never closes (spawnSync pipes it, never ends it).
+if (isDirectRun(import.meta.url)) main().catch(() => process.exit(0));

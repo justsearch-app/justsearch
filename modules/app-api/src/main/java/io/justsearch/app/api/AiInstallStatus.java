@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.configuration.model.SkipCause;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -320,6 +321,7 @@ public final class AiInstallStatus {
      * <p>Unknown is empty, never a guess: a consumer must fail closed onto the hardware verdict
      * rather than read an unclassified skip as harmless.
      */
+    @WireEnumIds(value = SkipCause.class, allowEmpty = true)
     public String skipCause = "";
 
     public String error = "";

@@ -286,6 +286,57 @@ await run('runner: --produce-inputs runs producer then evaluates for real', asyn
   assert.equal(res.status, 0, `stdout:\n${res.stdout}\nstderr:\n${res.stderr}`);
   assert.ok(fs.existsSync(reportAbs), 'producer should have written the report');
   assert.ok(res.stdout.includes('scratch-produce: pass'), res.stdout);
+
+  // Wall-time attribution (tempdoc 935 D4): one timed line per producer plus a total.
+  assert.match(
+    res.stdout,
+    /produced input for gate 'scratch-produce' in \d+ ms: /,
+    `expected a per-producer wall-time line; stdout:\n${res.stdout}`,
+  );
+  assert.match(
+    res.stdout,
+    /produce-inputs: 1 producer\(s\) in \d+ ms total/,
+    `expected a producer wall-time total; stdout:\n${res.stdout}`,
+  );
+});
+
+await run('runner: --produce-inputs times a FAILING producer too (935 D4 attribution)', async () => {
+  // The producer worth attributing is usually the one that fails or times out. A
+  // duration printed only on the success path attributes exactly the runs nobody
+  // needs, so assert the failure path carries the elapsed time as well.
+  const registry = writeRegistry([
+    {
+      id: 'scratch-produce-fail',
+      title: 'scratch failing-producer gate',
+      enforcer: 'scripts/governance/gates/dead-code/enforcer.mjs',
+      baseline: { kind: 'ratchet-file', path: 'tmp/nonexistent-baseline.txt' },
+      config: {
+        reportPath: 'tmp/input-contract-never-written.json',
+        inputs: [
+          {
+            path: 'tmp/input-contract-never-written.json',
+            producer: `${process.execPath} -e "process.exit(3)"`,
+            class: 'required',
+          },
+        ],
+      },
+    },
+  ]);
+  const res = runGovernance([
+    '--registry',
+    registry,
+    '--gate',
+    'scratch-produce-fail',
+    '--mode',
+    'gate',
+    '--produce-inputs',
+  ]);
+  assert.equal(res.status, 2, `stdout:\n${res.stdout}\nstderr:\n${res.stderr}`);
+  assert.match(
+    res.stderr,
+    /producer exited 3 after \d+ ms for gate 'scratch-produce-fail'/,
+    `expected the failing producer's elapsed time; stderr:\n${res.stderr}`,
+  );
 });
 
 await run('runner: ./-relative producer resolves to absolute path (NoDefaultCurrentDirectoryInExePath)', async () => {

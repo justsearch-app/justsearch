@@ -44,7 +44,6 @@ final class HealthEventEmitCoverageTest {
           "index.dense-unavailable",
           "worker.throughput.stalled",
           "worker.throughput.degraded",
-          "schema.rebuilding",
           "schema.blocked",
           "schema.reindex-required",
           "embedding.blocked",
@@ -84,12 +83,16 @@ final class HealthEventEmitCoverageTest {
    *   <li>{@code api.unreachable} — genuinely FE-only. The FE detects fetch failure of
    *       {@code /api/status} itself; the backend cannot tell the FE the FE can't reach
    *       it. The slim {@code deriveHealthEvents.ts} emits this from the FE.
-   *   <li>{@code ai.not-configured}, {@code embedding.not-configured},
-   *       {@code schema.rebuilding} — phantom events. Verified at rev 3.19 §B.AF.1: neither
-   *       backend nor FE produces them today. The catalog rows remain in §A.2 for
-   *       forward-compat (a future enum extension may surface the state values), but no
-   *       current code path emits them. Producers MUST NOT emit these either; if they did,
-   *       the assertion in {@link #producersDoNotEmitFeOnlyIds} fails.
+   *   <li>{@code ai.not-configured}, {@code embedding.not-configured} — phantom events.
+   *       Verified at rev 3.19 §B.AF.1: neither backend nor FE produces them today. The catalog
+   *       rows remain in §A.2 for forward-compat (a future enum extension may surface the state
+   *       values), but no current code path emits them. Producers MUST NOT emit these either; if
+   *       they did, the assertion in {@link #producersDoNotEmitFeOnlyIds} fails.
+   *       <p>{@code schema.rebuilding} was a third such id until tempdoc 941: it had no producer
+   *       AND no i18n catalog row to render, so it was deleted from
+   *       {@code health-events.en.properties} rather than kept as forward-compat for a state
+   *       value no emitter maps. Dropped from both lists here so this test stops asserting over
+   *       an id the catalog no longer declares.
    * </ul>
    */
   private static final Set<String> FE_ONLY_ALLOWLIST =
@@ -97,8 +100,7 @@ final class HealthEventEmitCoverageTest {
           "api.unreachable",
           // Phantom IDs (forward-compat; not currently fired anywhere):
           "ai.not-configured",
-          "embedding.not-configured",
-          "schema.rebuilding");
+          "embedding.not-configured");
 
   /** Returns the union of emittable IDs across all backend producers. */
   private static Set<String> collectProducerSet() {
@@ -160,11 +162,11 @@ final class HealthEventEmitCoverageTest {
   }
 
   @Test
-  @DisplayName("canonical list is exactly 34 entries with no duplicates")
-  void canonicalListIs34Unique() {
-    assertEquals(34, CANONICAL_IDS.size(), "CANONICAL_IDS should hold 34 entries");
+  @DisplayName("canonical list is exactly 33 entries with no duplicates")
+  void canonicalListIs33Unique() {
+    assertEquals(33, CANONICAL_IDS.size(), "CANONICAL_IDS should hold 33 entries");
     assertEquals(
-        34,
+        33,
         new HashSet<>(CANONICAL_IDS).size(),
         "CANONICAL_IDS contains a duplicate entry");
   }

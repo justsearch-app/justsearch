@@ -209,7 +209,17 @@ const STORAGE_KEY_BODY = 'justsearch.surfaceCatalog.body';
 const STORAGE_KEY_ETAG = 'justsearch.surfaceCatalog.etag';
 
 let entriesById: Map<string, Surface> = new Map();
-let bootAttempted = false;
+/**
+ * Tempdoc 941 — did the boot fetch actually GET AN ANSWER (200 or 304)?
+ *
+ * Was `bootAttempted`, tested together with "the index is non-empty". The boot seeds the index
+ * from the localStorage body BEFORE it fetches, so a boot that raced an unanswering backend left
+ * the guard set AND the index non-empty — permanently closed on whatever the previous session (or
+ * the previous VERSION) had cached. Success is recorded where success happens.
+ */
+let bootSucceeded = false;
+/** Shared in-flight boot, so a readiness-driven re-attempt joins the request rather than racing it. */
+let inFlightBoot: Promise<void> | null = null;
 let listeners: Set<() => void> = new Set();
 
 interface CachedEntry {
@@ -283,11 +293,25 @@ export async function bootSurfaceRegistry(
   baseUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (bootAttempted && entriesById.size > 0) {
-    return;
-  }
-  bootAttempted = true;
+  if (bootSucceeded) return;
+  if (inFlightBoot) return inFlightBoot;
+  inFlightBoot = fetchSurfaceRegistry(baseUrl, fetchImpl).finally(() => {
+    inFlightBoot = null;
+  });
+  return inFlightBoot;
+}
 
+/**
+ * Tempdoc 941 — re-attemptable by construction: until the backend has actually answered, calling
+ * `bootSurfaceRegistry` again refetches (`i18n.ts` `watchForBackendReady` does exactly that on the
+ * shell's backend-ready edge). The first-install backoff below covers a backend that is merely
+ * SLOW and deliberately does not apply to a RETURNING user (their cached rail is usable); the
+ * re-attempt covers the orthogonal case of a backend that was not there at all.
+ */
+async function fetchSurfaceRegistry(
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<void> {
   const cached = loadFromStorage();
   if (cached) {
     rebuildIndex(cached.body);
@@ -310,6 +334,8 @@ export async function bootSurfaceRegistry(
     }
     const populated = await tryFetchAndPopulate(baseUrl, fetchImpl, cached?.etag);
     if (populated) {
+      // 941 — the backend answered AND the catalog is populated: the boot is closed.
+      bootSucceeded = true;
       return;
     }
     // Returning users (cached catalog already rendered) don't retry — they
@@ -559,7 +585,8 @@ export function removePluginSurfaceContributions(pluginId: string): void {
 /** Test-only: reset module state. */
 export function __resetForTest(): void {
   entriesById = new Map();
-  bootAttempted = false;
+  bootSucceeded = false;
+  inFlightBoot = null;
   listeners = new Set();
   try {
     if (typeof localStorage !== 'undefined') {
@@ -574,5 +601,5 @@ export function __resetForTest(): void {
 /** Test-only: seed the catalog directly without an HTTP call. */
 export function __seedForTest(catalog: SurfaceCatalog): void {
   rebuildIndex(catalog);
-  bootAttempted = true;
+  bootSucceeded = true;
 }

@@ -183,7 +183,21 @@ export const sv3Tokens = css`
        inversion is carried as tokens instead (the spec's own recommendation). Dark catches light —
        a 1px inset top highlight and NO drop shadow; light casts one down. */
     --composer-glass-surface: color-mix(in srgb, var(--background) 96%, var(--color-white));
-    --composer-outline: color-mix(in srgb, var(--color-white) 5%, transparent);
+    /* Tempdoc 859 — WCAG 1.4.11 (Non-text Contrast) at 3:1. This edge is the visual information that
+       identifies the composer as an input, and at 5% white it was unfindable.
+       35% is the smallest 5% step clearing 3:1 against both adjacent colours. Still a color-mix off
+       '--color-white' rather than a literal, so one primitive drives both themes' edges.
+       WHICH STATES THIS PAINTS. '.glass::after' has three arms: RESTING, which since the 2026-09-07
+       owner decision (tempdoc 948) takes this token at FULL alpha — the 55% resting fade of 864
+       Layer 1(d) was removed, see the rule in 'Sv3Composer.ts' for the quoted line and the reasoning;
+       FOCUSED, where '.glass:has(textarea:focus-visible)::after' re-points the border to '--ring'
+       (9.69:1, this token uninvolved); and INVALID, which takes '--destructive'.
+       So the resting edge — the state a reader meets before touching anything, and the one 1.4.11 is
+       really about — now measures 3.25:1 over the page and 3.16:1 over the resting glass
+       (rgb(14,14,14), the surface half of the 864 knob, which is untouched and still spends the 4%
+       lift). It was 1.59:1 before. The resting-vs-focused hierarchy survives on the '--ring' hand-off
+       and the surface lift, which is what made removing the fade the cheaper half to give up. */
+    --composer-outline: color-mix(in srgb, var(--color-white) 35%, transparent);
     --composer-shadow: none;
     --composer-highlight: inset 0 1px rgb(255 255 255 / 3%);
     /* The USER message's fill ('bg-message' / 'text-message-foreground'). Both are pure
@@ -436,7 +450,22 @@ export const sv3Tokens = css`
     --sidebar-row-active: var(--color-white);
     --sidebar-row-selected: var(--color-white);
     --composer-glass-surface: var(--card);
-    --composer-outline: rgb(0 0 0 / 8%);
+    /* 859 — the same 1.4.11 floor from the other side. 8% black was "the stronger half" of the two
+       and still only 1.16:1 over the page; 45% is the smallest 5% step clearing 3:1 against both
+       adjacent colours here. Light needs a HIGHER alpha than dark because its edge darkens toward a
+       near-white page instead of lightening away from a near-black one, so the same nominal step
+       buys less separation.
+       The painted-state analysis on the dark declaration applies here unchanged. With the 864 resting
+       fade removed (owner decision 2026-09-07), the RESTING edge measures 3.32:1 over the page and
+       3.35:1 over the resting glass rgb(253,253,253), up from 1.60:1; the focused edge stays '--ring'
+       at 5.84:1.
+       ONE THING TO LOOK AT IN THE NEXT MEASURED PASS: this theme pays the most VISUAL weight for the
+       fix. The resting edge composites to rgb(139,139,139) — a mid-grey hairline on a near-white
+       page, where the window's ordinary '--border' (zinc-200) sits at 1.24:1. The composer will
+       therefore read as a harder-drawn box than any other edge in the light window. That is the
+       criterion's price, not a defect, but it is the kind of thing a design pass may want to answer
+       by lifting the OTHER hairlines rather than by lowering this one back under the floor. */
+    --composer-outline: rgb(0 0 0 / 45%);
     --composer-shadow: 0 12px 28px -18px rgb(0 0 0 / 40%);
     --composer-highlight: none;
     --dialog-border: color-mix(in srgb, var(--foreground) 10%, transparent);

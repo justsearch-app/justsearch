@@ -431,6 +431,25 @@ export class SearchV3View extends JfElement {
         left: var(--sidebar-width);
         transform: translateX(-50%);
         inline-size: var(--space-4);
+        /* Tempdoc 859 — WCAG 2.2 2.5.8 (Target Size, Minimum): the grip measured 16 CSS px wide
+           against the criterion's 24 px floor.
+           WHAT ENFORCES THIS (measured audit 2026-09-07 — the original note here credited axe, and
+           that was wrong in both directions). The repo's 'ui_measure.py' runs axe WITHOUT the
+           'wcag22aa' tag, so it never evaluated target-size at all; and when the tag IS added, the
+           16px grip PASSED, because 2.5.8's spacing exception covers an undersized target with
+           enough clear space around it. So axe is not the authority for this row either way — the
+           geometry assertion in 'sv3-tokens.test.ts' is. The floor is still worth pinning: the
+           exception is contingent on neighbouring layout that a later change can remove silently,
+           and the criterion's own minimum does not depend on it.
+           The TARGET grows; the VISUAL does not. What a reader sees of this control is the 2px line
+           '::after' draws at 'left: 50%', which is positioned against the button's centre and is
+           therefore unmoved and unresized by a wider box — the box itself is 'background: transparent'
+           and paints nothing. Written as a floor rather than by editing 'inline-size' so the spec's
+           16px anatomy stays legible as the intent, and as the literal 24px the criterion names
+           rather than a spacing token a later scale re-tune could drop back under the floor (the
+           '.run-prompt-auto' / ReasoningBlock precedent). The block axis is already full-height via
+           'inset-block: 0'. */
+        min-inline-size: 24px;
         padding: 0;
         border: 0;
         background: transparent;
@@ -582,6 +601,11 @@ export class SearchV3View extends JfElement {
         right: var(--pane-width);
         transform: translateX(50%);
         inline-size: var(--space-4);
+        /* 859 — the sidebar grip's 2.5.8 floor, for the sidebar grip's reason (including the note
+           there on what does and does not enforce it). "One window may not have two differently-sized
+           grips" (above) is exactly why this cannot be fixed on one of them: leaving this at 16px
+           would fork the anatomy that comment pins. */
+        min-inline-size: 24px;
         padding: 0;
         border: 0;
         background: transparent;

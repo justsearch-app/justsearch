@@ -452,3 +452,89 @@ describe('941 F1 — Structured result on a long-running conversation', () => {
     view.remove();
   });
 });
+
+/**
+ * Tempdoc 859 review F4 — the SECOND arrival of a loaded conversation's content.
+ *
+ * `loadConversation` leaves the retrieve base tier once the load produced something to read, but its
+ * gate reads `thread`, which is built from `resumeConversation`'s messages. The record projection is
+ * a different, LATER arrival: `refreshUnifiedThread()` is fired `void` before the resume is awaited,
+ * so its events land after that gate has already run. A record whose content lives only in
+ * `unifiedEvents` — a delegate run with no chat messages of its own — therefore satisfied
+ * `renderResumePrompt`'s "there is content" test (so no resume card) while the thread branch stayed
+ * gated behind `retrieve` (so no transcript): the blank stage again, by a second route.
+ *
+ * This file is the harness for it because it already mocks BOTH halves — `resumeConversation` with
+ * empty `messages`, and `unifiedThreadClient` with a mutable record — which is exactly the split the
+ * defect needs.
+ */
+describe('859 F4: a record that lives only in unifiedEvents also leaves the retrieve tier', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recordState.events = [];
+  });
+
+  const selectFromHistory = async (view: UnifiedChatView, sessionId: string): Promise<void> => {
+    const history = view.shadowRoot?.querySelector('jf-conversation-history');
+    expect(history, 'the History dropdown is not mounted').not.toBeNull();
+    history!.dispatchEvent(
+      new CustomEvent('conversation-select', {
+        detail: { sessionId, shapeId: 'core.agent-run' },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    for (let i = 0; i < 8; i += 1) await new Promise<void>((r) => setTimeout(r, 0));
+    await view.updateComplete;
+  };
+
+  it('renders the record instead of a blank stage when resumed.messages is empty', async () => {
+    recordState.events = PRIOR_RECORD;
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'retrieve';
+    (view as unknown as { searchSnapshot: unknown }).searchSnapshot = {
+      query: 'worker',
+      results: [],
+      isSearching: false,
+      error: null,
+    };
+    view.requestUpdate();
+    await view.updateComplete;
+    expect(view.affordance, 'the fixture did not reach the retrieve tier').toBe('retrieve');
+
+    await selectFromHistory(view, 'uc-record-only');
+
+    // The split this case exists for: NOTHING arrived through the thread…
+    expect((view as unknown as { thread: unknown[] }).thread).toHaveLength(0);
+    // …and the content arrived through the record instead.
+    expect(
+      (view as unknown as { unifiedEvents: unknown[] }).unifiedEvents.length,
+    ).toBeGreaterThan(0);
+    // …so the stage still has to show it.
+    expect(view.affordance).not.toBe('retrieve');
+    expect(view.shadowRoot?.querySelector('[data-testid="retrieve-tier"]')).toBeNull();
+    expect(
+      view.shadowRoot?.querySelectorAll('.message').length ?? 0,
+      'the stage rendered blank — the F4 defect',
+    ).toBeGreaterThan(0);
+    view.remove();
+  });
+
+  it('an EMPTY record leaves the reader on the search floor', async () => {
+    // The other half of the predicate. The exit is keyed on there being something to read, so a load
+    // that produced nothing at all must not yank a reader off the tier they chose.
+    recordState.events = [];
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'retrieve';
+    view.requestUpdate();
+    await view.updateComplete;
+
+    await selectFromHistory(view, 'uc-empty');
+
+    expect((view as unknown as { unifiedEvents: unknown[] }).unifiedEvents).toHaveLength(0);
+    expect(view.affordance).toBe('retrieve');
+    view.remove();
+  });
+});

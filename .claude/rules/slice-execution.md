@@ -2,10 +2,8 @@
 
 # Slice Execution Discipline
 
-When picking up a multi-phase tempdoc slice (e.g., 1.1.x / 1.2 / 1.3 in
-the 426 plan), apply the bidirectional pass pattern. <!-- rule:bidirectional-pass -->
-
-**Full reference**: `docs/reference/contributing/slice-execution.md`.
+Multi-phase tempdoc slices use the bidirectional pass pattern below. <!-- rule:bidirectional-pass -->
+Full reference: `docs/reference/contributing/slice-execution.md`.
 
 ## Quick reference
 

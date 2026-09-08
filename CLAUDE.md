@@ -34,20 +34,13 @@ Failure mode to avoid: creating a new utility function when an identical one exi
 
 ### Fix Root Causes, Not Symptoms <!-- rule:fix-root-causes-not-symptoms -->
 
-**Never resolve a build or test failure by making the failure invisible instead of impossible** — deleting or commenting the failing code, weakening or disabling the test, suppressing the warning, broadening the catch, removing the validation "in the way". (The suppression subset is ratcheted by `check-suppression-ratchet.mjs`; the rest is review-caught.)
+**Never resolve a build or test failure by making the failure invisible instead of impossible** — deleting or commenting the failing code, weakening or disabling the test, suppressing the warning, broadening the catch, removing the validation "in the way". (The suppression subset is ratcheted in CI by `check-suppression-ratchet.mjs`; the rest is review-caught.)
 
 **If a test fails after your changes**, the test is probably right and your code is wrong. Investigate its intent; if you genuinely believe it's wrong, explain why and ask the user before modifying it.
 
 ### Verify Your Work <!-- rule:verify-your-work -->
 
-After implementing a change, confirm it actually works before moving on. Run compilation and relevant module tests — do not rely on "it should work."
-
-- **At minimum**: `./gradlew.bat build -x test` (compilation) + `./gradlew.bat :modules:<module>:test` for affected modules.
-- **After multi-module changes**: `./gradlew.bat test` for the full unit test suite.
-- **After frontend changes** (`modules/ui-web`): `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
-- **For visual verification**: `jseval ui-shot <step>` (load `/ui-check` skill for full reference).
-
-Do not declare a task complete if the build is broken or tests are failing.
+Confirm a change works before moving on: compile plus the affected modules' tests at minimum, the full suite after multi-module changes, the frontend typecheck + unit tests after `modules/ui-web` changes, `/ui-check` for visual work (commands: Quick Commands below). Never declare a task complete on a broken build or failing tests.
 
 **Use every verification tier available to you, including the LLM.** <!-- rule:use-every-verification-tier --> When verifying AI-facing features (chat surfaces, RAG, conversation shapes), do not stop at `AI_OFFLINE` and declare "verified up to the LLM boundary" — `ai_activate` loads the runtime in seconds; load the model, send a real query, confirm the full response renders. Compile + unit tests verify code; live-stack API tests verify plumbing; only end-to-end with a running model verifies feature correctness. Before declaring a verification tier unavailable, check whether a tool provides it. The compact chat profile (dev default) satisfies this for plumbing/feature-shape checks; quality-sensitive verification (RAG quality, prompt-format, VLM extraction, eval work) needs `ai_activate {chatProfile:"standard"}`. Handle: `ai-offline-isnt-a-wall` (see `docs/reference/contributing/agent-postmortems.md`).
 
@@ -72,18 +65,6 @@ YAGNI applies to speculative abstractions, not to known structural defects. One 
 ### Tempdocs Are Dated History, Not Current Truth <!-- rule:tempdocs-are-dated-history -->
 
 `docs/tempdocs/` is append-only design history, not canonical truth — a tempdoc reflects its writing date, and newer tempdocs and shipped code supersede older ones. Newer tempdocs have higher numbers; always check the highest-numbered tempdoc first to gauge how stale an older one really is. Before trusting a tempdoc's claim as current, check its frontmatter (`status`/`created`/`updated`) and verify against `main` + canonical docs. (`verify-don't-guess`, applied to docs.)
-
-### Tempdoc Is Your Contract <!-- rule:tempdoc-is-your-contract -->
-
-Every item marked for implementation is work the user already judged necessary — you do not get to decide remaining items are "not worth it", "too difficult", or "diminishing returns". Implement every item unless the user explicitly says skip; if an item looks infeasible, explain why and ask rather than silently skipping or summarizing-and-suggesting-closure. A tempdoc is complete when all its items are implemented, not when the impactful ones feel done.
-
-### Stay Focused on Your Assigned Work <!-- rule:stay-focused-on-assigned-work -->
-
-When asked "what should we do next?", consult the active tempdoc for remaining items first. Propose those before suggesting new work.
-
-- **Do not propose switching to a different tempdoc** unless the current one is fully complete.
-- **If nothing is left on the current tempdoc**, say so explicitly and let the user decide.
-- **Parallel agents share `main`** — untouched-code reformatting causes merge conflicts with other worktrees, so keep diffs scoped to your task.
 
 ### Route Out-of-Scope Findings, Don't Log Them <!-- rule:log-pre-existing-issues -->
 
@@ -114,15 +95,14 @@ No-hooks consequences: never delegate destructive git; no repeat-guard/build-cou
 **Model routing (delegation economics).** Binds the ORCHESTRATOR — whatever model runs the main loop.
 
 - **Fits a subagent:** open-ended research, parallel exploration, second-opinion review, batch read-only audits, bounded verifiable implementation chunks. **Risky:** shared state, migrations, `.gitignore`/CI edits, anything that could leave the worktree inconsistent.
-- **Default is delegate.** Orchestrator tokens are the scarcest resource: prefer even inefficient delegation over inline execution, and when unsure, delegate anyway. Orchestration — decomposition, briefs, design, judging returned evidence — is the main loop's job. Chunk long refactors into bounded delegations.
-- **Delegate mechanical work once it is enumerable** — when diagnosis ends and the rest is a known list, bundle it into a worker brief with self-verifying acceptance criteria; don't pull worker-grade loops inline out of quality doubt. Exception: a chunk clearly below the spawn cost (brief + re-orientation + round-trip exceeds the task) is done directly — estimate first; when unsure, still delegate.
+- **Delegate when the work fits the list above.** Orchestration — decomposition, briefs, design, judging returned evidence — is the main loop's job. Chunk long refactors into bounded delegations.
+- **Delegate mechanical work once it is enumerable** — when diagnosis ends and the rest is a known list, bundle it into a worker brief with self-verifying acceptance criteria. Exception: a chunk clearly below the spawn cost (brief + re-orientation + round-trip exceeds the task) is done directly — estimate first.
 - **Set an explicit `model` on every subagent** — unset inherits the parent, silently billing orchestrator-tier. Sonnet is the floor for findings you'll rely on; `opus` where sonnet quality is in doubt; haiku only where wrong output is self-evident. If output misses the bar, redo it with a stronger model — judge the output, not the price tag.
 - **Never delegate:** brief-writing, evidence judgment, main-checkout writes, merge/publish, irreversible actions, trivial edits (single-command scale — an edit+test+doc bundle is already delegable).
 - **Dev-stack:** lease acquisition/takeover/teardown and contention decisions stay main-loop; stack-driving MAY be delegated inside a window you have leased and actively supervise, with the contention rules inlined in the brief. **Fire-and-forget stack delegation is never allowed** — that is the predictable evasion, not a variant.
 - **Precedence:** a harness or system instruction restricting the Agent tool overrides this default for that session. Follow it and say so — never resolve the conflict silently.
-- **Contested, and due for judgment.** Anthropic reports multi-agent runs at ~15x single-agent tokens and that *coding* has fewer truly parallelizable tasks than research, so this paragraph generalizes research-shaped economics onto a coding repo. Falsifier (window opened 2026-07-14, judge by ~2026-09-14, instrument `scripts/agent-analytics/baseline-economics.mjs`): cost-per-shipped-merge should improve without rework rising — flat → delete this paragraph; rework up → raise the floor.
 
-Provenance for the above: owner decisions 2026-07-07 / 2026-07-14, pilot P-C 2026-07-17; tempdoc 743.
+Provenance for the above: owner decisions 2026-07-07 / 2026-07-14, pilot P-C 2026-07-17; tempdoc 743. The "default is delegate" economic claim was judged FLAT on its own falsifier and removed 2026-09-07 (tempdoc 948).
 
 ## Architecture
 
@@ -174,7 +154,7 @@ Pre-merge script checks — run the check whose **subject** you edited. Commands
 | guard-string register (`execution-surfaces`/`operation-surfaces`) | `--gate register-guard-resolution` |
 | `LifecycleReasonCode.java` / `readinessNotice.ts` | `check-readiness-reason-codes` |
 | `justsearch-dev-mcp/**` | `check-dev-mcp-doc-sync` |
-| `StoreCatalog.java` · store construction sites | `check-store-recoverability` |
+| `StoreCatalog.java` · store construction sites · `governance/store-{recoverability,corruption-policies}.v1.json` | `check-store-recoverability` |
 | **`modules/ui-web/src/**`** (ui-web gate set) | `node scripts/ci/run-ui-web-gates.mjs` — authority: the `ui-web-gates` recipe in `governance/consult-register.v1.json` |
 | ui-shot harness · new RAIL surface | `check-ui-step-coverage` |
 | `scripts/agent-analytics/**` | `node scripts/agent-analytics/run-all-tests.mjs` |

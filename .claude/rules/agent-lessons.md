@@ -13,7 +13,6 @@ Cross-cutting platform constraints. Project workflow lessons live in canonical d
 - **Agent tool `model` parameter works** — `haiku` for cheap search, `sonnet` for moderate work.
 - **`Read` tool has silent truncation layers**: 2000 chars/line, 2000 lines, 25k tokens (varies by model). Use offset/limit explicitly for rules/guardrail content.
 - **`Edit` tool validates `~/.claude/settings.json`** against the canonical schema. Probe via Edit if unsure whether a documented setting exists — the validator returns the schema on rejection.
-- **A worktree-copy and main-checkout copy of the "same" file don't share `Edit`'s read-state** — re-read the exact worktree-qualified path before editing, not "a" copy with the same basename (618 §11e / 727 F-7a). <!-- rule:edit-reread-cross-root -->
 - **Scoop shim junctions are unreachable from this session** (symptom: `Shim: Could not create process …`). Call the binary via its resolved path, e.g. `& "F:\scoop\apps\gh\2.90.0\bin\gh.exe" workflow run ci.yml`. Don't reinstall scoop packages — a session permissions quirk, not corruption.
 - **`browser_batch` chaining rapid navigations races the SPA boot** (tempdoc 618 §8). A batch of hash-route navigations + a screenshot can capture a blank page: the app has not mounted. Issue one navigation, poll for readiness (or the `wait` action), then screenshot — act-then-read, not act-act-act-read.
 - **After a branch is pushed once, catch up to a moving base with `git merge`, not `git rebase`** (tempdoc 695). Rebasing a pushed branch rewrites remote commits, so updating it needs a force-push, which native `permissions.deny` refuses with no exception (`branch-safety.md`). Recover a bad rebase with `git reset --hard origin/<your-branch>`, then `git merge origin/<default-branch>` instead. Under the live merge queue (829 R4) this is only needed for long-lived branch maintenance: the queue integrates against the moving base, so `strict` up-to-date-before-merge no longer blocks a stale branch. Two `gh` merge/CI-wait quirks live in `agent-guide.md` (History Publication).
@@ -44,7 +43,8 @@ Each handle resolves to a full case paragraph in
 `independent-review-required` · `static-green ≠ live-working` · `verdict-is-gate` ·
 `catalog-verbatim` · `wire-emitter-elision` · `ai-offline-isnt-a-wall` ·
 `standalone-capability-stays-stuck` · `unreachable-seed-green` · `green-masked-destructive` ·
-`shared-worktree-checkout` · `falsify-restore-from-backup`
+`shared-worktree-checkout` · `falsify-restore-from-backup` · `accepted-tracked-skills-no-removal` ·
+`edit-reread-cross-root`
 
 - **`subset-isnt-the-suite`** — A hand-picked subset of gates/tests passing is not "the gates passed"; run the full kernel + full suite before declaring done, not at merge. Worked case: postmortem #13. <!-- rule:subset-isnt-the-suite -->
 - **`green-masked-destructive`** — When a passing verification depends on an environment precondition, test the adverse precondition too; a green the environment happened to satisfy can hide the destructive branch.

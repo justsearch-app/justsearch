@@ -28,7 +28,8 @@
  *     from an observed one and the fact tier silently absorbs an inference.
  *
  * Dry-run is the default because this writes into a live measurement file that
- * a falsifier reads (CLAUDE.md's delegate-by-default window). §7: recovery and
+ * baseline-economics.mjs reads (the delegate-by-default falsifier was judged and
+ * closed 2026-09-07, tempdoc 948; the ledger remains the merge-cost authority). §7: recovery and
  * filtering push the merge count in opposite directions and must be reported as
  * separate labelled components, never netted into one moved number — so the
  * report prints candidates, rejects and skips separately rather than a total.

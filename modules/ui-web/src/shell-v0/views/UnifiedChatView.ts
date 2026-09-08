@@ -370,6 +370,28 @@ function makeCommittedSearchId(): string {
 }
 
 /**
+ * Tempdoc 941 — a shape id a RECORD declares, narrowed to the shapes this build knows, or
+ * `undefined` when the record declares nothing usable.
+ *
+ * The two readers of a per-turn shape — the live unified-thread path ({@link
+ * UnifiedChatView.recordShapeId}) and the resumed-history path ({@link
+ * UnifiedChatView.loadConversation}) — must narrow identically, or a mixed conversation would
+ * frame the same turn one way while streaming and another after a reload. Returning `undefined`
+ * rather than a default keeps the FALLBACK at each call site, where the two legitimately differ
+ * (the live path falls back to the window's current mode, the resume path to the conversation's
+ * first-wins shape).
+ *
+ * A shape this build does not know (a downgrade, or one retired from {@link
+ * CORE_INTERACTION_SHAPES}) is `undefined`, never cast into the union.
+ */
+function asKnownShape(declared: unknown): CoreInteractionShapeId | undefined {
+  return typeof declared === 'string' &&
+    (CORE_INTERACTION_SHAPES as readonly string[]).includes(declared)
+    ? (declared as CoreInteractionShapeId)
+    : undefined;
+}
+
+/**
  * Search Thread Round-2 R1a — drop a single cause bullet that only restates the headline+body (the
  * live-audit finding: the "Reindex required." headline already names the rebuild story, so the sole
  * `index.*_legacy`/`index.schema_mismatch`/`index.embedding_mismatch` cause bullet is a duplicate).
@@ -2059,6 +2081,30 @@ export class UnifiedChatView extends JfElement {
     await this.loadConversation(sessionId, shapeId);
   }
 
+  /**
+   * Tempdoc 577 Goal 3 (§3.13 / A2), widened by tempdoc 859 (live, 2026-08-25) — A LOADED
+   * CONVERSATION LEAVES THE RETRIEVE BASE TIER, whichever door the reader came through.
+   *
+   * <p>The renderer gates the whole thread branch behind `affordance !== 'retrieve'` and renders the
+   * hit-list in its place, while {@link renderResumePrompt} hides itself once `thread` has content.
+   * So a session loaded while the tier is still `retrieve` showed NEITHER: the session id was set and
+   * the activity rail showed the run, and the stage was BLANK — measured on ask and delegate records
+   * alike, with no cue that an escalation was what stood in the way.
+   *
+   * <p>The exit existed, but it lived on `restoreRecentConversation` — the resume card's handler — so
+   * only one of the doors into a conversation had it, and the History dropdown
+   * ({@link onConversationSelect}), the prev/next walk, the branch fork and the last-viewed restore on
+   * mount all walked straight into the blank stage. It belongs to the LOAD, so there is one act
+   * ("show me this conversation") and one place that answers it, and a future entry point cannot
+   * reintroduce the gap by omission.
+   *
+   * <p>It costs the reader nothing: viewing a restored thread needs no model — only sending a new
+   * turn does — and the escalation affordances put the search floor one click away.
+   */
+  private leaveRetrieveTier(): void {
+    if (this.affordance === 'retrieve') this.affordance = 'none';
+  }
+
   private async loadConversation(sessionId: string, shapeId: string): Promise<void> {
     // Slice 516 FIX-T1 — cancel any in-flight stream so its onDone doesn't
     // write into the new conversation's thread. AbortError is caught in
@@ -2086,16 +2132,18 @@ export class UnifiedChatView extends JfElement {
     if (this.historyLocked) {
       this.thread = [];
       this.showResumePrompt = false;
+      // A locked notice is content too, and it renders in the same gated branch the thread does.
+      this.leaveRetrieveTier();
       void loadConversations();
       return;
     }
-    const resolvedShape: ShapeId =
-      resumed.shapeId === 'core.rag-ask' ||
-      resumed.shapeId === 'core.extract' ||
-      resumed.shapeId === 'core.free-chat' ||
-      resumed.shapeId === 'core.agent-run'
-        ? resumed.shapeId
-        : 'core.free-chat';
+    // Tempdoc 941 review — the conversation-level shape narrows through the SAME authority the
+    // per-message one does. The hand-rolled four-arm test this replaces predated
+    // `core.workflow-run` (565 §15.C) and never gained it, so a resumed workflow conversation fell
+    // through to `core.free-chat` — an `ungrounded-llm` class — for every turn the record did not
+    // individually stamp. One narrowing function means a shape added to `CORE_INTERACTION_SHAPES`
+    // cannot be recognised on one path and silently dropped on the other.
+    const resolvedShape: ShapeId = asKnownShape(resumed.shapeId) ?? 'core.free-chat';
     // Slice 513 — if this is a branch, find the index of the branch point in
     // the resolved message list. All messages up to and including that index
     // were inherited from the parent.
@@ -2108,13 +2156,35 @@ export class UnifiedChatView extends JfElement {
         }
       }
     }
-    this.thread = resumed.messages.map((m, idx) => ({
-      role: m.role,
-      content: m.content,
-      shapeId: resolvedShape,
-      id: m.id,
-      inheritedFromParent: idx <= inheritedThrough,
-    }));
+    // Tempdoc 941 — the turn's OWN shape wins over the conversation's.
+    //
+    // `resolvedShape` is first-wins for the whole record (A-10.1), so stamping it on every
+    // message made a mixed conversation's turns all claim the shape that opened it — and the
+    // frame authority reads that shape to decide a turn's epistemic class. This is the reload
+    // half of the fact `recordShapeId` already reads on the live path; the same fallback applies
+    // (a row written before 863, or one declaring a shape this build does not know, keeps the
+    // conversation-level answer, which is the only fact available for it).
+    this.thread = resumed.messages.map((m, idx) => {
+      const shapeId = asKnownShape(m.shapeId) ?? resolvedShape;
+      return {
+        role: m.role,
+        content: m.content,
+        shapeId,
+        // Tempdoc 941 review — an EXTRACT turn renders verbatim (`transform`), not as markdown, and
+        // the record carries no per-turn `isExtract` flag, so it is derived from the turn's shape.
+        // The unified-thread record path already derives it this way (621 review fix); the resume
+        // path set the shape and not the flag, so the same turn rendered differently depending on
+        // which path rebuilt it. Derive it from the SAME per-message shape resolved just above.
+        isExtract: shapeId === 'core.extract',
+        id: m.id,
+        inheritedFromParent: idx <= inheritedThrough,
+        ...(m.standaloneQuestion ? { standaloneQuestion: m.standaloneQuestion } : {}),
+      };
+    });
+    // The load produced something to read, so the stage has to be able to show it (see
+    // `leaveRetrieveTier`). Keyed on the RESULT, not on the act: an empty restore has nothing to
+    // render, and yanking a reader off the search floor for it would be chrome moving on its own.
+    if (this.thread.length > 0) this.leaveRetrieveTier();
     // Slice 515 FIX-8 — capture parent preview for the branch banner.
     this.parentFirstMessagePreview = resumed.parentFirstUserMessage ?? null;
     // Tempdoc 610 Phase B — record this conversation's fork pointers so the
@@ -2154,12 +2224,8 @@ export class UnifiedChatView extends JfElement {
   // the dispatchRunControl seam; the rename keeps the `.resumeSession(` channel pattern unambiguous).
   private restoreRecentConversation(sessionId: string): void {
     this.showResumePrompt = false;
-    // Tempdoc 577 Goal 3 (§3.13 / A2) — leave the retrieve base tier when restoring a past chat, else
-    // the loaded thread renders BEHIND the still-showing hit-list. The restored conversation is a
-    // free-chat thread; viewing it needs no model (only sending a new turn does).
-    if (this.affordance === 'retrieve') {
-      this.affordance = 'none';
-    }
+    // Tempdoc 859 — the retrieve-tier exit used to live HERE, which is why it only ever covered the
+    // resume card. It is `loadConversation`'s job now (one authority, every entry point).
     void this.loadConversation(sessionId, 'core.free-chat');
   }
 
@@ -3559,6 +3625,15 @@ export class UnifiedChatView extends JfElement {
     this.unifiedEvents = res.events;
     this.unifiedLifecycles = res.lifecycles;
     this.hydrateAnswerEvidenceFromRecord(res.events);
+    // Tempdoc 859 review F4 — the SECOND arrival of content, and the one `loadConversation`'s own
+    // gate cannot see. That gate reads `thread`, but `renderResumePrompt` counts `unifiedEvents` as
+    // content too, and this refresh is fired `void` BEFORE the resume awaits, so its events land
+    // after the gate has already run. A record whose content lives only here — a delegate run with
+    // no chat messages of its own — would still have shown the blank stage. Same predicate, second
+    // arrival point: the exit is keyed on there being something to read, wherever it turned up.
+    // Inert on every other caller by construction (`leaveRetrieveTier` returns unless the tier IS
+    // retrieve, and a run dispatch or a stream terminal cannot happen from the retrieve tier).
+    if (this.unifiedEvents.length > 0) this.leaveRetrieveTier();
     this.requestUpdate();
   }
 
@@ -5221,11 +5296,7 @@ export class UnifiedChatView extends JfElement {
    * rather than being cast into the union.
    */
   private recordShapeId(it: UnifiedTurnItem): CoreInteractionShapeId {
-    const declared = it.attributes.shapeId;
-    return typeof declared === 'string' &&
-      (CORE_INTERACTION_SHAPES as readonly string[]).includes(declared)
-      ? (declared as CoreInteractionShapeId)
-      : this.currentShapeId();
+    return asKnownShape(it.attributes.shapeId) ?? this.currentShapeId();
   }
 
   /**
