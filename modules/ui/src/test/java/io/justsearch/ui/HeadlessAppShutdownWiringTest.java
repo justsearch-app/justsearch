@@ -3,6 +3,7 @@ package io.justsearch.ui;
 
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,6 +14,7 @@ import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.util.AppInstanceLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -126,5 +128,56 @@ final class HeadlessAppShutdownWiringTest {
 
     assertFalse(watcherStarted.get());
     assertTrue(Files.exists(io.justsearch.app.engine.ShutdownRequest.pathIn(runtime)));
+  }
+
+  @Test
+  @DisplayName("a watcher callback closes itself through the production ordered steps")
+  void watcherCallbackClosesProductionStepWithoutInterruptingLaterClose(
+      @TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    var watcherRef =
+        new java.util.concurrent.atomic.AtomicReference<
+            io.justsearch.app.engine.ShutdownRequestWatcher>();
+    var laterStep = new CountDownLatch(1);
+    var laterStepInterrupted = new java.util.concurrent.atomic.AtomicBoolean(true);
+    AppInstanceLock instanceLock = mock(AppInstanceLock.class);
+    doAnswer(
+            ignored -> {
+              laterStepInterrupted.set(Thread.currentThread().isInterrupted());
+              laterStep.countDown();
+              return null;
+            })
+        .when(instanceLock)
+        .close();
+    var sequence =
+        new EngineShutdownSequence(
+            tempDir,
+            HeadlessApp.orderedShutdownSteps(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                instanceLock,
+                OperationLeaseService.noOp(),
+                watcherRef::get),
+            ignored -> {});
+
+    try (var watcher =
+        HeadlessApp.startShutdownRequestWatcher(
+            runtime,
+            ignored -> true,
+            request -> sequence.run(request.reason()),
+            20L,
+            watcherRef::set)) {
+      new io.justsearch.app.engine.ShutdownRequest(
+              Reason.QUIT, Long.MAX_VALUE, null, "test", null)
+          .writeTo(runtime);
+      assertTrue(laterStep.await(2, TimeUnit.SECONDS));
+      assertFalse(watcher.isRunning());
+      assertFalse(laterStepInterrupted.get());
+    }
   }
 }
