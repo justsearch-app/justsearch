@@ -240,6 +240,38 @@ authority with a thin Java mirror for the drift check; `WORKER_RESTART_EXHAUSTED
 location with a manifest-history mirror the updater can read after death; extraction children are
 registered, never adopted; an absent supervisor file means the unsupervised mode of 3.1.
 
+**Stage C1 and C2 checklists drafted during B; their questions decided (orchestrator, 2026-09-08).**
+Both drafts (`stages/C1.md`, `stages/C2.md`, base `e692b86ef`) were written while B7 to B17 were
+open and are re-verified at each stage start (17.6). Decisions, one per question, so the briefs
+need no re-research. **C1:** the engine context is a sibling of `InvocationProvenance` with one
+tested one-way mapping at the single site where both are in scope, not a projection or a
+replacement (`core` carries no project dependency); the context reaches the indexing port through a
+`withContext` bound view, not 33 signature changes and never a thread-local; VDU's in-Engine PDF
+render keeps a dated, reasoned ArchUnit exception at C1 with the move behind the child protocol as an
+in-lane follow-up (17.5); the operator's explicit `in_process` sandbox mode survives and only the
+silent probe fallback is deleted; executor caps by kind and the retained-state caps live in one
+`governance/retained-state.v1.json` with a drift check that reads the register and compares (the
+supervision-register shape); all five retained-state kinds are declared, the three without a C1
+producer marked `awaitingProducer` with their stage; the MCP surface is admitted on the same caps and
+codes as HTTP, with the rejection mapped into the MCP error shape and asserted. **C2:** the
+acceptance, effect and completion order is stamped from the operations table's own autoincrement
+key, because no journal commit sequence number exists (`CommitOps.commit()` discards Lucene's
+`long`; the NRT watermark is generation-scoped) — 17.3 row C2 and `verified-facts.md` are corrected
+to say so; `jobs.db` becomes `MIXED` (a third `StoreRecoverability` value) with the operations table
+inside it, **and every lane-F change to a durable store's `owner`, `role` or `reconciliation` (the
+`WORKER` owner rename included) is batched into that one register change**, because the installed
+updater refuses a release whose durable-store identities or row count differ (`updater.rs`, the
+"closed set" and "changes ownership or recovery strategy" branches) and the cost is paid per
+boundary, not per field; the same C2 commit relaxes the rule's successor so a later release may add
+a durable store without refusing (the currently installed builds still pay the boundary once — a
+product decision on in-place upgrade, recorded here as such); the operation record sits beside
+`OperationLeaseService` with the boundary written into both javadocs; `version conflict` lands at
+C2 on the global accepted-settings revision only (7.4's line) and D1 adds the per-component
+versions; ingestion's unit key gains a persisted content-hash column in the same migration;
+acceptance durability is stated as process-crash-durable under `synchronous = NORMAL`, not raised to
+`FULL` without a paired run; the outcome query is the existing `OperationHistoryStore` surface made
+durable, not a second endpoint.
+
 **Decision authority (owner, 2026-09-07).** After PR 0 the owner delegated every remaining
 decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
 and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the

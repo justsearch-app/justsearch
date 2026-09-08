@@ -1,5 +1,12 @@
 # Lane F handoff: from the design orchestrator to the implementation orchestrator
 
+Two handoffs live in this file. The first (2026-09-07) is from the design orchestrator to the
+first implementation orchestrator and is kept as written. The second, **"Implementation
+orchestrator handoff (2026-09-08)"** at the end, is from that orchestrator to its successor and
+is the one to read first if you are taking the lane over mid-stage-B: it records the state of
+every branch and PR, the in-flight work, the review findings that are decided but not yet fixed,
+and the working practices that were never written down anywhere else.
+
 Written 2026-09-07 by the agent that orchestrated the design through seven reviews and the
 lock. The design is the contract; this file is what that agent knows and the contract does
 not say. Read `design.md` sections 0, 15, 16 and 17 first, then this file, then
@@ -114,3 +121,201 @@ not say. Read `design.md` sections 0, 15, 16 and 17 first, then this file, then
 - Line-number citations trusted across a moved base. The seven files above are the known
   cases; grep the symbol, not the line.
 - Any sentence that starts "the owner probably meant". 17.7 records what the owner meant.
+
+---
+
+## Implementation orchestrator handoff (2026-09-08)
+
+Written by the agent that orchestrated PR 0, PR 0b and stages A and B1 to B7 (session
+`9b397ac4-f652-4d85-ab86-880c86ef4c16`, branch `worktree-lane-F-A`), for the agent taking the
+orchestration over mid-stage-B. Everything below is either not written anywhere else or is
+scattered across commit bodies; `design.md` section 0 (dated paragraphs), `stages/A.md`,
+`stages/B.md` and the `evidence/` directories are the durable record and win on conflict.
+
+## 1. Where every branch and PR stands
+
+| worktree (`.claude/worktrees/`) | branch | contents | state |
+|---|---|---|---|
+| `lane-F` | `worktree-lane-F` | PR 0: Head launch flags, workflow fixture, baseline, design files | **PR #708**, base `main`, CLEAN, green; review record refreshed; awaiting the owner's merge go-ahead |
+| `lane-F-0b` | `worktree-lane-F-0b` | PR 0b: determinism pins (chunk tie-break, exhaustive kNN switch, `sampling` request override, fixture noise-pair gate, retaken split-side baseline) | **PR #717**, base `worktree-lane-F`, CLEAN, green; **retarget the base to `main` after #708 merges** (`gh pr edit 717 --base main`), then refresh the review record; awaiting go-ahead |
+| `lane-F-A` | `worktree-lane-F-A` | PR 1: stages A to F, one branch | no PR yet (opened at stage F per 17.6); stage A checkpoint complete; stage B in progress; `origin/main` last merged at the A/B boundary |
+
+Both PR bodies live at `tmp/pr0-body.md` (lane-F) and `tmp/pr0b-body.md` (lane-F-0b), the
+managed review records at `tmp/pr0-review-record.md` and `tmp/pr0b-review-record.md`; `tmp/` is
+untracked, so regenerate from those files if they are gone. The squash-message gate
+(`node scripts/ci/preview-squash-message.mjs <N>`) rejects a body over 2000 characters or 32
+lines and any banner or session URL; the accepted form ends with the single line
+`Session-Id: <session uuid>`. `node scripts/ci/pr-review-record.mjs check <N>` must pass on the
+PR head before enqueue; every push to a PR branch invalidates it, so refresh last.
+
+**Merges are the owner's per-PR call and were never given.** Everything else in the lane was
+delegated to the orchestrator on 2026-09-07 (design section 0, "Decision authority"): no
+"owner item" category exists any more; decide, record the decision dated in section 0 with its
+reasoning, and continue. The one other standing restriction is the owner's: **no benchmark,
+eval, soak or capture that takes more than an hour**; stage E's design must be cut to fit that
+(three captures per side under the pins already fits).
+
+## 2. Stage B: what is landed, in flight, and decided-but-unfixed
+
+**Landed and pushed** (`e692b86ef` = B1 to B6 plus the sweep; `c7e8e0302` = B7). Full suite at
+B6: 9331 tests, 0 failures (XML counts, `cleanTest --no-build-cache`); kernel 30 gates, 0 fail.
+
+**In flight at handoff time:** one implementer agent on B8 (dev-runner supervisor), B9 (runner
+and death-observability assertions, CI step) and B10 (Tauri supervisor, `supervisor.rs`, the
+`[[bin]] supervisor-conformance` target, the `shell-rust-tests` CI step, the `supervisor-state`
+FE consumer). Its uncommitted files when this was written: `scripts/dev/dev-runner.cjs`,
+`scripts/dev/lib/engine-supervisor.cjs`, `scripts/dev/run-dev-runner-tests.mjs`,
+`scripts/dev/test-dev-runner-supervisor.mjs`, `scripts/supervisor-conformance/*`,
+`scripts/ci/check-runtime-manifest-closure.mjs`, `governance/store-recoverability.v1.json`.
+**First thing to do:** `git log --oneline -12` and `git status --short`; if B8 to B10 commits exist
+and the tree is clean, the agent finished (its report went to the previous orchestrator's
+session and is lost; treat the commits and `stages/B.md` section 0.1 as the report and
+review them independently). If files are still modified and no agent is running, the agent
+died mid-item: read the diff before deciding whether to finish it or discard it; do not
+`git checkout --` a file another agent authored without reading it.
+
+**The B1 to B6 independent review (opus, read-only, 2026-09-08) returned 14 findings; the four
+highest were re-verified at the call sites by the orchestrator and all hold.** None is fixed
+yet because the fix set overlaps the files B8 to B10 edit (`HeadlessApp.java` is safe;
+`lib.rs`, the closure check and the recoverability register are not). Run the fix batch as one
+implementer brief immediately after B10 lands, one commit per finding group, then a second
+independent review of the fix range. Decisions per finding:
+
+1. **Blocker: llama-server stop-by-reason has no caller.** `InferenceLifecycleManager.setStopServerOnClose`
+   (`:1359`) and `ShutdownRequest.Reason.stopsGenerativeBackend()` (`:85`) are called only from
+   tests; the default is `true`, so `restart` and `hang` still stop the server and the restarted
+   Engine has nothing to adopt. Fix: the sequence sets `setStopServerOnClose(reason.stopsGenerativeBackend())`
+   before the `head-assembly` step closes the manager; replace `GenerativeBackendByReasonTest` with
+   one that drives a fake `serverOps` through `InferenceLifecycleManager.close()` for all four
+   reasons and asserts `stopLlamaServer` called or not called.
+2. **Must-fix: a stale request file shuts the next Engine down at boot.** `deadlineEpochMs` has
+   no reader; nothing clears the file at start; the watcher's production predicate is
+   `request -> true` (`HeadlessApp.java:1146`). Fix both halves: `pollOnce` drops and clears a
+   request whose deadline is past, and `HeadlessApp` calls `ShutdownRequest.clear(runtimeDir)`
+   once before `watcher.start()`. Test the adverse precondition (a pre-existing file at boot must
+   not fire).
+3. **Must-fix: 7.3 step 1 (admission freeze for every reason) is unimplemented** and
+   `HeadlessApp.java:1236` says all eight steps are. Fix: a first step calling
+   `leases.freezeAdmission(reason.wire())` (verify `OperationLeaseServiceImpl.freezeAdmission` is
+   idempotent for the upgrade reason, where prepare already froze it); step 2 (cancel interactive
+   turns with a reason code) has no admission front until C1, so record it as deferred in
+   `stages/B.md` section 0.1 and section 10 and correct the javadoc.
+4. **Medium: `worker_outcome` defaults to `UNKNOWN`** when `knowledgeServer == null`
+   (`HeadlessApp.java:1283`, `EngineShutdownSequence.java:146`), which `updater.rs:1044` rejects,
+   so an Engine that booted without its index half cannot be upgraded (the old code said
+   `GRACEFUL`). Fix: the step returns `GRACEFUL` when there is nothing to close and `FAILED`
+   when it throws; two new cases in `EngineShutdownSequenceTest`.
+5. **Medium: the B6 end-to-end test asserts a hand-copied duplicate of the production wiring**
+   (`UpgradeShutdownViaRequestFileTest.java:36-43` versus `HeadlessApp.java:1119-1156`). Fix:
+   extract the writer and dispatcher lambdas into package-visible factories and test those; add
+   the nonce-mismatch-writes-no-file case B6's acceptance asked for.
+6. **Medium: the shutdown-request row's `futureVersionRefusalTest` names a test with no version
+   refusal**, and the wire form has no `schemaVersion`. Fix: add `schemaVersion: 1`, a refusal
+   branch for an unknown version, a test, and point the register at it.
+7. **Medium: the nonce seam is declared and bypassed.** Fix: the predicate for `UPGRADE` with a
+   `preparationId` checks it against the live lease snapshot's preparation; if that is not
+   cheaply reachable from `HeadlessApp`, restate the javadoc as "unused until B8" and note it.
+8. **Medium: rename residue.** `verified-facts.md:120,191` still cite `checkpointForUpgrade`;
+   `KnowledgeServerHealthMonitor.java:120,366,699` and `KnowledgeServerBootRecoveryTest.java:294`
+   still name `performOrderedShutdown`. Sweep them.
+9. **Minor:** orphaned javadoc at `JobQueue.java:707-729`; `HeadShutdownCoordinator.shutdown(preparationId, nonce)`
+   has no caller and its `implements` clause is decorative (delete or re-justify); the watcher is
+   started and never closed (add it to the sequence's steps); the duplicated OOM comment at
+   `lib.rs:804-808` mislabels the prod flag (delete); `check-runtime-manifest-closure.mjs:58`
+   describes the Tauri supervisor and the dev-runner as writers in the present tense (say
+   "will"); the sequence exits with bare `0`/`1` outside `EngineExit`'s pin, so a requested but
+   unclean shutdown reads as a transient crash — add `EngineExit.REQUESTED_UNCLEAN` (a new
+   code classified `REQUESTED`), route both exits through the constants, and extend the call-site
+   pin to `EngineShutdownSequence`. Because B8's dev-runner classifier and B10's Rust classifier
+   read `EngineExit`'s table, adding the code after them must trip their drift tests; if it does
+   not, the drift test is the defect.
+10. **Verified sound, do not re-litigate:** UTF-8 and NUL clean; flag pins exact-set on both
+    spawn sites; no `System.exit` inside the JVM shutdown hook; idempotency, first-reason-wins,
+    error accounting and single exit each pinned by a test that reds when its guard is removed;
+    the B5 WAL justification is honest and the rename is complete in code; the governance rows
+    are shaped like their neighbours. `AotTraining.java:113`'s `System.exit(0)` is a separate
+    `main` and out of scope; the extraction child's exit codes are a different namespace.
+
+**Remaining stage B items after the fix batch:** B11 (child registry, manifest schema v2,
+`WorkerInfo.grpcPort` removed), B12 (reconciliation by PID plus start instant plus config
+identity; extraction children registered, never adopted), B13 (dead-Engine updater path with
+the `ENGINE_UNRECOVERABLE` witness phase; host-level proof on the branch, sandbox round deferred
+to the first post-merge installer, recorded as a dated gap), B14 (`ENGINE_RESTART_EXHAUSTED`
+producer and the rename, `readinessNotice.ts` rows), B15 (`restart_required` on cutover and the
+requested-restart consumer), B16 (residue sweep), B17 (stress-suite policy). Then the stage-end
+protocol of 17.6: full suite plus ui-web gates; the checkpoint proof run live and recorded under
+`evidence/B/` (harness green on both adapters, **a forced kill on the live dev stack recovers
+under the budget** — the orchestrator runs this under a dev-stack lease, it is not delegated
+fire-and-forget; the death-observability test green in CI); an independent review of the whole
+B range; `git merge origin/main` at the boundary; then the owner's "continue".
+
+## 3. Stage C1 and C2 drafts exist; their questions are decided
+
+`stages/C1.md` (863 lines) and `stages/C2.md` (788 lines) were drafted by two opus agents at
+base `e692b86ef` while B7 was landing. Their section 0 lists the `verified-facts.md` corrections
+found (ten for C1, twelve for C2); **apply those to `verified-facts.md` at the stage start**,
+not before, since B may move them again. All eleven open questions are decided in design section
+0 ("Stage C1 and C2 checklists drafted during B"). The three items each drafter judged most at
+risk: C1 — admission as the `ForegroundLoad` producer (rule 6b bars `ui` from the type, the
+gate forbids a second wrap, the front's filter skips GET: the producer must **move**, not be
+added), parser confinement (no module boundary exists and VDU already parses PDF in the
+Engine), context through the 33-method port (a `withContext` bound view is the decision);
+C2 — no journal commit sequence number exists (the operations table's own autoincrement key is
+the decision), `jobs.db` re-classification is refused by the installed updater's closed-set rule
+(batch every durable-store identity change into one register change, and relax the rule's
+successor in the same commit), and `version conflict` has no subject until the global
+accepted-settings revision exists (C2 builds that revision only). Note the installed updater
+compares against the installed build's **durable** stores, so stage B's `EPHEMERAL` rows do not
+trip it; a `DERIVED`/`AUTHORED` identity change does.
+
+## 4. Working practices that were never written down
+
+- **Parallel lanes, one implementer per branch.** Throughput came from running, at once: one
+  implementer committing on the branch (sequential items, one Gradle build at a time), one
+  read-only reviewer on the previous batch (no Gradle, no cargo, no edits), and drafters for the
+  next stage writing new files only. Never two writers on the same worktree. Do not commit your
+  own files while an implementer may have paths staged: check `git diff --cached --stat` first,
+  and stage by explicit path.
+- **Isolated Gradle homes** avoid shared-cache corruption when two worktrees must build: the
+  0b worktree used `GRADLE_USER_HOME=F:/gradle-home-0b`. Memory is the real limit: with the
+  standard chat model loaded (about 11 GB) a Gradle build or a Rust compile beside it gets
+  killed; use the compact profile for plumbing checks and unload before building.
+- **Background tasks die at about 60 minutes**; briefs over that size are chunked (B1 to B6 ran
+  64 minutes and survived by luck). Subagent reports go to the spawning session only; make
+  implementers write their findings into `stages/<letter>.md` section 0.1 and commit bodies so a
+  report is never the only copy.
+- **Every implementer is told, in the brief:** Edit/Write or node UTF-8 scripts only; the
+  NUL and non-ASCII diff checks before each commit; falsify every new assertion once and say how
+  in the commit body; one commit per item, green on its own; never `git checkout --`, `stash` or
+  `reset` on a dirty tree (the B1 to B6 implementer destroyed its own work twice); the two
+  trailer lines; do not push (the orchestrator pushes after review). Bash-tool `node -e` and
+  heredocs break on apostrophes and backslashes: the Edit tool for prose with either.
+- **Always-loaded budget is at its ceiling.** `AGENTS.md` sits at exactly 8296 of 8296 bytes;
+  any merge from `main` that adds a byte reds `check-always-loaded-budget`, and the invariants
+  block in `CLAUDE.md` is a generated projection (`node scripts/docs/agent-instructions-sync.mjs`,
+  `--check` to verify) that `scripts/ci/check-codex-agent-parity.mjs` runs in CI separately from
+  `regen-all`. Trim, regenerate, run `check-always-loaded-budget`, `regen-all --check --except
+  notices` and `check-codex-agent-parity`.
+- **Live verification.** The dev MCP tools (`quick_health`, `start`, `ai_activate`, `reload`,
+  `stop`) drive the stack from the worktree; ingest through `curl` with the worktree's absolute
+  paths, not the MCP `ingest` tool, which resolves paths against the main checkout and produced
+  a duplicated corpus once. The fixture capture pins live in `scripts/jseval/lane-f/fixture-pair.sh`
+  (exhaustive kNN, one LLM slot, rerank deadlines 60000, rerank top_k 40 with 4096 MB, candidate
+  limit 5000, collapse multiplier 50, leg arbitration and recall-complete off); `fixture-gate.sh`
+  gives the verdict; three captures per side is the accepted noise floor (216 equal, 0
+  regressions at PR 0b).
+- **Evidence directories** are the checkpoint record: `evidence/pr0/`, `evidence/baseline/`
+  (scifact, encoder-idle, fixture, fixture-pr0b), `evidence/A/` (red captures, accepted reds,
+  live check, suite-and-gates, deletion counts). Create `evidence/B/` in the same shape.
+- **Named reds and gaps carried at handoff**: `worker.restart_exhausted` has no producer until
+  B14 (declared `awaitingProducer`, owner lane-F/B, in the readiness register);
+  `WorkerBootRecoveryE2ETest` is red from stage A (A.md section 10 row 1c) and B owns it;
+  `build-installer.yml` cannot run on a branch ref (`environment: release-signing`), so every
+  packaging claim on the branch is "changed, locally reasoned, never executed" until the first
+  post-merge run; migration cutover served-generation observability is D1's;
+  `LambdaMartBenchmarkTest` is quarantined as load-sensitive on this branch; three other tests
+  flake only under concurrent worktree builds and pass isolated (`BatchUpdateIntegrationTest`
+  concurrent RMW, a `RuntimeReconcilerTest` temp-file move).
+- **Design amendments** go in section 0 as dated paragraphs, newest last; the checklist's
+  section 0.1 takes per-item corrections; `verified-facts.md` takes corrected citations at stage
+  start. Three places, three purposes; do not collapse them.
