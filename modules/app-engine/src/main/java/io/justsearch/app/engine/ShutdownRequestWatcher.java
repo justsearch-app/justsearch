@@ -118,6 +118,15 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
         return;
       }
       ShutdownRequest req = request.get();
+      if (req.deadlineEpochMs() < System.currentTimeMillis()) {
+        log.warn(
+            "Ignoring expired shutdown request with reason {} (issuedBy={}, deadlineEpochMs={})",
+            req.reason().wire(),
+            req.issuedBy(),
+            req.deadlineEpochMs());
+        ShutdownRequest.clear(runtimeDir);
+        return;
+      }
       if (!accepts.test(req)) {
         log.warn(
             "Ignoring a shutdown request with reason {} (issuedBy={}): it was refused by the"

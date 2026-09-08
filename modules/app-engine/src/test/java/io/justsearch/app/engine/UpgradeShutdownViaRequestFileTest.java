@@ -86,7 +86,7 @@ final class UpgradeShutdownViaRequestFileTest {
     var sequence =
         new EngineShutdownSequence(dataDir, List.of(), code -> {});
 
-    new ShutdownRequest(Reason.QUIT, 1L, null, "shell", null).writeTo(runtime);
+    new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "shell", null).writeTo(runtime);
     try (var watcher =
         new ShutdownRequestWatcher(runtime, r -> true, r -> dispatch(sequence, r), 50L)) {
       watcher.pollOnce();
@@ -107,7 +107,7 @@ final class UpgradeShutdownViaRequestFileTest {
     // A supervisor-issued upgrade (B8/B10 will write these) carries no preparation id, because no
     // commit-shutdown ran. It must still shut down, and must NOT produce a receipt the updater
     // would read as proof of a preparation that never happened.
-    new ShutdownRequest(Reason.UPGRADE, 1L, null, "supervisor", null).writeTo(runtime);
+    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, null, "supervisor", null).writeTo(runtime);
     try (var watcher =
         new ShutdownRequestWatcher(runtime, r -> true, r -> dispatch(sequence, r), 50L)) {
       watcher.pollOnce();

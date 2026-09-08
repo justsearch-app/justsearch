@@ -1147,8 +1147,7 @@ public class HeadlessApp {
 
       // Item B3's watcher, started here because this is after the API front is up. It consumes the
       // request the upgrade path (and, from B8/B10, the supervisor) writes.
-      final io.justsearch.app.engine.ShutdownRequestWatcher shutdownRequestWatcher =
-          new io.justsearch.app.engine.ShutdownRequestWatcher(
+      startShutdownRequestWatcher(
               runtimeDir,
               request -> true,
               request -> {
@@ -1161,9 +1160,8 @@ public class HeadlessApp {
                   shutdownSequence.runAndExit(request.reason());
                 }
               },
-              io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS);
-      shutdownRequestWatcherRef.set(shutdownRequestWatcher);
-      shutdownRequestWatcher.start();
+              io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
+              shutdownRequestWatcherRef::set);
 
       Runtime.getRuntime()
           .addShutdownHook(
@@ -1236,6 +1234,22 @@ public class HeadlessApp {
       // Tempdoc 501 Phase 18: api-port.txt is gone, the manifest publisher's
       // close() (above) handles its own file cleanup.
     }
+  }
+
+  /** Builds and starts the production watcher after clearing a prior incarnation's request. */
+  static io.justsearch.app.engine.ShutdownRequestWatcher startShutdownRequestWatcher(
+      Path runtimeDir,
+      java.util.function.Predicate<io.justsearch.app.engine.ShutdownRequest> accepts,
+      java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequest> onRequest,
+      long pollIntervalMs,
+      java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequestWatcher> beforeStart) {
+    io.justsearch.app.engine.ShutdownRequest.clear(runtimeDir);
+    var watcher =
+        new io.justsearch.app.engine.ShutdownRequestWatcher(
+            runtimeDir, accepts, onRequest, pollIntervalMs);
+    beforeStart.accept(watcher);
+    watcher.start();
+    return watcher;
   }
 
   private record KnowledgeServerStartResult(KnowledgeServerBootstrap bootstrap, String startError) {}

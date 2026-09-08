@@ -38,7 +38,7 @@ final class ShutdownRequestWatcherTest {
   void everyReasonReachesTheOrderedShutdown(@TempDir Path tempDir) throws Exception {
     for (Reason reason : Reason.values()) {
       Path runtime = runtimeDir(tempDir.resolve(reason.wire()));
-      new ShutdownRequest(reason, 1L, null, "test", null).writeTo(runtime);
+      new ShutdownRequest(reason, Long.MAX_VALUE, null, "test", null).writeTo(runtime);
 
       // A real sequence over a fake step, so this covers the whole path the production wiring
       // takes — watcher -> sequence -> step — rather than just the watcher's callback.
@@ -77,7 +77,7 @@ final class ShutdownRequestWatcherTest {
       assertFalse(watcher.hasFired());
 
       // The watcher must still be working: a good request written afterwards is acted on.
-      new ShutdownRequest(Reason.QUIT, 1L, null, "test", null).writeTo(runtime);
+      new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null).writeTo(runtime);
       watcher.pollOnce();
       assertEquals(Reason.QUIT, ran.get().reason(), "one bad file must not end the watch");
     }
@@ -87,7 +87,8 @@ final class ShutdownRequestWatcherTest {
   @DisplayName("a refused request is ignored and deleted, not re-read every poll")
   void refusedRequestIsIgnoredAndCleared(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.UPGRADE, 1L, "wrong-nonce", "updater", null).writeTo(runtime);
+    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "wrong-nonce", "updater", null)
+        .writeTo(runtime);
     var ran = new AtomicReference<ShutdownRequest>();
 
     try (var watcher = new ShutdownRequestWatcher(runtime, r -> false, ran::set, 50L)) {
@@ -103,7 +104,7 @@ final class ShutdownRequestWatcherTest {
   @DisplayName("the request is consumed before the sequence runs")
   void requestIsConsumedBeforeActing(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.RESTART, 1L, null, "supervisor", null).writeTo(runtime);
+    new ShutdownRequest(Reason.RESTART, Long.MAX_VALUE, null, "supervisor", null).writeTo(runtime);
     var fileStillPresentWhenActing = new AtomicReference<Boolean>();
 
     try (var watcher =
@@ -130,9 +131,9 @@ final class ShutdownRequestWatcherTest {
 
     try (var watcher =
         new ShutdownRequestWatcher(runtime, r -> true, r -> count.incrementAndGet(), 50L)) {
-      new ShutdownRequest(Reason.QUIT, 1L, null, null, null).writeTo(runtime);
+      new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null).writeTo(runtime);
       watcher.pollOnce();
-      new ShutdownRequest(Reason.QUIT, 1L, null, null, null).writeTo(runtime);
+      new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null).writeTo(runtime);
       watcher.pollOnce();
     }
 
@@ -148,7 +149,7 @@ final class ShutdownRequestWatcherTest {
     Path runtime = runtimeDir(tempDir);
     var threadName = new AtomicReference<String>();
     var latch = new CountDownLatch(1);
-    new ShutdownRequest(Reason.HANG, 1L, null, "supervisor", null).writeTo(runtime);
+    new ShutdownRequest(Reason.HANG, Long.MAX_VALUE, null, "supervisor", null).writeTo(runtime);
 
     try (var watcher =
         new ShutdownRequestWatcher(
@@ -198,5 +199,20 @@ final class ShutdownRequestWatcherTest {
         Boolean.FALSE,
         interruptedAfterClose.get(),
         "self-interruption here would disrupt the ordered close steps after the watcher");
+  }
+
+  @Test
+  @DisplayName("an expired request is discarded before acceptance and never fires")
+  void expiredRequestIsDiscarded(@TempDir Path tempDir) throws Exception {
+    Path runtime = runtimeDir(tempDir);
+    var ran = new AtomicReference<ShutdownRequest>();
+    new ShutdownRequest(Reason.RESTART, 1L, null, "stale-supervisor", null).writeTo(runtime);
+
+    try (var watcher = new ShutdownRequestWatcher(runtime, r -> true, ran::set, 50L)) {
+      watcher.pollOnce();
+    }
+
+    assertTrue(ran.get() == null, "a deadline from an earlier incarnation must not stop this one");
+    assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
   }
 }
