@@ -521,8 +521,10 @@ export async function resolveApiEndpoint(): Promise<ApiEndpoint> {
         } else if (
           (import.meta as unknown as Record<string, unknown>).env &&
           ((import.meta as unknown as Record<string, unknown>).env as Record<string, unknown>)?.DEV
+          && !isProbablyTauriRuntime()
         ) {
-          // In Vite dev mode, the dev server proxies /api/* to the backend.
+          // In browser Vite dev mode, the dev server proxies /api/* to the backend.
+          // A desktop host with no bound Engine must remain unresolved, including Tauri dev.
           // Use window.location.origin so relative API paths route through the proxy.
           resolved = { port: null, baseUrl: window.location.origin, source: 'proxy' };
         } else {
@@ -542,4 +544,3 @@ export async function resolveApiEndpoint(): Promise<ApiEndpoint> {
   }
   return resolved;
 }
-

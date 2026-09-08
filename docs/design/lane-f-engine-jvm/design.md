@@ -738,6 +738,13 @@ package within the same module. The whole-program dead-code rule ratchets classe
 not methods: require no baseline growth, and accept an unchanged baseline when no
 class is removed. This closes residue without adding a replacement lifecycle API.
 
+**Desktop recovery boot boundary (orchestrator, 2026-09-08).** The B13/B14 UI
+subset uses the existing host update commands and current in-memory snapshot.
+Vite's implicit proxy fallback is browser-only: a native host with no Engine port
+stays unresolved even in development, while explicit URL/environment overrides
+retain their existing precedence. The UI evidence does not prove dead-Engine
+installation; B13's replacement hold/stop witness and B14/R7 remain separate work.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

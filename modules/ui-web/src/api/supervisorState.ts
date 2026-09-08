@@ -15,8 +15,8 @@
  * `backend_restart_event_is_untouched_by_the_supervisor`; this file is the other end of the same
  * decision.
  *
- * In browser (vite dev): no-op — Tauri APIs absent, and there is no supervisor. That is not a
- * degraded mode, it is design 3.1's explicitly unsupervised shape.
+ * In a browser this native bridge is absent. The dev-runner may still supervise the Engine;
+ * it does not expose Tauri's native event channel to the browser.
  */
 
 import { isTauriRuntime } from '../utils/tauriRuntime.js';
@@ -77,7 +77,8 @@ export function isRecovering(state: SupervisorState | null | undefined): boolean
 }
 
 /**
- * Subscribe to the shell's supervisor-state event.
+ * Subscribe, then obtain the current host's retained in-memory snapshot. An event received
+ * during the snapshot request wins over that snapshot; an old disk file is never consulted.
  *
  * Returns an unsubscribe handle (no-op outside Tauri or when subscription fails). A malformed
  * payload is IGNORED rather than passed on: this event exists to explain an outage, and a consumer
@@ -93,17 +94,35 @@ export async function installSupervisorStateBridge(
   }
   try {
     const { listen } = await import('@tauri-apps/api/event');
-    return await listen(TAURI_EVENT_NAME, (event: { payload?: unknown }) => {
-      const payload = event?.payload as SupervisorState | undefined;
-      if (!payload || typeof payload !== 'object' || typeof payload.state !== 'string') {
-        return;
-      }
-      onState(payload);
+    let receivedEvent = false;
+    const unsubscribe = await listen(TAURI_EVENT_NAME, (event: { payload?: unknown }) => {
+      if (!isSupervisorState(event?.payload)) return;
+      receivedEvent = true;
+      onState(event.payload);
     });
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const snapshot: unknown = await invoke('supervisor_state');
+      if (!receivedEvent && isSupervisorState(snapshot)) onState(snapshot);
+    } catch {
+      // Older hosts can still supply events when the snapshot command is unavailable.
+    }
+    return unsubscribe;
   } catch (err) {
     console.warn('[supervisorState] failed to subscribe to Tauri event:', err);
     return () => {
       /* no-op */
     };
   }
+}
+
+function isSupervisorState(value: unknown): value is SupervisorState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Partial<SupervisorState>;
+  return state.schemaVersion === 1
+    && state.kind === 'engine-supervisor-state.v1'
+    && ['starting', 'running', 'stopping', 'restarting', 'exhausted'].includes(state.state ?? '')
+    && Number.isInteger(state.incarnation)
+    && Number.isInteger(state.restartCount)
+    && Number.isInteger(state.maxRestartAttempts);
 }

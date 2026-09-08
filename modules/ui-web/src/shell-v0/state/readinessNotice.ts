@@ -74,6 +74,11 @@ const CAUSE_ROWS: ReadonlyArray<{
   severity?: ReasonSeverity;
 }> = [
   {
+    code: 'engine.restart_exhausted',
+    wording: 'JustSearch could not restart',
+    severity: 'error',
+  },
+  {
     // Tempdoc 637 #1 — FE-derived (declared in readiness-reason-codes.v1.json feDerived); the
     // backend never emits it. Minted by computeVerdict when the FE→backend binding is dead.
     code: 'binding.unreachable',

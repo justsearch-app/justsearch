@@ -82,9 +82,13 @@ describe('i18n boot — backend-ready re-attempt (941)', () => {
     hoisted.listeners.length = 0;
   });
 
-  it('boots once at module evaluation and again on the backend-ready edge', async () => {
-    await import('./i18n');
-    // The module's boot chain is async (resolveApiEndpoint); let it settle.
+  it('does no discovery at module evaluation, then boots on explicit startup and the ready edge', async () => {
+    const { startMessageCatalogs } = await import('./i18n');
+    expect(hoisted.bootstrapAggregateSubstrate).toHaveBeenCalledOnce();
+    expect(hoisted.resolveApiEndpoint).not.toHaveBeenCalled();
+    expect(bootCallCount()).toBe(0);
+    expect(hoisted.listeners).toHaveLength(0);
+    startMessageCatalogs('http://127.0.0.1:33221');
     await vi.waitFor(() => expect(bootCallCount()).toBe(1));
     expect(hoisted.listeners.length).toBe(1);
 
@@ -101,7 +105,8 @@ describe('i18n boot — backend-ready re-attempt (941)', () => {
   });
 
   it('fires on the edge only — a steady-state ready poll does no work', async () => {
-    await import('./i18n');
+    const { startMessageCatalogs } = await import('./i18n');
+    startMessageCatalogs('http://127.0.0.1:33221');
     await vi.waitFor(() => expect(bootCallCount()).toBe(1));
 
     emit({ status: {}, snapshotLive: true });
@@ -118,7 +123,8 @@ describe('i18n boot — backend-ready re-attempt (941)', () => {
   });
 
   it('a snapshot that is no longer live is not "ready"', async () => {
-    await import('./i18n');
+    const { startMessageCatalogs } = await import('./i18n');
+    startMessageCatalogs('http://127.0.0.1:33221');
     await vi.waitFor(() => expect(bootCallCount()).toBe(1));
     // Precision: `status !== null` alone must not pass — a retained-but-dead snapshot is the
     // stale-observation case `snapshotLive` exists to separate (807 A.3).
