@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
+import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.services.HeadAssembly;
 import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
@@ -19,16 +20,18 @@ final class HeadlessAppShutdownWiringTest {
   void everyReasonConfiguresInferenceCloseBeforeAssemblyClose() {
     for (Reason reason : Reason.values()) {
       HeadAssembly assembly = mock(HeadAssembly.class);
+      OperationLeaseService leases = mock(OperationLeaseService.class);
       var sequence =
           new EngineShutdownSequence(
               Path.of("build", "shutdown-wiring", reason.wire()),
               HeadlessApp.orderedShutdownSteps(
-                  null, assembly, null, null, null, null, null, null),
+                  null, assembly, null, null, null, null, null, null, leases, () -> null),
               code -> {});
 
       sequence.run(reason);
 
-      var order = inOrder(assembly);
+      var order = inOrder(leases, assembly);
+      order.verify(leases).freezeAdmission(reason.wire());
       order.verify(assembly).setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
       order.verify(assembly).close();
     }

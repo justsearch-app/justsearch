@@ -1092,6 +1092,11 @@ public class HeadlessApp {
       final KnowledgeServerHealthMonitor knowledgeServerHealthMonitorRef = workerResult.healthMonitor();
       final RuntimeManifestPublisher manifestPublisherRef = manifestPublisher;
       final AppInstanceLock appInstanceLockRef = appInstanceLock;
+      final io.justsearch.app.api.OperationLeaseService operationLeasesRef =
+          bootstrapRef.serviceOut().operationLeaseService();
+      final java.util.concurrent.atomic.AtomicReference<
+              io.justsearch.app.engine.ShutdownRequestWatcher>
+          shutdownRequestWatcherRef = new java.util.concurrent.atomic.AtomicReference<>();
       // Item B4: the ordered close is the composition root's (design 7.3). What is bound here is
       // each step to the object it closes — those objects live in this module and app-services, so
       // they cannot move into the root without inverting the ui -> app-engine edge.
@@ -1104,9 +1109,11 @@ public class HeadlessApp {
                   knowledgeServerHealthMonitorRef,
                   knowledgeServerRef,
                   manifestPublisherRef,
-                  infraPhase.tracingBootstrap(),
-                  telemetryRef,
-                  appInstanceLockRef),
+                   infraPhase.tracingBootstrap(),
+                   telemetryRef,
+                   appInstanceLockRef,
+                   operationLeasesRef,
+                   shutdownRequestWatcherRef::get),
               System::exit);
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
@@ -1155,6 +1162,7 @@ public class HeadlessApp {
                 }
               },
               io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS);
+      shutdownRequestWatcherRef.set(shutdownRequestWatcher);
       shutdownRequestWatcher.start();
 
       Runtime.getRuntime()
@@ -1233,7 +1241,7 @@ public class HeadlessApp {
   private record KnowledgeServerStartResult(KnowledgeServerBootstrap bootstrap, String startError) {}
 
   /**
-   * The eight ordered steps of design 7.3, bound to the objects they close.
+   * The concrete ordered steps of design 7.3, bound to the objects they close.
    *
    * <p>The ORDER and the error accounting belong to {@link
    * io.justsearch.app.engine.EngineShutdownSequence}; what belongs here is the binding, because
@@ -1248,10 +1256,27 @@ public class HeadlessApp {
           KnowledgeServerHealthMonitor healthMonitor,
           KnowledgeServerBootstrap knowledgeServer,
           RuntimeManifestPublisher manifestPublisher,
-          io.justsearch.telemetry.TracingBootstrap tracing,
-          Telemetry telemetry,
-          AppInstanceLock appInstanceLock) {
+           io.justsearch.telemetry.TracingBootstrap tracing,
+           Telemetry telemetry,
+           AppInstanceLock appInstanceLock,
+           io.justsearch.app.api.OperationLeaseService operationLeases,
+           java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
+               shutdownRequestWatcher) {
     return List.of(
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "operation-admission",
+            reason -> {
+              operationLeases.freezeAdmission(reason.wire());
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "shutdown-request-watcher",
+            reason -> {
+              io.justsearch.app.engine.ShutdownRequestWatcher watcher =
+                  shutdownRequestWatcher.get();
+              if (watcher != null) watcher.close();
+              return null;
+            }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "runtime-manifest",
             reason -> {

@@ -169,4 +169,34 @@ final class ShutdownRequestWatcherTest {
         "the watcher must own its executor; if this ever reads as an API or common-pool thread"
             + " name, the separation 7.3 requires has been refactored away");
   }
+
+  @Test
+  @DisplayName("closing from the accepted-request callback does not interrupt later shutdown work")
+  void closeFromOwnCallbackDoesNotInterruptLaterShutdownWork(@TempDir Path tempDir)
+      throws Exception {
+    Path runtime = runtimeDir(tempDir);
+    var watcherRef = new AtomicReference<ShutdownRequestWatcher>();
+    var interruptedAfterClose = new AtomicReference<Boolean>();
+    var laterStepRan = new CountDownLatch(1);
+    new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null).writeTo(runtime);
+
+    var watcher =
+        new ShutdownRequestWatcher(
+            runtime,
+            r -> true,
+            r -> {
+              watcherRef.get().close();
+              interruptedAfterClose.set(Thread.currentThread().isInterrupted());
+              laterStepRan.countDown();
+            },
+            20L);
+    watcherRef.set(watcher);
+    watcher.start();
+
+    assertTrue(laterStepRan.await(10, TimeUnit.SECONDS), "the callback must complete after close");
+    assertEquals(
+        Boolean.FALSE,
+        interruptedAfterClose.get(),
+        "self-interruption here would disrupt the ordered close steps after the watcher");
+  }
 }

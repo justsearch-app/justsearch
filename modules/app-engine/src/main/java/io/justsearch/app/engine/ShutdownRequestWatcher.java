@@ -58,6 +58,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
   private final long pollIntervalMs;
   private final AtomicBoolean fired = new AtomicBoolean();
   private volatile ScheduledExecutorService executor;
+  private volatile Thread workerThread;
 
   /**
    * @param runtimeDir the {@code <dataDir>/runtime/} directory to watch
@@ -88,6 +89,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
             r -> {
               Thread t = new Thread(r, THREAD_NAME);
               t.setDaemon(true);
+              workerThread = t;
               return t;
             });
     executor.scheduleWithFixedDelay(
@@ -153,7 +155,14 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
     ScheduledExecutorService e = executor;
     executor = null;
     if (e != null) {
-      e.shutdownNow();
+      if (Thread.currentThread() == workerThread) {
+        // The accepted request runs the ordered shutdown on this executor thread. Interrupting
+        // ourselves here would leave the interrupt flag set for every later close step.
+        e.shutdown();
+      } else {
+        e.shutdownNow();
+      }
     }
+    workerThread = null;
   }
 }

@@ -26,6 +26,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
@@ -119,6 +120,28 @@ class HeadAssemblyTest {
       SearchResponse response = bootstrap.workers().search().search(request);
       assertNotNull(response);
       assertNotNull(response.hits());
+    }
+  }
+
+  @Test
+  void shutdownDirectiveReachesHeldInferenceManager() throws Exception {
+    try (HeadAssembly assembly =
+        new HeadAssembly(
+            new NoopTelemetry(),
+            new ConfigManagerBootstrap(),
+            null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            null)) {
+      Field field = HeadAssembly.class.getDeclaredField("inferenceManager");
+      field.setAccessible(true);
+      io.justsearch.app.inference.InferenceLifecycleManager manager =
+          (io.justsearch.app.inference.InferenceLifecycleManager) field.get(assembly);
+
+      assembly.setStopGenerativeBackendOnClose(false);
+      assertFalse(manager.stopsServerOnClose());
+      assembly.setStopGenerativeBackendOnClose(true);
+      assertTrue(manager.stopsServerOnClose());
     }
   }
 

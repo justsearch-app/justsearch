@@ -270,6 +270,12 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   supervised restart leaves the previous watcher polling. The duplicates are idempotent (both call
   `observe_manifest`, which is provenance-checked) but they accumulate, and two watchers can both
   emit `backend-restart` for one instance change. Pre-existing shape, made reachable by B10.
+- **The review fix batch implements shutdown admission but cannot yet cancel interactive turns.**
+  The ordered sequence now freezes the existing `OperationLeaseService` first for every reason;
+  an upgrade reuses the preparation that already owns the barrier. Design 7.3 step 2 remains
+  deferred to C1 because the interactive context/admission front does not exist in stage B. The
+  shutdown binding's javadoc therefore describes concrete steps rather than claiming that all
+  eight conceptual steps are already implemented.
 
 ---
 
@@ -840,15 +846,19 @@ room, and B is additive, so the list is short.
    table (7.5). B's step 3 is "stop taking new work and checkpoint what exists". The 16
    `recovery, process` row's durable-operation clause is therefore **unmeasurable, not failing**;
    the evidence record must say unmeasurable, not passed. See §11.
-3. **The dead-Engine sandbox round may be unrunnable on the branch** — `build-installer.yml:57`'s
+3. **Shutdown step 2 cannot cancel interactive turns yet.** C1 owns the interactive context and
+   admission front that can identify and cancel those turns with a reason code. B freezes all new
+   mutation admission first for every shutdown reason; the cancellation half remains unmeasurable
+   until that C1 contract exists.
+4. **The dead-Engine sandbox round may be unrunnable on the branch** — `build-installer.yml:57`'s
    `environment: release-signing` refuses every ref but `main`, and a local build is blocked by
    Smart App Control. This is the same wall that left A13's packaging steps "changed, locally
    reasoned, never executed" (`stages/A.md` §10 row 5). It is an **unrunnable check, not a red**,
    and it is a checkpoint proof, so it needs the owner's word (Q1), not an agent's judgement.
-4. **`core.restart-worker` still answers `restart_required`** rather than restarting anything
+5. **`core.restart-worker` still answers `restart_required`** rather than restarting anything
    (`RestartWorkerHandler.java:61,74`). D1 retires the operation; B only makes the *requested
    restart* that answers it real (B15).
-5. **Readiness is still Worker-shaped.** `LifecycleReasonCode`'s `WORKER_*` vocabulary
+6. **Readiness is still Worker-shaped.** `LifecycleReasonCode`'s `WORKER_*` vocabulary
    (`:33,40,44,50`) and `readinessNotice.ts`'s rows survive B with corrected wording; the
    component re-cut is D1's. If Q4 says rename, one code moves and the rest wait.
 
