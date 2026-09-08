@@ -713,3 +713,15 @@ installs an in-place upgrade, and C2-1 lands the successor rule plus a release-d
 baseline so that boundary is paid once. `verified-facts.md` has a dated correction section for
 everything the pass found. C1 starts with batch 1 of `stages/C1.md` §12 once PR 718's hosted
 correction is green; C2 starts after C1's batch 2 has landed and been reviewed.
+
+Later stages designed (2026-09-09, design orchestrator, `worktree-lane-F-design`): `stages/E.md`
+is the gate-run runbook (values instantiated from the PR 0 baseline, instruments inventoried
+against every row of 16 with the two stale ones named for the E1 fix, runs bounded to fifty-five
+minutes, the split side measured on `origin/main` at E, the collector protocol, the three
+representative changes, the signed dead-Engine round, the record layout). `stages/D1.md`,
+`stages/D2.md` and `stages/F.md` are code-verified drafts at `be47faa40` with their decisions
+recorded in design section 0; each is re-grounded at its stage start because C1, C2 and the
+stage before it move the code. All five later-stage files follow the C1/C2 shape: §0
+corrections, §1 ledger, §3 items with runnable acceptance, §7 harness, §9 allowed reds, §11
+decisions, §12 batches (the briefs). The Codex agent implements from §12 of the current stage
+and never from a draft two stages ahead.
