@@ -432,36 +432,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /**
-     * Tempdoc 825 review F1: whether SUPERVISION has already stamped its terminal verdict on this
-     * capability. {@code worker.restart_exhausted} and {@code worker.spawn.failed} are both
-     * {@code FAULT}, so {@link io.justsearch.app.services.lifecycle.ReasonRetention} lets the
-     * incoming one win — which means this class's own final "start failed" stamp would erase the
-     * supervisor's verdict on every boot where supervision engaged and gave up. That is not merely a
-     * cosmetic loss: {@link BootRecoveryDecision}'s permanent veto reads this exact slot, so the
-     * erasure would silently convert "supervision gave up, stop for good" into "nobody knows, keep
-     * re-attempting" — the second restart authority the tempdoc-627 review forbade.
-     */
-    private boolean supervisionVerdictHeld() {
-        return LifecycleReasonCode.WORKER_RESTART_EXHAUSTED
-            .code()
-            .equals(workerCapability.pendingReason());
-    }
-
-    /**
-     * Whether a supervisor is alive right now and holding the restart budget.
-     *
-     * <p><b>Always false since lane F stage A item A11</b>, which deleted {@code WorkerSpawner} and
-     * with it the only supervisor the Worker ever had. Kept rather than removed because
-     * {@link BootRecoveryDecision}'s {@code SUPERVISION_ENGAGED} veto has a named, dated future
-     * producer — design 7.1's one supervisor contract, landing at stage B — so deleting the veto
-     * now would mean re-adding it then. Stage A §10 records the loss: no crash detection, no
-     * restart budget, no cooldown, no stability window.
-     */
-    public boolean supervisionActive() {
-        return false;
-    }
-
-    /**
      * Tempdoc 825: whether a knowledge-port client is bound (it was a gRPC client until lane F
      * stage A item A6 made the port an in-process call). This is the discriminator between the health
      * monitor's two arms — a bound client means the bootstrap is up and {@link #checkHealth()} owns
@@ -669,15 +639,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /**
-     * Tempdoc 915 R1: whether a verdict is one of the two fatal INDEX causes, which are the ones a
-     * respawn cannot change — the condition lives in the index directory, not in the process.
-     */
-    private static boolean isIndexFatal(LifecycleReasonCode code) {
-        return code == LifecycleReasonCode.WORKER_INDEX_CORRUPT
-                || code == LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH;
-    }
-
-    /**
      * The remedy sentence behind the latched fatal index verdict, or {@code null} if none stands.
      * Read by the Head so {@code knowledgeServerStartError} names the refusal instead of the spawn
      * symptom ("Worker process crashed (exit code 1) before writing port to signal file"), which is
@@ -697,39 +658,18 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /**
      * Applies a {@link #workerDownCode} verdict to the capability as DEGRADED. Visible for tests.
      *
-     * <p>Review F1: this is the ONE funnel for every worker-down verdict this class produces
-     * ({@code start()}'s per-attempt catch, the health-budget branch, {@code startWithRetry}'s final
-     * catch, and {@code checkHealth}'s worker.lost), so the "do not overwrite supervision's terminal
-     * verdict" rule lives here rather than at four call sites that would drift.
-     * {@code worker.restart_exhausted} and the codes below are all {@code FAULT}, so
-     * {@link io.justsearch.app.services.lifecycle.ReasonRetention} lets the incoming one win — and
-     * losing it is not cosmetic: {@link BootRecoveryDecision}'s permanent veto reads this exact slot,
-     * so an overwrite silently converts "supervision gave up, stop for good" into "nobody knows, keep
-     * re-attempting".
-     *
-     * <p>The two fatal INDEX verdicts ({@link #isIndexFatal}) are the exception, and they are computed
-     * BEFORE the guard so the unrepeatable marker is still consumed: they explain WHY supervision
-     * exhausted itself and are strictly better information (their {@code STICKY} class says the same).
-     * Tempdoc 915 R1 widened this from corruption alone — the schema-mismatch refusal is the same kind
-     * of fact, and leaving it out meant a FAIL_CLOSED boot narrated {@code worker.spawn.failed}.
+     * <p>Every worker-down path uses this funnel. Fatal index evidence is consumed before
+     * narration suppression, so a recovery arc can later publish its actual terminal cause.
      */
     void transitionWorkerDown(LifecycleReasonCode generic, String detail) {
         WorkerDown down = workerDownCode(generic, detail);
         if (narrationSuppressed()) {
-            // Review F7: the suppression rule lives in the funnel too, for the same reason the
-            // supervision guard does — it was applied at three of the four worker-down sites and
+            // Review F7: suppression was applied at three of the four worker-down sites and
             // missed the health-budget branch, which is reachable mid-recovery (the attempt's worker
             // spawns and answers gRPC but never becomes healthy) and flapped the arc out of
             // RECOVERING. Any future site inherits the rule instead of having to remember it.
             log.debug(
                 "Suppressing worker-down narration ({}): a retry or recovery arc owns it",
-                down.code().code());
-            return;
-        }
-        if (supervisionVerdictHeld() && !isIndexFatal(down.code())) {
-            log.warn(
-                "Not overwriting supervision's terminal {} with {}: the supervisor's verdict stands",
-                LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(),
                 down.code().code());
             return;
         }

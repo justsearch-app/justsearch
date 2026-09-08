@@ -717,6 +717,15 @@ Each has one implementer and independent review. New findings are separate
 items; after two worker review rounds the orchestrator takes the diff. New raw
 logs remain outside Git; committed evidence carries summaries and hashes.
 
+**B14 Java retirement cut (orchestrator, 2026-09-08).** The already-decided local
+recovery veto retirement is implemented separately from B11-B12 in
+`codex/lane-f-b14-local-recovery`, with root as sole implementer. This lets bounded
+Java work proceed without changing the child-registry worker's brief or sharing its
+worktree/build slot. It removes the old host-to-Java veto path; it does not add a
+supervisor-file reader. The orphan reason enum, UI row and producer exemption are
+removed in the same cut, as the readiness gate requires. The current-host UI
+projection and R7 host probes remain in B13-B14; this cut does not close B14.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

@@ -689,7 +689,7 @@ final class InferenceHandlers {
    *
    * <p>An accepted request is 202 with the verdict, not 200: the attempt is SCHEDULED (a worker boot
    * takes tens of seconds — spawn, port discovery, health budget), and claiming 200/"restarted"
-   * would be the same over-claim this tempdoc exists to remove. A vetoed or exhausted request keeps
+   * would be the same over-claim this tempdoc exists to remove. An exhausted request keeps
    * 503, because it names a state that will not change by itself.
    */
   private boolean routeToRecoveryAuthority(Context ctx) {
@@ -703,26 +703,13 @@ final class InferenceHandlers {
         ctx.status(202).json(Map.of("success", true, "recovery", verdict.name()));
         return true;
       }
-      // Still supervised: a TEMPORARY refusal. Supervision owns the worker for now and this arm
-      // re-evaluates every tick, so retrying really can succeed — SERVICE_UNAVAILABLE (TRANSIENT,
-      // retryable) is the truth here.
-      case VETOED_SUPERVISION -> {
-        ctx.status(503)
-            .json(
-                ApiErrorHandler.toResponse(
-                    ApiErrorCode.SERVICE_UNAVAILABLE,
-                    "The knowledge server is being restarted by its supervisor — retry shortly",
-                    telemetry,
-                    ApiErrorHandler.routeOf(ctx)));
-        return true;
-      }
-      // Terminal: the budget is spent, or supervision itself gave up. The live leg (run 2) caught
+      // Terminal: the local recovery budget is spent. The live leg (run 2) caught
       // this answering `errorClass: TRANSIENT, retryable: true` for a state where the very next
       // request provably returns the same thing until the application restarts — a retry hint the
       // client cannot act on. PERMANENT (hence retryable=false, derived from the class) plus the
       // one honest remedy. The HTTP status stays 503: the service genuinely is not serving, which a
       // 500 would misreport as an internal fault.
-      case VETOED_RESTART_EXHAUSTED, EXHAUSTED -> {
+      case EXHAUSTED -> {
         ctx.status(503)
             .json(
                 ApiErrorHandler.toResponse(

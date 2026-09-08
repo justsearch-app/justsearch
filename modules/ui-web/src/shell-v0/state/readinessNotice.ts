@@ -234,7 +234,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   // budget is spent, so nothing is retrying any more. Distinct wording is the whole point of the code:
   // `worker.spawn.failed` now means "failed, recovery pending or in flight", and telling a user that
   // while the Head keeps re-attempting reads as a dead end it isn't. No one-click remedy — a respawn is
-  // exactly what just failed four times ⇒ Open-Health fallback, mirroring worker.restart_exhausted.
+  // exactly what just failed four times ⇒ Open-Health fallback.
   {
     code: 'worker.spawn_recovery_exhausted',
     wording: 'The knowledge server failed to start and could not be recovered',
@@ -246,14 +246,6 @@ const CAUSE_ROWS: ReadonlyArray<{
     code: 'worker.recovering',
     wording: 'The knowledge server is restarting',
     severity: 'info',
-  },
-  // Tempdoc 627 — terminal give-up: the supervisor exhausted its restart budget and stopped retrying.
-  // Distinct from transient codes; does not self-recover. No one-click remedy (a worker respawn is
-  // what just failed) ⇒ Open-Health fallback, mirroring worker.spawn.failed.
-  {
-    code: 'worker.restart_exhausted',
-    wording: 'The knowledge server stopped responding and could not be recovered',
-    severity: 'error',
   },
   // Tempdoc 837 S3 — the worker WAS serving and stopped answering. `worker.spawn.failed` told these
   // users their knowledge server "failed to start", which is false: it started fine and then died.
@@ -524,7 +516,6 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   'worker.starting',
   'worker.recovering',
   'worker.spawn.failed',
-  'worker.restart_exhausted',
   // Tempdoc 825 — the boot-recovery budget is spent and no worker is serving. Same rule as its
   // siblings: omission would let the banner claim "search is fully working" over nothing at all.
   'worker.spawn_recovery_exhausted',

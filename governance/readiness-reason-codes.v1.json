@@ -71,11 +71,5 @@
     }
   ],
   "emissionDirectionNote": "Lane F stage A checkpoint. checkProducers asks whether a code is MENTIONED; checkEmissions asks whether it is PRODUCED — mentioned in a value position rather than only compared against or logged. The weaker question let two passes of a design document disagree about whether WORKER_RESTART_EXHAUSTED had a producer while this gate certified both. awaitingProducer is the declared escape hatch: a code whose producer is scheduled but unwritten stays visible and owned instead of being indistinguishable from a live one. The gate also reds when a declared entry gains a producer, so the list cannot rot into a permanent exemption.",
-  "awaitingProducer": [
-    {
-      "code": "worker.restart_exhausted",
-      "owner": "lane-F/B",
-      "why": "Lane F stage A deleted the Worker process and with it the only thing that could give up on restarting it. All four main-source sites are consumers: KnowledgeServerBootstrap.java:444-447 and KnowledgeServerHealthMonitor.java:342-344 compare it against pendingReason(); KnowledgeServerBootstrap.java:729-732 and KnowledgeServerHealthMonitor.java:498-500 pass it to a logger. Nothing transitions to it, so supervisionVerdictHeld() is permanently false and BootRecoveryDecision SUPERVISION_ENGAGED plus its terminal-verdict branch are inert. Kept rather than deleted because design 7.1 lands a real supervisor with a kill path and a restart budget at stage B, which is the producer. Stage B clears this entry by adding the emit site."
-    }
-  ]
+  "awaitingProducer": []
 }

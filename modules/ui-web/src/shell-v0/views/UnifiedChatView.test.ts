@@ -430,7 +430,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
   it('a severe (error) verdict opens expanded even in Simple, with no collapse chevron', async () => {
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['worker.restart_exhausted'] });
+    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['worker.spawn_recovery_exhausted'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).not.toBeNull();
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-collapse"]')).toBeNull();
@@ -489,7 +489,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
     setUiMode('advanced');
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['worker.restart_exhausted'] });
+    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['worker.spawn_recovery_exhausted'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).not.toBeNull();
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-collapse"]')).toBeNull();

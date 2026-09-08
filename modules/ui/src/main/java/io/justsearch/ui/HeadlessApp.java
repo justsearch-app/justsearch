@@ -537,15 +537,11 @@ public class HeadlessApp {
       // Deliberately NO transition here. The bootstrap that just failed is the producer of this
       // verdict and has already narrated it exactly once (startWithRetry's final catch), with the
       // code it actually knows to be true — worker.spawn.failed, either fatal index code
-      // (worker.index_corrupt / worker.index_schema_mismatch), or supervision's terminal
-      // worker.restart_exhausted, which that catch now explicitly refuses to overwrite (review F1:
-      // both are FAULT, so ReasonRetention lets an incoming spawn-failed win, and before the guard the
-      // restart_exhausted case could never survive a real boot). Tempdoc 915 R1 added the
-      // schema-mismatch code and the latch that carries either fatal index cause across the three
+      // (worker.index_corrupt / worker.index_schema_mismatch). The fatal-index latch carries the
+      // specific cause across the three
       // SUPPRESSED start attempts that each consumed the one-shot marker — without it this branch
       // logged, and /api/health served, the generic spawn failure for a deliberate refusal.
-      // Re-stamping the generic code here would destroy the specific one all over again — and the
-      // boot-recovery veto reads exactly that slot to decide whether supervision's verdict stands.
+      // Re-stamping the generic code here would destroy that specific cause all over again.
       healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer);
       log.warn(
           "Knowledge Server failed to start: {} (worker reason: {}) — boot recovery armed",

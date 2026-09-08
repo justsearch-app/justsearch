@@ -103,13 +103,7 @@ public final class IsolatedBackendFixture {
    * trying, so every remaining millisecond of the health budget is spent waiting for nothing.
    */
   private static final List<String> TERMINAL_WORKER_REASONS =
-      List.of(
-          "worker.spawn_recovery_exhausted",
-          // Tempdoc 825 review F2(b): supervision's own give-up is equally terminal — boot recovery
-          // deliberately does NOT supersede it (owner decision 2), so nothing will retry from here
-          // either. Without this row that whole path kept the blind 240s wait charter item 3 exists
-          // to remove.
-          "worker.restart_exhausted");
+      List.of("worker.spawn_recovery_exhausted");
 
   private final String ownerLabel = resolveOwnerLabel();
 
