@@ -284,6 +284,18 @@ public final class HeadAssembly implements AutoCloseable {
     return serviceOut;
   }
 
+  /**
+   * Configures whether closing this assembly also stops its managed generative backend.
+   *
+   * <p>The ordered Engine shutdown calls this immediately before {@link #close()}. Restart and
+   * hang shutdowns leave llama-server alive for adoption; quit and upgrade shutdowns stop it.
+   */
+  public void setStopGenerativeBackendOnClose(boolean stop) {
+    if (inferenceManager != null) {
+      inferenceManager.setStopServerOnClose(stop);
+    }
+  }
+
   /** Create a bootstrap that wires the shared pipeline-backed search runtime. */
   public HeadAssembly(
       Telemetry telemetry,

@@ -1241,7 +1241,7 @@ public class HeadlessApp {
    * Each step is named for the resource it releases, since that name is what appears in the
    * receipt's {@code errors} list and in the log line a support session reads.
    */
-  private static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
+  static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
       orderedShutdownSteps(
           LocalApiServer apiServer,
           HeadAssembly bootstrap,
@@ -1273,7 +1273,10 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "head-assembly",
             reason -> {
-              if (bootstrap != null) bootstrap.close();
+              if (bootstrap != null) {
+                bootstrap.setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
+                bootstrap.close();
+              }
               return null;
             }),
         // The one step whose outcome the receipt reports. Named INDEX_HALF_STEP in the sequence so
