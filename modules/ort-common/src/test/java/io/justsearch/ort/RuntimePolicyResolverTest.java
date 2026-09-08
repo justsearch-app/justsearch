@@ -2,6 +2,7 @@ package io.justsearch.ort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.configuration.model.HardwareProfile;
@@ -33,6 +34,46 @@ class RuntimePolicyResolverTest {
     assertEquals("kSameAsRequested", onGpuFull.arena().extendStrategy());
     assertEquals("kSameAsRequested", onCpuOnly.arena().extendStrategy());
     assertEquals("kSameAsRequested", onSandbox.arena().extendStrategy());
+  }
+
+  @Test
+  @DisplayName("PR 0b: intraOpThreads is UNSET by default — ORT keeps its own choice")
+  void intraOpThreadsUnsetByDefault() {
+    // The default must be null, not a number: any number would silently re-partition every
+    // GEMM's reduction on every existing deployment, which is a behaviour change disguised as
+    // a default.
+    assertNull(
+        RuntimePolicyResolver.resolve(CFG, HardwareProfile.gpuFull(12_000_000_000L))
+            .session().intraOpThreads());
+    assertNull(
+        RuntimePolicyResolver.resolve(CFG, HardwareProfile.cpuOnly()).session().intraOpThreads());
+  }
+
+  @Test
+  @DisplayName("PR 0b: a positive justsearch.onnxruntime.intra_op_threads reaches the session")
+  void intraOpThreadsPinReachesTheSession() {
+    ResolvedConfig pinned =
+        TestResolvedConfigHelper.fromEntries(
+            java.util.Map.of("justsearch.onnxruntime.intra_op_threads", "1"));
+    assertEquals(
+        1,
+        RuntimePolicyResolver.resolve(pinned, HardwareProfile.cpuOnly())
+            .session().intraOpThreads());
+  }
+
+  @Test
+  @DisplayName("PR 0b: a non-positive intra-op count is ignored rather than passed to ORT")
+  void intraOpThreadsNonPositiveIsIgnored() {
+    // ORT rejects a non-positive intra-op count; resolving it to null leaves ORT's default
+    // instead of failing session creation on a typo.
+    for (String bad : java.util.List.of("0", "-1")) {
+      ResolvedConfig cfg =
+          TestResolvedConfigHelper.fromEntries(
+              java.util.Map.of("justsearch.onnxruntime.intra_op_threads", bad));
+      assertNull(
+          RuntimePolicyResolver.resolve(cfg, HardwareProfile.cpuOnly()).session().intraOpThreads(),
+          "intra_op_threads=" + bad + " must leave ORT's default");
+    }
   }
 
   @Test

@@ -438,17 +438,279 @@ class "ordering of equal-score hits"; the width of a tie is a mechanism detail (
 two consecutive captures of **one** build against **one** index: over 118 identity-matched hits the
 score delta was non-zero on 111, max 0.009442, mean 0.001658 — GPU float nondeterminism in the
 dense / cross-encoder legs. In the same data *no* adjacent score gap was zero, so exact-equality
-grouping yields all-singleton groups and permits nothing. The fixture declares
-`scoreTieEpsilon: 0.01` — just above the observed max jitter, below all but 3 of the 108 adjacent
-gaps (smallest 0.003652). Consequences: `queries.hits[].score` is **not** a declared field and is
+grouping yields all-singleton groups and permits nothing. That calibration was against the
+DELIVERED score and gave `0.01` — just above the observed max jitter, below all but 3 of the 108
+adjacent gaps (smallest 0.003652). It is superseded on both counts: the grouping basis is now the
+cross-encoder score, whose measured cross-build jitter is `0.0000`, and the committed epsilon is
+`0.001`, derived from the CE-score gap distribution (below). Consequences: `queries.hits[].score` is **not** a declared field and is
 not in the diffed capture (observed values go to the capture's non-diffed `observed` block); the
 differ never compares scores, only the groups it derives from them; and the tie-group partition is
 consulted **only when the delivered order actually changed** — an unconditional partition
 comparison is itself jitter-sensitive (measured: one query's hits were identical in identity *and*
 order, but a gap moved 0.010470 → 0.009788 across the epsilon and the query read as a regression
-with nothing changed). Grouping is over *consecutive* hits and the delivered order is not
-score-sorted (`SearchResultMapper.java:133` applies freshness decay per hit without re-sorting), so
-the grouping is deliberately conservative: it under-permits, never over-permits.
+with nothing changed). Grouping is over *consecutive* hits, so it is deliberately conservative: it
+under-permits, never over-permits.
+
+**Which score is grouped on: the cross-encoder's, because that is the delivered sort key.** The
+list arrives in the cross-encoder's order — `KnowledgeSearchEngine.java:1077` applies
+`applyRerankOrder(…)` — while the score carried *on* the hit is the pre-rerank fusion score,
+freshness-decayed afterwards without re-sorting (`SearchResultMapper.java:129-134`, on for `hybrid`
+via `SearchPipelinePresets.java:53-54`). Grouping on that number grouped a CE-ordered list by an
+unrelated key: measured non-monotone in **all 12 queries of both** 2026-09-07 captures, 7–11
+inversions per 20 hits. The CE's own per-hit score is on the wire as a `CROSS_ENCODER` `HitStage`
+(`SearchTraceMapper.java:44-51`, `contracts/wire/knowledge.proto:289-294`) and is not gated by
+`include_detail`, so the capture reads it as the score-tagged `score`. The delivered and fusion
+scores stay in the non-diffed `observed` block (`scores`, `fusionScores`), with `scoreBasis`
+recording per query which number grouped. A query the CE did not score every hit for (a
+lexical/TEXT fallback, or hits outside the rerank window) falls back to the delivered score for the
+**whole** query — a list mixing two bases would have epsilon comparing different scales.
+
+**The scale is measured, not assumed.** The cross-encoder emits raw,
+unsigmoided model output (`CrossEncoderReranker.java:369-379` returns the logits directly; the only
+sigmoid in that module belongs to `CitationScorer`, a different class), so the epsilon — derived
+against the roughly 0–1 *delivered* score — had to be re-checked against the real scale. Measured
+on a real `debug:true`, `limit:20` response over `docs/explanation`: 20 cross-encoder scores
+spanning **−3.0566 … +0.2603** (span 3.32), **17 of them negative**. It is therefore neither a 0–1
+score nor the ±11 a generic ms-marco model would suggest; reading only the top three hits (0.26,
+0.14, 0.019) makes it look normalised, which is an artefact of the best hits sitting near zero. On
+that scale `0.01` leaves only 2 of the 19 adjacent gaps inside the epsilon (smallest 0.001404) —
+the same profile the original calibration had (below all but 3 of 108 gaps). That kept it
+defensible; the wider six-capture gap distribution below is what later moved it to `0.001`. Still
+unmeasured at this point was the cross-encoder's *jitter* across two runs: that needs a pair
+with `observed.crossEncoderScores` on both sides, then the per-hit delta over identity-matched hits.
+
+**A dropped cross-encoder fails capture health.** When the stage is skipped for a drop reason
+(`INFERENCE_FAILED`, `DEADLINE_EXCEEDED`, `MODEL_NOT_LOADED`, `RPC_FAILED`, `UNKNOWN`) the results
+keep their fusion order, so the capture records a *different pipeline's* output. Both sides of a
+pair degrade together, so the diff gets **quieter**, not noisier — the dangerous direction. Pair run
+3 read as "2 regressions, nearly clean" while every query showed `cross-encoder: skipped /
+INFERENCE_FAILED`, caused by a `JUSTSEARCH_RERANK_TOP_K=100` pin that pushed the rerank batch from
+20 to 100 documents into an ONNX Runtime arena failure. That pin has been removed; the health check
+makes a green earned by disabling the reranker impossible to mistake for a clean pair.
+
+**`equal-score-order` covers the tie group straddling the rank-K cutoff, because equal-score hits
+beyond K are unobserved at K** (K = the query spec's `limit`, 10 in the shipped fixture). Measured
+on the 2026-09-07 paired capture: `q06` (tie-group score 0.121) and `q10` (0.236) each reported
+"tie group N is not a permutation" with *one* member of the bottom tie group differing — index-time
+GPU embedding jitter moved near-tied chunks across the rank-10 cutoff, so a swap with a member
+sitting at rank 11 read as a membership change. That is still "ordering of equal-score hits", now
+across the K boundary, so it stays in the existing class; **no fourth class was added**. Capture
+side: the request asks for `2 * K`, and `hits[]` stores the top K *plus* the remainder of the tie
+group holding rank K, dropping everything after that group. `hitCount` deliberately stays the
+**top-K** count (`min(returned, K)`) — it is diffed `exact`, and a legitimate 11-vs-12 cutoff-group
+size must not fail on it; `hitsCaptured` / `hitsCompared` go in the capture's non-diffed `observed`
+block for the same reason. Diff side: groups *above* the cutoff group keep the rules described
+above, and the cutoff group is compared as an unordered **set** over its full observed membership —
+any permutation allowed, a member absent from the other side's group is a regression, and the
+`extractionReasonCode` subset rule still applies to members present on both sides. It **fails
+closed** when the cutoff group runs to the end of a full 2K response (or an older capture records no
+`hitsCaptured`): the group may continue past what was observed, so its membership is unproven.
+
+**The capture requests `captureLimitMultiplier * K` (4K), and the multiplier is declared.** K is
+what gets compared; the extra breadth does two jobs. It makes the cutoff tie group observable
+whole, and it puts the **cross-encoder window** well past the compared K. The window is the request
+limit (`searchLimit = max(requestedLimit, rerankConfig.topK())`, `KnowledgeSearchEngine.java:625-629`;
+window = `min(topK, results.size())`, `:969-970`), so at 2K it ended *exactly* at the captured set
+and a chunk whose fusion rank jittered across rank 20 was reranked on one build and not the other —
+the three unmatched hits at ranks 7–8 of pair run 4. At 4K a hit near compared rank 10 has to move
+~30 fusion ranks to fall out of the window. `limit` also feeds the candidate budget / collapse
+limit / rerank pool, so the top-K set at one multiplier is not guaranteed identical to another's:
+both sides of a pair must use the same one. Re-capture both sides.
+
+**The rerank window and its arena move together, or the reranker dies.** `JUSTSEARCH_RERANK_TOP_K`
+sets *both* the wire limit and the cross-encoder batch, and that batch is one un-split tensor padded
+up to a bucket from `{4,8,16,24,32,48,64}` (`CrossEncoderReranker.BATCH_SIZE_BUCKETS`). Pair run 3
+pinned `top_k=100`, which is outside the ladder entirely, and exhausted the default 2048 MB arena on
+every query. The capture now pins `JUSTSEARCH_RERANK_TOP_K=40` (pads to bucket 48) with
+`JUSTSEARCH_RERANK_GPU_MEM_MB=4096`, sized to hold the per-row headroom the working configuration
+had rather than guessed:
+
+| docs | padded bucket | arena | MB per padded row | outcome |
+|---|---|---|---|---|
+| 20 | 24 | 2048 | 85.3 | worked |
+| 40 | 48 | **4096** | **85.3** | this capture |
+| 100 | 100 | 2048 | 20.5 | `INFERENCE_FAILED` |
+
+The active reranker is 12-layer / 12-head / 768-hidden (`models/onnx/reranker/config.json`,
+`NewForSequenceClassification` — not the MiniLM backup), so one layer's attention scores at bucket
+48 and sequence 512 are roughly 576 MB: inside 4096, not comfortably inside 2048. If the reranker
+drops again the ladder steps **down**, not up — `top_k=30` (bucket 32) at 3072 MB, else the known-good
+20 at 2048.
+
+**CPU encoders work, and are too slow to capture with (measured).** The theory holds: CUDA
+kernels reduce in a nondeterministic order, so the same text embeds to slightly different vectors
+on two runs, and those vectors move fusion candidates *upstream of every candidate budget* — which
+is why no budget pin removed it. ONNX Runtime on the CPU execution provider is bit-deterministic
+for a fixed thread count. But measured on this corpus: after the 15-minute enrichment wait,
+document embeddings were at **38%** and **0 of 1,283 chunks** had been embedded, at four intra-op
+threads. A cycle would exceed an hour and a pair two.
+
+So `fixture-pair.sh` does not set them. The keys stay as documented instruments and the capture
+*records* them when they are set, so a bit-stable capture is legible as one, but they are not
+required and a GPU capture is not failed for lacking them. The per-role provider keys
+(`justsearch.embed.gpu.enabled`, `justsearch.splade.gpu_enabled`, `justsearch.ner.gpu_enabled`,
+`justsearch.rerank.gpu.enabled`, `justsearch.bgem3.gpu_enabled`) already existed;
+`justsearch.onnxruntime.intra_op_threads` was added because `SessionOptionsApplier.applyBase` never
+set the intra-op count for production sessions, and on CPU that count decides a GEMM's reduction
+order and therefore an embedding's low bits. GPU encoder jitter is handled instead by the noise
+pair below.
+
+## Gating with a noise pair
+
+**Determinism is measured, not assumed.** Five paired rounds established that some fields are
+simply not stable on this stack. The gate therefore captures each side **N times on one build**
+(default three), each on a fresh ingest of the same corpus, and those captures *define what
+"within noise" means for each field*:
+
+```bash
+bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/split  compact 33221 3   # capture-1..3
+bash scripts/jseval/lane-f/fixture-pair.sh tmp/gate/single compact 33221 3
+bash scripts/jseval/lane-f/fixture-gate.sh tmp/gate/split tmp/gate/single report.json
+```
+
+`fixture-gate.sh` uses **every** `capture-*.json` in each directory (`capture-1` is the primary),
+so adding a cycle deepens the gate with no other change.
+
+**Why three and not two.** Gate run 3 had `q05` and `q12` differ across sides while being *stable
+within both sides' two-capture pairs*, on one build. Two draws under-sample: a field can agree once
+and disagree on the next, so the pair reported a stability it had not established. A field is
+therefore noisy when **any two** of a side's captures disagree — every pair is compared, so a field
+counts as stable only when every capture agreed with every other. A side that brings only one
+capture is **refused** (`no noise captures on <side>`) rather than judged stable by default, which
+is the direction that silently passes.
+
+`diff` gains repeatable `--baseline-noise` / `--candidate-noise`. Per compared field it first asks
+whether the field is stable *within* a side, then whether it differs *between* sides. A field any
+two of a side's captures disagree on is reported `noisy-baseline` / `noisy-candidate` /
+`noisy-both`, counted under `counts.noisy`, and **excluded from the regression verdict** — a difference the same build
+produces against itself cannot evidence a difference between two builds. The verdict the gate
+*would* have returned is kept on the entry as `crossSideStatus`, so nothing is hidden. Without the
+two flags, `diff` behaves exactly as before.
+
+This is the alternative to two worse options. Declaring the unstable fields non-exact would blind
+the gate to real regressions in them forever — the class would swallow the signal with the noise.
+Pinning the pipeline hard enough to silence them (CPU encoders) costs over an hour per cycle and
+stops measuring the shipping configuration.
+
+**A capture on a partially enriched index is refused.** `fixture-cycle.sh` exits non-zero without
+capturing when the enrichment wait fails, `fixture-pair.sh` retries that cycle once from a hard
+clean, the capture records `provenance.enrichment` (index state, per-stage enabled flags, coverage
+percentages, pending counts) read at capture *start*, and `capture_health` refuses a capture whose
+enabled stages are not complete. The verdict is
+`jseval.readiness._check_pipeline_complete_conditions` **imported**, not restated — two copies of
+"is the index ready" drift, and then a capture can satisfy the ingest wait while failing the
+capture check. This gap is why the first four-capture acceptance passed with 0 regressions: one
+side captured a half-enriched index, disagreed with *itself* on 11 of 12 queries, and every
+disagreement was withdrawn as noise.
+
+**A capture whose chat turns had no live engine is refused, and liveness is not
+`activation.state`.** All six captures of the 2026-09-07 acceptance recorded
+`provenance.aiRuntimeState: "failed"` while the engine was demonstrably answering — their chat
+turns terminated `done` with per-turn `samplingApplied` read off `session_started`. The field was
+simply the wrong one. `activation.state` is the outcome of the last activation **procedure**;
+liveness is the realized identity under `active`, which the backend projects only while the engine
+is online. The dev-MCP reads it that way after the same false negative bit it
+(`scripts/dev/justsearch-dev-mcp/server.mjs:2680-2687`, tempdoc 842 review D3/N1): an engine
+brought up by AI **autostart** never runs the activation state machine at all, so
+activation-completed alone is a false negative there.
+
+Three things follow, and all three are now in place. `fixture-cycle.sh` **pre-checks** before
+firing `activate` — if the engine is already online on the requested profile it does not
+re-activate, which both avoids tearing down a healthy engine for a needless GPU self-test and
+closes the race in which autostart brings the engine back during the ingest wait after the
+script's own opening `deactivate`. It then polls on engine-online **and** profile-match rather
+than on `activation.state == "completed"`, keeps the `activate` response (a 4xx there used to
+vanish into `/dev/null`, making a refused activation indistinguishable from a slow one), and
+**exits 4** rather than capturing chat turns no model answered — the same shape as the
+enrichment refusal above, and `fixture-pair.sh` retries it once from a hard clean. The capture
+records **both** signals (`aiRuntimeState` beside `aiRuntimeOnline` / `aiRuntimeOnlineSignal` /
+`aiRuntimeVariantId` / `aiRuntimeModelFile`), because a failed activation procedure standing
+beside a live engine is worth seeing. And `capture_health` refuses a capture that ran chat turns
+without engine-online evidence — including one that never recorded it, since an unknown that
+reads as healthy is exactly how the half-enriched side passed the four-capture acceptance. A
+`--skip-chat` capture is exempt: it measures search alone.
+
+What made the failed activation itself is *not* established. Each cycle tears its data dir down
+with `--clean hard`, which takes the activation status file and the head log with it, so the
+`errorCode` from those six runs is gone. That is why the script now writes `diag-N-ai-activate.json` and `diag-N-ai-status.json` beside
+each capture — per capture, since a side runs N cycles into one directory: the next occurrence is
+diagnosable from the artifact. The `diag-` prefix is not cosmetic. `fixture-gate.sh` used to
+select a side with a `capture-*.json` shell glob, so the first naming (`capture-N-ai-status.json`)
+was read AS a capture: the acceptance re-run reported "captures per side: baseline=6" for three
+real captures and marked the three diagnostics UNHEALTHY with `chatProfile None`. Selection now
+goes through `workflow-fixture side-captures`, which matches `capture-<digits>.json` exactly and
+orders by cycle number; the prefix is the second, independent reason the collision cannot recur.
+
+**Per-side noise fractions include `noisy-both`.** A field unstable on both sides is unstable on
+each, so it counts towards both fractions. Counting only a side's exclusive noise understated
+every side sharing an unstable field with the other — the same acceptance measured baseline 9
+exclusive + 6 both and scored 9/222 = 4%, under the ceiling, when the honest figure is 15/222 =
+6.8%.
+
+**The withdrawal is bounded.** `maxNoisyFraction` (fixture key, `0.05`) refuses the whole run when
+a side's noise pair moves more than that share of compared fields. That is about 10 of the shipped
+fixture's ~209 compared fields — roughly twice the 6 that pairs 4 and 5 actually measured. At
+`0.10` the gate would tolerate about triple today's noise before objecting, which catches only a
+*collapse* into noise; at `0.05` it also notices a *drift towards* it, with clear headroom above
+what has been observed. Raise it only against a measurement, the same way `scoreTieEpsilon` is set. Every noisy field leaves the
+verdict, so without a ceiling a pipeline degraded on *both* sides — a dropped reranker, an
+unfinished enrichment — would present as a very quiet diff with most fields silently excluded, and
+"almost nothing was compared" would read as "nothing regressed". A noise capture whose `pins`,
+`samplingApplied` or `chatProfile` differ from its own side's primary is refused for the same
+reason: it is a second configuration, so the noise it reports belongs to the configuration change
+rather than to the build. A field *absent* from a noise capture is not called noisy — absent
+evidence of instability leaves it in the verdict, so a truncated noise capture can only make the
+gate stricter, never laxer.
+
+**The cross-encoder score is deterministic across builds (measured), and `scoreTieEpsilon` is
+derived from the score distribution, not chosen.** Pair run 4, over 117 identity-matched hits
+between two fresh ingests of one corpus on one build: the cross-encoder score delta was **0.0000 at
+max, p95 and p50**. The sort key itself does not jitter, so the epsilon is not absorbing CE noise —
+there is none. It is pure margin, and margin is not free: every adjacent pair of hits whose scores
+fall inside it is declared a tie, and a tie may reorder freely under the equal-score-order class.
+
+So the width is set against what it would excuse. Over the six committed captures (655 adjacent
+score pairs, no exact ties), the adjacent-gap distribution is min `0.000488`, p5 `0.004456`, p10
+`0.005859`, p25 `0.0208`, p50 `0.0524`. At `0.01` the tie window swallows **102 of 655 (15.6%)** of
+adjacent pairs — a sixth of all neighbouring ranks free to swap on genuinely different scores. At
+`0.001` it is **13 of 655 (2.0%)**, still an order of magnitude above the float32 granularity of a
+score near `0.26` (~`1e-7`) and above the smallest gap actually observed. `0.001` is what the
+fixture declares. Going lower buys nothing measurable: at `0.0001` no observed pair is fused at all,
+which is the same as switching the class off.
+
+**The candidate budgets are pinned too, and one cutoff cannot be.** Beyond the four
+determinism pins above (exhaustive kNN, one LLM slot, the two rerank deadlines), a capture sets
+`JUSTSEARCH_RERANK_TOP_K=40` and `JUSTSEARCH_RERANK_GPU_MEM_MB=4096` — the window and the arena
+that has to hold it, which move together or the reranker dies (see above) —
+`JUSTSEARCH_INDEX_HYBRID_CANDIDATE_LIMIT_MAX=5000`,
+`JUSTSEARCH_HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER=50`,
+`JUSTSEARCH_HYBRID_LEG_ARBITRATION_ENABLED=false` and
+`JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE=false`. Two mechanisms motivate them. *Candidate
+truncation*: every leg hands fusion a bounded list, and a chunk missing from a leg scores `0.0`
+for it with the leg's weight still in the denominator (`index.hybrid.chunk_cc_zero_exclude`
+inherits `cc_zero_exclude`, default `false`), so falling out of one leg costs a chunk that leg's
+whole weighted share at once — and per-leg min-max normalisation then shifts its neighbours too.
+*Step functions*: leg arbitration flips alpha `0.5 → 0.7` when the two legs' top-10 doc ids share
+at most **one** document (Jaccard `i/(20-i) < 0.1` reduces to `i < 1.82`), and the recall-complete
+splice protects each leg's `rank ≤ 10` and **evicts** a fused hit to make room. Both are on by
+default, and both change behaviour discontinuously on a one-document difference.
+
+Three cutoffs stay hard-coded and the capture does not pretend otherwise:
+`SearchExecutor.CHUNK_INITIAL_CANDIDATE_MULTIPLIER = 10` and `CHUNK_RETRY_MULTIPLIER = 2`
+(`SearchExecutor.java:63-64`), and `SearchPlanner.MAX_LIMIT = 100` (`SearchPlanner.java:37`). The
+last is a hard ceiling: it caps the wire limit, so branch fusion emits at most 100 documents —
+below a 102-document corpus. No env setting lifts it; closing it needs a product change.
+
+**Candidate-pool sizes are not compared.** `queries.totalHits` and `queries.trace.stageCardinality`
+were dropped from the captured set. Both count how many candidates a *stage* happened to consider,
+which follows the candidate budget and which chunks sat at a per-leg cutoff — not what the search
+found. Both moved between two fresh ingests of one corpus on one build (q02, q03, q07, q09 of the
+2026-09-07 pair) while the evidence was otherwise equal, so diffing them reported pool churn as a
+semantic regression. Design 16 names evidence selection, truncation points, citation targets and
+cancellation as the byte-equal fields and never names either of these. They are recorded in the
+non-diffed `observed` block, where a reader diagnosing a hit-set difference still has them.
+`queries.matchCount` stays `exact`: it is an `IndexSearcher.count` over the query, a property of
+the corpus and the query rather than of any budget.
 
 **One capture per fresh corpus.** The chat turns index their own agent history, so a second capture
 on the same stack sees a changed index (measured: `docCount` 91 → 102 across one capture's three
@@ -463,26 +725,89 @@ by construction; `maxIterations` is now 8, and capture-health raises `chat turn 
 MAX_ITERATIONS` for any non-cancelled turn that still truncates, so a truncated baseline is refused
 rather than stored. The cancelled turn is exempt — it is supposed to end early.
 
+`c02` was **replaced** for exactly this reason. Its IndexingPacing duty-cycle question still ended
+`MAX_ITERATIONS` at 8 in *both* captures of the paired run, at temperature 0 — a two-part question
+whose "which ADR" half has no single obvious anchor, so the agent kept searching. A looping turn is
+worse than a partial answer: its tool trajectory diverges as soon as retrieval does, so every
+`exact` field downstream of the trajectory (`toolNames`, `toolCallsExecuted`, `sourceRefs`,
+`citationTargets`) differs for a reason that is not a build difference. `c02` now asks a
+single-document architecture question of `c01`'s shape, anchored on
+`docs/explanation/01-system-overview.md`, with `maxIterations` still 8. Read the question itself
+from the fixture (`scripts/jseval/lane-f-workflow-fixture.v1.json`), **not from here**: this file is
+inside the capture corpus (`docs/reference/**`), so restating a chat turn's distinctive wording
+would make this page a retrieval attractor for that very turn and put a document *about* the
+instrument into the evidence the instrument compares. `c01`'s wording appears nowhere in the corpus
+outside the documents that genuinely answer it, and `c02`'s must not either.
+
 **Both captures of a paired diff must be on the same chat profile.** The profile decides which
 model answered the chat turns, so a split-vs-single pair taken on different profiles compares two
 models, not two builds. `capture` records `provenance.chatProfile` and `provenance.aiRuntimeState`
 from `GET /api/ai/runtime/status` (non-diffed, and printed in the capture summary), reading the
 same fields the dev-MCP does. The 2026-09-07 baseline was taken on **`compact`** — the dev default
 — because the standard model's ~11 GB resident set on the dev machine tripped the harness's
-low-memory guard twice; with the narrowed `c01`/`c02` questions both ordinary turns complete on
-compact (`c01` in 3 iterations, `c02` in 6), so the profile choice does not cost the fixture its
-completion property.
+low-memory guard twice. `c01` completes on compact in 3 iterations; the *original* `c02` did not
+(see above), which is why it was replaced. Whether the replacement completes is what the next
+paired capture measures — capture-health refuses a `MAX_ITERATIONS` baseline either way, so a
+looping turn cannot be stored as one.
 
 **Generation is nondeterministic, and `citationTargets` is deliberately still `exact`.** Across two
-captures of one build, one turn's citation targets differed (`[]` vs two targets):
-`ConversationEngine.java:1154` hard-codes `new SamplingParams(0.8, 0.95, …)` — temperature 0.8,
-top_p 0.95 — and there is no settings key and no request field for temperature or seed. Design 16
-lists citation targets as deterministic, so reclassifying them is an owner decision, not the
-instrument's; the remedy is a backend sampling override (temperature 0 + a seed on the chat
-request). Until then, expect the chat `exact` fields to be the fixture's most fragile assumption
-and read a diff there as a finding, not as licence to reclassify. The **cancelled** turn was fully
-stable across both captures (terminal event, `CANCELLED` error code, session state, disposition and
-cancel trigger all identical), so the cancellation half of the row is sound as it stands.
+captures of one build, one turn's citation targets differed (`[]` vs two targets). The agent path is
+*shape-driven* and never reaches `ConversationEngine.parseSamplingParams`
+(`ConversationEngine.java:1151` — that is the chat-completions path, not `POST /api/chat/agent`):
+an agent turn samples under `SamplingParams.AGENT`, temperature **0.7** / top_p **0.8**
+(`SamplingParams.java:175`), returned by `AgentLlmCaller.resolveAgentSampling`
+(`AgentLlmCaller.java:282-295`, which applies the run's optional override through `agentBaseSampling` at `:310-322`), which adds `tool_choice`/grammar on a forced-tool turn and
+otherwise hands back that constant unchanged. PR 0b adds an optional top-level `sampling` object on
+the chat request — `{"temperature", "top_p", "seed"}`, each key optional, absent/null meaning no
+override — applied over that constant; the fixture declares the pin it wants (`temperature: 0.0` +
+a fixed seed) and `capture` sends it on every turn and records it in the non-diffed
+`provenance.sampling`. Design 16 lists citation targets as deterministic, so reclassifying them is
+an owner decision, not the instrument's. Until both sides of a pair are captured under the pin,
+expect the chat `exact` fields to be the fixture's most fragile assumption and read a diff there as
+a finding, not as licence to reclassify. The **cancelled** turn was fully stable across both
+captures (terminal event, `CANCELLED` error code, session state, disposition and cancel trigger all
+identical), so the cancellation half of the row is sound as it stands.
+
+**The capture records the *requested* pin and the *applied* one, and the difference is the point.**
+`provenance.sampling` is only what the capture asked for — it writes its own request back, so run
+the same fixture against a build predating the override and the artifact still reads as pinned while
+the backend silently ignored it. `provenance.samplingApplied` is what each run said it would
+*actually* use: the `session_started` frame echoes `samplingTemperature` / `samplingTopP` /
+`samplingSeed`, each key **omitted** when the backend resolved no value and **all three absent on a
+build predating PR 0b**. The capture reads them per turn and never defaults an absent key, because
+that absence is the signal. A pin that can only be asserted and never contradicted is not evidence;
+only these two records can disagree.
+
+**Both are capture-health checks, not diffed fields, and `diff` fails on them.** `capture_health`
+refuses a pair when either side's `provenance.pins` is absent or missing one of the keys in
+`PINNED_CONFIG_KEYS` (ten today), when
+the two sides' pins disagree on any key, when `provenance.samplingApplied` is absent or missing a
+recorded turn, when a turn's applied sampling is entirely null (the pre-PR-0b build), or when the
+two sides applied different sampling for a turn. They are health problems rather than declared
+fields because they are not outputs either build produced — they are the conditions both runs were
+measured under, and a pair captured under different conditions is not a comparison of two builds at
+all, so the right verdict is "this diff is not evidence" rather than "field X differs".
+
+**The pins come from `GET /api/debug/effective-config`.** Its body carries a top-level
+`resolvedConfig` array of `{key, value, source, ordinal, detail, candidates[]}`; `value` is always a
+**string** and is *omitted* (the record is `@JsonInclude(NON_NULL)`) for a key no source supplied,
+so an unset `index.vector.exhaustive_search` — which has no registered default — reads as **missing**
+rather than as a value, and the health check fires. An unreachable endpoint yields empty pins rather
+than an exception: the capture is still written, and the diff built on it then fails. Note the route:
+the PR 0b pair run fetched `/api/config/effective`, which does not exist
+(`tmp/pr0b-pair/effective-config-1.json` is the `NOT_FOUND` body), so that run recorded no pins and
+could not have caught a pin mismatch.
+
+**The capture run is pinned at boot, not only in the request.** Both sides of a paired diff must be
+captured with the same four settings, the first three set at stack launch:
+`JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true` (every kNN query exact, so the dense leg is not an
+approximate neighbour set that moves with the HNSW graph's build order); exactly **one**
+llama-server slot (`justsearch.llm.slots` / `JUSTSEARCH_LLM_SLOTS`, default 2 — two parallel slots
+make the prompt-cache prefix a turn sees a scheduling outcome); the cross-encoder reranker deadlines
+pinned high (`justsearch.rerank.deadline_ms` / `justsearch.rerank.chunks.deadline_ms`, defaults 200
+/ 150 — at the defaults a loaded machine can miss the deadline and reorder the hit set); and one
+chat profile for both sides. `scripts/jseval/lane-f/fixture-cycle.sh` carries the same list in its
+header.
 
 **Paths are relative to a declared corpus root.** Every path-bearing value the backend returns is
 the *absolute* indexed path (`IndexingDocumentOps` writes `DOC_ID = PATH = absolutePath`; a chunk's

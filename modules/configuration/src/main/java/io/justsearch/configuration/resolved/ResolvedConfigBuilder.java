@@ -326,6 +326,7 @@ public final class ResolvedConfigBuilder {
     putYamlInt("index.vector.hnsw.m", root, "index.vector.hnsw.m");
     putYamlInt("index.vector.hnsw.ef_construction", root, "index.vector.hnsw.ef_construction");
     putYamlInt("index.vector.ef_search", root, "index.vector.ef_search");
+    putYamlBoolean("index.vector.exhaustive_search", root, "index.vector.exhaustive_search");
     putYamlBoolean("index.vector.quantization.enabled", root,
         "index.vector.quantization.enabled");
     putYamlBoolean("index.auto_recovery", root, "index.auto_recovery");
@@ -1156,7 +1157,16 @@ public final class ResolvedConfigBuilder {
   private ResolvedConfig.Ai.Profiling buildProfiling() {
     return new ResolvedConfig.Ai.Profiling(
         resolvePath("justsearch.ort.profiling_dir", null),
-        resolveBoolean("justsearch.ort.verbose", false));
+        resolveBoolean("justsearch.ort.verbose", false),
+        // Lane F PR 0b — null (unset) keeps ORT's own hardware-derived intra-op count, which is
+        // today's behaviour byte for byte. A positive value pins it; a non-positive one is
+        // ignored rather than passed to ORT, which rejects it.
+        positiveOrNull(resolveNullableInt("justsearch.onnxruntime.intra_op_threads")));
+  }
+
+  /** {@code value} when it is a positive thread count, else null (leave ORT's default). */
+  private static Integer positiveOrNull(Integer value) {
+    return value != null && value > 0 ? value : null;
   }
 
   private ResolvedConfig.Ai.BgeM3 buildBgeM3() {
@@ -1479,6 +1489,10 @@ public final class ResolvedConfigBuilder {
         resolveNullableInt("index.vector.hnsw.m"),
         resolveNullableInt("index.vector.hnsw.ef_construction"),
         resolveNullableInt("index.vector.ef_search"),
+        // Lane F PR 0b — the exact-kNN capture switch. Resolved here (not read as a raw sysprop
+        // inside the Worker) so it reaches the Worker through the ordinal-450 config snapshot,
+        // the same channel index.commit.timer_interval_ms uses.
+        resolveBoolean("index.vector.exhaustive_search", false),
         resolveNullableBoolean("index.vector.quantization.enabled"),
         resolveBoolean("index.auto_recovery", false),
         normalizeSchemaMismatchPolicy(

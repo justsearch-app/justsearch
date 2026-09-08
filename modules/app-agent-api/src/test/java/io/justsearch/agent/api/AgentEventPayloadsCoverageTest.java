@@ -68,7 +68,11 @@ final class AgentEventPayloadsCoverageTest {
           new AgentEvent.ToolCallVirtual("c1", "wire", "args"),
           new AgentEvent.DirectiveAcknowledged("focus"),
           new AgentEvent.ContextCompacted(4),
-          new AgentEvent.SessionStarted("sid"),
+          // Lane F PR 0b: the three applied-sampling components are POPULATED here on purpose.
+          // base() omits each when null (so an un-echoed session_started stays byte-identical to
+          // its pre-PR-0b payload), and this test's question is "does a component that IS set reach
+          // the wire" — which a null-everywhere variant could not ask.
+          new AgentEvent.SessionStarted("sid", 0.7, 0.8, 20260907L, TraceContext.none()),
           new AgentEvent.HandoffExecuted("a", "b"),
           new AgentEvent.HandoffProposed("a", "b", "why"),
           new AgentEvent.BudgetGatePending(1, 2, 3),

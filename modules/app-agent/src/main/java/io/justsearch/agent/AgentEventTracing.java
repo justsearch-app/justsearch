@@ -77,7 +77,13 @@ final class AgentEventTracing {
           new AgentEvent.ContextGatePending(e.promptTokens(), e.contextWindow(), trace);
       case AgentEvent.ContextCompacted e ->
           new AgentEvent.ContextCompacted(e.droppedMessages(), trace);
-      case AgentEvent.SessionStarted e -> new AgentEvent.SessionStarted(e.sessionId(), trace);
+      case AgentEvent.SessionStarted e ->
+          new AgentEvent.SessionStarted(
+              e.sessionId(),
+              e.samplingTemperature(),
+              e.samplingTopP(),
+              e.samplingSeed(),
+              trace);
       case AgentEvent.HandoffProposed e ->
           new AgentEvent.HandoffProposed(e.fromAgentId(), e.toAgentId(), e.reason(), trace);
       case AgentEvent.HandoffExecuted e ->

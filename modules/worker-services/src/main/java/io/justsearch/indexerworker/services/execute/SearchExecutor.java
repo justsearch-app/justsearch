@@ -773,6 +773,13 @@ public final class SearchExecutor {
             : 0;
 
     int candidateBudget = Math.max(limit, limit * CHUNK_INITIAL_CANDIDATE_MULTIPLIER);
+    // Lane F PR 0b — index.vector.exhaustive_search. Read from the same resolved config the rest of
+    // this method reads, so the Head-side switch reaches the Worker through the ordinal-450 config
+    // snapshot rather than a raw sysprop read inside this JVM.
+    boolean denseExhaustive =
+        resolvedConfig != null
+            && resolvedConfig.index() != null
+            && resolvedConfig.index().vectorExhaustiveSearch();
     boolean retryTriggered = false;
     ChunkBranchResult chunkBranchResult =
         executeChunkBranchFusion(
@@ -788,7 +795,8 @@ public final class SearchExecutor {
             weights,
             debug,
             zeroExclude,
-            chunkRecallTopN);
+            chunkRecallTopN,
+            denseExhaustive);
     if (chunkBranchResult.parentResult().hits() == null
         || chunkBranchResult.parentResult().hits().isEmpty()) {
       return new ChunkMergeResult(
@@ -823,7 +831,8 @@ public final class SearchExecutor {
               weights,
               debug,
               zeroExclude,
-              chunkRecallTopN);
+              chunkRecallTopN,
+              denseExhaustive);
       chunkBranchResult =
           new ChunkBranchResult(
               chunkBranchResult.parentResult(),
@@ -991,7 +1000,8 @@ public final class SearchExecutor {
       double[] weights,
       boolean debug,
       boolean zeroExclude,
-      int recallCompleteTopN) {
+      int recallCompleteTopN,
+      boolean denseExhaustive) {
     LuceneRuntimeTypes.SearchResult bm25Result = emptySearchResult();
     LuceneRuntimeTypes.SearchResult denseResult = emptySearchResult();
     LuceneRuntimeTypes.SearchResult spladeResult = emptySearchResult();
@@ -1008,7 +1018,11 @@ public final class SearchExecutor {
       long t0 = System.nanoTime();
       denseResult = chunkSearchOps.searchChunkVector(queryVector, null, candidateBudget, chunkFilter);
       knnNs = System.nanoTime() - t0;
-      anyLegSaturated |= isCandidateBudgetSaturated(denseResult, candidateBudget);
+      // Lane F PR 0b: under index.vector.exhaustive_search the dense leg's totalHits is the whole
+      // vector-bearing corpus by construction, so it is excluded from the saturation test and the
+      // retry branch fires on exactly the queries it did with the switch off.
+      anyLegSaturated |=
+          isCandidateBudgetSaturated(denseResult, candidateBudget, denseExhaustive);
     }
     if (chunkSplade) {
       long t0 = System.nanoTime();
@@ -1100,11 +1114,30 @@ public final class SearchExecutor {
 
   private static boolean isCandidateBudgetSaturated(
       LuceneRuntimeTypes.SearchResult result, int candidateBudget) {
+    return isCandidateBudgetSaturated(result, candidateBudget, false);
+  }
+
+  /**
+   * Whether a retrieval leg hit the candidate budget, so the chunk branch should retry wider.
+   *
+   * <p>{@code ignoreTotalHits} exists for one caller: the dense leg under {@code
+   * index.vector.exhaustive_search} (lane F PR 0b). In that mode the kNN query runs with {@code k
+   * >= reader.maxDoc()} so it can take Lucene's exact branch, which makes its {@code totalHits} the
+   * whole vector-bearing corpus rather than a measure of how hard the leg pushed against the
+   * budget. Counting that as saturation would fire the chunk retry on essentially every query and
+   * change WHICH BRANCHES the pipeline takes — the switch is only allowed to change the
+   * approximation. The returned-hit-count term is untouched: it still measures the same thing.
+   */
+  static boolean isCandidateBudgetSaturated(
+      LuceneRuntimeTypes.SearchResult result, int candidateBudget, boolean ignoreTotalHits) {
     if (result == null || candidateBudget <= 0) {
       return false;
     }
     int hits = result.hits() != null ? result.hits().size() : 0;
-    return hits >= candidateBudget || result.totalHits() > candidateBudget;
+    if (hits >= candidateBudget) {
+      return true;
+    }
+    return !ignoreTotalHits && result.totalHits() > candidateBudget;
   }
 
   private static double hybridWeight(double configuredWeight) {

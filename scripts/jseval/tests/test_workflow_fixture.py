@@ -45,6 +45,101 @@ def test_committed_fixture_shape():
     assert cancelled[0]["cancelAfterEvent"] == "session_started"
 
 
+def test_committed_fixture_pins_the_agent_sampling():
+    """PR 0b: the fixture declares the `sampling` override the capture sends.
+
+    temperature 0 removes the sampler's freedom and the seed pins what freedom remains;
+    without both, the chat fields declared `exact` diff because the sampler differed
+    rather than because the build did (the agent path runs at 0.7/0.8 unpinned).
+    """
+    fixture = wf.load_fixture(DEFAULT_FIXTURE)
+    sampling = fixture["sampling"]
+    assert sampling["temperature"] == 0.0
+    assert isinstance(sampling["seed"], int) and not isinstance(sampling["seed"], bool)
+    assert set(sampling) <= wf.SAMPLING_KEYS
+
+
+def test_fixture_without_a_sampling_block_is_refused():
+    """The pin is REQUIRED, not advisory — an unpinned fixture must not validate."""
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    del fixture["sampling"]
+    with pytest.raises(wf.WorkflowFixtureError, match="sampling"):
+        wf.validate_fixture(fixture)
+    for malformed in ({}, {"temp": 0.0}, {"temperature": "cold"}, {"seed": 1.5}, "0.0"):
+        broken = _minimal_fixture({"queries.a": "exact"})
+        broken["sampling"] = malformed
+        with pytest.raises(wf.WorkflowFixtureError, match="sampling"):
+            wf.validate_fixture(broken)
+
+
+def test_an_all_null_sampling_block_is_refused():
+    """A block whose values are ALL null declares a pin and pins nothing.
+
+    Each key means "no override" individually, so `{"temperature": null, "seed": null}` runs
+    the turns under SamplingParams.AGENT exactly as an absent block does — while the artifact
+    records a `sampling` block and reads as pinned.
+    """
+    for empty_pin in ({"temperature": None},
+                      {"temperature": None, "top_p": None, "seed": None}):
+        fixture = _minimal_fixture({"queries.a": "exact"})
+        fixture["sampling"] = empty_pin
+        with pytest.raises(wf.WorkflowFixtureError, match="pins NOTHING"):
+            wf.validate_fixture(fixture)
+    # One real value is enough — the refusal is about pinning nothing, not about nulls.
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    fixture["sampling"] = {"temperature": None, "top_p": None, "seed": 7}
+    assert wf.validate_sampling(fixture["sampling"])["seed"] == 7
+
+
+def test_a_chat_turn_spec_is_validated_against_a_closed_key_set():
+    """`maxIterms: 8` must be REFUSED, not silently ignored.
+
+    The capture reads exactly CHAT_TURN_KEYS, so a typo leaves the turn at the default cap of
+    3 while the fixture reads as if it declared 8 — surfacing much later as an unexplained
+    MAX_ITERATIONS capture-health failure.
+    """
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    fixture["chatTurns"] = [{"id": "c1", "content": "x", "maxIterms": 8}]
+    with pytest.raises(wf.WorkflowFixtureError, match="maxIterms"):
+        wf.validate_fixture(fixture)
+
+    # Every key the capture actually honours passes.
+    fixture["chatTurns"] = [{"id": "c1", "content": "x", "maxIterations": 8,
+                             "cancelAfterEvent": "session_started"}]
+    assert wf.validate_fixture(fixture)
+    assert wf.CHAT_TURN_KEYS == {"id", "content", "maxIterations", "cancelAfterEvent"}
+    # …and the shipped fixture uses nothing outside it.
+    for turn in wf.load_fixture(DEFAULT_FIXTURE)["chatTurns"]:
+        assert set(turn) <= wf.CHAT_TURN_KEYS
+
+
+def test_c02_was_replaced_with_a_single_anchor_question():
+    """c02 looped at maxIterations 8 on BOTH captures even at temperature 0.
+
+    A looping turn is not merely a partial answer: its tool trajectory diverges as soon as
+    retrieval does, so the `exact` chat fields downstream of it differ for a reason that is
+    not a build difference. The replacement has c01's shape — one obvious anchor document.
+    """
+    fixture = wf.load_fixture(DEFAULT_FIXTURE)
+    c02 = next(t for t in fixture["chatTurns"] if t["id"] == "c02")
+    assert "IndexingPacing" not in c02["content"]
+    assert "three processes" in c02["content"]
+    assert c02["maxIterations"] == 8
+    notes = " ".join(fixture["notes"])
+    assert "C02 WAS REPLACED" in notes
+    assert "docs/explanation/01-system-overview.md" in notes
+    # The superseded "c02 completes in 6 iterations" claim must be gone, not outnumbered.
+    assert "c02 in 6" not in notes
+
+
+def test_cutoff_group_rule_is_recorded_in_the_fixture_notes():
+    """Including the caveat a reader must not miss: 2K changes what the backend ranks."""
+    notes = " ".join(wf.load_fixture(DEFAULT_FIXTURE)["notes"])
+    assert "STRADDLING THE RANK-K CUTOFF" in notes
+    assert "NO fourth class is introduced" in notes
+    assert "CAPTURES TAKEN AT A DIFFERENT captureLimitMultiplier ARE NOT COMPARABLE" in notes
+
+
 def test_hits_are_one_field_not_one_per_attribute():
     """Review blocker 1: per-attribute score-tagged lists permute independently.
 
@@ -128,7 +223,7 @@ def test_full_fixture_diffs_itself_clean():
 
     result = wf.diff(_full_snapshot(fixture), _full_snapshot(fixture), fixture)
     assert result["pass"] is True, result["health"]["problems"]
-    assert result["counts"] == {"equal": expected, "allowed": 0,
+    assert result["counts"] == {"equal": expected, "allowed": 0, "noisy": 0,
                                 "REGRESSION": 0, "missing": 0}
     assert result["declared_not_captured"] == []
     assert result["health"]["ok"] is True
@@ -409,13 +504,28 @@ def test_fixture_must_declare_score_tie_epsilon():
 
 
 def test_committed_epsilon_matches_the_recorded_measurement():
-    """The epsilon and the measurement that justifies it must not drift apart."""
+    """The epsilon and the measurement that justifies it must not drift apart.
+
+    The committed value is derived from the CROSS-ENCODER score gap distribution over the six
+    committed captures, not from the original delivered-score calibration -- which is still in
+    the notes, labelled superseded, because it is how the number got here.
+    """
     fixture = wf.load_fixture(DEFAULT_FIXTURE)
-    assert fixture["scoreTieEpsilon"] == 0.01
+    assert fixture["scoreTieEpsilon"] == 0.001
     notes = " ".join(fixture["notes"])
-    assert "0.009442" in notes           # the measured max identity-matched jitter
-    assert "0.003652" in notes           # the smallest adjacent score gap
-    assert fixture["scoreTieEpsilon"] > 0.009442
+    assert "0.009442" in notes           # the delivered-basis max identity-matched jitter
+    assert "0.003652" in notes           # the delivered-basis smallest adjacent score gap
+    # The derivation the committed 0.001 actually rests on: what each candidate width excuses.
+    assert "655 adjacent score pairs" in notes
+    assert "102 of 655" in notes         # 15.6% of adjacent pairs fused at 0.01
+    assert "13 of 655" in notes          # 2.0% at the committed 0.001
+    # The old floor here was `> 0.009442`, the DELIVERED-score jitter the epsilon had to absorb.
+    # That premise is gone: the grouping basis is the cross-encoder score and its measured
+    # cross-build jitter is 0.0000, so there is nothing to clear. The binding constraints are
+    # now the other way round -- above the float32 granularity of a score near 0.26 (~1e-7), and
+    # well below the p5 adjacent gap (0.004456), so the window does not swallow real gaps.
+    assert fixture["scoreTieEpsilon"] > 1e-6
+    assert fixture["scoreTieEpsilon"] < 0.004456
 
 
 def test_none_score_is_a_shape_violation_not_a_universal_tie():
@@ -443,6 +553,1185 @@ def test_new_reason_code_on_a_hit_is_allowed_and_a_lost_one_is_not():
                    _capture({"q1": {"hits[]": plain}}), fixture)
     assert lost["pass"] is False
     assert "gone in the candidate" in _entry(lost, "queries.hits[]")["reason"]
+
+
+# ---------------------------------------------------------------------------
+# The cutoff tie group (the group straddling rank K)
+# ---------------------------------------------------------------------------
+#
+# Every fixture here declares limit 3, so K = 3, and each declares its `captureLimitMultiplier`
+# explicitly so the request size these tests reason about is stated rather than assumed. The
+# compared slice ends on a tie-group boundary — hits `c` and `d` below are one group whose FIRST
+# member sits at rank 3, i.e. the cutoff group.
+
+def _cutoff_fixture(limit: int = 3, multiplier: int = 2) -> dict:
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    fixture["queries"][0]["limit"] = limit
+    fixture["captureLimitMultiplier"] = multiplier
+    return fixture
+
+
+def _cutoff_capture(tagged, *, hits_captured: int | None = 6) -> dict:
+    """A capture whose q1 carries ``tagged`` as its compared slice.
+
+    ``hits_captured`` is what the backend returned for the ``K * captureLimitMultiplier``
+    request, recorded where the real capture records it: the non-diffed ``observed`` block.
+    ``None`` omits the whole block, i.e. an older capture.
+    """
+    observed = None
+    if hits_captured is not None:
+        observed = {"q1": {"scores": [t["score"] for t in tagged],
+                           "hitsCaptured": hits_captured,
+                           "hitsCompared": len(tagged)}}
+    return _capture({"q1": {"hits[]": tagged, "hitCount": 3}}, observed=observed)
+
+
+def test_swap_across_the_rank_k_cutoff_inside_one_tie_group_is_allowed():
+    """The q06 / q10 live failure: one member of the BOTTOM tie group differed.
+
+    At limit 10 only the rank-10 half of that group was captured, so a swap with its rank-11
+    partner read as "tie group N is not a permutation". With the group observed whole, the
+    swap is what it is: a permutation of equal-score hits, across the K boundary.
+    """
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),      # the cutoff group, ranks 3-4
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.499, _hit("d")), (0.500, _hit("c")),      # same group, swapped
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    # The status string, not merely `pass`: this must be recorded as one of the three
+    # declared classes, and specifically as the ordering class.
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order"
+
+
+def test_cutoff_group_tolerates_a_head_partition_change_that_today_would_fail():
+    """The discriminating case — this FAILS if the cutoff rule is removed.
+
+    A swap inside the cutoff group plus a jittered gap ABOVE it: the old whole-list guard
+    saw "the order changed AND the partition sizes differ" and called it a regression, even
+    though the only reordering happened inside one tie group and nothing above it moved.
+    Splitting the cutoff group off means the head's order is unchanged (so its partition is
+    never consulted, exactly as the q07 fix intends) and the cutoff group is a set.
+    """
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.880, _hit("b")),      # gap 0.020 -> two head groups
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.895, _hit("b")),      # gap 0.005 -> ONE head group
+        (0.499, _hit("d")), (0.500, _hit("c")),
+    ]))
+    # Guard the premise: the two partitions really do differ in shape.
+    assert [len(m) for _, m in wf._tie_groups(base["queries"]["q1"]["hits[]"], 0.01)[1]] == [
+        1, 1, 2]
+    assert [len(m) for _, m in wf._tie_groups(cand["queries"]["q1"]["hits[]"], 0.01)[1]] == [
+        2, 2]
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order"
+    # …and without the cutoff (the same values compared as a plain hits[] list) it is the
+    # REGRESSION the rule exists to remove — proof the pass above is the rule's doing.
+    without_cutoff = wf.compare_field(
+        "equal-score-order", base["queries"]["q1"]["hits[]"],
+        cand["queries"]["q1"]["hits[]"], 0.01, None)
+    assert without_cutoff[0] == "REGRESSION"
+    assert "tie-group partition differs" in without_cutoff[1]
+
+
+def test_a_hit_that_joins_the_cutoff_group_without_moving_is_not_a_regression():
+    """The q07 false positive, at the boundary — caught in the post-implementation pass.
+
+    `b` jitters from its own group into the cutoff group while the DELIVERED ORDER stays
+    identical. Splitting the partition at the cutoff unconditionally shortened the head by
+    one group and the head's own partition check called it a regression with nothing
+    reordered. The split is therefore gated on "did anything actually reorder", exactly as
+    the whole-list guard already was.
+    """
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),      # groups [a] [b] [c,d]
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.505, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),      # groups [a] [b,c,d] — same order
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order"
+
+
+def test_a_member_missing_from_the_other_sides_cutoff_group_is_a_regression():
+    """Permutation across the cutoff is allowed; a different document is not."""
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("e")),      # d -> e: a real membership change
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "cutoff tie group" in reason and "not the same SET" in reason
+    # The membership is PROVEN here (4 compared out of 6 captured), so the regression must
+    # not be reported as the fail-closed case — that would hide a genuine finding behind
+    # "we could not tell".
+    assert "UNPROVEN" not in reason
+
+
+def test_a_change_in_a_group_above_the_cutoff_is_a_regression_exactly_as_today():
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("ZZZ")),    # above the cutoff group
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "not a permutation" in reason          # the unchanged per-group rule fired…
+    assert "cutoff tie group" not in reason       # …not the cutoff rule
+
+
+def _six_hit_cutoff_pair() -> tuple[dict, dict]:
+    """Six hits, the last of which differs — the cutoff group runs to the last hit captured."""
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")), (0.498, _hit("e")), (0.497, _hit("f")),
+    ]), hits_captured=6)
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")), (0.498, _hit("e")), (0.497, _hit("g")),
+    ]), hits_captured=6)
+    return base, cand
+
+
+def test_a_cutoff_group_that_ran_off_the_end_of_a_full_response_fails_closed():
+    """The group may continue past the last hit captured, so a set difference cannot be told
+    from an unseen member. Fail closed, and say why."""
+    # 6 compared out of 6 captured, and 6 == the full 3 * 2 requested: the group ran to the end
+    # of a FULL response, so nothing proves where it really ends.
+    base, cand = _six_hit_cutoff_pair()
+    result = wf.diff(base, cand, _cutoff_fixture(multiplier=2))
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "UNPROVEN" in reason
+    assert "runs to the end of what was captured" in reason
+    assert "request of 6" in reason              # the request size, derived not assumed
+
+
+def test_the_end_of_response_test_uses_the_declared_multiplier_not_two():
+    """The same six hits under a multiplier of 4 are a SHORT response, and that is proof.
+
+    The threshold was hard-coded `2 * limit` while the shipped fixture declared 4, so a
+    12-hit request that came back with 6 was read as "the response ran out" — and every set
+    difference in a cutoff group was then withdrawn as unproven on evidence that said the
+    opposite. A response shorter than the request is the backend saying it had nothing more.
+    """
+    base, cand = _six_hit_cutoff_pair()
+    result = wf.diff(base, cand, _cutoff_fixture(multiplier=4))
+    assert result["pass"] is False                       # still a regression: the set differs
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "UNPROVEN" not in reason
+    assert "not the same SET on both sides" in reason
+
+
+def test_a_capture_without_hits_captured_fails_closed_too():
+    """An older capture records no `hitsCaptured`, so there is no evidence either way."""
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]), hits_captured=None)
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("e")),
+    ]), hits_captured=None)
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is False
+    reason = _entry(result, "queries.hits[]")["reason"]
+    assert "UNPROVEN" in reason
+    assert "older capture" in reason      # …and for THIS cause, not the 2K one
+    assert "runs to the end of what was captured" not in reason
+
+
+def test_an_unsliced_capture_is_named_not_silently_compared():
+    """The cutoff group is the LAST group by construction — assert it, don't assume it."""
+    fixture = _cutoff_fixture()
+    unsliced = _tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+        (0.100, _hit("e")),                          # past the cutoff group: never sliced off
+    ])
+    swapped = list(unsliced)
+    swapped[2], swapped[3] = swapped[3], swapped[2]
+    result = wf.diff(_cutoff_capture(unsliced), _cutoff_capture(swapped), fixture)
+    assert result["pass"] is False
+    assert "was not sliced at the cutoff group" in _entry(result, "queries.hits[]")["reason"]
+
+
+def test_a_new_reason_code_inside_the_cutoff_group_is_still_allowed():
+    """The subset rule keeps applying to members present on both sides of the set."""
+    fixture = _cutoff_fixture()
+    base = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.500, _hit("c")), (0.499, _hit("d")),
+    ]))
+    cand = _cutoff_capture(_tagged([
+        (0.900, _hit("a")), (0.800, _hit("b")),
+        (0.499, _hit("d")), (0.500, _hit("c", extractionReasonCode="OCR_FALLBACK")),
+    ]))
+    result = wf.diff(base, cand, fixture)
+    assert result["pass"] is True, _entry(result, "queries.hits[]")["reason"]
+    assert _status(result, "queries.hits[]") == "allowed:new-reason-code"
+
+    lost = wf.diff(cand, base, fixture)
+    assert lost["pass"] is False
+    assert "gone in the candidate" in _entry(lost, "queries.hits[]")["reason"]
+
+
+def test_chat_turns_get_no_cutoff():
+    """There is no rank-K contract on a chat turn, so nothing is passed down for one."""
+    fixture = _minimal_fixture({"chatTurns.sourceRefs": "exact"})
+    base = _capture(chat={"c1": {"sourceRefs": ["docs/a.md#0"]}})
+    cand = _capture(chat={"c1": {"sourceRefs": ["docs/b.md#0"]}})
+    assert wf.diff(base, cand, fixture)["pass"] is False
+
+
+def test_build_search_body_asks_for_the_capture_multiple_of_the_declared_limit():
+    """K is compared; the extra breadth makes the cutoff group observable AND clears the
+    cross-encoder window past K.
+
+    The window is the request limit, so at 2K it ended exactly at the captured set and a hit
+    whose FUSION rank jittered across rank 2K was reranked on one build and not the other
+    (the three unmatched hits at ranks 7-8 of pair run 4). The default is 4K.
+    """
+    assert wf.DEFAULT_CAPTURE_LIMIT_MULTIPLIER == 4
+    assert wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})["limit"] == 40
+    assert wf._build_search_body({"query": "q", "limit": 3})["limit"] == 12
+    # …and the default limit scales too, rather than silently staying at 10.
+    assert wf._build_search_body({"query": "q"})["limit"] == 40
+    # The fixture's own declaration wins over the fallback.
+    assert wf._build_search_body({"query": "q", "limit": 10},
+                                 {"captureLimitMultiplier": 2})["limit"] == 20
+    # The shipped fixture declares it, so the request breadth is not an implicit constant.
+    assert wf.load_fixture(DEFAULT_FIXTURE)["captureLimitMultiplier"] == 4
+
+
+def test_compared_slice_keeps_the_whole_cutoff_group_and_drops_the_rest():
+    hits = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])["results"]
+    kept = wf.compared_slice(hits, 3, 0.01)
+    assert [h["id"] for h in kept] == ["h0", "h1", "h2", "h3", "h4"]
+    # Nothing to extend when the cutoff group is a singleton.
+    assert len(wf.compared_slice(hits, 2, 0.01)) == 2
+    # Fewer hits than K: the whole list, unchanged.
+    assert wf.compared_slice(hits, 99, 0.01) == hits
+
+
+def test_hit_count_stays_the_top_k_count_when_the_slice_is_longer():
+    """`hitCount` is diffed `exact`: an 11-vs-12 cutoff group must not fail on it."""
+    response = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])
+    record = wf.capture_query_record(response, limit=3, epsilon=0.01)
+    assert record["hitCount"] == 3                  # top-K, NOT the slice length
+    assert len(record["hits[]"]) == 5               # …and the slice really is longer
+    # A shorter response still reports what it returned rather than K.
+    assert wf.capture_query_record(
+        _response_with_scores([0.9, 0.8]), limit=3, epsilon=0.01)["hitCount"] == 2
+
+
+def test_hits_captured_and_compared_are_observed_only_and_never_diffed():
+    """Both legitimately differ between builds, so they must not be diffed fields."""
+    response = _response_with_scores([0.9, 0.8, 0.5, 0.499, 0.498, 0.1])
+    record = wf.capture_query_record(response, limit=3, epsilon=0.01)
+    counts = wf.observed_query_counts(response, record)
+    assert counts["hitsCaptured"] == 6
+    assert counts["hitsCompared"] == 5
+    assert "hitsCaptured" not in record and "hitsCompared" not in record
+    # The two candidate-pool counts share this block for the same reason and must not be in
+    # the record either (see test_candidate_pool_counts_are_observed_only).
+    assert "totalHits" in counts and "stageCardinality" in counts
+    assert "totalHits" not in record and "trace.stageCardinality" not in record
+
+    # And the differ does not walk them: two captures whose counts differ, with identical
+    # query records, still diff clean and produce no entry for either name.
+    fixture = _cutoff_fixture()
+    tagged = _tagged([(0.900, _hit("a")), (0.800, _hit("b")),
+                      (0.500, _hit("c")), (0.499, _hit("d"))])
+    result = wf.diff(_cutoff_capture(tagged, hits_captured=6),
+                     _cutoff_capture(tagged, hits_captured=4), fixture)
+    assert result["pass"] is True, result["health"]["problems"]
+    compared = {e["field"] for e in result["fields"]}
+    assert not [f for f in compared if "hitsCaptured" in f or "hitsCompared" in f]
+    # …and the pass is for the right reason: the hits[] field was byte-equal, not waved
+    # through under an allowed class.
+    assert _status(result, "queries.hits[]") == "equal"
+
+
+def _response_with_ce(pairs: list[tuple[float, float]], ids: list[str] | None = None) -> dict:
+    """A response carrying BOTH scores per hit: (delivered/fusion, cross-encoder).
+
+    The delivered order is the CROSS-ENCODER's (`KnowledgeSearchEngine` applies
+    `applyRerankOrder`), so `results` here is already in CE order while `score` is the
+    pre-rerank fusion value — the real shape, which is why it is worth building in a helper.
+    """
+    names = ids or [f"h{i}" for i in range(len(pairs))]
+    return {
+        "totalHits": len(pairs),
+        "matchCount": len(pairs),
+        "results": [
+            {
+                "id": name,
+                "score": delivered,
+                "fields": {"doc_id": name, "path": f"docs/{name}.md",
+                           "filename": f"{name}.md", "is_chunk": "true",
+                           "parent_doc_id": name, "chunk_index": "0"},
+                "matchedFields": [], "excerptRegions": [],
+                "trace": ([{"id": "fusion", "score": delivered}]
+                          + ([{"id": "cross-encoder", "score": ce}] if ce is not None else [])),
+            }
+            for name, (delivered, ce) in zip(names, pairs)
+        ],
+        "searchTrace": {"stages": [], "degradation": {}},
+    }
+
+
+def test_equal_score_is_grouped_on_the_cross_encoder_score_not_the_delivered_one():
+    """The delivered ORDER is the CE's, so the CE score is the only key whose ties mean
+    "these two could legitimately swap".
+
+    Two hits tie on the CE score (0.700 / 0.7005) while their delivered scores are 0.9 and
+    0.2 — far outside epsilon. Grouping on the delivered score makes them singletons and a
+    swap a REGRESSION; grouping on the CE score makes them one tie group and the swap
+    allowed. This is the case that fails if the basis reverts.
+    """
+    response = _response_with_ce([(0.9, 0.700), (0.2, 0.7005), (0.1, 0.100)])
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    tags = record["hits[]"]
+    assert [t["score"] for t in tags] == [0.700, 0.7005, 0.100],         "the stored tag must be the CROSS-ENCODER score, not the delivered one"
+
+    ok, groups = wf._tie_groups(tags, 0.01)
+    assert ok
+    assert [len(members) for _, members in groups] == [2, 1],         "the two CE-tied hits must land in ONE group despite delivered scores 0.9 vs 0.2"
+
+    # And end to end: swapping the two CE-tied hits is allowed, not a regression.
+    swapped = _response_with_ce([(0.2, 0.7005), (0.9, 0.700), (0.1, 0.100)],
+                                ids=["h1", "h0", "h2"])
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    base = _capture({"q1": record})
+    cand = _capture({"q1": wf.capture_query_record(swapped, limit=10, epsilon=0.01)})
+    result = wf.diff(base, cand, fixture)
+    assert _status(result, "queries.hits[]") == "allowed:equal-score-order", result["fields"]
+
+
+def test_score_basis_falls_back_to_delivered_when_the_cross_encoder_did_not_score():
+    """A lexical/TEXT fallback never runs the CE, so there is no sort key to group on."""
+    response = _response_with_ce([(0.9, None), (0.2, None)])
+    basis, scores = wf.resolve_score_basis(response["results"])
+    assert basis == wf.SCORE_BASIS_DELIVERED
+    assert scores == [0.9, 0.2]
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    assert [t["score"] for t in record["hits[]"]] == [0.9, 0.2]
+
+
+def test_a_partially_scored_query_falls_back_WHOLE_rather_than_mixing_two_bases():
+    """All-or-nothing per query.
+
+    A list mixing CE scores and delivered scores would have epsilon comparing numbers from
+    two different scales — precisely the defect this replaces. Falling back for the whole
+    query is merely conservative.
+    """
+    response = _response_with_ce([(0.9, 0.70), (0.2, None), (0.1, 0.10)])
+    basis, scores = wf.resolve_score_basis(response["results"])
+    assert basis == wf.SCORE_BASIS_DELIVERED
+    assert scores == [0.9, 0.2, 0.1], "no CE score may leak into a delivered-basis list"
+
+
+def test_the_score_basis_and_both_other_scores_are_observed_never_diffed():
+    """`scoreBasis` tells a reader which number grouped; the other two are for diagnosis."""
+    response = _response_with_ce([(0.9, 0.70), (0.2, 0.60)])
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    observed = wf.observed_query_counts(response, record)
+    assert observed["scoreBasis"] == wf.SCORE_BASIS_CROSS_ENCODER
+    assert observed["crossEncoderScores"] == [0.70, 0.60]
+    assert observed["fusionScores"] == [0.9, 0.2]
+    assert observed["scores"] if "scores" in observed else True
+    # None of the three may be a diffed field.
+    for name in ("scoreBasis", "crossEncoderScores", "fusionScores"):
+        assert name not in record
+
+
+def test_the_cutoff_slice_uses_the_cross_encoder_basis_too():
+    """The slice and the stored tags must mean the same number, or they disagree on where
+    the cutoff group ends — the disagreement the cutoff rule exists to remove."""
+    # CE scores tie at the rank-2 boundary (limit 2); delivered scores do not.
+    pairs = [(0.9, 0.90), (0.8, 0.50), (0.1, 0.5005), (0.05, 0.20)]
+    record = wf.capture_query_record(_response_with_ce(pairs), limit=2, epsilon=0.01)
+    assert record["hitCount"] == 2, "hitCount stays the TOP-K count"
+    assert len(record["hits[]"]) == 3,         "the slice must extend to the whole CE tie group holding rank 2"
+
+
+#: The `trace` arrays of the FIRST THREE results of a real `debug:true`, `limit:20`
+#: `POST /api/knowledge/search` response over `docs/explanation`
+#: (captured 2026-09-07, `tmp/raw-search-debug.json`), copied verbatim.
+#:
+#: This is the wire shape the extraction has to work against, and it is worth pinning from a
+#: real body rather than a hand-built one: pair run 3 recorded `scoreBasis: delivered` on all
+#: 12 queries and the first hypothesis was a wrong JSON path. It was not — the path below is
+#: exactly what the code reads; the cross-encoder stage was ABSENT because the stage had been
+#: dropped (`INFERENCE_FAILED`). A synthetic fixture could not have told those two apart.
+#:
+#: Note the shape facts this pins: stages are `{id, rank, score, detail}`; `rank` and `detail`
+#: are ABSENT on the cross-encoder entry (`SearchTraceMapper.mapHitStages` appends it with
+#: nulls for both); and `results[i].score` equals the `branch-fusion` stage score, NOT the
+#: cross-encoder's — which is the whole reason the basis had to change.
+_REAL_TRACES = [
+    [
+        {"id": "sparse-retrieval", "rank": 19, "score": 3.7805243,
+         "detail": {"sparse_rank": 19.0, "sparse": 3.7805243}},
+        {"id": "dense-retrieval", "rank": 16, "score": 0.5049805,
+         "detail": {"vector": 0.5049805, "vector_rank": 16.0}},
+        {"id": "fusion", "score": 0.42335153, "detail": {"cc_alpha": 0.5, "cc": 0.42335153}},
+        {"id": "chunk-merge", "score": 0.49315822, "detail": {"chunk_cc": 0.49315822}},
+        {"id": "branch-fusion", "score": 0.46152, "detail": {"branch_merge_cc": 0.46152}},
+        {"id": "cross-encoder", "score": 0.2602539},
+    ],
+    [
+        {"id": "sparse-retrieval", "rank": 8, "score": 4.6122785, "detail": {}},
+        {"id": "dense-retrieval", "rank": 11, "score": 0.5312805, "detail": {}},
+        {"id": "fusion", "score": 0.36807224, "detail": {}},
+        {"id": "branch-fusion", "score": 0.5792252, "detail": {}},
+        {"id": "cross-encoder", "score": 0.14123535},
+    ],
+    [
+        {"id": "sparse-retrieval", "rank": 3, "score": 5.011, "detail": {}},
+        {"id": "dense-retrieval", "rank": 2, "score": 0.61, "detail": {}},
+        {"id": "fusion", "score": 0.56067425, "detail": {}},
+        {"id": "branch-fusion", "score": 0.6673769, "detail": {}},
+        {"id": "cross-encoder", "score": 0.019317627},
+    ],
+]
+
+#: `results[i].score` of the same three hits — the branch-fusion value, freshness-decayed.
+#: NOT monotone with the delivered order, which is the defect the CE basis fixes.
+_REAL_DELIVERED = [0.4615199863910675, 0.5792251825332642, 0.6673769354820251]
+
+
+def _real_response() -> dict:
+    """A trimmed real response: the three real traces above on minimal hit envelopes.
+
+    Only `trace` and `score` are real; the identity fields are simplified because the
+    extraction under test does not read them (path rewriting has its own tests).
+    """
+    return {
+        "totalHits": 3,
+        "matchCount": 3,
+        "results": [
+            {
+                "id": f"h{i}",
+                "score": _REAL_DELIVERED[i],
+                "fields": {"doc_id": f"h{i}", "path": f"docs/h{i}.md",
+                           "filename": f"h{i}.md", "is_chunk": "true",
+                           "parent_doc_id": f"h{i}", "chunk_index": str(i)},
+                "matchedFields": [], "excerptRegions": [], "trace": trace,
+            }
+            for i, trace in enumerate(_REAL_TRACES)
+        ],
+        "searchTrace": {"stages": [], "degradation": {}},
+    }
+
+
+def test_cross_encoder_score_is_read_from_the_real_wire_shape():
+    """Proven against a real `debug:true` body, not a synthetic one.
+
+    Pins the exact path — `results[i].trace[]`, entry with `id == "cross-encoder"`, its
+    `score` — and the three real values.
+    """
+    response = _real_response()
+    hits = response["results"]
+    assert [wf.stage_score(h, "cross-encoder") for h in hits] == [
+        0.2602539, 0.14123535, 0.019317627]
+    assert [wf.stage_score(h, "fusion") for h in hits] == [
+        0.42335153, 0.36807224, 0.56067425]
+
+    basis, scores = wf.resolve_score_basis(hits)
+    assert basis == wf.SCORE_BASIS_CROSS_ENCODER
+    assert scores == [0.2602539, 0.14123535, 0.019317627]
+
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    assert [t["score"] for t in record["hits[]"]] == [0.2602539, 0.14123535, 0.019317627], \
+        "the stored tag must be the cross-encoder score"
+
+
+def test_the_real_response_shows_why_the_delivered_score_is_the_wrong_basis():
+    """The delivered score RISES down the list while the CE score falls.
+
+    `results[i].score` equals the branch-fusion stage score, and the list is ordered by the
+    cross-encoder. Grouping on the delivered score therefore grouped a CE-ordered list by an
+    unrelated key — measured non-monotone in all 12 queries of both 2026-09-07 captures.
+    """
+    hits = _real_response()["results"]
+    delivered = [h["score"] for h in hits]
+    ce = [wf.stage_score(h, "cross-encoder") for h in hits]
+
+    assert delivered == sorted(delivered), \
+        "the delivered score INCREASES down the delivered order — it cannot be the sort key"
+    assert ce == sorted(ce, reverse=True), \
+        "the cross-encoder score decreases monotonically — it IS the sort key"
+    # And each hit's delivered score is its branch-fusion stage score, not its CE score.
+    for h in hits:
+        assert abs(h["score"] - wf.stage_score(h, "branch-fusion")) < 1e-6
+
+
+def test_a_hit_without_a_cross_encoder_entry_falls_back():
+    """The fallback the dropped-CE case needs: no `cross-encoder` entry in `trace`."""
+    response = _real_response()
+    for h in response["results"]:
+        h["trace"] = [st for st in h["trace"] if st["id"] != "cross-encoder"]
+    basis, scores = wf.resolve_score_basis(response["results"])
+    assert basis == wf.SCORE_BASIS_DELIVERED
+    assert scores == _REAL_DELIVERED
+
+
+def test_a_dropped_cross_encoder_fails_capture_health():
+    """A capture whose CE was dropped records a DEGRADED pipeline, so it is refused.
+
+    Both sides of a pair degrade together, so the diff gets QUIETER — the dangerous
+    direction. Pair run 3 read as "2 regressions, nearly clean" with every query showing
+    `cross-encoder: skipped / INFERENCE_FAILED`.
+    """
+    record = {
+        "httpStatus": 200, "matchCount": 1, "hitCount": 1, "hits[]": [],
+        "trace.stageStatuses": {"10:cross-encoder": "skipped"},
+        "trace.stageReasons": {"10:cross-encoder": "INFERENCE_FAILED"},
+    }
+    base = _capture({"q1": record})
+    problems = wf._cross_encoder_problems(base, base)
+    assert problems, "a dropped cross-encoder must be a health problem"
+    assert "INFERENCE_FAILED" in problems[0]
+    assert "JUSTSEARCH_RERANK_GPU_MEM_MB" in problems[0], "the message must name the remedy"
+
+    # A cross-encoder that RAN is not a problem, and neither is a by-design skip.
+    ok = dict(record, **{"trace.stageStatuses": {"10:cross-encoder": "executed"},
+                         "trace.stageReasons": {}})
+    assert not wf._cross_encoder_problems(_capture({"q1": ok}), _capture({"q1": ok}))
+    by_design = dict(record, **{"trace.stageReasons": {"10:cross-encoder": "not-selected"}})
+    assert not wf._cross_encoder_problems(
+        _capture({"q1": by_design}), _capture({"q1": by_design})), \
+        "a by-design skip is not a drop"
+
+
+def _noise_fixture(max_noisy_fraction: float = wf.MAX_NOISY_FRACTION_CEILING) -> dict:
+    """A two-field fixture whose noise ceiling is as HIGH as a fixture may legally set it.
+
+    These fixtures are tiny, so one noisy field is already 50% of the compared set and the
+    default 10% ceiling would fire in every classification test. The ceiling has its own tests;
+    everything else pushes it to the top of its legal range so it is testing the property it
+    names. It cannot be pushed out of the way entirely — `validate_fixture` refuses anything
+    above `MAX_NOISY_FRACTION_CEILING`, because a gate that withdraws more than half its
+    compared fields is not a strict gate with a wide tolerance, it is not a gate.
+    """
+    return dict(_minimal_fixture({"queries.a": "exact", "queries.b": "exact"}),
+                maxNoisyFraction=max_noisy_fraction)
+
+
+def _q(a, b):
+    """A one-query capture carrying two exact fields, plus a healthy provenance floor."""
+    return _capture({"q1": {"httpStatus": 200, "hitCount": 1, "a": a, "b": b}})
+
+
+def test_a_field_its_own_side_moves_is_not_a_regression():
+    """The whole point: determinism is MEASURED, not assumed.
+
+    Field `a` differs across sides AND differs within the baseline own same-build pair, so the
+    build cannot be what changed it. It is reported noisy-baseline and withdrawn from the
+    verdict; field `b`, stable everywhere, keeps the run honest by staying `equal`.
+    """
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=[_q("z", "same")], candidate_noise=[_q("y", "same")])
+    assert _status(result, "queries.a") == "noisy-baseline"
+    assert _status(result, "queries.b") == "equal"
+    assert result["counts"]["noisy"] == 1
+    assert result["counts"]["REGRESSION"] == 0
+    assert result["pass"] is True, result["health"]["problems"]
+    # The verdict it WOULD have returned is kept for the reader, so nothing is hidden.
+    entry = [e for e in result["fields"] if e["field"] == "queries.a"][0]
+    assert entry["crossSideStatus"] == "REGRESSION"
+
+
+def test_a_field_stable_in_both_noise_pairs_is_still_a_regression():
+    """Noise excuses only what it actually covers.
+
+    Both noise pairs reproduce their side exactly, so nothing is withdrawn and a cross-side
+    difference is attributable to the build — which is the case the gate exists for.
+    """
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=_q("x", "same"), candidate_noise=_q("y", "same"))
+    assert _status(result, "queries.a") == "REGRESSION"
+    assert result["counts"]["noisy"] == 0
+    assert result["pass"] is False
+
+
+def test_noise_on_both_sides_is_reported_as_noisy_both():
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=_q("p", "same"), candidate_noise=_q("r", "same"))
+    assert _status(result, "queries.a") == "noisy-both"
+    assert result["noisy_by_side"]["both"] == 1
+
+
+def test_a_noise_pair_louder_than_the_ceiling_fails_the_run():
+    """A degraded pipeline must not hide behind noise.
+
+    Every noisy field is withdrawn from the verdict, so without a ceiling a run whose sides are
+    both broken would present as very quiet — "almost nothing was compared" reading as "nothing
+    regressed". Both of this fixture two fields are noisy (100% > 10%), so the run is refused.
+    """
+    fixture = _noise_fixture(max_noisy_fraction=0.10)
+    result = wf.diff(_q("x", "y"), _q("x", "y"), fixture,
+                     baseline_noise=[_q("p", "q")], candidate_noise=[_q("x", "y")])
+    assert result["counts"]["noisy"] == 2
+    assert result["pass"] is False
+    hit = _has(result["health"]["problems"], "same-build noise pair moved")
+    assert hit, result["health"]["problems"]
+    assert "maxNoisyFraction" in hit[0]
+    assert "almost nothing was checked" in hit[0]
+
+
+def test_the_ceiling_is_read_from_the_fixture():
+    """Raising the declared ceiling admits the same run — the number is the fixture, not code.
+
+    One of the two fields is noisy, which is exactly 50%: refused at the shipped 0.05 and
+    admitted at the highest a fixture may declare. The refusal is `>`, not `>=`, so a run
+    sitting exactly ON its declared ceiling passes.
+    """
+    baseline, candidate = _q("x", "y"), _q("x", "y")
+    noise = ([_q("p", "y")], [_q("x", "y")])   # only field `a` moves within the baseline pair
+
+    strict = wf.diff(baseline, candidate, _noise_fixture(max_noisy_fraction=0.05),
+                     baseline_noise=noise[0], candidate_noise=noise[1])
+    assert strict["counts"]["noisy"] == 1
+    assert strict["pass"] is False
+
+    result = wf.diff(baseline, candidate,
+                     _noise_fixture(max_noisy_fraction=wf.MAX_NOISY_FRACTION_CEILING),
+                     baseline_noise=noise[0], candidate_noise=noise[1])
+    assert result["counts"]["noisy"] == 1
+    assert result["pass"] is True, result["health"]["problems"]
+    assert result["maxNoisyFraction"] == wf.MAX_NOISY_FRACTION_CEILING
+
+
+def test_a_fixture_may_not_declare_an_unknown_top_level_key():
+    """A misspelt threshold silently leaves the run on the default, erring towards passing."""
+    fixture = dict(_minimal_fixture({"queries.a": "exact"}), maxNoisyFractoin=0.02)
+    with pytest.raises(wf.WorkflowFixtureError) as exc:
+        wf.validate_fixture(fixture)
+    assert "maxNoisyFractoin" in str(exc.value)
+
+
+@pytest.mark.parametrize("value", [0, 0.0, -0.1, 0.6, 1.0, "0.05", True, None])
+def test_max_noisy_fraction_is_bounded(value):
+    """0 makes the first jittering score fail the run; >0.5 makes the gate unable to fail."""
+    fixture = dict(_minimal_fixture({"queries.a": "exact"}), maxNoisyFraction=value)
+    with pytest.raises(wf.WorkflowFixtureError) as exc:
+        wf.validate_fixture(fixture)
+    assert "maxNoisyFraction" in str(exc.value)
+
+
+@pytest.mark.parametrize("value", [1, 0, -2, 2.5, "4", True, None])
+def test_capture_limit_multiplier_is_a_whole_number_of_at_least_two(value):
+    """At 1 the cross-encoder window ends exactly at the captured set; 2.5 truncates in silence."""
+    fixture = dict(_minimal_fixture({"queries.a": "exact"}), captureLimitMultiplier=value)
+    with pytest.raises(wf.WorkflowFixtureError) as exc:
+        wf.validate_fixture(fixture)
+    assert "captureLimitMultiplier" in str(exc.value)
+
+
+def test_the_bounded_values_the_shipped_fixture_declares_are_accepted():
+    """The falsifier for the four tests above: the real fixture must still load."""
+    shipped = wf.load_fixture(DEFAULT_FIXTURE)
+    assert 0 < shipped["maxNoisyFraction"] <= wf.MAX_NOISY_FRACTION_CEILING
+    assert isinstance(shipped["captureLimitMultiplier"], int)
+    assert shipped["captureLimitMultiplier"] >= 2
+
+
+def test_a_noise_capture_under_different_pins_fails_health():
+    """A noise pair has to be the same build under the same conditions.
+
+    Otherwise the "noise" it measures is the condition change, and every field it excuses is
+    excused for the wrong reason.
+    """
+    primary = _q("x", "same")
+    other_pins = dict(_HEALTHY_PINS, **{"justsearch.llm.slots": "2"})
+    noise = _capture({"q1": {"httpStatus": 200, "hitCount": 1, "a": "x", "b": "same"}},
+                     provenance={"pins": other_pins})
+    result = wf.diff(primary, _q("x", "same"), _noise_fixture(),
+                     baseline_noise=[noise], candidate_noise=[_q("x", "same")])
+    assert result["pass"] is False
+    hit = _has(result["health"]["problems"], "provenance.pins differs from its own")
+    assert hit, result["health"]["problems"]
+    assert "SAME build under the SAME conditions" in hit[0]
+
+
+def test_a_noise_capture_on_a_different_chat_profile_fails_health():
+    primary = _q("x", "same")
+    noise = _capture({"q1": {"httpStatus": 200, "hitCount": 1, "a": "x", "b": "same"}},
+                     provenance={"chatProfile": "standard"})
+    result = wf.diff(primary, _q("x", "same"), _noise_fixture(),
+                     baseline_noise=[noise], candidate_noise=[_q("x", "same")])
+    assert result["pass"] is False
+    assert _has(result["health"]["problems"], "provenance.chatProfile differs from its own")
+
+
+def test_without_noise_flags_the_diff_is_unchanged():
+    """The gate is opt-in: no noise captures means exactly today's verdict."""
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture())
+    assert _status(result, "queries.a") == "REGRESSION"
+    assert result["counts"]["noisy"] == 0
+    assert result["noisy_by_side"] == {"baseline": 0, "candidate": 0, "both": 0}
+
+
+def test_a_noise_capture_missing_the_field_does_not_excuse_it():
+    """Absent evidence of instability is not evidence of it.
+
+    A truncated or empty noise capture can only make the gate STRICTER, never laxer — the
+    field stays in the verdict rather than being withdrawn on no evidence.
+    """
+    noise = _capture({"q1": {"httpStatus": 200, "hitCount": 1, "b": "same"}})
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=[noise], candidate_noise=[_q("y", "same")])
+    assert _status(result, "queries.a") == "REGRESSION"
+    assert result["counts"]["noisy"] == 0
+
+
+def test_the_shipped_fixture_declares_the_noise_ceiling():
+    # ~10 fields of the shipped fixture's ~209 compared — roughly twice the 6 measured on pairs
+    # 4 and 5, so the gate notices a drift TOWARDS noise, not only a collapse into it.
+    assert wf.load_fixture(DEFAULT_FIXTURE)["maxNoisyFraction"] == 0.05
+
+
+def test_a_partially_enriched_capture_is_refused():
+    """The gap that let the four-capture acceptance pass with 0 regressions.
+
+    Side A cycle 1's enrichment wait timed out and the capture was taken anyway. That side then
+    disagreed with ITSELF on 11 of 12 queries, every disagreement was classified noise and
+    withdrawn, and the run reported success having compared almost nothing. An unfinished index
+    is not a slower capture, it is a different index.
+    """
+    half = dict(_HEALTHY_ENRICHMENT,
+                embeddingCoveragePercent=38.0,
+                chunkEmbeddingPendingCount=1283,
+                incompleteReasons=["chunk_vectors_not_complete", "embedding_not_complete"])
+    bad = _capture(provenance={"enrichment": half})
+    result = wf.diff(bad, _capture(), _minimal_fixture({"queries.a": "exact"}))
+    assert result["pass"] is False
+    hit = _has(result["health"]["problems"], "was NOT fully enriched")
+    assert hit, result["health"]["problems"]
+    # The message has to carry the evidence, or a reader cannot act on it.
+    assert "embedding_not_complete" in hit[0]
+    assert "38.0" in hit[0] and "1283" in hit[0]
+
+
+def test_a_capture_with_no_enrichment_block_is_refused():
+    """Absent is refused too: a capture that cannot show the index was ready proves nothing."""
+    result = wf.diff(_capture(provenance={"enrichment": None}), _capture(),
+                     _minimal_fixture({"queries.a": "exact"}))
+    assert result["pass"] is False
+    assert _has(result["health"]["problems"], "provenance.enrichment is absent")
+
+
+def test_a_fully_enriched_capture_passes():
+    """Precision: the check must not fire on the healthy case it is meant to allow."""
+    healthy = _capture({"q1": {"a": 1}})
+    result = wf.diff(healthy, healthy, _minimal_fixture({"queries.a": "exact"}))
+    assert not _has(result["health"]["problems"], "enriched")
+    assert result["pass"] is True, result["health"]["problems"]
+
+
+def test_enrichment_uses_the_shared_readiness_predicate():
+    """`read_enrichment` must not restate the completeness rule — it imports it.
+
+    Two copies of "is the index ready" drift, and then a capture can satisfy the ingest wait
+    while failing the capture check (or worse, the reverse). Asserted by feeding the SAME
+    snapshot to both and requiring the same verdict.
+    """
+    from jseval.readiness import _check_pipeline_complete_conditions
+
+    snapshot = {"indexState": "INDEXING", "embeddingCoveragePercent": 38.0,
+                "spladeCoveragePercent": 100.0, "nerEnabled": False}
+    assert "index_not_idle" in _check_pipeline_complete_conditions(snapshot, 0)
+    assert "embedding_not_complete" in _check_pipeline_complete_conditions(snapshot, 0)
+    # A disabled stage is skipped rather than blocking forever — the behaviour the capture
+    # inherits for free by importing rather than restating.
+    assert "ner_not_complete" not in _check_pipeline_complete_conditions(snapshot, 0)
+
+
+def test_a_field_noisy_on_both_sides_counts_towards_each_side_fraction():
+    """The arithmetic bug that let the four-capture acceptance pass.
+
+    `noisy-both` means the field is unstable on the baseline AND on the candidate, so it counts
+    towards BOTH fractions. Counting only each side's exclusive noise understated every side
+    that shares an unstable field: the acceptance measured baseline 9 exclusive + 6 both and
+    scored 9/222 = 4%, under the 5% ceiling, when the honest figure is 15/222 = 6.8%.
+    """
+    # `a` is noisy on both sides, `b` on the baseline only. Five fields are compared (a, b, and
+    # the health floor httpStatus/hitCount/chatTurns.httpStatus), so the baseline is 2/5 = 40%
+    # once `both` counts and the candidate 1/5 = 20%. A 30% ceiling therefore fires for the
+    # baseline and only for the baseline — under the old arithmetic the baseline was 1/5 = 20%
+    # and nothing fired at all.
+    fixture = _noise_fixture(max_noisy_fraction=0.30)
+    result = wf.diff(_q("x", "m"), _q("x", "m"), fixture,
+                     baseline_noise=_q("p", "n"), candidate_noise=_q("r", "m"))
+    assert _status(result, "queries.a") == "noisy-both"
+    assert _status(result, "queries.b") == "noisy-baseline"
+    hit = _has(result["health"]["problems"], "baseline: the same-build noise pair moved")
+    assert hit, "baseline is 2 of 4 compared fields (50%) once `both` counts — the ceiling fires"
+    # The candidate carries only the shared field, so it stays inside the same ceiling.
+    assert not _has(result["health"]["problems"], "candidate: the same-build noise pair moved")
+
+
+def test_three_captures_where_only_the_later_two_disagree_marks_the_field_noisy():
+    """Two captures UNDER-SAMPLE, which is why the default is three.
+
+    Gate run 3 had q05 and q12 change their tie-group partition across sides while being stable
+    within BOTH sides' two-capture pairs, on one build: the pair had not drawn the unstable
+    value yet. So a field is noisy when ANY TWO of a side's captures disagree — here captures 2
+    and 3 differ while capture 1 agrees with capture 2, which a primary-vs-each comparison would
+    have missed entirely.
+    """
+    fixture = _noise_fixture()
+    # baseline captures: primary "x", then "x", then "y" — 1 vs 2 agree, 2 vs 3 do not.
+    result = wf.diff(_q("x", "same"), _q("x", "same"), fixture,
+                     baseline_noise=[_q("x", "same"), _q("y", "same")],
+                     candidate_noise=[_q("x", "same"), _q("x", "same")])
+    assert _status(result, "queries.a") == "noisy-baseline"
+    assert result["captures_per_side"] == {"baseline": 3, "candidate": 3}
+
+    # The falsifier: with only the first two baseline captures the field looks stable.
+    two_only = wf.diff(_q("x", "same"), _q("x", "same"), fixture,
+                       baseline_noise=[_q("x", "same")],
+                       candidate_noise=[_q("x", "same")])
+    assert _status(two_only, "queries.a") == "equal", \
+        "with two captures the instability is not sampled — the reason the default is three"
+
+
+def test_a_side_with_one_capture_refuses_to_gate():
+    """A side that brought no second capture cannot be gated.
+
+    Nothing of it was measured for stability, so every one of its fields would count as stable
+    by default — the direction that silently passes. Refusing is the only honest answer.
+    """
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture(),
+                     baseline_noise=[_q("x", "same"), _q("x", "same")])
+    assert result["pass"] is False
+    hit = _has(result["health"]["problems"], "no noise captures on candidate")
+    assert hit, result["health"]["problems"]
+    assert "stable by default" in hit[0]
+    assert "fixture-pair.sh" in hit[0], "the message must name the remedy"
+    assert result["captures_per_side"] == {"baseline": 3, "candidate": 1}
+    # The baseline, which DID bring captures, is not accused of the same thing.
+    assert not _has(result["health"]["problems"], "no noise captures on baseline")
+
+
+def test_no_noise_arguments_at_all_still_behaves_as_before():
+    """Opt-in: a plain two-capture diff is not suddenly refused for lacking noise captures."""
+    result = wf.diff(_q("x", "same"), _q("y", "same"), _noise_fixture())
+    assert not _has(result["health"]["problems"], "no noise captures")
+    assert _status(result, "queries.a") == "REGRESSION"
+    assert result["captures_per_side"] == {"baseline": 1, "candidate": 1}
+
+
+def test_a_single_capture_is_still_accepted_for_a_side():
+    """Back-compat: one capture, not wrapped in a list, is normalised rather than iterated."""
+    result = wf.diff(_q("x", "same"), _q("x", "same"), _noise_fixture(),
+                     baseline_noise=_q("y", "same"), candidate_noise=_q("x", "same"))
+    assert _status(result, "queries.a") == "noisy-baseline"
+    assert result["captures_per_side"] == {"baseline": 2, "candidate": 2}
+
+
+def test_candidate_pool_counts_are_observed_only():
+    """`totalHits` and `trace.stageCardinality` are pool sizes, not evidence.
+
+    Both moved between two fresh ingests of ONE corpus on ONE build (q02/q03/q07/q09 of the
+    2026-09-07 pair) because they count how many candidates a stage happened to consider,
+    which follows the candidate budget and which chunks sat at a per-leg cutoff. Design 16
+    names evidence selection, truncation points, citation targets and cancellation as the
+    byte-equal fields and never these. `matchCount` is different and stays exact: it is an
+    IndexSearcher.count over the query, a property of the corpus and the query.
+    """
+    response = _response_with_scores([0.9, 0.8, 0.5])
+    record = wf.capture_query_record(response, limit=10, epsilon=0.01)
+    assert "totalHits" not in record
+    assert "trace.stageCardinality" not in record
+    assert "matchCount" in record, "matchCount is NOT a pool size and must survive"
+
+    # The shipped fixture no longer declares either, and still declares matchCount.
+    fields = wf.load_fixture(DEFAULT_FIXTURE)["fields"]
+    assert "queries.totalHits" not in fields
+    assert "queries.trace.stageCardinality" not in fields
+    assert fields["queries.matchCount"] == "exact"
+
+    # An undeclared field is a regression by construction, so the removal only works because
+    # the capture stopped emitting them. Prove the differ sees neither name.
+    counts = wf.observed_query_counts(response, record)
+    assert counts["totalHits"] == 3
+    assert "stageCardinality" in counts
+
+
+def test_capture_records_the_counts_in_the_observed_block(tmp_path: Path):
+    """End to end through `capture`: the counts land in `observed`, not in `queries`."""
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    client_kwargs = {"transport": httpx.MockTransport(
+        _search_backend(_absolute_search_response(), roots=[_ROOT]))}
+    doc = _capture_with_transport(fixture, tmp_path / "out.json", client_kwargs)
+    observed = doc["observed"]["queries"]["q1"]
+    assert observed["hitsCaptured"] == 2
+    assert observed["hitsCompared"] == 2
+    assert "hitsCaptured" not in doc["queries"]["q1"]
+    assert "hitsCompared" not in doc["queries"]["q1"]
+
+
+# ---------------------------------------------------------------------------
+# Run preconditions: the boot-time pins and the APPLIED sampling
+# ---------------------------------------------------------------------------
+#
+# These are not fields either build produced — they are the conditions both runs were
+# performed under, so they are capture-HEALTH problems rather than diffed rows. Every
+# assertion below checks the problem TEXT, not just `pass is False`: a test that only
+# asserted the verdict would pass because some unrelated health check happened to fire.
+
+def _problems(baseline, candidate, fixture=None):
+    fixture = fixture or _minimal_fixture({"queries.a": "exact"})
+    return wf.diff(baseline, candidate, fixture)["health"]["problems"]
+
+
+def _has(problems, *needles):
+    return [p for p in problems if all(n in p for n in needles)]
+
+
+def test_absent_pins_fail_the_diff():
+    """No `provenance.pins` at all — an older capture, or an endpoint that 404s."""
+    base = _capture({"q1": {"a": 1}}, provenance={"pins": None})
+    cand = _capture({"q1": {"a": 1}})
+    problems = _problems(base, cand)
+    hit = _has(problems, "baseline", "provenance.pins is missing")
+    assert hit, problems
+    assert "index.vector.exhaustive_search" in hit[0]
+    assert "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true" in hit[0]
+    assert wf.diff(base, cand, _minimal_fixture({"queries.a": "exact"}))["pass"] is False
+    # The candidate had all four, so only ONE side is named.
+    assert not _has(problems, "candidate:", "provenance.pins is missing")
+
+
+def test_pins_missing_one_key_fail_the_diff_and_the_key_is_named():
+    partial = dict(_HEALTHY_PINS)
+    del partial["justsearch.llm.slots"]
+    base = _capture({"q1": {"a": 1}}, provenance={"pins": partial})
+    problems = _problems(base, _capture({"q1": {"a": 1}}))
+    hit = _has(problems, "provenance.pins is missing")
+    assert hit, problems
+    # The named list is EXACTLY the absent key — not the three that were present.
+    assert "provenance.pins is missing ['justsearch.llm.slots']" in hit[0]
+
+
+def test_pins_that_differ_between_the_two_sides_fail_the_diff():
+    """A pair whose sides ran under different boot-time settings is not a build comparison."""
+    other = dict(_HEALTHY_PINS, **{"justsearch.llm.slots": "2"})
+    problems = _problems(_capture({"q1": {"a": 1}}),
+                         _capture({"q1": {"a": 1}}, provenance={"pins": other}))
+    hit = _has(problems, "ran under DIFFERENT justsearch.llm.slots")
+    assert hit, problems
+    assert "'1'" in hit[0] and "'2'" in hit[0]      # both values, so the reader can act
+    assert "two configurations, not two builds" in hit[0]
+
+
+def test_absent_applied_sampling_fails_the_diff():
+    """`provenance.sampling` is only what was REQUESTED — absence of the applied echo fails."""
+    base = _capture({"q1": {"a": 1}}, provenance={"samplingApplied": None})
+    problems = _problems(base, _capture({"q1": {"a": 1}}))
+    hit = _has(problems, "baseline", "provenance.samplingApplied is absent")
+    assert hit, problems
+    assert "only what it requested" in hit[0]
+
+
+def test_applied_sampling_missing_a_recorded_turn_fails_the_diff():
+    base = _capture({"q1": {"a": 1}}, chat={"c1": {}, "c2": {}},
+                    provenance={"samplingApplied": {"c1": dict(_HEALTHY_APPLIED)}})
+    cand = _capture({"q1": {"a": 1}}, chat={"c1": {}, "c2": {}})
+    problems = _problems(base, cand)
+    hit = _has(problems, "baseline chatTurns/c2", "no entry in provenance.samplingApplied")
+    assert hit, problems
+    assert not _has(problems, "baseline chatTurns/c1", "no entry")
+
+
+def test_a_build_that_echoes_no_applied_sampling_fails_the_diff():
+    """The pre-PR-0b case: session_started omits all three keys, so the entry is all-null.
+
+    This must FAIL rather than read as "the run applied no override" — it is exactly the
+    situation `provenance.sampling` alone cannot distinguish, since the capture writes its
+    own request back regardless of what the backend did with it.
+    """
+    silent = {"c1": {"temperature": None, "top_p": None, "seed": None}}
+    base = _capture({"q1": {"a": 1}}, provenance={"samplingApplied": silent})
+    problems = _problems(base, _capture({"q1": {"a": 1}}))
+    hit = _has(problems, "baseline chatTurns/c1", "carried NO applied sampling")
+    assert hit, problems
+    assert "predating PR 0b" in hit[0]
+
+
+def test_applied_sampling_that_differs_between_the_two_sides_fails_the_diff():
+    hotter = {"c1": dict(_HEALTHY_APPLIED, temperature=0.7)}
+    problems = _problems(_capture({"q1": {"a": 1}}),
+                         _capture({"q1": {"a": 1}},
+                                  provenance={"samplingApplied": hotter}))
+    hit = _has(problems, "chatTurns/c1", "APPLIED different sampling")
+    assert hit, problems
+    assert "0.7" in hit[0] and "not a build difference" in hit[0]
+
+
+def test_matching_preconditions_produce_no_precondition_problem():
+    """The floor itself must be clean, or every assertion above proves nothing."""
+    result = wf.diff(_capture({"q1": {"a": 1}}), _capture({"q1": {"a": 1}}),
+                     _minimal_fixture({"queries.a": "exact"}))
+    assert result["health"] == {"ok": True, "problems": []}
+
+
+def test_applied_sampling_is_read_off_the_session_started_frame():
+    frames = wf.parse_sse_frames(
+        "event: session_started\n"
+        'data: {"sessionId":"s","samplingTemperature":0.0,"samplingTopP":0.8,'
+        '"samplingSeed":20260907}\n\n'
+        "event: done\n"
+        'data: {"finalResponse":"x"}\n\n'
+    )
+    assert wf.applied_sampling(frames) == {
+        "temperature": 0.0, "top_p": 0.8, "seed": 20260907}
+    # A key the backend omitted stays None — never defaulted to the requested value.
+    partial = wf.parse_sse_frames(
+        'event: session_started\ndata: {"sessionId":"s","samplingTemperature":0.0}\n\n')
+    assert wf.applied_sampling(partial) == {
+        "temperature": 0.0, "top_p": None, "seed": None}
+    # A build predating PR 0b emits the one-key payload: all three absent.
+    old = wf.parse_sse_frames('event: session_started\ndata: {"sessionId":"s"}\n\n')
+    assert wf.applied_sampling(old) == {
+        "temperature": None, "top_p": None, "seed": None}
+    assert wf.applied_sampling([]) == {
+        "temperature": None, "top_p": None, "seed": None}
+
+
+def test_run_chat_turn_returns_the_applied_sampling_beside_the_record():
+    """It rides NEXT TO the record, not inside it — an undeclared record key is a regression."""
+    stream = (
+        "event: session_started\n"
+        'data: {"sessionId":"s","samplingTemperature":0.0,"samplingSeed":7}\n\n'
+        'event: done\ndata: {"finalResponse":"x","iterationsUsed":2,"disposition":"COMPLETED"}\n\n'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=stream,
+                              headers={"Content-Type": "text/event-stream"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        turn = wf.run_chat_turn(client, {"id": "c01", "content": "x"})
+    assert turn.sampling_applied == {"temperature": 0.0, "top_p": None, "seed": 7}
+    assert turn.record["disposition"] == "COMPLETED"
+    for leaked in ("samplingApplied", "temperature", "samplingTemperature"):
+        assert leaked not in turn.record
+
+
+def test_pins_are_read_from_the_effective_config_endpoint():
+    """The shape is `resolvedConfig[] = {key, value, source, ordinal, detail, candidates}`.
+
+    `value` is a STRING and is OMITTED (not null) for a key no source supplied — the record
+    is `@JsonInclude(NON_NULL)` — so an unset `index.vector.exhaustive_search` must read as
+    MISSING, not as a value.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/debug/effective-config"
+        return httpx.Response(200, json={"schemaVersion": 1, "resolvedConfig": [
+            {"key": "justsearch.data.dir", "value": "F:/data", "source": "env_var",
+             "ordinal": 400, "candidates": []},
+            {"key": "index.vector.exhaustive_search", "value": "true", "source": "env_var",
+             "ordinal": 400, "detail": "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH",
+             "candidates": []},
+            {"key": "justsearch.llm.slots", "value": "1", "source": "jvm_arg",
+             "ordinal": 500, "candidates": []},
+            {"key": "justsearch.rerank.deadline_ms", "value": "5000", "source": "env_var",
+             "ordinal": 400, "candidates": []},
+            # No `value` key at all: nothing supplied one.
+            {"key": "justsearch.rerank.chunks.deadline_ms", "source": "none",
+             "ordinal": 0, "candidates": []},
+        ]})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        pins, sources = wf.read_config_pins(client)
+    assert pins == {"index.vector.exhaustive_search": "true",
+                    "justsearch.llm.slots": "1",
+                    "justsearch.rerank.deadline_ms": "5000"}
+    assert "justsearch.rerank.chunks.deadline_ms" not in pins    # valueless != a value
+    assert sources["justsearch.llm.slots"] == "jvm_arg"
+    assert "justsearch.data.dir" not in pins                     # only the declared pins
+
+
+def test_an_absent_effective_config_endpoint_yields_empty_pins_not_an_exception():
+    """`/api/config/effective` is what the PR 0b pair run fetched — it 404s.
+
+    (`tmp/pr0b-pair/effective-config-1.json` is the NOT_FOUND body.) The capture must still
+    be written, and the diff built on it must then FAIL health rather than pass silently.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "No handler registered",
+                                         "errorCode": "NOT_FOUND"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        assert wf.read_config_pins(client) == ({}, {})
+    # A body with no `resolvedConfig` array is the same "cannot prove it" answer.
+    def no_block(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"schemaVersion": 1, "keys": []})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(no_block)) as client:
+        assert wf.read_config_pins(client) == ({}, {})
+
+    empty = _capture({"q1": {"a": 1}}, provenance={"pins": {}})
+    result = wf.diff(empty, empty, _minimal_fixture({"queries.a": "exact"}))
+    assert result["pass"] is False
+    assert _has(result["health"]["problems"], "provenance.pins is missing")
+
+
+def test_capture_records_the_pins_and_the_applied_sampling(tmp_path: Path):
+    """End to end: both blocks land in `provenance`, and neither becomes a diffed field."""
+    fixture = _minimal_fixture({"queries.hits[]": "equal-score-order"})
+    client_kwargs = {"transport": httpx.MockTransport(
+        _search_backend(_absolute_search_response(), roots=[_ROOT], chat=True))}
+    doc = _capture_with_transport(fixture, tmp_path / "out.json", client_kwargs)
+    prov = doc["provenance"]
+    # Compared against the shared healthy set, which is itself derived from PINNED_CONFIG_KEYS —
+    # a hard-coded literal here would have to be edited every time a pin is added, and the
+    # editing is exactly where it would silently fall short of the code.
+    assert prov["pins"] == _HEALTHY_PINS
+    assert set(prov["pins"]) == set(wf.PINNED_CONFIG_KEYS)
+    assert prov["pinSources"]["index.vector.exhaustive_search"] == "env_var"
+    assert prov["samplingApplied"] == {"c1": {"temperature": 0.0, "top_p": 0.8, "seed": 7}}
+    # The REQUESTED pin is still recorded separately — the two must be able to disagree.
+    assert prov["sampling"] == {"temperature": 0.0, "seed": 7}
+    assert "samplingApplied" not in doc["chatTurns"]["c1"]
+    assert "pins" not in doc["chatTurns"]["c1"]
+    # …and a capture written this way passes health against itself.
+    assert wf.diff(doc, doc, fixture)["health"] == {"ok": True, "problems": []}
 
 
 # ---------------------------------------------------------------------------
@@ -598,13 +1887,23 @@ def test_ordinary_turns_are_given_room_to_complete():
 
 
 def test_generation_nondeterminism_finding_is_recorded():
-    """Live finding 4: citationTargets stays `exact`; the finding is recorded, not hidden."""
+    """Live finding 4: citationTargets stays `exact`; the finding is recorded, not hidden.
+
+    The note must name the sampling the AGENT path actually runs under. It is not
+    `ConversationEngine`'s hard-coded 0.8/0.95 — an agent turn is shape-driven and never
+    reaches `parseSamplingParams`; it samples under `SamplingParams.AGENT` (0.7 / 0.8)
+    returned by `AgentLlmCaller.resolveAgentSampling`.
+    """
     fixture = wf.load_fixture(DEFAULT_FIXTURE)
     assert fixture["fields"]["chatTurns.citationTargets"] == "exact"
     notes = " ".join(fixture["notes"])
-    assert "ConversationEngine.java:1154" in notes
-    assert "SamplingParams(0.8, 0.95" in notes
+    assert "AgentLlmCaller.resolveAgentSampling" in notes
+    assert "SamplingParams.AGENT" in notes
+    assert "temperature 0.7, top_p 0.8" in notes
     assert "owner decision" in notes or "owner" in notes
+    # The superseded claim must be gone, not merely outnumbered.
+    assert "ConversationEngine.java:1154" not in notes
+    assert "SamplingParams(0.8, 0.95" not in notes
     # The cancelled turn WAS stable across both captures — say so, don't imply otherwise.
     assert "CANCELLED turn's fields were fully stable" in notes
 
@@ -922,15 +2221,42 @@ def test_capture_records_the_chat_profile(tmp_path: Path):
     assert doc["provenance"]["aiRuntimeState"] == "completed"
 
 
-def test_chat_profile_falls_back_to_the_top_level_field():
-    """`active.chatProfile ?? chatProfile` — the dev-MCP reads both shapes (server.mjs:2376)."""
+def test_capture_records_the_sampling_pin_in_provenance(tmp_path: Path):
+    """Recorded beside chatProfile and for the same reason: it decides what was generated.
+
+    Non-diffed — `provenance` is not walked by `diff` — so a pair captured under two
+    different pins is legible after the fact instead of reading as chat regressions.
+    """
+    fixture = _minimal_fixture({"queries.a": "exact"})
+    fixture["sampling"] = {"temperature": 0.0, "top_p": None, "seed": 20260907}
+    doc = _capture_with_transport(
+        fixture, tmp_path / "c.json",
+        {"transport": httpx.MockTransport(_search_backend(_absolute_search_response()))},
+        skip_chat=True, corpus_root=_ROOT)
+    assert doc["provenance"]["sampling"] == {
+        "temperature": 0.0, "top_p": None, "seed": 20260907}
+    # Beside chatProfile, and neither is compared.
+    assert doc["provenance"]["chatProfile"] == "compact"
+    result = wf.diff(doc, doc, fixture)
+    assert not [e for e in result["fields"] if "sampling" in e["field"]]
+
+
+def _ai_runtime(status: dict) -> dict:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"chatProfile": "standard",
-                                         "activation": {"state": "activating"}})
+        return httpx.Response(200, json=status)
 
     with httpx.Client(base_url="http://127.0.0.1:33221",
                       transport=httpx.MockTransport(handler)) as client:
-        assert wf.read_ai_runtime(client) == ("standard", "activating")
+        return wf.read_ai_runtime(client)
+
+
+def test_chat_profile_falls_back_to_the_top_level_field():
+    """`active.chatProfile ?? chatProfile` — the dev-MCP reads both shapes (server.mjs:2376)."""
+    ai = _ai_runtime({"chatProfile": "standard", "activation": {"state": "activating"}})
+    assert ai["chatProfile"] == "standard"
+    assert ai["activationState"] == "activating"
+    # Nothing under `active`, so nothing says the engine is up.
+    assert ai["online"] is False
 
 
 def test_chat_profile_is_absent_not_fatal_when_ai_is_offline():
@@ -940,15 +2266,245 @@ def test_chat_profile_is_absent_not_fatal_when_ai_is_offline():
 
     with httpx.Client(base_url="http://127.0.0.1:33221",
                       transport=httpx.MockTransport(handler)) as client:
-        assert wf.read_ai_runtime(client) == (None, None)
+        ai = wf.read_ai_runtime(client)
+    assert ai["chatProfile"] is None and ai["activationState"] is None
+    # TRI-STATE: unreadable is None, not False. Nothing was observed, so nothing may be
+    # concluded — `capture_health` must not read this as either healthy or broken.
+    assert ai["online"] is None
+
+
+def test_engine_online_is_read_from_active_not_from_the_activation_state():
+    """The exact shape all six captures of the 2026-09-07 acceptance were taken under.
+
+    `activation.state` was "failed" on every one of them while the engine was demonstrably
+    answering (their chat turns terminated `done`). It is the last activation PROCEDURE's
+    outcome; `active.modelPath` is projected only while the engine is online, which is the
+    signal the dev-MCP reads for the same reason (server.mjs:2680-2687).
+    """
+    ai = _ai_runtime({
+        "active": {"modelPath": "F:/models/qwen3-4b.gguf", "chatProfile": "compact"},
+        "activation": {"state": "failed"},
+    })
+    assert ai["online"] is True
+    assert ai["onlineSignal"] == "active.modelPath"
+    assert ai["activationState"] == "failed"   # recorded, not used as the liveness verdict
+    assert ai["chatProfile"] == "compact"
+    # Basename only — the artifact must not carry a machine-specific absolute model path.
+    assert ai["modelFile"] == "qwen3-4b.gguf"
+
+
+def test_engine_online_also_accepts_a_completed_activation():
+    """The other disjunct: an activation that DID run and completed, with a realized variant."""
+    ai = _ai_runtime({
+        "active": {"activeVariantId": "cuda12", "chatProfile": "compact"},
+        "activation": {"state": "completed"},
+    })
+    assert ai["online"] is True
+    assert ai["onlineSignal"] == "activation.completed+active.activeVariantId"
+    assert ai["modelFile"] is None
+
+
+def test_engine_is_not_online_when_neither_signal_is_present():
+    """A completed activation with nothing realized under `active` is not an online engine."""
+    ai = _ai_runtime({"active": {"chatProfile": "compact"}, "activation": {"state": "completed"}})
+    assert ai["online"] is False
+    assert ai["onlineSignal"] is None
+
+
+def _capture_with_ai(online, *, activation_state="failed") -> dict:
+    """A minimal capture carrying one chat turn and the given liveness provenance."""
+    doc = {
+        "provenance": {"chatProfile": "compact", "aiRuntimeState": activation_state},
+        "queries": {},
+        "chatTurns": {"c01": {"httpStatus": 200, "terminalEvent": "done"}},
+    }
+    if online is not _ABSENT:
+        doc["provenance"]["aiRuntimeOnline"] = online
+    return doc
+
+
+_ABSENT = object()
+
+
+def _side_dir(tmp_path: Path, names) -> Path:
+    directory = tmp_path / "side"
+    directory.mkdir(exist_ok=True)
+    for name in names:
+        (directory / name).write_text("{}", encoding="utf-8")
+    return directory
+
+
+def test_side_capture_selection_ignores_everything_that_is_not_a_numbered_capture(tmp_path):
+    """The acceptance re-run's regression, pinned.
+
+    `fixture-gate.sh` selected a side with a `capture-*.json` shell glob. The cycle script
+    writes its per-capture AI diagnostics into the same directory, so
+    `capture-1-ai-status.json` was read AS a capture: a three-cycle side reported "captures per
+    side: baseline=6" and the three non-captures came back UNHEALTHY with `chatProfile None` --
+    a verdict computed over files that are not captures. Every decoy below is a real file that
+    directory holds.
+    """
+    directory = _side_dir(tmp_path, [
+        "capture-1.json", "capture-2.json", "capture-3.json",
+        # The exact decoys that caused it, and the renamed ones that replaced them.
+        "capture-1-ai-status.json", "capture-2-ai-activate.json",
+        "diag-1-ai-status.json", "diag-2-ai-activate.json",
+        # The rest of what fixture-pair.sh leaves in a side directory.
+        "cleanup-before-1.json", "cleanup-after-1.json", "effective-config-1.json",
+        "stop-1.json", "noise-diff.json", "dev-runner-1.log", "pair.log",
+        # Near-misses on the pattern itself: no digits, extra suffix, wrong extension.
+        "capture-.json", "capture-x.json", "capture-1.json.bak", "capture-1.txt",
+        "recapture-1.json",
+    ])
+    # Falsifier: the glob this replaces really does match the decoys, so the assertion below
+    # distinguishes the fixed rule from the broken one rather than passing on an empty set.
+    assert len(list(directory.glob("capture-*.json"))) > 3
+    assert [c.name for c in wf.select_side_captures(directory)] == [
+        "capture-1.json", "capture-2.json", "capture-3.json"]
+
+
+def test_fixture_gate_selects_through_the_python_rule_and_holds_no_capture_glob(tmp_path):
+    """The shell is what regressed, and it has no test harness of its own.
+
+    Everything above tests `select_side_captures`; none of it would notice `fixture-gate.sh`
+    going back to globbing. This does, and it is the whole reason the rule was moved into
+    python: a bash glob cannot be unit-tested, and this one had already drifted once.
+    """
+    gate = (Path(__file__).resolve().parents[2] / "jseval/lane-f/fixture-gate.sh").read_text(
+        encoding="utf-8")
+    assert "workflow-fixture side-captures" in gate
+    code = [line for line in gate.splitlines() if not line.lstrip().startswith("#")]
+    assert not [line for line in code if "capture-*.json" in line],         "fixture-gate.sh globs capture-*.json again — that matches the cycle diagnostics"
+
+
+def test_side_captures_are_ordered_by_cycle_number_not_lexicographically(tmp_path):
+    """capture-10 follows capture-9. A lexicographic sort would put it second, which silently
+    makes the wrong file the primary once a side runs ten cycles."""
+    directory = _side_dir(tmp_path, [f"capture-{n}.json" for n in (1, 2, 9, 10, 11)])
+    assert [c.name for c in wf.select_side_captures(directory)] == [
+        "capture-1.json", "capture-2.json", "capture-9.json",
+        "capture-10.json", "capture-11.json"]
+
+
+def test_a_side_with_only_diagnostics_is_refused_not_silently_empty(tmp_path):
+    """The direction that matters: a gate that quietly compares nothing must not report PASS."""
+    directory = _side_dir(tmp_path, ["diag-1-ai-status.json", "pair.log"])
+    with pytest.raises(wf.WorkflowFixtureError, match="capture-1.json"):
+        wf.select_side_captures(directory)
+    with pytest.raises(wf.WorkflowFixtureError, match="not a directory"):
+        wf.select_side_captures(directory / "missing")
+
+
+def test_side_captures_cli_prints_only_the_numbered_captures(tmp_path):
+    """The path `fixture-gate.sh` actually takes, decoys and all."""
+    directory = _side_dir(tmp_path, [
+        "capture-1.json", "capture-2.json",
+        "capture-1-ai-status.json", "diag-1-ai-activate.json", "noise-diff.json"])
+    result = CliRunner().invoke(main, ["workflow-fixture", "side-captures", str(directory)])
+    assert result.exit_code == 0, result.output
+    printed = [Path(line).name for line in result.output.splitlines() if line.strip()]
+    assert printed == ["capture-1.json", "capture-2.json"]
+
+
+def test_side_captures_cli_exits_2_when_a_side_has_no_primary(tmp_path):
+    """A usage exit, like every other refusal in this CLI -- not a traceback, not a 0."""
+    directory = _side_dir(tmp_path, ["capture-2.json", "diag-1-ai-status.json"])
+    result = CliRunner().invoke(main, ["workflow-fixture", "side-captures", str(directory)])
+    assert result.exit_code == 2
+    assert "capture-1.json" in result.output
+
+
+#: The Head-side enum whose drop members `CROSS_ENCODER_DROP_REASONS` mirrors.
+_SKIP_REASON_JAVA = (
+    Path(__file__).resolve().parents[3]
+    / "modules/app-api/src/main/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReason.java"
+)
+
+
+def _java_drop_reasons() -> set[str]:
+    """The members `CrossEncoderSkipReason.isDrop()` returns true for, read from the source.
+
+    Parsed rather than restated: a restated list is the drift this test exists to catch.
+    """
+    source = _SKIP_REASON_JAVA.read_text(encoding="utf-8")
+    body = source[source.index("public boolean isDrop()"):]
+    arm = body[body.index("case "):body.index("-> true;")]
+    return {token.strip() for token in arm[len("case "):].split(",") if token.strip()}
+
+
+def test_the_python_drop_set_matches_the_java_enums_drop_members():
+    """The capture-health refusal and the enum that defines a drop must not drift apart.
+
+    `_cross_encoder_problems` refuses a capture whose cross-encoder was DROPPED, and the whole
+    weight of that refusal rests on this set naming the same members `isDrop()` does. A code
+    that moved from by-design to drop, or a new drop member, would otherwise leave the capture
+    silently accepting a degraded pipeline — the failure mode pair run 3 already produced once,
+    where every query had `cross-encoder: skipped / INFERENCE_FAILED` and the diff read as
+    "nearly clean" because both sides degraded together.
+    """
+    java = _java_drop_reasons()
+    assert java, "failed to parse isDrop() — the enum's shape changed, so this check is blind"
+    assert wf.CROSS_ENCODER_DROP_REASONS == java, (
+        "CROSS_ENCODER_DROP_REASONS and CrossEncoderSkipReason.isDrop() disagree: "
+        f"only in python {sorted(wf.CROSS_ENCODER_DROP_REASONS - java)}, "
+        f"only in java {sorted(java - set(wf.CROSS_ENCODER_DROP_REASONS))}"
+    )
+
+
+def test_the_java_enum_parse_would_notice_a_by_design_member():
+    """Falsifier: the parse must return the drop arm, not every member of the enum.
+
+    A parse that accidentally returned all constants would make the test above pass for any
+    python set that happened to be a subset — so pin that a by-design skip is NOT in it.
+    """
+    java = _java_drop_reasons()
+    assert "NAVIGATIONAL_QUERY" not in java
+    assert "FUSION_CONFIDENT" not in java
+    assert "INFERENCE_FAILED" in java
+
+
+def test_capture_health_refuses_a_capture_whose_engine_was_offline():
+    """Chat turns taken with no engine did not measure a model, whatever they recorded."""
+    doc = _capture_with_ai(False)
+    result = wf.capture_health(doc, doc, [])
+    assert result["ok"] is False
+    assert sum("was not online" in p for p in result["problems"]) == 2  # both sides named
+
+
+def test_capture_health_refuses_a_capture_that_never_recorded_liveness():
+    """Unknown is not healthy — the same tri-state trap the enrichment guard exists for."""
+    doc = _capture_with_ai(_ABSENT)
+    result = wf.capture_health(doc, doc, [])
+    assert result["ok"] is False
+    assert sum("aiRuntimeOnline is absent" in p for p in result["problems"]) == 2
+
+
+def test_capture_health_accepts_a_live_engine_despite_a_failed_activation():
+    """The observed shape must PASS: a failed activation procedure beside a live engine."""
+    doc = _capture_with_ai(True, activation_state="failed")
+    assert not wf._ai_runtime_problems(doc, doc)
+
+
+def test_capture_health_ignores_liveness_for_a_search_only_capture():
+    """`--skip-chat` measures search alone; an offline engine is irrelevant to it."""
+    doc = {"provenance": {"aiRuntimeOnline": False}, "queries": {"q1": {}}, "chatTurns": {}}
+    assert not wf._ai_runtime_problems(doc, doc)
 
 
 def test_chat_profile_requirement_is_recorded():
+    """The note must pin the profile requirement AND the per-turn completion evidence.
+
+    It used to assert "c02 in 6" — a measurement the next paired capture falsified: c02 ended
+    MAX_ITERATIONS at 8 on BOTH sides at temperature 0, which is why the question was
+    replaced (`test_c02_was_replaced_with_a_single_anchor_question`). The assertion now pins
+    c01's still-true figure and the note's honesty about c02 instead of a stale number.
+    """
     fixture = wf.load_fixture(DEFAULT_FIXTURE)
     notes = " ".join(fixture["notes"])
     assert "SAME CHAT PROFILE" in notes
     assert "compact" in notes and "11 GB" in notes
-    assert "c02 in 6" in notes
+    assert "c01 completes on compact in 3 iterations" in notes
+    assert "MAX_ITERATIONS at 8 in both captures" in notes
 
 
 def test_capture_derives_the_root_from_a_single_watched_root(tmp_path: Path):
@@ -995,6 +2551,34 @@ def test_corpus_root_env_is_used_when_no_option(monkeypatch, tmp_path: Path):
         skip_chat=True)
     assert doc["provenance"]["corpusRootSource"] == "env"
     assert doc["provenance"]["corpusRoot"] == _ROOT
+
+
+def test_capture_run_requirements_are_recorded():
+    """The pin is four settings, three of them boot-time — all four must be written down."""
+    notes = " ".join(wf.load_fixture(DEFAULT_FIXTURE)["notes"])
+    assert "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH=true" in notes
+    assert "justsearch.llm.slots" in notes and "JUSTSEARCH_LLM_SLOTS" in notes
+    assert "JUSTSEARCH_RERANK_DEADLINE_MS" in notes
+    assert "JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS" in notes
+    assert "ONE chat profile" in notes
+    # …and that the four are now OBSERVED, not merely asked for: the note must say the diff
+    # fails on a missing or disagreeing pin, or a reader will keep reading it as advice.
+    assert "THESE ARE NOW OBSERVED, NOT MERELY REQUESTED" in notes
+    assert "/api/debug/effective-config" in notes
+    assert "provenance.pins" in notes
+
+
+def test_the_applied_sampling_proof_is_recorded_in_the_notes():
+    """Requested vs applied is the whole mechanism — it must be written down, not implied."""
+    fixture = wf.load_fixture(DEFAULT_FIXTURE)
+    notes = " ".join(fixture["notes"])
+    assert "THE CAPTURE PROVES THE SAMPLING PIN WAS APPLIED, NOT JUST SENT" in notes
+    assert "provenance.samplingApplied" in notes
+    assert "samplingTemperature" in notes
+    assert "predating PR 0b" in notes
+    # The pinned keys the code reads and the note names must not drift apart.
+    for key in wf.PINNED_CONFIG_KEYS:
+        assert key in notes, key
 
 
 def test_chat_source_and_citation_paths_are_made_relative():
@@ -1059,7 +2643,7 @@ def test_run_chat_turn_cancels_and_records_the_session_outcome():
     calls: list[tuple[str, str]] = []
     with httpx.Client(base_url="http://127.0.0.1:33221",
                       transport=httpx.MockTransport(_cancel_backend(calls))) as client:
-        record = wf.run_chat_turn(
+        record, _applied = wf.run_chat_turn(
             client,
             {"id": "c03", "content": "…", "maxIterations": 3,
              "cancelAfterEvent": "session_started"},
@@ -1104,6 +2688,45 @@ def test_cancel_is_issued_on_session_started_before_the_terminal_frame():
     assert order == ["stream-open", "cancel", "session-read"]
 
 
+def test_run_chat_turn_sends_the_sampling_override_in_the_request_body():
+    """PR 0b: the pin has to reach the wire, not just sit in the fixture file."""
+    bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200, text=_CANCEL_STREAM_HEAD + _CANCEL_STREAM_TAIL,
+            headers={"Content-Type": "text/event-stream"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        wf.run_chat_turn(client, {"id": "c01", "content": "x", "maxIterations": 8},
+                         sampling={"temperature": 0.0, "seed": 20260907})
+
+    assert len(bodies) == 1
+    assert bodies[0]["sampling"] == {"temperature": 0.0, "seed": 20260907}
+    # Unchanged shape around it — the override is additive, not a replacement.
+    assert bodies[0]["maxIterations"] == 8
+    assert bodies[0]["messages"] == [{"role": "user", "content": "x"}]
+
+
+def test_run_chat_turn_omits_sampling_when_none_is_pinned():
+    """Absent means "no override" on the wire too — not `"sampling": null`."""
+    bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200, text=_CANCEL_STREAM_HEAD + _CANCEL_STREAM_TAIL,
+            headers={"Content-Type": "text/event-stream"})
+
+    with httpx.Client(base_url="http://127.0.0.1:33221",
+                      transport=httpx.MockTransport(handler)) as client:
+        wf.run_chat_turn(client, {"id": "c01", "content": "x"})
+
+    assert "sampling" not in bodies[0]
+
+
 def test_capture_sends_the_session_token_on_every_request(tmp_path: Path):
     """Review fix 5: POST/PUT/DELETE all require the token (ApiSecurityFilters)."""
     seen: list[tuple[str, str, str | None]] = []
@@ -1134,8 +2757,9 @@ def test_capture_sends_the_session_token_on_every_request(tmp_path: Path):
 
 
 def test_build_search_body_carries_the_fixture_spec():
+    """The spec's query/mode ride verbatim; `limit` is the capture multiple of K."""
     body = wf._build_search_body({"query": "q", "limit": 10, "mode": "hybrid"})
-    assert body == {"query": "q", "limit": 10, "mode": "hybrid",
+    assert body == {"query": "q", "limit": 40, "mode": "hybrid",
                     "includeExcerpts": True, "debug": True}
 
 
@@ -1298,7 +2922,8 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
     """A one-query/one-turn fixture that is HEALTHY by default.
 
     The health floor (`httpStatus`/`hitCount` on every query, a non-empty chat section)
-    is declared here so each test only has to add the field it is about.
+    is declared here so each test only has to add the field it is about. The `sampling`
+    pin is REQUIRED by `validate_fixture`, so it is part of that floor too.
     """
     declared = {"queries.httpStatus": "exact", "queries.hitCount": "exact",
                 "chatTurns.httpStatus": "exact"}
@@ -1308,14 +2933,79 @@ def _minimal_fixture(fields: dict[str, str]) -> dict:
         "version": 1,
         "id": "test-fixture",
         "scoreTieEpsilon": 0.01,
+        "sampling": {"temperature": 0.0, "seed": 7},
         "queries": [{"id": "q1", "query": "x", "limit": 10, "mode": "hybrid"}],
         "chatTurns": [{"id": "c1", "content": "x", "maxIterations": 1}],
         "fields": declared,
     }
 
 
-def _capture(queries: dict | None = None, chat: dict | None = None) -> dict:
-    """A healthy synthetic capture: every record carries httpStatus 200 (+ hitCount)."""
+#: A synthetic capture's healthy run PRECONDITIONS: the boot-time pins as
+#: `/api/debug/effective-config` reports them (string values, as the real endpoint emits) and
+#: the applied sampling `session_started` echoes. Part of the health FLOOR, like httpStatus
+#: 200 — a test that is not about preconditions should not have to think about them.
+#: Derived from PINNED_CONFIG_KEYS rather than listed, so adding a pin cannot leave this helper
+#: silently short and turn every health assertion in this file into a "missing pin" failure that
+#: has nothing to do with the property under test.
+_HEALTHY_PIN_VALUES = {
+    "index.vector.exhaustive_search": "true",
+    "justsearch.llm.slots": "1",
+    "justsearch.rerank.deadline_ms": "5000",
+    "justsearch.rerank.chunks.deadline_ms": "5000",
+    "justsearch.rerank.top_k": "40",
+    "justsearch.rerank.gpu_mem_mb": "4096",
+    "index.hybrid.candidate_limit_max": "5000",
+    "index.hybrid.chunk_collapse_limit_multiplier": "50",
+    "index.hybrid.leg_arbitration_enabled": "false",
+    "index.hybrid.leg_recall_complete_enabled": "false",
+    "justsearch.embed.gpu.enabled": "false",
+    "justsearch.splade.gpu_enabled": "false",
+    "justsearch.ner.gpu_enabled": "false",
+    "justsearch.rerank.gpu.enabled": "false",
+    "justsearch.bgem3.gpu_enabled": "false",
+    "justsearch.onnxruntime.intra_op_threads": "1",
+}
+_HEALTHY_PINS = {k: _HEALTHY_PIN_VALUES[k] for k in wf.PINNED_CONFIG_KEYS}
+_HEALTHY_APPLIED = {"temperature": 0.0, "top_p": 0.8, "seed": 7}
+#: A fully-enriched index: no outstanding reasons from the shared completeness predicate. The
+#: coverage figures are carried too so a test that overrides one reads like a real capture.
+_HEALTHY_ENRICHMENT = {
+    "indexState": "IDLE",
+    "embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
+    "embeddingCoveragePercent": 100.0, "spladeCoveragePercent": 100.0,
+    "chunkVectorCoveragePercent": 100.0,
+    "chunkEmbeddingPendingCount": 0, "pendingNerCount": 0, "completedNerCount": 5,
+    "incompleteReasons": [],
+}
+
+#: A capture with chat turns must show the engine was ONLINE when it was taken, so every
+#: synthetic healthy capture declares it. `aiRuntimeState` is deliberately the FAILED value the
+#: 2026-09-07 acceptance recorded: these fixtures then also pin that a failed activation
+#: procedure beside a live engine is healthy, which is the whole point of separating the two.
+_HEALTHY_AI_RUNTIME = {
+    "chatProfile": "compact",
+    "aiRuntimeState": "failed",
+    "aiRuntimeOnline": True,
+    "aiRuntimeOnlineSignal": "active.modelPath",
+}
+
+
+def _capture(
+    queries: dict | None = None,
+    chat: dict | None = None,
+    observed: dict | None = None,
+    provenance: dict | None = None,
+) -> dict:
+    """A healthy synthetic capture: every record carries httpStatus 200 (+ hitCount).
+
+    ``observed`` populates the NON-diffed ``observed.queries`` block (``scores``,
+    ``hitsCaptured``, ``hitsCompared``). Omitted entirely, the capture looks like one taken
+    before that block carried the counts — which the cutoff rule must fail closed on.
+
+    ``provenance`` overrides the healthy precondition floor (pins + applied sampling +
+    enrichment); a key
+    set to ``None`` there is DELETED, which is how a test says "this capture predates it".
+    """
     q: dict[str, dict] = {}
     for rid, rec in (queries or {"q1": {}}).items():
         merged = {"httpStatus": 200, "hitCount": 1}
@@ -1326,13 +3016,49 @@ def _capture(queries: dict | None = None, chat: dict | None = None) -> dict:
         merged = {"httpStatus": 200}
         merged.update(rec)
         c[rid] = merged
-    return {
+    prov: dict = {
+        "available": True,
+        "pins": dict(_HEALTHY_PINS),
+        "samplingApplied": {rid: dict(_HEALTHY_APPLIED) for rid in c},
+        "enrichment": dict(_HEALTHY_ENRICHMENT),
+        **_HEALTHY_AI_RUNTIME,
+    }
+    for key, value in (provenance or {}).items():
+        if value is None:
+            prov.pop(key, None)
+        else:
+            prov[key] = value
+    doc = {
         "schema": wf.CAPTURE_SCHEMA,
         "fixture_id": "test-fixture",
         "fixture_version": 1,
-        "provenance": {"available": True},
+        "provenance": prov,
         "queries": q,
         "chatTurns": c,
+    }
+    if observed is not None:
+        doc["observed"] = {"queries": observed}
+    return doc
+
+
+def _response_with_scores(scores: list[float], ids: list[str] | None = None) -> dict:
+    """A `/api/knowledge/search` response whose results carry exactly these scores."""
+    names = ids or [f"h{i}" for i in range(len(scores))]
+    return {
+        "totalHits": len(scores),
+        "matchCount": len(scores),
+        "results": [
+            {
+                "id": name,
+                "score": score,
+                "fields": {"doc_id": name, "path": f"docs/{name}.md",
+                           "filename": f"{name}.md", "is_chunk": "true",
+                           "parent_doc_id": name, "chunk_index": "0"},
+                "matchedFields": [], "excerptRegions": [], "trace": [],
+            }
+            for name, score in zip(names, scores)
+        ],
+        "searchTrace": {"stages": [], "degradation": {}},
     }
 
 
@@ -1342,7 +3068,14 @@ def _full_snapshot(fixture: dict) -> dict:
         "schema": wf.CAPTURE_SCHEMA,
         "fixture_id": fixture["id"],
         "fixture_version": fixture["version"],
-        "provenance": {"available": True},
+        "provenance": {
+            "available": True,
+            "pins": dict(_HEALTHY_PINS),
+            "samplingApplied": {t["id"]: dict(_HEALTHY_APPLIED)
+                                for t in fixture["chatTurns"]},
+            "enrichment": dict(_HEALTHY_ENRICHMENT),
+            **_HEALTHY_AI_RUNTIME,
+        },
         "queries": {q["id"]: wf.capture_query_record(_SEARCH_RESPONSE)
                     for q in fixture["queries"]},
         "chatTurns": {
@@ -1353,13 +3086,59 @@ def _full_snapshot(fixture: dict) -> dict:
     }
 
 
-def _search_backend(response: dict, roots: list[str] | None = None, status: int = 200):
-    """A mock backend serving /api/status, /api/indexing/roots and the search POST."""
+#: What the mock effective-config endpoint answers: every declared pin, in the real
+#: `resolvedConfig[]` shape (`{key, value, source, ordinal, detail, candidates}`) with STRING
+#: values, as `EffectiveConfigEntry` serialises them.
+_EFFECTIVE_CONFIG_BODY = {"schemaVersion": 1, "resolvedConfig": [
+    {"key": key, "value": value, "source": "env_var", "ordinal": 400,
+     "detail": "JUSTSEARCH_" + key.upper().replace(".", "_"), "candidates": []}
+    for key, value in _HEALTHY_PINS.items()
+]}
+
+#: A `session_started`-first agent stream that echoes the APPLIED sampling (PR 0b).
+_APPLIED_SAMPLING_STREAM = (
+    "event: session_started\n"
+    'data: {"sessionId":"s1","samplingTemperature":0.0,"samplingTopP":0.8,"samplingSeed":7}\n\n'
+    "event: done\n"
+    'data: {"finalResponse":"x","iterationsUsed":2,"toolCallsExecuted":1,'
+    '"disposition":"COMPLETED","sources":[],"citations":[]}\n\n'
+)
+
+
+def _search_backend(response: dict, roots: list[str] | None = None, status: int = 200,
+                    chat: bool = False):
+    """A mock backend serving /api/status, /api/indexing/roots and the search POST.
+
+    ``chat=True`` also serves the agent stream and the effective-config endpoint, for the
+    tests that exercise the run PRECONDITIONS end to end.
+    """
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        if path == "/api/debug/effective-config":
+            return httpx.Response(200, json=_EFFECTIVE_CONFIG_BODY) if chat else (
+                httpx.Response(404, json={"errorCode": "NOT_FOUND"}))
+        if chat and path == "/api/chat/agent":
+            return httpx.Response(200, text=_APPLIED_SAMPLING_STREAM,
+                                  headers={"Content-Type": "text/event-stream"})
         if path == "/api/status":
-            return httpx.Response(200, json={"service": "justsearch", "schema_version": 1,
-                                             "worker": {"buildStamp": "abc"}})
+            # A FULLY ENRICHED index. `read_enrichment` runs the same completeness predicate the
+            # ingest wait uses, so a mock that omitted these would make every capture test fail
+            # the enrichment health check for a reason that has nothing to do with the test.
+            return httpx.Response(200, json={
+                "service": "justsearch", "schema_version": 1,
+                "worker": {
+                    "buildStamp": "abc",
+                    "indexState": "IDLE",
+                    "pendingJobs": 0, "pendingJobsCount": 0, "processingJobsCount": 0,
+                    "embedding": {
+                        "embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
+                        "embeddingCoveragePercent": 100.0, "spladeCoveragePercent": 100.0,
+                        "chunkVectorCoveragePercent": 100.0,
+                        "chunkEmbeddingPendingCount": 0,
+                        "pendingNerCount": 0, "completedNerCount": 5,
+                        "docCount": 2, "chunkDocCount": 0,
+                    },
+                }})
         if path == "/api/ai/runtime/status":
             return httpx.Response(200, json={
                 "active": {"chatProfile": "compact", "activeVariantId": "v1"},

@@ -1,0 +1,6275 @@
+{
+  "base_url": "http://127.0.0.1:33221",
+  "chatTurns": {
+    "c01": {
+      "cancel.httpStatus": null,
+      "cancel.requested": false,
+      "cancel.sessionCancelTrigger": null,
+      "cancel.sessionDisposition": null,
+      "cancel.sessionState": null,
+      "cancel.terminalEvent": null,
+      "cancel.terminalReasonCode": null,
+      "citationScorer": "CROSS_ENCODER",
+      "citationSentences": [
+        "Main Process (Head): Updates heartbeat_epoch_ms (MMF offset 8) every 1 second via WorkerSpawner",
+        "Worker Process: Has a watchdog inside MmfWorkerSignalBus.shouldDie()",
+        "Rule: After a startup grace period (~15s), if CurrentTime - Heartbeat > 5000ms, the Worker invokes server.close() and exits",
+        "Result: If the Main Process crashes (blue screen, SIGKILL), the Worker cleans itself up within 5 seconds"
+      ],
+      "citationTargets": [
+        "docs/explanation/02-process-coordination.md#2"
+      ],
+      "disposition": "COMPLETED",
+      "errorCode": null,
+      "eventNames": [
+        "session_started",
+        "progress",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "budget_update",
+        "tool_batch_proposed",
+        "tool_call_proposed",
+        "tool_call_approved",
+        "tool_exec_started",
+        "tool_exec_completed",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "budget_update",
+        "tool_batch_proposed",
+        "tool_call_proposed",
+        "tool_call_approved",
+        "tool_exec_started",
+        "tool_exec_completed",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "chunk",
+        "budget_update",
+        "done"
+      ],
+      "finalResponse": "According to the documentation, the **Suicide Pact** is a reliability mechanism in JustSearch's multi-process architecture that prevents \"zombie processes\" from lingering after the application closes.\n\n**The Pact:**\n- **Main Process (Head)**: Updates `heartbeat_epoch_ms` (MMF offset 8) every 1 second via `WorkerSpawner`\n- **Worker Process**: Has a watchdog inside `MmfWorkerSignalBus.shouldDie()`\n- **Rule**: After a startup grace period (~15s), if `CurrentTime - Heartbeat > 5000ms`, the Worker invokes `server.close()` and exits\n- **Result**: If the Main Process crashes (blue screen, SIGKILL), the Worker cleans itself up within 5 seconds\n\nThis is essentially a mutual monitoring agreement where both processes watch each other's health and take action if the other becomes unresponsive.\n\n**Document:** This is described in **\"02-process-coordination.md\"** located at:\n`f:\\justsearch-public\\.claude\\worktrees\\lane-f-0b\\docs\\explanation\\02-process-coordination.md`\n\nThe document explains that JustSearch uses a custom \"Nervous System\" built on Memory-Mapped Files (MMF) and gRPC to ensure sub-millisecond coordination between the Main Process ('Head') and the Knowledge Server ('Body').",
+      "httpStatus": 200,
+      "iterationsUsed": 3,
+      "reasoningText": "The user is asking about a \"suicide pact between the Head and the Worker\" and wants to know which document describes it. This sounds like it could be from a specific document in the knowledge base. I should search for this topic using core_search_index to find relevant documents.\n\nLet me search for \"suicide pact Head Worker\" to find the relevant information.\nI found references to the \"Suicide Pact\" in the search results. The most relevant document appears to be \"02-process-coordination.md\" which has a score of 1,000 and contains detailed information about the Suicide Pact mechanism. Let me read this document to get the full description.\nI found the document that describes the \"Suicide Pact\" between the Head (Main Process) and the Worker. Let me continue reading to get the complete picture, though I already have the key information.\n\nThe Suicide Pact is described in the document \"02-process-coordination.md\" and it's a reliability mechanism to prevent zombie processes. Here are the key points:\n\n1. **Main Process**: Updates `heartbeat_epoch_ms` (MMF offset 8) every 1 second via `WorkerSpawner`\n2. **Worker Process**: Has a watchdog inside `MmfWorkerSignalBus.shouldDie()`\n3. **Rule**: After a startup grace period (~15s), if `CurrentTime - Heartbeat > 5000ms`, the Worker invokes `server.close()` and exits\n4. **Result**: If Main crashes (blue screen, SIGKILL), Worker cleans itself up within 5 seconds\n\nThis is a mutual agreement where both processes monitor each other's health and take action if the other is unresponsive.\n",
+      "sourceContextIncludedChars": [
+        null,
+        0,
+        0
+      ],
+      "sourceContextInclusion": [
+        null,
+        "dropped",
+        "dropped"
+      ],
+      "sourceExcerptDigests": [
+        "2977b7fcdca5fa06",
+        "93f011ad0d3db3e0",
+        "fce414f60d713736"
+      ],
+      "sourcePaths": [
+        "docs/explanation/02-process-coordination.md",
+        "docs/explanation/03-knowledge-server.md",
+        "docs/explanation/09-testing-strategy.md"
+      ],
+      "sourceRefs": [
+        "docs/explanation/02-process-coordination.md#2",
+        "docs/explanation/03-knowledge-server.md#2",
+        "docs/explanation/09-testing-strategy.md#2"
+      ],
+      "sourceSpans": [
+        "48:72",
+        "53:72",
+        "55:72"
+      ],
+      "terminalEvent": "done",
+      "terminalPayloadParseError": false,
+      "toolArguments": [
+        "{\"query\":\"suicide pact Head Worker\"}",
+        "{\"path\":\"f:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-0b\\\\docs\\\\explanation\\\\02-process-coordination.md\"}"
+      ],
+      "toolCallsExecuted": 2,
+      "toolErrorCodes": [
+        null,
+        null
+      ],
+      "toolNames": [
+        "core_search_index",
+        "core_read_document"
+      ],
+      "toolTruncatedForModel": [
+        false,
+        false
+      ]
+    },
+    "c02": {
+      "cancel.httpStatus": null,
+      "cancel.requested": false,
+      "cancel.sessionCancelTrigger": null,
+      "cancel.sessionDisposition": null,
+      "cancel.sessionState": null,
+      "cancel.terminalEvent": null,
+      "cancel.terminalReasonCode": null,
+      "citationScorer": "CROSS_ENCODER",
+      "citationSentences": [
+        "According to the documentation, the three processes in the JustSearch architecture are described in the document \"01-system-overview.md\" (System Overview).",
+        "The three processes are:",
+        "Entry Point: io.justsearch.ui.HeadlessApp"
+      ],
+      "citationTargets": [
+        "docs/explanation/01-system-overview.md#0",
+        "docs/explanation/07-ui-host-architecture.md#0"
+      ],
+      "disposition": "COMPLETED",
+      "errorCode": null,
+      "eventNames": [
+        "session_started",
+        "progress",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "budget_update",
+        "tool_batch_proposed",
+        "tool_call_proposed",
+        "tool_call_approved",
+        "tool_exec_started",
+        "tool_exec_completed",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "budget_update",
+        "tool_batch_proposed",
+        "tool_call_proposed",
+        "tool_call_approved",
+        "tool_exec_started",
+        "tool_exec_completed",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "chunk",
+        "budget_update",
+        "done"
+      ],
+      "finalResponse": "According to the documentation, the three processes in the JustSearch architecture are described in the document **\"01-system-overview.md\"** (System Overview).\n\nThe three processes are:\n\n1. **The Main Process** ('The Head')\n   - **Entry Point:** `io.justsearch.ui.HeadlessApp`\n   - **Role:** User Interface, Application Orchestration, and API Gateway\n   - **Responsibilities:** Runs as a child process of the Tauri shell, manages configuration, monitors health of child processes, exposes REST APIs, and acts as a gateway to the Knowledge Server via gRPC\n   - **Key constraint:** Never touches Lucene index files to preserve the \"Worker owns Lucene\" invariant\n\n2. **The Knowledge Server** ('The Body')\n   - **Entry Point:** `io.justsearch.indexerworker.IndexerWorker`\n   - **Role:** The heavy lifter that handles all file indexing, text extraction, and vector search\n   - **Responsibilities:** Owns the Lucene index and generation layout, orchestrates schema migrations, and handles resilience through auto-restart on crashes\n   - **Managed by:** `WorkerSpawner.java`\n\n3. **The Inference Server** ('The Brain')\n   - **Executable:** `llama-server.exe` (Native Binary, no JVM)\n   - **Role:** Providing Intelligence (LLM Chat & RAG)\n   - **Responsibilities:** Manages VRAM, handles hung/crash recovery, can adopt existing llama-server instances, and provides health monitoring\n   - **Managed by:** `InferenceLifecycleManager.java`\n\nThis three-process architecture ensures that a crash or heavy load in one component never brings down the entire system, providing resilience on the desktop environment.",
+      "httpStatus": 200,
+      "iterationsUsed": 3,
+      "reasoningText": "The user is asking about the three processes in the JustSearch architecture and wants to know which document describes them. This is a factual question about the knowledge base, so I should search for information about \"JustSearch architecture\" and \"processes\" to find the relevant documents.\n\nLet me start by searching for information about JustSearch architecture.\nThe search results show that the document \"01-system-overview.md\" mentions \"The 3-Process Model\" and describes how the application is split into three distinct OS processes. Let me read this document to get the specific details about the three processes.\nI found the document that describes the three processes in the JustSearch architecture. The document is \"01-system-overview.md\" and it clearly outlines the three processes:\n\n1. **The Main Process** ('The Head') - Entry point: `io.justsearch.ui.HeadlessApp`\n2. **The Knowledge Server** ('The Body') - Entry point: `io.justsearch.indexerworker.IndexerWorker`\n3. **The Inference Server** ('The Brain') - Executable: `llama-server.exe`\n\nThe document describes them in detail with their roles, responsibilities, and how they interact. Let me provide a clear answer to the user.\n",
+      "sourceContextIncludedChars": [
+        null,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "sourceContextInclusion": [
+        null,
+        "dropped",
+        "dropped",
+        "dropped",
+        "dropped",
+        "dropped",
+        "dropped",
+        "dropped",
+        "dropped",
+        "dropped"
+      ],
+      "sourceExcerptDigests": [
+        "9c3ac2f95204310d",
+        "6a1e20810d73dab3",
+        "524645f866decce9",
+        "25f2102ee38007c9",
+        "b7f2dd0ae7a2cee1",
+        "b68452ab9b653b84",
+        "5ef93bcfe507c0a6",
+        "405612d9ccc3201a",
+        "34cd385bfca16432",
+        "b776e7084aeeb704"
+      ],
+      "sourcePaths": [
+        "docs/explanation/01-system-overview.md",
+        "docs/reference/security/threat-model.md",
+        "docs/explanation/19-module-architecture.md",
+        "docs/explanation/07-ui-host-architecture.md",
+        "docs/explanation/05-ai-architecture.md",
+        "ssot/docs/help/troubleshooting.md",
+        "docs/explanation/20-benchmarking-architecture.md",
+        "docs/explanation/09-testing-strategy.md",
+        "docs/explanation/02-process-coordination.md",
+        "docs/explanation/12-desktop-installer-and-sandbox-setup.md"
+      ],
+      "sourceRefs": [
+        "docs/explanation/01-system-overview.md#0",
+        "docs/reference/security/threat-model.md#0",
+        "docs/explanation/19-module-architecture.md#0",
+        "docs/explanation/07-ui-host-architecture.md#0",
+        "docs/explanation/05-ai-architecture.md#0",
+        "ssot/docs/help/troubleshooting.md#-1",
+        "docs/explanation/20-benchmarking-architecture.md#0",
+        "docs/explanation/09-testing-strategy.md#1",
+        "docs/explanation/02-process-coordination.md#0",
+        "docs/explanation/12-desktop-installer-and-sandbox-setup.md#7"
+      ],
+      "sourceSpans": [
+        "1:16",
+        "1:32",
+        "1:35",
+        "1:27",
+        "1:34",
+        "-1:-1",
+        "1:40",
+        "33:55",
+        "1:32",
+        "243:270"
+      ],
+      "terminalEvent": "done",
+      "terminalPayloadParseError": false,
+      "toolArguments": [
+        "{\"query\":\"JustSearch architecture processes\",\"limit\":10}",
+        "{\"path\":\"f:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-0b\\\\docs\\\\explanation\\\\01-system-overview.md\"}"
+      ],
+      "toolCallsExecuted": 2,
+      "toolErrorCodes": [
+        null,
+        null
+      ],
+      "toolNames": [
+        "core_search_index",
+        "core_read_document"
+      ],
+      "toolTruncatedForModel": [
+        false,
+        false
+      ]
+    },
+    "c03": {
+      "cancel.httpStatus": 200,
+      "cancel.requested": true,
+      "cancel.sessionCancelTrigger": "USER",
+      "cancel.sessionDisposition": "CANCELLED",
+      "cancel.sessionState": "CANCELLED",
+      "cancel.terminalEvent": "error",
+      "cancel.terminalReasonCode": "CANCELLED",
+      "citationScorer": null,
+      "citationSentences": [],
+      "citationTargets": [],
+      "disposition": null,
+      "errorCode": "CANCELLED",
+      "eventNames": [
+        "session_started",
+        "progress",
+        "budget_update",
+        "progress",
+        "reasoning_chunk",
+        "budget_update",
+        "tool_batch_proposed",
+        "error"
+      ],
+      "finalResponse": null,
+      "httpStatus": 200,
+      "iterationsUsed": null,
+      "reasoningText": "The user is asking for a summary of \"desktop installer and sandbox setup\" in detail. This seems to be asking about technical documentation related to software installation and sandboxing. I should search the knowledge index for relevant information about desktop installers and sandbox setups.\n\nLet me start by searching for these terms to find relevant documents.\n",
+      "sourceContextIncludedChars": [],
+      "sourceContextInclusion": [],
+      "sourceExcerptDigests": [],
+      "sourcePaths": [],
+      "sourceRefs": [],
+      "sourceSpans": [],
+      "terminalEvent": "error",
+      "terminalPayloadParseError": false,
+      "toolArguments": [],
+      "toolCallsExecuted": null,
+      "toolErrorCodes": [],
+      "toolNames": [],
+      "toolTruncatedForModel": []
+    }
+  },
+  "fixture_id": "lane-f-workflow-fixture",
+  "fixture_version": 1,
+  "observed": {
+    "queries": {
+      "q01": {
+        "crossEncoderScores": [
+          0.2602539,
+          0.14123535,
+          0.019317627,
+          -0.0014762878,
+          -0.04159546,
+          -0.057250977,
+          -0.10583496,
+          -0.11517334,
+          -0.119628906,
+          -0.121032715,
+          -0.16748047,
+          -0.21362305,
+          -0.24951172,
+          -0.31201172,
+          -0.39624023,
+          -0.4453125,
+          -0.4621582,
+          -0.46801758,
+          -0.48364258,
+          -0.52734375,
+          -0.546875,
+          -0.5991211,
+          -0.6435547,
+          -0.6464844,
+          -0.65771484,
+          -0.7026367,
+          -0.75927734,
+          -0.7871094,
+          -0.9394531,
+          -1.0615234,
+          -1.0908203,
+          -1.1748047,
+          -1.2978516,
+          -1.8818359,
+          -2.3242188,
+          -2.3398438,
+          -2.7792969,
+          -2.9882812,
+          -3.0566406,
+          -3.2539062
+        ],
+        "fusionScores": [
+          0.42625612,
+          0.3707352,
+          0.55727285,
+          0.5227566,
+          0.47298682,
+          0.45175284,
+          0.49308014,
+          0.53518474,
+          0.48344448,
+          0.9698743,
+          0.4613869,
+          0.76439077,
+          0.46510062,
+          0.49763682,
+          0.573061,
+          0.30840376,
+          0.65370315,
+          0.5435098,
+          0.39137948,
+          0.45952386,
+          0.4923956,
+          0.50404525,
+          0.6006594,
+          0.4929432,
+          0.5245781,
+          0.52764004,
+          0.5069581,
+          0.5503145,
+          0.5396978,
+          0.44686252,
+          0.42267057,
+          0.47792247,
+          0.45606983,
+          0.4838317,
+          0.6861965,
+          0.45848656,
+          0.36973614,
+          0.522467,
+          0.45520148,
+          0.5100822
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.4086150825023651,
+          0.506397545337677,
+          0.5993653535842896,
+          0.7182512879371643,
+          0.6139565110206604,
+          0.6296728253364563,
+          0.38637837767601013,
+          0.4438740015029907,
+          0.41775134205818176,
+          0.9824093580245972,
+          0.4247373938560486,
+          0.814721941947937,
+          0.40526604652404785,
+          0.507892370223999,
+          0.6752138137817383,
+          0.33890509605407715,
+          0.6135159730911255,
+          0.6338616609573364,
+          0.31466323137283325,
+          0.5625143051147461,
+          0.5184682607650757,
+          0.43568873405456543,
+          0.6401899456977844,
+          0.4370828866958618,
+          0.43162989616394043,
+          0.5118393301963806,
+          0.513353168964386,
+          0.5317488312721252,
+          0.3869861364364624,
+          0.3471224009990692,
+          0.3358580768108368,
+          0.42013901472091675,
+          0.3421706259250641,
+          0.4051712155342102,
+          0.36837702989578247,
+          0.3817119896411896,
+          0.3169171214103699,
+          0.47149986028671265,
+          0.3492797613143921,
+          0.3930385112762451
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 96,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 81,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 81
+      },
+      "q02": {
+        "crossEncoderScores": [
+          0.71875,
+          0.30322266,
+          0.29125977,
+          0.27612305,
+          0.22375488,
+          -0.03515625,
+          -0.053344727,
+          -0.06591797,
+          -0.101623535,
+          -0.10662842,
+          -0.19799805,
+          -0.2006836,
+          -0.20996094,
+          -0.21154785,
+          -0.22363281,
+          -0.2409668,
+          -0.26538086,
+          -0.29223633,
+          -0.32983398,
+          -0.36572266,
+          -0.37231445,
+          -0.42822266,
+          -0.54248047,
+          -0.60058594,
+          -0.6044922,
+          -0.609375,
+          -0.61621094,
+          -0.64746094,
+          -0.75146484,
+          -0.8120117,
+          -0.8144531,
+          -0.8535156,
+          -0.95947266,
+          -1.0253906,
+          -1.0556641,
+          -1.1445312,
+          -1.1835938,
+          -1.3164062,
+          -1.8359375,
+          -3.0058594
+        ],
+        "fusionScores": [
+          0.7649971,
+          0.75670093,
+          0.54713124,
+          0.76074266,
+          0.47022477,
+          0.62998235,
+          0.37678382,
+          0.42779034,
+          0.42800987,
+          0.47343034,
+          0.33487853,
+          0.3863738,
+          0.3213995,
+          0.6389389,
+          0.40381634,
+          0.45206833,
+          0.42229936,
+          0.38826522,
+          0.39919344,
+          0.29388773,
+          0.42653728,
+          0.4179844,
+          0.4838325,
+          0.3643403,
+          0.4654711,
+          0.28262284,
+          0.48547113,
+          0.31785062,
+          0.35749668,
+          0.4502689,
+          0.5236128,
+          0.3445688,
+          0.42373264,
+          0.34603494,
+          0.31848097,
+          0.37997746,
+          0.3226913,
+          0.38333055,
+          0.34419414,
+          0.3410334
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.9253802299499512,
+          0.9931589961051941,
+          0.6129055619239807,
+          0.7881568074226379,
+          0.4696955382823944,
+          0.7382707595825195,
+          0.3417719900608063,
+          0.4499134421348572,
+          0.3320041596889496,
+          0.42101529240608215,
+          0.24665378034114838,
+          0.3275621235370636,
+          0.2320145219564438,
+          0.6550858020782471,
+          0.37268969416618347,
+          0.4544071555137634,
+          0.47079193592071533,
+          0.30216389894485474,
+          0.2588169276714325,
+          0.20687998831272125,
+          0.32310932874679565,
+          0.3891999125480652,
+          0.36473119258880615,
+          0.29821890592575073,
+          0.29485082626342773,
+          0.19842417538166046,
+          0.4579859673976898,
+          0.2283039391040802,
+          0.2269178181886673,
+          0.3965524733066559,
+          0.3652357757091522,
+          0.18922920525074005,
+          0.35430407524108887,
+          0.22171682119369507,
+          0.23617911338806152,
+          0.3650292754173279,
+          0.21660009026527405,
+          0.2600466310977936,
+          0.21194911003112793,
+          0.1761326938867569
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 96,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 83,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 83
+      },
+      "q03": {
+        "crossEncoderScores": [
+          0.78125,
+          0.6879883,
+          0.6826172,
+          0.6767578,
+          0.5185547,
+          0.42700195,
+          0.3972168,
+          0.37548828,
+          0.3137207,
+          0.22949219,
+          0.19995117,
+          0.13903809,
+          -0.0037384033,
+          -0.01348114,
+          -0.07501221,
+          -0.09539795,
+          -0.12011719,
+          -0.12384033,
+          -0.13537598,
+          -0.23120117,
+          -0.27246094,
+          -0.30322266,
+          -0.37548828,
+          -0.41552734,
+          -0.53222656,
+          -0.54833984,
+          -0.55908203,
+          -0.5961914,
+          -0.64160156,
+          -0.64990234,
+          -0.7138672,
+          -0.8466797,
+          -0.8959961,
+          -0.89990234,
+          -1.0146484,
+          -1.0693359,
+          -1.109375,
+          -1.234375,
+          -1.6904297,
+          -2.2773438
+        ],
+        "fusionScores": [
+          1.0,
+          0.79695415,
+          0.537477,
+          0.5932773,
+          0.7564405,
+          0.7724503,
+          0.4909709,
+          0.45790035,
+          0.42546287,
+          0.58323705,
+          0.3393837,
+          0.4181688,
+          0.46626204,
+          0.6835233,
+          0.6640585,
+          0.4085474,
+          0.46387598,
+          0.5118977,
+          0.25794607,
+          0.57838666,
+          0.56994706,
+          0.30159616,
+          0.52946335,
+          0.2877025,
+          0.34804827,
+          0.5879732,
+          0.36933982,
+          0.26797113,
+          0.3638247,
+          0.34526777,
+          0.2681211,
+          0.33460286,
+          0.27202663,
+          0.38201037,
+          0.29893875,
+          0.39205253,
+          0.36476576,
+          0.26940852,
+          0.24424008,
+          0.38954768
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          1.0,
+          0.8706023097038269,
+          0.635087251663208,
+          0.6893969178199768,
+          0.6604190468788147,
+          0.7066826820373535,
+          0.5132754445075989,
+          0.512170135974884,
+          0.4045342206954956,
+          0.6189801692962646,
+          0.4740505814552307,
+          0.40542590618133545,
+          0.3510841727256775,
+          0.5500891804695129,
+          0.5657051801681519,
+          0.3354187607765198,
+          0.3359891176223755,
+          0.3982833921909332,
+          0.22223234176635742,
+          0.4180000424385071,
+          0.503673791885376,
+          0.22188474237918854,
+          0.42483165860176086,
+          0.15643303096294403,
+          0.19781024754047394,
+          0.4367632269859314,
+          0.21232852339744568,
+          0.14685815572738647,
+          0.24811053276062012,
+          0.1999315321445465,
+          0.19142135977745056,
+          0.2612878978252411,
+          0.15661680698394775,
+          0.2584589719772339,
+          0.17539621889591217,
+          0.22135594487190247,
+          0.3502283990383148,
+          0.1394408494234085,
+          0.1429666131734848,
+          0.3451099097728729
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 68,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 83,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 83
+      },
+      "q04": {
+        "crossEncoderScores": [
+          0.8339844,
+          0.7084961,
+          0.47485352,
+          0.45532227,
+          0.39892578,
+          0.32226562,
+          0.30126953,
+          0.22399902,
+          0.14978027,
+          0.14477539,
+          0.070373535,
+          0.03704834,
+          0.019989014,
+          -0.037597656,
+          -0.05480957,
+          -0.15930176,
+          -0.21618652,
+          -0.22131348,
+          -0.23181152,
+          -0.27197266,
+          -0.30566406,
+          -0.40429688,
+          -0.46020508,
+          -0.46826172,
+          -0.5527344,
+          -0.69140625,
+          -0.7216797,
+          -0.72802734,
+          -0.75439453,
+          -0.7832031,
+          -0.79345703,
+          -0.79785156,
+          -0.95654297,
+          -0.98046875,
+          -0.98339844,
+          -1.1054688,
+          -1.4013672,
+          -1.8378906,
+          -1.9140625,
+          -2.9277344
+        ],
+        "fusionScores": [
+          0.6861036,
+          1.0,
+          0.6518841,
+          0.4089993,
+          0.7755436,
+          0.34382755,
+          0.3821666,
+          0.35220152,
+          0.5966894,
+          0.48106447,
+          0.37103724,
+          0.40733334,
+          0.5004194,
+          0.3512473,
+          0.3558127,
+          0.35839495,
+          0.50931436,
+          0.41445133,
+          0.37897238,
+          0.30124554,
+          0.36916527,
+          0.282791,
+          0.43705967,
+          0.5532091,
+          0.31820345,
+          0.35554057,
+          0.27493423,
+          0.2756039,
+          0.3598766,
+          0.49357027,
+          0.38363487,
+          0.28551605,
+          0.20451708,
+          0.3310933,
+          0.27025464,
+          0.21218854,
+          0.22740568,
+          0.3456382,
+          0.33477333,
+          null
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.7580093741416931,
+          1.0,
+          0.6080199480056763,
+          0.3892626464366913,
+          0.6355839967727661,
+          0.350037157535553,
+          0.37291377782821655,
+          0.2854829728603363,
+          0.5563291907310486,
+          0.5654498338699341,
+          0.30031174421310425,
+          0.36321064829826355,
+          0.36663898825645447,
+          0.4135952293872833,
+          0.31441810727119446,
+          0.25966235995292664,
+          0.37816789746284485,
+          0.38592609763145447,
+          0.2561907172203064,
+          0.4221058785915375,
+          0.4196465015411377,
+          0.21107132732868195,
+          0.4347177743911743,
+          0.37655389308929443,
+          0.2038036584854126,
+          0.2928990423679352,
+          0.2109604775905609,
+          0.22271747887134552,
+          0.2030484974384308,
+          0.32930976152420044,
+          0.18785633146762848,
+          0.20568156242370605,
+          0.12128346413373947,
+          0.22496333718299866,
+          0.19722740352153778,
+          0.13335050642490387,
+          0.15009045600891113,
+          0.24872693419456482,
+          0.26820263266563416,
+          0.1611783802509308
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 96,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 82,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 82
+      },
+      "q05": {
+        "crossEncoderScores": [
+          0.6425781,
+          0.4892578,
+          0.38598633,
+          0.3239746,
+          0.24731445,
+          0.24499512,
+          0.21118164,
+          0.101135254,
+          0.03967285,
+          0.003156662,
+          -0.0061912537,
+          -0.019119263,
+          -0.030532837,
+          -0.19030762,
+          -0.26831055,
+          -0.34643555,
+          -0.375,
+          -0.38476562,
+          -0.39038086,
+          -0.42626953,
+          -0.47705078,
+          -0.5258789,
+          -0.54785156,
+          -0.68310547,
+          -0.71972656,
+          -0.7285156,
+          -0.7548828,
+          -0.79003906,
+          -0.8300781,
+          -0.92578125,
+          -1.2285156,
+          -1.2333984,
+          -1.2919922,
+          -1.3896484,
+          -1.7607422,
+          -1.8369141,
+          -1.8515625,
+          -1.9443359,
+          -2.0117188,
+          -2.0917969
+        ],
+        "fusionScores": [
+          0.51202136,
+          0.576075,
+          0.65917504,
+          0.8926388,
+          0.47305506,
+          0.47895914,
+          0.4070585,
+          0.33434725,
+          0.8220545,
+          0.46360177,
+          0.31082544,
+          0.34106347,
+          0.5756914,
+          0.23129919,
+          0.48085463,
+          0.24522234,
+          0.34398144,
+          0.60586476,
+          0.21462111,
+          0.30929983,
+          0.3991619,
+          0.34122148,
+          0.25656906,
+          0.23669687,
+          0.28276882,
+          0.27273184,
+          0.5448229,
+          0.2596287,
+          0.45117477,
+          0.37825924,
+          0.21983342,
+          0.2393825,
+          0.25773883,
+          0.84943116,
+          0.21148312,
+          0.2176276,
+          0.22490695,
+          0.21404347,
+          0.20079891,
+          0.22501403
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.6530584692955017,
+          0.7533789873123169,
+          0.7481259703636169,
+          1.0,
+          0.4454154968261719,
+          0.45899131894111633,
+          0.4320248067378998,
+          0.395633339881897,
+          0.8830083012580872,
+          0.34701240062713623,
+          0.15330611169338226,
+          0.2658987045288086,
+          0.4475707709789276,
+          0.11730895191431046,
+          0.45180875062942505,
+          0.10845846682786942,
+          0.1965327262878418,
+          0.5182169675827026,
+          0.1380823403596878,
+          0.20683522522449493,
+          0.3155456781387329,
+          0.2238067388534546,
+          0.13304762542247772,
+          0.16241173446178436,
+          0.11121746152639389,
+          0.16095919907093048,
+          0.4638993740081787,
+          0.191693976521492,
+          0.2544488310813904,
+          0.23337221145629883,
+          0.14087839424610138,
+          0.16584108769893646,
+          0.18928073346614838,
+          0.8908417224884033,
+          0.13021568953990936,
+          0.12352461367845535,
+          0.14735691249370575,
+          0.13348506391048431,
+          0.10727798193693161,
+          0.1474936455488205
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 49,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 80,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 80
+      },
+      "q06": {
+        "crossEncoderScores": [
+          1.4609375,
+          -0.30126953,
+          -0.33276367,
+          -0.5307617,
+          -0.7265625,
+          -0.8071289,
+          -0.82373047,
+          -0.82421875,
+          -0.85253906,
+          -0.87939453,
+          -0.9038086,
+          -0.9067383,
+          -0.9394531,
+          -1.1992188,
+          -1.2490234,
+          -1.3125,
+          -1.4375,
+          -1.5224609,
+          -1.5253906,
+          -1.5517578,
+          -1.59375,
+          -1.8017578,
+          -1.8808594,
+          -1.9199219,
+          -1.9980469,
+          -2.0332031,
+          -2.1269531,
+          -2.1757812,
+          -2.203125,
+          -2.5273438,
+          -2.5546875,
+          -2.7636719,
+          -2.7714844,
+          -2.8007812,
+          -2.8164062,
+          -3.0351562,
+          -3.0371094,
+          -3.2617188,
+          -3.2929688,
+          -3.3027344
+        ],
+        "fusionScores": [
+          1.0,
+          0.6451329,
+          0.17145821,
+          0.3508492,
+          0.16379653,
+          0.2542687,
+          0.19009905,
+          0.20039111,
+          0.15917593,
+          0.33646232,
+          0.3157441,
+          0.15508497,
+          0.36518487,
+          0.25631028,
+          0.29597166,
+          0.15089418,
+          0.23923922,
+          0.13488993,
+          0.15328616,
+          0.32126924,
+          0.19196823,
+          0.118460864,
+          0.127879,
+          0.2608028,
+          0.309643,
+          0.15404065,
+          0.300502,
+          0.32750666,
+          0.18836167,
+          0.1613918,
+          0.2471768,
+          0.14184088,
+          0.13943256,
+          0.2579632,
+          0.21615815,
+          0.2376725,
+          0.15276738,
+          0.15574253,
+          0.14235519,
+          0.1716974
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          1.0,
+          0.5771856904029846,
+          0.21739809215068817,
+          0.36206257343292236,
+          0.1870805323123932,
+          0.21111565828323364,
+          0.2151128649711609,
+          0.17430679500102997,
+          0.15267951786518097,
+          0.25538456439971924,
+          0.32349860668182373,
+          0.10147751122713089,
+          0.33539026975631714,
+          0.1829124391078949,
+          0.2915019094944,
+          0.11758528649806976,
+          0.18170633912086487,
+          0.12789848446846008,
+          0.12481588125228882,
+          0.2632363736629486,
+          0.22586461901664734,
+          0.110327810049057,
+          0.10273987054824829,
+          0.18623308837413788,
+          0.23074382543563843,
+          0.10819482058286667,
+          0.2155688852071762,
+          0.2618940770626068,
+          0.13831084966659546,
+          0.1335913985967636,
+          0.18744158744812012,
+          0.12495385110378265,
+          0.10666421055793762,
+          0.19124019145965576,
+          0.14215803146362305,
+          0.19672085344791412,
+          0.11899983882904053,
+          0.11217263340950012,
+          0.10421250760555267,
+          0.1227908730506897
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 94,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 80,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 80
+      },
+      "q07": {
+        "crossEncoderScores": [
+          0.5180664,
+          0.18261719,
+          0.1628418,
+          0.097473145,
+          -0.035003662,
+          -0.16552734,
+          -0.17016602,
+          -0.22937012,
+          -0.2944336,
+          -0.3022461,
+          -0.3383789,
+          -0.35351562,
+          -0.41333008,
+          -0.4777832,
+          -0.4807129,
+          -0.4831543,
+          -0.48339844,
+          -0.51416016,
+          -0.5151367,
+          -0.5576172,
+          -0.5917969,
+          -0.61376953,
+          -0.6430664,
+          -0.67285156,
+          -0.67871094,
+          -0.71191406,
+          -0.73583984,
+          -0.7558594,
+          -0.765625,
+          -0.85839844,
+          -0.9067383,
+          -0.9243164,
+          -0.9638672,
+          -1.0527344,
+          -1.0566406,
+          -1.1328125,
+          -1.1953125,
+          -1.4521484,
+          -1.8017578,
+          -2.3378906
+        ],
+        "fusionScores": [
+          0.7286221,
+          0.49653128,
+          0.60111386,
+          0.27166745,
+          0.55305475,
+          0.6220665,
+          0.35144168,
+          0.4919751,
+          0.42966658,
+          0.26255694,
+          0.3436615,
+          0.38016403,
+          0.44798574,
+          0.46128702,
+          0.38497132,
+          0.21332073,
+          0.30215162,
+          0.3382,
+          0.40242052,
+          0.35651553,
+          0.3211844,
+          0.35472983,
+          0.30427635,
+          0.2973652,
+          0.29154077,
+          0.47215033,
+          0.37305218,
+          0.3550743,
+          0.33480355,
+          0.48124933,
+          0.29739383,
+          0.37268928,
+          0.3403965,
+          0.35910445,
+          0.28549314,
+          0.38086236,
+          0.269921,
+          0.3311316,
+          0.3155073,
+          0.3077834
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.9932111501693726,
+          0.7535049319267273,
+          0.8943344354629517,
+          0.3477705717086792,
+          0.781579852104187,
+          0.7394633293151855,
+          0.43896782398223877,
+          0.5346158742904663,
+          0.4215298295021057,
+          0.3145659863948822,
+          0.45954468846321106,
+          0.4406563341617584,
+          0.48887524008750916,
+          0.47183144092559814,
+          0.6310761570930481,
+          0.27383899688720703,
+          0.385389119386673,
+          0.38516178727149963,
+          0.5625448822975159,
+          0.3935648500919342,
+          0.3249581456184387,
+          0.30919259786605835,
+          0.2795834243297577,
+          0.33545708656311035,
+          0.2653046250343323,
+          0.4400350749492645,
+          0.39291536808013916,
+          0.3748076260089874,
+          0.258373886346817,
+          0.4320037066936493,
+          0.23955947160720825,
+          0.35463854670524597,
+          0.31289488077163696,
+          0.3726843595504761,
+          0.2981858253479004,
+          0.2646294832229614,
+          0.23984423279762268,
+          0.24665910005569458,
+          0.290905237197876,
+          0.2608371078968048
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 81,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 82,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 82
+      },
+      "q08": {
+        "crossEncoderScores": [
+          0.6459961,
+          0.4790039,
+          0.2824707,
+          0.023025513,
+          -0.06896973,
+          -0.12438965,
+          -0.38916016,
+          -0.41601562,
+          -0.45483398,
+          -0.4909668,
+          -0.5234375,
+          -0.5654297,
+          -0.5722656,
+          -0.61279297,
+          -0.61865234,
+          -0.625,
+          -0.67285156,
+          -0.71777344,
+          -0.7495117,
+          -0.7944336,
+          -0.82128906,
+          -0.8330078,
+          -0.8881836,
+          -0.9370117,
+          -0.9838867,
+          -1.0576172,
+          -1.1015625,
+          -1.2138672,
+          -1.2148438,
+          -1.2246094,
+          -1.6191406,
+          -1.8466797,
+          -1.8574219,
+          -2.0371094,
+          -2.2695312,
+          -2.7207031,
+          -3.046875,
+          -3.1582031,
+          -3.2363281,
+          -3.2792969
+        ],
+        "fusionScores": [
+          0.4701,
+          0.62641287,
+          0.5254559,
+          0.3493016,
+          0.29581535,
+          0.47486755,
+          0.49436808,
+          0.31355506,
+          0.28862268,
+          0.3887528,
+          0.5157562,
+          0.4291954,
+          0.48650584,
+          0.42300653,
+          0.39099082,
+          0.2843274,
+          0.6161923,
+          0.2727297,
+          0.34155485,
+          0.31436342,
+          0.455902,
+          0.40175658,
+          0.601405,
+          0.39015624,
+          0.35156414,
+          0.29862383,
+          0.5430574,
+          0.32683533,
+          0.3904785,
+          0.3646382,
+          0.3785212,
+          0.4185445,
+          0.46301916,
+          0.28527093,
+          0.33401242,
+          0.38783547,
+          0.45734423,
+          0.34563404,
+          0.34858754,
+          0.36780167
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.8250247836112976,
+          0.981622576713562,
+          0.5812540054321289,
+          0.42800888419151306,
+          0.27056685090065,
+          0.5268693566322327,
+          0.4160708487033844,
+          0.29759734869003296,
+          0.24250227212905884,
+          0.3866400122642517,
+          0.4916183650493622,
+          0.4979041814804077,
+          0.4081335961818695,
+          0.39229223132133484,
+          0.35377392172813416,
+          0.2238108515739441,
+          0.6864784359931946,
+          0.219552680850029,
+          0.28801485896110535,
+          0.25824159383773804,
+          0.34497809410095215,
+          0.37360119819641113,
+          0.7549959421157837,
+          0.3593144416809082,
+          0.2879675030708313,
+          0.30023419857025146,
+          0.5144440531730652,
+          0.32931116223335266,
+          0.36036911606788635,
+          0.21545618772506714,
+          0.3673006594181061,
+          0.4055537283420563,
+          0.3684399127960205,
+          0.23625752329826355,
+          0.2504780888557434,
+          0.26981258392333984,
+          0.31601035594940186,
+          0.24413998425006866,
+          0.23321568965911865,
+          0.26010939478874207
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 94,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 84,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 84
+      },
+      "q09": {
+        "crossEncoderScores": [
+          0.4855957,
+          0.27270508,
+          0.18359375,
+          0.0949707,
+          0.09399414,
+          0.072509766,
+          0.0014400482,
+          -0.070495605,
+          -0.23620605,
+          -0.26513672,
+          -0.30786133,
+          -0.31323242,
+          -0.31567383,
+          -0.34106445,
+          -0.43017578,
+          -0.45898438,
+          -0.46728516,
+          -0.5527344,
+          -0.6435547,
+          -0.6616211,
+          -0.7060547,
+          -0.7319336,
+          -0.7626953,
+          -0.8383789,
+          -0.859375,
+          -0.8623047,
+          -0.8925781,
+          -0.9013672,
+          -0.9038086,
+          -0.91552734,
+          -0.9433594,
+          -0.9448242,
+          -1.0019531,
+          -1.0048828,
+          -1.4560547,
+          -1.6308594,
+          -1.7089844,
+          -1.8085938,
+          -1.9892578,
+          -2.3164062
+        ],
+        "fusionScores": [
+          0.67489535,
+          0.7247354,
+          0.6954949,
+          0.5913235,
+          0.64352113,
+          0.6671649,
+          0.772914,
+          0.6320404,
+          0.697347,
+          0.753344,
+          0.57781744,
+          0.6803465,
+          0.66006297,
+          0.539834,
+          0.6648008,
+          0.8420154,
+          0.34662065,
+          0.63596183,
+          0.5526977,
+          0.41631293,
+          0.54582274,
+          0.6872734,
+          0.3281415,
+          0.4524539,
+          0.4573297,
+          0.4782611,
+          0.3892188,
+          0.7881964,
+          0.36922932,
+          0.622877,
+          0.37634513,
+          0.39963618,
+          0.52630365,
+          0.43060338,
+          0.3536549,
+          0.44271505,
+          0.3289551,
+          0.49424493,
+          0.47974378,
+          0.390584
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.8765982389450073,
+          0.697880744934082,
+          0.8350281715393066,
+          0.7823165059089661,
+          0.5969623923301697,
+          0.8000412583351135,
+          0.9487560987472534,
+          0.6657850742340088,
+          0.85953688621521,
+          0.7582318782806396,
+          0.5354228615760803,
+          0.7463123798370361,
+          0.7547613978385925,
+          0.4088313579559326,
+          0.5909286737442017,
+          0.8874130249023438,
+          0.282108873128891,
+          0.7043130397796631,
+          0.5093796253204346,
+          0.2277022898197174,
+          0.47158047556877136,
+          0.5820680260658264,
+          0.24940995872020721,
+          0.32760366797447205,
+          0.2820323705673218,
+          0.4066130220890045,
+          0.25944268703460693,
+          0.9433221817016602,
+          0.22489112615585327,
+          0.6241164803504944,
+          0.2665553092956543,
+          0.23927247524261475,
+          0.4086785912513733,
+          0.24815234541893005,
+          0.23292146623134613,
+          0.22853563725948334,
+          0.24231043457984924,
+          0.30607306957244873,
+          0.324069619178772,
+          0.27850377559661865
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 95,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 80,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 80
+      },
+      "q10": {
+        "crossEncoderScores": [
+          0.41601562,
+          0.39086914,
+          0.2553711,
+          -0.051483154,
+          -0.0927124,
+          -0.11730957,
+          -0.14855957,
+          -0.17297363,
+          -0.24621582,
+          -0.24951172,
+          -0.25585938,
+          -0.2626953,
+          -0.28149414,
+          -0.30200195,
+          -0.37573242,
+          -0.38354492,
+          -0.38916016,
+          -0.421875,
+          -0.42456055,
+          -0.5888672,
+          -0.60009766,
+          -0.66308594,
+          -0.68896484,
+          -0.7241211,
+          -0.78222656,
+          -0.9199219,
+          -0.92822266,
+          -0.9296875,
+          -0.97314453,
+          -0.9897461,
+          -1.0283203,
+          -1.0322266,
+          -1.0732422,
+          -1.1396484,
+          -1.2304688,
+          -1.3125,
+          -1.3427734,
+          -1.6269531,
+          -1.6962891,
+          -3.0859375
+        ],
+        "fusionScores": [
+          0.60222214,
+          0.88838565,
+          0.932822,
+          0.5450646,
+          0.4774774,
+          0.4516812,
+          0.3487947,
+          0.48671353,
+          0.41978285,
+          0.32701722,
+          0.39642754,
+          0.46934825,
+          0.37739033,
+          0.7148264,
+          0.36255053,
+          0.4847984,
+          0.590739,
+          0.6634984,
+          0.41735488,
+          0.37810206,
+          0.3425092,
+          0.39324346,
+          0.39296475,
+          0.5533371,
+          0.39419845,
+          0.34464645,
+          0.4280722,
+          0.40006712,
+          0.38836992,
+          0.31723937,
+          0.3407732,
+          0.34591722,
+          0.5200168,
+          0.41384616,
+          0.4205397,
+          0.51364607,
+          0.35811687,
+          0.3468288,
+          0.36740026,
+          0.45582342
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.6012285947799683,
+          0.932716965675354,
+          1.0,
+          0.37600138783454895,
+          0.29324111342430115,
+          0.3263299763202667,
+          0.24438972771167755,
+          0.3987780809402466,
+          0.27911117672920227,
+          0.22990800440311432,
+          0.3482813835144043,
+          0.325839102268219,
+          0.2732548713684082,
+          0.570046067237854,
+          0.23092100024223328,
+          0.3994927406311035,
+          0.4563821852207184,
+          0.6324025988578796,
+          0.32347092032432556,
+          0.33795681595802307,
+          0.18853536248207092,
+          0.29473164677619934,
+          0.27070844173431396,
+          0.42307648062705994,
+          0.25409993529319763,
+          0.2069777101278305,
+          0.22673916816711426,
+          0.29031214118003845,
+          0.23720818758010864,
+          0.21841120719909668,
+          0.19248616695404053,
+          0.23777250945568085,
+          0.3694697618484497,
+          0.2929128110408783,
+          0.32961198687553406,
+          0.42158445715904236,
+          0.21753311157226562,
+          0.19774127006530762,
+          0.2729071378707886,
+          0.26964545249938965
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 94,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 82,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 82
+      },
+      "q11": {
+        "crossEncoderScores": [
+          0.29052734,
+          0.20788574,
+          -0.048583984,
+          -0.075805664,
+          -0.14013672,
+          -0.15710449,
+          -0.21459961,
+          -0.2602539,
+          -0.28027344,
+          -0.32788086,
+          -0.34228516,
+          -0.3840332,
+          -0.5439453,
+          -0.5649414,
+          -0.5751953,
+          -0.6347656,
+          -0.66796875,
+          -0.69873047,
+          -0.72998047,
+          -0.78466797,
+          -0.80029297,
+          -0.8227539,
+          -0.89990234,
+          -0.9375,
+          -0.9628906,
+          -1.0097656,
+          -1.0488281,
+          -1.0693359,
+          -1.0761719,
+          -1.1474609,
+          -1.2441406,
+          -1.2519531,
+          -1.3183594,
+          -1.6005859,
+          -1.6035156,
+          -1.7919922,
+          -2.09375,
+          -2.1210938,
+          -2.3105469,
+          -2.6015625
+        ],
+        "fusionScores": [
+          0.6834235,
+          1.0,
+          0.47065783,
+          0.42919663,
+          0.47083682,
+          0.4400491,
+          0.6074877,
+          0.36453444,
+          0.5660164,
+          0.49628255,
+          0.40187386,
+          0.30695117,
+          0.32893848,
+          0.3988134,
+          0.32667202,
+          0.32359886,
+          0.34567082,
+          0.50355923,
+          0.36888298,
+          0.40120536,
+          0.32860216,
+          0.5184699,
+          0.41760874,
+          0.2710199,
+          0.5137159,
+          0.44403997,
+          0.35174122,
+          0.4371567,
+          0.39673024,
+          0.38905364,
+          0.43529266,
+          0.42426348,
+          0.3239482,
+          0.3122397,
+          0.3490867,
+          0.33887684,
+          0.28332552,
+          0.32080987,
+          0.3715612,
+          0.6945428
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.6049784421920776,
+          1.0,
+          0.40223586559295654,
+          0.3290274739265442,
+          0.4212515652179718,
+          0.39554643630981445,
+          0.49906134605407715,
+          0.23011469841003418,
+          0.4870329797267914,
+          0.4020422399044037,
+          0.23845070600509644,
+          0.17569056153297424,
+          0.18218228220939636,
+          0.28839462995529175,
+          0.17412246763706207,
+          0.16729600727558136,
+          0.22365017235279083,
+          0.3433910012245178,
+          0.23829461634159088,
+          0.2459234893321991,
+          0.2857416272163391,
+          0.3592531979084015,
+          0.2209586203098297,
+          0.3016415536403656,
+          0.47572243213653564,
+          0.2901979088783264,
+          0.2890251576900482,
+          0.2762209475040436,
+          0.19083234667778015,
+          0.2595585882663727,
+          0.32035326957702637,
+          0.2268499732017517,
+          0.17158526182174683,
+          0.18064461648464203,
+          0.19938932359218597,
+          0.19069799780845642,
+          0.17230810225009918,
+          0.17007339000701904,
+          0.20953874289989471,
+          0.5419929027557373
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 84,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 84,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 84
+      },
+      "q12": {
+        "crossEncoderScores": [
+          0.2849121,
+          0.16259766,
+          -0.12463379,
+          -0.17053223,
+          -0.29052734,
+          -0.34716797,
+          -0.3552246,
+          -0.40478516,
+          -0.4140625,
+          -0.44677734,
+          -0.45825195,
+          -0.45874023,
+          -0.49121094,
+          -0.5239258,
+          -0.5292969,
+          -0.55029297,
+          -0.56591797,
+          -0.5932617,
+          -0.6220703,
+          -0.625,
+          -0.6411133,
+          -0.6425781,
+          -0.6430664,
+          -0.6826172,
+          -0.69677734,
+          -0.74365234,
+          -0.75146484,
+          -0.7548828,
+          -0.8256836,
+          -0.8330078,
+          -0.87109375,
+          -0.8935547,
+          -0.9008789,
+          -0.90527344,
+          -0.9472656,
+          -0.9707031,
+          -0.9970703,
+          -1.03125,
+          -1.1650391,
+          -1.4511719
+        ],
+        "fusionScores": [
+          0.70582116,
+          0.75864416,
+          0.63677484,
+          0.9974182,
+          0.6237222,
+          0.6010527,
+          0.42447186,
+          0.38228202,
+          0.4247391,
+          0.4887975,
+          0.45536292,
+          0.4492031,
+          0.514328,
+          0.55196875,
+          0.33628383,
+          0.62394404,
+          0.5583919,
+          0.36568177,
+          0.6149864,
+          0.36606425,
+          0.49660754,
+          0.546226,
+          0.47788507,
+          0.56933385,
+          0.43584132,
+          0.5176031,
+          0.61527807,
+          0.55442524,
+          0.4013998,
+          0.43393517,
+          0.4466399,
+          0.5139236,
+          0.39017957,
+          0.4056584,
+          0.3435624,
+          0.44039246,
+          0.4735853,
+          0.521892,
+          0.3786216,
+          0.5137443
+        ],
+        "hitsCaptured": 40,
+        "hitsCompared": 10,
+        "scoreBasis": "cross-encoder",
+        "scores": [
+          0.8222717642784119,
+          0.602895975112915,
+          0.4793921113014221,
+          0.7312931418418884,
+          0.3361888825893402,
+          0.37708839774131775,
+          0.23241399228572845,
+          0.23282970488071442,
+          0.2675667703151703,
+          0.2518681585788727,
+          0.2846909761428833,
+          0.2955552935600281,
+          0.26256150007247925,
+          0.33670520782470703,
+          0.21835818886756897,
+          0.41591906547546387,
+          0.2981925904750824,
+          0.210855171084404,
+          0.4153025150299072,
+          0.18937863409519196,
+          0.35504207015037537,
+          0.39821112155914307,
+          0.31028950214385986,
+          0.4012701213359833,
+          0.22676058113574982,
+          0.36877772212028503,
+          0.3342370092868805,
+          0.45999208092689514,
+          0.18816865980625153,
+          0.22525368630886078,
+          0.24547813832759857,
+          0.26334521174430847,
+          0.18687060475349426,
+          0.19653719663619995,
+          0.19994795322418213,
+          0.18952439725399017,
+          0.3614482879638672,
+          0.25111302733421326,
+          0.17367170751094818,
+          0.3122568428516388
+        ],
+        "stageCardinality": {
+          "0:correction": null,
+          "10:cross-encoder": null,
+          "11:freshness": null,
+          "1:sparse-retrieval": 95,
+          "2:dense-retrieval": null,
+          "3:splade-retrieval": null,
+          "4:fusion": 81,
+          "5:chunk-merge": null,
+          "6:branch-fusion": null,
+          "7:query-understanding": null,
+          "8:expansion": null,
+          "9:lambdamart": null
+        },
+        "totalHits": 81
+      }
+    }
+  },
+  "provenance": {
+    "aiRuntimeModelFile": "Qwen3.5-4B-Q4_K_M.gguf",
+    "aiRuntimeOnline": true,
+    "aiRuntimeOnlineSignal": "active.modelPath",
+    "aiRuntimeState": "failed",
+    "aiRuntimeVariantId": "cuda12",
+    "available": true,
+    "chatProfile": "compact",
+    "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
+    "corpusRootSource": "option",
+    "docCountAtEnd": 97,
+    "docCountAtStart": 96,
+    "docCountSource": "embedding.docCount",
+    "enrichment": {
+      "chunkDocCount": 1288,
+      "chunkEmbeddingPendingCount": 0,
+      "chunkSpladeCoveragePercent": 0.0,
+      "chunkSpladeEnabled": false,
+      "chunkVectorCoveragePercent": 100.0,
+      "completedNerCount": 96,
+      "docCount": null,
+      "embeddingCoveragePercent": 100.0,
+      "embeddingEnabled": true,
+      "incompleteReasons": [],
+      "indexState": "IDLE",
+      "nerEnabled": true,
+      "pendingNerCount": 0,
+      "spladeCoveragePercent": 100.0,
+      "spladeEnabled": true
+    },
+    "indexAvailable": true,
+    "observed_at": "2026-09-07T20:17:20.970665400Z",
+    "pathsOutsideCorpusRoot": 0,
+    "pathsOutsideCorpusRootExamples": [],
+    "pinSources": {
+      "index.hybrid.candidate_limit_max": "env_var",
+      "index.hybrid.chunk_collapse_limit_multiplier": "env_var",
+      "index.hybrid.leg_arbitration_enabled": "env_var",
+      "index.hybrid.leg_recall_complete_enabled": "env_var",
+      "index.vector.exhaustive_search": "env_var",
+      "justsearch.embed.gpu.enabled": "jvm_arg",
+      "justsearch.llm.slots": "env_var",
+      "justsearch.ner.gpu_enabled": "jvm_arg",
+      "justsearch.rerank.chunks.deadline_ms": "env_var",
+      "justsearch.rerank.chunks.gpu.enabled": "default",
+      "justsearch.rerank.deadline_ms": "env_var",
+      "justsearch.rerank.gpu.enabled": "default",
+      "justsearch.rerank.gpu_mem_mb": "env_var",
+      "justsearch.rerank.top_k": "env_var",
+      "justsearch.splade.gpu_enabled": "jvm_arg"
+    },
+    "pins": {
+      "index.hybrid.candidate_limit_max": "5000",
+      "index.hybrid.chunk_collapse_limit_multiplier": "50",
+      "index.hybrid.leg_arbitration_enabled": "false",
+      "index.hybrid.leg_recall_complete_enabled": "false",
+      "index.vector.exhaustive_search": "true",
+      "justsearch.embed.gpu.enabled": "true",
+      "justsearch.llm.slots": "1",
+      "justsearch.ner.gpu_enabled": "true",
+      "justsearch.rerank.chunks.deadline_ms": "60000",
+      "justsearch.rerank.chunks.gpu.enabled": "false",
+      "justsearch.rerank.deadline_ms": "60000",
+      "justsearch.rerank.gpu.enabled": "true",
+      "justsearch.rerank.gpu_mem_mb": "4096",
+      "justsearch.rerank.top_k": "40",
+      "justsearch.splade.gpu_enabled": "true"
+    },
+    "rawRootExample": "f:\\justsearch-public\\.claude\\worktrees\\lane-f-0b\\docs\\explanation\\06-configuration-ssot.md",
+    "sampling": {
+      "seed": 20260907,
+      "temperature": 0.0
+    },
+    "samplingApplied": {
+      "c01": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c02": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c03": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      }
+    },
+    "schema_version": 1,
+    "service": "JustSearch Local API",
+    "status": "ok",
+    "worker.buildStamp": "8a048084ff68bc54"
+  },
+  "queries": {
+    "q01": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.2602539,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6861:8630",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "873:1288"
+            ],
+            "extractionReasonCode": null,
+            "filename": "06-configuration-ssot.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/06-configuration-ssot.md",
+            "path": "docs/explanation/06-configuration-ssot.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.14123535,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1584:3390",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:265",
+              "753:1160"
+            ],
+            "extractionReasonCode": null,
+            "filename": "19-module-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/19-module-architecture.md",
+            "path": "docs/explanation/19-module-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.019317627,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1929",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:476",
+              "1266:1690"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.0014762878,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "11849:13721",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:326",
+              "967:1375"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.04159546,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "11888:13754",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "709:1117"
+            ],
+            "extractionReasonCode": null,
+            "filename": "07-ui-host-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/07-ui-host-architecture.md",
+            "path": "docs/explanation/07-ui-host-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.057250977,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "5331:7298",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "846:1272"
+            ],
+            "extractionReasonCode": null,
+            "filename": "health-readiness-contract.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "path": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.10583496,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6926:8719",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:330",
+              "1000:1404"
+            ],
+            "extractionReasonCode": null,
+            "filename": "model-inventory.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/model-inventory.md",
+            "path": "docs/reference/model-inventory.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.11517334,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6738:8598",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "11:415",
+              "984:1389"
+            ],
+            "extractionReasonCode": null,
+            "filename": "00-primitives.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/ui/frontend-kernel/kernel/00-primitives.md",
+            "path": "docs/reference/ui/frontend-kernel/kernel/00-primitives.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.119628906,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1903",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "835:1257"
+            ],
+            "extractionReasonCode": null,
+            "filename": "22-agent-system-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/22-agent-system-architecture.md",
+            "path": "docs/explanation/22-agent-system-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.121032715,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1923",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "688:1133"
+            ],
+            "extractionReasonCode": null,
+            "filename": "02-process-coordination.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/02-process-coordination.md",
+            "path": "docs/explanation/02-process-coordination.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 96,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q02": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.71875,
+          "value": {
+            "chunkIndex": "16",
+            "chunkSpan": "26314:28210",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:318",
+              "630:1057"
+            ],
+            "extractionReasonCode": null,
+            "filename": "18-adapters-lucene-deep-dive.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "path": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.30322266,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1833",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "690:1097"
+            ],
+            "extractionReasonCode": null,
+            "filename": "11-index-schema-migration.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/11-index-schema-migration.md",
+            "path": "docs/explanation/11-index-schema-migration.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.29125977,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3425:5339",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "514:946"
+            ],
+            "extractionReasonCode": null,
+            "filename": "common-workflows.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/contributing/common-workflows.md",
+            "path": "docs/reference/contributing/common-workflows.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.27612305,
+          "value": {
+            "chunkIndex": "10",
+            "chunkSpan": "17287:19078",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "676:1119"
+            ],
+            "extractionReasonCode": null,
+            "filename": "04-storage-engine.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/04-storage-engine.md",
+            "path": "docs/explanation/04-storage-engine.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.22375488,
+          "value": {
+            "chunkIndex": "168",
+            "chunkSpan": "287914:289637",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "674:1130"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-quality-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-quality-register.md",
+            "path": "docs/reference/search-quality-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.03515625,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3151:4875",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "666:1110"
+            ],
+            "extractionReasonCode": null,
+            "filename": "index-schema-mismatch-reindex-noop.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/index-schema-mismatch-reindex-noop.md",
+            "path": "docs/reference/index-schema-mismatch-reindex-noop.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.053344727,
+          "value": {
+            "chunkIndex": "11",
+            "chunkSpan": "18938:20662",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "379:836",
+              "1507:1724"
+            ],
+            "extractionReasonCode": null,
+            "filename": "mcp-production-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/mcp-production-server.md",
+            "path": "docs/reference/mcp-production-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.06591797,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3023:4852",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:389",
+              "1019:1428"
+            ],
+            "extractionReasonCode": null,
+            "filename": "01-system-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/01-system-overview.md",
+            "path": "docs/explanation/01-system-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.101623535,
+          "value": {
+            "chunkIndex": "22",
+            "chunkSpan": "37800:38702",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:298",
+              "451:902"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-ui-behavior.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-ui-behavior.md",
+            "path": "docs/reference/search-ui-behavior.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.10662842,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1929",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "283:700",
+              "1189:1648",
+              "1558:1929"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 96,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q03": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.78125,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1911",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:385",
+              "883:1328"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-platform-stack.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/ui/frontend-kernel/kernel/03-platform-stack.md",
+            "path": "docs/reference/ui/frontend-kernel/kernel/03-platform-stack.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.6879883,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1924",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "78:497",
+              "1080:1497",
+              "1641:1924"
+            ],
+            "extractionReasonCode": null,
+            "filename": "07-ui-host-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/07-ui-host-architecture.md",
+            "path": "docs/explanation/07-ui-host-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.6826172,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1892",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "481:994",
+              "1481:1885"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-ui-behavior.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-ui-behavior.md",
+            "path": "docs/reference/search-ui-behavior.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.6767578,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:2013",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "1034:1465",
+              "1774:2013"
+            ],
+            "extractionReasonCode": null,
+            "filename": "secondary-views-behavior.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/secondary-views-behavior.md",
+            "path": "docs/reference/secondary-views-behavior.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.5185547,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1724:3649",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "31:468",
+              "529:1019"
+            ],
+            "extractionReasonCode": null,
+            "filename": "06-declarative-presentation.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/ui/frontend-kernel/kernel/06-declarative-presentation.md",
+            "path": "docs/reference/ui/frontend-kernel/kernel/06-declarative-presentation.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.42700195,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1864",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:333",
+              "768:1173",
+              "1492:1864"
+            ],
+            "extractionReasonCode": null,
+            "filename": "simple-vs-detailed-mode.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/ui/simple-vs-detailed-mode.md",
+            "path": "docs/reference/ui/simple-vs-detailed-mode.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.3972168,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1584:3390",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "858:1265"
+            ],
+            "extractionReasonCode": null,
+            "filename": "19-module-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/19-module-architecture.md",
+            "path": "docs/explanation/19-module-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.37548828,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6888:8807",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:444",
+              "698:1151",
+              "1416:1824"
+            ],
+            "extractionReasonCode": null,
+            "filename": "09-testing-strategy.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/09-testing-strategy.md",
+            "path": "docs/explanation/09-testing-strategy.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.3137207,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6993:8826",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "178:587"
+            ],
+            "extractionReasonCode": null,
+            "filename": "composition-substrate-slots.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/contracts/composition-substrate-slots.v1.md",
+            "path": "docs/reference/contracts/composition-substrate-slots.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.22949219,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1273:3210",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "283:690",
+              "950:1362"
+            ],
+            "extractionReasonCode": null,
+            "filename": "01-system-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/01-system-overview.md",
+            "path": "docs/explanation/01-system-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 68,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q04": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.8339844,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3453:5405",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "795:1218"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.7084961,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1739:3710",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "195:687",
+              "1407:1816"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.47485352,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1795:3085",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "235:638"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.svg",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.svg",
+            "path": "docs/explanation/23-search-pipeline-overview.svg",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.45532227,
+          "value": {
+            "chunkIndex": "54",
+            "chunkSpan": "93300:95321",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "722:1169"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-quality-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/search-quality-register.md",
+            "path": "docs/reference/search-quality-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.39892578,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "5047:6658",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "607:1013"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-pipeline-invariants.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-pipeline-invariants.md",
+            "path": "docs/reference/contracts/search-pipeline-invariants.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.32226562,
+          "value": {
+            "chunkIndex": "8",
+            "chunkSpan": "13821:15842",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "801:1226"
+            ],
+            "extractionReasonCode": null,
+            "filename": "ui-user-readiness.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/ui-user-readiness.md",
+            "path": "docs/reference/ui-user-readiness.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.30126953,
+          "value": {
+            "chunkIndex": "12",
+            "chunkSpan": "20602:22526",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "999:1478"
+            ],
+            "extractionReasonCode": null,
+            "filename": "05-ai-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/05-ai-architecture.md",
+            "path": "docs/explanation/05-ai-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.22399902,
+          "value": {
+            "chunkIndex": "28",
+            "chunkSpan": "47541:49457",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "751:1204"
+            ],
+            "extractionReasonCode": null,
+            "filename": "08-observability.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/08-observability.md",
+            "path": "docs/explanation/08-observability.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.14978027,
+          "value": {
+            "chunkIndex": null,
+            "chunkSpan": null,
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:395",
+              "681:1017"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-syntax.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": null,
+            "path": "ssot/docs/help/search-syntax.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.14477539,
+          "value": {
+            "chunkIndex": "34",
+            "chunkSpan": "58786:60682",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "708:1134"
+            ],
+            "extractionReasonCode": null,
+            "filename": "environment-variables.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/configuration/environment-variables.md",
+            "path": "docs/reference/configuration/environment-variables.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 96,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q05": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.6425781,
+          "value": {
+            "chunkIndex": "10",
+            "chunkSpan": "16546:18426",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "753:1197"
+            ],
+            "extractionReasonCode": null,
+            "filename": "18-adapters-lucene-deep-dive.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "path": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.4892578,
+          "value": {
+            "chunkIndex": "130",
+            "chunkSpan": "222841:224614",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "309:747",
+              "1133:1539"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-quality-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-quality-register.md",
+            "path": "docs/reference/search-quality-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.38598633,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "12145:14054",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:504"
+            ],
+            "extractionReasonCode": null,
+            "filename": "ai-runtime-and-model-redistribution.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/legal/ai-runtime-and-model-redistribution.md",
+            "path": "docs/reference/legal/ai-runtime-and-model-redistribution.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.3239746,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6984:8797",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "384:785",
+              "1229:1628"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.24731445,
+          "value": {
+            "chunkIndex": "42",
+            "chunkSpan": "71739:73579",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "452:874",
+              "1412:1840"
+            ],
+            "extractionReasonCode": null,
+            "filename": "jseval-pipeline-reference.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/jseval-pipeline-reference.md",
+            "path": "docs/reference/jseval-pipeline-reference.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.24499512,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1823",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "761:1186"
+            ],
+            "extractionReasonCode": null,
+            "filename": "ai-features.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "ssot/docs/help/ai-features.md",
+            "path": "ssot/docs/help/ai-features.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.21118164,
+          "value": {
+            "chunkIndex": "32",
+            "chunkSpan": "55428:57343",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "122:527",
+              "700:1241"
+            ],
+            "extractionReasonCode": null,
+            "filename": "environment-variables.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/configuration/environment-variables.md",
+            "path": "docs/reference/configuration/environment-variables.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.101135254,
+          "value": {
+            "chunkIndex": "27",
+            "chunkSpan": "45734:47539",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "44:516",
+              "673:1087"
+            ],
+            "extractionReasonCode": null,
+            "filename": "08-observability.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/08-observability.md",
+            "path": "docs/explanation/08-observability.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.03967285,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1980",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "150:565",
+              "1282:1681"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.svg",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.svg",
+            "path": "docs/explanation/23-search-pipeline-overview.svg",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.003156662,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36005:36733",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "191:728"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 49,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q06": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 1.4609375,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1970",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "682:1169"
+            ],
+            "extractionReasonCode": null,
+            "filename": "12-desktop-installer-and-sandbox-setup.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/12-desktop-installer-and-sandbox-setup.md",
+            "path": "docs/explanation/12-desktop-installer-and-sandbox-setup.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.30126953,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1842",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "84:488",
+              "1015:1417",
+              "1542:1842"
+            ],
+            "extractionReasonCode": null,
+            "filename": "13-ai-setup-and-verification.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/13-ai-setup-and-verification.md",
+            "path": "docs/explanation/13-ai-setup-and-verification.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.33276367,
+          "value": {
+            "chunkIndex": "13",
+            "chunkSpan": "22099:23833",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "594:1027"
+            ],
+            "extractionReasonCode": null,
+            "filename": "architectural-risks.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/architectural-risks.md",
+            "path": "docs/reference/architectural-risks.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.5307617,
+          "value": {
+            "chunkIndex": "6",
+            "chunkSpan": "10532:12359",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "349:753",
+              "1397:1827"
+            ],
+            "extractionReasonCode": null,
+            "filename": "threat-model.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/security/threat-model.md",
+            "path": "docs/reference/security/threat-model.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.7265625,
+          "value": {
+            "chunkIndex": "14",
+            "chunkSpan": "23752:25766",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:447",
+              "810:1285",
+              "1732:2014"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.8071289,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1734:3636",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "465:872",
+              "1419:1902"
+            ],
+            "extractionReasonCode": null,
+            "filename": "07-ui-host-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/07-ui-host-architecture.md",
+            "path": "docs/explanation/07-ui-host-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.82373047,
+          "value": {
+            "chunkIndex": "24",
+            "chunkSpan": "41497:43488",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "192:700",
+              "1395:1819"
+            ],
+            "extractionReasonCode": null,
+            "filename": "environment-variables.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/configuration/environment-variables.md",
+            "path": "docs/reference/configuration/environment-variables.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.82421875,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1462",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "585:993"
+            ],
+            "extractionReasonCode": null,
+            "filename": "01-system-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/01-system-overview.md",
+            "path": "docs/explanation/01-system-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.85253906,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "12150:14019",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:364",
+              "933:1338"
+            ],
+            "extractionReasonCode": null,
+            "filename": "09-testing-strategy.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/09-testing-strategy.md",
+            "path": "docs/explanation/09-testing-strategy.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.87939453,
+          "value": {
+            "chunkIndex": "5",
+            "chunkSpan": "8171:10084",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "658:1063",
+              "1330:1779"
+            ],
+            "extractionReasonCode": null,
+            "filename": "16-gpu-booster-pack.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/16-gpu-booster-pack.md",
+            "path": "docs/explanation/16-gpu-booster-pack.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 94,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q07": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.5180664,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1810",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:471",
+              "1416:1810"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.18261719,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3447:5368",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "1331:1796"
+            ],
+            "extractionReasonCode": null,
+            "filename": "07-ui-host-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/07-ui-host-architecture.md",
+            "path": "docs/explanation/07-ui-host-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.1628418,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "12028:12291",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:263"
+            ],
+            "extractionReasonCode": null,
+            "filename": "runtime-contract.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/runtime-contract.md",
+            "path": "docs/reference/runtime-contract.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.097473145,
+          "value": {
+            "chunkIndex": "9",
+            "chunkSpan": "15602:16086",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "88:484"
+            ],
+            "extractionReasonCode": null,
+            "filename": "threat-model.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/security/threat-model.md",
+            "path": "docs/reference/security/threat-model.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.035003662,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "5326:6671",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "514:957"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-evolution.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/api-evolution.md",
+            "path": "docs/reference/contracts/api-evolution.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.16552734,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1643:3454",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "85:490",
+              "1209:1659"
+            ],
+            "extractionReasonCode": null,
+            "filename": "28-runtime-contract.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/28-runtime-contract.md",
+            "path": "docs/explanation/28-runtime-contract.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.17016602,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1571:3430",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "976:1448"
+            ],
+            "extractionReasonCode": null,
+            "filename": "glossary.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/glossary.md",
+            "path": "docs/reference/glossary.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.22937012,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:2010",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:416"
+            ],
+            "extractionReasonCode": null,
+            "filename": "health-readiness-contract.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "path": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.2944336,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6993:8826",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "192:634",
+              "1450:1833"
+            ],
+            "extractionReasonCode": null,
+            "filename": "composition-substrate-slots.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/contracts/composition-substrate-slots.v1.md",
+            "path": "docs/reference/contracts/composition-substrate-slots.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.3022461,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1733:3629",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "292:694"
+            ],
+            "extractionReasonCode": null,
+            "filename": "module-deps.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/architecture/module-deps.md",
+            "path": "docs/reference/architecture/module-deps.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 81,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q08": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.6459961,
+          "value": {
+            "chunkIndex": "19",
+            "chunkSpan": "32319:34112",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "695:1136"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.4790039,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "35262:37212",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "752:1159"
+            ],
+            "extractionReasonCode": null,
+            "filename": "22-agent-system-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/22-agent-system-architecture.md",
+            "path": "docs/explanation/22-agent-system-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.2824707,
+          "value": {
+            "chunkIndex": "10",
+            "chunkSpan": "17249:19242",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "398:824",
+              "1561:1993"
+            ],
+            "extractionReasonCode": null,
+            "filename": "09-testing-strategy.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/09-testing-strategy.md",
+            "path": "docs/explanation/09-testing-strategy.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.023025513,
+          "value": {
+            "chunkIndex": "38",
+            "chunkSpan": "64796:66536",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "74:507",
+              "896:1353",
+              "1433:1740"
+            ],
+            "extractionReasonCode": null,
+            "filename": "08-observability.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/08-observability.md",
+            "path": "docs/explanation/08-observability.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.06896973,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1731",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:360",
+              "1029:1452",
+              "1519:1731"
+            ],
+            "extractionReasonCode": null,
+            "filename": "agent-guide.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contributing/agent-guide.md",
+            "path": "docs/reference/contributing/agent-guide.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.12438965,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3253:5229",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "716:1118"
+            ],
+            "extractionReasonCode": null,
+            "filename": "extension-substrate-conventions.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/ui/extension-substrate-conventions.md",
+            "path": "docs/reference/ui/extension-substrate-conventions.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.38916016,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1736:3616",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "1181:1662"
+            ],
+            "extractionReasonCode": null,
+            "filename": "common-workflows.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/contributing/common-workflows.md",
+            "path": "docs/reference/contributing/common-workflows.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.41601562,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "4768:6782",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "771:1182"
+            ],
+            "extractionReasonCode": null,
+            "filename": "21-agent-analytics-pipeline.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/21-agent-analytics-pipeline.md",
+            "path": "docs/explanation/21-agent-analytics-pipeline.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.45483398,
+          "value": {
+            "chunkIndex": "26",
+            "chunkSpan": "44364:46204",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "93:497",
+              "799:1232",
+              "1452:1840"
+            ],
+            "extractionReasonCode": null,
+            "filename": "inference-runtime-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/inference-runtime-register.md",
+            "path": "docs/reference/inference-runtime-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.4909668,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1834",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "1072:1503"
+            ],
+            "extractionReasonCode": null,
+            "filename": "28-runtime-contract.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/28-runtime-contract.md",
+            "path": "docs/explanation/28-runtime-contract.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 94,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q09": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.4855957,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6780:8589",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:314",
+              "594:1049",
+              "1416:1809"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.27270508,
+          "value": {
+            "chunkIndex": "43",
+            "chunkSpan": "73345:75134",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "31:479",
+              "665:1078",
+              "1495:1789"
+            ],
+            "extractionReasonCode": null,
+            "filename": "08-observability.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/08-observability.md",
+            "path": "docs/explanation/08-observability.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.18359375,
+          "value": {
+            "chunkIndex": "6",
+            "chunkSpan": "10218:12073",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "234:651",
+              "1303:1755"
+            ],
+            "extractionReasonCode": null,
+            "filename": "10-ui-ux-design.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/10-ui-ux-design.md",
+            "path": "docs/explanation/10-ui-ux-design.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.0949707,
+          "value": {
+            "chunkIndex": "19",
+            "chunkSpan": "32669:34444",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "760:1169"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.09399414,
+          "value": {
+            "chunkIndex": "20",
+            "chunkSpan": "33743:35754",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "754:1229"
+            ],
+            "extractionReasonCode": null,
+            "filename": "inference-runtime-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/inference-runtime-register.md",
+            "path": "docs/reference/inference-runtime-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.072509766,
+          "value": {
+            "chunkIndex": "120",
+            "chunkSpan": "205671:207679",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "17:486",
+              "668:1146",
+              "1689:2008"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-quality-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-quality-register.md",
+            "path": "docs/reference/search-quality-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.0014400482,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "11981:13885",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "544:1051"
+            ],
+            "extractionReasonCode": null,
+            "filename": "indexing-throughput.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/performance/indexing-throughput.md",
+            "path": "docs/reference/performance/indexing-throughput.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.070495605,
+          "value": {
+            "chunkIndex": "19",
+            "chunkSpan": "32661:34426",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "566:1028"
+            ],
+            "extractionReasonCode": null,
+            "filename": "11-index-schema-migration.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/11-index-schema-migration.md",
+            "path": "docs/explanation/11-index-schema-migration.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.23620605,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6946:8699",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "140:543",
+              "1223:1629"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.26513672,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36167:38080",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "158:567",
+              "1177:1595"
+            ],
+            "extractionReasonCode": null,
+            "filename": "05-ai-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/05-ai-architecture.md",
+            "path": "docs/explanation/05-ai-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 95,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q10": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.41601562,
+          "value": {
+            "chunkIndex": "50",
+            "chunkSpan": "85416:87192",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:374",
+              "819:1247"
+            ],
+            "extractionReasonCode": null,
+            "filename": "08-observability.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/08-observability.md",
+            "path": "docs/explanation/08-observability.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.39086914,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3599:5521",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "263:711",
+              "1291:1711"
+            ],
+            "extractionReasonCode": null,
+            "filename": "health-readiness-contract.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "path": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.2553711,
+          "value": {
+            "chunkIndex": "5",
+            "chunkSpan": "8509:10436",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "769:1225"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.051483154,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1739",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:383",
+              "954:1372"
+            ],
+            "extractionReasonCode": null,
+            "filename": "ui-user-readiness.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/ui-user-readiness.md",
+            "path": "docs/reference/ui-user-readiness.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.0927124,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6738:8598",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "566:1034",
+              "1565:1860"
+            ],
+            "extractionReasonCode": null,
+            "filename": "00-primitives.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/ui/frontend-kernel/kernel/00-primitives.md",
+            "path": "docs/reference/ui/frontend-kernel/kernel/00-primitives.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.11730957,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36167:38080",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:452",
+              "1177:1595"
+            ],
+            "extractionReasonCode": null,
+            "filename": "05-ai-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/05-ai-architecture.md",
+            "path": "docs/explanation/05-ai-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.14855957,
+          "value": {
+            "chunkIndex": "6",
+            "chunkSpan": "10231:12040",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "291:692"
+            ],
+            "extractionReasonCode": null,
+            "filename": "02-process-coordination.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/02-process-coordination.md",
+            "path": "docs/explanation/02-process-coordination.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.17297363,
+          "value": {
+            "chunkIndex": "9",
+            "chunkSpan": "15677:17400",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "693:1108"
+            ],
+            "extractionReasonCode": null,
+            "filename": "11-index-schema-migration.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/11-index-schema-migration.md",
+            "path": "docs/explanation/11-index-schema-migration.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.24621582,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6849:8643",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:462",
+              "833:1276"
+            ],
+            "extractionReasonCode": null,
+            "filename": "secondary-views-behavior.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/secondary-views-behavior.md",
+            "path": "docs/reference/secondary-views-behavior.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.24951172,
+          "value": {
+            "chunkIndex": "8",
+            "chunkSpan": "13528:15502",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "410:922",
+              "1740:1974"
+            ],
+            "extractionReasonCode": null,
+            "filename": "22-agent-system-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/22-agent-system-architecture.md",
+            "path": "docs/explanation/22-agent-system-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 94,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q11": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.29052734,
+          "value": {
+            "chunkIndex": "5",
+            "chunkSpan": "8523:10378",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:363",
+              "1100:1509"
+            ],
+            "extractionReasonCode": null,
+            "filename": "07-ui-host-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/07-ui-host-architecture.md",
+            "path": "docs/explanation/07-ui-host-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.20788574,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1802:3759",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "312:791"
+            ],
+            "extractionReasonCode": null,
+            "filename": "threat-model.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/security/threat-model.md",
+            "path": "docs/reference/security/threat-model.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.048583984,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3121:4905",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "628:1035"
+            ],
+            "extractionReasonCode": null,
+            "filename": "14-ai-pack-spec.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/14-ai-pack-spec.md",
+            "path": "docs/explanation/14-ai-pack-spec.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.075805664,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1917",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "440:858",
+              "1214:1635"
+            ],
+            "extractionReasonCode": null,
+            "filename": "09-testing-strategy.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/09-testing-strategy.md",
+            "path": "docs/explanation/09-testing-strategy.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.14013672,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3511:5392",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "475:882"
+            ],
+            "extractionReasonCode": null,
+            "filename": "runtime-contract.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/runtime-contract.md",
+            "path": "docs/reference/runtime-contract.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.15710449,
+          "value": {
+            "chunkIndex": "9",
+            "chunkSpan": "15739:17482",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "88:489",
+              "926:1331"
+            ],
+            "extractionReasonCode": null,
+            "filename": "mcp-dev-tools.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/contributing/mcp-dev-tools.md",
+            "path": "docs/reference/contributing/mcp-dev-tools.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.21459961,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6865:8773",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "123:531",
+              "838:1237"
+            ],
+            "extractionReasonCode": null,
+            "filename": "mcp-production-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/mcp-production-server.md",
+            "path": "docs/reference/mcp-production-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.2602539,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "5280:7183",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:255"
+            ],
+            "extractionReasonCode": null,
+            "filename": "composition-substrate-slots.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/contracts/composition-substrate-slots.v1.md",
+            "path": "docs/reference/contracts/composition-substrate-slots.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.28027344,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3264:4554",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:292",
+              "802:1208"
+            ],
+            "extractionReasonCode": null,
+            "filename": "28-runtime-contract.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/28-runtime-contract.md",
+            "path": "docs/explanation/28-runtime-contract.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.32788086,
+          "value": {
+            "chunkIndex": "5",
+            "chunkSpan": "8530:10459",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "324:763",
+              "1160:1651"
+            ],
+            "extractionReasonCode": null,
+            "filename": "15-enterprise-policy.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/15-enterprise-policy.md",
+            "path": "docs/explanation/15-enterprise-policy.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 84,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    },
+    "q12": {
+      "hitCount": 10,
+      "hits[]": [
+        {
+          "score": 0.2849121,
+          "value": {
+            "chunkIndex": "32",
+            "chunkSpan": "54171:56150",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "796:1230"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": 0.16259766,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3453:5405",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "272:686",
+              "1426:1839"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.12463379,
+          "value": {
+            "chunkIndex": "9",
+            "chunkSpan": "15402:17358",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "110:516",
+              "859:1281",
+              "1530:1956"
+            ],
+            "extractionReasonCode": null,
+            "filename": "mcp-production-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/mcp-production-server.md",
+            "path": "docs/reference/mcp-production-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.17053223,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "12068:14028",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "621:1091",
+              "1647:1960"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.29052734,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1913",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "344:829",
+              "1472:1913"
+            ],
+            "extractionReasonCode": null,
+            "filename": "20-benchmarking-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/20-benchmarking-architecture.md",
+            "path": "docs/explanation/20-benchmarking-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.34716797,
+          "value": {
+            "chunkIndex": "15",
+            "chunkSpan": "25990:27912",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:385",
+              "718:1126"
+            ],
+            "extractionReasonCode": null,
+            "filename": "environment-variables.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/configuration/environment-variables.md",
+            "path": "docs/reference/configuration/environment-variables.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.3552246,
+          "value": {
+            "chunkIndex": "15",
+            "chunkSpan": "25098:27021",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "137:540",
+              "802:1280",
+              "1389:1828"
+            ],
+            "extractionReasonCode": null,
+            "filename": "22-agent-system-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/22-agent-system-architecture.md",
+            "path": "docs/explanation/22-agent-system-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.40478516,
+          "value": {
+            "chunkIndex": "14",
+            "chunkSpan": "23820:25599",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "340:783"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-ui-behavior.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/search-ui-behavior.md",
+            "path": "docs/reference/search-ui-behavior.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.4140625,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1762",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "115:591",
+              "1259:1762"
+            ],
+            "extractionReasonCode": null,
+            "filename": "glossary.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/glossary.md",
+            "path": "docs/reference/glossary.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        },
+        {
+          "score": -0.44677734,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "12110:14073",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "873:1319"
+            ],
+            "extractionReasonCode": null,
+            "filename": "04-storage-engine.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/04-storage-engine.md",
+            "path": "docs/explanation/04-storage-engine.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion",
+              "cross-encoder"
+            ]
+          }
+        }
+      ],
+      "httpStatus": 200,
+      "matchCount": 95,
+      "trace.decisionKind": "multi_leg",
+      "trace.degradationFlags": {
+        "hybridFallback": false,
+        "spladeExecuted": false,
+        "vectorBlocked": false
+      },
+      "trace.degradationReasons": {
+        "hybridFallbackReason": null,
+        "spladeSkipReason": null,
+        "vectorBlockedReason": null
+      },
+      "trace.effectiveMode": "HYBRID",
+      "trace.stageIds": [
+        "correction",
+        "sparse-retrieval",
+        "dense-retrieval",
+        "splade-retrieval",
+        "fusion",
+        "chunk-merge",
+        "branch-fusion",
+        "query-understanding",
+        "expansion",
+        "lambdamart",
+        "cross-encoder",
+        "freshness"
+      ],
+      "trace.stageReasons": {
+        "0:correction": "not-triggered",
+        "10:cross-encoder": null,
+        "11:freshness": null,
+        "1:sparse-retrieval": null,
+        "2:dense-retrieval": null,
+        "3:splade-retrieval": "not-selected",
+        "4:fusion": null,
+        "5:chunk-merge": null,
+        "6:branch-fusion": null,
+        "7:query-understanding": null,
+        "8:expansion": "DISABLED",
+        "9:lambdamart": "MODEL_NOT_LOADED"
+      },
+      "trace.stageStatuses": {
+        "0:correction": "skipped",
+        "10:cross-encoder": "executed",
+        "11:freshness": "executed",
+        "1:sparse-retrieval": "executed",
+        "2:dense-retrieval": "executed",
+        "3:splade-retrieval": "skipped",
+        "4:fusion": "executed",
+        "5:chunk-merge": "executed",
+        "6:branch-fusion": "executed",
+        "7:query-understanding": "executed",
+        "8:expansion": "skipped",
+        "9:lambdamart": "skipped"
+      }
+    }
+  },
+  "schema": "jseval.workflow-fixture-capture.v1"
+}

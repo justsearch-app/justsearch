@@ -1,0 +1,1789 @@
+{
+  "allowed_by_class": {
+    "equal-score-order": 0,
+    "generative-text": 1,
+    "new-reason-code": 0
+  },
+  "baseline_provenance": {
+    "aiRuntimeState": "failed",
+    "available": true,
+    "chatProfile": "compact",
+    "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
+    "corpusRootSource": "option",
+    "docCountAtEnd": 97,
+    "docCountAtStart": 96,
+    "docCountSource": "embedding.docCount",
+    "enrichment": {
+      "chunkDocCount": 1284,
+      "chunkEmbeddingPendingCount": 0,
+      "chunkSpladeCoveragePercent": 0.0,
+      "chunkSpladeEnabled": false,
+      "chunkVectorCoveragePercent": 100.0,
+      "completedNerCount": 96,
+      "docCount": null,
+      "embeddingCoveragePercent": 100.0,
+      "embeddingEnabled": true,
+      "incompleteReasons": [],
+      "indexState": "IDLE",
+      "nerEnabled": true,
+      "pendingNerCount": 0,
+      "spladeCoveragePercent": 100.0,
+      "spladeEnabled": true
+    },
+    "indexAvailable": true,
+    "observed_at": "2026-09-07T18:26:14.819809700Z",
+    "pathsOutsideCorpusRoot": 0,
+    "pathsOutsideCorpusRootExamples": [],
+    "pinSources": {
+      "index.hybrid.candidate_limit_max": "env_var",
+      "index.hybrid.chunk_collapse_limit_multiplier": "env_var",
+      "index.hybrid.leg_arbitration_enabled": "env_var",
+      "index.hybrid.leg_recall_complete_enabled": "env_var",
+      "index.vector.exhaustive_search": "env_var",
+      "justsearch.embed.gpu.enabled": "jvm_arg",
+      "justsearch.llm.slots": "env_var",
+      "justsearch.ner.gpu_enabled": "jvm_arg",
+      "justsearch.rerank.chunks.deadline_ms": "env_var",
+      "justsearch.rerank.deadline_ms": "env_var",
+      "justsearch.rerank.gpu.enabled": "default",
+      "justsearch.rerank.gpu_mem_mb": "env_var",
+      "justsearch.rerank.top_k": "env_var",
+      "justsearch.splade.gpu_enabled": "jvm_arg"
+    },
+    "pins": {
+      "index.hybrid.candidate_limit_max": "5000",
+      "index.hybrid.chunk_collapse_limit_multiplier": "50",
+      "index.hybrid.leg_arbitration_enabled": "false",
+      "index.hybrid.leg_recall_complete_enabled": "false",
+      "index.vector.exhaustive_search": "true",
+      "justsearch.embed.gpu.enabled": "true",
+      "justsearch.llm.slots": "1",
+      "justsearch.ner.gpu_enabled": "true",
+      "justsearch.rerank.chunks.deadline_ms": "60000",
+      "justsearch.rerank.deadline_ms": "60000",
+      "justsearch.rerank.gpu.enabled": "true",
+      "justsearch.rerank.gpu_mem_mb": "4096",
+      "justsearch.rerank.top_k": "40",
+      "justsearch.splade.gpu_enabled": "true"
+    },
+    "rawRootExample": "f:\\justsearch-public\\.claude\\worktrees\\lane-f-0b\\docs\\explanation\\06-configuration-ssot.md",
+    "sampling": {
+      "seed": 20260907,
+      "temperature": 0.0
+    },
+    "samplingApplied": {
+      "c01": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c02": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c03": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      }
+    },
+    "schema_version": 1,
+    "service": "JustSearch Local API",
+    "status": "ok",
+    "worker.buildStamp": "867c7c8dd24ec9bd"
+  },
+  "candidate_provenance": {
+    "aiRuntimeState": "failed",
+    "available": true,
+    "chatProfile": "compact",
+    "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
+    "corpusRootSource": "option",
+    "docCountAtEnd": 97,
+    "docCountAtStart": 96,
+    "docCountSource": "embedding.docCount",
+    "enrichment": {
+      "chunkDocCount": 1285,
+      "chunkEmbeddingPendingCount": 0,
+      "chunkSpladeCoveragePercent": 0.0,
+      "chunkSpladeEnabled": false,
+      "chunkVectorCoveragePercent": 100.0,
+      "completedNerCount": 96,
+      "docCount": null,
+      "embeddingCoveragePercent": 100.0,
+      "embeddingEnabled": true,
+      "incompleteReasons": [],
+      "indexState": "IDLE",
+      "nerEnabled": true,
+      "pendingNerCount": 0,
+      "spladeCoveragePercent": 100.0,
+      "spladeEnabled": true
+    },
+    "indexAvailable": true,
+    "observed_at": "2026-09-07T18:45:47.751744400Z",
+    "pathsOutsideCorpusRoot": 0,
+    "pathsOutsideCorpusRootExamples": [],
+    "pinSources": {
+      "index.hybrid.candidate_limit_max": "env_var",
+      "index.hybrid.chunk_collapse_limit_multiplier": "env_var",
+      "index.hybrid.leg_arbitration_enabled": "env_var",
+      "index.hybrid.leg_recall_complete_enabled": "env_var",
+      "index.vector.exhaustive_search": "env_var",
+      "justsearch.embed.gpu.enabled": "jvm_arg",
+      "justsearch.llm.slots": "env_var",
+      "justsearch.ner.gpu_enabled": "jvm_arg",
+      "justsearch.rerank.chunks.deadline_ms": "env_var",
+      "justsearch.rerank.deadline_ms": "env_var",
+      "justsearch.rerank.gpu.enabled": "default",
+      "justsearch.rerank.gpu_mem_mb": "env_var",
+      "justsearch.rerank.top_k": "env_var",
+      "justsearch.splade.gpu_enabled": "jvm_arg"
+    },
+    "pins": {
+      "index.hybrid.candidate_limit_max": "5000",
+      "index.hybrid.chunk_collapse_limit_multiplier": "50",
+      "index.hybrid.leg_arbitration_enabled": "false",
+      "index.hybrid.leg_recall_complete_enabled": "false",
+      "index.vector.exhaustive_search": "true",
+      "justsearch.embed.gpu.enabled": "true",
+      "justsearch.llm.slots": "1",
+      "justsearch.ner.gpu_enabled": "true",
+      "justsearch.rerank.chunks.deadline_ms": "60000",
+      "justsearch.rerank.deadline_ms": "60000",
+      "justsearch.rerank.gpu.enabled": "true",
+      "justsearch.rerank.gpu_mem_mb": "4096",
+      "justsearch.rerank.top_k": "40",
+      "justsearch.splade.gpu_enabled": "true"
+    },
+    "rawRootExample": "f:\\justsearch-public\\.claude\\worktrees\\lane-f-0b\\docs\\explanation\\06-configuration-ssot.md",
+    "sampling": {
+      "seed": 20260907,
+      "temperature": 0.0
+    },
+    "samplingApplied": {
+      "c01": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c02": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c03": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      }
+    },
+    "schema_version": 1,
+    "service": "JustSearch Local API",
+    "status": "ok",
+    "worker.buildStamp": "867c7c8dd24ec9bd"
+  },
+  "captures_per_side": {
+    "baseline": 3,
+    "candidate": 3
+  },
+  "counts": {
+    "REGRESSION": 0,
+    "allowed": 1,
+    "equal": 210,
+    "missing": 0,
+    "noisy": 11
+  },
+  "declared_not_captured": [],
+  "fields": [
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 1, 1] vs candidate [1, 1, 1, 1, 1, 1, 1, 2] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "crossSideStatus": "REGRESSION",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the both same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
+      "record": "queries/q02",
+      "status": "noisy-both"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "the cutoff tie group (the group holding rank 10) is not the same SET on both sides: member(s) only in the baseline ['{\"chunkIndex\": \"34\", \"chunkSpan\": \"58786:60682\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"708:1134\"], \"filename\": \"environment-variables.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\", \"path\"], \"parentDocId\": \"docs/reference/configuration/environment-variables.md\", \"path\": \"docs/reference/configuration/environment-variables.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']; only in the candidate ['{\"chunkIndex\": \"33\", \"chunkSpan\": \"57152:58977\", \"contentTruncated\": \"0\", \"excerptSpans\": [\"0:373\", \"1036:1497\"], \"filename\": \"environment-variables.md\", \"isChunk\": null, \"matchedFields\": [\"content_preview\", \"path\"], \"parentDocId\": \"docs/reference/configuration/environment-variables.md\", \"path\": \"docs/reference/configuration/environment-variables.md\", \"stageIds\": [\"sparse-retrieval\", \"dense-retrieval\", \"fusion\", \"chunk-merge\", \"branch-fusion\", \"cross-encoder\"]}']",
+      "crossSideStatus": "REGRESSION",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the both same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
+      "record": "queries/q04",
+      "status": "noisy-both"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 1, 1, 1] vs candidate [1, 1, 1, 1, 2, 1, 1, 1] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "crossSideStatus": "REGRESSION",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
+      "record": "queries/q05",
+      "status": "noisy-baseline"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
+      "record": "queries/q06",
+      "status": "noisy-baseline"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 2, 2, 1, 1] vs candidate [1, 1, 1, 2, 1, 1, 1, 1] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "crossSideStatus": "REGRESSION",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
+      "record": "queries/q09",
+      "status": "noisy-baseline"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the both same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
+      "record": "queries/q11",
+      "status": "noisy-both"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "crossSideReason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 2] vs candidate [1, 1, 1, 1, 1, 2, 2] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "crossSideStatus": "REGRESSION",
+      "field": "queries.hits[]",
+      "reason": "excluded from the verdict: the baseline same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: REGRESSION)",
+      "record": "queries/q12",
+      "status": "noisy-baseline"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.requested",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionCancelTrigger",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionDisposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionState",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "chatTurns.cancel.terminalReasonCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationScorer",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.citationSentences",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationTargets",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.disposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.errorCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.eventNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.finalResponse",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.iterationsUsed",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.reasoningText",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextIncludedChars",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextInclusion",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceExcerptDigests",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourcePaths",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceRefs",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceSpans",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalPayloadParseError",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.toolArguments",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolCallsExecuted",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolErrorCodes",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolTruncatedForModel",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.requested",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionCancelTrigger",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionDisposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionState",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "chatTurns.cancel.terminalReasonCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationScorer",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.citationSentences",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationTargets",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.disposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.errorCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.eventNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.finalResponse",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.iterationsUsed",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.reasoningText",
+      "reason": "generative text differs (no fixed seed on the chat path)",
+      "record": "chatTurns/c02",
+      "status": "allowed:generative-text"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextIncludedChars",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextInclusion",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
+      "field": "chatTurns.sourceExcerptDigests",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
+      "record": "chatTurns/c02",
+      "status": "noisy-candidate"
+    },
+    {
+      "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
+      "field": "chatTurns.sourcePaths",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
+      "record": "chatTurns/c02",
+      "status": "noisy-candidate"
+    },
+    {
+      "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
+      "field": "chatTurns.sourceRefs",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
+      "record": "chatTurns/c02",
+      "status": "noisy-candidate"
+    },
+    {
+      "class": "exact",
+      "crossSideReason": "byte-equal",
+      "crossSideStatus": "equal",
+      "field": "chatTurns.sourceSpans",
+      "reason": "excluded from the verdict: the candidate same-build noise pair already moves this field, so a cross-side difference here is not attributable to the build (cross-side would have been: equal)",
+      "record": "chatTurns/c02",
+      "status": "noisy-candidate"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalPayloadParseError",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.toolArguments",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolCallsExecuted",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolErrorCodes",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolTruncatedForModel",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.requested",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionCancelTrigger",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionDisposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionState",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "chatTurns.cancel.terminalReasonCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationScorer",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.citationSentences",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationTargets",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.disposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.errorCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.eventNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.finalResponse",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.iterationsUsed",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.reasoningText",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextIncludedChars",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextInclusion",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceExcerptDigests",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourcePaths",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceRefs",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceSpans",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalPayloadParseError",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.toolArguments",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolCallsExecuted",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolErrorCodes",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolTruncatedForModel",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    }
+  ],
+  "fixture_id": "lane-f-workflow-fixture",
+  "fixture_version": 1,
+  "health": {
+    "ok": true,
+    "problems": []
+  },
+  "maxNoisyFraction": 0.05,
+  "noisy_by_side": {
+    "baseline": 4,
+    "both": 3,
+    "candidate": 4
+  },
+  "pass": true,
+  "schema": "jseval.workflow-fixture-diff.v1"
+}

@@ -533,6 +533,67 @@ class OnlineModeOpsTest {
         "DETERMINISTIC preset should inject top_p=0.9");
   }
 
+  /**
+   * Lane F PR 0b — the seed half of the agent chat request's optional {@code sampling} override.
+   * Asserted here, in the body llama-server actually receives, because that is the only place the
+   * pin can be checked; a {@code SamplingParams} carrying a seed that this transport dropped would
+   * pass every test upstream of it and still produce an unpinned completion.
+   */
+  @Test
+  void streamChatWithTools_injectsSeedWhenSetAndOmitsItWhenNull() throws Exception {
+    AtomicReference<String> capturedBody = new AtomicReference<>();
+    server.removeContext("/v1/chat/completions");
+    server.createContext(
+        "/v1/chat/completions",
+        exchange -> {
+          capturedBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          respondWithOneSseChunk(exchange);
+        });
+
+    List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "test"));
+
+    CountDownLatch seeded = new CountDownLatch(1);
+    ops.streamChatWithTools(
+        messages, List.of(), 100,
+        chunk -> {}, toolDelta -> {}, reasoning -> {}, null,
+        fr -> seeded.countDown(), t -> {},
+        SamplingParams.AGENT.withSeed(20260907L));
+    assertTrue(seeded.await(5, TimeUnit.SECONDS));
+
+    JsonNode withSeed = MAPPER.readTree(capturedBody.get());
+    assertEquals(20260907L, withSeed.path("seed").asLong(),
+        "a pinned seed must reach llama-server");
+
+    CountDownLatch unseeded = new CountDownLatch(1);
+    ops.streamChatWithTools(
+        messages, List.of(), 100,
+        chunk -> {}, toolDelta -> {}, reasoning -> {}, null,
+        fr -> unseeded.countDown(), t -> {},
+        SamplingParams.AGENT);
+    assertTrue(unseeded.await(5, TimeUnit.SECONDS));
+
+    JsonNode withoutSeed = MAPPER.readTree(capturedBody.get());
+    assertTrue(withoutSeed.path("seed").isMissingNode(),
+        "a null seed must OMIT the field, so the body is byte-identical to before the component"
+            + " existed — not send an explicit null or a 0");
+  }
+
+  /** Writes one SSE content chunk and terminates the stream. */
+  private static void respondWithOneSseChunk(com.sun.net.httpserver.HttpExchange exchange)
+      throws java.io.IOException {
+    exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+    exchange.sendResponseHeaders(200, 0);
+    var os = exchange.getResponseBody();
+    os.write(
+        "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n"
+            .getBytes(StandardCharsets.UTF_8));
+    os.flush();
+    os.write("data: [DONE]\n\n".getBytes(StandardCharsets.UTF_8));
+    os.flush();
+    os.close();
+  }
+
   @Test
   void streamChatWithTools_reroutesInlineThinkTagsSplitAcrossFrames() throws Exception {
     // Tempdoc 835 §5.3 — the wiring, not just the filter: a build that leaks inline reasoning emits

@@ -257,6 +257,27 @@ final class AgentSession {
   }
 
   /**
+   * Lane F PR 0b — the run's optional sampling override (temperature / top_p / seed). Mirrors
+   * {@link #docIdsScope}: a per-run control input the request supplies, threaded onto the session by
+   * {@code AgentLoopService.runAgent} right after construction. It lives on the SESSION rather than
+   * being read off the request at each call site because the three sites that build agent sampling
+   * ({@code AgentLlmCaller.resolveAgentSampling} and the two inline {@code SamplingParams.AGENT}
+   * turns in {@code AgentStepRunner}) all see the session but not all see the request — and one of
+   * them honouring the override while another silently ignored it is exactly the shape that makes a
+   * capture look pinned while the forced-tool turns still drift. Null = no override, which is
+   * byte-identical to the behaviour before the field existed.
+   */
+  private volatile io.justsearch.agent.api.AgentRequest.SamplingOverride samplingOverride;
+
+  io.justsearch.agent.api.AgentRequest.SamplingOverride samplingOverride() {
+    return samplingOverride;
+  }
+
+  void setSamplingOverride(io.justsearch.agent.api.AgentRequest.SamplingOverride override) {
+    this.samplingOverride = override;
+  }
+
+  /**
    * Tempdoc 565 §30 — the human's mid-run STEERING directive (the DIRECTION authority's
    * {@code interject} value). An external {@code POST /api/chat/agent/steer} queues it; the loop
    * DRAINS it (read-and-clear, exactly-once) at the next step boundary and folds the text into the

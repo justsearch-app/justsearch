@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-07.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-08.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -104,6 +104,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | ConfigKey.INDEX_VALIDATION_MODE | permanent | index.validation.mode | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | ConfigKey.INDEX_VECTOR_DIMENSION | permanent | index.vector.dimension | - | - | - | modules/configuration (ResolvedConfigBuilder) | YAML > default |
 | EnvRegistry.INDEX_VECTOR_EF_SEARCH | permanent | index.vector.ef_search | JUSTSEARCH_INDEX_VECTOR_EF_SEARCH | index.vector.ef_search | INDEX_VECTOR_EF_SEARCH | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
+| EnvRegistry.INDEX_VECTOR_EXHAUSTIVE_SEARCH | permanent | index.vector.exhaustive_search | JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH | index.vector.exhaustive_search | INDEX_VECTOR_EXHAUSTIVE_SEARCH | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEX_VECTOR_HNSW_EF_CONSTRUCTION | permanent | index.vector.hnsw.ef_construction | JUSTSEARCH_INDEX_VECTOR_HNSW_EF_CONSTRUCTION | index.vector.hnsw.ef_construction | INDEX_VECTOR_HNSW_EF_CONSTRUCTION | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEX_VECTOR_HNSW_M | permanent | index.vector.hnsw.m | JUSTSEARCH_INDEX_VECTOR_HNSW_M | index.vector.hnsw.m | INDEX_VECTOR_HNSW_M | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEX_VECTOR_QUANTIZATION_ENABLED | permanent | index.vector.quantization.enabled | JUSTSEARCH_INDEX_VECTOR_QUANTIZATION_ENABLED | index.vector.quantization.enabled | INDEX_VECTOR_QUANTIZATION_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
@@ -213,6 +214,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.NER_GPU_MEM_MB | permanent | - | JUSTSEARCH_NER_GPU_MEM_MB | justsearch.ner.gpu_mem_mb | NER_GPU_MEM_MB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.NER_MAX_SEQ_LEN | permanent | - | JUSTSEARCH_NER_MAX_SEQ_LEN | justsearch.ner.max_seq_len | NER_MAX_SEQ_LEN | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.NER_MODEL_PATH | permanent | - | JUSTSEARCH_NER_MODEL_PATH | justsearch.ner.model_path | NER_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.ORT_INTRA_OP_THREADS | permanent | - | JUSTSEARCH_ORT_INTRA_OP_THREADS | justsearch.onnxruntime.intra_op_threads | ORT_INTRA_OP_THREADS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ORT_NATIVE_PATH | permanent | - | JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH | justsearch.onnxruntime.native_path | ORT_NATIVE_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ONNXRUNTIME_VARIANT_ID | permanent | - | JUSTSEARCH_ONNXRUNTIME_VARIANT_ID | justsearch.onnxruntime.variantId | ONNXRUNTIME_VARIANT_ID | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ORT_PROFILING_DIR | permanent | - | JUSTSEARCH_ORT_PROFILING_DIR | justsearch.ort.profiling_dir | ORT_PROFILING_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

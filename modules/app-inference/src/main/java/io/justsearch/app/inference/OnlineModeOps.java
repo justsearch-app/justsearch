@@ -419,6 +419,12 @@ final class OnlineModeOps {
                 if (sampling != null) {
                   body.put("temperature", sampling.temperature());
                   body.put("top_p", sampling.topP());
+                  // Lane F PR 0b: the RNG seed, when the caller pinned one. Null (every preset, and
+                  // every request that sends no `sampling` override) omits the field entirely, so
+                  // the body llama-server sees is byte-identical to before the component existed.
+                  if (sampling.seed() != null) {
+                    body.put("seed", sampling.seed());
+                  }
                   // Tempdoc 835 §10f: this transport dropped enableThinking entirely — the only one
                   // of the three that did — so a caller's suppression was silently discarded and
                   // the server-wide budget applied anyway. Query expansion and section summarize
@@ -737,6 +743,10 @@ final class OnlineModeOps {
                 if (sampling != null) {
                   body.put("temperature", sampling.temperature());
                   body.put("top_p", sampling.topP());
+                  // Lane F PR 0b: see streamChat above — omitted unless the caller pinned a seed.
+                  if (sampling.seed() != null) {
+                    body.put("seed", sampling.seed());
+                  }
                   if (sampling.toolChoice() != null) {
                     body.put("tool_choice", sampling.toolChoice());
                   }
@@ -969,6 +979,13 @@ final class OnlineModeOps {
       if (sampling != null) {
         body.put("temperature", sampling.temperature());
         body.put("top_p", sampling.topP());
+        // Lane F PR 0b: SamplingParams now carries an optional seed of its own. The explicit `seed`
+        // parameter above is the vision probe's, and stays authoritative when both are set; this
+        // branch keeps the record's meaning uniform across all three transports instead of leaving
+        // one that silently drops it. No shipped preset sets it, so nothing changes today.
+        if (seed == null && sampling.seed() != null) {
+          body.put("seed", sampling.seed());
+        }
         if (sampling.toolChoice() != null) {
           body.put("tool_choice", sampling.toolChoice());
         }

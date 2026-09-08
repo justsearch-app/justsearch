@@ -244,6 +244,19 @@ KnnFloatVectorQuery query = new KnnFloatVectorQuery(
 );
 ```
 
+**With `index.vector.exhaustive_search`** (exact, not approximate):
+
+`ReadPathOps#buildKnnQuery` is the one site that builds every `KnnFloatVectorQuery` — both
+document-level overloads and the chunk dense leg. `ef_search` widens the HNSW beam but cannot make
+the result exact: `AbstractKnnVectorQuery.getLeafResults` has no exact branch for an *unfiltered*
+query at any `k`. With a filter present it takes `exactSearch` once the filter's cost is within the
+per-leaf top-k, so this switch raises `k` to at least `reader.maxDoc()` and substitutes a
+`MatchAllDocsQuery` when the caller supplied no filter. Cost is O(vectors) per query — a
+capture/diagnostic knob for reproducible runs, not a production default. In that mode the dense
+leg's inflated `totalHits` is excluded from the chunk branch's candidate-budget saturation test
+(`SearchExecutor#isCandidateBudgetSaturated`), so only the approximation changes, not which
+branches the pipeline takes.
+
 ### 3.3 Field Separation Strategy
 
 JustSearch uses separate vector fields to avoid filter overhead:
@@ -262,6 +275,7 @@ For current HNSW tuning parameters (M, efConstruction, efSearch), see [`docs/exp
 | Parameter | Purpose |
 |-----------|---------|
 | `index.vector.ef_search` | Query-time search breadth (oversampling k) |
+| `index.vector.exhaustive_search` | Make every kNN query exact instead of approximate (default off) |
 | `index.vector.hnsw.m` | Max connections per HNSW node |
 | `index.vector.hnsw.ef_construction` | Build-time beam width |
 | `index.vector.quantization.enabled` | Enable Int8 quantization |
@@ -472,6 +486,41 @@ String cursor = SEARCH_AFTER_CURSOR_PREFIX +
 | `SIZE_ASC` | size_bytes ASC | docId |
 | `PATH_ASC` | docId ASC | - |
 | `PATH_DESC` | docId DESC | - |
+
+The `docId` tie-breaker above is the **stored** `doc_id` field, not Lucene's internal ordinal, and
+on a whole-document row it is the normalized absolute path — deterministic across index builds.
+
+**Chunk rows need a different tie-breaker.** A chunk's `doc_id` is `ChunkIds.newChunkDocId()` =
+`"chunk:" + UUID.randomUUID()`, minted fresh per ingest and deliberately not derived from the parent
+or the chunk index. It is unique within one index and uncorrelated between two, so breaking a score
+tie on it gives an order that is stable per index and random per build. Every chunk search in
+`ChunkSearchOps` therefore sorts by score, then `parent_doc_id` (the parent's normalized absolute
+path), then `chunk_index`, then `doc_id` as the final total-order comparator
+(`LuceneRuntimeUtils#buildChunkTieBreakSort`). Two ingests of the same corpus agree on that key.
+
+That covers both shapes of chunk search, which reach Lucene by different routes. The postings-based
+legs (BM25, SPLADE, the doc-scoped variants) share `ChunkSearchOps#searchChunksWithStableTieBreak`.
+The dense leg (`searchChunkVector`) does not: it builds a `KnnFloatVectorQuery` and goes through
+`ReadPathOps#search`, so it passes the same `Sort` explicitly through that method's
+`sortOverride` parameter. An overriding `Sort` and a search-after cursor are mutually exclusive
+there — `SearchAfterCursorHelper` encodes and decodes against the `RuntimeSearchSort`, so an
+inbound cursor is refused and no outbound one is minted.
+
+**Pruning is retained; only a `totalHits` margin moves.** A leading score comparator does not cost
+WAND/block-max pruning. `TopFieldCollector`'s constructor sets `scoreMode = TOP_SCORES` and
+`canSetMinScore = true` whenever `firstComparator.getClass() ==
+FieldComparator.RelevanceComparator.class && reverseMul[0] == 1 && totalHitsThreshold !=
+Integer.MAX_VALUE` — all three hold for these sorts (`SortField.FIELD_SCORE` is a non-reversed
+relevance comparator, and the threshold is Lucene's default 1000). So there is no latency
+regression, and the whole-document read path was never paying one either.
+
+What does change, besides the order of equal-score hits, is a small margin in the reported
+`totalHits` past the threshold. `updateMinCompetitiveScore` passes the bottom entry's **raw** score
+to `setMinCompetitiveScore` with no `Math.nextUp`, because with a secondary comparator a later doc
+that ties the bottom score can still win on the tie-break and so must not be skipped. Docs equal to
+the bottom score are therefore visited and counted, where a docId-tie-broken `TopScoreDocCollector`
+would have excluded them. (Both statements verified against the shipped lucene-core 10.4.0
+bytecode.)
 
 ### 6.3 Lookahead Strategy
 

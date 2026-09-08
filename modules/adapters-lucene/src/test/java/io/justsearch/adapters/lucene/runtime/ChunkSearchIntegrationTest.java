@@ -2,6 +2,7 @@ package io.justsearch.adapters.lucene.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,6 +11,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSor
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.indexing.chunking.ChunkIds;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -904,6 +906,559 @@ class ChunkSearchIntegrationTest {
     assertNotNull(result);
     assertEquals(1, result.hits().size());
     assertEquals("agent-run.md", result.hits().get(0).docId());
+  }
+
+  // ========== Chunk-leg tie-break (lane F PR 0b) ==========
+
+  /**
+   * Lane F PR 0b — a chunk BM25 tie must break on a key that is stable ACROSS INDEX BUILDS.
+   *
+   * <p>Three chunks with byte-identical content tie exactly on BM25, and each is committed on its
+   * own so each lands in its own segment. Two things could decide their order, and both are
+   * per-build random:
+   *
+   * <ul>
+   *   <li>Lucene's INTERNAL docId — what {@code searcher.search(query, n)} falls back to. It
+   *       follows the commit order, which a different segment layout renumbers.
+   *   <li>the chunk's {@code doc_id} — what the first version of this fix sorted on. On a chunk row
+   *       that is {@code ChunkIds.newChunkDocId()} = {@code "chunk:" + UUID.randomUUID()}
+   *       ({@code ChunkIds.java:51-53}), minted fresh per ingest and deliberately not derived from
+   *       the parent or the chunk index. Stable within one index, uncorrelated between two.
+   * </ul>
+   *
+   * <p>So the fixture mints REAL chunk ids through {@code ChunkIds.newChunkDocId()} and forces both
+   * adversaries: the commit order is non-ascending, and the minted ids are re-drawn until their
+   * lexicographic order disagrees with the chunk-index order. Under either of those two tie-breaks
+   * this test fails deterministically — not with probability 5/6. What must hold is that both
+   * builds return the chunks in {@code parent_doc_id} then {@code chunk_index} order, which two
+   * ingests of the same corpus agree on.
+   */
+  @Test
+  @DisplayName("chunk BM25 ties break on a key that is stable across index builds")
+  void chunkBm25TiesBreakOnAKeyThatIsStableAcrossBuilds() throws Exception {
+    // Each probe opens its OWN index; the @BeforeEach one holds the ephemeral write lock, and the
+    // two probes must not overlap either, so they are opened and closed strictly in sequence.
+    runtime.close();
+    runtime = null;
+
+    List<String> expected = List.of("0", "1", "2");
+
+    // Build A: the discriminating layout — the HIGHEST chunk index is committed first, so the
+    // internal-docId order disagrees with the chunk-index order.
+    TieBreakProbe buildA = probeTiedChunkOrder(List.of(2, 0, 1));
+    assertNotEquals(
+        expected,
+        buildA.rawInternalDocIdOrder(),
+        "fixture precondition: the unsorted (internal-docId) order must differ from the "
+            + "chunk-index order, otherwise this test would pass for the wrong reason");
+    assertNotEquals(
+        expected,
+        buildA.chunkIndexOrderIfSortedByDocId(),
+        "fixture precondition: the minted chunk UUIDs must not happen to sort into chunk-index "
+            + "order, otherwise a doc_id tie-break would pass this test for the wrong reason");
+    assertEquals(
+        expected, buildA.sortedChunkIndexOrder(), "chunk BM25 ties must break on parent+index");
+
+    // Build B: the same three chunks, opposite insertion order, and a FRESH draw of chunk UUIDs.
+    TieBreakProbe buildB = probeTiedChunkOrder(List.of(0, 1, 2));
+    assertNotEquals(
+        expected,
+        buildB.chunkIndexOrderIfSortedByDocId(),
+        "fixture precondition: build B's minted UUIDs must not sort into chunk-index order either");
+    assertEquals(
+        expected, buildB.sortedChunkIndexOrder(), "chunk BM25 ties must break on parent+index");
+
+    // The two builds drew different chunk ids — the point of the whole test. If this ever held,
+    // the two builds would share a doc_id ordering and the assertions above would prove nothing
+    // about cross-build stability.
+    assertNotEquals(
+        buildA.docIdOrder(),
+        buildB.docIdOrder(),
+        "the two builds must have drawn different chunk UUIDs");
+    assertEquals(
+        buildA.sortedChunkIndexOrder(),
+        buildB.sortedChunkIndexOrder(),
+        "two index builds of the same documents must return the same chunk order");
+  }
+
+  /**
+   * Lane F PR 0b — the FIRST tie-break comparator, {@code parent_doc_id}, exercised on its own.
+   *
+   * <p>{@link #chunkBm25TiesBreakOnAKeyThatIsStableAcrossBuilds} uses one parent, so {@code
+   * chunk_index} alone decides it and a {@code parent_doc_id} comparator that silently did nothing
+   * — a missing docvalues column, a misspelled field — would still let it pass. Across parents
+   * that hole is real: every chunk's index is 0, so with {@code parent_doc_id} inert the order
+   * falls straight through to the per-ingest UUID, which is the defect this whole change exists to
+   * remove.
+   *
+   * <p>Both adversaries are forced again: the LATER parent's chunk is committed first (so the
+   * internal-docId order is b, a) and the two chunk ids are drawn until the LATER parent's sorts
+   * first lexicographically (so a {@code doc_id} tie-break also says b, a). Only an effective
+   * {@code parent_doc_id} comparator produces a, b.
+   */
+  @Test
+  @DisplayName("chunk BM25 ties break on parent_doc_id before chunk_index")
+  void chunkBm25TiesBreakOnTheParentPathAcrossParents() throws Exception {
+    runtime.close();
+    runtime = null;
+
+    List<List<String>> observed = new java.util.ArrayList<>();
+    for (int build = 0; build < 2; build++) {
+      observed.add(probeTwoParentTieOrder());
+    }
+    assertEquals(
+        List.of("tie-a", "tie-b"),
+        observed.get(0),
+        "a chunk tie across parents must order by the parent's deterministic path");
+    assertEquals(
+        observed.get(0),
+        observed.get(1),
+        "and two index builds with different chunk UUIDs must agree on it");
+  }
+
+  /**
+   * Lane F PR 0b, second review B1 — the DENSE chunk leg, which the two tests above do not reach.
+   *
+   * <p>{@code searchChunksText}/{@code searchChunksSplade} go through {@code
+   * searchChunksWithStableTieBreak}. {@code searchChunkVector} does not: it builds a {@link
+   * org.apache.lucene.search.KnnFloatVectorQuery} and hands it to {@code ReadPathOps.search},
+   * which until this change sorted by {@code buildRuntimeSort(RELEVANCE, doc_id)} — the DOCUMENT
+   * tie-break, whose secondary key on a chunk row is the per-ingest {@code
+   * ChunkIds.newChunkDocId()} UUID. So the leg the two tests above certify was fixed while the
+   * dense leg beside it still ordered its ties at random per build.
+   *
+   * <p>Ties are not exotic here: two chunks with the same text get byte-identical vectors, so
+   * their kNN similarity is exactly equal. Under {@code index.vector.exhaustive_search} the leg
+   * returns the whole corpus, so every such tie is in the result rather than possibly beyond k.
+   *
+   * <p>The fixture forces both adversaries, as above: the chunks are committed in the REVERSE of
+   * the expected order (so the internal-docId order is the opposite), and the minted ids are
+   * assigned so that their lexicographic order is the opposite too. Only an effective {@code
+   * parent_doc_id} then {@code chunk_index} sort produces the expected order.
+   */
+  @Test
+  @DisplayName("chunk kNN ties break on parent_doc_id then chunk_index, not the per-ingest UUID")
+  void chunkVectorTiesBreakOnAKeyThatIsStableAcrossBuilds() throws Exception {
+    runtime.close();
+    runtime = null;
+
+    List<String> expected = List.of("tie-a/0", "tie-a/1", "tie-b/0", "tie-b/1");
+
+    DenseTieProbe buildA = probeTiedChunkVectorOrder();
+    assertNotEquals(
+        expected,
+        buildA.internalDocIdOrder(),
+        "fixture precondition: the commit (internal-docId) order must differ from the expected "
+            + "order, otherwise this test would pass for the wrong reason");
+    assertNotEquals(
+        expected,
+        buildA.orderIfSortedByDocId(),
+        "fixture precondition: the minted chunk UUIDs must not sort into the expected order, "
+            + "otherwise the old doc_id tie-break would pass this test for the wrong reason");
+    assertEquals(
+        expected, buildA.observedOrder(), "chunk kNN ties must break on parent_doc_id then index");
+
+    // A second build over the same documents, with a fresh draw of chunk UUIDs.
+    DenseTieProbe buildB = probeTiedChunkVectorOrder();
+    assertNotEquals(
+        expected,
+        buildB.orderIfSortedByDocId(),
+        "fixture precondition: build B's minted UUIDs must not sort into the expected order");
+    assertNotEquals(
+        buildA.docIdOrder(),
+        buildB.docIdOrder(),
+        "the two builds must have drawn different chunk UUIDs");
+    assertEquals(
+        buildA.observedOrder(),
+        buildB.observedOrder(),
+        "two index builds of the same documents must return the same dense-leg chunk order");
+  }
+
+  /**
+   * Lane F PR 0b, second review B1 — the two cursor branches the {@code Sort} override adds.
+   *
+   * <p>{@code SearchAfterCursorHelper} encodes and decodes against the {@code RuntimeSearchSort},
+   * not against the Lucene {@code Sort} the search actually ran with. Combining the two would
+   * therefore page through an order the cursor does not describe — silently. So an inbound cursor
+   * is refused outright, and an outbound one is withheld. Both directions are asserted here
+   * because only one of them is on the path the chunk legs take, and the untaken branch is the
+   * one that would rot.
+   */
+  @Test
+  @DisplayName("an explicit Sort override refuses an inbound cursor and mints no outbound one")
+  void sortOverrideAndSearchAfterCursorsAreMutuallyExclusive() throws Exception {
+    org.apache.lucene.search.Sort override =
+        LuceneRuntimeUtils.buildChunkTieBreakSort(SchemaFields.DOC_ID);
+    org.apache.lucene.search.Query matchAll = new org.apache.lucene.search.MatchAllDocsQuery();
+
+    IllegalArgumentException refused =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                runtime
+                    .readPathOps()
+                    .search(matchAll, 1, null, RuntimeSearchSort.RELEVANCE, "some-cursor",
+                        override));
+    assertTrue(
+        refused.getMessage().contains("cursor"),
+        "the refusal must name the cursor as the reason: " + refused.getMessage());
+
+    // Two parents, so a limit of 1 leaves more to page through: without an override this search
+    // mints a cursor, which is what makes the null below evidence rather than a vacuous pass.
+    for (String docId : List.of("cursor-a", "cursor-b")) {
+      Map<String, Object> parent = new LinkedHashMap<>();
+      parent.put(SchemaFields.DOC_ID, docId);
+      parent.put(SchemaFields.DOC_UID, docId + "#0");
+      parent.put(SchemaFields.CONTENT, TIE_CHUNK_TEXT);
+      parent.put(SchemaFields.PATH, docId);
+      parent.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(TIE_CHUNK_TEXT));
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(parent));
+    }
+    runtime.commitOps().commitAndTrack();
+    runtime.commitOps().maybeRefreshBlocking();
+
+    assertNotNull(
+        runtime.readPathOps().search(matchAll, 1, null, RuntimeSearchSort.RELEVANCE, null)
+            .nextCursor(),
+        "fixture precondition: the same search without an override must mint a cursor");
+    assertNull(
+        runtime
+            .readPathOps()
+            .search(matchAll, 1, null, RuntimeSearchSort.RELEVANCE, null, override)
+            .nextCursor(),
+        "a search ordered by an overriding Sort must not mint a cursor encoded against the "
+            + "RuntimeSearchSort it did not use");
+  }
+
+  /**
+   * What one dense tie-break probe build observed.
+   *
+   * @param observedOrder the kNN leg's hits as their {@code parent/index} keys, in returned order
+   * @param docIdOrder the same hits' minted chunk ids, in returned order
+   * @param orderIfSortedByDocId what a {@code doc_id} tie-break would have produced
+   * @param internalDocIdOrder the commit order, which is the unsorted (internal-docId) order
+   */
+  private record DenseTieProbe(
+      List<String> observedOrder,
+      List<String> docIdOrder,
+      List<String> orderIfSortedByDocId,
+      List<String> internalDocIdOrder) {}
+
+  /** The one vector every tie-break chunk carries: identical bytes mean an exactly equal score. */
+  private static final float[] TIE_CHUNK_VECTOR = {0.25f, -0.5f, 0.75f, 1.0f};
+
+  /** The dense probe's four chunks, in the order the tie-break must deliver them. */
+  private static final List<String> DENSE_TIE_EXPECTED_KEYS =
+      List.of("tie-a/0", "tie-a/1", "tie-b/0", "tie-b/1");
+
+  /** The same four, reversed: the commit order, and the lexicographic order of the minted ids. */
+  private static final List<String> DENSE_TIE_ADVERSARIAL_KEYS =
+      List.of("tie-b/1", "tie-b/0", "tie-a/1", "tie-a/0");
+
+  /**
+   * Draws one real chunk id per key and assigns them so the ids' lexicographic order is {@link
+   * #DENSE_TIE_ADVERSARIAL_KEYS} — the exact reverse of what the tie-break must produce.
+   *
+   * <p>Assigning a sorted draw rather than re-drawing until the permutation appears keeps this
+   * deterministic: a 4-key re-draw loop would hit the wanted permutation with probability 1/24 per
+   * attempt and so carry a real flake rate. The ids are still genuine {@code
+   * ChunkIds.newChunkDocId()} values, freshly drawn per build.
+   */
+  private static Map<String, String> mintReverseOrderedChunkIds() {
+    List<String> drawn = new java.util.ArrayList<>();
+    for (int i = 0; i < DENSE_TIE_ADVERSARIAL_KEYS.size(); i++) {
+      drawn.add(ChunkIds.newChunkDocId());
+    }
+    java.util.Collections.sort(drawn);
+    Map<String, String> ids = new LinkedHashMap<>();
+    for (int i = 0; i < DENSE_TIE_ADVERSARIAL_KEYS.size(); i++) {
+      ids.put(DENSE_TIE_ADVERSARIAL_KEYS.get(i), drawn.get(i));
+    }
+    return ids;
+  }
+
+  /**
+   * Opens a FRESH ephemeral index holding two parents with two identical-vector chunks each,
+   * committed one per segment in the REVERSE of the expected order, and reports what the dense
+   * chunk leg returned alongside the two orders that must NOT have decided it.
+   */
+  private DenseTieProbe probeTiedChunkVectorOrder() throws Exception {
+    Map<String, String> chunkIds = mintReverseOrderedChunkIds();
+
+    RunningRuntime probe =
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    try {
+      String parentContent = TIE_CHUNK_TEXT + " " + TIE_CHUNK_TEXT;
+      for (String parentDocId : List.of("tie-a", "tie-b")) {
+        Map<String, Object> parent = new LinkedHashMap<>();
+        parent.put(SchemaFields.DOC_ID, parentDocId);
+        parent.put(SchemaFields.DOC_UID, parentDocId + "#0");
+        parent.put(SchemaFields.CONTENT, parentContent);
+        parent.put(SchemaFields.PATH, parentDocId);
+        parent.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(parentContent));
+        probe.indexingCoordinator().indexSingle(new IndexDocument(parent));
+      }
+      probe.commitOps().commitAndTrack();
+
+      int span = TIE_CHUNK_TEXT.length();
+      for (String key : DENSE_TIE_ADVERSARIAL_KEYS) {
+        int slash = key.indexOf('/');
+        String parentDocId = key.substring(0, slash);
+        int index = Integer.parseInt(key.substring(slash + 1));
+        int start = index * (span + 1);
+        String chunkId = chunkIds.get(key);
+        Map<String, Object> chunk = new LinkedHashMap<>();
+        chunk.put(SchemaFields.DOC_ID, chunkId);
+        chunk.put(SchemaFields.DOC_UID, chunkId + "#0");
+        chunk.put(SchemaFields.IS_CHUNK, "true");
+        chunk.put(SchemaFields.PARENT_DOC_ID, parentDocId);
+        chunk.put(SchemaFields.CHUNK_INDEX, String.valueOf(index));
+        chunk.put(SchemaFields.CHUNK_TOTAL, "2");
+        chunk.put(SchemaFields.CHUNK_CONTENT, TIE_CHUNK_TEXT);
+        chunk.put(SchemaFields.CHUNK_START_CHAR, String.valueOf(start));
+        chunk.put(SchemaFields.CHUNK_END_CHAR, String.valueOf(start + span));
+        chunk.put(SchemaFields.CHUNK_VECTOR, TIE_CHUNK_VECTOR.clone());
+        chunk.put(SchemaFields.PATH, parentDocId);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(chunk));
+        // One commit per chunk: each lands in its own segment, so the internal docId order is the
+        // commit order.
+        probe.commitOps().commitAndTrack();
+      }
+      probe.commitOps().maybeRefreshBlocking();
+
+      var hits =
+          probe.chunkSearchOps().searchChunkVector(TIE_CHUNK_VECTOR.clone(), null, 10, null).hits();
+      assertEquals(
+          DENSE_TIE_EXPECTED_KEYS.size(),
+          hits.size(),
+          "fixture precondition: the dense leg must return every tied chunk, or the ordering "
+              + "assertion would only cover a prefix");
+
+      // Resolve each hit back to its parent/index key through the ids this build actually minted,
+      // rather than through projected fields: the dense leg passes a null projection, so what
+      // lands in fields() is whatever the catalog happens to store.
+      Map<String, String> keyByChunkId = new HashMap<>();
+      chunkIds.forEach((key, id) -> keyByChunkId.put(id, key));
+      List<String> docIdOrder = hits.stream().map(LuceneRuntimeTypes.SearchHit::docId).toList();
+      List<String> observed = docIdOrder.stream().map(keyByChunkId::get).toList();
+      assertFalse(
+          observed.contains(null),
+          "every returned hit must be one of the four chunks this build indexed");
+
+      // Derived from the drawn ids, not restated: this is what a doc_id tie-break would produce,
+      // and the test asserts the observed order is NOT it.
+      List<String> orderIfSortedByDocId =
+          chunkIds.entrySet().stream()
+              .sorted(Map.Entry.comparingByValue())
+              .map(Map.Entry::getKey)
+              .toList();
+      return new DenseTieProbe(
+          observed, docIdOrder, orderIfSortedByDocId, DENSE_TIE_ADVERSARIAL_KEYS);
+    } finally {
+      probe.close();
+    }
+  }
+
+  /**
+   * One parent-order probe: two parents, one identical-content chunk each at index 0, with the
+   * commit order and the minted ids both arranged to disagree with the parent-path order.
+   *
+   * @return the returned hits' {@code parent_doc_id} values, in the order the BM25 leg produced
+   */
+  private List<String> probeTwoParentTieOrder() throws Exception {
+    // Draw until the LATER parent's chunk id sorts FIRST, so a doc_id tie-break cannot produce the
+    // expected order by luck. One draw in two already satisfies it; the loop makes it certain.
+    String idForA;
+    String idForB;
+    int attempt = 0;
+    do {
+      idForA = ChunkIds.newChunkDocId();
+      idForB = ChunkIds.newChunkDocId();
+      attempt++;
+    } while (idForB.compareTo(idForA) >= 0 && attempt < 100);
+    assertTrue(
+        idForB.compareTo(idForA) < 0,
+        "fixture precondition: tie-b's chunk id must sort before tie-a's, or a doc_id tie-break "
+            + "would produce the expected order for the wrong reason");
+
+    RunningRuntime probe =
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    try {
+      // Commit tie-b's chunk FIRST so the internal-docId order is b, a.
+      for (String parentDocId : List.of("tie-b", "tie-a")) {
+        String sha = ChunkParentRevision.sha256Hex(TIE_CHUNK_TEXT);
+        Map<String, Object> parent = new LinkedHashMap<>();
+        parent.put(SchemaFields.DOC_ID, parentDocId);
+        parent.put(SchemaFields.DOC_UID, parentDocId + "#0");
+        parent.put(SchemaFields.CONTENT, TIE_CHUNK_TEXT);
+        parent.put(SchemaFields.PATH, parentDocId);
+        parent.put(SchemaFields.CONTENT_SHA256, sha);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(parent));
+
+        String chunkId = "tie-a".equals(parentDocId) ? idForA : idForB;
+        Map<String, Object> chunk = new LinkedHashMap<>();
+        chunk.put(SchemaFields.DOC_ID, chunkId);
+        chunk.put(SchemaFields.DOC_UID, chunkId + "#0");
+        chunk.put(SchemaFields.IS_CHUNK, "true");
+        chunk.put(SchemaFields.PARENT_DOC_ID, parentDocId);
+        chunk.put(SchemaFields.CHUNK_INDEX, "0");
+        chunk.put(SchemaFields.CHUNK_TOTAL, "1");
+        chunk.put(SchemaFields.CHUNK_CONTENT, TIE_CHUNK_TEXT);
+        chunk.put(SchemaFields.CHUNK_START_CHAR, "0");
+        chunk.put(SchemaFields.CHUNK_END_CHAR, String.valueOf(TIE_CHUNK_TEXT.length()));
+        chunk.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, sha);
+        chunk.put(SchemaFields.PATH, parentDocId);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(chunk));
+        probe.commitOps().commitAndTrack();
+      }
+      probe.commitOps().maybeRefreshBlocking();
+
+      return probe.chunkSearchOps().searchChunksText("tiebreakalpha", 10, null).hits().stream()
+          .map(h -> h.fields().get(SchemaFields.PARENT_DOC_ID))
+          .toList();
+    } finally {
+      probe.close();
+    }
+  }
+
+  /**
+   * What one tie-break probe build observed. The chunk SPLADE leg ({@code searchChunksSplade}) and
+   * the two other bare chunk searches share the one {@code searchChunksWithStableTieBreak} helper
+   * this asserts, and the testing field catalog carries no {@code splade} FeatureField, so BM25 is
+   * where the property is exercised.
+   *
+   * @param sortedChunkIndexOrder the leg's returned chunks, as their {@code chunk_index} values
+   * @param docIdOrder the same hits' minted chunk ids, in returned order
+   * @param chunkIndexOrderIfSortedByDocId what a {@code doc_id} tie-break would have produced
+   * @param rawInternalDocIdOrder what an unsorted {@code searcher.search(query, n)} produces
+   */
+  private record TieBreakProbe(
+      List<String> sortedChunkIndexOrder,
+      List<String> docIdOrder,
+      List<String> chunkIndexOrderIfSortedByDocId,
+      List<String> rawInternalDocIdOrder) {}
+
+  /** Content shared by every tie-break chunk — identical text means an identical BM25 score. */
+  private static final String TIE_CHUNK_TEXT = "tiebreakalpha tiebreakbeta";
+
+  /**
+   * Mints one real chunk id per index in {@code 0..count-1}, re-drawing until their lexicographic
+   * order disagrees with the index order.
+   *
+   * <p>Without the re-draw the test would be probabilistic: three random UUIDs already sort into
+   * ascending-index order one time in six, and a green run would then say nothing about whether the
+   * tie-break used {@code doc_id}. Forcing the disagreement makes the falsifier deterministic.
+   */
+  private static List<String> mintDiscriminatingChunkIds(int count) {
+    for (int attempt = 0; attempt < 100; attempt++) {
+      List<String> ids = new java.util.ArrayList<>(count);
+      for (int i = 0; i < count; i++) {
+        ids.add(ChunkIds.newChunkDocId());
+      }
+      List<String> byDocId = new java.util.ArrayList<>(ids);
+      java.util.Collections.sort(byDocId);
+      if (!byDocId.equals(ids)) {
+        return List.copyOf(ids);
+      }
+    }
+    throw new IllegalStateException(
+        "could not mint chunk ids whose lexicographic order differs from the index order");
+  }
+
+  /**
+   * Opens a FRESH ephemeral index, writes one parent plus three byte-identical chunks committing
+   * each chunk on its own (one segment each, in {@code commitOrder}), and reports what the BM25 leg
+   * returned alongside the two orders that must NOT have decided it.
+   */
+  private TieBreakProbe probeTiedChunkOrder(List<Integer> commitOrder) throws Exception {
+    String parentDocId = "tie";
+    String parentContent = TIE_CHUNK_TEXT + "\n" + TIE_CHUNK_TEXT + "\n" + TIE_CHUNK_TEXT;
+    int span = TIE_CHUNK_TEXT.length();
+    String parentSha = ChunkParentRevision.sha256Hex(parentContent);
+    List<String> chunkIds = mintDiscriminatingChunkIds(commitOrder.size());
+
+    RunningRuntime probe =
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    try {
+      Map<String, Object> parent = new LinkedHashMap<>();
+      parent.put(SchemaFields.DOC_ID, parentDocId);
+      parent.put(SchemaFields.DOC_UID, parentDocId + "#0");
+      parent.put(SchemaFields.CONTENT, parentContent);
+      parent.put(SchemaFields.PATH, parentDocId);
+      parent.put(SchemaFields.CONTENT_SHA256, parentSha);
+      probe.indexingCoordinator().indexSingle(new IndexDocument(parent));
+      probe.commitOps().commitAndTrack();
+
+      for (int index : commitOrder) {
+        String chunkId = chunkIds.get(index);
+        int start = index * (span + 1);
+        Map<String, Object> chunk = new LinkedHashMap<>();
+        chunk.put(SchemaFields.DOC_ID, chunkId);
+        chunk.put(SchemaFields.DOC_UID, chunkId + "#0");
+        chunk.put(SchemaFields.IS_CHUNK, "true");
+        chunk.put(SchemaFields.PARENT_DOC_ID, parentDocId);
+        chunk.put(SchemaFields.CHUNK_INDEX, String.valueOf(index));
+        chunk.put(SchemaFields.CHUNK_TOTAL, "3");
+        chunk.put(SchemaFields.CHUNK_CONTENT, TIE_CHUNK_TEXT);
+        chunk.put(SchemaFields.CHUNK_START_CHAR, String.valueOf(start));
+        chunk.put(SchemaFields.CHUNK_END_CHAR, String.valueOf(start + span));
+        chunk.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, parentSha);
+        chunk.put(SchemaFields.PATH, parentDocId);
+        probe.indexingCoordinator().indexSingle(new IndexDocument(chunk));
+        // One commit per chunk: each lands in its own segment, so the internal docId order is the
+        // commit order and diverges from the chunk-index order for a non-ascending commitOrder.
+        probe.commitOps().commitAndTrack();
+      }
+      probe.commitOps().maybeRefreshBlocking();
+
+      var hits = probe.chunkSearchOps().searchChunksText("tiebreakalpha", 10, null).hits();
+      List<String> indexOrder =
+          hits.stream().map(h -> h.fields().get(SchemaFields.CHUNK_INDEX)).toList();
+      List<String> docIdOrder = hits.stream().map(LuceneRuntimeTypes.SearchHit::docId).toList();
+
+      // What a doc_id tie-break would have delivered, computed from the same three chunks.
+      List<String> byDocId = new java.util.ArrayList<>(chunkIds);
+      java.util.Collections.sort(byDocId);
+      List<String> indexOrderIfSortedByDocId =
+          byDocId.stream().map(id -> String.valueOf(chunkIds.indexOf(id))).toList();
+
+      List<String> raw =
+          probe
+              .readPathOps()
+              .withSearcher(
+                  searcher -> {
+                    assertTrue(
+                        searcher.getIndexReader().leaves().size() >= 2,
+                        "fixture precondition: the chunks must span at least two segments, got "
+                            + searcher.getIndexReader().leaves().size());
+                    var q =
+                        new org.apache.lucene.search.BooleanQuery.Builder()
+                            .add(
+                                new org.apache.lucene.search.TermQuery(
+                                    new org.apache.lucene.index.Term(
+                                        SchemaFields.CHUNK_CONTENT, "tiebreakalpha")),
+                                org.apache.lucene.search.BooleanClause.Occur.MUST)
+                            .add(
+                                new org.apache.lucene.search.TermQuery(
+                                    new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
+                                org.apache.lucene.search.BooleanClause.Occur.FILTER)
+                            .build();
+                    var top = searcher.search(q, 10);
+                    List<String> indices = new java.util.ArrayList<>();
+                    for (var sd : top.scoreDocs) {
+                      indices.add(
+                          searcher
+                              .storedFields()
+                              .document(sd.doc)
+                              .get(SchemaFields.CHUNK_INDEX));
+                    }
+                    return List.copyOf(indices);
+                  });
+
+      return new TieBreakProbe(indexOrder, docIdOrder, indexOrderIfSortedByDocId, raw);
+    } finally {
+      probe.close();
+    }
   }
 
   // ========== Helper Methods ==========

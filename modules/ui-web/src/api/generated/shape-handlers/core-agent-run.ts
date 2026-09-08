@@ -12,6 +12,9 @@ import type { AgentSentenceCite, AgentSource, ParkSnapshot, PendingApproval, Pro
 /** Payload of the `session_started` event. */
 export interface CoreAgentRunSessionStartedPayload {
   sessionId: string;
+  samplingTemperature?: number;
+  samplingTopP?: number;
+  samplingSeed?: number;
   trace?: TracePayload;
 }
 

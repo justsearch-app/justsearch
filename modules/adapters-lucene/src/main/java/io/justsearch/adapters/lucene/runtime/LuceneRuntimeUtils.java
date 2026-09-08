@@ -334,6 +334,48 @@ public final class LuceneRuntimeUtils {
   // ==========================================================================
 
   /**
+   * The relevance sort a CHUNK-level search must use: score, then the chunk's identity expressed
+   * in fields that are stable ACROSS index builds (lane F PR 0b).
+   *
+   * <p>{@code doc_id} alone is not such a key on a chunk row. {@code ChunkDocumentWriter} mints it
+   * as {@code ChunkIds.newChunkDocId()} = {@code "chunk:" + UUID.randomUUID()}
+   * ({@code ChunkIds.java:51-53}), deliberately not derived from the parent or the chunk index — so
+   * it is unique within one index and uncorrelated between two ingests of the same corpus.
+   * Breaking a score tie on it therefore produces an order that is stable per index and RANDOM per
+   * build, which is precisely the property the tie-break exists to remove.
+   *
+   * <p>The deterministic pair is {@code parent_doc_id} — the parent's normalized absolute path
+   * ({@code IndexingDocumentOps.java:172}) — then {@code chunk_index}. Together they identify a
+   * chunk by position in a named document, which two ingests of the same corpus agree on.
+   * {@code doc_id} stays as the final comparator so the order is total even for a row that carries
+   * neither (a whole-document row reaching a chunk search through a filter that let it past, and
+   * every row in an index written before chunking): both docvalues columns then read as "missing"
+   * uniformly, which is a tie, and the deterministic path-shaped {@code doc_id} decides.
+   *
+   * <p>Both fields carry docvalues on chunk rows by catalog declaration —
+   * {@code parent_doc_id} is a single-valued {@code keyword} with {@code docValues: true}
+   * (a {@code SortedDocValuesField}) and {@code chunk_index} a {@code long} with
+   * {@code docValues: true} (a {@code NumericDocValuesField}); see {@code SSOT/catalogs/fields.v1
+   * .json} and {@code FieldMapper#addFields}. No schema change was needed to sort on them.
+   *
+   * @param idField the document ID field, used as the final tie-breaker
+   * @return the Lucene Sort instance
+   * @throws NullPointerException if idField is null
+   */
+  public static Sort buildChunkTieBreakSort(String idField) {
+    if (idField == null) {
+      throw new NullPointerException("idField must not be null");
+    }
+    return new Sort(
+        SortField.FIELD_SCORE,
+        new SortField(SchemaFields.PARENT_DOC_ID, SortField.Type.STRING, false),
+        // Missing (a non-chunk row) reads as Lucene's numeric default 0 for every such row, so it
+        // is a uniform tie that falls through to idField rather than a silent reordering.
+        new SortField(SchemaFields.CHUNK_INDEX, SortField.Type.LONG, false),
+        new SortField(idField, SortField.Type.STRING, false));
+  }
+
+  /**
    * Builds a Lucene Sort for the given RuntimeSearchSort.
    *
    * <p>Always includes a stable tie-breaker (idField) unless the sort is already purely by doc_id.

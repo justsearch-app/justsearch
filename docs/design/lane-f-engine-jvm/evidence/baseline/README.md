@@ -30,26 +30,46 @@ Index-time encoder profiles (`summary.json` `pipeline_timing.inference` and
 `encoder_profiles`): embedding 60 batches at 919 ms/batch, SPLADE 83 at 1,283 ms, NER 58 at
 456 ms; per-encoder ORT p50/p95 in `encoder_profiles`.
 
-## 2. Workflow fixture capture
+## 2. Workflow fixture capture (retaken under PR 0b)
 
-`fixture/workflow-fixture-capture.v1.json`: `python -m jseval workflow-fixture capture` against the
-dev stack on the fixture corpus (`docs/explanation` + `docs/reference` of this tree, 91 documents
-plus the 5 bundled help documents, paths stored relative to the worktree root), **compact** chat
-profile (the standard model's 11 GB resident set tripped the dev machine's memory guard twice;
-both captures of a paired diff must use one profile, so stage E picks the profile once and
-captures both sides on it). Both ordinary turns completed (3 and 6 iterations); the cancelled
-turn cancelled.
+`fixture-pr0b/`: the split-side record the stage E gate diffs against. `side-a/capture-1.json` is
+the primary capture; `side-a/capture-{2,3}.json` are its same-build noise captures, each on a fresh
+ingest of the fixture corpus (`docs/explanation` + `docs/reference` of this tree, 91 documents plus
+the 5 bundled help documents, paths relative to the worktree root), compact chat profile, every
+capture-run pin on and recorded in `provenance.pins`, applied sampling echoed per turn, enrichment
+complete at capture start (refused otherwise). `side-b/` is a second set of three taken the same
+way on the same build, and `gate.json` is the gate over the two: **PASS, 216 equal, 3 allowed, 0 regressions, 3 noisy fields on one side and 2 on the other
+(1.4 and 0.9 percent, ceiling 5 percent)**. The noisy fields are the hit lists of 3 of 12 queries
+at the rerank-window boundary; all three chat turns (one cancelled) and every other field were
+identical across all six captures. `gate-before-dense-leg-fix.json` is the same gate before the
+chunk dense leg's tie-break was fixed (7 noisy fields per side), kept to show what that fix
+removed.
 
-`fixture/stability-second-fresh-corpus-capture.json` and `fixture/stability-diff.json`: a second
-capture on a second fresh ingest of the same documents, same build and profile, diffed under
-the fixture's relation. Result: FAIL, 190 equal, 19 allowed, 37 regressions, all with a named
-cause and none caused by code: `totalHits` moved by one on q03, q07, q09, q10 and one tie-group
-member was replaced on q02 and q10 (the chunk BM25 and SPLADE legs search without a sort, so
-equal scores break on Lucene's internal docId, which differs per index build; corrected from the
-first HNSW reading by the PR 0b investigation), and both ordinary chat turns hit the iteration
-cap this time (the agent samples at temperature 0.7 with no seed, `AgentLlmCaller.java:277-288`). These are the owner items in design section 0 and
-17.7; the fixture instrument itself behaved as specified (the differ named each cause, the
-health check refused the looping turns as a baseline).
+**Read the PASS for what it is: on ONE build, it is the noise withdrawal by construction.** Both
+sides of this record are the same tree, so the only correct verdict is "no difference", and the
+gate reaches it partly by *excluding* fields rather than by finding them equal. Without the noise
+mask the same six captures give **5 raw cross-side regressions** — `queries.hits[]` on q02, q04,
+q05, q09 and q12 — every one of which is withdrawn because the side's own same-build captures
+already move it. That is the mechanism working exactly as designed, and it is also the reason the
+run cannot certify more than it does: 5 of the 12 query hit-lists are outside the verdict, so a
+real regression in one of them would land in the same blind spot. What the PASS establishes is
+that the 210 fields the pins DID make deterministic are deterministic. Narrowing that blind spot
+is a matter of removing noise sources (the index-time GPU embedding jitter upstream of every
+candidate budget), not of tuning the mask.
+
+That is the measured noise floor of split mode under the pins; `round-*-raw-pair-diff.json`
+are the raw two-capture diffs of the five pin rounds that preceded it (37, 5, 11, 2, 2, 5
+regressions), and `two-per-side-gate-with-stale-side-b.json` is the run that showed two captures
+per side under-sample the noise. The capture before PR 0b (`fixture/`) is kept for the record and
+is not comparable (request breadth and pins changed).
+
+Capture-run pins (all in `scripts/jseval/lane-f/fixture-pair.sh`): `index.vector.exhaustive_search`,
+`justsearch.llm.slots=1`, both rerank deadlines at 60 s, `rerank.top_k=40` with
+`rerank.gpu_mem_mb=4096`, `index.hybrid.candidate_limit_max=5000`,
+`chunk_collapse_limit_multiplier=50`, leg arbitration and recall-complete splice off; the chat
+`sampling` override at temperature 0 with a fixed seed. CPU encoders were measured too slow for
+this corpus (38 percent of document embeddings in 15 minutes at four threads) and stay a documented
+instrument.
 
 ## 3. Brief v2 performance list
 
@@ -76,7 +96,7 @@ rotated `worker.log.N` exists, and no Head-side restart line occurs in any `back
 Observed Worker restarts in development: 0 in 183 runs. The soak at stage E is the first place
 a rate under load is measured; this is the reference.
 
-## What the captures found
+## What the first captures found (before PR 0b)
 
 Four captures on one build. Stable across all of them: the cancelled turn's outcome and the rank
 order of every hit both sides returned. Unstable: scores (GPU float jitter, max delta 0.0094;

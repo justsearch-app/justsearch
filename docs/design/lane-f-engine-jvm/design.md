@@ -194,6 +194,15 @@ rule are unchanged for stable fields. Captures taken before PR 0b are not compar
 after it (the request breadth and the pins changed) and the split-side baseline capture is
 retaken under PR 0b.
 
+**PR 0b acceptance (2026-09-07, 22:40, after the second review).** Under the noise-pair reference
+with three captures per side on one build: PASS, 216 fields equal, 3 allowed, 0 regressions, 3 and
+2 noisy fields per side (1.4 and 0.9 percent; ceiling 5 percent), the noise being 3 of 12 hit lists
+at the rerank-window boundary and no chat field (the chunk dense leg's tie-break, found by the
+second review, had been the larger half of the earlier 7-per-side noise); two captures per side were shown to under-sample (two false regressions on
+the same build), so three is the default. The split-side baseline is retaken as
+`evidence/baseline/fixture-pr0b/` (six captures and the gate). Stage E captures each side three
+times under the same pins and gates with `fixture-gate.sh`.
+
 **Stage A checkpoint (orchestrator, 2026-09-08).** Items A1 to A20 landed on `worktree-lane-F-A`
 (cut from the PR 0 head; PR 0 and PR 0b are open, green and unmerged): the Engine composes the
 index half in-process from `HeadlessApp` through `EngineRoot`; the ports are direct calls behind a
@@ -893,6 +902,17 @@ argfile changes remain test controls; no production fault endpoint is added.
 The Tauri conformance driver now calls the production EngineHost lifecycle/binding
 methods instead of owning another Child slot. Its fake workload stays intentional;
 AppHandle setup/events and signed installation remain outside that execution claim.
+
+**Stage B main integration / 17.8 (orchestrator, 2026-09-08).** Integrate main
+`f938c4eb2`, including the already accepted PR 0b determinism pins and fixture.
+The overlap produced 19 conflicts, chiefly duplicated pre-squash fixture/docs
+history. Preserve the lane's one-Engine flags, direct JVM launch, log naming,
+current stage decisions and expanded dev-runner tests; import PR 0b's fixture
+implementation, tests, baseline and acceptance record. The measured combined
+configuration surface is 110 YAML keys / 247 env-system-property pairs, retaining
+Stage A's deletions while adding PR 0b's approved knobs. No new process boundary
+or later-stage mechanism is needed. The main-development trigger remains active,
+but this reconciliation does not require changing the checkpoint order.
 
 ## 0.1 Forces that shaped the design
 
