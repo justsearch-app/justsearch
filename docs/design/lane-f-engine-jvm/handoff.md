@@ -160,19 +160,60 @@ eval, soak or capture that takes more than an hour**; stage E's design must be c
 **Landed and pushed** (`e692b86ef` = B1 to B6 plus the sweep; `c7e8e0302` = B7). Full suite at
 B6: 9331 tests, 0 failures (XML counts, `cleanTest --no-build-cache`); kernel 30 gates, 0 fail.
 
-**In flight at handoff time:** one implementer agent on B8 (dev-runner supervisor), B9 (runner
-and death-observability assertions, CI step) and B10 (Tauri supervisor, `supervisor.rs`, the
-`[[bin]] supervisor-conformance` target, the `shell-rust-tests` CI step, the `supervisor-state`
-FE consumer). Its uncommitted files when this was written: `scripts/dev/dev-runner.cjs`,
-`scripts/dev/lib/engine-supervisor.cjs`, `scripts/dev/run-dev-runner-tests.mjs`,
-`scripts/dev/test-dev-runner-supervisor.mjs`, `scripts/supervisor-conformance/*`,
-`scripts/ci/check-runtime-manifest-closure.mjs`, `governance/store-recoverability.v1.json`.
-**First thing to do:** `git log --oneline -12` and `git status --short`; if B8 to B10 commits exist
-and the tree is clean, the agent finished (its report went to the previous orchestrator's
-session and is lost; treat the commits and `stages/B.md` section 0.1 as the report and
-review them independently). If files are still modified and no agent is running, the agent
-died mid-item: read the diff before deciding whether to finish it or discard it; do not
-`git checkout --` a file another agent authored without reading it.
+**B8 to B10 landed (same day, one implementer, 111 minutes), pushed with this handoff:**
+`f97511113` B8 (the dev-runner supervisor, `scripts/dev/lib/engine-supervisor.cjs`),
+`664da18d4` B9 (`scripts/dev/run-dev-runner-tests.mjs`, nine files discovered, CI step in
+`windows-native-tests` because `dev-runner.cjs` is Windows-first; `public-claims` runs the
+harness `--self-test`), `63826830e` B10 (`modules/shell/src-tauri/src/supervisor.rs`, the
+`[[bin]] supervisor-conformance` target, the `shell-rust-tests` step, the `supervisor-state`
+FE consumer), `c05216f6a` and `1242fd288` (critical-analysis fixes: `force_kill` reaped the
+handle so `poll_exit` never fired again; a 50 ms resurrection window in the shutdown check;
+the same start/death race in the dev-runner), `b5e3a5ce2` (B.md section 0.1 corrections,
+`status: B1-B10 landed`). Implementer's verification: harness self-test 31/31, dev-runner
+adapter 10/10, Tauri adapter 10/10 with real children; `cargo test --lib --locked` 56 passed
+(Smart App Control did **not** block cargo here; `modules/shell/src-tauri/resources/headless/.ci-placeholder`
+must exist locally, gitignored); `run-dev-runner-tests` 9/9; every kernel gate green;
+`check-runtime-manifest-closure` with **both writers unskipped**; ui-web typecheck, 6451 unit
+tests, `run-ui-web-gates` 27/27.
+
+**Two things the successor must resolve before trusting that suite run.** (1) The full
+`cleanTest test --no-build-cache` reported **1433 XML files, 9001 tests, 1 failure** against
+9331 tests and 1514 files at B6: 81 result files and 330 tests are missing, which means at
+least one module's test task did not complete (the failing task likely aborted the rest of its
+module). Re-run the full suite and reconcile the count before the stage-end claim; a total that
+is smaller than the previous one is not "one failure". (2) The one failure,
+`OnnxEmbeddingEncoderLongDocForensicTest.longDocEmbedWithSpansMatchesBaseEmbed`, ran 68 s
+against its own 30 s `@Timeout`, deterministically and alone on an idle machine; the branch
+does not touch `embed/onnx/` (`git diff origin/main..HEAD` on that path is empty). The
+implementer reads it as a CPU-fallback encoder on this machine (tempdoc 710's question), not a
+branch defect. Verify that reading (does the same test pass on `main` in a clean worktree on
+this machine? does the ORT provider log say CUDA?) before either widening the timeout or
+recording it as an environment red; do not widen the number to make it green.
+
+**B7 to B10 have not been independently reviewed.** Run the same refute-first, read-only opus
+review used for B1 to B6 (brief shape: findings ranked by severity with file:line, a concrete
+failure scenario and the smallest fix; then a verified-sound list), and fold its fixes into the
+B1 to B6 fix batch below. The implementer's own attack list, in its order: `ShellActuator` in
+`supervisor.rs` is the half CI cannot reach (the loop is shared, the bindings are not, and both
+critical-analysis findings lived there); `dev-runner.cjs` grew about 780 lines on the path every
+agent's stack uses (the port-wait no longer short-circuits on an explicit `--api-port`; the
+engine and frontend spawn commands are overridable through `JUSTSEARCH_DEV_RUNNER_{ENGINE,FRONTEND}_COMMAND`,
+both gated behind `JUSTSEARCH_SUPERVISOR_HARNESS=1` — verify the gate, not the variable);
+timing-shaped conformance cases (`hang-soft` at a 1.5 s graceful deadline was flaky before the
+re-entrancy guard; margins are harness-tuned); the `watch_manifest` thread accumulates one per
+Tauri restart (pre-existing shape, newly reachable; duplicate `backend-restart` emits are
+idempotent, the threads are not reclaimed). Premises that did not survive, recorded in B.md
+section 0.1: `SupervisionContractTest` cannot hold `enginePolicyMatchesCode()` (edge
+`app-engine -> app-services`), so the engine row names its drift check in a `driftCheck`
+field and guard resolution now accepts repo-relative paths; the closure check's Rust glob had
+never matched `src/lib.rs` (fixed, and the planted-artifact falsification now reds at
+`lib.rs:1080`); `maxCooldownMs: 5000` is inert at three attempts (ramp tops out at 3 s; stated
+in the register, one case raises the budget to reach it); the dev-runner's first incarnation
+cannot be supervised because `start` is synchronous for its caller, so `startDeadlineMs`
+governs restarts there and first boot on Tauri; Q5's mirror is a sibling
+`runtime/instances/supervisor-history.v1.jsonl` because the manifest mirror is keyed by an
+instance id the exhausted case does not have; no conformance case covers "`exhausted` kills
+registered children" until B11/B12 exist (a red placeholder was refused, correctly).
 
 **The B1 to B6 independent review (opus, read-only, 2026-09-08) returned 14 findings; the four
 highest were re-verified at the call sites by the orchestrator and all hold.** None is fixed
