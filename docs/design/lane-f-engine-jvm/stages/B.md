@@ -2,8 +2,9 @@
 title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
-base: 58d889e78
-status: "DRAFT (written during stage A's checkpoint; re-verify at stage start)"
+base: dafc4a484
+status: "B1-B6 landed (the Engine side); B7-B17 open"
+updated: 2026-09-08
 ---
 
 # Lane F stage B — lifecycle: implementation checklist
@@ -79,6 +80,71 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
    `KnowledgeServerBootstrap.supervisionEngagedOnLastAttempt`, which does not exist in code
    (grep: only this JSON and `docs/tempdocs/825-*`). Sweep it with **B16**; it is inside the
    still-active part of a register B edits.
+
+---
+
+### 0.1 Corrections found while implementing (appended per item)
+
+- **Every B1-B6 citation re-checked at stage start; none was wrong, nine had drifted.** The
+  branch moved between this draft (`58d889e78`) and the stage start (`dafc4a484`) — the
+  checkpoint fixes plus two merges — so 22 load-bearing `file:line` citations were re-resolved
+  against HEAD by content, not by line. All 22 resolve; 9 sit up to 6 lines from where the draft
+  put them (`HeadlessApp` exits at `:901`/`:955`/`:1129`, `performOrderedShutdown` at `:1186`,
+  the JVM hook at `:1115`, `dev-runner.cjs`'s HeapDump at `:715`, `lib.rs`'s at `:796`,
+  `SHARED_FLAGS` at `:44`, `SqliteJobQueue.close` at `:2120`). No claim changed.
+- **§0.1 of this draft is itself now stale, and in the direction it warned about.** It says
+  `stages/A.md` §10 row 1 "over-corrected" by claiming `WORKER_RESTART_EXHAUSTED` has a producer.
+  That was true of the A.md it was written against; stage A's checkpoint then corrected row 1
+  from the call sites and reached the same conclusion this draft did. Independently re-verified
+  here: `KnowledgeServerHealthMonitor.java:545` emits `WORKER_SPAWN_RECOVERY_EXHAUSTED` — a
+  *different* code — and no site transitions to `WORKER_RESTART_EXHAUSTED`. It is now declared in
+  `governance/readiness-reason-codes.v1.json`'s `awaitingProducer` with `owner: lane-F/B`, and
+  the gate's new emission direction reds if a producer appears and the entry is not removed. B14
+  still owes the producer; what changed is that the gate now agrees.
+- **B1's premise about the exit codes was wrong on one of three, and it is the one that matters.**
+  The item says the Head's three `System.exit` calls "are all plain boot failures, i.e.
+  **non-transient**". Read at the sites: `:955` (another instance holds the data-directory lock)
+  is genuinely non-transient, but `:901` is the default uncaught-exception handler — installed
+  before anything boots, able to fire on any thread at any time, i.e. a crash — and `:1129` is the
+  catch around the whole run. Both exit `1` and nothing in the integer separates them. Classifying
+  that union non-transient would send every runtime crash straight to `exhausted` with no retry,
+  the opposite of 7.1's intent. `EngineExit` classifies `1` **transient** and records the
+  ambiguity at the constant; the non-transient class grows by giving a genuinely unretryable boot
+  failure its own code.
+- **The out-of-memory exit code is 3, measured.** 7.1 calls "the out-of-memory exit" transient
+  without naming the code. Measured on the project's JDK (Temurin 25.0.2, 2026-09-08): with
+  `-XX:+ExitOnOutOfMemoryError` the JVM exits **3**; the same program WITHOUT the flag exits
+  **1**, because the OOM reaches the uncaught-exception handler. That is the argument for the
+  flag — not diagnostics, but the difference between a supervisor that can see a memory death and
+  one that reads it as a bad config.
+- **B4's "re-home both halves" is not available; one half moves.** The item asks for
+  `HeadlessApp.performOrderedShutdown` **and** `HeadShutdownCoordinator` to move into
+  `app-engine`. The eight steps close `LocalApiServer`, `HeadAssembly` and six other types living
+  in `modules/ui` and `app-services`, and the edge runs `ui -> app-engine`; importing them into
+  the root inverts it and breaches ArchUnit rule 6b. What moved is the **sequence** — order,
+  reason, error accounting, idempotency, receipt, single exit — and what stayed is the **binding**
+  of each step to the object it closes. `HeadShutdownCoordinator` survives as a 45-line adapter
+  because `UpgradeShutdownAction` is a `ui.api` interface the root cannot implement.
+- **B5's WAL acceptance could not be met as written, and three falsifications say why.** The item
+  asks for a test on the `-wal` file's size or the pragma result, "not on the call" — to prevent a
+  vacuous `verify()`. Each draft passed with the new call deleted: (1) `-wal` after a lone close —
+  SQLite checkpoints and deletes it itself when the last connection closes cleanly; (2) database
+  growth with a second connection held open, on the theory SQLite defers — identical numbers with
+  and without (`4096 -> 139264`, wal absent), because the connection was never used and
+  sqlite-jdbc opens lazily; (3) `-wal` shrinking to zero — failed, because
+  `wal_checkpoint(FULL)` copies frames and REUSES the log file rather than truncating it
+  (`wal 3753352 -> 3753352, db 4096 -> 139264`). On this driver an ordinary close already drains
+  the log either way. The explicit call still lands, because 7.3 step 7's guarantee should be
+  stated by our code rather than inherited from the driver's happy path — but that is a smaller
+  claim than "undrained frames were piling up", and the rename (`checkpointForUpgrade` named its
+  *caller*, and had exactly one) is the change with teeth.
+- **B2's field set gained `preparationId` at B6.** The receipt is preparation- and nonce-bound and
+  both were passed in memory before; the file became the gap they had to cross. Extended before
+  any second writer exists, which is the only cheap moment.
+- **B3 lands before B4 in the commit order.** B.md numbers the watcher before the sequence it
+  runs. Implemented sequence-first so each commit is green on its own terms; the watcher was inert
+  for one commit and went live at B6, which is stated in B3's commit body rather than left as a
+  gap a reader has to notice.
 
 ---
 
