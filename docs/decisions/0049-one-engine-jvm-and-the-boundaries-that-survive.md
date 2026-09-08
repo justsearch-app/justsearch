@@ -11,6 +11,7 @@ probes:
   - adr-0049-lucene-owners-pinned
   - adr-0049-engine-port-boundary
   - adr-0049-no-grpc-in-module-builds
+  - adr-0049-no-grpc-imports-in-java
 last_reviewed: 2026-09-07
 ---
 
@@ -119,10 +120,19 @@ that hosted it, and the `protoc-gen-grpc-java` generator in `modules/ipc-common`
 declares a gRPC dependency and no gRPC method is served. The infra-health service was deleted
 outright rather than migrated — nothing dialled its two RPCs, and an HTTP handler over the same
 `InfraDiagnosticsService` payload already existed (`InfraHealthController`). What survives of
-`indexing.proto` is its message half, still the DTO vocabulary at the in-process ports. The
-absence probe below stays scoped to the index-half module build files, not widened to the
-repository: it is the probe for *this* decision, and an absence probe that grows to cover
-everything stops meaning anything.
+`indexing.proto` is its message half, still the DTO vocabulary at the in-process ports.
+
+Two absence probes hold this, and they watch different things. `adr-0049-no-grpc-in-module-builds`
+scans every `.kts` file under `modules/` for `libs.grpc` — the whole module tree, not the index half
+alone, because item A14 removed the last declaration anywhere including the infra-health service
+that had been the one exemption. It counts comments as well as code, deliberately: a build file
+naming `libs.grpc` is residue by the same rule that deleted the dependency.
+`adr-0049-no-grpc-imports-in-java` scans every `.java` file under `modules/`, main and test, for an
+`import io.grpc` at the start of a line. A build-file probe watches the *declaration*, and a
+declaration can return by a route that never spells `libs.grpc`; the import statement is where a
+returning dependency first becomes visible in code. That one is anchored to a line start on purpose,
+because `io.grpc` is still named in javadoc across the tree — each retargeted classifier records
+which gRPC type it used to match — and that record is history worth keeping, not residue.
 
 **Reversibility.** Re-splitting is possible but is not a rollback: the ports are the seam, so a
 future boundary would be drawn at a port and would need its own ADR under the decision rule above.

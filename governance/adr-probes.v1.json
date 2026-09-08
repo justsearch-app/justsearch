@@ -39,6 +39,20 @@
       "note": "Added at lane F item A15, widened to all of modules/ at A14. It was briefly scoped to worker-core/worker-services/indexer-worker while the infra-health gRPC service was expected to survive; the owner then decided that service is part of the wire and it was deleted, so the exemption is gone and the probe means the simpler thing. Note that grep-absent counts COMMENTS as well as code, and that is deliberate here: a comment naming libs.grpc is residue by the same rule that deleted the dependency, and the probe caught exactly one such comment in modules/indexer-worker/build.gradle.kts before it passed."
     },
     {
+      "id": "adr-0049-no-grpc-imports-in-java",
+      "adr": "0049",
+      "premise": "NO Java source under modules/ imports io.grpc. The build-file probe above is necessary and not sufficient: it watches the DECLARATION, and a declaration can return by a route that does not spell 'libs.grpc' - a transitive edge, a version-catalog alias, a direct coordinate string. What ADR-0049 actually decided is that no gRPC method is served and no gRPC type crosses a seam, and the cheapest mechanical restatement of THAT is the import statement, which is where a returning dependency first becomes visible in code.",
+      "kind": "grep-absent",
+      "pattern": "(^|\\n)import io\\.grpc",
+      "paths": [
+        "modules"
+      ],
+      "include": [
+        ".java"
+      ],
+      "note": "Added at the lane F stage A checkpoint. Anchored to a line start deliberately, and this is the one place it differs from its build-file sibling: that probe counts comments on purpose (a comment naming libs.grpc is residue), whereas io.grpc is still NAMED in prose all over the tree - GplJobCoordinator, AgentToolErrors, KnowledgeClientException and CancelToken all explain in javadoc which io.grpc type they used to match, and those explanations are the record of the retargeting, not residue. An unanchored pattern would have to delete that history to go green, which is the wrong trade. Main AND test sources are in scope: a test importing io.grpc means a gRPC artifact is back on a test classpath, which is how the dependency returns before anyone ships it."
+    },
+    {
       "id": "adr-0003-lucene-direct",
       "adr": "0003",
       "premise": "Lucene is consumed as a library directly.",
