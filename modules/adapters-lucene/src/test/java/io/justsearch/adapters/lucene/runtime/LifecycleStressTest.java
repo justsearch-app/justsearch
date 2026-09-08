@@ -40,7 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <ul>
  *   <li>4 reader threads: tight search loop via {@code holder.get().readPathOps().search(...)}
  *   <li>2 writer threads: tight indexSingle loop via {@code holder.get().indexingCoordinator()};
- *       catches drain-time ISE and retries on the upgraded holder reference
+ *       catches typed drain-time rejections and retries on the upgraded holder reference
  *   <li>1 swapper thread: 50 cycles of {@code old = holder.getAndSet(builder.open());
  *       old.drainAndClose(...);}
  * </ul>
@@ -104,6 +104,28 @@ class LifecycleStressTest {
     int baselineThreads = Thread.activeCount();
 
     CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch writerInsideBarrier = new CountDownLatch(1);
+    CountDownLatch drainMarked = new CountDownLatch(1);
+    AtomicBoolean armFirstWriter = new AtomicBoolean(true);
+    holder.get().session().telemetryEvents =
+        new LuceneRuntimeTypes.TelemetryEvents() {
+          @Override
+          public void onWriteBarrierContention(long waitNanos) {
+            if (!Thread.currentThread().getName().equals("stress-writer-0")
+                || !armFirstWriter.compareAndSet(true, false)) {
+              return;
+            }
+            writerInsideBarrier.countDown();
+            try {
+              if (!drainMarked.await(10, TimeUnit.SECONDS)) {
+                uncaught.add(new AssertionError("swapper did not mark the forced drain in time"));
+              }
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              uncaught.add(e);
+            }
+          }
+        };
     List<Thread> workers = new ArrayList<>();
 
     // Reader threads
@@ -173,11 +195,12 @@ class LifecycleStressTest {
                                       SchemaFields.DOC_UID, docId + "#0",
                                       SchemaFields.CONTENT, "writer body " + n)));
                       writesCompleted.incrementAndGet();
-                    } catch (IllegalStateException e) {
-                      // Drain-time ISE — caller retries on upgraded holder reference
+                    } catch (IndexRuntimeIOException e) {
+                      if (e.reason() != IndexRuntimeIOException.Reason.DRAINING) {
+                        throw e;
+                      }
+                      // The governed drain signal tells the caller to retry on the upgraded holder.
                       writesRetried.incrementAndGet();
-                    } catch (Throwable e) {
-                      if (!isExpectedSwapException(e)) uncaught.add(e);
                     }
                   }
                 } catch (InterruptedException e) {
@@ -200,10 +223,17 @@ class LifecycleStressTest {
                 start.await();
                 for (int cycle = 0; cycle < CYCLES; cycle++) {
                   RunningRuntime old = holder.get();
+                  if (cycle == 0
+                      && !writerInsideBarrier.await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("first writer did not enter the write barrier in time");
+                  }
                   // Mark draining so writers stop immediately.
                   old.session().draining = true;
                   // Swap to null so new writes route nowhere; existing in-flight finish.
                   holder.set(null);
+                  if (cycle == 0) {
+                    drainMarked.countDown();
+                  }
                   swappedOut.add(new WeakReference<>(old));
                   old.drainAndClose(Duration.ofSeconds(5));
                   // Old writer is now closed; safe to acquire write.lock for the new instance.
@@ -215,6 +245,7 @@ class LifecycleStressTest {
               } catch (Throwable e) {
                 uncaught.add(e);
               } finally {
+                drainMarked.countDown();
                 stop.set(true);
               }
             },
@@ -249,12 +280,11 @@ class LifecycleStressTest {
     assertEquals(CYCLES, swappedOut.size(), "expected exactly " + CYCLES + " swap cycles");
     assertTrue(searchesCompleted.get() > 0, "readers should have completed at least one search");
     assertTrue(writesCompleted.get() > 0, "writers should have completed at least one write");
-    // Item 7: with 50 swap cycles and 2 writers, drain races should produce at least one
-    // ISE that the writer caught and counted. If this is zero, swap timing is unrealistic
-    // (e.g., cycles too slow vs writer rate).
+    // The first swap deterministically marks draining while writer 0 holds the barrier read lock.
+    // This pins the production retry contract without relying on an incidental scheduling race.
     assertTrue(
         writesRetried.get() > 0,
-        "writers should have hit at least one drain-time ISE across "
+        "writers should have hit at least one typed drain rejection across "
             + CYCLES
             + " cycles; got "
             + writesRetried.get());
