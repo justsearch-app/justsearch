@@ -956,6 +956,12 @@ public class HeadlessApp {
         return;
       }
 
+      // Clear only the predecessor's request, while the instance lock proves no current Engine can
+      // be writing one. Failure is fatal: publishing readiness with a stale live request would let
+      // the watcher shut this incarnation down immediately.
+      final Path runtimeDir = configPhase.dataDir().resolve("runtime");
+      clearPriorShutdownRequest(runtimeDir, java.nio.file.Files::deleteIfExists);
+
       // Tempdoc 501 Phase 1: instantiate the runtime manifest publisher as soon as the dataDir
       // is known. The first manifest write happens after the API server binds (Phase 2 below);
       // the worker fields are filled in after Phase 3 (Worker connect). The publisher cleans
@@ -1122,7 +1128,6 @@ public class HeadlessApp {
       // than running the ordered close itself. The watcher below is what runs it. Routing the
       // upgrade through the same file as the supervisor means there is one trigger path to reason
       // about, not two that must be kept in step.
-      final Path runtimeDir = configPhase.dataDir().resolve("runtime");
       upgradeShutdownBridge.install(upgradeShutdownRequestWriter(runtimeDir));
       // Tempdoc 805 G.1: the shell's normal-quit request. Unchanged — it is already cooperative and
       // in-process, so routing it through the file would add a poll's latency for nothing.
@@ -1257,14 +1262,28 @@ public class HeadlessApp {
     };
   }
 
-  /** Builds and starts the production watcher after clearing a prior incarnation's request. */
+  @FunctionalInterface
+  interface RequestFileDeleter {
+    boolean delete(Path path) throws java.io.IOException;
+  }
+
+  /** Strictly clears a predecessor request before this incarnation publishes readiness. */
+  static void clearPriorShutdownRequest(Path runtimeDir, RequestFileDeleter deleter)
+      throws java.io.IOException {
+    Path request = io.justsearch.app.engine.ShutdownRequest.pathIn(runtimeDir);
+    deleter.delete(request);
+    if (java.nio.file.Files.exists(request)) {
+      throw new java.io.IOException("shutdown request still exists after boot clear: " + request);
+    }
+  }
+
+  /** Builds and starts the production watcher; boot clearing has already completed. */
   static io.justsearch.app.engine.ShutdownRequestWatcher startShutdownRequestWatcher(
       Path runtimeDir,
       java.util.function.Predicate<io.justsearch.app.engine.ShutdownRequest> accepts,
       java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequest> onRequest,
       long pollIntervalMs,
       java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequestWatcher> beforeStart) {
-    io.justsearch.app.engine.ShutdownRequest.clear(runtimeDir);
     var watcher =
         new io.justsearch.app.engine.ShutdownRequestWatcher(
             runtimeDir, accepts, onRequest, pollIntervalMs);

@@ -4,15 +4,17 @@ package io.justsearch.ui;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
-import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.services.HeadAssembly;
-import java.nio.file.Path;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
@@ -75,6 +77,7 @@ final class HeadlessAppShutdownWiringTest {
     new io.justsearch.app.engine.ShutdownRequest(
             Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null)
         .writeTo(runtime);
+    HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
     var fired = new CountDownLatch(1);
 
     try (var watcher =
@@ -84,5 +87,44 @@ final class HeadlessAppShutdownWiringTest {
     }
 
     assertFalse(Files.exists(io.justsearch.app.engine.ShutdownRequest.pathIn(runtime)));
+  }
+
+  @Test
+  @DisplayName("a request written after the boot clear survives until watcher dispatch")
+  void currentIncarnationRequestSurvivesWatcherStart(@TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
+    new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "current-incarnation", null)
+        .writeTo(runtime);
+    var fired = new CountDownLatch(1);
+
+    try (var watcher =
+        HeadlessApp.startShutdownRequestWatcher(
+            runtime, r -> true, r -> fired.countDown(), 20L, ignored -> {})) {
+      assertTrue(fired.await(2, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  @DisplayName("boot does not start the watcher when a predecessor request cannot be removed")
+  void failedBootClearPreventsWatcherStart(@TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null)
+        .writeTo(runtime);
+    var watcherStarted = new java.util.concurrent.atomic.AtomicBoolean();
+
+    assertThrows(
+        java.io.IOException.class,
+        () -> {
+          HeadlessApp.clearPriorShutdownRequest(runtime, ignored -> false);
+          watcherStarted.set(true);
+          HeadlessApp.startShutdownRequestWatcher(
+              runtime, r -> true, ignored -> {}, 20L, ignored -> {});
+        });
+
+    assertFalse(watcherStarted.get());
+    assertTrue(Files.exists(io.justsearch.app.engine.ShutdownRequest.pathIn(runtime)));
   }
 }
