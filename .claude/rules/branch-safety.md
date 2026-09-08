@@ -208,7 +208,7 @@ publication and cleanup scoped to your branch:
 - Keep diffs scoped to your task: untouched-code reformatting conflicts with
   other worktrees.
 - There is no shared inbox file to append to (the observations store was retired,
-  tempdoc 872): route out-of-scope findings per CLAUDE.md `log-pre-existing-issues`.
+  tempdoc 872): route findings through the canonical agent-workflow guide.
 
 ## Recovery
 
