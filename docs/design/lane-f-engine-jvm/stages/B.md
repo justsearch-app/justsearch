@@ -277,14 +277,15 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   shutdown binding's javadoc therefore describes concrete steps rather than claiming that all
   eight conceptual steps are already implemented.
 - **The B3 review fixes make request lifetime and watcher ownership explicit.** Expired requests
-  are refused and cleared before dispatch, a prior incarnation's request is cleared once before
-  watcher startup, and the watcher is itself an ordered shutdown step. Closing it from its own
+  are refused and cleared before dispatch, a prior incarnation's request is strictly cleared after
+  taking the instance lock and before readiness publication, and the watcher is itself an ordered
+  shutdown step. Closing it from its own
   callback uses orderly executor shutdown so the remaining close steps are not interrupted.
   Accepted-request retention and supervisor observation remain the separately decided follow-up
   protocol in `design.md` §0.
-- **The B4 review fixes classify the index half from observable close behavior.** No index half
-  means it is already closed and reports `GRACEFUL`; an exception from the index-half step reports
-  `FAILED` and makes the sequence unclean rather than falling through to `UNKNOWN`.
+- **The B4 review fixes classify the index half from observable close behavior.** The production
+  binding reports `GRACEFUL` when no index half was composed; an omitted index step remains
+  `UNKNOWN`. An exception from the index-half step reports `FAILED` and makes the sequence unclean.
 - **The B5 review fixes connect the reason table to the real inference lifecycle.** The production
   ordered step sets the close directive before `HeadAssembly.close()`, the assembly delegates to
   its held `InferenceLifecycleManager`, and the manager's real `close()` reaches `LlamaServerOps`
