@@ -315,11 +315,10 @@ fn decide_on_exit(observation: &Observation, policy: &Policy) -> Decision {
     let requested = observation.requested_reason.as_deref();
     let code = observation.exit_code.unwrap_or(0);
 
-    // A shutdown the supervisor asked for is classified by the ASK, not by the integer. This is
-    // 627 U3's unresolved caveat closed by construction: one budget, one classifier, and the
-    // requested path cannot double-spend it because it does not spend it at all.
+    // Quit and upgrade retain host ownership. Restart is free only when the Engine
+    // certifies a clean ordered close with its registered requested-restart exit.
     match requested {
-        Some("restart") => {
+        Some("restart") if describe_exit(code, policy) == "requested_restart" => {
             // No cooldown ramp: nothing crashed. The actuator still waits for the process handle
             // to close, which is the floor under EVERY restart and is not a number this function
             // can express.
@@ -346,13 +345,22 @@ fn decide_on_exit(observation: &Observation, policy: &Policy) -> Decision {
         _ => {}
     }
 
-    // `hang` is the one requested reason that IS counted: the request was the recovery, and the
+    // `hang` is always counted: the request was the recovery, and the
     // thing being recovered from was a fault. Treating it as requested-and-free would give an
     // Engine that hangs every thirty seconds an unbounded number of restarts.
     let hang = requested == Some("hang");
     let exit_class = if hang { "TRANSIENT".to_string() } else { classify_exit(code, policy) };
     let reason = if hang { "hang".to_string() } else { describe_exit(code, policy) };
 
+    if exit_class == "REQUESTED" && reason == "requested_restart" {
+        return Decision {
+            action: Action::Restart,
+            reason: Some(reason),
+            exit_class: Some(exit_class),
+            cooldown_ms: Some(0),
+            counted: false,
+        };
+    }
     if exit_class == "REQUESTED" {
         // Exit 0 with nothing outstanding: the ordered shutdown ran because something else asked
         // for it (the HTTP trigger, a signal). Restarting here would fight the user.
@@ -1069,21 +1077,21 @@ mod tests {
         );
     }
 
-    /// A requested restart does not spend the budget, and the state record says so. The direction
-    /// that makes this non-vacuous is the second half: an unrequested exit with the same code DOES
-    /// spend it.
+    /// Only a clean requested restart is free. A failed close spends the budget even when
+    /// the host observed the restart request before the Engine exited.
     #[test]
-    fn a_requested_restart_is_free_and_an_unrequested_one_is_not() {
+    fn a_clean_requested_restart_is_free_but_a_failed_close_is_counted() {
         let mut supervisor = Supervisor::new(load_policy());
         supervisor.observe(Event::Ready, None);
         supervisor.requested_reason = Some("restart".to_string());
-        let requested = supervisor.observe(Event::Exit, Some(0));
+        let requested = supervisor.observe(Event::Exit, Some(4));
         assert_eq!(requested.action, Action::Restart);
         assert!(!requested.counted);
         assert_eq!(supervisor.restart_count, 0);
 
         supervisor.entered_starting();
         supervisor.observe(Event::Ready, None);
+        supervisor.requested_reason = Some("restart".to_string());
         let crashed = supervisor.observe(Event::Exit, Some(1));
         assert_eq!(crashed.action, Action::Restart);
         assert!(crashed.counted);

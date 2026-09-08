@@ -77,6 +77,9 @@ public final class EngineExit {
    */
   public static final int OUT_OF_MEMORY = 3;
 
+  /** A clean Engine-local restart; the host replaces it without charging the crash budget. */
+  public static final int REQUESTED_RESTART = 4;
+
   /**
    * Classifies an observed exit code.
    *
@@ -85,7 +88,7 @@ public final class EngineExit {
    */
   public static ExitClass classify(int code) {
     return switch (code) {
-      case OK -> ExitClass.REQUESTED;
+      case OK, REQUESTED_RESTART -> ExitClass.REQUESTED;
       case DATA_DIR_LOCKED -> ExitClass.NON_TRANSIENT;
       case FATAL_OR_UNCAUGHT, OUT_OF_MEMORY -> ExitClass.TRANSIENT;
       default -> ExitClass.TRANSIENT;
@@ -102,6 +105,7 @@ public final class EngineExit {
   public static String describe(int code) {
     return switch (code) {
       case OK -> "ok";
+      case REQUESTED_RESTART -> "requested_restart";
       case FATAL_OR_UNCAUGHT -> "fatal_or_uncaught";
       case DATA_DIR_LOCKED -> "data_dir_locked";
       case OUT_OF_MEMORY -> "out_of_memory";

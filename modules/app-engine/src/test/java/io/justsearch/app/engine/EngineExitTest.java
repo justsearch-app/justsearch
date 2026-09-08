@@ -28,6 +28,7 @@ final class EngineExitTest {
   @DisplayName("each named code classifies as design 7.1 says")
   void namedCodesClassify() {
     assertEquals(ExitClass.REQUESTED, EngineExit.classify(EngineExit.OK));
+    assertEquals(ExitClass.REQUESTED, EngineExit.classify(EngineExit.REQUESTED_RESTART));
     assertEquals(
         ExitClass.NON_TRANSIENT,
         EngineExit.classify(EngineExit.DATA_DIR_LOCKED),

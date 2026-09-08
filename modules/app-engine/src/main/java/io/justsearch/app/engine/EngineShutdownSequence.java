@@ -190,7 +190,9 @@ public final class EngineShutdownSequence {
       return;
     }
     Result shutdown = run(reason);
-    exit.accept(selectExitCode(shutdown.clean() ? 0 : 1));
+    int completedCode =
+        shutdown.reason() == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK;
+    exit.accept(selectExitCode(shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));
   }
 
   /**

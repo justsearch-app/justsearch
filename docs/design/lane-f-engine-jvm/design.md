@@ -807,6 +807,17 @@ passes; no report may call installer/store recovery verified before then. This
 supersedes earlier scheduling wording, without changing signing policy or moving
 any installer implementation out of B.
 
+**B15 clean local restart exit (orchestrator, 2026-09-08).** Allocate exit code 4
+as `REQUESTED_RESTART`, emitted only after a clean ordered RESTART close. Both
+hosts restart it without charging the crash budget even if they never observed
+the Engine's handoff. Unclean local close and terminal writer failure retain code
+1 and its charged recovery, including when a host has already observed a restart
+request: a request alone cannot certify clean completion. Host-owned quit/upgrade
+and hang retain their existing priority. This replaces the suspended proposal to allocate 4 as a generic
+requested-unclean exit: cleanliness matters to granting a free local restart.
+The register remains the cross-language authority. No request-file writer or
+manifest-deadline change is included in this first B15 implementation cut.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

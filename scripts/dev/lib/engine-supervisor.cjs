@@ -149,10 +149,9 @@ function decideOnExit(observation, policy) {
   const requested = observation.requestedReason ?? null;
   const code = observation.exitCode;
 
-  // A shutdown the supervisor asked for is classified by the ASK, not by the integer. This is 627
-  // U3's unresolved caveat closed by construction: there is one budget and one classifier, and the
-  // requested path cannot double-spend it because it does not spend it at all.
-  if (requested === 'restart') {
+  // Quit and upgrade retain host ownership. Restart is free only when the Engine
+  // certifies a clean ordered close with its registered requested-restart exit.
+  if (requested === 'restart' && describeExit(code, policy) === 'requested_restart') {
     // No cooldown ramp: nothing crashed. The actuator still waits for the process handle to close,
     // which is the floor under EVERY restart and is not a number this function can express.
     return { action: ACTIONS.RESTART, reason: 'restart', exitClass: 'REQUESTED', cooldownMs: 0, counted: false };
@@ -164,12 +163,15 @@ function decideOnExit(observation, policy) {
     return { action: ACTIONS.STOP, reason: 'quit', exitClass: 'REQUESTED', counted: false };
   }
 
-  // `hang` is the one requested reason that IS counted: the request was the recovery, and the thing
+  // `hang` is always counted: the request was the recovery, and the thing
   // being recovered from was a fault. Treating it as requested-and-free would give an Engine that
   // hangs every 30 seconds an unbounded number of restarts.
   const exitClass = requested === 'hang' ? 'TRANSIENT' : classifyExit(code, policy);
   const reason = requested === 'hang' ? 'hang' : describeExit(code, policy);
 
+  if (exitClass === 'REQUESTED' && reason === 'requested_restart') {
+    return { action: ACTIONS.RESTART, reason, exitClass, cooldownMs: 0, counted: false };
+  }
   if (exitClass === 'REQUESTED') {
     // Exit 0 with nothing outstanding: the ordered shutdown ran because something else asked for it
     // (the HTTP trigger, a signal). Restarting here would fight the user.

@@ -151,11 +151,13 @@ async function driveCase({ testCase, policy, io }) {
 }
 
 const RESTART_CASES = new Set([
+  'fileless-clean-local-restart-is-not-counted',
   'crash-1-restarts-under-budget',
   'oom-3-restarts-under-budget',
   'hang-soft-recovered-through-the-request-file',
   'hang-hard-recovered-by-forced-kill',
   'requested-restart-is-not-counted',
+  'requested-restart-completion-failure-is-counted',
 ]);
 
 export async function runCase({ testCase, policy, io }) {
@@ -223,6 +225,22 @@ export async function runCase({ testCase, policy, io }) {
         problems.push(
           `restartCount ${restarted.restartCount}, expected 0 — a REQUESTED restart must not spend the crash budget`,
         );
+      }
+      if (testCase.id === 'fileless-clean-local-restart-is-not-counted'
+          || testCase.id === 'requested-restart-is-not-counted'
+          || testCase.id === 'requested-restart-completion-failure-is-counted') {
+        const expectedReason = counted ? 'fatal_or_uncaught'
+          : testCase.request ? 'restart' : 'requested_restart';
+        const expectedClass = counted ? 'TRANSIENT' : 'REQUESTED';
+        if (restarted.lastExit?.code !== testCase.observation.exitCode
+            || restarted.lastExit?.reason !== expectedReason
+            || restarted.lastExit?.class !== expectedClass
+            || restarted.lastExit?.counted !== counted) {
+          problems.push(`incorrect restart exit record: ${JSON.stringify(restarted.lastExit)}`);
+        }
+        if (!testCase.request && fs.existsSync(path.join(run.dataDir, 'runtime', 'shutdown-request.v1.json'))) {
+          problems.push('fileless restart left a shutdown request');
+        }
       }
       if (testCase.id === 'oom-3-restarts-under-budget' && restarted.lastExit?.reason !== 'out_of_memory') {
         problems.push(`lastExit.reason ${restarted.lastExit?.reason}, expected out_of_memory`);

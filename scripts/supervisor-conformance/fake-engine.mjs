@@ -293,7 +293,7 @@ function start() {
     } catch {
       /* the supervisor rewrites it if it still wants us gone */
     }
-    orderlyExit(0, `shutdown request reason=${reason}`);
+    orderlyExit(behaviour.requestExitCode ?? (reason === 'restart' ? 4 : 0), `shutdown request reason=${reason}`);
   }, behaviour.requestPollMs).unref();
   // The interval is unref'd on purpose: the listening server is what holds the event loop open, so
   // once the server closes the process can exit instead of being pinned by a poll that has nothing

@@ -35,6 +35,22 @@ final class EngineShutdownSequenceTest {
   }
 
   @Test
+  void onlyCleanLocalRestartUsesTheRequestedRestartCode(@TempDir Path dataDir) {
+    for (boolean clean : List.of(true, false)) {
+      var code = new AtomicInteger(-1);
+      var sequence = new EngineShutdownSequence(
+          dataDir,
+          List.of(new Step(EngineShutdownSequence.INDEX_HALF_STEP, ignored -> "GRACEFUL")),
+          code::set,
+          preliminary -> {
+            if (!clean) throw new java.io.IOException("handoff publication failed");
+          });
+      sequence.runAndExit(Reason.RESTART);
+      assertEquals(clean ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT, code.get());
+    }
+  }
+
+  @Test
   @DisplayName("the upgrade path is idempotent and writes a nonce-bound receipt")
   void upgradeShutdownIsIdempotentAndWritesNonceBoundReceipt(@TempDir Path dataDir)
       throws Exception {

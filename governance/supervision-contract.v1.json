@@ -185,6 +185,7 @@
         "note": "A 300 s stability window and a multi-second cooldown make the conformance harness unrunnable in CI, so both implementations accept per-run overrides — but ONLY when the flag above is set to 1 in the same environment. Setting an override alone is inert. That is asserted in both implementations (engine-supervisor.test + supervisor.rs's overrides_are_inert_without_the_harness_flag) so the product path cannot pick a test value up by accident from an inherited environment."
       },
       "exitCodes": [
+        { "code": 4, "name": "REQUESTED_RESTART", "class": "REQUESTED" },
         { "code": 0, "name": "OK", "class": "REQUESTED" },
         { "code": 1, "name": "FATAL_OR_UNCAUGHT", "class": "TRANSIENT" },
         { "code": 2, "name": "DATA_DIR_LOCKED", "class": "NON_TRANSIENT" },
@@ -258,6 +259,32 @@
       ],
       "conformanceCases": [
         {
+          "id": "fileless-clean-local-restart-is-not-counted",
+          "faultMode": "clean-exit",
+          "drives": [
+            "decision",
+            "actuator"
+          ],
+          "engine": {
+            "mode": "clean-exit",
+            "exitCode": 4,
+            "exitAfterMs": 600
+          },
+          "observation": {
+            "event": "exit",
+            "exitCode": 4,
+            "requestedReason": null,
+            "restartCount": 2,
+            "state": "running"
+          },
+          "expect": {
+            "action": "restart",
+            "cooldownMs": 0,
+            "counted": false
+          },
+          "why": "A clean local restart remains identifiable if the Engine exits before its host observes the manifest handoff. Neither Engine nor fixture writes a shutdown request."
+        },
+        {
           "id": "clean-exit-0-stops",
           "faultMode": "clean-exit",
           "drives": ["decision", "actuator"],
@@ -297,11 +324,21 @@
           "id": "requested-restart-is-not-counted",
           "faultMode": "clean-exit",
           "drives": ["decision", "actuator"],
-          "engine": { "mode": "honour", "exitCode": 0 },
+          "engine": { "mode": "honour", "exitCode": 4 },
           "request": { "reason": "restart" },
-          "observation": { "event": "exit", "exitCode": 0, "requestedReason": "restart", "restartCount": 2, "state": "stopping" },
+          "observation": { "event": "exit", "exitCode": 4, "requestedReason": "restart", "restartCount": 2, "state": "stopping" },
           "expect": { "action": "restart", "cooldownMs": 0, "counted": false },
           "why": "627 U3's unresolved caveat closed by construction: one budget, one classifier, and the requested path does not spend it. restartCount 2 in the observation is deliberate — at 2 a counted restart would be the last one, so a case that passed with `counted: true` would be indistinguishable here if the count were 0."
+        },
+        {
+          "id": "requested-restart-completion-failure-is-counted",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "honour", "requestExitCode": 1, "requestPollMs": 500 },
+          "request": { "reason": "restart" },
+          "observation": { "event": "exit", "exitCode": 1, "requestedReason": "restart", "restartCount": 0, "state": "stopping" },
+          "expect": { "action": "restart", "cooldownMs": 1000, "counted": true },
+          "why": "Observing a restart request cannot excuse a failed ordered close. Only clean completion code 4 grants a free restart; code 1 must spend the bounded crash budget."
         },
         {
           "id": "requested-upgrade-stops",
