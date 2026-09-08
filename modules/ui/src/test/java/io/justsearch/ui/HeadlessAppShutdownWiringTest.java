@@ -139,9 +139,11 @@ final class HeadlessAppShutdownWiringTest {
             io.justsearch.app.engine.ShutdownRequestWatcher>();
     var laterStep = new CountDownLatch(1);
     var laterStepInterrupted = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var callbackThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
     AppInstanceLock instanceLock = mock(AppInstanceLock.class);
     doAnswer(
             ignored -> {
+              callbackThread.set(Thread.currentThread());
               laterStepInterrupted.set(Thread.currentThread().isInterrupted());
               laterStep.countDown();
               return null;
@@ -175,8 +177,10 @@ final class HeadlessAppShutdownWiringTest {
               Reason.QUIT, Long.MAX_VALUE, null, "test", null)
           .writeTo(runtime);
       assertTrue(laterStep.await(2, TimeUnit.SECONDS));
-      assertFalse(watcher.isRunning());
       assertFalse(laterStepInterrupted.get());
+      Thread thread = callbackThread.get();
+      thread.join(2_000L);
+      assertFalse(thread.isAlive(), "the production close step must terminate the watcher thread");
     }
   }
 }

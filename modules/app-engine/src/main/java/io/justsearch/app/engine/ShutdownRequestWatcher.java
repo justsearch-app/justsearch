@@ -159,11 +159,6 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
     return fired.get();
   }
 
-  /** Whether the polling executor is currently live. Diagnostic and lifecycle-test surface. */
-  public synchronized boolean isRunning() {
-    return executor != null && !executor.isShutdown();
-  }
-
   @Override
   public synchronized void close() {
     ScheduledExecutorService e = executor;
