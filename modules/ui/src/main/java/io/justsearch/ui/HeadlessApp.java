@@ -806,7 +806,7 @@ public class HeadlessApp {
       return null;
     }
     try {
-      Path p = Path.of(exePath).toAbsolutePath().normalize();
+      Path p = Path.of(exePath.replace('\\', '/')).toAbsolutePath().normalize();
       int n = p.getNameCount();
       for (int i = 0; i + 2 < n; i++) {
         if ("llama-server".equalsIgnoreCase(p.getName(i).toString())

@@ -1,5 +1,10 @@
 # B17 recovery proofs — 2026-09-08
 
+**Hosted-proof correction:** this record establishes the local checkpoint. B9's separate hosted
+PR obligation was omitted from the completion claim; [hosted-ci.md](hosted-ci.md) tracks the
+first PR run, its concrete failures and their correction before C1. Platform and installer proof
+limits remain explicit, including the Windows-only advisory installed tier.
+
 Implementation checkpoint after B15 `cb760f409`, followed by B17 `b8094f9cf` and
 main integration `39f598efa` (main parent `f938c4eb2`, accepted PR 0b).
 

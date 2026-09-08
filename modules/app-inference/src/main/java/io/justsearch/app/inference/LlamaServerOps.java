@@ -1256,7 +1256,6 @@ final class LlamaServerOps {
           io.justsearch.app.api.runtime.ManagedChild.fromProcess(
               started,
               io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER,
-              cfg.serverExecutable(),
               "http://127.0.0.1:" + cfg.serverPort(),
               cfg.modelPath().toString(),
               declaredConfigHash,

@@ -23,7 +23,7 @@ across three build systems. Load this before working in any of these areas.
 - **`isProd` gate:** Don't gate bundled path resolution on `isProd` — check prod layout unconditionally (G27)
 - **CUDA DLLs:** When adding native DLL bundles, set env vars in `lib.rs:spawn_headless_backend()` (G16)
 - **Extended-length paths:** Tauri `resource_dir()` may return `\\?\`-prefixed paths — normalize before Java APIs
-- **Config snapshot staleness:** `runtime/worker-config-snapshot.json` from prior runs causes stale config on first boot (G26)
+- **Retired config snapshot:** `runtime/worker-config-snapshot.json` is no longer consumed by the Engine; old copies are inert and do not justify clearing user data (historical G26).
 - **Local build prereq — vswhere needs `-all`:** `package-installer-win.ps1` queries `vswhere -requires …VC.Tools.x86.x64`; an incomplete-but-usable VS Build Tools install (`isComplete=0`) is hidden without `-all`, causing a false "MSVC not found". (tempdoc 562)
 - **Local build prereq — Smart App Control:** if SAC is enforcing (`HKLM:\…\CI\Policy\VerifiedAndReputablePolicyState=1`) the local Rust build dies with `os error 4551` (unsigned cargo build-scripts blocked). The script fails fast with guidance; disable SAC or build on CI (`gh workflow run build-installer.yml`). Bypass the preflight with `JUSTSEARCH_SKIP_SAC_CHECK=1`. (tempdoc 562)
 
@@ -382,7 +382,7 @@ The Sandbox is used as a clean, ephemeral environment to validate:
 
 ### 8.2 Operational caveats
 
-- **Worker config snapshot invalidation:** If `runtime/worker-config-snapshot.json` persists from a previous run with different model paths, the Worker uses stale config on first boot. This can cause GPU session failures and quality regressions. Fix: clean the data directory before a fresh install, or invalidate the snapshot on version change. (374 G26)
+- **Retired Worker configuration snapshot:** The one-Engine runtime no longer reads or writes `runtime/worker-config-snapshot.json`. A file left by an older release is inert; it is not a reason to clear user data or invalidate current Engine configuration. The former stale-path failure (374 G26) belonged to the removed Worker launch path.
 - **`isProd` gate fix:** `resolveWorkerLibDir()` now checks the bundled layout unconditionally (not gated on `isProd`), fixing Worker spawn failures on installed apps where Tauri passes `isProd=false`. (375 G27)
 
 <!-- generated:end -->

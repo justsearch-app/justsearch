@@ -205,8 +205,10 @@ final class ManagedLlamaAdoptionTest {
         throws Exception {
       child =
           new ProcessBuilder(
-                  "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                  "Start-Sleep -Seconds 30")
+                  Path.of(System.getProperty("java.home"), "bin",
+                      System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java")
+                      .toString(),
+                  "-cp", System.getProperty("java.class.path"), SleepingChild.class.getName())
               .start();
       Path executable = Path.of(child.info().command().orElseThrow());
       Path model = Files.createFile(tmp.resolve("model.gguf"));
@@ -284,6 +286,12 @@ final class ManagedLlamaAdoptionTest {
     @Override public void onContextTokensObserved(int contextTokens) {}
     @Override public String observedModelId() { return null; }
     @Override public Integer observedContextTokens() { return null; }
+  }
+
+  public static final class SleepingChild {
+    public static void main(String[] args) throws InterruptedException {
+      Thread.sleep(30_000);
+    }
   }
 
   private static final class RetryKillProcess extends Process {

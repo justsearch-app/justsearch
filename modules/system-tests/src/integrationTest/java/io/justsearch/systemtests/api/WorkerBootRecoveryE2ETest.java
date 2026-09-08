@@ -22,15 +22,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Boot recovery CONVERGENCE against a real Head + a real Worker (tempdoc 825, top rung of the §D4
+ * Boot recovery CONVERGENCE against a real Engine with its index half (tempdoc 825, top rung of the §D4
  * ladder below the live dev-stack leg).
  *
  * <p>The pure decision test pins the law and the component test pins the arc; neither can prove the
  * half that matters most to the acceptance criterion — that a boot which exhausts the #439 retries
  * <em>comes back</em>, in the same process, without a restart. That needs a worker which fails a
  * bounded number of times and then succeeds, which is exactly what the countdown fault injector
- * ({@code justsearch.worker.boot.faultInjectAttempts}) provides: the first N PID validations throw
- * the confirmed 821 §O.4 signature, then the injector stops. The pre-825 knob
+ * ({@code justsearch.worker.boot.faultInjectAttempts}) provides: the first N index-composition attempts fail, then the injector stops. The pre-825 knob
  * ({@code pid_validation_timeout_ms}) fails EVERY attempt and so can only ever prove the pin.
  *
  * <p>N=3 consumes the ENTIRE boot-time retry budget
@@ -81,7 +80,7 @@ class WorkerBootRecoveryE2ETest {
     assertTrue(
         snapshot.contains("worker.restart-attempted"),
         "READY must be the recovery arm's doing, not a boot that quietly succeeded anyway — the"
-            + " injector fires on PID validation, so a missing occurrence means the injected"
+            + " injector fails attempts before index composition, so a missing occurrence means the injected"
             + " failures never happened and this run proves nothing. Snapshot: "
             + snapshot);
     assertTrue(

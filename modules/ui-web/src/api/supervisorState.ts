@@ -24,7 +24,7 @@ import { isTauriRuntime } from '../utils/tauriRuntime.js';
 const TAURI_EVENT_NAME = 'justsearch://supervisor-state';
 
 /** The supervisor's states (design 7.1). One vocabulary, two writers (the dev-runner and the shell). */
-export type SupervisorStateName =
+type SupervisorStateName =
   | 'starting'
   | 'running'
   | 'stopping'

@@ -126,6 +126,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * which is the honest reading of "still starting". The final outcome always transitions.
      */
     private volatile boolean retryPending;
+    /** Existing test-only countdown, retained across retries and local recovery attempts. */
+    private final java.util.concurrent.atomic.AtomicInteger bootFaultsRemaining;
 
     /**
      * Tempdoc 825: true while {@link KnowledgeServerHealthMonitor}'s boot-recovery arm owns the
@@ -201,6 +203,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
         this.config = config;
+        this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();
         this.workerCapability = workerCapability != null ? workerCapability : new WorkerCapability();
         // Tempdoc 915 R1: drop the fatal-index latch wherever READY comes from, rather than at the
@@ -243,6 +246,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
         log.info("Starting Knowledge Server integration...");
 
         try {
+            // The old injector lived in deleted Worker PID validation. Fail before composition
+            // instead; KnowledgeServerConfig forces this countdown to zero in production.
+            if (bootFaultsRemaining.getAndUpdate(remaining -> Math.max(0, remaining - 1)) > 0) {
+                throw new IOException("Injected test-only Engine index boot failure");
+            }
             // 0. Enforce single-instance semantics for this data directory.
             // This must happen before we spawn the Worker (and before any code tries to mutate jobs.db/index).
             //

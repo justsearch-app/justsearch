@@ -688,3 +688,12 @@ dead-Engine installer/user-store proof is deferred to E, carried through F only 
 signing requires the final merge. Keep the one-branch checkpoint sequence until F/PR 1;
 autonomous merge authority does not require publishing the implementation at each stage.
 The secondary recovery worktree remains preserved and must not overwrite this branch.
+
+Hosted-proof correction (2026-09-08): the B-complete wording above omitted B9's hosted PR-run
+acceptance. Draft PR 1 is now [718](https://github.com/justsearch-app/justsearch/pull/718), with
+no change to final merge placement. Its first run exposed real CI/platform/test-wiring gaps;
+`evidence/B/hosted-ci.md` records the causes, fixes and current verification. C1 waits for the
+hosted correction. Design section 0 is now a short Stage B decision index into owning sections;
+the pre-consolidation chronology is preserved at `be47faa40`. Paired installer skills and their
+canonical source now label the old config snapshot as inert history. E explicitly owns any
+unproved supported-OS whole-Engine recovery coverage as well as signed installer/store proof.

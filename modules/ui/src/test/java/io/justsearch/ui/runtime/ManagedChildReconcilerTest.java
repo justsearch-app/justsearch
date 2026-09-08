@@ -3,15 +3,48 @@ package io.justsearch.ui.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.runtime.ManagedChild;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 final class ManagedChildReconcilerTest {
+  @Test
+  void captureUsesTheOwnedProcessesObservedExecutable() throws Exception {
+    Process child = sleepingJava();
+    try {
+      ManagedChild captured = ManagedChild.fromProcess(
+          child, ManagedChild.Kind.EXTRACTION, "stdio", null, null, "argv");
+
+      assertEquals(
+          ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())),
+          captured.executable());
+      assertEquals(ManagedChild.IdentityMatch.MATCH, captured.identityOf(child.toHandle()));
+    } finally {
+      child.destroyForcibly();
+      child.waitFor(Duration.ofSeconds(5));
+    }
+  }
+
+  @Test
+  void missingObservedExecutableRefusesRegistration() {
+    Process child = mock(Process.class);
+    ProcessHandle.Info info = mock(ProcessHandle.Info.class);
+    when(child.info()).thenReturn(info);
+    when(info.startInstant()).thenReturn(Optional.of(Instant.now()));
+    when(info.command()).thenReturn(Optional.empty());
+
+    assertThrows(IllegalStateException.class, () -> ManagedChild.fromProcess(
+        child, ManagedChild.Kind.EXTRACTION, "stdio", null, null, "argv"));
+  }
+
   @Test
   void matchingManagedLlamaIdentityHealthPropsAndConfigAreRetainedForAdoption() throws Exception {
     Process child = sleepingJava();
@@ -21,7 +54,7 @@ final class ManagedChildReconcilerTest {
           new ManagedChild(
               "managed-llama", ManagedChild.Kind.LLAMA_SERVER, child.pid(),
               child.info().startInstant().orElseThrow().toString(),
-              ManagedChild.normalizePath(sleeperExecutable()), stub.endpoint(), "model.gguf",
+              ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
               "applied-A", "diagnostic-argv");
       registry.register(record);
 
@@ -44,7 +77,7 @@ final class ManagedChildReconcilerTest {
           new ManagedChild(
               "stale-config", ManagedChild.Kind.LLAMA_SERVER, child.pid(),
               child.info().startInstant().orElseThrow().toString(),
-              ManagedChild.normalizePath(sleeperExecutable()), stub.endpoint(), "model.gguf",
+              ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
               "old-B", "diagnostic-argv"));
 
       new ManagedChildReconciler(registry, "applied-A").reconcile();
@@ -61,7 +94,7 @@ final class ManagedChildReconcilerTest {
     Process child = sleepingJava();
     try {
       var registry = activeRegistry();
-      registry.register(record(child, ManagedChild.normalizePath(sleeperExecutable()), child.info().startInstant().orElseThrow()));
+      registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), child.info().startInstant().orElseThrow()));
 
       new ManagedChildReconciler(registry, null).reconcile();
 
@@ -94,7 +127,7 @@ final class ManagedChildReconcilerTest {
     Process child = sleepingJava();
     try {
       var registry = activeRegistry();
-      registry.register(record(child, ManagedChild.normalizePath(sleeperExecutable()), Instant.EPOCH));
+      registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), Instant.EPOCH));
 
       new ManagedChildReconciler(registry, null).reconcile();
 
@@ -112,7 +145,7 @@ final class ManagedChildReconcilerTest {
     try {
       var registry = activeRegistry();
       ManagedChild record = record(
-          child, ManagedChild.normalizePath(sleeperExecutable()), child.info().startInstant().orElseThrow());
+          child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), child.info().startInstant().orElseThrow());
       registry.register(record);
 
       new ManagedChildReconciler(registry, null, ignored -> false).reconcile();

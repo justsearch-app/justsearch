@@ -443,7 +443,6 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
           io.justsearch.app.api.runtime.ManagedChild.fromProcess(
               process,
               io.justsearch.app.api.runtime.ManagedChild.Kind.EXTRACTION,
-              Path.of(argv.get(0)),
               "stdio",
               null,
               null,

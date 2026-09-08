@@ -216,7 +216,8 @@ final class EngineReadWhileWriteTest {
                       // the concurrency covers the ForegroundLoadGate path as well.
                       boolean healthy = client.isHealthy();
                       SearchResponse response = client.search("concurrent caller probe", 5);
-                      if (healthy && response.getResultsCount() >= 0) {
+                      // This phase has an empty index; a successful search must return no hits.
+                      if (healthy && response.getResultsCount() == 0) {
                         successCount.incrementAndGet();
                       } else {
                         failCount.incrementAndGet();

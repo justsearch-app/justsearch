@@ -36,7 +36,7 @@ bootstrapAggregateSubstrate();
  * Slice 3a.1.4b: extends the boot sequence with the registry-resource catalog so
  * HealthLitView can resolve MetricRef.label keys without dragging Lingui into Lit.
  */
-export function bootMessageCatalogs(baseUrl: string): Promise<void> {
+function bootMessageCatalogs(baseUrl: string): Promise<void> {
   return Promise.all([
     bootErrorCatalog(baseUrl),
     bootResourceCatalog(baseUrl),

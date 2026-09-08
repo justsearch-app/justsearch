@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B17 complete and independently reviewed; integrated unit/stress, installed recovery and development smoke checks green; signed dead-Engine installer proof assigned to stage E"
+status: "B1-B17 implemented and independently reviewed; local checks green; B9 hosted PR CI proof pending on draft PR 718; signed dead-Engine installer proof assigned to stage E"
 updated: 2026-09-08
 ---
 
@@ -1027,9 +1027,11 @@ room, and B is additive, so the list is short.
 5. **`core.restart-worker` still answers `restart_required`** rather than restarting anything
    (`RestartWorkerHandler.java:61,74`). D1 retires the operation; B only makes the *requested
    restart* that answers it real (B15).
-6. **Readiness is still Worker-shaped.** `LifecycleReasonCode`'s `WORKER_*` vocabulary
-   (`:33,40,44,50`) and `readinessNotice.ts`'s rows survive B with corrected wording; the
-   component re-cut is D1's. If Q4 says rename, one code moves and the rest wait.
+6. **The remaining component readiness re-cut belongs to D1.** B14 retired the Java
+   whole-Worker supervision veto, orphan enum/UI row and producer exemption. Host exhaustion
+   is already projected as `engine.restart_exhausted` from the current host's state, with
+   external code `ENGINE_RESTART_EXHAUSTED`. Other Worker-shaped component vocabulary and
+   bounded local startup recovery remain until D1; Q4 is decided, not an open rename.
 
 **Not allowed red (a defect of the stage, not a deliberate loss):**
 

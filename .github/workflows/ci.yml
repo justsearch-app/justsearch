@@ -1140,6 +1140,14 @@ jobs:
       # exercise (cuda12 resolution, taskkill, the handle-release cooldown) either do not exist or
       # do not mean the same thing on Linux. The trigger coverage B9 asked for is unchanged: this
       # job runs on the same `pull_request` and `push` as that one. Recorded in B.md §0.1.
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
       - name: Dev-runner suite (auto-discovered)
         run: npm ci --audit=false && npm run test:dev-runner
 
@@ -1149,14 +1157,6 @@ jobs:
       # process handle closing — is a real constraint rather than a no-op.
       - name: Supervisor conformance (dev-runner adapter)
         run: node scripts/supervisor-conformance/run.mjs --adapter dev-runner
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: |
-            21
-            ${{ env.JAVA_VERSION }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6

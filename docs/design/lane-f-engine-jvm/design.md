@@ -1,9 +1,9 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED (2026-09-07): design through six independent reviews and four owner conversations (section 0); all open items decided (section 15); sequencing decided by the owner and written (section 17): no transport flag, one branch with checkpoints, two merges to main; per-stage checklists are written at each stage's start; stages B to D2 derisked against the code and the design corrected in place (17.9); review seven's six contract counterexamples amended in place (section 0); every owner value recorded (15, 17.7, 18) and the supervisor budget re-cut for the Engine (7.1). LOCKED 2026-09-07: changes follow 17.6. No code."
+status: "LOCKED design; A/B implemented with hosted B acceptance correction pending on draft PR 718; C1-F remain. Section 0 indexes dated decisions; owning sections carry current contracts."
 created: 2026-09-06
-updated: 2026-09-07
+updated: 2026-09-08
 lane: F (decision re-examination programme, wave 4)
 model: fable (orchestration)
 category: engine / process-boundary
@@ -285,645 +285,33 @@ durable, not a second endpoint.
 decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
 and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the
 orchestrator decides it and records the decision, dated, in this section with its reasoning.
-The merge go-aheads (17.6, handoff rule 1) are unchanged.
+The subsequent 2026-09-08 delegation also includes continuation and merges (§17.6).
 
-**Stage B takeover and shutdown-request observation (orchestrator, 2026-09-08).**
-The inherited long-document timeout explanation is withdrawn: the test deliberately selects
-CPU FP32, and fresh serialized controls pass on clean main and the lane in about 17 seconds;
-`evidence/B/takeover-verification.md` records the exact runs. No timeout is widened and no
-environment red is declared from the unreproduced timing failure. The full-suite inventory
-is captured before any targeted rerun can overwrite a module's results.
-The B7-B10 review also exposed a protocol race: the Engine deleted an accepted shutdown
-request before either supervisor was guaranteed to read its reason, and both supervisors
-ignored an externally written request's deadline. **Decided:** retain an accepted request
-through the terminating incarnation; the watcher's existing one-shot guard prevents repeat
-dispatch, and boot must clear the predecessor's request before starting the watcher. Expired
-and refused requests must still be cleared. Both supervisors must read the request before classifying
-an exit and enforce its original deadline, including when the Engine consumed it before
-the supervisor's next poll. **Acceptance distinction (same-day refute-first correction):**
-presence is not acceptance. Before dispatch, the Engine must atomically mark the existing request
-with `acceptedByInstanceId` from its `RuntimeManifestPublisher.instanceId()`; externally
-written requests influence a supervisor only when that marker matches the terminating
-incarnation. A refused request must never arm a supervisor deadline or change exit
-classification. A supervisor's own request will remain authoritative in its in-memory state
-without an Engine acknowledgement, since a hung Engine cannot acknowledge. A failed marker
-write must not dispatch or consume the watcher's one-shot guard. The supervisor must read the
-accepted record before clearing predecessor discovery state or spawning the replacement.
-This uses the existing request artifact, not a second receipt or authority. The old
-consume-before-callback test will become a stronger acceptance-plus-retention-plus-one-shot
-test, paired with the stale-at-boot test; this changes the protocol, not its protection
-against shutting down the next incarnation. The Java retention change and supervisor
-observation/deadline tests will belong to one reviewed follow-up batch.
+**Stage B decision index (orchestrator, 2026-09-08; consolidated after checkpoint review).**
+The current contracts and trade-offs live in the owning sections below. The complete earlier
+chronology, including rejected mechanisms, remains in Git at `be47faa40` for this file;
+it is history, not a second current contract. Evidence records retain the experiments and reviews.
 
-**B7-B10 review disposition (orchestrator, 2026-09-08).**
-The independent source review at `1ffd6cc2d` is recorded in
-`evidence/B/b7-b10-independent-review.md`. R1-R3 and R5-R9 are accepted for fixes;
-R4 is the cross-cutting proof obligation for the production bindings, not another
-claim of product failure. The fixes will preserve predecessor identity while clearing
-its port/token, will make host closing monotonic and serialize it with spawn admission,
-will publish terminal spawn failure, will install the supervisor-state consumer in the real
-UI boot path, will end supervision before deliberate runner teardown, and will bound the
-manifest watcher's lifetime. API responsiveness still permits `running`; the
-300-second budget reset instead requires continuous readiness of both essential
-components (`api`, `index`) and loses that clock when either ceases to be ready.
-R3 follows the accepted-instance request protocol above. Production binding tests
-must fail for the reported scenarios; the conformance binary's distinct actuator
-cannot stand in for those tests. These fixes follow the inherited shutdown fix
-batch, before B11-B17. No merge or stage-B checkpoint is implied by their acceptance.
-
-**Upgrade request persistence and acknowledgement (orchestrator, 2026-09-08).**
-The B6 production-wiring review found that commit acknowledged success before its
-asynchronous file write, then swallowed write failure, leaving a committed barrier
-with no shutdown. It also found that a direct file with a live preparation ID and
-wrong nonce passed the new acceptance predicate. The HTTP nonce test did not cover
-that direct-file path. Both findings are accepted for fixes.
-
-`UpgradeController` remains the sole preparation/nonce/commit authority. The existing
-`UpgradeShutdownBridge` will forward a verifier callback installed by the controller
-before route registration; it must not keep a second nonce. The writer is installed
-after the instance lock and strict predecessor clear, before API startup, because it
-requires only the already-known runtime directory. Late watcher startup must preserve
-a current request written in the intervening boot window.
-
-Commit will use short synchronized OPEN/PERSISTING/ACKNOWLEDGED transitions, with
-synchronous request persistence before writing/flushing the success response and
-ACKNOWLEDGED only after successful flush. No servlet or filesystem I/O runs while
-holding the controller monitor: a stalled response must not block the dedicated
-watcher from observing a supervisor hang request. The watcher acceptance contract
-becomes ACCEPT/DEFER/REFUSE. Matching preparation and nonce while PERSISTING returns
-DEFER, leaving the file and one-shot guard untouched; ACKNOWLEDGED plus the current
-frozen lease preparation permits ACCEPT; wrong identifiers or OPEN returns REFUSE.
-Unprepared supervisor requests retain the plain path. Persistence failure restores
-OPEN, returns a non-success response, and leaves the same capability retryable or
-cancellable. Response-write failure restores OPEN and must not dispatch; any retained
-unacknowledged file is refused. An unavailable bridge verifier fails closed.
-
-The commit tests must traverse production factories and cover persistence failure,
-response-write failure, a direct wrong-nonce file, deferred acceptance during flush,
-and a valid request written before watcher startup. Death before the Engine's accepted
-instance marker remains fail-closed to supervisors and cannot fabricate an upgrade
-receipt. Single-slot writer admission and conditional cleanup/marking are a separate
-coupled obligation of the accepted-request protocol batch; tri-state verification alone
-does not make read-then-delete or read-then-replace safe against another writer.
-
-**Shutdown request writer admission (orchestrator, 2026-09-08).**
-The accepted-instance protocol above needs first-claim-wins admission in all three
-languages. Unconditional replacement lets a refused request's cleanup delete a newer
-one or an old acceptance marker overwrite it. The fixed request path will therefore
-be claimed with atomic create-new; an occupied slot returns BUSY without changing it.
-The winner writes the fixed `shutdown-request.v1.json.tmp` staging file in the same
-directory (the existing Java name, shared by all three writers) and atomically
-replaces its own empty claim. Other writers never replace an occupied slot. Readers
-defer empty or malformed in-flight content without consuming the one-shot guard.
-Failure removes the winner's staging and any still-empty claim and propagates;
-a complete published request is preserved if publication's outcome is uncertain.
-Atomic replacement is
-required for this channel, with explicit failure on unsupported filesystems instead
-of a non-atomic fallback. This avoids adding a hard-link filesystem requirement or a
-cross-process lock service. The occupied-slot invariant permits one fixed staging
-name: only its claimant publishes, then only the single watcher may mark it. A successful
-rename consumes that writer's staging file; success must not subsequently delete the
-staging path because the watcher may already be using it. Failure cleanup remains
-within the writer's ownership interval. Strict predecessor boot/death cleanup removes
-both the request and its fixed staging residue, with the existing staging artifact's
-closure/recoverability treatment asserted. Staging is write mechanics, not a second
-request or receipt authority, and unique staging files must not accumulate after crashes.
-
-Only the Engine's single watcher clears an expired/refused complete request or
-replaces it with the accepted-instance marker. The occupied slot excludes another
-writer during that read/clear/mark interval. Accepted requests remain through death;
-supervisors read their accepted reason and original deadline before classifying the
-exit, then clear only after the owned Engine is dead and before a successor starts.
-Strict Engine boot cleanup precedes its own writers and API exposure. A supervisor
-whose own request finds BUSY still owns its in-memory reason and original deadline
-and must force-stop at that deadline if cooperation cannot happen. Controller BUSY
-is a failed commit, so the preparation remains retryable/cancellable. The first
-claim wins the slot; the sequence's first accepted reason still owns
-resource shutdown.
-
-Java, Rust, Node and their conformance fixtures will change in one reviewed protocol
-batch. Tests will pause publication after claim, cleanup after reading A, and marker
-write after reading A; B must receive BUSY and leave A untouched in each interval,
-then may publish after legitimate removal. They also cover an upgrade response
-stalled in PERSISTING while a supervisor hang request is BUSY but its force deadline
-still fires, marker-write failure leaving the watcher unfired, retained acceptance
-read at exit, and empty claim residue cleared at the predecessor boundary. The
-request gains required `schemaVersion: 1` with unknown/missing versions refused and
-the field shape pinned across writers. Publication and marker rewrites use real JSON
-string encoding, including optional strings read from the request, so quoting cannot
-turn an accepted request into malformed retained evidence. An accepted record whose
-deadline has elapsed still supplies the terminating incarnation's reason; its deadline
-means force-stop now if still alive, not forget the accepted reason after death.
-The same batch will replace sequence exit
-literals with `EngineExit.OK` and new `REQUESTED_UNCLEAN = 4`, classified REQUESTED
-in the supervision register and both supervisors; exact drift tests must reject a
-Java constant/table mismatch. The existing shutdown-request recoverability row is
-asserted, without making a second durable-store ownership change before C2.
-
-**Production supervisor ownership fixes (orchestrator, 2026-09-08).**
-R1, R2, R4, R5 and R9 will be implemented through a focused, Tauri-free production
-host core, not by moving the whole shell or updater. One mutex will own the real
-Engine child and the monotonic host-closing flag. The final close check, prepared
-command spawn, pipe extraction and child installation occur under that mutex:
-close wins and no child starts, or spawn wins and close observes and reaps that
-child. Incarnation reset must never clear host closing. Discovery will distinguish
-awaiting a successor from awaiting the installed child's manifest and a bound
-incarnation. Reset retains the predecessor instance ID and clears its port/token;
-no manifest is accepted while no successor is installed, and the successor's
-manifest PID must match the installed child and its instance ID must differ from
-the retained predecessor (including PID reuse). The real observation and event path
-must emit exactly one restart event when the new identity arrives. One host-owned
-manifest watcher survives incarnation changes, has explicit cancellation and join,
-and cannot be started twice or after host close. A watcher holding the host alive
-must not depend on the host's destructor to cancel itself.
-
-Asynchronous stdout-close diagnostics also belong to their spawning incarnation.
-The existing drain captures shared state and can set a spawn error after reset;
-the production core must reject that callback once its child has been replaced,
-using a monotonic spawn generation rather than a reusable PID.
-A regression delays the old child's EOF notification until a successor is installed
-and verifies that the successor's discovery state is unchanged.
-
-Initial and replacement launch failures will both publish a terminal supervisor
-transition through the same production state writer and a narrow injectable event
-sink. Resolve the data directory before launch; if that resolution itself fails,
-report the terminal state in memory and to the UI because no file destination is
-available. The existing conformance binary proves the shared loop with a distinct
-actuator and real child timing; it does not prove the shell's bindings. Tests will
-exercise the production host operations, including stale discovery, both sides of
-the close/spawn race, both launch failures, and watcher ownership. A later updater
-replacement hold is releasable and must remain distinct from permanent host close.
-
-**Managed child ownership and manifest handoff (orchestrator, 2026-09-08).**
-B11/B12 will put the child record and narrow registration contract in `app-api`,
-with one mutable registry at the composition root and `RuntimeManifestPublisher`
-as its sole persisted writer. No second child file or history-based adoption
-authority is introduced. The manifest becomes schema version 2; its public
-projection also moves to a v2 schema and excludes child identifiers and private
-shutdown handoff data. The root SSOT schema remains authoritative and its existing
-sync/generation paths update consumers. This breaking constituent change raises
-the runtime contract from 0.2.0 to 0.3.0, rather than maintaining a separate public
-v1 representation while the private manifest moves to v2.
-
-The canonical manifest must survive an intentional warm handoff. The publisher
-will capture the predecessor before its first publication. The existing early
-manifest shutdown step will mark shutdown pending, while child updates remain
-writable through resource teardown. A narrow sequence completion callback runs inside
-the memoized sequence, including the JVM-hook path, after the ordinary steps. It
-receives their aggregate result; the publisher reads the current registry itself.
-Only an error-free result with a GRACEFUL index outcome can mark handoff complete.
-Persistence failure enters the sequence's error accounting, makes its final result
-unclean, and leaves pending evidence. A
-RESTART/HANG keeps surviving ownership in the same canonical manifest; QUIT/UPGRADE
-deletes it only when registered children are confirmed gone and the preliminary
-aggregate is clean with a GRACEFUL index outcome. Failed cleanup retains
-ownership evidence. The publisher's ordinary/finally close must obey this disposition
-and cannot erase it. An abrupt JVM death never calls the completion callback, so
-pending or ordinary crash residue remains unclean. The per-instance snapshots,
-NDJSON and start log stay diagnostic history.
-
-Capturing predecessor records only in memory is insufficient: the first successor
-publication must carry every unreconciled record forward, so another crash during
-startup cannot erase the sole ownership record. Removal requires confirmed death
-or proved identity mismatch; failed termination of an identity-matched child keeps
-its record. Registration persistence failure after spawn must stop and reap the
-just-spawned child and fail activation, never return an unregistered managed child
-as healthy. PID, process start time and executable identity must all match before
-acting on a live process. Reused PIDs or mismatched executables are left untouched.
-The first v2 carry-forward publication must precede any child-capable asynchronous
-bootstrap, including the existing early worker future. Publishing only once the API
-binds is too late. An explicit pre-bind ownership seed is published after the instance
-lock, then enriched when the API binds; the current single-use `publishHead` cannot
-serve both moments unchanged. A race test must hold that seed publication and show that child startup
-cannot escape registration or erase predecessor records. No origin-instance field
-is required for process safety; the recorded OS and configuration identities suffice.
-
-Managed llama adoption compares a `declaredConfigHash` of applied launch inputs;
-`realizedArgvHash` records the actual final launch command for diagnosis. They are
-different projections of the same launch: context step-down and reasoning-budget
-fallback can change realized argv without changing applied configuration. Current
-free-VRAM observation is diagnostic and does not choose the automatic context rung;
-the earlier suspected VRAM-driven comparison mismatch was refuted. The declared
-hash covers normalized executable/model/mmproj paths, port, effective GPU policy,
-VDU mode, automatic or explicit context setting, thinking/reasoning inputs, slots,
-KV type and a fixed-launch-flags version. No global settings revision is invented
-before C2. Identity-matched configuration mismatch stops the old managed child and
-starts from applied A. Extraction children are registered and never adopted.
-
-The documented external llama path remains unmanaged: existing health and `/props`
-validation and the disallow-external policy remain in force, but an unregistered
-external process is never claimed or terminated by managed-child reconciliation.
-Managed reconciliation runs first. This is an explicit exception for the existing
-BYO contract, not permission to adopt an unregistered process as owned. Both
-supervisors must separate killing the Engine alone on recoverable death/hang from
-identity-checked child cleanup on terminal exit; process-tree killing cannot remain
-on the recovery path because it would defeat warm adoption.
-
-**Dead-Engine update path and recovery UI (orchestrator, 2026-09-08).**
-B13's draft assertion that no API port means nothing needs stopping is false. A
-booting Engine can own handles before binding. The updater must acquire an
-exclusive, releasable replacement hold, block further spawns, end the current
-supervision generation, and stop/reap the owned Engine before reconciling registered
-children and launching the installer. The hold must not reuse permanent host close.
-If installer launch fails, one resume operation starts both a child and exactly one
-new supervision generation; starting an unsupervised replacement is insufficient.
-Every failure after taking the hold and before confirmed installer launch must
-either resume once when safe or remain terminal with the held/owned state explicit;
-no failure silently releases ordinary supervision into child reconciliation.
-
-An ENGINE_UNRECOVERABLE phase alone loses its evidence when later phases replace
-it. The existing upgrade intent will retain a tagged, mutually exclusive stop
-witness through install launch, reconciliation and commit. The normal prepared
-path keeps all existing preparation, nonce, receipt and PID checks. The dead-Engine
-path requires that normal evidence be absent and must never invent a nonce or
-HEAD_STOPPED receipt. Reconciliation carries the evidence kind and attempt identity,
-requiring a shutdown nonce echo only for the prepared path; release, durable-store
-ownership and per-boot mutation-token checks remain. Mixed evidence is refused.
-The host proof must traverse the production coordinator after staging/authentication
-with injected launch/backend edges, not a copied state-machine implementation.
-
-The current UI returns a static alert before mounting Settings when the first Engine
-never binds. The supervisor bridge must therefore be installed before API resolution,
-with subscribe-then-snapshot initialization from a read-only shell command and a guard
-against stale snapshot overwrite. Packaged boot with no API mounts a local recovery
-surface using existing host update status/check/install commands and update state;
-it must not fabricate an API base URL or start the normal shell's API work against
-an empty binding. Tests cover a terminal state published before UI subscription,
-later events, snapshot ordering, and installation from that recovery surface. The
-browser-only unresolved-API behavior is unaffected by this packaged recovery path.
-
-**Upgrade acknowledgement deadline correction (orchestrator, 2026-09-08).** A request's
-force deadline is computed when the request is created, before synchronous persistence and before
-the HTTP response is flushed. The watcher must therefore consult the controller verifier before
-generic expiry handling. An exact request observed while its reservation is PERSISTING remains
-DEFERred even after its deadline, so a blocked flush cannot delete it. After the flush succeeds,
-the same exact request maps to the watcher-only ACCEPT_COMMITTED outcome while its preparation
-remains the live frozen lease; this outcome dispatches even if the deadline has elapsed. Ordinary
-ACCEPT requests remain subject to expiry and REFUSE remains fail-closed. Dispatch still follows
-the user-visible acknowledgement, and it carries the unchanged original deadline so the
-supervisor's later accepted-instance protocol can interpret an elapsed deadline as force now.
-This adds no nonce, phase or deadline authority. Accepted-instance retention and cross-language
-supervisor observation remain in the separate protocol batch above.
-
-**Upgrade preparation reservation correction (orchestrator, 2026-09-08).** The controller's
-sole-authority rule also covers the complete prepare transaction. A short PREPARING reservation
-serializes admission freeze, cancellation request, nonce publication, Worker prepare and response
-publication against another prepare, cancel or commit. Competing calls receive a retryable
-conflict. The reservation is acquired and released under the controller monitor, including release
-in `finally`; lease, Worker and servlet work runs outside it. Repeating prepare after completion
-preserves the live preparation and nonce. This prevents a delayed repeated prepare from publishing
-an old nonce after cancel and a new freeze, and prevents delayed Worker prepare from recreating an
-orphan Worker barrier after Head admission was released.
-
-**B14/R7 supervision and readiness correction (orchestrator, 2026-09-08, from independent
-`review_b7_b10`).** B14 must retire the obsolete Java whole-Worker supervision veto chain
-`SUPERVISION_ENGAGED`/`RESTART_EXHAUSTED`, including the phantom
-`worker.restart_exhausted` producer and its exemption. It must preserve the fatal index/schema
-veto, operator override, bounded local four-attempt/backoff policy and
-`worker.spawn_recovery_exhausted`. Host restart exhaustion must project the frontend-derived
-`engine.restart_exhausted` row from the current host's retained in-memory `StateRecord`: the Tauri
-bridge subscribes early, then snapshots, and guards a current event against a stale snapshot. It
-must never seed this state from an old supervisor file or inject a predecessor failure into Java
-readiness. The uppercase external contract `ENGINE_RESTART_EXHAUSTED` remains unchanged, and the
-existing no-API recovery UI requirement applies. This contract needs no new owner or launch
-identity.
-
-R7 treats the current-child binding plus any bounded valid HTTP response, including 503, as
-startup/running liveness; only lack of a response charges start or hang. Essential API and index
-readiness alone own the continuous 300-second stability clock, and loss of either resets it.
-Production tests must cover 503 during startup and running, timeout, an old supervisor file unable
-to veto local recovery, preservation of the fatal veto, a real host event/snapshot reaching the
-real no-API UI, and the readiness gate's frontend-derived row without an awaiting producer. D1's
-later essential-recovery escalation uses a counted fault reason and must not route failure
-escalation through the uncounted requested-restart path. B14 must also correct the canonical
-index-migration documentation and the `supervisorState` Vite comment when implemented. All B14/R7
-work remains open.
-
-**Host discovery projection correction (orchestrator, 2026-09-08).** The production
-ownership review also applies manifest admission to every UI projection. A refused
-manifest must neither replace the binding nor update the tray tooltip. An admitted
-unchanged observation is distinct from refusal; repeated identical tooltip text
-does not cause repeated native mutations. Initial launch failure, replacement
-failure, manifest events and tooltip updates use the same production methods in
-tests and in the shell. The tests cover both serialized close/spawn orderings,
-child-absent discovery, delayed stdout EOF and watcher cleanup from its own thread.
-Tauri setup call sites are source-reviewed; these tests do not claim packaged UI
-execution or a current AppHandle-linking failure.
-
-**Stage B scope stop and ownership re-cut (orchestrator, 2026-09-08).** Applying
-17.8 after the review of amendment growth stops the unimplemented shared
-first-claim/accepted-instance batch. Its three-language acceptance and retention
-protocol pulls C2-shaped guarantees into an ephemeral shutdown trigger. The
-preferred replacement gives the supervisor sole file-writer ownership and keeps
-Engine-local shutdown dispatch local; it is not yet implementation-approved.
-Existing manifest lifecycle evidence may bound a responsive Engine stalled during
-local shutdown, but that production path must be proved before the replacement
-lands. Exact cross-process request-deadline recovery is not silently retained as a
-promise. The earlier accepted-marker and writer-admission paragraphs are suspended
-by this decision, including their proposed race fixtures. Reviewed local preparation
-and response-ordering protections remain necessary; their file transport may be
-removed. [The scope review](evidence/B/scope-recut.md) records alternatives, costs,
-retirements and the required proof. The previous main-development stop-rule
-disposition remains in force. No stage checkpoint or merge is authorized here.
-
-**Integrated stress verification finding (orchestrator, 2026-09-08).** The fresh
-9,364-test run exposes a closed Lucene writer after file-lock contention. This is
-a blocking recovery finding, not an allowed timing red: B14's no-client boot retry
-does not repair an already-bound client with an unusable writer. Preserve the
-assertion and investigate detection, recovery ownership and durable replay before
-choosing a fix. If the remedy needs D1's activation mechanism, 17.8 applies again;
-this finding does not itself approve moving live replacement into B. The separate
-drain-retry fixture defect is repaired without production changes. Exact evidence
-and the still-red suite inventory are in
-[the integrated verification record](evidence/B/integrated-verification.md).
-
-**Merge authority delegated (owner, 2026-09-08).** The owner explicitly authorizes
-the lane orchestrator to make merge decisions autonomously. This supersedes the
-earlier per-PR approval requirement, including PRs #708 and #717. The orchestrator
-still owns verification, independent review, the repository merge queue and
-post-merge checks. The open stage-B recovery finding remains blocking for that
-stage; it does not make the separately scoped split-mode PRs dependent on another
-owner reply.
-
-**Writer recovery scope (orchestrator, 2026-09-08).** Prove whole-Engine fault
-recovery before importing D1's component reopening. The existing transient-exit
-budget and startup queue replay are a smaller ownership cut; the cost is a full
-application outage. The existing runtime swap has unresolved failed-open and
-loop-handoff semantics. This chooses the next proof, not an implementation or a
-green checkpoint. [The investigation](evidence/B/writer-recovery-investigation.md)
-records the evidence and the detection, supervised restart and replay still to
-demonstrate. No new file protocol or generic fault framework is approved.
-
-**Split baseline publication (orchestrator, 2026-09-08).** PRs #708 and #717
-have landed through the merge queue under delegated authority. Each landed tree
-equals its reviewed candidate. [The publication record](evidence/publication.md)
-contains the fresh suite inventories, review and hosted results. This does not
-advance the Stage B checkpoint: PR 0b still enters the primary lane at its recorded
-main-integration checkpoint, and the writer-recovery and shutdown proofs remain
-open. Publication of the split baseline is not integration into the Engine branch.
-
-**Terminal writer fault ownership (orchestrator, 2026-09-08).** Implement the
-whole-Engine recovery direction through a narrow notification from the active
-Lucene runtime to the composition root. Observe the writer after mutations and
-commits; an ordinary IO failure with a usable writer remains recoverable.
-`RuntimeSession` atomically arbitrates one notification against retirement;
-initial and post-bulk CRTRT threads route only a Lucene `AlreadyClosedException`,
-so intentional retirement consumes its close-induced observation while unrelated
-errors retain the JVM uncaught owner. `EngineRoot` accepts only the current
-`KnowledgeServer` and starts a dedicated fault thread after all mutation or commit
-locks are released.
-
-The fault thread waits for HeadlessApp's complete `EngineShutdownSequence`
-binding, runs the existing ordered close with `RESTART` policy, and selects fatal
-exit code 1 through that sequence's one exit authority. Direct `System.exit`
-before the ordered close is rejected: ORT owns an independent JVM hook, and the
-live failure showed it tearing down the native environment while Engine resources
-were still initializing/closing. Calling `EngineRoot.close()` first is also
-rejected because it bypasses the composition-owned order and races boot
-publication. A concurrent cooperative exit already selected remains final; a
-fatal request admitted by the sequence before selection upgrades the one exit to
-1 and cannot produce a clean upgrade receipt. A main-thread boot failure that
-prevents sequence binding retains the existing fatal-startup fallback. Close now
-waits for the already-published deferred-model initializer to finish before model
-fields are released; a stuck initializer therefore leaves an unsupervised close
-pending, while the existing external supervisor hang/force budget owns death
-after the API has stopped. This avoids importing D1's runtime replacement and
-replay coordination, at the cost of an application-wide outage. No request
-artifact, polling watchdog or generic fault framework is introduced.
-
-The in-process contention fixture cannot prove supervised recovery: retain its
-original red and assertions while establishing a real child-process proof with
-durable-job replay. Test relocation or a stage-proof change requires an explicit
-decision after that proof, not a silent harness restart. This authorizes the
-bounded repair, not a green checkpoint or relaxed survival promise.
-
-**Recovery verification tier (orchestrator, 2026-09-08).** B17 explicitly includes
-`system-tests:integrationTest` for the installed-Engine writer regression. That
-task builds the production distribution and exercises the dev-runner's real child
-binding. Default unit tests cannot prove an actual exit and automatic restart.
-The existing Windows integration CI job runs it and retains diagnostics, but
-remains advisory; this decision does not turn it into a required hosted gate or
-clear the original file-lock stress test. The deterministic segment collision
-proves a terminal writer recovery path; hostile-lock survival and both durable
-queue outcomes remain separate acceptance evidence.
-
-**B17-R1 placement and scope limit (orchestrator, 2026-09-08).** Section 17.8's
-later-mechanism trigger applies to the writer repair: terminal-writer detection
-and bounded whole-Engine escalation are moved from D1 into the named B17-R1 item.
-The demonstrated alternative is an Engine that stays alive with a permanently
-closed writer, so leaving this connection absent cannot meet B's survival proof.
-Only detection, ordered fatal exit and existing supervisor/startup replay move;
-D1 retains live component replacement and general local recovery. B17-R1's proof
-is the focused negative tests, installed-process collision/replay test, native
-initialization overlap arm, full default suite and build/static checks. Finish
-and push that batch without adding hostile-lock fixture relocation or another
-shutdown protocol. Those remain enumerated B17 and shutdown re-cut work.
-
-Remaining implementation runs in fixed batches: B11-B12 (registry/reconciliation),
-B13-B14 (dead-Engine updater and supervision/readiness), then B15-B17 (requested
-restart, residue and stage proof, including the existing shutdown re-cut).
-Each has one implementer and independent review. New findings are separate
-items; after two worker review rounds the orchestrator takes the diff. New raw
-logs remain outside Git; committed evidence carries summaries and hashes.
-
-**B14 Java retirement cut (orchestrator, 2026-09-08).** The already-decided local
-recovery veto retirement is implemented separately from B11-B12 in
-`codex/lane-f-b14-local-recovery`, with root as sole implementer. This lets bounded
-Java work proceed without changing the child-registry worker's brief or sharing its
-worktree/build slot. It removes the old host-to-Java veto path; it does not add a
-supervisor-file reader. The orphan reason enum, UI row and producer exemption are
-removed in the same cut, as the readiness gate requires. The current-host UI
-projection and R7 host probes remain in B13-B14; this cut does not close B14.
-
-**B16 residue disposition (orchestrator, 2026-09-08).** Delete the unconsumed
-`KnowledgeServer.isRunning()` API and its state-only tests; boot tests assert the
-already-existing service surface instead. Retain `shutdownLatch`: stage A's final
-checkpoint gave it a real `EngineRoot.close()` consumer through `awaitClosed`, so
-deleting it would remove completion evidence. The worker-config snapshot entries
-in the named four files are already labelled retirement history, with no writer,
-reader or allowlist entry; keep that history. Remove the phantom method name from
-the retired supervision row and re-home its contract test into the supervision
-package within the same module. The whole-program dead-code rule ratchets classes,
-not methods: require no baseline growth, and accept an unchanged baseline when no
-class is removed. This closes residue without adding a replacement lifecycle API.
-
-**Desktop recovery boot boundary (orchestrator, 2026-09-08).** The B13/B14 UI
-subset uses the existing host update commands and current in-memory snapshot.
-Vite's implicit proxy fallback is browser-only: a native host with no Engine port
-stays unresolved even in development, while explicit URL/environment overrides
-retain their existing precedence. The UI evidence does not prove dead-Engine
-installation; B13's replacement hold/stop witness and B14/R7 remain separate work.
-
-**R7 essential stability projection (orchestrator, 2026-09-08).** The hosts project
-existing status fields: a ready Head lifecycle, a successful current Worker sample
-(`indexAvailable`), a healthy core index, and a non-stale `indexServing` observation.
-Do not require the retrieval composite or `indexServing.state == READY`: those
-also degrade for unavailable embeddings, rebuilds and optional ranking models.
-This retains the existing status authority and avoids inventing another readiness
-dimension. Each bounded sample belongs to the same admitted child before and
-after the request; missing, stale or malformed evidence resets the stability clock.
-HTTP response receipt alone remains sufficient for liveness, independent of status
-code and readiness. There is no new restart reason or recovery authority.
-
-**B11 terminal cleanup truth (orchestrator, 2026-09-08).** A process whose
-registration failed cannot be preserved for adoption. Its exact handle remains
-owned through bounded cleanup retries, including a final JVM callback; another
-launch is refused while it survives. Terminal close reports failure after trying
-remaining resources, and the existing ordered shutdown therefore retains an
-incomplete handoff instead of issuing a clean receipt. Logging and swallowing
-Head teardown failures was rejected because it hid this proven surviving-child
-case. This is B11 ownership completion, not D1 local runtime recovery: no new
-restart policy, durable registry, or retry loop is added. Confirmed-dead current
-children retire their exact records synchronously at close, without depending
-on an asynchronous death callback winning the race.
-
-**B13 hold and stop-witness implementation cut (orchestrator, 2026-09-08).**
-Re-reading 17.8 keeps this work inside B's already-decided dead-Engine updater:
-no C2 acceptance protocol or D1 runtime replacement is needed. The shell retains
-and joins its existing supervision thread under a local replacement hold. This
-was chosen over generation tokens because a joined old loop cannot resume;
-permanent host close was rejected because failed installer launch must resume.
-The existing update intent retains mutually exclusive prepared/dead stop evidence,
-using one tagged field rather than a second file or writer. A failed normal
-prepare/commit never falls through to dead-Engine installation. Unknown child
-ownership or uncertain stop stays explicitly held; only a confirmed failed
-installer launch safely resumes one child and one loop. Tests traverse the actual
-post-staging coordinator and its durable files, including a real registered child.
-Installed Tauri/AppHandle and signed network download remain separate proof tiers.
-
-**B15 handoff reuse constraint (orchestrator, 2026-09-08).** The B11 manifest's
-existing shutdown handoff survives late readiness publications and final cleanup,
-and a successor ownership seed removes it; a discriminating test now proves this.
-Prefer that existing field over a new STOPPING authority, marker or schema. The
-handoff can bound a locally initiated close, but cannot classify its exit as free:
-the terminal-writer fatal path also publishes `restart`. Fatal exits and an expired
-local-close deadline remain charged; only an explicit clean requested-restart exit
-may be uncounted without a host-owned request. The single-writer transport cut still
-needs its remaining production proofs before implementation lands. This narrows the
-stopped batch without moving any C2/D1 mechanism forward; see `evidence/B/scope-recut.md`.
-
-**Installer proof moved to final validation (orchestrator, 2026-09-08, owner request).**
-The signed dead-Engine upgrade and inherited-store recovery exercise belongs to
-stage E, after the implementation stages, rather than an intermediate B checkpoint
-or an incidental earlier installer run. B's reviewed host/process proof remains
-its acceptance tier. Testing the completed Engine avoids paying for a packaged
-round against behavior later stages will change; dropping the proof is rejected.
-Stage E prepares and runs the registered `upgrade-dead-engine-recovery` procedure
-against the final candidate. The recorded main-only signing constraint is unchanged:
-if it still prevents a candidate artifact, execute on the first eligible signed
-installer after the final merge. Stage F must carry that named gap until the run
-passes; no report may call installer/store recovery verified before then. This
-supersedes earlier scheduling wording, without changing signing policy or moving
-any installer implementation out of B.
-
-**B15 clean local restart exit (orchestrator, 2026-09-08).** Allocate exit code 4
-as `REQUESTED_RESTART`, emitted only after a clean ordered RESTART close. Both
-hosts restart it without charging the crash budget even if they never observed
-the Engine's handoff. Unclean local close and terminal writer failure retain code
-1 and its charged recovery, including when a host has already observed a restart
-request: a request alone cannot certify clean completion. Host-owned quit/upgrade
-and hang retain their existing priority. This replaces the suspended proposal to allocate 4 as a generic
-requested-unclean exit: cleanliness matters to granting a free local restart.
-The register remains the cross-language authority. No request-file writer or
-manifest-deadline change is included in this first B15 implementation cut.
-
-**B15 local dispatch and bounded handoff (orchestrator, 2026-09-08).** Implement the
-single-writer cut already selected under 17.8: the owning host alone writes the
-out-of-band file; Engine-local upgrade dispatch follows response flush on its own
-thread. Keep controller reservation/nonce ownership, but remove file persistence,
-watcher phase verification and the Java writer. Before exposure, compose the
-watcher and shutdown hook. Failed flush remains retryable/cancellable; failure
-after acknowledgement cannot fabricate the receipt required by the held updater.
-The existing v2 handoff (`pending`, `ready`, `incomplete`) bounds local close for
-the admitted PID and instance. Reuse the host's Stopping state and deadline as the
-one-shot latch; ignore later identity changes, deletion and refreshed timestamps.
-A completion handoff also needs a bound because native exit hooks can hang after
-ordered close. It never sets host request intent or certifies success: exit 4 does
-that; local deadline expiry becomes a charged hang. Publish the pending handoff
-before blocking close steps. This avoids a second lifecycle record and the rejected
-accepted-marker/request-slot protocol. Migration callers and their publication-failure
-behavior still require their own B15 proof before the item can close.
-
-**B15 migration consumer cut (orchestrator, 2026-09-08).** The common Engine client
-consumes accepted, restart-required start/rollback results, covering REST and both
-rebuild operations. Cutover requests project the requirement but restart only after
-the monitor durably promotes the generation and preserves its evidence. One callback
-from the process composition schedules the existing ordered RESTART close; embedded
-compositions retain their owner's explicit restart. Per-controller callbacks were
-rejected because they miss non-HTTP operations. This does not promise delivery of an
-in-flight response: durable migration state precedes dispatch, and C2 owns outcome
-recovery. A timing sleep or a new acknowledgement protocol would not belong to B.
-The callback publishes the existing handoff before entering blocking teardown. If
-that publication fails, terminate with fatal code 1 without running potentially
-unbounded JVM shutdown hooks: the host cannot bound an unpublished voluntary close.
-This trades graceful flushing for durable-queue replay and the existing charged
-recovery policy on this exceptional path. Continuing to serve the old generation or
-entering an unbounded close were rejected. No new restart budget or file is added.
-The earlier I2 wording is corrected by A section 10: genuine bound-index settings
-retain HTTP 409; AI install/pack import already report success with restart guidance.
-They are not additional automatic migration restart triggers.
-
-**B15 installed Windows launch identity (orchestrator, 2026-09-08).** The real
-migration fixture exposed the batch wrapper: the dev runner owned cmd.exe while
-the Engine manifest correctly named its JVM child, so exact-PID admission rejected
-a healthy boot. Launch the JVM directly, deriving defaults and main class from the
-installed Gradle script rather than copying a second option authority. Preserve
-quoted option values, pass arguments without shell expansion, and reject an unknown
-script shape. Adopting an arbitrary manifest PID or loosening identity checks was
-rejected. JDK_JAVA_OPTIONS was considered but would leak Engine-only options into
-spawned extraction JVMs; direct arguments keep those options on the owned process.
-Thread dispatch failure is also fatal code 1: a durably promoted generation must not
-remain on the old reader because a restart thread could not be created.
-
-**B15 observed embedding-drain race (orchestrator, 2026-09-08).** In the installed
-migration run, startup root scanning indexed Green at 20:00:30 before embeddings
-became ready at 20:00:32. The drained primary queue triggered final verification at
-20:00:33, while successful embedding backfill completed at 20:00:36. The missing
-fingerprint was unfinished work, not a corrupt completed generation. Reuse the
-existing embedding-pending count before final commit: remain in SWITCHING while
-it is nonzero or unreadable, under the existing cutover deadline, then retain all metadata checks.
-Use the existing throwing count accessor: the best-effort accessor converts an I/O failure
-to zero, which cannot be used as rebuild certification evidence.
-This is B15's promotion prerequisite; no new recovery loop, deadline or D1 live swap
-is introduced. Disabling metadata verification or stamping without embeddings was
-rejected. The earlier disabled-embedding fixture remains a negative observation,
-not evidence of completed migration.
-
-**B17 proof placement (orchestrator, 2026-09-08).** Move hostile-file-lock survival
-from embedded EngineRoot tests to the installed-process integration tier, retaining
-the 5-thread/10ms boot attack, 3-thread/50ms indexing attack, 100-document workload
-and 180-second search bound. Whole-Engine fatal recovery cannot be exercised inside
-the test owner's JVM. Require actual locks acquired; release the intruder before
-owned cleanup. Separately hold a real claimed job inside the existing chaos parser,
-crash only the fixture's identity-verified Engine, and require PROCESSING after death
-before the successor starts. This distinguishes durable replay from a transient
-pre-death observation or a synthetic database edit. Harness-only cooldown and parser
-argfile changes remain test controls; no production fault endpoint is added.
-The Tauri conformance driver now calls the production EngineHost lifecycle/binding
-methods instead of owning another Child slot. Its fake workload stays intentional;
-AppHandle setup/events and signed installation remain outside that execution claim.
-
-**Stage B main integration / 17.8 (orchestrator, 2026-09-08).** Integrate main
-`f938c4eb2`, including the already accepted PR 0b determinism pins and fixture.
-The overlap produced 19 conflicts, chiefly duplicated pre-squash fixture/docs
-history. Preserve the lane's one-Engine flags, direct JVM launch, log naming,
-current stage decisions and expanded dev-runner tests; import PR 0b's fixture
-implementation, tests, baseline and acceptance record. The measured combined
-configuration surface is 110 YAML keys / 247 env-system-property pairs, retaining
-Stage A's deletions while adding PR 0b's approved knobs. No new process boundary
-or later-stage mechanism is needed. The main-development trigger remains active,
-but this reconciliation does not require changing the checkpoint order.
-
-**Stage B completion (orchestrator, 2026-09-08).** B1–B17 are complete at the agreed
-branch proof tier after main integration. The final unit/stress run is 9,456/0;
-installed recovery is 5/5 and both production supervisor adapters are 17/17.
-The bounded jseval development smoke also passes. Keep the checkpoint order:
-C1 supplies interactive admission/cancellation, C2 durable operations, and D1 the
-component/readiness re-cut and live reconfiguration. Signed installer/user-store
-proof stays in E (carried through F if signing needs the final main merge).
-Do not expand B to implement those later contracts; its existing host ownership,
-ordered shutdown and requested whole-Engine restart now have their required proof.
-See `evidence/B/b17-recovery-proofs.md` for exact verification limits and hashes.
+| date | decision | current contract / evidence |
+| --- | --- | --- |
+| 2026-09-08 | Withdraw the CPU-fallback explanation; preserve full-suite XML before filtered reruns. | [takeover verification](evidence/B/takeover-verification.md) |
+| 2026-09-08 | Serialize spawn/close and bind discovery, watchers and callbacks to the owned incarnation. | §7.1; [B7–B10 review](evidence/B/b7-b10-independent-review.md) |
+| 2026-09-08 | Keep controller preparation/nonce/response-ordering ownership; reject the shared request-slot and accepted-marker protocol under 17.8. | §7.3; [scope re-cut and alternatives](evidence/B/scope-recut.md) |
+| 2026-09-08 | Use manifest v2 as the sole persisted child registry; preserve unreconciled ownership through startup and failed close. | §7.2 |
+| 2026-09-08 | Never kill an unknown or identity-mismatched process; adopt only eligible managed llama children. | §7.2 |
+| 2026-09-08 | Hold replacement and retain tagged stop evidence through dead-Engine installation; expose recovery before API discovery. | §7.3; [B13](evidence/B/b13-updater-handoff.md) |
+| 2026-09-08 | Retire the Java host-exhaustion veto; derive exhaustion from current host state and distinguish liveness from essential stability. | §7.1; §7.6 |
+| 2026-09-08 | Move terminal-writer detection and ordered fatal exit into B17-R1; keep live component replacement in D1. | §7.3; [writer investigation](evidence/B/writer-recovery-investigation.md) |
+| 2026-09-08 | Delete dead lifecycle/config-snapshot consumers without replacing their authority or growing the dead-code baseline. | [B16 checklist](stages/B.md) |
+| 2026-09-08 | Use exit 4 only for clean requested restart; a local handoff bounds shutdown but never makes fatal exit free. | §7.1; §7.3; [B15](evidence/B/b15-requested-restart.md) |
+| 2026-09-08 | Restart from common migration outcomes and durable promotion; wait for trustworthy embedding drain before certification. | §7.3; [B15](evidence/B/b15-requested-restart.md) |
+| 2026-09-08 | Launch the installed JVM directly on Windows while preserving the script's option authority and exact PID admission. | §7.1 |
+| 2026-09-08 | Prove hostile locks and PENDING/PROCESSING replay through an installed supervised Engine; exercise production EngineHost methods. | §16; [B17](evidence/B/b17-recovery-proofs.md) |
+| 2026-09-08 | Publish PRs 708/717 and integrate main at the checkpoint without changing stage order. | §17.6; [publication](evidence/publication.md), [B17](evidence/B/b17-recovery-proofs.md) |
+| 2026-09-08 | Owner delegates lane decisions, continuation and merges; preserve independent review and the merge queue. | §17.6 |
+| 2026-09-08 | Move signed installer/user-store proof to E, carried through F only if final-main signing is required. | §16; §17.3 |
+| 2026-09-08 | Correct B's completion claim: local proof is green, but B9 hosted PR proof is still pending; open draft PR 718 before C1 without moving the final merge. | §17.3; §17.6; [hosted CI](evidence/B/hosted-ci.md) |
+| 2026-09-08 | Capture child identity from the OS and restore the existing production-disabled boot test counter at index composition; fix hosted platform/tooling gaps without relaxing gates. | §7.2; §7.3; [hosted CI](evidence/B/hosted-ci.md) |
 
 ## 0.1 Forces that shaped the design
 
@@ -1339,7 +727,7 @@ under the section 2 rule (14).
 
 ## 7. Lifecycle: supervision, shutdown, reconfiguration, readiness, operations
 
-**What exists today.** The Worker is supervised by `WorkerSpawner` on death and hang paths
+**Pre-lane baseline (historical).** The Worker was supervised by `WorkerSpawner` on death and hang paths
 under one `SupervisionPolicy` budget (terminal `WORKER_RESTART_EXHAUSTED`), and `restart()`
 doubles as the reload path for config-apply, AI install and pack import (five call sites). The
 Head is **not supervised**: `lib.rs` spawns it once, follows the port manifest, emits
@@ -1367,7 +755,7 @@ third implementation. The `SupervisionPolicy` semantics are ported, not reinvent
 | death path | child exit observed; wait for the process handle to close (Windows keeps file handles until then); restart after cooldown; the restarted Engine reconciles its children (7.2) |
 | hang path | in `running` only: liveness probe (`/api/health` on the manifest port), a route admission never gates for any caller because it is cheap and read-only (3.4, 8), so throttling can never read as a hang and no role claim is involved; N consecutive failures with the process alive count as a hang; a shutdown request over the out-of-band channel (7.3) with a deadline, then forced kill, then the death path |
 | requested restart | host-owned request or direct Engine-local ordered close; wait for exit 4, then start without charging the crash budget. Failed close and deadline expiry remain charged. Used by restart-required settings (7.4); the updater uses its held upgrade path and launches the installer instead |
-| budget | max restarts, exponential cooldown with a ceiling, stability window that resets the count. *(re-cut 2026-09-07, lock)* The 627 values seed the numbers; their meaning is re-cut for the Engine because the Worker's budget assumed a live API in front of it and transient faults behind it. **Exit reasons have three classes**: *requested* (`restart`, `upgrade`; not counted); *transient* (native crash, the out-of-memory exit, a hang; counted, retried under cooldown); *non-transient* (a boot failure whose exit code says the same input fails again: invalid configuration, port in use, a store at a schema the release cannot open; `exhausted` at once with that reason, no retry, since three retries of a port conflict are forty seconds of flapping before the same answer). **Cooldown is the outage**: the floor is the process handle closing, which is a fact the death path already waits for, not a number; the ceiling is a few seconds above it, because the restart count bounds a loop and a long cooldown only lengthens dead-API time. **The stability window runs from `ready`** (the essential components), not from spawn, since the Engine's boot carries the encoder load and a window counted from spawn is mostly consumed by it. **Hang parameters are set with the collector at stage E**: the health endpoint and indexing allocation now share a heap, so the poll interval times the miss count must exceed the worst safepoint pause the soak observes; ported values would read a long pause as a hang |
+| budget | max restarts, exponential cooldown with a ceiling, stability window that resets the count. *(re-cut 2026-09-07, lock)* The 627 values seed the numbers; their meaning is re-cut for the Engine because the Worker's budget assumed a live API in front of it and transient faults behind it. **Exit evidence has three classes**: *requested* (clean ordered RESTART exit 4 is uncounted; a host-owned quit/upgrade is a stop/install path, not a free fatal retry); *transient* (native crash, the out-of-memory exit, a hang; counted, retried under cooldown); *non-transient* (a boot failure whose exit code says the same input fails again: invalid configuration, port in use, a store at a schema the release cannot open; `exhausted` at once with that reason, no retry, since three retries of a port conflict are forty seconds of flapping before the same answer). **Cooldown is the outage**: the floor is the process handle closing, which is a fact the death path already waits for, not a number; the ceiling is a few seconds above it, because the restart count bounds a loop and a long cooldown only lengthens dead-API time. **The stability window runs from `ready`** (the essential components), not from spawn, since the Engine's boot carries the encoder load and a window counted from spawn is mostly consumed by it. **Hang parameters are set with the collector at stage E**: the health endpoint and indexing allocation now share a heap, so the poll interval times the miss count must exceed the worst safepoint pause the soak observes; ported values would read a long pause as a hang |
 | visible state | `supervisor.v1.json` next to the port manifest carrying the state; the shell forwards it as a new `justsearch://supervisor-state` event (`backend-restart` keeps its instance-id trigger), and `quick_health`, jseval and the dev MCP read the file. No engine API carries it, since the engine is down when it matters |
 | terminal | `ENGINE_RESTART_EXHAUSTED` with the last exit reason; on this path only, the supervisor kills the children listed in the manifest so nothing holds VRAM behind a dead product |
 | never | the Engine's supervisor is itself a JVM, or is on the Engine's classpath. (The Engine spawning extraction JVMs is ownership, not supervision.) |
@@ -1376,24 +764,75 @@ third implementation. The `SupervisionPolicy` semantics are ported, not reinvent
 drives both implementations under their own test runners; "one contract" is true only while
 both pass it.
 
+**Owned process and discovery (B decisions, 2026-09-08).** The production host core
+serializes child spawn/installation with permanent close under one owner. A releasable updater
+hold is separate from close. Incarnation reset preserves the predecessor instance and clears
+its port/token; discovery accepts only an installed child's PID and a new instance. Refusal
+cannot update bindings, events or the tray. An unchanged admitted observation is not refusal.
+Old stdout callbacks use a spawn generation, so PID reuse cannot damage a successor's state.
+One cancellable, joined manifest watcher survives incarnation changes; its lifetime cannot
+rely on a destructor while it retains the host. Initial/replacement launch failures publish
+terminal state through the same core and UI event path, even without a writable data directory.
+
+**Liveness and stability are different.** A bounded HTTP response, including 503, from the
+current admitted child establishes liveness. The continuous 300-second reset clock instead
+requires the existing API/index evidence: ready Head lifecycle, current successful Worker
+sample with `indexAvailable`, healthy core index and non-stale `indexServing`. Optional
+encoders or retrieval-composite readiness cannot veto it. Check identity before and after
+sampling; missing/stale/malformed evidence resets the clock. The host's current in-memory
+state owns exhaustion (`ENGINE_RESTART_EXHAUSTED`, frontend `engine.restart_exhausted`).
+No predecessor supervisor file may veto a fresh Java boot. D1 retains the broader component
+readiness re-cut and local recovery; fatal schema veto, operator override and bounded local
+startup attempts remain. Failure escalation is charged, never a clean requested restart.
+
+**Windows launch identity.** Launch the JVM directly using the installed Gradle script's
+main class/default options, with quoted values preserved and no shell expansion; unknown
+script shapes fail closed. Owning cmd.exe while admitting its JVM child would break identity.
+Loosening PID admission was rejected; JDK_JAVA_OPTIONS would leak Engine options into extraction
+children. POSIX keeps its existing exec/ulimit script. The supervision register is the policy
+authority; the conformance driver uses production EngineHost methods, not a parallel Child owner.
+
 ### 7.2 Children: adopt or kill
 
-The Engine owns children that outlive its crash: llama-server (VRAM, a port) and the extraction
-pool; an orphaned llama-server means the restarted Engine cannot load models. Two mechanisms: a
-**child registry in the runtime manifest** (each child recorded at spawn with PID, start time,
-executable identity and its port or pipe, removed at exit; a versioned schema bump under a
-schema test, 6), and **reconciliation on Engine start** (a listed child whose identity checks
-out, whose health answers **and whose recorded configuration matches the applied config
-version the Engine boots from** is adopted; `app-inference` has an adopt-by-port path today
-that checks the HTTP shape only, holding no process handle and comparing no identity or
-config, so the identity and config match are new *(corrected 2026-09-07, 17.9)*;
-identity and health say the child is alive and ours, not that it is running the model and
-arguments version A names, so the registry entry carries the child's config identity (model
-path, argument hash) and a mismatch, which a crash mid-reconfigure can leave behind (7.4), is
-stopped and respawned from A rather than adopted; anything
-else listed is killed by PID with identity evidence, never by port alone; extraction children
-keep a parent-liveness watch and exit on their own). The supervisor does not kill children on
-the death path, or adoption could never fire (7.1).
+The composition root owns one mutable child registry through an `app-api` registration
+contract; `RuntimeManifestPublisher` is its sole persisted writer. Manifest schema v2 and
+runtime contract 0.3.0 cover the breaking change; the public v2 projection excludes private
+child identifiers and shutdown evidence. No second registry or history-based adoption authority
+exists. Records contain PID, OS start time, executable identity and declared configuration.
+The first pre-bind ownership seed, after the instance lock and before child-capable bootstrap,
+carries every unreconciled predecessor record forward. Another startup crash must not erase it.
+
+Registration captures start time and executable from one OS process-info snapshot, never from
+the configured launcher spelling: symlinks may make them different. Missing executable/start
+evidence refuses registration and invokes the existing exact-handle spawn rollback. Declared
+configuration remains separate from destructive process identity.
+
+All OS identity fields must match before acting on a live process. Unknown identity or a reused
+PID/executable mismatch is never killed. Confirmed death or proved mismatch retires the stale
+record; failed termination of a matching child preserves it. Healthy managed llama children
+are adopted only with matching `declaredConfigHash` of applied launch inputs. A configuration
+mismatch stops the identity-matched child and starts applied A. `realizedArgvHash` is diagnostic:
+context/reasoning fallback can alter actual argv without changing declared configuration. The
+hash includes normalized executable/model/mmproj paths, port, effective GPU policy, VDU,
+context/thinking inputs, slots, KV type and fixed-launch-flags version, not a new global settings
+revision. Extraction children retain parent-watch and are registered, reconciled and never adopted.
+
+The existing BYO llama path remains unmanaged, with its health/props and disallow-external checks.
+Managed reconciliation runs first; it never claims or terminates an unregistered external process.
+Recoverable death/hang kills the Engine alone, preserving eligible children for adoption. Terminal
+cleanup checks every registered identity; a generic process-tree kill would defeat warm adoption.
+
+Registration must persist before activation succeeds. On persistence failure, stop/reap the exact
+new child; retain its handle through bounded cleanup and refuse another launch while it survives.
+Cleanup errors flow into ordered shutdown, not logs alone. Confirmed-dead current records retire
+synchronously, without depending on a racing death callback.
+
+The canonical manifest retains pending ownership throughout teardown and late readiness writes.
+The memoized shutdown completion callback, including the JVM-hook path, marks handoff ready only
+for an error-free aggregate with GRACEFUL index close. Persistence failure makes it incomplete.
+RESTART/HANG retain surviving ownership; QUIT/UPGRADE delete only after all children are confirmed
+gone and close is clean. Finally-close cannot erase pending/incomplete evidence. A new ownership
+seed clears predecessor handoff, while diagnostics remain non-authoritative history.
 
 ### 7.3 One ordered shutdown
 
@@ -1425,15 +864,75 @@ the front half of this sequence (it validates the nonce, closes admission and re
 then flushes the response and dispatches the local sequence) and no longer waits for a second process. The Worker-quiescence
 class becomes step 4.
 
-**Upgrade with no Engine (a precondition of no fallback release, 15).** Today every apply path
-needs a running Head: `prepare` fails on a missing port or token, a missing child witness ends
-in `Cancelled` or `RepairRequired`, and the installer launches only after both receipts, so a
-release that cannot boot could not be fixed by a release. The updater therefore gains a
-**dead-Engine path**: when the supervisor is `exhausted` or no Engine has bound a port, the
-shell skips prepare and commit, reconciles the manifest's child registry (7.2) so nothing holds
-the llama-server binary or VRAM, records a distinct no-receipt witness (never a forged
-`HEAD_STOPPED`) and launches the installer. The Settings action is already reachable with the
-backend down, since update state is shell-owned. A sandbox round exercises the path (16).
+**Controller and transport ownership.** The host alone writes the out-of-band request;
+its in-memory intent/deadline remains authoritative even when a hung Engine cannot cooperate.
+The watcher and JVM shutdown hook are composed before API exposure, with strict predecessor
+cleanup. Engine-local upgrade dispatch follows successful response flush on its own thread.
+The controller alone owns the preparation, nonce and commit; short reservations serialize
+prepare/cancel/commit, while lease, filesystem and servlet work stays outside its monitor.
+A failed flush leaves the capability retryable/cancellable and dispatches nothing; failure
+after acknowledgement cannot invent the receipt the updater requires. The shared three-language
+request slot, accepted-instance marker and watcher/controller phase protocol were rejected:
+they added multi-writer coordination to an ephemeral trigger. [The re-cut](evidence/B/scope-recut.md)
+retains alternatives and the four discharged production proof obligations.
+
+The existing handoff (`pending`, `ready`, `incomplete`) arms the admitted PID/instance's existing
+Stopping deadline once; deletion, timestamp refresh or later identities cannot cancel/re-arm it.
+Even completed close needs a bound because native exit hooks can hang. Handoff does not set host
+request intent and never certifies a free exit: only clean ordered RESTART emits exit 4.
+Unclean close/fatal writer exits use charged code 1; local deadline expiry is a charged hang.
+Host quit/upgrade and hang retain their priority. Publish pending before blocking close steps.
+
+**Terminal writer recovery (B17-R1).** An unusable active writer notifies the current composition
+root once, arbitrated against runtime retirement. Ordinary I/O failure with a usable writer
+remains recoverable. Close-induced `AlreadyClosedException` during intentional retirement is
+consumed; unrelated errors retain their uncaught owner. A dedicated fault thread, outside
+mutation/commit locks, waits for the complete shutdown binding and runs ordered RESTART with
+fatal exit 1. A fatal request admitted before exit selection upgrades that one exit and prevents
+a clean receipt; an already-selected cooperative exit stays final. Calling System.exit or
+EngineRoot.close first was rejected because it bypassed ordered native teardown and raced boot.
+Deferred model initialization completes before model resources are released; the external host
+bounds a stuck close. Boot failure before binding retains fatal-startup fallback. Detection,
+ordered death and existing queue replay moved from D1 because an alive Engine with a permanently
+closed writer cannot meet B's survival proof. Live component replacement stays in D1; the cost
+of this smaller repair is a whole-application outage, not a new watchdog or fault framework.
+
+**Migration until D1.** The common Engine client schedules ordered restart for accepted,
+restart-required start/rollback outcomes, covering REST and non-HTTP operations. Cutover requests
+project the requirement; only durable verified promotion dispatches restart. Embedded compositions
+retain explicit owner restart. Primary-queue drain is insufficient: the existing throwing pending-
+embedding count must be trustworthy zero before final commit, under the existing SWITCHING deadline
+and all metadata checks. Disabling certification was rejected. Durable migration state precedes
+dispatch; B promises no extra in-flight response delivery protocol (C2 owns outcome recovery).
+Failed restart-thread creation or pending-handoff publication takes fatal exit 1 rather than
+serving the old reader or entering an unbounded voluntary close. This exceptional path trades
+graceful flush for existing durable-queue replay. Genuine bound-index settings keep HTTP 409;
+AI install/pack import retain restart guidance, not new automatic migration triggers.
+
+The existing test-only boot-failure counter acts before index composition and survives local
+retry/cleanup, replacing its deleted PID-validation injection site. The configuration type still
+forces it to zero in production. This preserves the installed proof of one exhausted boot-retry
+arc followed by local recovery; it adds no production recovery policy or new fault control.
+
+**Upgrade with no Engine.** No API port does not prove absence of a booting process. The updater
+acquires an exclusive replacement hold, ends and joins the current supervisor loop, stops/reaps
+its owned Engine, and reconciles registered children before installer launch. Joining the loop
+was chosen over another generation token; permanent close cannot support failed-launch resume.
+One safe resume starts one child and one loop. Unknown ownership or uncertain stop stays explicitly
+held; no failure releases ordinary supervision into reconciliation. A failed normal prepare/commit
+never falls through to dead-Engine installation.
+
+The existing durable update intent retains mutually exclusive prepared/dead stop evidence through
+reconciliation and launch. Normal preparation/nonce/receipt/PID checks remain. Dead-Engine evidence
+requires normal evidence absent, never fabricates a nonce or HEAD_STOPPED receipt, and carries the
+attempt identity; mixed evidence is refused. Release, store ownership and mutation-token checks
+remain. Host proof traverses the actual post-staging coordinator with injected launch/backend edges.
+
+The native UI subscribes then snapshots the current host state before API resolution, guarding
+against stale snapshot overwrite. With no API it mounts recovery using existing host update commands,
+not a fabricated API base or normal shell API work. Vite's implicit proxy fallback is browser-only;
+explicit overrides keep precedence. Tauri AppHandle setup/events remain source-reviewed; signed
+installer/user-store proof and operating-system coverage are explicit §16 final-validation duties.
 
 ### 7.4 Reconfiguration without restart
 
@@ -2267,6 +1766,21 @@ to decide the remaining items and fold reviews four and five), and locked by the
 
 ## 16. What must be measured, and the gate for flipping the default
 
+**Recovery proof tiers (2026-09-08).** B's installed-process proof is Windows-only and its hosted
+integration job is advisory; it cannot establish Linux whole-Engine recovery or a required hosted
+recovery gate. E must execute forced-kill/replay under the real supervisor on each claimed supported
+OS, including Linux if claimed, and record missing coverage explicitly. The host adapters exercise
+production ownership with a fake workload; Tauri AppHandle setup/events are not installed GUI proof.
+Hostile locks keep the 5-thread/10ms boot and 3-thread/50ms ingest attacks, 100 documents, actual
+acquisitions and 180-second search bound. Durable replay observes a genuine PROCESSING row after
+actual identity-verified Engine death and before successor startup, plus PENDING recovery.
+
+Signed dead-Engine upgrade and inherited-store recovery belongs to E on the final candidate;
+testing an intermediate installer repeatedly was rejected, dropping the proof was also rejected.
+Run the registered `upgrade-dead-engine-recovery` procedure. If main-only signing still prevents
+that artifact, F carries the named gap to the first eligible installer after the final merge.
+Neither local host proof nor a green advisory job proves signed installation or store recovery.
+
 Brief v2's list stands (startup cold/warm, RSS idle and indexing, search p95 during bulk indexing,
 API p95 for the agent loop, crash-to-recovered, installer size). Added: index-time embedding
 throughput and request-time single-call latency (one query NER, one embedding, one rerank of
@@ -2329,10 +1843,11 @@ the owner halts all other development for its duration, and no release is cut mi
 "`main` after every merge" to "the branch at every checkpoint", which the next stage's agent
 needs regardless, and its expensive forms fall away: the flag itself, the both-modes suite on
 every change, the dual-mode prohibition as a live constraint, and the per-merge ceremony
-(review record, squash message, CI, merge queue, post-merge build, go-ahead round trip).
+(a final squash message, merge queue and post-merge build for each stage). The draft PR keeps
+review records and hosted CI active on the checkpoint branch (§17.3).
 What does not fall away: every stage is verified before the next starts, every stage gets an
 independent review of its diff range recorded in the managed review record, and every stage
-ends with an explicit "continue" go-ahead from the owner. A stop between steps is a checkpoint,
+ends with a recorded continuation decision by the delegated orchestrator (17.6). A stop between steps is a checkpoint,
 not a merge; nothing in the programme rules says otherwise. The paired measurement is the
 branch against `main`; rollback is one revert; a failed gate leaves the code on a branch, which
 is cleaner than a dead flag on `main`. The one cost accepted and recorded: while the branch is
@@ -2362,6 +1877,10 @@ is the split side of every paired row in 16 and is stored under
 
 ### 17.3 PR 1: the Engine, one branch, seven checkpoints
 
+PR 1 is opened as draft at the B checkpoint (PR #718, 2026-09-08), so hosted CI runs before C1.
+This changes PR creation timing, not stage order, readiness for merge, or the single final merge.
+B9's hosted step is pending until the actual PR job passes; local green is not that proof.
+
 Stage order is risk-first: the spine is the change most likely to surface an unknown, so it
 precedes the compensation work that assumes one process. (Sequencing stages are lettered A to
 F; "stage 1" and "the target" elsewhere in this document name the inference seam's two shapes,
@@ -2377,10 +1896,10 @@ and what the checkpoint review must see.
 | **C2. Operations** | operations table under the recoverability register, and `jobs.db` re-classified there (it is `DERIVED` today, which the operations table makes wrong); acceptance, effect, completion order stamped from the commit sequence number the journal already carries (`commit`, then `drainPending()` is the precedent); client-supplied key, for which the inert `OperationInvocationRequest.idempotencyKey` wire field gets its first consumer, and outcome query answering the recorded outcome on a same-key retry, with `expired`, `history since` and the retention period, and `version conflict` on a reconfigure issued against a moved applied version (7.6, review seven); resume under the four conditions for ingestion and reindex bundles; ingestion's per-file recovery re-based on it (7.5, 7.6) | a killed ingest resumes from its checkpoint; the outcome query answers all five states | the three-point forced-kill row and the resume-conditions row of 16 for a write |
 | **D1. Reconfigure, generations, readiness** | recomposable registry, applied and attempted versions, beside-or-in-place, `generation-bound` and `restart required` in the config register (7.4); `core.restart-worker` retired and its `structuredData.port` consumers re-pointed at reconfigure (6); the generation cutover at the scope 17.4 fixes, on top of `IndexGenerationManager` (live runtime swap in place of the post-cutover restart, the journal and replay, the failed-unit default flipped, 17.7), under the review-seven contract: the reindex as a converging operation with gaps distinct from processing history (7.5), lexical-only ingestion with deferred enrichment in the in-place mode and the response field that says so, encoder A recomposed on refusal or abandonment, and the applied config version computed from the active generation's metadata with boot composing encoders from it (7.4); the candidate footprint declared per model and free device memory read in-process (7.4); readiness as a component vector with re-cut codes and `readinessNotice.ts`, the second readiness representation made a projection or retired (17.7), start deadlines, local recovery and bounded escalation (7.6) | an encoder config change applies with the API up; requested restart serves restart-required settings only | the reconfigure, stuck-component and generation-transition rows of 16 |
 | **D2. Self-description and request-time paths** | component map endpoint and its coverage test, profiles (`full`, `bench`, `verification`), engine-as-library (10); session gate with aging under the `passed` rule and the one-producer test (4, review seven); index-and-return at the port with its durability test (the port's `submit` discards the sequence number today, so the durable variant is a new port method, not a flag); cursor generation token, reader pinning for a live cursor (Lucene's `SearcherLifetimeManager` is the obvious primitive) under the cursor and reader caps of the retained-state register, and `cursor expired` (4, 8); the ephemeral store axis for the `verification` profile completed (the Lucene side exists: `IndexSchema.ephemeral()` builds at an auto-temp path that `RuntimeSession` deletes on close; the three SQLite stores take a file path only, so they gain the temp-and-delete variant) | the verification profile boots in seconds; every 16 row is exercisable | the request-time-encoder and durability rows of 16 |
-| **E. Gate run** | signed dead-Engine upgrade and inherited-store recovery exercise (section 0 final-validation scheduling amendment); no code beyond the fixes the run forces; collector and heap chosen, and the supervisor's hang poll interval and count set with them from the soak's worst safepoint pause (7.1); the owner's bounds and the three allowed-difference classes (17.7) instantiated from the PR 0 baseline before the run; paired against `main` after PR 0 on the same corpus and machine, plus a run at the supported floor | the measurement record exists | the 16 table row by row, including the registered dead-Engine installer/store-recovery exercise; section 0 governs artifact availability and any explicitly carried final-validation gap |
+| **E. Gate run** | signed dead-Engine upgrade and inherited-store recovery plus supported-OS whole-Engine recovery coverage (§16); no code beyond the fixes the run forces; collector and heap chosen, and the supervisor's hang poll interval and count set with them from the soak's worst safepoint pause (7.1); the owner's bounds and the three allowed-difference classes (17.7) instantiated from the PR 0 baseline before the run; paired against `main` after PR 0 on the same corpus and machine, plus a run at the supported floor | the measurement record exists | the 16 table row by row, including the registered dead-Engine installer/store-recovery exercise; §16 governs artifact availability and explicitly carried platform/installer gaps |
 | **F. Prose sweep and report** | `CLAUDE.md` invariant 1, `AGENTS.md`, the subagent baseline brief, skills, postmortems, `19-module-architecture.md` rewritten on the rings, jseval and `scripts/agent-analytics` parsers, governance registers and contract-surface registrations, the docs listed in `verified-facts.md`; the report-back (19) | nothing on the branch names the Worker as a process | the 917 §8 residue grep returns only labelled hits; `docs-validate` and the regen set green |
 
-Then one merge, one go-ahead. Between checkpoints the branch may be red only in the way the
+Then one final merge under delegated authority. Between checkpoints the branch may be red only in the way the
 "branch state after" column names; any other red is a defect of the stage.
 
 ### 17.4 Three questions, resolved against the code
@@ -2451,18 +1970,21 @@ picks it up:
   live and recorded under `docs/design/lane-f-engine-jvm/evidence/<letter>/`; an independent
   review of the stage's commit range by an agent other than the implementer
   (`independent-review-required`), recorded in the managed review record with the range, its
-  findings fixed before a go-ahead is requested; then the owner's "continue" go-ahead, which
-  authorises the next stage and nothing else. The critical-analysis pass (`CLAUDE.md`) runs
+  findings fixed before continuation; then the orchestrator records the continue decision under delegated authority. A named
+  hosted acceptance obligation must pass before the next stage; no new owner reply is required. The critical-analysis pass (`CLAUDE.md`) runs
   before the review is requested, not instead of it.
 - **Design errors found mid-stage.** The design is amended in place with a dated line in
   section 0 naming the stage that found the error and what changed. An amendment inside a
   decided line (a mechanism detail, a citation) proceeds; a change to a decision (15), a gate
   row (16) or the stage table (17.3) is decided by the implementation orchestrator and recorded
-  in section 0 with its reasoning (owner delegation, 2026-09-07; it previously waited for the
-  owner's word). Merge go-aheads are not delegated.
+  in its owning section with reasoning and alternatives, indexed by a dated one-line entry in
+  section 0. Owner delegation (2026-09-07/08) includes decisions, continuation and merges; the
+  root still owns independent review, the repository merge queue and post-merge verification.
 - **Drift.** `git merge origin/main` weekly and once more before stage E; never a rebase of the
-  pushed branch (`agent-lessons.md`). With development halted, PR 0 is the only expected source
-  of conflict.
+  pushed branch (`agent-lessons.md`). Main development resumed during the lane, so re-check
+  17.8 at each checkpoint. Integration of main `f938c4eb2` retained the one-Engine behavior and
+  imported accepted PR 0b; its 19 resolutions were independently reviewed. No stage reordering
+  or new mechanism was needed. PRs 708/717 publication evidence remains separate from integration.
 - **Commits on the branch** are per checklist item so a review range is legible. ADR-0045
   squashes at the merge, so the branch history is working history; the PR body written at
   stage F carries the public narrative.
@@ -2509,7 +2031,10 @@ The cut holds under stated conditions. If one fails, the cut is redone, not bent
 
 - **Development resumes on `main` while the branch is open.** The coherence rule regains a
   consumer. Either the resumed work waits, or the sequencing reverts to the incremental shape
-  from the next checkpoint, which reopens 15's flag decision. The owner's call, made then.
+  from the next checkpoint, which reopens 15's flag decision. **Applied disposition, 2026-09-08:**
+  delegated review instead accepted checkpoint main integration after measuring the overlap and
+  independently reviewing the conflict resolutions (§17.6); stage order stays unchanged. Repeat
+  this assessment at each checkpoint rather than assuming that another overlap has the same cost.
 - **A release must be cut mid-lane.** A fix to split code lands on `main` as its own PR and is
   merged into the branch; the "no hotfix path" cost in 17.1 is paid, not avoided.
 - **Stage A's checklist outgrows the 917 consumer audit.** Time-to-complete is an architecture

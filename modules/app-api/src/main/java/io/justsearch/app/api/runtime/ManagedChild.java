@@ -49,20 +49,22 @@ public record ManagedChild(
   public static ManagedChild fromProcess(
       Process process,
       Kind kind,
-      Path executable,
       String endpoint,
       String modelPath,
       String declaredConfigHash,
       String realizedArgvHash) {
+    ProcessHandle.Info observed = process.info();
     Instant start =
-        process.toHandle().info().startInstant().orElseThrow(
+        observed.startInstant().orElseThrow(
             () -> new IllegalStateException("started child has no process start instant"));
+    String executable = observed.command().filter(command -> !command.isBlank()).orElseThrow(
+        () -> new IllegalStateException("started child has no observed executable"));
     return new ManagedChild(
         UUID.randomUUID().toString(),
         kind,
         process.pid(),
         start.toString(),
-        normalizePath(executable),
+        normalizePath(Path.of(executable)),
         endpoint,
         modelPath == null ? null : normalizePath(Path.of(modelPath)),
         declaredConfigHash,

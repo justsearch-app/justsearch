@@ -184,7 +184,7 @@ final class EngineSwitchingFenceBufferingTest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       String state = engine.status().getMigration().getMigrationState();
-      if (expected.equalsIgnoreCase(state == null ? "" : state.trim())) {
+      if (expected.equalsIgnoreCase(state.trim())) {
         return true;
       }
       Thread.sleep(100);
@@ -200,7 +200,7 @@ final class EngineSwitchingFenceBufferingTest {
     while (System.currentTimeMillis() < deadline) {
       last = engine.status();
       String state = last.getMigration().getMigrationState();
-      if (expected.equalsIgnoreCase(state == null ? "" : state.trim())) {
+      if (expected.equalsIgnoreCase(state.trim())) {
         return last;
       }
       Thread.sleep(100);
