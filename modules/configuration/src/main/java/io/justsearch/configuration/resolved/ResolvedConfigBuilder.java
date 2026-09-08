@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
  * <table>
  * <tr><th>Ordinal</th><th>Source</th><th>Rationale</th></tr>
  * <tr><td>500</td><td>{@code -D} JVM argument</td><td>Operator override — always wins</td></tr>
- * <tr><td>450</td><td>Worker config snapshot</td><td>Head→Worker propagation</td></tr>
  * <tr><td>400</td><td>Environment variable</td><td>Scripting/CI override (12-factor)</td></tr>
  * <tr><td>350</td><td>CI profile overrides</td><td>CI-specific config file</td></tr>
  * <tr><td>300</td><td>{@code settings.json}</td><td>User preference (GUI-set)</td></tr>
@@ -54,7 +53,6 @@ public final class ResolvedConfigBuilder {
 
   /** {@code -D} JVM argument — operator override, always wins. */
   public static final int ORDINAL_JVM_ARG = 500;
-
 
   /** Environment variable — scripting/CI override (12-factor). */
   public static final int ORDINAL_ENV_VAR = 400;

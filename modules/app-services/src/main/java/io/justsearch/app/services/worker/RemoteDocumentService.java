@@ -23,18 +23,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * DocumentService implementation that fetches documents via gRPC from the Worker process.
+ * DocumentService implementation that fetches documents through the knowledge port rather than
+ * opening the index itself.
  *
- * <p>This implementation avoids the index locking issue by routing all document fetches
- * through the Worker process, which owns the Lucene index. The Main process no longer
- * needs direct access to the index files.
- *
- * <p>Benefits:
- * <ul>
- *   <li>No MMapDirectory conflicts between Main and Worker</li>
- *   <li>No write.lock contention</li>
- *   <li>Worker is single source of truth for indexed data</li>
- * </ul>
+ * <p>The application half never touches Lucene: every fetch goes through {@link KnowledgeClient}
+ * to the index half, which owns the runtimes and the {@code write.lock}. Until lane F stage A that
+ * port was a gRPC channel to a second JVM; since item A6 it is a direct call inside the Engine
+ * ({@code EngineKnowledgeClient}). The rule the class exists to keep is the same either way — one
+ * owner of the index — which is why the routing survived the transport that motivated it.
  *
  * @see KnowledgeClient#fetchDocuments(List)
  */
@@ -47,7 +43,7 @@ public final class RemoteDocumentService implements DocumentService {
   /**
    * Creates a new RemoteDocumentService without telemetry (backward compatible).
    *
-   * @param clientSupplier supplier for the gRPC client; resolves at use-time per §31 supplier-aware
+   * @param clientSupplier supplier for the knowledge-port client; resolves at use-time per §31
    */
   public RemoteDocumentService(Supplier<KnowledgeClient> clientSupplier) {
     this(clientSupplier, RagMetricCatalog.noop());
@@ -56,7 +52,7 @@ public final class RemoteDocumentService implements DocumentService {
   /**
    * Creates a new RemoteDocumentService with observability catalog.
    *
-   * @param clientSupplier supplier for the gRPC client
+   * @param clientSupplier supplier for the knowledge-port client
    * @param catalog RAG metric catalog (use {@link RagMetricCatalog#noop()} when not wired)
    */
   public RemoteDocumentService(
@@ -92,7 +88,7 @@ public final class RemoteDocumentService implements DocumentService {
 
     return CompletableFuture.supplyAsync(() -> {
       try {
-        log.debug("Fetching {} documents via gRPC", docIds.size());
+        log.debug("Fetching {} documents through the knowledge port", docIds.size());
         // Tempdoc 885 item 6 [R6b]: this list is caller-supplied (a search result set, a citation
         // set), so nothing here bounds it. Paged under the byte budget so the reply can never reach
         // the transport ceiling regardless of how many ids arrive.
@@ -108,7 +104,10 @@ public final class RemoteDocumentService implements DocumentService {
             metadata.put("error", doc.getError());
             metadata.put("contentSource", "none");
           } else {
-            metadata.put("contentSource", "grpc");
+            // Lane F stage A: this said "grpc" and named a transport that no longer exists. The
+            // value is provenance for a preview, so it names WHERE the bytes came from — the index
+            // half, through the knowledge port — not how they got here.
+            metadata.put("contentSource", "index");
             metadata.put("contentLength", doc.getContent().length());
           }
 
@@ -116,11 +115,11 @@ public final class RemoteDocumentService implements DocumentService {
               new DocumentRecord(doc.getDocId(), doc.getContent(), metadata));
         }
 
-        log.debug("Fetched {} documents via gRPC", results.size());
+        log.debug("Fetched {} documents through the knowledge port", results.size());
         return results;
 
       } catch (Exception e) {
-        log.error("Failed to fetch documents via gRPC", e);
+        log.error("Failed to fetch documents from the index half", e);
         throw new UnavailableException("Failed to fetch documents via Worker: " + e.getMessage(), e);
       }
     });
@@ -146,7 +145,7 @@ public final class RemoteDocumentService implements DocumentService {
               metadata.put("error", response.getError());
               metadata.put("contentSource", "none");
             } else {
-              metadata.put("contentSource", "grpc_slice");
+              metadata.put("contentSource", "index_slice");
               metadata.put("contentLength", response.getContent().length());
             }
 
@@ -171,7 +170,7 @@ public final class RemoteDocumentService implements DocumentService {
                 error);
 
           } catch (Exception e) {
-            log.error("Failed to fetch document slice via gRPC", e);
+            log.error("Failed to fetch document slice from the index half", e);
             throw new UnavailableException("Failed to fetch document slice via Worker: " + e.getMessage(), e);
           }
         });
@@ -186,7 +185,7 @@ public final class RemoteDocumentService implements DocumentService {
             return new DocumentIdPage(
                 response.getDocIdsList(), response.getTotalCount(), response.getTookMs());
           } catch (Exception e) {
-            log.error("Failed to list document IDs via gRPC", e);
+            log.error("Failed to list document IDs from the index half", e);
             throw new UnavailableException(
                 "Failed to list document IDs via Worker: " + e.getMessage(), e);
           }
@@ -194,7 +193,7 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   /**
-   * Retrieves relevant context for Q&A using RAG (chunk search) via gRPC,
+   * Retrieves relevant context for Q&A using RAG (chunk search) over the knowledge port,
    * with metadata about chunk usage.
    *
    * <p>Overrides the default implementation to use the Worker's BM25 chunk search
@@ -232,7 +231,7 @@ public final class RemoteDocumentService implements DocumentService {
 
     return CompletableFuture.supplyAsync(() -> {
       try {
-        log.debug("Retrieving RAG context via gRPC: question='{}', docIds={}, topK={}, maxTokens={}",
+        log.debug("Retrieving RAG context: question='{}', docIds={}, topK={}, maxTokens={}",
             question, docIds.size(), topK, maxContextTokens);
 
         RetrieveContextResponse response = clientSupplier.get().retrieveContext(question, docIds, topK, maxContextTokens);
@@ -277,7 +276,7 @@ public final class RemoteDocumentService implements DocumentService {
             sections);
 
       } catch (Exception e) {
-        log.error("Failed to retrieve context via gRPC, falling back to default", e);
+        log.error("Failed to retrieve context from the index half, falling back to default", e);
         // Record fallback counter
         recordRagFallback();
         // Fall back to default implementation (concatenate full docs)
@@ -315,7 +314,7 @@ public final class RemoteDocumentService implements DocumentService {
           }
         }
 
-        log.debug("Retrieving RAG context via gRPC (rich params): question='{}', topK={}, "
+        log.debug("Retrieving RAG context (rich params): question='{}', topK={}, "
             + "docIds={}, autoEntityExtract={}, format={}",
             effectiveParams.question(), effectiveParams.topK(), effectiveParams.docIds().size(),
             effectiveParams.autoEntityExtract(), effectiveParams.contextFormat());
@@ -323,7 +322,7 @@ public final class RemoteDocumentService implements DocumentService {
         RetrieveContextResponse response = clientSupplier.get().retrieveContext(effectiveParams);
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
-        log.error("Failed to retrieve context via gRPC (rich params), falling back", e);
+        log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
         return retrieveContextFallback(params.docIds());
       }
@@ -332,7 +331,7 @@ public final class RemoteDocumentService implements DocumentService {
 
   /**
    * Pre-search to discover relevant document IDs for open retrieval.
-   * Uses the existing gRPC search with optional filters to find top-matching documents.
+   * Uses the existing port search with optional filters to find top-matching documents.
    */
   private Set<String> preSearchForDocIds(
       io.justsearch.app.api.RetrieveContextParams params, int limit) {
@@ -432,7 +431,7 @@ public final class RemoteDocumentService implements DocumentService {
     }
   }
 
-  /** Maps a gRPC RetrieveContextResponse to the Head-side ContextResult. */
+  /** Maps a wire RetrieveContextResponse to the Head-side ContextResult. */
   private ContextResult mapRetrieveContextResponse(RetrieveContextResponse response) {
     int chunksFound = response.getChunksFound();
     int chunksUsed = response.getUsedChunks() ? response.getChunksCount() : 0;
@@ -491,7 +490,7 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   /**
-   * Fallback context retrieval when gRPC fails.
+   * Fallback context retrieval when chunk retrieval fails.
    * Uses fetchBatch and concatenates documents.
    *
    * @return ContextResult with chunksUsed=0 to indicate fallback was used
@@ -602,7 +601,7 @@ public final class RemoteDocumentService implements DocumentService {
             ScorerKind.fromWire(resp.getScorer()),
             coverage);
       } catch (Exception e) {
-        log.warn("Citation matching via gRPC failed", e);
+        log.warn("Citation matching failed in the index half", e);
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
       }
     });

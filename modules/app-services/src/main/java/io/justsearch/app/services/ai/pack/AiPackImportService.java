@@ -594,7 +594,10 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     // Record installed pack AFTER successful settings application (matches original ordering).
     packInstallOps.recordPack(result.pack());
 
-    updateState("running", "restart_worker", "Restarting worker…", null);
+    // Lane F stage A: nothing restarts a worker (RestartRequiredException). The import is done;
+    // the user restarts JustSearch to pick it up. The phase ID is the machine key and stays.
+    updateState(
+        "running", "restart_worker", "Applied — restart JustSearch to use the new model", null);
     tryRestartWorkerBestEffort();
 
     updateState("completed", "done", "AI Pack installed.", null);

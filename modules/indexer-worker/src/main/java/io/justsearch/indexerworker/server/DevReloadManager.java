@@ -12,7 +12,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Dev-only service restart manager for hot-reloading Worker application services.
  *
- * <p>On reload signal (MMF byte at offset 29): quiesces the IndexingLoop, reconstructs
+ * <p>On reload signal — the existence of {@code <dataDir>/runtime/dev-reload.request}, polled by
+ * {@link io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus#isReloadRequested()} and
+ * consumed by deleting the file ({@code clearReloadSignal()}); it was a byte in the memory-mapped
+ * file until lane F stage A item A10 deleted that bus — quiesces the IndexingLoop, reconstructs
  * {@link DefaultWorkerAppServices} from the same {@link InfraContext}, re-wires models,
  * publishes the new instance, and starts the new indexing loop. Until lane F stage A item A9 the
  * publish step was two: re-point the three {@code Delegating*Service} gRPC delegates, then update

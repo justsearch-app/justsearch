@@ -2,72 +2,96 @@
 title: System Overview
 type: explanation
 status: stable
-description: "The 3-process architecture pattern."
+description: "The Engine JVM, the process boundaries that survive, and the module roles behind them."
 ---
 
 # System Overview
 
-JustSearch is built on a **Local-First Microservices** architecture. While it runs entirely on the user's local machine, it mimics the resilience and separation of concerns found in distributed cloud systems. This design handles the unique constraints of desktop environments—specifically OS file locking on Windows and UI responsiveness guarantees.
+JustSearch is a **local-first** application: everything runs on the user's own machine, and the design is shaped by desktop constraints — OS file locking on Windows, UI responsiveness guarantees, and a single shared GPU.
 
-Functionally it is more than a search index: over the local corpus it layers an optional on-device **LLM agent** (cited Q&A, summarize, extract, and gated file actions — see [22. Agent System Architecture](22-agent-system-architecture.md)) and ships a **production MCP server** (`POST /mcp`) so external AI agents (Claude Code, Cursor, Claude Desktop) can drive that same search and retrieval — see [Production MCP Server](../reference/mcp-production-server.md). That agent-facing capability is JustSearch's public center: it is exposed as a small, versioned **local runtime contract** (see [28. The Runtime Contract](28-runtime-contract.md)), and the desktop app is that runtime's first-party **reference client**. The three processes below are how the runtime is delivered resiliently on the desktop.
+Functionally it is more than a search index: over the local corpus it layers an optional on-device **LLM agent** (cited Q&A, summarize, extract, and gated file actions — see [22. Agent System Architecture](22-agent-system-architecture.md)) and ships a **production MCP server** (`POST /mcp`) so external AI agents (Claude Code, Cursor, Claude Desktop) can drive that same search and retrieval — see [Production MCP Server](../reference/mcp-production-server.md). That agent-facing capability is JustSearch's public center: it is exposed as a small, versioned **local runtime contract** (see [28. The Runtime Contract](28-runtime-contract.md)), and the desktop app is that runtime's first-party **reference client**. The processes below are how the runtime is delivered on the desktop.
 
-## The 3-Process Model
+## The process model
 
-The application is split into three distinct OS processes to ensure that a crash or heavy load in one component never brings down the entire system.
+**One process boundary earns its cost when at least one of three things differs across it:** the
+runtime and its toolchain churn, the failure domain, or ownership of a scarce resource. Where only
+the *rate of change* differs, a module boundary — an interface in a contract module, pinned by
+ArchUnit — is enough. That rule is [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md),
+which supersedes ADR-0001 (three OS processes) and ADR-0002 (gRPC + MMF hybrid IPC).
+
+Applying it leaves **one JVM — the Engine — plus two native process boundaries.** The application
+half (HTTP + MCP API, agent loop, conversation, RAG assembly) and the index half (Lucene, job queue,
+indexing loop, pacing, durable stores) are both JVM code with the same failure domain and no scarce
+resource to partition, so they share a process and meet at **ports**.
 
 ```mermaid
 graph TD
-    User[User] --> UI[Main Process\n(UI Host + Orchestrator)]
-    UI -- in-process port calls --> Worker[Knowledge Server\n(Indexer + Search Engine)]
-    UI -- HTTP --> AI[Inference Server\n(llama-server.exe)]
-    
-    subgraph "Main Process (Head)"
-        Tauri[Tauri Shell]
-        Lit[Frontend]
-        Headless[Java Backend\nHeadlessApp.java]
-    end
-    
-    subgraph "Knowledge Server (Body)"
+    User[User] --> Engine[Engine JVM\nHeadlessApp.java]
+    Engine -- HTTP --> AI[Inference Server\n(llama-server.exe)]
+    Engine -- child processes --> Extract[Extraction sandbox pool\n(Tika / PDF / Office / OCR)]
+
+    subgraph "Engine (one JVM)"
+        Headless[Application half\nREST + MCP + agent + RAG]
+        Ports[[Ports\nSearchPort, IndexingService, ...]]
+        Index[Index half\nKnowledgeServer]
         Lucene[(Lucene Index)]
         SQLite[(Job Queue)]
-        Tika[Content Extractor]
+        Headless --> Ports --> Index
+        Index --- Lucene
+        Index --- SQLite
     end
-    
-    subgraph "Inference Server (Brain)"
-        Llama[Llama.cpp Server]
+
+    subgraph "Tauri shell"
+        Tauri[Rust shell]
+        Lit[Lit frontend]
     end
+    Tauri --> Engine
 ```
 
-### 1. The Main Process ("The Head")
-*   **Entry Point:** `io.justsearch.ui.HeadlessApp`
-*   **Modules:** `modules/ui` (Headless backend), `modules/ui-web` (Lit web-components frontend), `modules/shell` (Tauri desktop shell)
-*   **JVM Heap:** capped at 512 MB in the packaged shell (`-Xmx512m`, `modules/shell/src-tauri/src/lib.rs`); the dev-runner sets no cap unless `JUSTSEARCH_HEAD_HEAP` is given.
-*   **Role:** User Interface, Application Orchestration, and API Gateway.
-*   **Key Responsibilities:**
-    *   **Sidecar Host:** Runs as a child process of the Tauri shell.
-    *   **Configuration Owner:** Loads `SSOT` configs and injects them into child processes.
-    *   **Watchdog:** Monitors the health of `KnowledgeServer` and `llama-server`.
-    *   **API Gateway:** Exposes the REST surface used by the UI (e.g. `/api/status`, `/api/health`, `/api/knowledge/*`, `/api/summarize/*`, `/api/inference/*`) and bridges to in-process port calls into the Knowledge Server when present.
-    *   **Zero IO (index):** Crucially, it **never** touches Lucene index files, preventing `LockObtainFailedException` and preserving the “Worker owns Lucene” invariant.
-    *   **Deterministic failure surfacing:** Knowledge Server startup failures are captured and surfaced via `/api/status` (so the UI can show “backend up, worker failed” instead of guessing).
+### 1. The Engine (one JVM)
+*   **Entry point:** `io.justsearch.ui.HeadlessApp`
+*   **Modules:** `modules/ui` (headless backend), `modules/ui-web` (Lit frontend), `modules/shell` (Tauri desktop shell), `modules/app-engine` (composition root), `modules/indexer-worker` + `modules/worker-services` + `modules/worker-core` (index half)
+*   **JVM heap:** `-Xmx2g` in the packaged shell (`modules/shell/src-tauri/src/lib.rs`) — the old Head 512 MB plus the Worker's 1 GB, with headroom, because there is one heap now instead of two. The index half's larger working set is off-heap (ORT arenas, Lucene mmap), which `-Xmx` does not govern. The dev-runner deliberately sets no default cap.
+*   **Sidecar host:** the Engine runs as a child process of the Tauri shell.
+*   **Composition:** `io.justsearch.app.engine.EngineRoot` is the composition root. It is the only module permitted to see both halves; it binds every port and owns the two sequences that span them, startup and shutdown.
+*   **API gateway:** exposes the REST surface used by the UI (e.g. `/api/status`, `/api/health`, `/api/knowledge/*`, `/api/inference/*`) plus the MCP endpoint, and reaches the index half through port calls.
+*   **Watchdog:** monitors `llama-server` (`InferenceLifecycleManager`, policy in `BrainSupervisionPolicy`). There is no worker-process watchdog — the Worker's `SupervisionPolicy` went with the process it supervised.
+*   **Deterministic failure surfacing:** index-half startup failures are captured and surfaced via `/api/status`, and a corrupt index or schema mismatch stamps a fatal-reason marker so the UI can offer "Rebuild index" instead of blind-restarting.
+*   **One log:** `%DATA_DIR%/logs/engine.log`. There is no separate `worker.log`.
+*   **`--add-modules=jdk.incubator.vector`** was removed to enable the JDK 25 AOT cache's full-module-graph optimization; Lucene uses its scalar fallback. See tempdoc 269 §D4a.
 
-### 2. The Knowledge Server ("The Body")
-*   **Entry Point:** `io.justsearch.indexerworker.IndexerWorker`
-*   **Module:** `modules/indexer-worker`
-*   **Spawning Logic:** Managed by `WorkerSpawner.java`.
-*   **JVM Arguments:**
-    *   `-Xmx<dynamic>` (Configurable heap, typically larger for buffering).
-    *   Note: `--add-modules=jdk.incubator.vector` was removed to enable JDK 25 AOT Cache
-        full module graph optimization. Lucene uses scalar fallback. See tempdoc 269 §D4a.
-*   **Role:** The heavy lifter. Handles all file indexing, text extraction, and vector search.
-*   **Index ownership:** Owns Lucene + generation layout (`state.json`, `indices/<gen>/`) and orchestrates schema migrations (blue/green) when configured.
-*   **Resilience:**
-    *   **Auto-Restart:** If the process crashes (e.g., Tika parses a "poison pill" PDF), the Main process detects exit code != 0 and restarts it (up to 3 times).
-    *   **Log Redirection:** `stdout/stderr` are redirected to the one Engine log, `%DATA_DIR%/logs/engine.log` (item A13 deleted the Worker's own logback config, so there is no separate `worker.log`).
+#### Ports: how the two halves meet
 
-### Head→Worker Config Propagation
+A **port** is an interface in a contract module (`modules/core` or `modules/app-api`), catalogued in
+`governance/engine-ports.v1.json` with its owner and consumers, and bound only by `EngineRoot`.
+Adding a port is a catalogue entry, an interface, and a binding.
 
-Configuration reaches the Worker subprocess through three channels:
+**Application code never touches Lucene** — hard invariant 1, unchanged by the merge. Sharing an
+address space does not license a controller to reach past a port into the index, and two ArchUnit
+rules in `modules/app-launcher/src/test/` pin it: `IndexWriterOwnershipTest` keeps Lucene imports
+inside the owner packages, and `LayeringEnforcementTest` rule 6b lets only
+`io.justsearch.app.engine..`, `io.justsearch.indexerworker..` and `io.justsearch.adapters..` depend
+on `io.justsearch.indexerworker.{server,services,loop}..`.
+
+**Four operation contracts survived the channel.** Deadlines, per-call result-size bounds, streaming
+flow control and cancellation were requirements of the *work*, not of the network, so they are
+re-homed onto the port calls (`KnowledgeClient` / `EngineKnowledgeClient`) rather than deleted with
+the transport. This is the part of the merge most likely to be got wrong, because a direct method
+call appears to need none of them.
+
+### 2. The index half ("the Knowledge Server")
+*   **Composed by:** `EngineRoot`, in the Engine JVM. It has no `main`, no distribution and no port — the log line at boot is `KnowledgeServer started successfully (in-process; no port)`.
+*   **Modules:** `modules/indexer-worker` (lifecycle, job queue, recovery), `modules/worker-services` (search, ingest, indexing loop, pacing, extraction), `modules/worker-core` (encoders), `modules/adapters-lucene` (the only module that depends on Lucene).
+*   **Role:** the heavy lifter — all file indexing, text extraction, and hybrid search.
+*   **Index ownership:** owns Lucene + the generation layout (`state.json`, `indices/<gen>/`) and orchestrates blue/green schema migrations when configured.
+*   **Pacing, not partition:** with one heap and one set of pools, a runaway batch can starve the HTTP listener in a way two JVMs made impossible. The mitigation is `IndexingPacing` — the loop yields to hold indexing at `justsearch.indexing.foreground_duty_pct` (default 20%) while user-waiting calls are in flight — plus per-operation budgets, rather than a second address space. See `modules/indexer-worker/README.md`.
+*   **Deferred model init:** the ONNX encoders load on a background thread while the ports already answer. Search degrades to BM25 and the loop skips embedding/SPLADE until they are wired.
+
+### 3. The extraction sandbox pool
+*   **Boundary rationale:** parsing untrusted files is the one place a native fault or an infinite loop is *expected*, so containing it is worth a process. [ADR-0048](../decisions/0048-extraction-isolation-and-indexing-pacing.md) decided this independently, and the merge makes it **more** valuable, not less: a crash in the Engine is now a crash of everything.
+*   **Shape:** `ExtractionSandboxFactory` offers three modes — `IN_PROCESS`, `PROCESS` (a persistent pool of child JVMs, `PersistentExtractionSandbox`, recycled after `maxRequestsPerChild`), and the shipped default `AUTO`, which routes per file family between the two. The child's deadline is the enforcing one; the outer `TimeboxedContentExtractor` waits a 15 s grace beyond it so the pool's kill-at-the-deadline path is the mechanism that actually runs.
+
+### Configuration: one resolution, no propagation
 
 **There is one `ResolvedConfig`, and both halves read it.** The application half and the index
 half share a JVM (lane F stage A), so config does not travel: `ConfigStore.global()` is the same
@@ -91,7 +115,8 @@ notice when the other three had failed to agree. Items A11, A13 and A19 deleted 
 processes could disagree about their configuration; one cannot, so the detector had nothing left to
 detect and the ordinal-450 tier had nothing left to cross.
 
-### 3. The Inference Server ("The Brain")
+### 4. The Inference Server ("The Brain")
+*   **Boundary rationale:** a separate native binary with its own toolchain that owns VRAM — a different runtime, a different failure domain, and a scarce resource, so it clears the rule on all three counts.
 *   **Executable:** `llama-server.exe` (Native Binary, no JVM).
 *   **Managed By:** `InferenceLifecycleManager.java`
 *   **Arguments:** `-m <model_path> [--mmproj <mmproj_path>] --host 127.0.0.1 --port <port> -c <ctx_size> -ngl <gpu_layers> <vram-tuning-flags...>` (loopback bind is always injected as defense-in-depth).
@@ -104,22 +129,25 @@ detect and the ordinal-450 tier had nothing left to cross.
 
 ## Module roles
 
-The three processes above are assembled from Gradle modules. This table gives each
-significant module's **role**; the authoritative inventory and the full dependency graph
+The Engine and the two native boundaries above are assembled from Gradle modules. The "half" column
+says which side of the Engine's port seam a module sits on — it is a **module** boundary, not a
+process one, except for the `Brain` rows. This table gives each significant module's **role**; the
+authoritative inventory and the full dependency graph
 are generated into `docs/reference/architecture/module-deps.md` by
 `node scripts/architecture/module-deps.mjs`.
 
-| Module | Process | Role |
+| Module | Half | Role |
 |---|---|---|
-| `modules/ui` | Head | UI Host backend — Javalin REST API, gateway to the index half's in-process ports, watchdogs the other processes |
-| `modules/ui-web` | Head | Frontend — TypeScript, Lit web components, Vite |
-| `modules/app-services` | Head | Head-side service layer — bootstrap/assembly, conversation, operation registry, worker client |
-| `modules/shell` | Head | Tauri desktop shell |
-| `modules/indexer-worker` | Body | Knowledge Server entry point — sole owner of the Lucene index |
-| `modules/worker-services` | Body | Worker service layer — ingest, indexing loop, RAG context, search execution |
-| `modules/worker-core` | Body | Worker encoders and index primitives — SPLADE, ONNX embedding |
-| `modules/adapters-lucene` | Body | Lucene search integration — the only module that depends on Lucene itself |
-| `modules/indexing` | Body | Index document model and field definitions |
+| `modules/ui` | application | API front — Javalin REST API + MCP, calls the index half through ports, watchdogs `llama-server` |
+| `modules/ui-web` | application | Frontend — TypeScript, Lit web components, Vite |
+| `modules/app-services` | application | Application service layer — bootstrap/assembly, conversation, operation registry, `KnowledgeClient` (the port facade) |
+| `modules/shell` | application | Tauri desktop shell |
+| `modules/app-engine` | composition root | Binds every port and owns startup/shutdown — the only module permitted to depend on both halves |
+| `modules/indexer-worker` | index | `KnowledgeServer` lifecycle, job queue, index recovery — a library, no `main` |
+| `modules/worker-services` | index | Index service layer — ingest, indexing loop, pacing, extraction, RAG context, search execution |
+| `modules/worker-core` | index | Encoders and index primitives — SPLADE, ONNX embedding |
+| `modules/adapters-lucene` | index | Lucene search integration — the only module that depends on Lucene itself |
+| `modules/indexing` | index | Index document model and field definitions |
 | `modules/app-inference` | Brain | Online `llama-server` lifecycle management |
 | `modules/ai-backend` | Brain | Backend abstractions and local translator support |
 | `modules/ort-common` | shared | ORT session infrastructure — `OrtSessionAssembler`, `SessionHandle`, `OnnxSessionCache`, `ModelManifest` |
@@ -141,18 +169,21 @@ The system is built to be deterministic.
 *   **Lifecycle Gate:** Automation uses `GET /api/health` as a **contract-tested gate** (schema v1). It returns HTTP `200` for `READY|DEGRADED` and `503` otherwise; `/api/status` remains the richer “what’s running?” payload.
 
 ### "One Owner" Policy
-Data corruption on Windows is often caused by two processes trying to open the same file.
-*   **Lucene Index:** Owned exclusively by **Knowledge Server**.
-*   **Configuration:** Owned by **Main Process**, injected into Worker defaults.
-*   **User Settings:** Owned by **Main Process**.
+Data corruption on Windows is often caused by two processes trying to open the same file. Merging
+the halves removed one *class* of that risk and left the rest, so the ownership rules stand:
+*   **Lucene index:** owned exclusively by the **index half**, and reached only through a port. The process boundary that used to make this true by construction is gone; the two ArchUnit rules above are what make it true now.
+*   **Configuration:** one `ResolvedConfig`, resolved once, read by both halves. Nothing is injected anywhere.
+*   **User settings:** owned by the application half (`settings.json`), and contributed to the resolver at ordinal 300.
 *   **Enforced by locks:**
     * `AppInstanceLock` prevents multiple app instances from sharing a single `dataDir`.
-    * `IndexRootLock` prevents multiple Workers from mutating the same effective `indexBasePath` (important when `justsearch.index.base_path` is overridden).
+    * `IndexRootLock` prevents two Engines from mutating the same effective `indexBasePath` (important when `justsearch.index.base_path` is overridden).
 
 ### Graceful Degradation
 The system is designed to work even if parts fail:
 *   **No GPU:** Inference Manager detects VRAM shortage and refuses to start `Online Mode`, falling back to keyword search.
-*   **Worker Crash:** UI remains responsive (running on Main Process), shows "Index Offline" state, and acts as a generic file browser until the Watchdog restarts the worker.
+*   **Models not loaded yet:** the ports answer before the encoders finish loading — search degrades to BM25, the indexing loop skips embedding/SPLADE, and ingest queues normally.
+*   **Index unusable:** a corrupt index or an exhausted rebuild brake leaves search serving read-only while `/api/status` reports why, instead of crashing the boot.
+*   **Index-half failure is now Engine failure.** This is the honest cost ADR-0049 records: recovery isolation is gone. An OOM or wedge in indexing takes the API with it, where before the API survived to report it. Supervision — crash detection, restart budget, cooldown — is stage B's work; until it lands the mitigation is admission control and per-operation budgets, not a second address space.
 
 ## Current implementation notes / living docs
 

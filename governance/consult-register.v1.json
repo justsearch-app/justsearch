@@ -114,13 +114,13 @@
     {
       "id": "workflow-rest-endpoint",
       "pathIncludes": ["modules/ui/src/main/java/io/justsearch/ui/api/"],
-      "region": "the Head REST API (Javalin)",
+      "region": "the Engine's REST API (Javalin)",
       "docs": [],
       "recipe": [
         "Add the handler/controller under modules/ui/src/main/java/.../api/.",
         "Register the route via the relevant .../api/routes/*Routes.java class, then wire that route class from LocalApiServer.java if needed.",
         "Update docs/reference/api-contract-map.md if the endpoint is public.",
-        "Honor the Hard Invariants: loopback-only bind (127.0.0.1), no legacy endpoints (/api/search, /api/settings), and Head never touches Lucene — delegate index IO to the Worker via gRPC.",
+        "Honor the Hard Invariants: loopback-only bind (127.0.0.1), no legacy endpoints (/api/search, /api/settings), and application code never touches Lucene — reach the index half through a port (ADR-0049). Sharing one JVM does not license a controller to open an index: the ports are catalogued in governance/engine-ports.v1.json and bound by io.justsearch.app.engine.EngineRoot, and LayeringEnforcementTest rule 6b refuses a dependency from ui.api on io.justsearch.indexerworker.{server,services,loop}.",
         "Verify: ./gradlew.bat :modules:ui:test",
         "Full reference: docs/reference/contributing/common-workflows.md (Add a REST endpoint)."
       ]

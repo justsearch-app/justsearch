@@ -45,7 +45,12 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   // Tempdoc 501 Phase 18 (2026-05-21) removed api-port.txt outright. All consumers
   // (Vite proxy, dev-runner, prod MCP, integration test harness, sidecar smoke)
   // now read manifest.json. The entry is no longer on this allowlist.
-  ['worker-config-snapshot.json', 'tempdoc 501 §5 carve-out — Head→Worker config passing (-Djustsearch.worker.config_snapshot), not an external discovery surface'],
+  // worker-config-snapshot.json was here as a tempdoc 501 §5 carve-out for Head→Worker config
+  // passing. Lane F stage A deleted the second JVM (items A11/A13) and then the writer and the
+  // ordinal-450 tier (item A19), so nothing produces the file and nothing reads it — see the
+  // retired `worker-config-snapshot` row in governance/store-corruption-policies.v1.json. An
+  // allowlist entry for a file no code writes is a sanction for nothing; it is removed rather
+  // than relabelled so a reappearance fails this gate.
   ['instances', 'tempdoc 501 §3.7 — per-instance history directory (mirror of tmp/dev-runner/runs/)'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);

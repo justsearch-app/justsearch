@@ -1637,8 +1637,7 @@ final class ResolvedConfigBuilderTest {
 
     @Test
     @DisplayName("Master GPU flag falls through to every per-feature flag when only it is set")
-    void masterGpuFlagFallsThroughToPerFeatureFlags(@TempDir Path tempDir)
-        throws Exception {
+    void masterGpuFlagFallsThroughToPerFeatureFlags() {
       // Lane F item A19 retargeted this test, and kept it. It was
       // "masterFallthroughViaWorkerSnapshot", and it reproduced a round-6 sandbox defect where a
       // worker-config-snapshot.json carried justsearch.gpu.enabled=true while embed.gpuEnabled read
@@ -1654,21 +1653,15 @@ final class ResolvedConfigBuilderTest {
       String prevNer = System.getProperty("justsearch.ner.gpu_enabled");
       String prevPolicy = System.getProperty("policy.gpu_acceleration_enabled");
       try {
-        // Crucially: master is in the SNAPSHOT, NOT a sysprop. Per-feature keys unset everywhere.
+        // Crucially: master arrives from a NON-sysprop source (YAML, below). Per-feature keys
+        // unset everywhere. The A19 retarget above left a @TempDir write of a
+        // worker-config-snapshot.json here; the builder never read it — the master flag comes
+        // from the ORDINAL_YAML put — so it set up state nothing asserted on and is removed.
         System.clearProperty("justsearch.gpu.enabled");
         System.clearProperty("justsearch.embed.gpu.enabled");
         System.clearProperty("justsearch.splade.gpu_enabled");
         System.clearProperty("justsearch.ner.gpu_enabled");
         System.clearProperty("policy.gpu_acceleration_enabled");
-
-        // Write a snapshot file with master=true (and a few other realistic keys).
-        Path snapshotFile = tempDir.resolve("worker-config-snapshot.json");
-        String snapshotJson = "{\n"
-            + "  \"justsearch.gpu.enabled\": \"true\",\n"
-            + "  \"justsearch.gpu.layers\": \"99\",\n"
-            + "  \"justsearch.rerank.gpu.enabled\": \"true\"\n"
-            + "}\n";
-        Files.writeString(snapshotFile, snapshotJson);
 
         ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
         builder.contributeAutoDetected(Map.of()); // empty (the hardware probe found nothing)

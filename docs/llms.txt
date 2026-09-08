@@ -28,7 +28,7 @@ We strictly enforce "Inversion of Control" for configuration and use "Memory Map
 - [Agent Guide](reference/contributing/agent-guide.md): Development workflows, static analysis, and testing reference for autonomous agents.
 
 ### Explanation (Understanding the Architecture)
-- [System Overview](explanation/01-system-overview.md): The 3-process architecture pattern.
+- [System Overview](explanation/01-system-overview.md): The Engine JVM, the process boundaries that survive, and the module roles behind them.
 - [Process Coordination](explanation/02-process-coordination.md): MMF signaling, the "Suicide Pact", and the indexing duty cycle.
 - [Knowledge Server](explanation/03-knowledge-server.md): Formatting logic, JobQueue, and Tika usage.
 - [Storage Engine](explanation/04-storage-engine.md): Lucene internals, schema (SSOT), and locking strategies.

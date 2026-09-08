@@ -91,16 +91,18 @@ public class HeadlessApp {
    *   <li><b>Phase E — sysprop-mirror.</b> Each entry written by the probe
    *       (e.g. {@code justsearch.gpu.enabled = "true"}) is also set as a
    *       system property, but only when {@code EnvRegistry.<key>.get()} is
-   *       empty (no user sysprop or env var override exists). This makes the
-   *       value (a) survive {@link io.justsearch.app.services.config.ConfigStoreRebuilder#rebuild}
-   *       (which only re-contributes sysprops via env-registry, not the
-   *       transient ord-150 autoDetected map), and (b) propagate to the
-   *       worker subprocess via {@code WORKER_FORWARDED_PROPS} —
-   *       {@code GPU_ENABLED} and {@code ORT_NATIVE_PATH} are in that list.
-   *       {@code GPU_LAYERS} is in it too, but no longer arrives by this
-   *       route: since tempdoc 883 it is Phase F's map-only value, and it
-   *       reaches the Worker through the resolved worker-config snapshot at
-   *       ordinal 450 instead (pinned by {@code WorkerSnapshotAutoDetectedTest}).
+   *       empty (no user sysprop or env var override exists). The mirror
+   *       exists so the value survives
+   *       {@link io.justsearch.app.services.config.ConfigStoreRebuilder#rebuild},
+   *       which only re-contributes sysprops via env-registry, not the
+   *       transient ord-150 autoDetected map.
+   *       <p>It used to have a second reason — {@code GPU_ENABLED} and
+   *       {@code ORT_NATIVE_PATH} were forwarded as {@code -D} args to the
+   *       Worker child process, and {@code GPU_LAYERS} reached it through the
+   *       ordinal-450 worker-config snapshot. Lane F stage A deleted the child
+   *       process (item A11), the {@code -D} forwarding set and the snapshot
+   *       tier (item A19). There is one JVM and one {@code ResolvedConfig}, so
+   *       the rebuild survival above is now the whole reason.
    *   <li><b>Phase F — VRAM-tier auto-populate of gpu_layers.</b> If "GPU
    *       should be used" (probe said true AND user didn't explicitly say
    *       false) AND no explicit {@code gpu.layers} is set, query NVML for

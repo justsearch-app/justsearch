@@ -114,11 +114,32 @@ Related helper (repo-root SSOT discovery):
 - `RepoRootLocator` (in `modules/configuration`) centralizes repo-root discovery and is preferred for new code that needs repo-root/SSOT discovery without re-implementing traversal logic.
 
 ### Initialization Flow
-1.  **Main Process:** `HeadlessApp` creates a `JustSearchConfigurationLoader`, loads the config **once**, and passes it downstream to `WorkerSpawner`, `AppFacade`, etc.
-2.  **Worker Process:** `IndexerWorker` loads config on startup and initializes the Worker (`KnowledgeServer`, Lucene runtimes, job queue).
-    * Critical overrides (e.g., `justsearch.index.base_path`) are forwarded by `WorkerSpawner` into the Worker JVM so Head and Worker don’t silently diverge.
 
-This ensures that both processes, even though isolated, share the exact same configuration schema.
+There is **one** resolution, in **one** JVM (the Engine, [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)).
+
+1.  `HeadlessApp` loads the SSOT artifacts and builds the resolved config **once**, then publishes it with `ConfigStore.setGlobal(...)` (`modules/ui/.../HeadlessApp.java:653`). `LauncherEnvironment` does the same for launcher-hosted entry points.
+2.  `io.justsearch.app.engine.EngineRoot` composes the index half (`KnowledgeServer`, Lucene runtimes, job queue) in the same JVM. It reads the same `ConfigStore.global()` object — nothing is serialised, forwarded, or re-resolved.
+
+The Head→Worker config-snapshot tier is **deleted** (lane F stage A item A19). It sat at ordinal
+450, was written exactly once at boot, and existed only so a second JVM could inherit the first's
+resolved values; so did the blanket `JUSTSEARCH_*` env forwarding, the declared `-D` forwarding set,
+and the post-handshake divergence detector whose whole job was to notice when those three had failed
+to agree. Two processes could disagree about their configuration; one cannot.
+
+**The surviving ordinals** (`ResolvedConfigBuilder`, higher wins):
+
+| Ordinal | Source |
+|---|---|
+| 500 | `-D` JVM argument — operator override, always wins |
+| 400 | environment variable |
+| 350 | CI profile overrides |
+| 300 | `settings.json` — user preference set via the GUI |
+| 200 | YAML `application.yaml` |
+| 150 | auto-detected values (GPU capabilities, platform paths) |
+| 100 | programmatic default |
+
+There is no 450. Every resolved value carries a `ConfigResolution` trace naming the sources
+considered and the winner, which is what `/api/debug/effective-config` reports.
 
 ## Settings → Effective Runtime (AI)
 There are two layers that matter for “what the UI shows” vs “what is running”:
@@ -130,7 +151,7 @@ In the current app:
 * **The settings→system-property promotions are gone** (tempdoc 883 decision 4 and its §C.5c residue). They predated the ordinal chain and were a precedence lie: a GUI value written as a system property resolves at ordinal 500, so `/api/debug/effective-config` reported it as `jvm_arg` and then had to read a second `*.source=ui_settings` marker sysprop to un-tell that. Every settings-borne key now reaches the resolver exactly once, at ordinal 300, via `ConfigStoreRebuilder.contributeUiSettings` — including the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, whose `/api/debug/effective-config` rows are sourced from the resolver's own provenance and read no marker.
 * **Three writes still copy a value the user or the installer chose into a system property.** Named exhaustively, because "the promotions are gone" is only checkable against a complete list. (Separately, `HeadlessApp` and `AiInstallService` also mirror *hardware-probe* and *disk-discovered* values — GPU flags, per-encoder GPU backstops, the ORT native path — to sysprops; those were never settings and are not promotions.)
   1. `HeadlessApp` applies `UiSettings.llamaLibPath` to the raw `llama.lib.path` system property ("set only if blank"; a blank setting is "unset"). Not a JustSearch config key at all — no `EnvRegistry` entry, no resolver key, no marker — because the llama.cpp JNI loader reads it straight out of the system properties. Retiring it means giving it a config key first.
-  2. `AiInstallService.applyOnnxSettings` writes the five per-encoder ONNX `*.model_path` system properties **as well as** `settings.json`. This one is knowingly kept: the Worker is respawned immediately after that step, and `WorkerSpawner` forwards those keys as `-D` args read from the **Head's system properties** — while the ordinal-450 worker snapshot is written exactly once, at boot, so it predates the install. Deleting the write would silently disable SPLADE/NER/reranker after Install AI (tempdoc 374 alpha.19 Bug J-1). The real fix is a snapshot that can be rewritten at runtime.
+  2. `AiInstallService.applyOnnxSettings` writes the five per-encoder ONNX `*.model_path` system properties **as well as** `settings.json`. This one is knowingly kept, and the merge made it matter *more*, not less: these five keys are what the index half actually reads, and it reads them through `EnvRegistry.get()` — that is, straight out of **this JVM's** system properties. Before lane F stage A the route was longer for the same reason (the Worker was respawned right after this step and `WorkerSpawner` forwarded the five keys as `-D` args); item A11 deleted the respawn and the forwarding, so the read is now direct. Deleting the write would re-open tempdoc 374 alpha.19 Bug J-1: SPLADE/NER/reranker silently disabled after Install AI because the index half saw `modelPath=null`. Until the five keys are read from `ResolvedConfig` rather than from sysprops, this is a knowingly-kept ordinal-500 write, not a forgotten one. (The ordinal-450 worker snapshot that used to be named here as the alternative was never a usable one — written once at boot, it always predated an install — and item A19 has since deleted it. There is one `ResolvedConfig` now, so the "real fix" this entry used to propose, a snapshot re-writable at runtime, is neither needed nor coming.)
   3. The runtime GPU-variant switch writes `justsearch.server.exe` + `justsearch.server.exe.source` (`RuntimeActivationService`, `AiInstallService.applyCudaServerExe`, `HeadlessApp.maybeAutoSelectCuda12Variant`). The marker is the ownership token `applyServerExeSysProp` reads to refuse an operator lock, and the activation rollback restores it — it is a runtime decision that must beat settings, not a copy of settings.
 * **`justsearch.llm.model_path.source` now has no writer at all.** The boot promotion went with 883 §C.5c and the installer/pack-import promotions with it, so a chat-model path reaches the resolver once, at ordinal 300. The constant survives only for tempdoc 842's unshipped profile-persistence writer; an absent marker correctly means "operator".
 * **`justsearch.context.size` no longer has a promotion or a `.source` marker.** The window is derived and contributed at ordinal 150 (`auto_detected` / `hardware_probe`); a user override rides `settings.json` at 300; an operator `-D` / env var still wins at 500 / 400 - by the chain, not by a sysprop write. See `05-ai-architecture.md`, section "The context window".

@@ -2,12 +2,13 @@
 
 This module is the integration "glue" of the application. It bridges the gap between the UI/Shell and the core business logic.
 
-**Critical Responsibility**: It implements the **Process Management** for the new "Knowledge Server" architecture (Client/Server), while maintaining the Legacy (In-Process) stack for backward compatibility.
+**Critical Responsibility**: it owns the **application half's** service layer — bootstrap and assembly, conversation, the operation registry, AI install/runtime — and it declares the **port facade** the application half uses to reach the index half: `KnowledgeClient` (abstract; it carries the deadline categories, the per-call result-size bound and the batch clamp) plus the `NoopSearchPort` placeholder held between HTTP-listener start and index-half readiness. It does **not** manage a process: since lane F stage A there is one Engine JVM, the live binding is `EngineKnowledgeClient` in `modules/app-engine`, and the port catalogue is `governance/engine-ports.v1.json`. See [ADR-0049](../../docs/decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md).
 
 > **Configuration Dependency:** This module depends on `modules/configuration` for centralized config loading.
-> Embedding clients (`LocalEmbeddingClient`, `GrpcEmbeddingClient`, `AnnRetrievalClient`) require explicit
-> dimension injection—they no longer have hardcoded fallbacks. Use `FieldCatalogDef.vectorDimension()` to get
-> the correct dimension. See [Configuration Module README](../configuration/README.md).
+> Anything needing the embedding vector dimension must read it from `FieldCatalogDef.vectorDimension()`
+> — there are no hardcoded fallbacks. (The three client classes this note used to name —
+> `LocalEmbeddingClient`, `GrpcEmbeddingClient`, `AnnRetrievalClient` — no longer exist; they belonged to
+> the removed `app-search` / `app-ai` modules.) See [Configuration Module README](../configuration/README.md).
 
 ## 🧠 Key Concepts
 
@@ -35,8 +36,10 @@ This module is the integration "glue" of the application. It bridges the gap bet
 
 ## 🔥 Hot Paths & Execution Flows
 
-### 1. Knowledge Search Flow (Target Architecture)
-*Trace of a query going to the isolated worker.*
+### 1. Knowledge Search Flow *(historical — the pre-lane-F wire)*
+*Trace of a query going to the isolated worker. `RemoteKnowledgeClient`, `MainSignalBus` and the
+gRPC stub below were all deleted at items A9/A10; today `KnowledgeSearchController` reaches
+`KnowledgeClient` → `EngineKnowledgeClient` → `WorkerAppServices` as direct in-process calls.*
 
 ```text
 [UI Request] POST /api/knowledge/search
@@ -151,8 +154,9 @@ The `DefaultAppFacade` provides the interface for the **Local/In-Process** stack
 | :--- | :--- |
 | `KnowledgeServerBootstrap.java` | **New Architecture Entry**. Starts and manages the Knowledge Server (a child process until item A11; in this JVM via `EngineRoot` since item A6). |
 | ~~`WorkerSpawner.java`~~ | Deleted at lane F stage A item A11. Handled process creation, JVM flags, self-healing, and dev/prod profile switching. |
-| `RemoteKnowledgeClient.java` | gRPC Client for Search/Ingest/Health. |
-| `MainSignalBus.java` | **IPC Layer**. Manages the Memory Mapped File (Signal Bus) for coordination. |
+| `KnowledgeClient.java` | The **port facade** — abstract, declares `SearchPort` + `IndexingService` and carries the deadline categories, per-call result-size bound and batch clamp. Bound by `EngineKnowledgeClient` (`modules/app-engine`). |
+| ~~`RemoteKnowledgeClient.java`~~ | Deleted at lane F stage A item A9/A10. Was the gRPC client for Search/Ingest/Health. |
+| ~~`MainSignalBus.java`~~ | Deleted at lane F stage A item A10. Was the Head end of the memory-mapped signal bus; the two signals that survived are fields on the in-process `GpuSchedulingGauge` (`modules/core`). |
 
 ### AI (`io.justsearch.app.services.ai`)
 *Bridge to AI capabilities (used by both stacks).*

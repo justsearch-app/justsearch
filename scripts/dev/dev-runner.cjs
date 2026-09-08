@@ -1967,7 +1967,10 @@ async function cmdStart(opts) {
       justsearchHome: toPosix(dataDir),
       settingsStorePath: toPosix(path.join(dataDir, 'ui', 'settings.json')),
       runtimeDir: toPosix(path.join(dataDir, 'runtime')),
-      workerConfigSnapshotPath: toPosix(path.join(dataDir, 'runtime', 'worker-config-snapshot.json')),
+      // workerConfigSnapshotPath was claimed here until lane F stage A. The Engine no longer
+      // writes <dataDir>/runtime/worker-config-snapshot.json (item A19 deleted the writer with
+      // the ordinal-450 tier and the second JVM that read it), so the claim named a path that
+      // never exists. runtimeDir already covers the directory for ownership purposes.
       // Tempdoc 501 §3.7: cross-link the orchestrator's run.json with the
       // producer-published manifest's instanceId. Restarts changing instanceId
       // are detectable from either view; stale orchestrator state becomes a

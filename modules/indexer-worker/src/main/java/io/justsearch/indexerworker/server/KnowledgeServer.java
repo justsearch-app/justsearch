@@ -90,7 +90,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Search queries</li>
  *   <li>Batch ingestion of file paths</li>
  *   <li>Background indexing loop</li>
- *   <li>Process coordination via MMF (memory-mapped file)</li>
+ *   <li>The signal bus: the GPU-scheduling gauge it shares with the application half, and the
+ *       dev-only hot-reload request file</li>
  * </ul>
  *
  * <p><b>It is not a server in the socket sense any more.</b> Until lane F stage A it hosted gRPC
