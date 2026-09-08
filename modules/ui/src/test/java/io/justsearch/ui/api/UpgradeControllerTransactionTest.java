@@ -6,14 +6,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.javalin.http.Context;
+import io.justsearch.app.api.WorkerQuiescenceSnapshot;
 import io.justsearch.app.engine.ShutdownRequest;
 import io.justsearch.app.engine.ShutdownRequestWatcher;
 import io.justsearch.app.services.lease.OperationLeaseServiceImpl;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,10 +26,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,6 +52,121 @@ final class UpgradeControllerTransactionTest {
   }
 
   @Test
+  void preparationReservationStartsBeforeLeaseCancellationSnapshotReturns() throws Exception {
+    var leases = spy(new OperationLeaseServiceImpl());
+    var cancellationCalls = new AtomicInteger();
+    var cancellationSnapshotReady = new CountDownLatch(1);
+    var releaseCancellationSnapshot = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              var snapshot = (io.justsearch.app.api.OperationLeaseSnapshot) invocation.callRealMethod();
+              if (cancellationCalls.incrementAndGet() == 2) {
+                cancellationSnapshotReady.countDown();
+                assertTrue(releaseCancellationSnapshot.await(2, TimeUnit.SECONDS));
+              }
+              return snapshot;
+            })
+        .when(leases)
+        .requestCancellation(anyString());
+    var controller = new UpgradeController(leases, () -> {});
+    Map<String, Object> capability = prepare(controller);
+
+    var repeatedBody = new AtomicReference<Map<String, Object>>();
+    Thread repeatedThread =
+        Thread.ofPlatform().start(() -> controller.prepare(jsonContext(repeatedBody)));
+    assertTrue(cancellationSnapshotReady.await(2, TimeUnit.SECONDS));
+
+    Context competingPrepare = conflictContext();
+    controller.prepare(competingPrepare);
+    verify(competingPrepare).status(409);
+    Context competingCancel = requestContext(capability);
+    controller.cancel(competingCancel);
+    verify(competingCancel).status(409);
+    Context competingCommit = requestContext(capability);
+    controller.commitShutdown(competingCommit);
+    verify(competingCommit).status(409);
+
+    releaseCancellationSnapshot.countDown();
+    repeatedThread.join(2_000L);
+    assertFalse(repeatedThread.isAlive());
+    assertEquals(capability.get("preparationId"), repeatedBody.get().get("preparationId"));
+    assertEquals(capability.get("shutdownNonce"), repeatedBody.get().get("shutdownNonce"));
+    assertEquals(capability.get("preparationId"), leases.snapshot().preparationId());
+
+    controller.cancel(requestContext(capability));
+    assertFalse(leases.snapshot().admissionFrozen());
+  }
+
+  @Test
+  void preparationReservationSpansWorkerAndPreservesRepeatedCapability() throws Exception {
+    var leases = new OperationLeaseServiceImpl();
+    KnowledgeClient worker = mock(KnowledgeClient.class);
+    var prepareCalls = new AtomicInteger();
+    var workerEntered = new CountDownLatch(1);
+    var releaseWorker = new CountDownLatch(1);
+    when(worker.prepareUpgrade(any(String.class)))
+        .thenAnswer(
+            invocation -> {
+              String preparationId = invocation.getArgument(0);
+              if (prepareCalls.incrementAndGet() == 2) {
+                workerEntered.countDown();
+                assertTrue(releaseWorker.await(2, TimeUnit.SECONDS));
+              }
+              return readyWorker(preparationId);
+            });
+    when(worker.upgradeStatus(any(String.class)))
+        .thenAnswer(invocation -> readyWorker(invocation.getArgument(0)));
+    when(worker.cancelUpgrade(any(String.class)))
+        .thenAnswer(invocation -> readyWorker(invocation.getArgument(0)));
+    var controller = new UpgradeController(leases, (preparationId, nonce) -> {}, () -> worker);
+    Map<String, Object> capability = prepare(controller);
+
+    var repeatedBody = new AtomicReference<Map<String, Object>>();
+    Context repeated = jsonContext(repeatedBody);
+    Thread repeatedThread = Thread.ofPlatform().start(() -> controller.prepare(repeated));
+    assertTrue(workerEntered.await(2, TimeUnit.SECONDS));
+
+    Context competingPrepare = conflictContext();
+    controller.prepare(competingPrepare);
+    verify(competingPrepare).status(409);
+
+    Context competingCancel = requestContext(capability);
+    controller.cancel(competingCancel);
+    verify(competingCancel).status(409);
+
+    Context competingCommit = requestContext(capability);
+    controller.commitShutdown(competingCommit);
+    verify(competingCommit).status(409);
+    assertTrue(leases.snapshot().admissionFrozen());
+
+    releaseWorker.countDown();
+    repeatedThread.join(2_000L);
+    assertFalse(repeatedThread.isAlive());
+    assertEquals(capability.get("preparationId"), repeatedBody.get().get("preparationId"));
+    assertEquals(capability.get("shutdownNonce"), repeatedBody.get().get("shutdownNonce"));
+    assertEquals(capability.get("preparationId"), leases.snapshot().preparationId());
+
+    Context cancel = requestContext(capability);
+    controller.cancel(cancel);
+    assertFalse(leases.snapshot().admissionFrozen());
+  }
+
+  @Test
+  void failedPreparationResponseReleasesReservation() {
+    var leases = new OperationLeaseServiceImpl();
+    var controller = new UpgradeController(leases, () -> {});
+    Context failed = mock(Context.class);
+    when(failed.json(any())).thenThrow(new IllegalStateException("response failed"));
+
+    assertThrows(IllegalStateException.class, () -> controller.prepare(failed));
+    Map<String, Object> capability = prepare(controller);
+    assertEquals(capability.get("preparationId"), leases.snapshot().preparationId());
+
+    controller.cancel(requestContext(capability));
+    assertFalse(leases.snapshot().admissionFrozen());
+  }
+
+  @Test
   void watcherDefersDuringBlockedFlushAndDispatchesOnlyAfterAcknowledgement(@TempDir Path tempDir)
       throws Exception {
     Path runtimeDir = Files.createDirectories(tempDir.resolve("runtime"));
@@ -53,7 +175,7 @@ final class UpgradeControllerTransactionTest {
     var persisted = new CountDownLatch(1);
     bridge.install(
         (preparationId, nonce) -> {
-          writeRequest(runtimeDir, preparationId, nonce);
+          writeRequest(runtimeDir, preparationId, nonce, System.currentTimeMillis() + 150L);
           persisted.countDown();
         });
     var controller = new UpgradeController(leases, bridge, null);
@@ -65,6 +187,7 @@ final class UpgradeControllerTransactionTest {
     var deferred = new CountDownLatch(1);
     var dispatched = new CountDownLatch(1);
     var dispatchedAfterFlush = new AtomicBoolean();
+    var dispatchedRequest = new AtomicReference<ShutdownRequest>();
     try (var watcher =
         new ShutdownRequestWatcher(
             runtimeDir,
@@ -73,7 +196,8 @@ final class UpgradeControllerTransactionTest {
               if (decision == UpgradeShutdownBridge.Verification.DEFER) deferred.countDown();
               return acceptance(decision);
             },
-            ignored -> {
+            request -> {
+              dispatchedRequest.set(request);
               dispatchedAfterFlush.set(flushed.get());
               dispatched.countDown();
             },
@@ -84,6 +208,9 @@ final class UpgradeControllerTransactionTest {
       assertTrue(persisted.await(2, TimeUnit.SECONDS));
       assertTrue(flushEntered.await(2, TimeUnit.SECONDS));
       assertTrue(deferred.await(2, TimeUnit.SECONDS));
+      TimeUnit.MILLISECONDS.sleep(200L);
+      long originalDeadline = ShutdownRequest.read(runtimeDir).orElseThrow().deadlineEpochMs();
+      assertTrue(originalDeadline < System.currentTimeMillis());
       assertTrue(Files.isRegularFile(ShutdownRequest.pathIn(runtimeDir)));
       assertFalse(watcher.hasFired());
 
@@ -92,6 +219,7 @@ final class UpgradeControllerTransactionTest {
       assertFalse(commitThread.isAlive());
       assertTrue(dispatched.await(2, TimeUnit.SECONDS));
       assertTrue(dispatchedAfterFlush.get());
+      assertEquals(originalDeadline, dispatchedRequest.get().deadlineEpochMs());
     }
   }
 
@@ -143,7 +271,8 @@ final class UpgradeControllerTransactionTest {
     Path runtimeDir = Files.createDirectories(tempDir.resolve("runtime"));
     var leases = new OperationLeaseServiceImpl();
     var bridge = new UpgradeShutdownBridge();
-    bridge.install((preparationId, nonce) -> writeRequest(runtimeDir, preparationId, nonce));
+    bridge.install(
+        (preparationId, nonce) -> writeRequest(runtimeDir, preparationId, nonce, Long.MAX_VALUE));
     var controller = new UpgradeController(leases, bridge, null);
     Map<String, Object> capability = prepare(controller);
     Context commit = commitContext(capability, null, null, new AtomicBoolean(), true);
@@ -175,8 +304,14 @@ final class UpgradeControllerTransactionTest {
   }
 
   private static Map<String, Object> prepare(UpgradeController controller) {
-    Context context = mock(Context.class);
     var body = new AtomicReference<Map<String, Object>>();
+    Context context = jsonContext(body);
+    controller.prepare(context);
+    return body.get();
+  }
+
+  private static Context jsonContext(AtomicReference<Map<String, Object>> body) {
+    Context context = mock(Context.class);
     when(context.json(any()))
         .thenAnswer(
             invocation -> {
@@ -184,8 +319,24 @@ final class UpgradeControllerTransactionTest {
               body.set(value);
               return context;
             });
-    controller.prepare(context);
-    return body.get();
+    return context;
+  }
+
+  private static Context requestContext(Map<String, Object> capability) {
+    Context context = conflictContext();
+    when(context.body()).thenReturn(capabilityBodyUnchecked(capability));
+    return context;
+  }
+
+  private static Context conflictContext() {
+    Context context = mock(Context.class);
+    when(context.status(409)).thenReturn(context);
+    when(context.json(any())).thenReturn(context);
+    return context;
+  }
+
+  private static WorkerQuiescenceSnapshot readyWorker(String preparationId) {
+    return new WorkerQuiescenceSnapshot(preparationId, true, true, true, "IDLE", List.of());
   }
 
   private static Context commitContext(
@@ -237,17 +388,22 @@ final class UpgradeControllerTransactionTest {
   private static ShutdownRequestWatcher.Acceptance acceptance(
       UpgradeShutdownBridge.Verification verification) {
     return switch (verification) {
-      case ACCEPT -> ShutdownRequestWatcher.Acceptance.ACCEPT;
+      case ACCEPT -> ShutdownRequestWatcher.Acceptance.ACCEPT_COMMITTED;
       case DEFER -> ShutdownRequestWatcher.Acceptance.DEFER;
       case REFUSE -> ShutdownRequestWatcher.Acceptance.REFUSE;
     };
   }
 
   private static void writeRequest(Path runtimeDir, String preparationId, String nonce) {
+    writeRequest(runtimeDir, preparationId, nonce, Long.MAX_VALUE);
+  }
+
+  private static void writeRequest(
+      Path runtimeDir, String preparationId, String nonce, long deadlineEpochMs) {
     try {
       new ShutdownRequest(
               ShutdownRequest.Reason.UPGRADE,
-              Long.MAX_VALUE,
+              deadlineEpochMs,
               nonce,
               "controller-test",
               preparationId)
@@ -263,6 +419,14 @@ final class UpgradeControllerTransactionTest {
             "schemaVersion", 1,
             "preparationId", capability.get("preparationId"),
             "shutdownNonce", capability.get("shutdownNonce")));
+  }
+
+  private static String capabilityBodyUnchecked(Map<String, Object> capability) {
+    try {
+      return capabilityBody(capability);
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   private static boolean waitForAbsent(Path path) throws Exception {

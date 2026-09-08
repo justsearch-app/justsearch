@@ -28,6 +28,7 @@ final class UpgradeController {
   private String shutdownNonce;
   private CommitPhase commitPhase = CommitPhase.OPEN;
   private CommitReservation commitReservation;
+  private boolean preparationInProgress;
   private boolean cancellationInProgress;
 
   UpgradeController(OperationLeaseService leases, Runnable orderlyShutdown) {
@@ -64,10 +65,18 @@ final class UpgradeController {
   }
 
   void prepare(Context ctx) {
-    OperationLeaseSnapshot snapshot = leases.freezeAdmission("application upgrade");
-    snapshot = leases.requestCancellation(snapshot.preparationId());
-    String nonce = nonceFor(snapshot.preparationId());
-    ctx.json(response(snapshot, nonce, prepareWorker(snapshot.preparationId())));
+    if (!reservePreparation()) {
+      preparationBusy(ctx);
+      return;
+    }
+    try {
+      OperationLeaseSnapshot snapshot = leases.freezeAdmission("application upgrade");
+      snapshot = leases.requestCancellation(snapshot.preparationId());
+      String nonce = nonceFor(snapshot.preparationId());
+      ctx.json(response(snapshot, nonce, prepareWorker(snapshot.preparationId())));
+    } finally {
+      releasePreparation();
+    }
   }
 
   void cancel(Context ctx) {
@@ -114,11 +123,6 @@ final class UpgradeController {
       ctx.status(409).json(response(snapshot, request.shutdownNonce(), worker));
       return;
     }
-    CommitReservation reservation = claimCommit(request);
-    if (reservation == null) {
-      preparationMismatch(ctx);
-      return;
-    }
     byte[] response =
         JSON.writeValueAsBytes(
             Map.of(
@@ -129,6 +133,11 @@ final class UpgradeController {
                 "admissionFrozen", true,
                 "activeLeaseCount", 0,
                 "issuedAtEpochMs", System.currentTimeMillis()));
+    CommitReservation reservation = claimCommit(request);
+    if (reservation == null) {
+      preparationMismatch(ctx);
+      return;
+    }
     try {
       orderlyShutdown.shutdown(preparationId, request.shutdownNonce());
     } catch (RuntimeException e) {
@@ -264,6 +273,7 @@ final class UpgradeController {
   private synchronized CommitReservation claimCommit(UpgradeRequest request) {
     if (!ownsNonce(request)
         || commitPhase != CommitPhase.OPEN
+        || preparationInProgress
         || cancellationInProgress) return null;
     commitPhase = CommitPhase.PERSISTING;
     commitReservation = new CommitReservation(request.preparationId(), request.shutdownNonce());
@@ -308,7 +318,10 @@ final class UpgradeController {
   }
 
   private synchronized boolean reserveCancellation(UpgradeRequest request) {
-    if (!ownsNonce(request) || commitPhase != CommitPhase.OPEN || cancellationInProgress)
+    if (!ownsNonce(request)
+        || commitPhase != CommitPhase.OPEN
+        || preparationInProgress
+        || cancellationInProgress)
       return false;
     cancellationInProgress = true;
     return true;
@@ -327,6 +340,26 @@ final class UpgradeController {
     commitPhase = CommitPhase.OPEN;
     commitReservation = null;
     cancellationInProgress = false;
+  }
+
+  private synchronized boolean reservePreparation() {
+    if (preparationInProgress
+        || cancellationInProgress
+        || commitPhase != CommitPhase.OPEN) return false;
+    preparationInProgress = true;
+    return true;
+  }
+
+  private synchronized void releasePreparation() {
+    preparationInProgress = false;
+  }
+
+  private static void preparationBusy(Context ctx) {
+    ctx.status(409)
+        .json(
+            Map.of(
+                "error", "Another upgrade preparation transaction is in progress",
+                "errorCode", "UPGRADE_PREPARATION_BUSY"));
   }
 
   private static void preparationMismatch(Context ctx) {

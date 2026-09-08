@@ -1244,7 +1244,8 @@ public class HeadlessApp {
         return io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT;
       }
       return switch (bridge.verify(request.preparationId(), request.nonce())) {
-        case ACCEPT -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT;
+        case ACCEPT ->
+            io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT_COMMITTED;
         case DEFER -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.DEFER;
         case REFUSE -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE;
       };

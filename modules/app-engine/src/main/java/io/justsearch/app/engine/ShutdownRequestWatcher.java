@@ -35,9 +35,11 @@ import org.slf4j.LoggerFactory;
  */
 public final class ShutdownRequestWatcher implements AutoCloseable {
 
-  /** Decision for a well-formed, live request. */
+  /** Admission decision for a well-formed request. */
   public enum Acceptance {
     ACCEPT,
+    /** Accepts a controller-acknowledged transaction even when its force deadline has elapsed. */
+    ACCEPT_COMMITTED,
     DEFER,
     REFUSE
   }
@@ -124,15 +126,6 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
         return;
       }
       ShutdownRequest req = request.get();
-      if (req.deadlineEpochMs() < System.currentTimeMillis()) {
-        log.warn(
-            "Ignoring expired shutdown request with reason {} (issuedBy={}, deadlineEpochMs={})",
-            req.reason().wire(),
-            req.issuedBy(),
-            req.deadlineEpochMs());
-        ShutdownRequest.clear(runtimeDir);
-        return;
-      }
       Acceptance decision = acceptance.apply(req);
       if (decision == Acceptance.DEFER) {
         log.debug(
@@ -141,7 +134,17 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
             req.issuedBy());
         return;
       }
-      if (decision != Acceptance.ACCEPT) {
+      if (decision != Acceptance.ACCEPT_COMMITTED
+          && req.deadlineEpochMs() < System.currentTimeMillis()) {
+        log.warn(
+            "Ignoring expired shutdown request with reason {} (issuedBy={}, deadlineEpochMs={})",
+            req.reason().wire(),
+            req.issuedBy(),
+            req.deadlineEpochMs());
+        ShutdownRequest.clear(runtimeDir);
+        return;
+      }
+      if (decision != Acceptance.ACCEPT && decision != Acceptance.ACCEPT_COMMITTED) {
         log.warn(
             "Ignoring a shutdown request with reason {} (issuedBy={}): it was refused by the"
                 + " acceptance check, most likely a nonce that does not match this Engine's"

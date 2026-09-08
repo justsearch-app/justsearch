@@ -87,7 +87,7 @@ final class HeadlessAppUpgradeShutdownWiringTest {
   }
 
   @Test
-  @DisplayName("the production writer and dispatcher preserve upgrade receipt identifiers")
+  @DisplayName("an acknowledged request dispatches with its original identifiers after expiry")
   void productionFactoriesCarryUpgradeRequestToReceipt(@TempDir Path dataDir) throws Exception {
     Path runtimeDir = Files.createDirectories(dataDir.resolve("runtime"));
     var bridge = new UpgradeShutdownBridge();
@@ -112,6 +112,14 @@ final class HeadlessAppUpgradeShutdownWiringTest {
       String preparationId = prepared.get("preparationId").asText();
       assertEquals(200, post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared)).statusCode());
       assertTrue(Files.isRegularFile(ShutdownRequest.pathIn(runtimeDir)));
+      var persisted = ShutdownRequest.read(runtimeDir).orElseThrow();
+      new ShutdownRequest(
+              persisted.reason(),
+              1L,
+              persisted.nonce(),
+              persisted.issuedBy(),
+              persisted.preparationId())
+          .writeTo(runtimeDir);
 
       try (var watcher =
           HeadlessApp.startShutdownRequestWatcher(
