@@ -1329,6 +1329,11 @@ fn update_tray_tooltip(state: &BackendState, tooltip: &str) {
 }
 
 #[tauri::command]
+fn supervisor_state(state: tauri::State<'_, Arc<BackendState>>) -> Option<supervisor::StateRecord> {
+    state.host.latest_record()
+}
+
+#[tauri::command]
 async fn api_port(state: tauri::State<'_, Arc<BackendState>>) -> Result<Option<u16>, String> {
     if let Some(port) = state.get_port() {
         return Ok(Some(port));
@@ -1644,6 +1649,7 @@ pub fn run() {
         .manage(state.clone())
         .manage(update_coordinator.clone())
         .invoke_handler(tauri::generate_handler![
+            supervisor_state,
             api_port,
             session_token,
             smoke_run_id,

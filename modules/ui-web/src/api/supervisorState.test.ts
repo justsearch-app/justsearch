@@ -15,15 +15,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   isTauriRuntime: vi.fn(() => true),
   listen: vi.fn(),
+  invoke: vi.fn(),
 }));
 
 vi.mock('../utils/tauriRuntime', () => ({ isTauriRuntime: mocks.isTauriRuntime }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
 
 beforeEach(() => {
   vi.resetModules();
   mocks.isTauriRuntime.mockReturnValue(true);
   mocks.listen.mockReset();
+  mocks.invoke.mockReset().mockResolvedValue(null);
 });
 
 const RUNNING = {
@@ -37,6 +40,44 @@ const RUNNING = {
 };
 
 describe('installSupervisorStateBridge', () => {
+  it('recovers terminal state published before subscription from the current host snapshot', async () => {
+    mocks.listen.mockResolvedValue(() => {});
+    mocks.invoke.mockImplementation(async () => {
+      expect(mocks.listen).toHaveBeenCalledOnce();
+      return { ...RUNNING, state: 'exhausted' };
+    });
+    const { installSupervisorStateBridge } = await import('./supervisorState.js');
+    const seen = vi.fn();
+    await installSupervisorStateBridge(seen);
+    expect(mocks.invoke).toHaveBeenCalledWith('supervisor_state');
+    expect(seen).toHaveBeenCalledExactlyOnceWith({ ...RUNNING, state: 'exhausted' });
+  });
+
+  it('does not overwrite an event with a late snapshot and still receives later events', async () => {
+    let fire!: (event: { payload: unknown }) => void;
+    mocks.listen.mockImplementation(async (_name, handler) => { fire = handler; return () => {}; });
+    mocks.invoke.mockImplementation(async () => {
+      fire({ payload: RUNNING });
+      return { ...RUNNING, state: 'exhausted', incarnation: 1 };
+    });
+    const { installSupervisorStateBridge } = await import('./supervisorState.js');
+    const seen = vi.fn();
+    await installSupervisorStateBridge(seen);
+    expect(seen).toHaveBeenCalledExactlyOnceWith(RUNNING);
+    fire({ payload: { ...RUNNING, state: 'restarting' } });
+    expect(seen).toHaveBeenLastCalledWith({ ...RUNNING, state: 'restarting' });
+  });
+
+  it('keeps the event subscription if an older host has no snapshot command', async () => {
+    const unsubscribe = vi.fn();
+    mocks.listen.mockResolvedValue(unsubscribe);
+    mocks.invoke.mockRejectedValue(new Error('unknown command'));
+    const { installSupervisorStateBridge } = await import('./supervisorState.js');
+    const stop = await installSupervisorStateBridge(vi.fn());
+    stop();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
   it('subscribes to the supervisor event, NOT to the restart event beside it', async () => {
     mocks.listen.mockResolvedValue(() => {});
     const { installSupervisorStateBridge } = await import('./supervisorState.js');

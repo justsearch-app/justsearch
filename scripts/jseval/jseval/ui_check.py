@@ -428,6 +428,35 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     demo = _demo_url(ui_url)
     ai_init = "localStorage.setItem('justsearch-inspector-tab', 'ai');"
 
+    async def setup_engine_recovery(page):
+        # Capture the real desktop boot path with a deterministic native command boundary.
+        # The initial browser shell satisfies the common harness mount check; reload then
+        # starts main.jsx without an Engine binding. This is UI proof, not an installed updater.
+        await page.context.add_init_script("""(() => {
+          let nextCallback = 0;
+          window.__TAURI_INTERNALS__ = {
+            transformCallback: () => ++nextCallback,
+            unregisterCallback: () => {},
+            invoke: async (command) => {
+              if (command === 'plugin:event|listen') return ++nextCallback;
+              if (command === 'plugin:event|unlisten') return null;
+              if (command === 'api_port') return null;
+              if (command === 'supervisor_state') return {
+                schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri',
+                state: 'exhausted', incarnation: 1, restartCount: 3, maxRestartAttempts: 3
+              };
+              if (command === 'app_update_status') return {
+                state: 'available', currentVersion: '0.3.0', availableVersion: '0.3.1'
+              };
+              throw new Error('Unexpected native command in recovery capture: ' + command);
+            }
+          };
+        })();""")
+        await page.reload(wait_until="domcontentloaded")
+        await page.get_by_test_id("engine-recovery").wait_for(state="visible", timeout=15_000)
+        await page.get_by_text("JustSearch could not restart", exact=True).wait_for()
+        await page.get_by_text("Install update", exact=True).wait_for()
+
     # === Shared-browser chain (sequential, depends_on linkage) ===
 
     async def setup_search_results(page):
@@ -1988,6 +2017,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     ]
 
     return [
+        Step("engine-recovery", setup=setup_engine_recovery, isolated=True),
         Step("health-completion", setup=setup_health_completion, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),

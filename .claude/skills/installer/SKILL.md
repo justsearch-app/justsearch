@@ -187,7 +187,15 @@ The Lit UI resolves the backend endpoint in `resolveApiEndpoint()`:
 2. JavaFX bridge (`window.justSearch.getApiPort()`) when present
 3. **Tauri command**: `invoke("api_port")`
 4. Vite env vars (`VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`)
-5. Browser dev-mode probing (safe loopback scan)
+5. Browser Vite development proxy (page origin); a desktop host without a port stays unresolved
+
+Before desktop API discovery, boot subscribes to supervisor events and reads the
+current host's in-memory `supervisor_state` snapshot. A newer event wins over a late
+snapshot. If no API binds, a local Lit recovery view shows the host's state and
+exposes the existing update status, check and install commands. It does not start
+the normal API catalogs or read a predecessor's supervisor file. Installation still
+uses the host updater's checks described below; displaying the controls does not
+waive those checks.
 
 Current desktop API base URL shape:
 - `http://127.0.0.1:<ephemeralPort>`

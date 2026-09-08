@@ -406,7 +406,6 @@ impl EngineHost {
         );
         self.publish_state(path, &record, event);
     }
-    #[cfg(test)]
     pub(crate) fn latest_record(&self) -> Option<StateRecord> {
         self.inner.lock().unwrap().latest_record.clone()
     }

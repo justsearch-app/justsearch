@@ -6,7 +6,6 @@
 // the backend-served message catalogs (error/resource/surface/health-event/
 // operation/workflow), which were always locale-agnostic (`/en`-only,
 // tempdoc 434) and independent of the lingui runtime.
-import { resolveApiEndpoint } from "./api/http";
 import { bootErrorCatalog } from "./i18n/errorCatalog";
 import { bootResourceCatalog, bootSurfaceCatalog, bootHealthEventsCatalog, bootOperationMessageCatalog, bootWorkflowCatalog } from "./i18n/resourceCatalog";
 // Slice 3a.1.9 §B.B.B D3: registry catalog boot moved here from
@@ -71,7 +70,7 @@ export function bootMessageCatalogs(baseUrl: string): Promise<void> {
 /**
  * Tempdoc 941 — re-attempt the catalog boot when the shell observes the backend answering.
  *
- * The boot above fires once, at module evaluation, and races the Head: the shell reloads itself
+ * The initial boot starts after API discovery and can still race the Head: the shell reloads itself
  * the instant the Rust side reports a new backend instance (`main.jsx`'s
  * `installBackendRestartBridge` → `window.location.reload()`), so the document routinely loads
  * against a Head that is up enough to publish a manifest but not yet answering
@@ -102,19 +101,10 @@ function watchForBackendReady(baseUrl: string): void {
   });
 }
 
-// Background-fetch the backend message catalogs. Runs async; UI mounts immediately
-// without waiting. Until each catalog arrives, lookups fall back to the raw key
-// or wire message per tempdoc 434 §3.
-if (typeof window !== "undefined") {
-  resolveApiEndpoint()
-    .then((endpoint) => {
-      if (endpoint.baseUrl) {
-        watchForBackendReady(endpoint.baseUrl);
-        return bootMessageCatalogs(endpoint.baseUrl);
-      }
-      return undefined;
-    })
-    .catch((err) => {
-      console.debug("[i18n] message catalog boot fetch failed", err);
-    });
+/** Start background catalog loading once production boot has resolved its API binding. */
+export function startMessageCatalogs(baseUrl: string): void {
+  watchForBackendReady(baseUrl);
+  void bootMessageCatalogs(baseUrl).catch((err) => {
+    console.debug("[i18n] message catalog boot fetch failed", err);
+  });
 }

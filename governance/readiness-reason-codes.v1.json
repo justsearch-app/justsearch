@@ -54,6 +54,10 @@
   ],
   "feDerived": [
     {
+      "code": "engine.restart_exhausted",
+      "why": "Lane F B14: the desktop recovery surface derives exhaustion from the current host's supervisor event or in-memory snapshot; an unavailable Engine cannot emit it. No disk predecessor state is read."
+    },
+    {
       "code": "no_documents",
       "why": "Tempdoc 596 §17 — FE-only control-availability code; not emitted by the readiness producer"
     },

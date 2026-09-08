@@ -35,6 +35,7 @@ describe('http module', () => {
       (globalThis as { window?: typeof window }).window = originalWindow;
     }
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('SESSION_TOKEN_HEADER constant', () => {
@@ -221,6 +222,24 @@ describe('http module', () => {
   });
 
   describe('resolveApiEndpoint', () => {
+    it('does not invent a proxy API for a desktop host with no Engine port', async () => {
+      mocks.isTauriRuntime.mockReturnValue(true);
+      mocks.invoke.mockResolvedValue(null);
+      vi.stubEnv('DEV', true);
+      vi.stubEnv('VITE_API_PORT', '');
+      vi.stubEnv('VITE_JUSTSEARCH_API_PORT', '');
+      (globalThis as { window?: Pick<typeof window, 'location'> }).window = {
+        location: { search: '', origin: 'http://localhost:5174' } as Location,
+      };
+      globalThis.fetch = vi.fn();
+      const { resolveApiEndpoint } = await import('./http');
+      await expect(resolveApiEndpoint()).resolves.toEqual({ port: null, baseUrl: null, source: 'unresolved' });
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      mocks.isTauriRuntime.mockReturnValue(false);
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('no manifest'));
+      await expect(resolveApiEndpoint()).resolves.toMatchObject({ baseUrl: 'http://localhost:5174', source: 'proxy' });
+    });
+
     it('uses the Tauri api_port command for packaged desktop origins', async () => {
       mocks.isTauriRuntime.mockReturnValue(true);
       mocks.invoke.mockResolvedValue(8080);
