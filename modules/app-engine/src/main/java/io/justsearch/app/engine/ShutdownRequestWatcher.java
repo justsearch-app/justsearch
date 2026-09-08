@@ -3,6 +3,7 @@ package io.justsearch.app.engine;
 
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -79,7 +80,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
       Consumer<ShutdownRequest> onRequest,
       long pollIntervalMs) {
     this.runtimeDir = runtimeDir;
-    this.acceptance = acceptance == null ? r -> Acceptance.ACCEPT : acceptance;
+    this.acceptance = Objects.requireNonNull(acceptance, "acceptance");
     this.onRequest = onRequest;
     this.pollIntervalMs = pollIntervalMs;
   }
@@ -140,7 +141,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
             req.issuedBy());
         return;
       }
-      if (decision == Acceptance.REFUSE) {
+      if (decision != Acceptance.ACCEPT) {
         log.warn(
             "Ignoring a shutdown request with reason {} (issuedBy={}): it was refused by the"
                 + " acceptance check, most likely a nonce that does not match this Engine's"

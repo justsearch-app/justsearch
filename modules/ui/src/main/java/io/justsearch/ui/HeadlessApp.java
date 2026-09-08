@@ -961,6 +961,7 @@ public class HeadlessApp {
       // the watcher shut this incarnation down immediately.
       final Path runtimeDir = configPhase.dataDir().resolve("runtime");
       clearPriorShutdownRequest(runtimeDir, java.nio.file.Files::deleteIfExists);
+      upgradeShutdownBridge.install(upgradeShutdownRequestWriter(runtimeDir));
 
       // Tempdoc 501 Phase 1: instantiate the runtime manifest publisher as soon as the dataDir
       // is known. The first manifest write happens after the API server binds (Phase 2 below);
@@ -1128,7 +1129,6 @@ public class HeadlessApp {
       // than running the ordered close itself. The watcher below is what runs it. Routing the
       // upgrade through the same file as the supervisor means there is one trigger path to reason
       // about, not two that must be kept in step.
-      upgradeShutdownBridge.install(upgradeShutdownRequestWriter(runtimeDir));
       // Tempdoc 805 G.1: the shell's normal-quit request. Unchanged — it is already cooperative and
       // in-process, so routing it through the file would add a poll's latency for nothing.
       lifecycleShutdownBridge.install(shutdownCoordinator::shutdownAndExit);
@@ -1137,7 +1137,7 @@ public class HeadlessApp {
       // request the upgrade path (and, from B8/B10, the supervisor) writes.
       startShutdownRequestWatcher(
           runtimeDir,
-          shutdownRequestAcceptance(operationLeasesRef),
+          shutdownRequestAcceptance(upgradeShutdownBridge),
           shutdownRequestDispatcher(shutdownSequence),
           io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
           shutdownRequestWatcherRef::set);
@@ -1227,10 +1227,8 @@ public class HeadlessApp {
                 "upgrade-controller",
                 preparationId)
             .writeTo(runtimeDir);
-      } catch (Exception e) {
-        // A missing receipt is the updater's fail-closed signal, so a failed request write must not
-        // be presented as a successful shutdown.
-        log.error("Could not write the upgrade shutdown request; the Engine will not stop", e);
+      } catch (java.io.IOException e) {
+        throw new java.io.UncheckedIOException("could not persist upgrade shutdown request", e);
       }
     };
   }
@@ -1239,17 +1237,17 @@ public class HeadlessApp {
   static java.util.function.Function<
           io.justsearch.app.engine.ShutdownRequest,
           io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance>
-      shutdownRequestAcceptance(io.justsearch.app.api.OperationLeaseService operationLeases) {
+      shutdownRequestAcceptance(io.justsearch.ui.api.UpgradeShutdownBridge bridge) {
     return request -> {
       if (request.reason() != io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
           || request.preparationId() == null) {
         return io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT;
       }
-      io.justsearch.app.api.OperationLeaseSnapshot snapshot = operationLeases.snapshot();
-      return snapshot.admissionFrozen()
-              && java.util.Objects.equals(request.preparationId(), snapshot.preparationId())
-          ? io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT
-          : io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE;
+      return switch (bridge.verify(request.preparationId(), request.nonce())) {
+        case ACCEPT -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT;
+        case DEFER -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.DEFER;
+        case REFUSE -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE;
+      };
     };
   }
 

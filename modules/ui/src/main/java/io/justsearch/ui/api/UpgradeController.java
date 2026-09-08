@@ -26,7 +26,8 @@ final class UpgradeController {
   private final UpgradeReconciliationProbe reconciliation;
   private String noncePreparationId;
   private String shutdownNonce;
-  private boolean shutdownCommitted;
+  private CommitPhase commitPhase = CommitPhase.OPEN;
+  private CommitReservation commitReservation;
   private boolean cancellationInProgress;
 
   UpgradeController(OperationLeaseService leases, Runnable orderlyShutdown) {
@@ -53,6 +54,9 @@ final class UpgradeController {
     this.workerClient = workerClient;
     this.reconciliation =
         new UpgradeReconciliationProbe(dataDir, runningVersion, headReady, workerReady);
+    if (orderlyShutdown instanceof UpgradeShutdownBridge bridge) {
+      bridge.installVerifier(this::verifyShutdownRequest);
+    }
   }
 
   void reconcile(Context ctx) {
@@ -110,7 +114,8 @@ final class UpgradeController {
       ctx.status(409).json(response(snapshot, request.shutdownNonce(), worker));
       return;
     }
-    if (!claimCommit(request)) {
+    CommitReservation reservation = claimCommit(request);
+    if (reservation == null) {
       preparationMismatch(ctx);
       return;
     }
@@ -124,18 +129,32 @@ final class UpgradeController {
                 "admissionFrozen", true,
                 "activeLeaseCount", 0,
                 "issuedAtEpochMs", System.currentTimeMillis()));
-    ctx.contentType("application/json");
-    ctx.res().setContentLength(response.length);
     try {
+      orderlyShutdown.shutdown(preparationId, request.shutdownNonce());
+    } catch (RuntimeException e) {
+      restoreOpen(reservation);
+      ctx.status(503)
+          .json(
+              Map.of(
+                  "shutdownAccepted", false,
+                  "preparationId", preparationId,
+                  "error", "Upgrade shutdown request could not be persisted",
+                  "errorCode", "UPGRADE_SHUTDOWN_PERSIST_FAILED"));
+      return;
+    }
+    try {
+      ctx.contentType("application/json");
+      ctx.res().setContentLength(response.length);
       ctx.res().getOutputStream().write(response);
       ctx.res().flushBuffer();
     } catch (IOException e) {
+      restoreOpen(reservation);
       throw new UncheckedIOException("failed to acknowledge orderly upgrade shutdown", e);
+    } catch (RuntimeException e) {
+      restoreOpen(reservation);
+      throw e;
     }
-    Thread.ofPlatform()
-        .daemon(true)
-        .name("upgrade-orderly-shutdown")
-        .start(() -> orderlyShutdown.shutdown(preparationId, request.shutdownNonce()));
+    acknowledge(reservation);
   }
 
   private static Map<String, Object> response(
@@ -230,7 +249,8 @@ final class UpgradeController {
     if (!preparationId.equals(noncePreparationId)) {
       noncePreparationId = preparationId;
       shutdownNonce = java.util.UUID.randomUUID().toString();
-      shutdownCommitted = false;
+      commitPhase = CommitPhase.OPEN;
+      commitReservation = null;
       cancellationInProgress = false;
     }
     return shutdownNonce;
@@ -241,20 +261,61 @@ final class UpgradeController {
         && request.shutdownNonce().equals(shutdownNonce);
   }
 
-  private synchronized boolean claimCommit(UpgradeRequest request) {
-    if (!ownsNonce(request) || shutdownCommitted || cancellationInProgress) return false;
-    shutdownCommitted = true;
-    return true;
+  private synchronized CommitReservation claimCommit(UpgradeRequest request) {
+    if (!ownsNonce(request)
+        || commitPhase != CommitPhase.OPEN
+        || cancellationInProgress) return null;
+    commitPhase = CommitPhase.PERSISTING;
+    commitReservation = new CommitReservation(request.preparationId(), request.shutdownNonce());
+    return commitReservation;
+  }
+
+  private synchronized void restoreOpen(CommitReservation reservation) {
+    if (commitPhase == CommitPhase.PERSISTING && commitReservation == reservation) {
+      commitPhase = CommitPhase.OPEN;
+      commitReservation = null;
+    }
+  }
+
+  private synchronized void acknowledge(CommitReservation reservation) {
+    if (commitPhase != CommitPhase.PERSISTING || commitReservation != reservation) {
+      throw new IllegalStateException("upgrade commit reservation is no longer active");
+    }
+    commitPhase = CommitPhase.ACKNOWLEDGED;
+  }
+
+  private UpgradeShutdownBridge.Verification verifyShutdownRequest(
+      String preparationId, String nonce) {
+    CommitPhase phase;
+    synchronized (this) {
+      if (!java.util.Objects.equals(preparationId, noncePreparationId)
+          || !java.util.Objects.equals(nonce, shutdownNonce)) {
+        return UpgradeShutdownBridge.Verification.REFUSE;
+      }
+      phase = commitPhase;
+    }
+    if (phase == CommitPhase.PERSISTING) {
+      return UpgradeShutdownBridge.Verification.DEFER;
+    }
+    if (phase != CommitPhase.ACKNOWLEDGED) {
+      return UpgradeShutdownBridge.Verification.REFUSE;
+    }
+    OperationLeaseSnapshot snapshot = leases.snapshot();
+    return snapshot.admissionFrozen()
+            && java.util.Objects.equals(preparationId, snapshot.preparationId())
+        ? UpgradeShutdownBridge.Verification.ACCEPT
+        : UpgradeShutdownBridge.Verification.REFUSE;
   }
 
   private synchronized boolean reserveCancellation(UpgradeRequest request) {
-    if (!ownsNonce(request) || shutdownCommitted || cancellationInProgress) return false;
+    if (!ownsNonce(request) || commitPhase != CommitPhase.OPEN || cancellationInProgress)
+      return false;
     cancellationInProgress = true;
     return true;
   }
 
   private synchronized void releaseCancellationReservation(UpgradeRequest request) {
-    if (ownsNonce(request) && !shutdownCommitted) {
+    if (ownsNonce(request) && commitPhase == CommitPhase.OPEN) {
       cancellationInProgress = false;
     }
   }
@@ -263,6 +324,8 @@ final class UpgradeController {
     if (!ownsNonce(request)) return;
     noncePreparationId = null;
     shutdownNonce = null;
+    commitPhase = CommitPhase.OPEN;
+    commitReservation = null;
     cancellationInProgress = false;
   }
 
@@ -275,6 +338,14 @@ final class UpgradeController {
   }
 
   private record UpgradeRequest(String preparationId, String shutdownNonce) {}
+
+  private enum CommitPhase {
+    OPEN,
+    PERSISTING,
+    ACKNOWLEDGED
+  }
+
+  private record CommitReservation(String preparationId, String shutdownNonce) {}
 
   private static UpgradeRequest requiredRequest(Context ctx) {
     try {

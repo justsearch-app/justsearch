@@ -107,6 +107,22 @@ final class ShutdownRequestWatcherTest {
   }
 
   @Test
+  @DisplayName("a null acceptance decision fails closed")
+  void nullAcceptanceDecisionIsRefused(@TempDir Path tempDir) throws Exception {
+    Path runtime = runtimeDir(tempDir);
+    var ran = new AtomicReference<ShutdownRequest>();
+    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep")
+        .writeTo(runtime);
+
+    try (var watcher = new ShutdownRequestWatcher(runtime, ignored -> null, ran::set, 50L)) {
+      watcher.pollOnce();
+      assertTrue(ran.get() == null);
+      assertFalse(watcher.hasFired());
+      assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
+    }
+  }
+
+  @Test
   @DisplayName("a deferred request remains pending without consuming the one-shot guard")
   void deferredRequestRemainsForLaterAcceptance(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
