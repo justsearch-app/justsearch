@@ -83,7 +83,11 @@ final class HeadlessAppShutdownWiringTest {
 
     try (var watcher =
         HeadlessApp.startShutdownRequestWatcher(
-            runtime, r -> true, r -> fired.countDown(), 20L, ignored -> {})) {
+            runtime,
+            r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+            r -> fired.countDown(),
+            20L,
+            ignored -> {})) {
       assertFalse(fired.await(200, TimeUnit.MILLISECONDS));
     }
 
@@ -102,7 +106,11 @@ final class HeadlessAppShutdownWiringTest {
 
     try (var watcher =
         HeadlessApp.startShutdownRequestWatcher(
-            runtime, r -> true, r -> fired.countDown(), 20L, ignored -> {})) {
+            runtime,
+            r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+            r -> fired.countDown(),
+            20L,
+            ignored -> {})) {
       assertTrue(fired.await(2, TimeUnit.SECONDS));
     }
   }
@@ -122,7 +130,11 @@ final class HeadlessAppShutdownWiringTest {
           HeadlessApp.clearPriorShutdownRequest(runtime, ignored -> false);
           watcherStarted.set(true);
           HeadlessApp.startShutdownRequestWatcher(
-              runtime, r -> true, ignored -> {}, 20L, ignored -> {});
+              runtime,
+              r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+              ignored -> {},
+              20L,
+              ignored -> {});
         });
 
     assertFalse(watcherStarted.get());
@@ -169,7 +181,7 @@ final class HeadlessAppShutdownWiringTest {
     try (var watcher =
         HeadlessApp.startShutdownRequestWatcher(
             runtime,
-            ignored -> true,
+            ignored -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
             request -> sequence.run(request.reason()),
             20L,
             watcherRef::set)) {

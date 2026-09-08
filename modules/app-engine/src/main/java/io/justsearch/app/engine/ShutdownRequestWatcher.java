@@ -8,7 +8,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +34,13 @@ import org.slf4j.LoggerFactory;
  */
 public final class ShutdownRequestWatcher implements AutoCloseable {
 
+  /** Decision for a well-formed, live request. */
+  public enum Acceptance {
+    ACCEPT,
+    DEFER,
+    REFUSE
+  }
+
   private static final Logger log = LoggerFactory.getLogger(ShutdownRequestWatcher.class);
 
   /** The watcher thread's name. Asserted against, so it is part of the contract. */
@@ -54,7 +61,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
 
   private final Path runtimeDir;
   private final Consumer<ShutdownRequest> onRequest;
-  private final Predicate<ShutdownRequest> accepts;
+  private final Function<ShutdownRequest, Acceptance> acceptance;
   private final long pollIntervalMs;
   private final AtomicBoolean fired = new AtomicBoolean();
   private volatile ScheduledExecutorService executor;
@@ -62,19 +69,17 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
 
   /**
    * @param runtimeDir the {@code <dataDir>/runtime/} directory to watch
-   * @param accepts whether a well-formed request should be acted on — the seam where nonce policy
-   *     lives, because the watcher does not know which nonce the updater minted and should not
-   *     pretend to. Returning {@code false} logs and ignores, and the file is deleted so the
-   *     rejected request is not re-read every second.
+   * @param acceptance whether a well-formed request should be acted on, retained for a pending
+   *     acknowledgement, or refused and deleted
    * @param onRequest what to run when a request is accepted; in production, the ordered shutdown
    */
   public ShutdownRequestWatcher(
       Path runtimeDir,
-      Predicate<ShutdownRequest> accepts,
+      Function<ShutdownRequest, Acceptance> acceptance,
       Consumer<ShutdownRequest> onRequest,
       long pollIntervalMs) {
     this.runtimeDir = runtimeDir;
-    this.accepts = accepts == null ? r -> true : accepts;
+    this.acceptance = acceptance == null ? r -> Acceptance.ACCEPT : acceptance;
     this.onRequest = onRequest;
     this.pollIntervalMs = pollIntervalMs;
   }
@@ -127,7 +132,15 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
         ShutdownRequest.clear(runtimeDir);
         return;
       }
-      if (!accepts.test(req)) {
+      Acceptance decision = acceptance.apply(req);
+      if (decision == Acceptance.DEFER) {
+        log.debug(
+            "Deferring shutdown request with reason {} (issuedBy={}) until acknowledgement",
+            req.reason().wire(),
+            req.issuedBy());
+        return;
+      }
+      if (decision == Acceptance.REFUSE) {
         log.warn(
             "Ignoring a shutdown request with reason {} (issuedBy={}): it was refused by the"
                 + " acceptance check, most likely a nonce that does not match this Engine's"

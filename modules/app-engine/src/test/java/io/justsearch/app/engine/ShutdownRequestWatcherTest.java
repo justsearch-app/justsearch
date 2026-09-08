@@ -52,7 +52,9 @@ final class ShutdownRequestWatcherTest {
               code -> {});
 
       try (var watcher =
-          new ShutdownRequestWatcher(runtime, r -> true, r -> sequence.run(r.reason()), 50L)) {
+          new ShutdownRequestWatcher(
+              runtime, r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
+              r -> sequence.run(r.reason()), 50L)) {
         watcher.pollOnce();
       }
 
@@ -71,7 +73,9 @@ final class ShutdownRequestWatcherTest {
     Files.writeString(
         ShutdownRequest.pathIn(runtime), "{ this is not json", StandardCharsets.UTF_8);
 
-    try (var watcher = new ShutdownRequestWatcher(runtime, r -> true, ran::set, 50L)) {
+    try (var watcher =
+        new ShutdownRequestWatcher(
+            runtime, r -> ShutdownRequestWatcher.Acceptance.ACCEPT, ran::set, 50L)) {
       watcher.pollOnce();
       assertTrue(ran.get() == null, "a corrupt file must never be read as a shutdown");
       assertFalse(watcher.hasFired());
@@ -91,12 +95,36 @@ final class ShutdownRequestWatcherTest {
         .writeTo(runtime);
     var ran = new AtomicReference<ShutdownRequest>();
 
-    try (var watcher = new ShutdownRequestWatcher(runtime, r -> false, ran::set, 50L)) {
+    try (var watcher =
+        new ShutdownRequestWatcher(
+            runtime, r -> ShutdownRequestWatcher.Acceptance.REFUSE, ran::set, 50L)) {
       watcher.pollOnce();
       assertTrue(ran.get() == null, "a refused request must not shut the Engine down");
       assertFalse(
           Files.exists(ShutdownRequest.pathIn(runtime)),
           "a refused request left on disk is re-read and re-logged every second forever");
+    }
+  }
+
+  @Test
+  @DisplayName("a deferred request remains pending without consuming the one-shot guard")
+  void deferredRequestRemainsForLaterAcceptance(@TempDir Path tempDir) throws Exception {
+    Path runtime = runtimeDir(tempDir);
+    var decision = new AtomicReference<>(ShutdownRequestWatcher.Acceptance.DEFER);
+    var ran = new AtomicReference<ShutdownRequest>();
+    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep")
+        .writeTo(runtime);
+
+    try (var watcher = new ShutdownRequestWatcher(runtime, ignored -> decision.get(), ran::set, 50L)) {
+      watcher.pollOnce();
+      assertTrue(Files.exists(ShutdownRequest.pathIn(runtime)));
+      assertFalse(watcher.hasFired());
+      assertTrue(ran.get() == null);
+
+      decision.set(ShutdownRequestWatcher.Acceptance.ACCEPT);
+      watcher.pollOnce();
+      assertEquals("nonce", ran.get().nonce());
+      assertTrue(watcher.hasFired());
     }
   }
 
@@ -110,7 +138,7 @@ final class ShutdownRequestWatcherTest {
     try (var watcher =
         new ShutdownRequestWatcher(
             runtime,
-            r -> true,
+            r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> fileStillPresentWhenActing.set(Files.exists(ShutdownRequest.pathIn(runtime))),
             50L)) {
       watcher.pollOnce();
@@ -130,7 +158,11 @@ final class ShutdownRequestWatcherTest {
     var count = new java.util.concurrent.atomic.AtomicInteger();
 
     try (var watcher =
-        new ShutdownRequestWatcher(runtime, r -> true, r -> count.incrementAndGet(), 50L)) {
+        new ShutdownRequestWatcher(
+            runtime,
+            r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
+            r -> count.incrementAndGet(),
+            50L)) {
       new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null).writeTo(runtime);
       watcher.pollOnce();
       new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null).writeTo(runtime);
@@ -154,7 +186,7 @@ final class ShutdownRequestWatcherTest {
     try (var watcher =
         new ShutdownRequestWatcher(
             runtime,
-            r -> true,
+            r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> {
               threadName.set(Thread.currentThread().getName());
               latch.countDown();
@@ -184,7 +216,7 @@ final class ShutdownRequestWatcherTest {
     var watcher =
         new ShutdownRequestWatcher(
             runtime,
-            r -> true,
+            r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> {
               watcherRef.get().close();
               interruptedAfterClose.set(Thread.currentThread().isInterrupted());
@@ -208,7 +240,9 @@ final class ShutdownRequestWatcherTest {
     var ran = new AtomicReference<ShutdownRequest>();
     new ShutdownRequest(Reason.RESTART, 1L, null, "stale-supervisor", null).writeTo(runtime);
 
-    try (var watcher = new ShutdownRequestWatcher(runtime, r -> true, ran::set, 50L)) {
+    try (var watcher =
+        new ShutdownRequestWatcher(
+            runtime, r -> ShutdownRequestWatcher.Acceptance.ACCEPT, ran::set, 50L)) {
       watcher.pollOnce();
     }
 

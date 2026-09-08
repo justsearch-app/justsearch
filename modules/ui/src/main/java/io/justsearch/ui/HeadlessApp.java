@@ -1236,16 +1236,20 @@ public class HeadlessApp {
   }
 
   /** Accepts prepared upgrades only while their exact lease preparation remains live. */
-  static java.util.function.Predicate<io.justsearch.app.engine.ShutdownRequest>
+  static java.util.function.Function<
+          io.justsearch.app.engine.ShutdownRequest,
+          io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance>
       shutdownRequestAcceptance(io.justsearch.app.api.OperationLeaseService operationLeases) {
     return request -> {
       if (request.reason() != io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
           || request.preparationId() == null) {
-        return true;
+        return io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT;
       }
       io.justsearch.app.api.OperationLeaseSnapshot snapshot = operationLeases.snapshot();
       return snapshot.admissionFrozen()
-          && java.util.Objects.equals(request.preparationId(), snapshot.preparationId());
+              && java.util.Objects.equals(request.preparationId(), snapshot.preparationId())
+          ? io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT
+          : io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE;
     };
   }
 
@@ -1280,7 +1284,10 @@ public class HeadlessApp {
   /** Builds and starts the production watcher; boot clearing has already completed. */
   static io.justsearch.app.engine.ShutdownRequestWatcher startShutdownRequestWatcher(
       Path runtimeDir,
-      java.util.function.Predicate<io.justsearch.app.engine.ShutdownRequest> accepts,
+      java.util.function.Function<
+              io.justsearch.app.engine.ShutdownRequest,
+              io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance>
+          accepts,
       java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequest> onRequest,
       long pollIntervalMs,
       java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequestWatcher> beforeStart) {
