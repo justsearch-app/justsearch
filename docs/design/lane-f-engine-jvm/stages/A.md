@@ -1555,6 +1555,13 @@ green suite would otherwise be read as covering them:
   loop). What is new is that stage A put *replacement* assertions behind it. Any claim that A12's
   conversions are verified must name the stress runner, not the unit suite.
 
+**Later stress evidence (2026-09-08, stage B).** The full serialized stress run at
+`3721395ff` found a different failure from the earlier scheduling observations:
+`EngineFileLockContentionTest` closed its Lucene writer after a mandatory-lock
+segment-write exception and did not recover. Its assertion and timeout remain
+unchanged. This is a blocking B verification finding, not a new allowed red;
+see `evidence/B/integrated-verification.md` for the preserved cause and inventory.
+
 **Not allowed red (a defect of the stage, not a deliberate loss):**
 - the full unit suite, `spotlessCheck`, `pmdAll`, `./gradlew.bat build -x test`
 - `WholeProgramDeadCodeTest` (17.4 makes it the reason A is one stage)

@@ -476,3 +476,36 @@ PRs #708 and #717 remain the owner's per-PR merge decisions. No merge was perfor
 No benchmark, evaluation or capture longer than one hour was started. All implementers
 release their branch before orchestration edits or integration; reviewers remain
 read-only and do not implement the work they review.
+
+## Scope and integrated verification checkpoint (2026-09-08)
+
+The scope stop is committed as `da62f5201`; the independently reviewed drain
+fixture repair is `4349b28f5`. All B6 transaction and host ownership work is now
+integrated in the primary branch. The host worktree is clean at `bb0409520`, with
+no remaining implementation delta to integrate. No implementer retains branch or
+Gradle ownership after this checkpoint.
+
+The full stress-enabled run at `3721395ff` executed 9,364 tests and failed two.
+All 1,522 XML files and per-file hashes were captured before targeted reruns.
+The drain fixture now passes its full 699-test module; its deliberate wrong-reason
+mutation failed. The final repository build with tests excluded also passes.
+**The Engine file-locking boot test remains a blocking red.** A locked compound
+segment closed the Lucene writer; subsequent work kept retrying that writer.
+B14's no-client boot retry is not its recovery path. Read
+`evidence/B/integrated-verification.md` for exact commands, counts, raw logs and
+the next bounded detection/recovery/replay experiment. Do not turn an isolated
+passing rerun into a claim that the writer failure is fixed.
+
+The first-claim/accepted-marker request batch remains stopped. Before approving a
+replacement, prove the preferred single-writer cut through production response
+ordering, requested exits, responsive shutdown stalls and updater intent ownership
+as listed in `evidence/B/scope-recut.md`. If either recovery investigation needs a
+later-stage mechanism, apply 17.8 before moving it earlier. No stage-B completion,
+live-model/installer proof, PR merge or new PR is implied by this checkpoint.
+
+Closeout found no owned registered helper to reap; the ownerless OTLP sink
+(PID 14468) was reported and retained. The extra host branch is intentionally
+unpublished because all its reviewed content is integrated in the primary branch;
+it is not an outstanding implementation lane. The clean main-control worktree
+remains available for future comparisons. Unrelated worktrees and main were left
+untouched.

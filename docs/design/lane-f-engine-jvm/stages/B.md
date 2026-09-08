@@ -85,6 +85,18 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
 
 ### 0.1 Corrections found while implementing (appended per item)
 
+- **Scope stop (2026-09-08).** The newest design section 0 amendment suspends the
+  unimplemented shared first-claim/accepted-marker protocol. Read
+  `evidence/B/scope-recut.md` before the next B2/B3/B6/R3 batch. The preferred
+  single-writer cut needs production proof before replacing the current transport.
+- **B17's explicit stress run found a new blocking red (2026-09-08).** The
+  integrated 9,364-test inventory has two failures, preserved in
+  `evidence/B/integrated-verification.md`. The obsolete drain classifier is repaired
+  in `4349b28f5`; the Engine boot-under-file-lock test exposes a writer closed by
+  a segment-write failure with no effective runtime recovery. This is not B14's
+  no-client boot case. Do not claim stage-B verification or change the failing
+  assertion while the recovery investigation remains open.
+
 - **B10's production binding was not proved by the conformance adapter.** The adapter owns a
   distinct fake actuator, so its real-child timing cannot prove the shell's child slot, close/spawn
   admission, manifest event, stdout generation, watcher lifetime, or UI event writer. The follow-up

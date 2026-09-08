@@ -4,6 +4,27 @@ Base `b96cd999` (#687). Each fact was read in the source by the orchestrator or 
 reviewer and spot-checked; the implementation checklist written after the lock inherits them.
 Section numbers refer to `design.md` beside this file.
 
+## Runtime writer failure (2026-09-08, checked at 4349b28f5)
+
+The integrated stress failure is recorded in `evidence/B/integrated-verification.md`.
+`modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerHealthMonitor.java`:237-246
+only selects boot recovery without a client. With a client it calls `checkHealth`.
+`modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerHealthService.java`:200-225
+checks SQLite queue access and Lucene reader count, not writer usability.
+`modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java`:81-87
+returns zero on reader IO failure. Consequently, B14's boot-retry re-cut alone
+does not supply runtime recovery from the closed writer observed in the stress log.
+
+`modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java`:100-105
+starts `EngineRoot` directly; the failing test does not construct
+`KnowledgeServerHealthMonitor`, whose production construction and start are in
+`modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`:597-617.
+`modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java`:191-207
+records write failures, and
+`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java`:997-1025
+persists retry state. These sources do not prove automatic recovery or replay after
+this particular failure; that is the next bounded experiment.
+
 ## Wire and launch
 
 - `indexing.proto` has **49** RPCs on this base (10 Search + 38 Ingest + 1 Health): #664 added

@@ -1,0 +1,761 @@
+Calculating task graph as configuration cache cannot be reused because Gradle property 'includeStress' has changed.
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:compileKotlin UP-TO-DATE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors UP-TO-DATE
+> Task :build-logic:processResources UP-TO-DATE
+> Task :build-logic:classes UP-TO-DATE
+> Task :build-logic:jar UP-TO-DATE
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+The 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:194)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:adapters-lucene
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:43)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:83)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:ai-backend
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:27)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-agent
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:39)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-agent-api
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:20)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-api
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$4$1.execute(build.gradle.kts:35)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-api-tck
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:34)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-config
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:15)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-engine
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:68)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-inference
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:29)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-launcher
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$11$1.execute(build.gradle.kts:170)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-observability
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:56)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-services
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:99)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:app-util
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:17)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:configuration
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:22)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:core
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:35)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:dead-code-audit
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:58)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:gpu-bridge
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:14)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:indexer-worker
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$4$1.execute(build.gradle.kts:133)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:indexing
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:52)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:infra-core
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:24)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:ort-common
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:36)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:prompt-support
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$2$1.execute(build.gradle.kts:18)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:reranker
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:37)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:ssot-tools
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$4$1.execute(build.gradle.kts:36)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:system-tests
+The 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:119)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:123)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:128)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:131)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:telemetry
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$3$1.execute(build.gradle.kts:40)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:test-support
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$8$1.execute(build.gradle.kts:377)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:ui
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$4$1.execute(build.gradle.kts:92)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:186)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:207)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:215)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:230)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:255)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:304)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:330)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:349)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:438)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:455)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:508)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:590)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:655)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:706)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:804)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:846)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:918)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:937)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:997)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1035)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1100)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1155)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1221)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1308)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1369)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1492)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+The 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle.<init>(build.gradle.kts:1516)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:worker-core
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$5$1.execute(build.gradle.kts:128)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Configure project :modules:worker-services
+The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties
+	at Build_gradle$4$1.execute(build.gradle.kts:188)
+	(Run with --stacktrace to get the full stack trace of this deprecation warning.)
+
+> Task :modules:app-api-tck:cleanTest UP-TO-DATE
+> Task :modules:app-util:cleanTest
+> Task :modules:extension-substrate:cleanTest
+> Task :modules:app-config:cleanTest
+> Task :modules:api-contract-projection-java:cleanTest
+> Task :modules:dead-code-audit:cleanTest
+> Task :modules:core-contracts:cleanTest
+> Task :modules:core:cleanTest
+> Task :modules:gpu-bridge:cleanTest
+> Task :modules:app-engine:cleanTest
+> Task :modules:ai-backend:cleanTest
+> Task :modules:infra-core:cleanTest
+> Task :modules:benchmarks:cleanTest
+> Task :modules:prompt-support:cleanTest
+> Task :modules:ipc-common:cleanTest
+> Task :modules:ssot-tools:cleanTest
+> Task :modules:app-launcher:cleanTest
+> Task :modules:reranker:cleanTest
+> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE
+> Task :modules:test-support:cleanTest
+> Task :modules:core-contracts:compileJava UP-TO-DATE
+> Task :modules:adapters-lucene:processTestResources UP-TO-DATE
+> Task :modules:core:compileJava UP-TO-DATE
+> Task :modules:configuration:processResources UP-TO-DATE
+> Task :modules:adapters-lucene:processResources UP-TO-DATE
+> Task :modules:core:processResources NO-SOURCE
+> Task :modules:core-contracts:processResources NO-SOURCE
+> Task :modules:core:classes UP-TO-DATE
+> Task :modules:core-contracts:classes UP-TO-DATE
+> Task :modules:core-contracts:jar UP-TO-DATE
+> Task :modules:core:jar UP-TO-DATE
+> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE
+> Task :modules:indexing:processResources NO-SOURCE
+> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE
+> Task :modules:indexing:compileJava UP-TO-DATE
+> Task :modules:indexing:cleanTest
+> Task :modules:indexing:classes UP-TO-DATE
+> Task :modules:configuration:compileJava UP-TO-DATE
+> Task :modules:indexing:jar UP-TO-DATE
+> Task :modules:configuration:classes UP-TO-DATE
+> Task :modules:configuration:jar UP-TO-DATE
+> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE
+> Task :modules:app-inference:cleanTest
+> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE
+> Task :modules:ai-backend:processTestResources UP-TO-DATE
+> Task :modules:ai-backend:processResources UP-TO-DATE
+> Task :modules:app-agent-api:processResources NO-SOURCE
+> Task :modules:extension-substrate:processResources NO-SOURCE
+> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE
+> Task :modules:extension-substrate:compileJava UP-TO-DATE
+> Task :modules:app-api:processResources UP-TO-DATE
+> Task :modules:extension-substrate:classes UP-TO-DATE
+> Task :modules:api-contract-projection-java:processResources UP-TO-DATE
+> Task :modules:configuration:cleanTest
+> Task :modules:api-contract-projection-java:extractTestProto UP-TO-DATE
+> Task :modules:adapters-lucene:compileJava UP-TO-DATE
+> Task :modules:adapters-lucene:classes UP-TO-DATE
+> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE
+> Task :modules:adapters-lucene:jar UP-TO-DATE
+> Task :modules:api-contract-projection-java:processTestProtoResources UP-TO-DATE
+> Task :modules:api-contract-projection-java:processTestResources NO-SOURCE
+> Task :modules:extension-substrate:jar UP-TO-DATE
+> Task :modules:api-contract-projection-java:extractIncludeTestProto UP-TO-DATE
+> Task :modules:api-contract-projection-java:generateTestProto NO-SOURCE
+> Task :modules:app-agent:processResources NO-SOURCE
+> Task :modules:app-util:compileJava UP-TO-DATE
+> Task :modules:ipc-common:protobufDummy UP-TO-DATE
+> Task :modules:telemetry:compileJava UP-TO-DATE
+> Task :modules:app-config:compileJava UP-TO-DATE
+> Task :modules:ipc-common:extractProto UP-TO-DATE
+> Task :modules:adapters-lucene:compileTestJava UP-TO-DATE
+> Task :modules:adapters-lucene:testClasses UP-TO-DATE
+> Task :modules:infra-core:compileJava UP-TO-DATE
+> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE
+> Task :modules:api-contract-projection-java:classes UP-TO-DATE
+> Task :modules:api-contract-projection-java:jar UP-TO-DATE
+> Task :modules:configuration:compileTestFixturesJava UP-TO-DATE
+> Task :modules:app-config:processResources NO-SOURCE
+> Task :modules:app-config:classes UP-TO-DATE
+> Task :modules:app-agent-api:compileJava UP-TO-DATE
+> Task :modules:app-config:jar UP-TO-DATE
+> Task :modules:app-agent-api:classes UP-TO-DATE
+> Task :modules:app-agent-api:jar UP-TO-DATE
+> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE
+> Task :modules:app-api:cleanTest
+> Task :modules:app-util:processResources NO-SOURCE
+> Task :modules:app-util:classes UP-TO-DATE
+> Task :modules:app-agent:processTestResources UP-TO-DATE
+> Task :modules:configuration:processTestFixturesResources NO-SOURCE
+> Task :modules:configuration:testFixturesClasses UP-TO-DATE
+> Task :modules:app-util:jar UP-TO-DATE
+> Task :modules:app-observability:processResources UP-TO-DATE
+> Task :modules:telemetry:compileTestFixturesJava UP-TO-DATE
+> Task :modules:configuration:testFixturesJar UP-TO-DATE
+> Task :modules:prompt-support:processResources NO-SOURCE
+> Task :modules:infra-core:processResources NO-SOURCE
+> Task :modules:prompt-support:compileJava UP-TO-DATE
+> Task :modules:telemetry:processResources NO-SOURCE
+> Task :modules:telemetry:processTestFixturesResources NO-SOURCE
+> Task :modules:infra-core:classes UP-TO-DATE
+> Task :modules:prompt-support:classes UP-TO-DATE
+> Task :modules:telemetry:classes UP-TO-DATE
+> Task :modules:telemetry:testFixturesClasses UP-TO-DATE
+> Task :modules:api-contract-projection-java:compileTestJava UP-TO-DATE
+> Task :modules:api-contract-projection-java:testClasses UP-TO-DATE
+> Task :modules:ipc-common:processProtoResources UP-TO-DATE
+> Task :modules:infra-core:jar UP-TO-DATE
+> Task :modules:telemetry:jar UP-TO-DATE
+> Task :modules:prompt-support:jar UP-TO-DATE
+> Task :modules:telemetry:testFixturesJar UP-TO-DATE
+> Task :modules:app-agent-api:processTestResources NO-SOURCE
+> Task :modules:app-api-tck:processResources NO-SOURCE
+> Task :modules:app-api-tck:processTestResources NO-SOURCE
+> Task :modules:app-api-tck:compileJava NO-SOURCE
+> Task :modules:app-api-tck:classes UP-TO-DATE
+> Task :modules:app-api-tck:compileTestJava NO-SOURCE
+> Task :modules:app-api-tck:testClasses UP-TO-DATE
+> Task :modules:ipc-common:generateProto UP-TO-DATE
+> Task :modules:app-config:processTestResources NO-SOURCE
+> Task :modules:app-api:processTestResources UP-TO-DATE
+> Task :modules:ipc-common:processResources UP-TO-DATE
+> Task :modules:app-engine:processResources NO-SOURCE
+> Task :modules:app-api-tck:jar UP-TO-DATE
+> Task :modules:app-engine:processTestResources NO-SOURCE
+> Task :modules:app-inference:processResources NO-SOURCE
+> Task :modules:gpu-bridge:processResources NO-SOURCE
+> Task :modules:indexer-worker:processResources NO-SOURCE
+> Task :modules:ort-common:processResources NO-SOURCE
+> Task :modules:reranker:processResources NO-SOURCE
+> Task :modules:worker-core:processResources NO-SOURCE
+> Task :modules:worker-services:processResources NO-SOURCE
+> Task :modules:worker-services:processTestFixturesResources NO-SOURCE
+> Task :modules:gpu-bridge:compileJava UP-TO-DATE
+> Task :modules:app-config:compileTestJava UP-TO-DATE
+> Task :modules:app-config:testClasses UP-TO-DATE
+> Task :modules:gpu-bridge:classes UP-TO-DATE
+> Task :modules:app-inference:processTestResources NO-SOURCE
+> Task :modules:ort-common:compileJava UP-TO-DATE
+> Task :modules:ort-common:cleanTest
+> Task :modules:ort-common:classes UP-TO-DATE
+> Task :modules:gpu-bridge:jar UP-TO-DATE
+> Task :modules:app-services:processResources UP-TO-DATE
+> Task :modules:app-launcher:processTestResources UP-TO-DATE
+> Task :modules:app-agent-api:compileTestJava UP-TO-DATE
+> Task :modules:app-launcher:processResources UP-TO-DATE
+> Task :modules:app-agent-api:testClasses UP-TO-DATE
+> Task :modules:app-observability:processTestResources NO-SOURCE
+> Task :modules:app-services:processTestFixturesResources NO-SOURCE
+> Task :modules:ort-common:jar UP-TO-DATE
+> Task :modules:app-util:processTestResources NO-SOURCE
+> Task :modules:benchmarks:processResources UP-TO-DATE
+> Task :modules:benchmarks:processTestResources NO-SOURCE
+> Task :modules:configuration:processTestResources NO-SOURCE
+> Task :modules:app-services:processTestResources UP-TO-DATE
+> Task :modules:core:processTestResources UP-TO-DATE
+> Task :modules:telemetry:cleanTest
+> Task :modules:app-api:compileJava UP-TO-DATE
+> Task :modules:core-contracts:processTestResources UP-TO-DATE
+> Task :modules:app-util:compileTestJava UP-TO-DATE
+> Task :modules:app-api:classes UP-TO-DATE
+> Task :modules:reranker:compileJava UP-TO-DATE
+> Task :modules:app-api:jar UP-TO-DATE
+> Task :modules:app-agent-api:cleanTest
+> Task :modules:core-contracts:compileTestJava UP-TO-DATE
+> Task :modules:reranker:classes UP-TO-DATE
+> Task :modules:reranker:jar UP-TO-DATE
+> Task :modules:app-util:testClasses UP-TO-DATE
+> Task :modules:core:compileTestJava UP-TO-DATE
+> Task :modules:core:testClasses UP-TO-DATE
+> Task :modules:core-contracts:testClasses UP-TO-DATE
+> Task :modules:configuration:compileTestJava UP-TO-DATE
+> Task :modules:configuration:testClasses UP-TO-DATE
+> Task :modules:dead-code-audit:compileJava NO-SOURCE
+> Task :modules:app-agent:compileJava UP-TO-DATE
+> Task :modules:app-agent:classes UP-TO-DATE
+> Task :modules:dead-code-audit:processResources NO-SOURCE
+> Task :modules:dead-code-audit:classes UP-TO-DATE
+> Task :modules:dead-code-audit:processTestResources UP-TO-DATE
+> Task :modules:ipc-common:compileJava UP-TO-DATE
+> Task :modules:ai-backend:compileJava UP-TO-DATE
+> Task :modules:app-inference:compileJava UP-TO-DATE
+> Task :modules:app-agent:jar UP-TO-DATE
+> Task :modules:app-inference:classes UP-TO-DATE
+> Task :modules:ipc-common:classes UP-TO-DATE
+> Task :modules:ai-backend:classes UP-TO-DATE
+> Task :modules:app-inference:jar UP-TO-DATE
+> Task :modules:ipc-common:jar UP-TO-DATE
+> Task :modules:ai-backend:jar UP-TO-DATE
+> Task :modules:ssot-tools:processResources NO-SOURCE
+> Task :modules:app-api:compileTestJava UP-TO-DATE
+> Task :modules:benchmarks:compileJava UP-TO-DATE
+> Task :modules:benchmarks:classes UP-TO-DATE
+> Task :modules:app-api:testClasses UP-TO-DATE
+> Task :modules:benchmarks:jar UP-TO-DATE
+> Task :modules:ssot-tools:compileJava UP-TO-DATE
+> Task :modules:ssot-tools:classes UP-TO-DATE
+> Task :modules:extension-substrate:processTestResources NO-SOURCE
+> Task :modules:ssot-tools:jar UP-TO-DATE
+> Task :modules:app-inference:compileTestJava UP-TO-DATE
+> Task :modules:app-inference:testClasses UP-TO-DATE
+> Task :modules:gpu-bridge:processTestResources NO-SOURCE
+> Task :modules:extension-substrate:compileTestJava UP-TO-DATE
+> Task :modules:indexer-worker:processTestResources UP-TO-DATE
+> Task :modules:extension-substrate:testClasses UP-TO-DATE
+> Task :modules:ort-common:processTestFixturesResources NO-SOURCE
+> Task :modules:indexing:processTestResources NO-SOURCE
+> Task :modules:ai-backend:compileTestJava UP-TO-DATE
+> Task :modules:ai-backend:testClasses UP-TO-DATE
+> Task :modules:infra-core:processTestResources NO-SOURCE
+> Task :modules:benchmarks:compileTestJava UP-TO-DATE
+> Task :modules:gpu-bridge:compileTestJava UP-TO-DATE
+> Task :modules:ort-common:compileTestFixturesJava UP-TO-DATE
+> Task :modules:benchmarks:testClasses UP-TO-DATE
+> Task :modules:gpu-bridge:testClasses UP-TO-DATE
+> Task :modules:ort-common:testFixturesClasses UP-TO-DATE
+> Task :modules:ipc-common:extractTestProto UP-TO-DATE
+> Task :modules:ort-common:testFixturesJar UP-TO-DATE
+> Task :modules:app-observability:cleanTest
+> Task :modules:infra-core:compileTestJava UP-TO-DATE
+> Task :modules:infra-core:testClasses UP-TO-DATE
+> Task :modules:prompt-support:processTestResources NO-SOURCE
+> Task :modules:app-observability:compileJava UP-TO-DATE
+> Task :modules:app-observability:classes UP-TO-DATE
+> Task :modules:ipc-common:processTestProtoResources UP-TO-DATE
+> Task :modules:ort-common:processTestResources UP-TO-DATE
+> Task :modules:app-observability:jar UP-TO-DATE
+> Task :modules:ipc-common:processTestResources NO-SOURCE
+> Task :modules:prompt-support:compileTestJava UP-TO-DATE
+> Task :modules:prompt-support:testClasses UP-TO-DATE
+> Task :modules:ort-common:compileTestJava UP-TO-DATE
+> Task :modules:reranker:processTestResources NO-SOURCE
+> Task :modules:ort-common:testClasses UP-TO-DATE
+> Task :modules:ssot-tools:processTestResources NO-SOURCE
+> Task :modules:ipc-common:extractIncludeTestProto UP-TO-DATE
+> Task :modules:worker-core:compileJava UP-TO-DATE
+> Task :modules:worker-core:classes UP-TO-DATE
+> Task :modules:ipc-common:generateTestProto NO-SOURCE
+> Task :modules:ssot-tools:compileTestJava UP-TO-DATE
+> Task :modules:worker-core:jar UP-TO-DATE
+> Task :modules:reranker:compileTestJava UP-TO-DATE
+> Task :modules:ssot-tools:testClasses UP-TO-DATE
+> Task :modules:reranker:testClasses UP-TO-DATE
+> Task :modules:system-tests:processResources NO-SOURCE
+> Task :modules:ipc-common:compileTestJava UP-TO-DATE
+> Task :modules:ipc-common:testClasses UP-TO-DATE
+> Task :modules:ui:cleanTest
+> Task :modules:telemetry:processTestResources NO-SOURCE
+> Task :modules:system-tests:cleanTest
+> Task :modules:system-tests:processTestResources UP-TO-DATE
+> Task :modules:app-agent:compileTestJava UP-TO-DATE
+> Task :modules:test-support:processTestResources NO-SOURCE
+> Task :modules:app-agent:testClasses UP-TO-DATE
+> Task :modules:ui:processTestResources UP-TO-DATE
+> Task :modules:test-support:processResources UP-TO-DATE
+> Task :modules:worker-core:processTestFixturesResources NO-SOURCE
+> Task :modules:worker-core:processTestResources NO-SOURCE
+> Task :modules:system-tests:compileJava UP-TO-DATE
+> Task :modules:system-tests:classes UP-TO-DATE
+> Task :modules:worker-core:compileTestFixturesJava NO-SOURCE
+> Task :modules:worker-core:testFixturesClasses UP-TO-DATE
+> Task :modules:worker-services:processTestResources UP-TO-DATE
+> Task :modules:app-observability:compileTestJava UP-TO-DATE
+> Task :modules:worker-core:testFixturesJar UP-TO-DATE
+> Task :modules:app-observability:testClasses UP-TO-DATE
+> Task :modules:test-support:compileJava UP-TO-DATE
+> Task :modules:test-support:classes UP-TO-DATE
+> Task :modules:telemetry:compileTestJava UP-TO-DATE
+> Task :modules:telemetry:testClasses UP-TO-DATE
+> Task :modules:test-support:jar UP-TO-DATE
+> Task :modules:app-services:compileJava UP-TO-DATE
+> Task :modules:worker-services:compileJava UP-TO-DATE
+> Task :modules:app-services:classes UP-TO-DATE
+> Task :modules:worker-services:classes UP-TO-DATE
+> Task :modules:app-services:jar UP-TO-DATE
+> Task :modules:worker-services:jar UP-TO-DATE
+> Task :modules:app-services:compileTestFixturesJava NO-SOURCE
+> Task :modules:app-services:testFixturesClasses UP-TO-DATE
+> Task :modules:test-support:compileTestJava UP-TO-DATE
+> Task :modules:test-support:testClasses UP-TO-DATE
+> Task :modules:app-services:testFixturesJar UP-TO-DATE
+> Task :modules:app-launcher:compileJava UP-TO-DATE
+> Task :modules:app-launcher:classes UP-TO-DATE
+> Task :modules:app-launcher:jar UP-TO-DATE
+> Task :modules:indexer-worker:compileJava UP-TO-DATE
+> Task :modules:indexer-worker:classes UP-TO-DATE
+> Task :modules:worker-core:compileTestJava UP-TO-DATE
+> Task :modules:worker-core:testClasses UP-TO-DATE
+> Task :modules:indexer-worker:jar UP-TO-DATE
+> Task :modules:app-engine:compileJava UP-TO-DATE
+> Task :modules:app-engine:classes UP-TO-DATE
+> Task :modules:app-engine:jar UP-TO-DATE
+> Task :modules:system-tests:compileTestJava UP-TO-DATE
+> Task :modules:app-launcher:compileTestJava UP-TO-DATE
+> Task :modules:app-launcher:testClasses UP-TO-DATE
+> Task :modules:worker-services:compileTestFixturesJava UP-TO-DATE
+> Task :modules:system-tests:testClasses UP-TO-DATE
+> Task :modules:worker-services:testFixturesClasses UP-TO-DATE
+> Task :modules:worker-services:testFixturesJar UP-TO-DATE
+> Task :modules:app-engine:compileTestJava UP-TO-DATE
+> Task :modules:app-engine:testClasses UP-TO-DATE
+> Task :modules:ui:compileJava UP-TO-DATE
+> Task :modules:dead-code-audit:compileTestJava UP-TO-DATE
+> Task :modules:adapters-lucene:cleanTest
+> Task :modules:indexer-worker:compileTestJava UP-TO-DATE
+> Task :modules:dead-code-audit:testClasses UP-TO-DATE
+> Task :modules:indexer-worker:testClasses UP-TO-DATE
+> Task :modules:app-services:compileTestJava UP-TO-DATE
+> Task :modules:app-services:testClasses UP-TO-DATE
+> Task :modules:worker-services:compileTestJava UP-TO-DATE
+> Task :modules:worker-services:testClasses UP-TO-DATE
+> Task :modules:worker-core:cleanTest
+> Task :modules:app-agent:cleanTest
+> Task :modules:indexer-worker:cleanTest
+> Task :modules:ui:syncSsotSchemas UP-TO-DATE
+> Task :modules:indexing:compileTestJava UP-TO-DATE
+> Task :modules:indexing:testClasses UP-TO-DATE
+> Task :modules:ui:installWebDependencies UP-TO-DATE
+> Task :modules:ui:buildWeb UP-TO-DATE
+> Task :modules:ui:copyWebResources UP-TO-DATE
+> Task :modules:ui:processResources UP-TO-DATE
+> Task :modules:ui:classes UP-TO-DATE
+> Task :modules:ui:jar UP-TO-DATE
+> Task :modules:ui:compileTestJava UP-TO-DATE
+> Task :modules:ui:testClasses UP-TO-DATE
+> Task :modules:worker-services:cleanTest
+> Task :modules:app-services:cleanTest
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+> Task :modules:api-contract-projection-java:test
+> Task :modules:api-contract-projection-java:jacocoTestReport SKIPPED
+> Task :modules:adapters-lucene:test
+
+LifecycleStressTest > fiftyHolderSwapCycles_noLeaks_concurrentReadsAndWrites() FAILED
+    org.opentest4j.AssertionFailedError at LifecycleStressTest.java:255
+
+699 tests completed, 1 failed
+
+> Task :modules:adapters-lucene:test FAILED
+> Task :modules:adapters-lucene:jacocoTestReport SKIPPED
+> Task :modules:ai-backend:test
+> Task :modules:ai-backend:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+> Task :modules:app-agent:test
+> Task :modules:app-agent:jacocoTestReport SKIPPED
+> Task :modules:app-agent-api:test
+> Task :modules:app-agent-api:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+> Task :modules:app-api:test
+> Task :modules:app-api:jacocoTestReport SKIPPED
+> Task :modules:app-api-tck:test NO-SOURCE
+> Task :modules:app-api-tck:jacocoTestReport SKIPPED
+> Task :modules:app-config:test
+> Task :modules:app-config:jacocoTestReport SKIPPED
+> Task :modules:app-engine:test
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+
+> Task :modules:app-engine:test
+
+EngineFileLockContentionTest > the index half boots and indexes while an intruder holds locks under the data directory FAILED
+    org.opentest4j.AssertionFailedError at EngineFileLockContentionTest.java:119
+
+125 tests completed, 1 failed
+
+> Task :modules:app-engine:test FAILED
+> Task :modules:app-engine:jacocoTestReport SKIPPED
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :modules:app-inference:test
+> Task :modules:app-inference:jacocoTestReport SKIPPED
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+> Task :modules:app-launcher:test
+> Task :modules:app-launcher:jacocoTestReport SKIPPED
+> Task :modules:app-observability:test
+> Task :modules:app-observability:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[LightGBM] [Warning] There are no meaningful features which satisfy the provided configuration. Decreasing Dataset parameters min_data_in_bin or min_data_in_leaf and re-constructing Dataset might resolve this warning.
+> Task :modules:app-services:test
+
+[LightGBM] [Warning] There are no meaningful features which satisfy the provided configuration. Decreasing Dataset parameters min_data_in_bin or min_data_in_leaf and re-constructing Dataset might resolve this warning.
+
+> Task :modules:app-services:jacocoTestReport SKIPPED
+> Task :modules:app-util:test
+> Task :modules:app-util:jacocoTestReport SKIPPED
+> Task :modules:benchmarks:test
+> Task :modules:benchmarks:jacocoTestReport SKIPPED
+> Task :modules:configuration:test
+> Task :modules:configuration:jacocoTestReport SKIPPED
+> Task :modules:core:test
+> Task :modules:core:jacocoTestReport SKIPPED
+> Task :modules:core-contracts:test
+> Task :modules:core-contracts:jacocoTestReport SKIPPED
+> Task :modules:dead-code-audit:test
+> Task :modules:dead-code-audit:jacocoTestReport SKIPPED
+> Task :modules:extension-substrate:test
+> Task :modules:extension-substrate:jacocoTestReport SKIPPED
+> Task :modules:gpu-bridge:test
+> Task :modules:gpu-bridge:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :modules:indexer-worker:test
+
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :modules:indexer-worker:jacocoTestReport SKIPPED
+> Task :modules:indexing:test
+> Task :modules:indexing:jacocoTestReport SKIPPED
+> Task :modules:infra-core:test
+> Task :modules:infra-core:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+> Task :modules:ipc-common:test
+> Task :modules:ipc-common:jacocoTestReport SKIPPED
+> Task :modules:ort-common:test
+> Task :modules:ort-common:jacocoTestReport SKIPPED
+> Task :modules:prompt-support:test
+> Task :modules:prompt-support:jacocoTestReport SKIPPED
+> Task :modules:reranker:test
+> Task :modules:reranker:jacocoTestReport SKIPPED
+> Task :modules:ssot-tools:test
+> Task :modules:ssot-tools:jacocoTestReport SKIPPED
+> Task :modules:system-tests:test
+> Task :modules:system-tests:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+> Task :modules:telemetry:test
+> Task :modules:telemetry:jacocoTestReport SKIPPED
+> Task :modules:test-support:test
+> Task :modules:test-support:jacocoTestReport SKIPPED
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+> Task :modules:ui:test
+> Task :modules:ui:jacocoTestReport SKIPPED
+> Task :modules:worker-core:test
+> Task :modules:worker-core:jacocoTestReport SKIPPED
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :modules:worker-services:test
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/C:/Users/Elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)
+WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+
+> Task :modules:worker-services:jacocoTestReport SKIPPED
+
+[Incubating] Problems report is available at: file:///F:/justsearch-public/.claude/worktrees/lane-F-A/build/reports/problems/problems-report.html
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':modules:adapters-lucene:test'.
+> There were failing tests. See the report at: file:///F:/justsearch-public/.claude/worktrees/lane-F-A/modules/adapters-lucene/build/reports/tests/test/index.html
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':modules:app-engine:test'.
+> There were failing tests. See the report at: file:///F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-engine/build/reports/tests/test/index.html
+==============================================================================
+
+229 actionable tasks: 68 executed, 161 up-to-date
+BUILD FAILED in 23m 55s
+Configuration cache entry stored.

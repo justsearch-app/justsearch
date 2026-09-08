@@ -617,6 +617,17 @@ removed. [The scope review](evidence/B/scope-recut.md) records alternatives, cos
 retirements and the required proof. The previous main-development stop-rule
 disposition remains in force. No stage checkpoint or merge is authorized here.
 
+**Integrated stress verification finding (orchestrator, 2026-09-08).** The fresh
+9,364-test run exposes a closed Lucene writer after file-lock contention. This is
+a blocking recovery finding, not an allowed timing red: B14's no-client boot retry
+does not repair an already-bound client with an unusable writer. Preserve the
+assertion and investigate detection, recovery ownership and durable replay before
+choosing a fix. If the remedy needs D1's activation mechanism, 17.8 applies again;
+this finding does not itself approve moving live replacement into B. The separate
+drain-retry fixture defect is repaired without production changes. Exact evidence
+and the still-red suite inventory are in
+[the integrated verification record](evidence/B/integrated-verification.md).
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.
