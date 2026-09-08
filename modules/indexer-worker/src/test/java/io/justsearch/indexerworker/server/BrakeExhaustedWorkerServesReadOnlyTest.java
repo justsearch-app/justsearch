@@ -96,7 +96,6 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
     assertTrue(
         server.rebuildBrakeExhaustedForTest(),
         "precondition: the boot actually took the exhausted-brake path");
-    assertTrue(server.isRunning(), "the Worker must not treat an exhausted brake as a fatal start");
     assertNotNull(
         server.appServices(),
         "start() must have run to completion: a Worker with no service surface is a Worker gone");

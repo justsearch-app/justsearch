@@ -1,4 +1,4 @@
-package io.justsearch.app.services.worker;
+package io.justsearch.app.services.supervision;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

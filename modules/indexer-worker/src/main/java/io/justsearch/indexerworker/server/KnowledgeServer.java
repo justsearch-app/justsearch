@@ -182,20 +182,8 @@ public final class KnowledgeServer implements Closeable {
   @SuppressWarnings("unused")
   private io.justsearch.indexerworker.services.WorkerOpsMetricCatalog workerOpsCatalog;
   /**
-   * Released by {@link #close()} and read by {@link #isRunning()}.
-   *
-   * <p>Lane F stage A item A9: this used to be the gRPC {@code Server}'s own termination, and
-   * "running" needed a definition that is not "a socket is bound". Item A13 deleted the standalone
-   * {@code IndexerWorker.main} that parked on this latch, so nothing blocks on it any more.
-   *
-   * <p><b>Stage-A checkpoint (blocker 1).</b> The previous sentence here said "the sentinel or a
-   * migration cutover releases it". That was the defect, not a description: the cutover released it
-   * through {@code initiateShutdown()}, which set {@code running = false} and counted this down
-   * WITHOUT reopening the index — so a cutover marked the server not-running while it went on
-   * serving the old generation, and stopped the sentinel thread as a side effect. That path is
-   * deleted. {@link #close()} is now the only releaser, which is the only event that actually means
-   * "this server is finished", and {@code EngineRoot.close()} reads {@link #isRunning()} afterwards
-   * to confirm the close completed.
+   * Released only after {@link #close()} reaches its final resource-release step. EngineRoot
+   * checks {@link #awaitClosed(long)} to distinguish completed teardown from an interrupted close.
    */
   private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
@@ -2160,15 +2148,6 @@ public final class KnowledgeServer implements Closeable {
    */
   public ForegroundLoad foregroundLoad() {
     return foregroundLoad;
-  }
-
-  /**
-   * Checks if the server is running.
-   *
-   * @return true if the server is running
-   */
-  public boolean isRunning() {
-    return running && shutdownLatch.getCount() > 0;
   }
 
   /**

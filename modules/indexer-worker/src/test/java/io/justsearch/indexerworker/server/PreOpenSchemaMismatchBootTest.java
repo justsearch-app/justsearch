@@ -74,7 +74,7 @@ final class PreOpenSchemaMismatchBootTest {
         "an index whose shape changed must start migrating at boot — this is the whole point of"
             + " making BLUE_GREEN_MIGRATE the production default");
     assertNotNull(after.building_generation(), "a Green generation was allocated");
-    assertTrue(server.isRunning(), "and Blue keeps serving while it rebuilds");
+    assertNotNull(server.appServices(), "Blue's service surface is built while Green rebuilds");
   }
 
   /** (a) The same index under the refusing policy. */
@@ -180,9 +180,8 @@ final class PreOpenSchemaMismatchBootTest {
     server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
-    assertTrue(server.isRunning(), "a misspelled policy is a typo, not a reason to refuse to boot");
     assertNotNull(
-        server.appServices(), "and start() ran to completion: the service surface is built");
+        server.appServices(), "a misspelled policy must still build the service surface");
   }
 
   /**
@@ -216,7 +215,6 @@ final class PreOpenSchemaMismatchBootTest {
       server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
-      assertTrue(server.isRunning(), "auto-recovery must still get its chance to run");
       assertNotNull(
           server.appServices(), "a Worker with no service surface is a Worker gone");
       var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
@@ -301,7 +299,7 @@ final class PreOpenSchemaMismatchBootTest {
           stateAfterBoot(layout).migration_state(),
           "a matching index must not be migrated — a detector that fires on everything is not a"
               + " detector");
-      assertTrue(server.isRunning());
+      assertNotNull(server.appServices(), "a matching index builds its service surface");
       assertFalse(
           appender.list.stream()
               .map(ILoggingEvent::getFormattedMessage)
