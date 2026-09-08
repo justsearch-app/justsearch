@@ -6,7 +6,7 @@
 # Without these lines the weights sit untracked-AND-unignored, so one `git add
 # -A` stages ~2.6 GB into public history through the *.onnx LFS filter in
 # .gitattributes. That is not hypothetical: the same move already leaked the
-# orchestration skills (branch-safety.md, accepted-tracked-skills-no-removal).
+# orchestration skills (agent-postmortems.md §30, accepted-tracked-skills-no-removal).
 *.onnx
 *.gguf
 *onnx_data

@@ -6461,3 +6461,231 @@ describe('UnifiedChatView reloaded-turn shape provenance (tempdoc 941 F4)', () =
     view.remove();
   });
 });
+
+/**
+ * Tempdoc 859 (live, 2026-08-25) — selecting a conversation from the History dropdown while the
+ * window sat on the `retrieve` base tier LOADED the session (the id was set, the activity rail showed
+ * the run) and rendered a BLANK stage. Measured on ask AND delegate records alike.
+ *
+ * The renderer gates the whole thread branch behind `affordance !== 'retrieve'` and puts the hit-list
+ * in its place, while the resume card hides itself the moment `thread` has content — so a session
+ * loaded on the retrieve tier showed neither, with no cue that an escalation was what stood between
+ * the reader and the conversation they had just asked for.
+ *
+ * The exit existed, but it lived on `restoreRecentConversation` — the resume card's handler — so only
+ * ONE of the doors into a conversation had it. These pin it on the load itself, which is what makes
+ * "show me this conversation" answer the same way whichever door the reader used.
+ */
+describe('859: loading a conversation leaves the retrieve tier, whichever door was used', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetUnifiedChatState();
+    __resetUserConfigForTest();
+    __resetUiModeForTest();
+    vi.mocked(resumeConversation).mockImplementation(async (sessionId: string) => ({
+      sessionId,
+      shapeId: 'core.free-chat',
+      messages: [
+        { id: 'm1', role: 'user', content: 'what did we decide about the worker?' },
+        { id: 'm2', role: 'assistant', content: 'The Worker owns all index I/O.' },
+      ],
+    }) as never);
+  });
+
+  /** The window as the reader left it: on the retrieve tier with a live hit-list. */
+  async function onRetrieveWithResults(): Promise<UnifiedChatView> {
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'retrieve';
+    (view as unknown as { searchSnapshot: unknown }).searchSnapshot = {
+      query: 'worker',
+      results: [],
+      isSearching: false,
+      error: null,
+    };
+    view.requestUpdate();
+    await view.updateComplete;
+    expect(view.affordance, 'the fixture did not reach the retrieve tier').toBe('retrieve');
+    return view;
+  }
+
+  const messages = (view: UnifiedChatView): number =>
+    view.shadowRoot?.querySelectorAll('.message').length ?? 0;
+
+  it('the History dropdown renders the thread instead of a blank stage', async () => {
+    const view = await onRetrieveWithResults();
+    // Through the real event the dropdown fires, not the private handler: the defect was about which
+    // DOOR carried the exit, so a test that called the handler directly would assert nothing.
+    const history = view.shadowRoot?.querySelector('jf-conversation-history');
+    expect(history, 'the History dropdown is not mounted').not.toBeNull();
+    history!.dispatchEvent(
+      new CustomEvent('conversation-select', {
+        detail: { sessionId: 'uc-history-1', shapeId: 'core.free-chat' },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    for (let i = 0; i < 6; i += 1) await new Promise<void>((r) => setTimeout(r, 0));
+    await view.updateComplete;
+
+    // The session loaded…
+    expect(vi.mocked(resumeConversation)).toHaveBeenCalledWith('uc-history-1', 'core.free-chat');
+    // …and the stage is the CONVERSATION, not the hit-list and not nothing.
+    expect(view.affordance).not.toBe('retrieve');
+    expect(view.shadowRoot?.querySelector('[data-testid="retrieve-tier"]')).toBeNull();
+    expect(messages(view), 'the stage rendered blank — the 859 defect').toBeGreaterThan(0);
+    // BOTH turns of the restored thread, by id: a count alone would pass on a placeholder. (The
+    // assistant's prose itself lives inside <jf-markdown-block>'s own shadow root, which this tree's
+    // `textContent` does not cross, so the assertion is on the turns rather than on the words.)
+    expect(view.shadowRoot?.querySelector('.message.user[data-item-id="m1"]')).not.toBeNull();
+    expect(view.shadowRoot?.querySelector('.message.assistant[data-item-id="m2"]')).not.toBeNull();
+    view.remove();
+  });
+
+  it('the resume card keeps the behaviour it already had', async () => {
+    // The one door that WAS covered. Pinned so moving the exit onto the load did not quietly drop it
+    // from the path it originally served.
+    const view = await onRetrieveWithResults();
+    await (
+      view as unknown as { restoreRecentConversation: (id: string) => void }
+    ).restoreRecentConversation('uc-resume-1');
+    for (let i = 0; i < 6; i += 1) await new Promise<void>((r) => setTimeout(r, 0));
+    await view.updateComplete;
+    expect(view.affordance).not.toBe('retrieve');
+    expect(messages(view)).toBeGreaterThan(0);
+    view.remove();
+  });
+
+  it('a load from a NON-retrieve tier leaves the tier alone', async () => {
+    // The exit is scoped to the state it repairs: it must not knock a reader off Documents/Agent as
+    // a side effect of opening a past chat.
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'documents';
+    await view.updateComplete;
+    const history = view.shadowRoot?.querySelector('jf-conversation-history');
+    history!.dispatchEvent(
+      new CustomEvent('conversation-select', {
+        detail: { sessionId: 'uc-history-2', shapeId: 'core.free-chat' },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    for (let i = 0; i < 6; i += 1) await new Promise<void>((r) => setTimeout(r, 0));
+    await view.updateComplete;
+    expect(view.affordance).toBe('documents');
+    view.remove();
+  });
+});
+
+/**
+ * Tempdoc 941 — the RESUMED thread carries the same per-message shape data as a live one.
+ *
+ * F4 above closed the unified-thread (record) path. The conversation-history path is the other
+ * half: `loadConversation` stamped ONE conversation-level shape across every resumed message, so
+ * in a mixed conversation a `core.rag-ask` turn came back declaring the shape that merely OPENED
+ * the conversation. `resumeConversation` now surfaces the per-message `shapeId` the store has
+ * stamped since 863, and the window reads it.
+ */
+describe('UnifiedChatView resumed-thread shape provenance (tempdoc 941)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The window auto-restores the last-viewed conversation at mount, which would consume a
+    // one-shot mock before the test's own load ran. Start each case with no pointer.
+    clearLastViewedConversation();
+  });
+
+  afterEach(() => {
+    vi.mocked(resumeConversation).mockResolvedValue({
+      sessionId: 'uc',
+      shapeId: 'core.free-chat',
+      messages: [],
+    });
+  });
+
+  async function loadResumed(messages: unknown[]): Promise<UnifiedChatView> {
+    vi.mocked(resumeConversation).mockResolvedValue({
+      sessionId: 'uc-mixed',
+      shapeId: 'core.free-chat',
+      messages: messages as never,
+    });
+    const view = mountView();
+    await view.updateComplete;
+    // @ts-expect-error — private method, driven directly (the mocked store answers the fetch).
+    await view.loadConversation('uc-mixed', 'core.free-chat');
+    return view;
+  }
+
+  it('stamps each resumed turn with the shape the RECORD declares', async () => {
+    const view = await loadResumed([
+      { role: 'user', content: 'q', id: 'm1', shapeId: 'core.rag-ask' },
+      { role: 'assistant', content: 'a', id: 'm2', shapeId: 'core.rag-ask' },
+      { role: 'user', content: 'run it', id: 'm3', shapeId: 'core.agent-run' },
+    ]);
+    expect(view.thread.map((m) => m.shapeId)).toEqual([
+      'core.rag-ask',
+      'core.rag-ask',
+      'core.agent-run',
+    ]);
+    // Precision: the conversation-level shape was `core.free-chat`, so every one of these would
+    // have read `core.free-chat` before — the assertion cannot pass for the old reason.
+    view.remove();
+  });
+
+  it('falls back to the conversation shape for a record that declares none, or an unknown one', async () => {
+    const view = await loadResumed([
+      { role: 'user', content: 'legacy', id: 'm1' },
+      { role: 'user', content: 'from a newer build', id: 'm2', shapeId: 'core.not-a-shape' },
+    ]);
+    // No backfill exists for pre-863 rows, and a shape this build does not know must not be cast
+    // into the union — both keep the only fact available, the conversation's own shape.
+    expect(view.thread.map((m) => m.shapeId)).toEqual(['core.free-chat', 'core.free-chat']);
+    view.remove();
+  });
+
+  it('941 review — the conversation-level shape narrows through the same authority (workflow-run)', async () => {
+    // The hand-rolled four-arm narrowing this replaced predated `core.workflow-run` (565 §15.C)
+    // and never gained it, so a resumed workflow conversation fell through to `core.free-chat` —
+    // an `ungrounded-llm` class — for every turn the record did not individually stamp.
+    vi.mocked(resumeConversation).mockResolvedValue({
+      sessionId: 'uc-wf',
+      shapeId: 'core.workflow-run',
+      messages: [{ role: 'user', content: 'run the brief', id: 'm1' }] as never,
+    });
+    const view = mountView();
+    await view.updateComplete;
+    // @ts-expect-error — private method.
+    await view.loadConversation('uc-wf', 'core.workflow-run');
+    expect(view.thread[0]?.shapeId).toBe('core.workflow-run');
+    view.remove();
+  });
+
+  it('941 review — a resumed EXTRACT turn keeps its verbatim render (isExtract)', async () => {
+    // Extract renders verbatim (`transform`), not as markdown. The record carries no per-turn
+    // `isExtract`, so both rebuild paths derive it from the turn's shape — the unified-thread path
+    // already did; resume set the shape and not the flag, so one turn rendered two ways depending
+    // on which path rebuilt it.
+    const view = await loadResumed([
+      { role: 'assistant', content: 'extracted', id: 'm1', shapeId: 'core.extract' },
+      { role: 'assistant', content: 'chatted', id: 'm2', shapeId: 'core.free-chat' },
+    ]);
+    expect(view.thread.map((m) => m.isExtract)).toEqual([true, false]);
+    view.remove();
+  });
+
+  it('carries a resumed turn’s standaloneQuestion onto the thread', async () => {
+    const view = await loadResumed([
+      {
+        role: 'assistant',
+        content: 'a',
+        id: 'm1',
+        shapeId: 'core.rag-ask',
+        standaloneQuestion: 'What did the Q3 report say about churn?',
+      },
+    ]);
+    expect(view.thread[0]?.standaloneQuestion).toBe(
+      'What did the Q3 report say about churn?',
+    );
+    view.remove();
+  });
+});

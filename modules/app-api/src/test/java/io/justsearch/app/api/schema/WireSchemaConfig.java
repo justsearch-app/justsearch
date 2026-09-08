@@ -16,10 +16,15 @@ import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.NamespacedId;
 import io.justsearch.agent.api.registry.Nullable;
 import io.justsearch.agent.api.registry.PreciseWire;
+import io.justsearch.app.api.WireEnumIds;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -67,7 +72,85 @@ public final class WireSchemaConfig {
     // Tempdoc 560 §4c: precision — populate `required` for PreciseWire types (closes the 564 §7.2
     // all-optional gap, opt-in so non-registry baselines stay byte-identical).
     builder.forFields().withRequiredCheck(WireSchemaConfig::isRequiredOnWire);
+    // A String field that carries an enum's published ids states the closed set (see WireEnumIds).
+    builder.forFields().withInstanceAttributeOverride(WireSchemaConfig::injectWireEnumIds);
     return new SchemaGenerator(builder.build());
+  }
+
+  /**
+   * Narrows a {@link WireEnumIds}-marked {@code String} field from a bare string to the closed set
+   * of its enum's published ids, so the schema (and the FE type/Zod generated from it) can state
+   * which values the wire actually carries.
+   *
+   * <p>A nullable field becomes {@code anyOf: [{string + enum}, {null}]} rather than an {@code enum}
+   * containing {@code null}: {@code gen-wire-schema-types.mjs} renders a nullable branch as
+   * {@code z.enum([...]).nullable()}, while a null INSIDE the enum list would emit
+   * {@code z.enum([..., null])} — not a legal Zod enum. Same accepted values, a validator that runs.
+   */
+  private static void injectWireEnumIds(
+      ObjectNode node, FieldScope field, SchemaGenerationContext context) {
+    WireEnumIds marker = field.getAnnotationConsideringFieldAndGetter(WireEnumIds.class);
+    if (marker == null) {
+      return;
+    }
+    List<String> ids = publishedIds(marker.value());
+    if (marker.allowEmpty()) {
+      ids.add("");
+    }
+    String typeKey = SchemaKeyword.TAG_TYPE.forVersion(SchemaVersion.DRAFT_2020_12);
+    String enumKey = SchemaKeyword.TAG_ENUM.forVersion(SchemaVersion.DRAFT_2020_12);
+    // The `type` keyword is not in the collected member attributes at override time (victools
+    // applies nullability to the type schema afterwards), so ask the same predicate the rest of
+    // this config uses rather than inspecting the node — otherwise an explicit `type: string`
+    // here would silently DROP the null the field is allowed to carry.
+    boolean nullable = Boolean.TRUE.equals(isNullableOnWire(field));
+
+    ObjectNode stringBranch = context.getGeneratorConfig().createObjectNode();
+    stringBranch.put(typeKey, "string");
+    ArrayNode values = context.getGeneratorConfig().createArrayNode();
+    ids.forEach(values::add);
+    stringBranch.set(enumKey, values);
+
+    node.remove(typeKey);
+    node.remove(enumKey);
+    if (!nullable) {
+      node.setAll(stringBranch);
+      return;
+    }
+    ObjectNode nullBranch = context.getGeneratorConfig().createObjectNode();
+    nullBranch.put(typeKey, "null");
+    ArrayNode anyOf = context.getGeneratorConfig().createArrayNode();
+    anyOf.add(stringBranch);
+    anyOf.add(nullBranch);
+    node.set(SchemaKeyword.TAG_ANYOF.forVersion(SchemaVersion.DRAFT_2020_12), anyOf);
+  }
+
+  /**
+   * The wire ids of an enum's constants: its {@code id()} accessor when it publishes one (the
+   * convention in this codebase, e.g. {@code SkipCause.id()} → {@code "user-declined"}), else the
+   * constant name. Read from the enum itself so the schema projects the enum rather than restating
+   * it.
+   */
+  private static List<String> publishedIds(Class<? extends Enum<?>> enumClass) {
+    Method idAccessor;
+    try {
+      idAccessor = enumClass.getMethod("id");
+    } catch (NoSuchMethodException e) {
+      idAccessor = null;
+    }
+    List<String> ids = new ArrayList<>();
+    for (Enum<?> constant : enumClass.getEnumConstants()) {
+      if (idAccessor == null) {
+        ids.add(constant.name());
+        continue;
+      }
+      try {
+        ids.add(String.valueOf(idAccessor.invoke(constant)));
+      } catch (ReflectiveOperationException e) {
+        throw new IllegalStateException("cannot read " + enumClass.getName() + ".id()", e);
+      }
+    }
+    return ids;
   }
 
   /**

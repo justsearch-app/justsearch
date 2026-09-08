@@ -438,6 +438,27 @@ describe('the answer\'s evidence is stored on its turn and rendered from there',
   });
 });
 
+/**
+ * The markdown/sanitiser FORK shapes, as code rather than as vocabulary: a dependency edge on either
+ * package (static, side-effect, re-export, `require`, dynamic `import()`), or a call site of one of
+ * their APIs for the case where the binding arrives some other way (a global, a local re-export).
+ * The import half is already covered more strongly by the "no third-party package" assertion above;
+ * the call-site half is what this adds, and it is why the guard is patterns rather than a word list.
+ */
+const MARKDOWN_FORK_PATTERNS: readonly RegExp[] = [
+  /(?:^|\W)(?:import|export)\b[^'"\n]*\bfrom\s*['"](?:marked|dompurify)(?:\/[^'"]*)?['"]/m,
+  /^\s*import\s*['"](?:marked|dompurify)(?:\/[^'"]*)?['"]/m,
+  /\b(?:import|require)\s*\(\s*['"](?:marked|dompurify)(?:\/[^'"]*)?['"]\s*\)/,
+  /\bnew\s+Marked\s*\(/,
+  /\bmarked\s*\.\s*(?:parse|parseInline|use|setOptions|lexer|Lexer|Renderer)\b/,
+  /\bmarked\s*\(/,
+  /\bDOMPurify\s*\.\s*sanitize\s*\(/,
+  /\bcreateDOMPurify\s*\(/,
+];
+
+const forksMarkdown = (src: string): boolean =>
+  MARKDOWN_FORK_PATTERNS.some((pattern) => pattern.test(src));
+
 describe('the window brings no renderer and no dependency of its own', () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const sources = (): string[] =>
@@ -467,8 +488,43 @@ describe('the window brings no renderer and no dependency of its own', () => {
     // A window-local parse would be the fork these imports exist to prevent — including a second
     // sanitiser, which is the part that would be a security defect and not merely a duplicate.
     const parsers = sources().filter((name) =>
-      /\b(marked|Marked|DOMPurify|dompurify)\b/.test(readFileSync(join(here, name), 'utf8')),
+      forksMarkdown(readFileSync(join(here, name), 'utf8')),
     );
     expect(parsers).toEqual([]);
+  });
+
+  // Tempdoc 859 (2026-08-25) — the guard used to be /\b(marked|Marked|DOMPurify|dompurify)\b/ over
+  // the whole file, so an ordinary English sentence using the word "marked" (this window's own
+  // vocabulary: a citation MARK, a turn marked cut-short) failed a SECURITY assertion. A guard that
+  // fires on prose gets read as noise and then gets loosened, which is how the real one goes away.
+  // These cases pin the tightening in both directions: the fork shapes must still fail, and the
+  // prose must not.
+  it('the fork guard reads dependency edges and call sites, not the English word', () => {
+    for (const fork of [
+      `import { marked } from 'marked';`,
+      `import {marked as md} from "marked";`,
+      `import * as marked from 'marked/lib/marked.esm.js';`,
+      `import 'dompurify';`,
+      `export { marked } from 'marked';`,
+      `const { marked } = require('marked');`,
+      `const mod = await import("dompurify");`,
+      `const md = new Marked({ gfm: true });`,
+      `return marked.parse(text);`,
+      `marked.setOptions({});`,
+      `const html = marked(text);`,
+      `return DOMPurify.sanitize(html);`,
+      `const purify = createDOMPurify(window);`,
+    ]) {
+      expect(forksMarkdown(fork), fork).toBe(true);
+    }
+    for (const prose of [
+      `/* a turn marked cut-short keeps its answer */`,
+      `// the ungrounded citation is marked in the answer prose`,
+      `const marked = false; // a local flag named for the English word`,
+      `expect(row.marked).toBe(true);`,
+      `/* every step is marked with its own disposition */`,
+    ]) {
+      expect(forksMarkdown(prose), prose).toBe(false);
+    }
   });
 });

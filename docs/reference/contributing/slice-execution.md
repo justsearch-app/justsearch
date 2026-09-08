@@ -429,7 +429,8 @@ If no producer exists, the ID is one of:
 The defect class: a slice's headline ("23 backend + 4 FE-only")
 implies a fact the code doesn't yet support. Slice 430 §B.AF caught
 3 phantom IDs (`ai.not-configured`, `embedding.not-configured`,
-`schema.rebuilding`) by reading the producing code paths verbatim:
+`schema.rebuilding`; the last was retired outright on 2026-09-07,
+tempdoc 948) by reading the producing code paths verbatim:
 neither backend nor FE produced them, and the FE's defensive checks
 were dead code. The headline shifted from "23 backend + 4 FE-only" to
 "24 fire-able + 3 phantom (forward-compat)" — a different claim about

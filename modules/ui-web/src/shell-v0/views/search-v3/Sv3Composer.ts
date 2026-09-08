@@ -530,15 +530,28 @@ export class Sv3Composer extends JfElement {
         z-index: 1;
         inset: 0;
         border: 1px solid var(--composer-outline);
-        /* Tempdoc 864 Layer 1(d), the second derived declaration — the frame §2.9(b) named as the
-           thing that "frames the entire box as the input" fades with the same knob, so the resting
-           box does not only sit lower, it is outlined more faintly too. The shorthand above keeps the
-           1px line and the token as the single source; only its alpha is spent here. */
-        border-color: color-mix(
-          in srgb,
-          var(--composer-outline) calc(100% - 55% * var(--composer-rest)),
-          transparent
-        );
+        /* THE FRAME IS AT FULL ALPHA IN EVERY STATE — owner decision 2026-09-07 (tempdoc 948),
+           reversing the second half of tempdoc 864 Layer 1(d).
+           864 §4.7(a) shipped two derived declarations off '--composer-rest'. The one being reversed
+           is, in its own words: "the **frame** — '.glass::after''s 'border-color' fades to 45% of
+           '--composer-outline' at rest, the element §2.9(b) named as the thing that 'frames the
+           entire box as the input'". That declaration lived exactly here and is now gone; the
+           shorthand above is the whole resting frame.
+           WHY, in 864's own terms. 864's stated principle for this layer is that the de-emphasis
+           "deliberately spends no text contrast" — it picked the surface lift precisely because a
+           treatment that dimmed the placeholder "would have bought the affordance with the one thing
+           the audit measures". The frame fade is the half that spends NON-text contrast, and WCAG
+           1.4.11 measures that: 864's own §4.8 already logged the resting boundary at 1.06:1 in dark
+           and asked for a number, and the 2026-09-07 measured audit put the resting edge at 1.59:1
+           (dark) / 1.60:1 (light) over the page against a 3:1 floor. So the same principle that
+           chose the surface lift is what removes the frame fade.
+           THE DE-EMPHASIS SURVIVES, and this is the part a reader can check: the surface half is
+           untouched ('--composer-rest-surface' still spends the 4% lift), and the FOCUSED frame is a
+           different token entirely — '--ring' at 9.69:1 dark / 5.84:1 light, against the resting
+           edge's 3.25:1 / 3.32:1. Resting-versus-focused is still a colour change AND a material
+           change; it is no longer also a contrast failure.
+           The 'transition' below stays: it now animates the resting→'--ring' hand-off at the focus
+           arm rather than an alpha fade, so the state change is still not a cut. */
         border-radius: inherit;
         box-shadow: var(--composer-highlight);
         transition: border-color var(--duration-sv3-micro) var(--ease-sv3-enter);

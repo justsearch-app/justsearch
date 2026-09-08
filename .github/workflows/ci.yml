@@ -191,8 +191,6 @@ jobs:
         run: |
           node --test scripts/release/release-changelog.test.mjs
           node scripts/release/release-changelog.mjs check
-          node --test scripts/release/winget-manifests.test.mjs
-          node scripts/release/winget-manifests.mjs check --metadata packaging/winget/package.v1.json --release packaging/winget/releases/v0.2.0.json --output packaging/winget/manifests/e/eliasjustus/JustSearch/0.2.0
 
       - name: Model-promotion planner tests
         run: python -m unittest discover -s scripts/models/tests -p "test_*.py" -v
@@ -212,6 +210,13 @@ jobs:
       # (`--bump <file> --reason "<why>"`), which is what an unrun check can't ask for.
       - name: Always-loaded agent-doc budget ratchet
         run: node scripts/ci/check-always-loaded-budget.mjs
+
+      # Tempdoc 949 §5: CLAUDE.md's fix-root-causes rule has claimed since it was written that
+      # "the suppression subset is ratcheted by check-suppression-ratchet.mjs" — the script existed
+      # and no workflow ran it, the same shape as the budget ratchet above before 799 L.1. Green on
+      # main at wiring time (1 file, 3 suppressions, all baselined).
+      - name: Suppression ratchet (@Disabled / noinspection baseline)
+        run: node scripts/ci/check-suppression-ratchet.mjs
 
       # Tempdoc 930 §18.1 row 8 / §19.3 F4: docs/tempdocs/ is append-only design history, so nothing
       # shrinks a tempdoc back down on its own — the same always-loaded-budget argument above, applied

@@ -338,6 +338,14 @@ async function main() {
   // selected gate's absent required input before evaluating. On-demand inputs
   // are never auto-produced. A non-zero producer exit is a runner error.
   if (args.produceInputs) {
+    // Wall time per producer (tempdoc 935 D4). The kernel's input builders include
+    // a Gradle-backed dead-code producer, and the whole step is what exhausted a CI
+    // lane — but the step reported no breakdown, so every timeout was unattributed
+    // and every caching proposal was a guess. This is the attribution, not the fix:
+    // it is a precondition for 929 §4.5 (timeouts with attribution) and for deciding
+    // whether any producer is worth caching at all.
+    let producerCount = 0;
+    let producedTotalMs = 0;
     for (const gate of gates) {
       for (const input of requiredInputsToProduce({ gate, repoRoot })) {
         console.log(`producing input for gate '${gate.id}': ${input.producer}`);
@@ -349,20 +357,30 @@ async function main() {
         if (dotSlash) {
           command = `"${resolve(REPO_ROOT, dotSlash[1])}"${dotSlash[2]}`;
         }
+        const startedAt = Date.now();
         const res = spawnSync(command, { shell: true, cwd: REPO_ROOT, stdio: 'inherit' });
+        const elapsedMs = Date.now() - startedAt;
+        producerCount += 1;
+        producedTotalMs += elapsedMs;
+        // Timed on BOTH exits: the slow producer is usually the failing one, and a
+        // duration only printed on success attributes exactly the runs nobody needs.
         if (res.error) {
           console.error(
-            `failed to launch producer for gate '${gate.id}' (${input.producer}): ${res.error.message}`,
+            `failed to launch producer for gate '${gate.id}' after ${elapsedMs} ms (${input.producer}): ${res.error.message}`,
           );
           process.exit(2);
         }
         if (res.status !== 0) {
           console.error(
-            `producer exited ${res.status ?? `signal ${res.signal}`} for gate '${gate.id}': ${input.producer}`,
+            `producer exited ${res.status ?? `signal ${res.signal}`} after ${elapsedMs} ms for gate '${gate.id}': ${input.producer}`,
           );
           process.exit(2);
         }
+        console.log(`produced input for gate '${gate.id}' in ${elapsedMs} ms: ${input.producer}`);
       }
+    }
+    if (producerCount > 0) {
+      console.log(`produce-inputs: ${producerCount} producer(s) in ${producedTotalMs} ms total`);
     }
   }
 
