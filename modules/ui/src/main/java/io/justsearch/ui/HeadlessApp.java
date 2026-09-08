@@ -960,7 +960,7 @@ public class HeadlessApp {
       // be writing one. Failure is fatal: publishing readiness with a stale live request would let
       // the watcher shut this incarnation down immediately.
       final Path runtimeDir = configPhase.dataDir().resolve("runtime");
-      clearPriorShutdownRequest(runtimeDir, java.nio.file.Files::deleteIfExists);
+      clearPriorShutdownRequest(runtimeDir, Files::deleteIfExists);
       upgradeShutdownBridge.install(upgradeShutdownRequestWriter(runtimeDir));
 
       // Tempdoc 501 Phase 1: instantiate the runtime manifest publisher as soon as the dataDir
@@ -1275,7 +1275,7 @@ public class HeadlessApp {
       throws java.io.IOException {
     Path request = io.justsearch.app.engine.ShutdownRequest.pathIn(runtimeDir);
     deleter.delete(request);
-    if (java.nio.file.Files.exists(request)) {
+    if (Files.exists(request)) {
       throw new java.io.IOException("shutdown request still exists after boot clear: " + request);
     }
   }

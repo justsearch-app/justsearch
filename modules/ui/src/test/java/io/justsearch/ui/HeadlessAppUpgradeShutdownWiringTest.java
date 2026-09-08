@@ -121,7 +121,7 @@ final class HeadlessAppUpgradeShutdownWiringTest {
               persisted.preparationId())
           .writeTo(runtimeDir);
 
-      try (var watcher =
+      try (var _ =
           HeadlessApp.startShutdownRequestWatcher(
               runtimeDir,
               HeadlessApp.shutdownRequestAcceptance(bridge),
@@ -156,7 +156,7 @@ final class HeadlessAppUpgradeShutdownWiringTest {
     try {
       HttpClient client = HttpClient.newHttpClient();
       post(client, server, "/api/upgrade/prepare", "{}");
-      try (var watcher =
+      try (var _ =
           HeadlessApp.startShutdownRequestWatcher(
               runtimeDir,
               HeadlessApp.shutdownRequestAcceptance(bridge),

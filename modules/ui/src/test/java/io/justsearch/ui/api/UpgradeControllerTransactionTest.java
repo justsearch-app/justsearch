@@ -394,10 +394,6 @@ final class UpgradeControllerTransactionTest {
     };
   }
 
-  private static void writeRequest(Path runtimeDir, String preparationId, String nonce) {
-    writeRequest(runtimeDir, preparationId, nonce, Long.MAX_VALUE);
-  }
-
   private static void writeRequest(
       Path runtimeDir, String preparationId, String nonce, long deadlineEpochMs) {
     try {

@@ -81,7 +81,7 @@ final class HeadlessAppShutdownWiringTest {
     HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
     var fired = new CountDownLatch(1);
 
-    try (var watcher =
+    try (var _ =
         HeadlessApp.startShutdownRequestWatcher(
             runtime,
             r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
@@ -104,7 +104,7 @@ final class HeadlessAppShutdownWiringTest {
         .writeTo(runtime);
     var fired = new CountDownLatch(1);
 
-    try (var watcher =
+    try (var _ =
         HeadlessApp.startShutdownRequestWatcher(
             runtime,
             r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
@@ -178,7 +178,7 @@ final class HeadlessAppShutdownWiringTest {
                 watcherRef::get),
             ignored -> {});
 
-    try (var watcher =
+    try (var _ =
         HeadlessApp.startShutdownRequestWatcher(
             runtime,
             ignored -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
