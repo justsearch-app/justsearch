@@ -2804,10 +2804,17 @@ async function cmdStart(opts) {
       await new Promise((r) => setTimeout(r, decision.cooldownMs));
     }
     if (!supervising) return;
+    // The incarnation this call is about to start. A restart is asynchronous and the child's exit
+    // handler is not: if THIS incarnation dies before it comes up, its own onEngineExit runs, decides
+    // a restart of its own, and advances the counter — while the await below is still pending and
+    // will reject on its timeout. Without this witness the stale rejection would request a shutdown
+    // of an incarnation that had just started and done nothing wrong.
+    const startedIncarnation = incarnation + 1;
     try {
       await startNextIncarnation();
     } catch (err) {
       if (!supervising) return; // the incarnation died while starting; its own exit owns the outcome
+      if (incarnation !== startedIncarnation) return; // a later incarnation owns the outcome now
       // The start deadline elapsed: the incarnation is alive but has published nothing. Hang
       // detection is suspended in `starting`, so this edge is the only thing that ends the state —
       // and it ends it the same way a hang does, because the two are the same problem seen at
