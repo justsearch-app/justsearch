@@ -600,3 +600,34 @@ preserving intruder-before-boot ordering, lock intensity, corpus, acceptance and
 that move. Prove both durable queue outcomes. Then finish the single-writer
 shutdown re-cut's production proofs and B11-B17; D1 live runtime replacement and
 the rejected shared request-slot protocol remain outside this repair.
+
+## Integrated B11–B14 and B16 checkpoint (2026-09-08)
+
+Resume in `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
+The root is sole implementer; reviewers are read-only and have returned signoff.
+B11/B12 is `531fa93f1`; the primary then integrated reviewed B14 Java retirement
+`03c4e513b`, B16 `a7eb1abdf`, pre-API recovery UI `5c1e933d4`, and R7 `c7a0aae41`.
+The following B13 commit completes the exclusive updater hold, real owned-child
+stop/reconciliation, tagged no-receipt evidence and one-loop failed-launch resume.
+Its evidence is [b13-updater-handoff.md](evidence/B/b13-updater-handoff.md).
+The full integrated suite passed 9,405/0 with exact task XML preserved; Rust 76/0,
+frontend 6,462/0, both supervisor adapters 11/11 and governance checks passed.
+A stale Tauri conformance executable caused an initial failed invocation; rebuild
+that binary explicitly before adapter runs. The two B11 stale UI assertions were
+corrected to the new public schema and completion ordering and independently reviewed.
+
+B11–B14 and B16 are complete at the permitted branch proof tier. The signed
+installer/user-store exercise is still owed in the first post-merge installer round,
+registered under `upgrade-dead-engine-recovery`. B15 and remaining B17 work are next:
+actual promotion → requested whole-Engine restart → promoted generation served;
+hostile-lock survival through real supervision; PROCESSING as well as PENDING replay;
+and the single-writer shutdown re-cut's four production proofs. Read `scope-recut.md`
+before changing shutdown transport. No shared request-slot/accepted-marker protocol
+or D1 live component swap has been approved by this checkpoint.
+
+The previous secondary recovery worktree/branch remains a preserved checkpoint at
+`ad272bdd9`, including its earlier uncommitted B13 snapshot; do not resume editing it
+or copy its older files over this integrated primary. Raw outputs remain in ignored
+`tmp/`; tracked evidence contains summaries and hashes. Main and other worktrees
+remain untouched. PRs #708 and #717 are merged; PR 0b still enters at the recorded
+main-integration checkpoint. User authorization now permits autonomous merges.

@@ -988,54 +988,97 @@ struct ManagedChildRecord {
     executable: String,
 }
 
-/// Terminal fallback only: terminate registered children after the OS confirms PID, start instant
-/// and executable. Recoverable supervision never calls this function.
+/// Terminal fallback reports incomplete ownership; recoverable supervision never calls it.
 fn cleanup_registered_children_for_terminal(data_dir: &std::path::Path) {
-    let path = data_dir.join("runtime").join("manifest.json");
-    let Ok(raw) = std::fs::read_to_string(path) else {
-        return;
-    };
-    let Ok(root) = serde_json::from_str::<serde_json::Value>(&raw) else {
-        return;
-    };
-    let Some(children) = root.get("children").and_then(|v| v.as_array()) else {
-        return;
-    };
-    for value in children {
-        let Ok(child) = serde_json::from_value::<ManagedChildRecord>(value.clone()) else {
-            continue;
-        };
-        terminal_kill_if_identity_matches(&child);
+    if let Err(error) = reconcile_registered_children(data_dir) {
+        eprintln!("Registered child cleanup incomplete: {error}");
     }
 }
 
+/// Shared terminal/update edge. Read and validate the entire ownership projection before killing
+/// anything. The Engine remains the manifest writer; a host never edits this child register.
+fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), String> {
+    let path = data_dir.join("runtime").join("manifest.json");
+    let raw = match std::fs::read(&path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("Cannot read child ownership: {error}")),
+    };
+    let root: serde_json::Value = serde_json::from_slice(&raw)
+        .map_err(|error| format!("Malformed child ownership manifest: {error}"))?;
+    let version = root.get("schemaVersion").and_then(|value| value.as_u64());
+    if !matches!(version, Some(1 | 2)) {
+        return Err("Unknown child ownership manifest schema".into());
+    }
+    let values = match root.get("children") {
+        Some(serde_json::Value::Array(children)) => children,
+        None if version == Some(1) => return Ok(()),
+        _ => return Err("Malformed or missing managed children array".into()),
+    };
+    let children: Vec<ManagedChildRecord> = values.iter().map(|value| {
+        let child: ManagedChildRecord = serde_json::from_value(value.clone())
+            .map_err(|error| format!("Malformed managed child identity: {error}"))?;
+        if child.pid == 0 || child.started_at.trim().is_empty()
+            || !std::path::Path::new(&child.executable).is_absolute() {
+            return Err("Incomplete managed child identity".into());
+        }
+        Ok(child)
+    }).collect::<Result<_, String>>()?;
+    for child in children { terminal_kill_if_identity_matches(&child)?; }
+    Ok(())
+}
+
 #[cfg(windows)]
-fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) {
+fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
+    // Capture the OS process handle before checking identity, and terminate through that object.
+    // A PID reused between validation and termination cannot redirect the destructive operation.
     // Values cross the process boundary as environment variables, never interpolated command text.
-    // Unknown access, parse failure, PID reuse, or executable mismatch exits without Stop-Process.
     let script = r#"
 $ErrorActionPreference='Stop'
-$p=Get-Process -Id ([int]$env:JUSTSEARCH_CHILD_PID)
-$expected=[DateTimeOffset]::Parse($env:JUSTSEARCH_CHILD_STARTED).ToUnixTimeMilliseconds()
-$actual=([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds()
-if ([Math]::Abs($actual-$expected) -gt 1000) { exit 10 }
-$want=[IO.Path]::GetFullPath($env:JUSTSEARCH_CHILD_EXE).TrimEnd('\').ToLowerInvariant()
-$got=[IO.Path]::GetFullPath($p.Path).TrimEnd('\').ToLowerInvariant()
-if ($want -ne $got) { exit 11 }
-Stop-Process -Id $p.Id -Force -ErrorAction Stop
-Wait-Process -Id $p.Id -Timeout 5 -ErrorAction SilentlyContinue
+try { $p=[Diagnostics.Process]::GetProcessById([int]$env:JUSTSEARCH_CHILD_PID) }
+catch [ArgumentException] { exit 0 }
+try {
+  $null=$p.Handle
+  $expected=[DateTimeOffset]::Parse($env:JUSTSEARCH_CHILD_STARTED).ToUnixTimeMilliseconds()
+  $actual=([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds()
+  if ($actual -ne $expected) { exit 10 }
+  $want=[IO.Path]::GetFullPath($env:JUSTSEARCH_CHILD_EXE).TrimEnd('\').ToLowerInvariant()
+  $got=[IO.Path]::GetFullPath($p.Path).TrimEnd('\').ToLowerInvariant()
+  if ($want -ne $got) { exit 11 }
+  if (!$p.HasExited) { $p.Kill() }
+  if (!$p.WaitForExit(5000)) { exit 12 }
+  exit 0
+} catch { exit 20 } finally { $p.Dispose() }
 "#;
-    let _ = Command::new("powershell.exe")
+    let mut process = Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .env("JUSTSEARCH_CHILD_PID", child.pid.to_string())
         .env("JUSTSEARCH_CHILD_STARTED", &child.started_at)
         .env("JUSTSEARCH_CHILD_EXE", &child.executable)
         .creation_flags(CREATE_NO_WINDOW)
-        .status();
+        .spawn().map_err(|error| format!("Child identity check could not start: {error}"))?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        match process.try_wait() {
+            Ok(Some(status)) => return match status.code() {
+                // Already dead, confirmed terminated, or positively a different process.
+                Some(0 | 10 | 11) => Ok(()),
+                _ => Err(format!("Managed child {} could not be safely reconciled ({status})", child.pid)),
+            },
+            Ok(None) if std::time::Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = process.kill();
+                let _ = process.wait();
+                return Err(format!("Managed child {} identity/termination deadline elapsed", child.pid));
+            }
+        }
+    }
 }
 
 #[cfg(not(windows))]
-fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) {}
+fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) -> Result<(), String> {
+    Err("Registered child termination is unsupported on this installer platform".into())
+}
 
 /// The production [`supervisor::Actuator`] (lane F stage B item B10).
 ///
@@ -1236,21 +1279,20 @@ impl supervisor::Actuator for ShellActuator {
 /// An OS thread, following the split this file already uses for the stdout drain and the manifest
 /// watcher: the loop blocks on sockets and on `try_wait`, and it must keep running while the async
 /// runtime is busy or winding down.
-pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>) {
+pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>) -> Result<(), String> {
     let Ok(data_dir) = resolve_app_data_dir(app) else {
-        eprintln!("supervisor: no app data dir; the Engine will not be supervised");
-        return;
+        return Err("supervisor: no app data dir; the Engine will not be supervised".into());
     };
+    let host = state.host.clone();
     let mut actuator = ShellActuator { app: app.clone(), state, data_dir };
-    thread::spawn(move || {
+    host.start_supervisor(move || {
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
         let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
         match outcome {
             supervisor::Outcome::Exhausted { reason, .. } => {
-                // design 7.1's terminal state. Nothing else is emitted: the state file already
-                // carries it, and the updater's dead-Engine path (item B13) reads exactly that file
-                // because an Engine that cannot boot can answer no API.
+                // The current host state already carries the terminal result. B13 uses owned
+                // child/binding state under its replacement hold, even before an API exists.
                 eprintln!("supervisor: {reason}");
             }
             supervisor::Outcome::Stopped { reason, .. } => {
@@ -1258,7 +1300,7 @@ pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>
             }
             supervisor::Outcome::Cancelled => {}
         }
-    });
+    })
 }
 
 /// Tempdoc 501 Phase 7: poll the runtime manifest and feed port + session
@@ -1674,7 +1716,9 @@ pub fn run() {
                 //
                 // Only on a successful spawn: a spawn that failed has no child to supervise, and the
                 // failure is already reported through `spawn_error` to everything waiting on it.
-                start_supervision(app.handle(), state.clone());
+                if let Err(error) = start_supervision(app.handle(), state.clone()) {
+                    publish_terminal_spawn_failure(app.handle(), &state, launch_data_dir.as_deref(), &error);
+                }
             }
             let reconciliation_app = app.handle().clone();
             let reconciliation_state = state.clone();
@@ -1856,7 +1900,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[cfg(windows)]
-    fn owned_sleep_child() -> (std::process::Child, ManagedChildRecord) {
+    pub(super) fn owned_sleep_child() -> (std::process::Child, ManagedChildRecord) {
         let child = Command::new("powershell.exe")
             .args([
                 "-NoProfile",
@@ -1889,15 +1933,32 @@ mod tests {
     #[test]
     fn terminal_child_cleanup_kills_only_matching_identity() {
         let (mut matched, record) = owned_sleep_child();
-        terminal_kill_if_identity_matches(&record);
+        terminal_kill_if_identity_matches(&record).unwrap();
         assert!(matched.try_wait().unwrap().is_some());
 
         let (mut unrelated, mut mismatch) = owned_sleep_child();
         mismatch.executable.push_str(".unrelated");
-        terminal_kill_if_identity_matches(&mismatch);
+        terminal_kill_if_identity_matches(&mismatch).unwrap();
         assert!(unrelated.try_wait().unwrap().is_none());
         unrelated.kill().unwrap();
         let _ = unrelated.wait();
+    }
+
+    #[test]
+    fn terminal_cleanup_refuses_malformed_or_future_ownership_before_any_action() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("runtime")).unwrap();
+        let path = dir.path().join("runtime/manifest.json");
+        for bad in ["null", "{}", r#"{"schemaVersion":3,"children":[]}"#,
+            r#"{"schemaVersion":2}"#, r#"{"schemaVersion":2,"children":null}"#,
+            r#"{"schemaVersion":2,"children":{}}"#, r#"{"schemaVersion":2,"children":[{}]}"#] {
+            fs::write(&path, bad).unwrap();
+            assert!(reconcile_registered_children(dir.path()).is_err(), "{bad}");
+        }
+        for good in [r#"{"schemaVersion":1}"#, r#"{"schemaVersion":2,"children":[]}"#] {
+            fs::write(&path, good).unwrap();
+            reconcile_registered_children(dir.path()).unwrap();
+        }
     }
 
     /// Lane F stage B item B10 adds a SECOND shell event and this pins the first one against it.

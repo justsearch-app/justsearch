@@ -1492,6 +1492,10 @@
   ],
   "nonDurableWriteSites": [
     {
+      "path": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "reason": "Included only under cfg(test). The updater coordinator fixtures write staged artifacts, intents, witnesses and manifests in test-owned temporary directories; this module cannot write from a production binary. Production updater stores retain their existing classifications."
+    },
+    {
       "path": "modules/shell/src-tauri/src/bin/supervisor_conformance.rs",
       "reason": "A conformance driver, not a product path: it writes the supervisor state file and the shutdown request into a THROWAWAY data directory the harness creates per case and deletes after (scripts/supervisor-conformance/adapters/tauri.mjs). The artifacts it produces are the ones `engine-supervisor-state` and `engine-shutdown-request` already classify; what this binary owns is the temp directory around them, and nothing in it survives the case that made it. It is discovered by the write-site scan because the scan reads modules/**/*.rs by construction — which is right, and the honest answer is this row rather than an exclusion."
     },

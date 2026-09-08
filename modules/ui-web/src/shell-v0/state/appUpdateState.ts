@@ -17,6 +17,7 @@ export type AppUpdateState =
   | 'preparing'
   | 'prepared'
   | 'head_stopped'
+  | 'engine_unrecoverable'
   | 'install_launching'
   | 'install_launched'
   | 'reconciling'

@@ -215,9 +215,7 @@ fn engine_row() -> serde_json::Value {
         .expect("the supervision register must carry an `engine` process row")
 }
 
-fn env_override(var: &str) -> Option<u64> {
-    std::env::var(var).ok().and_then(|raw| raw.trim().parse::<u64>().ok())
-}
+
 
 /// The overridable parameters and their env vars, in the register's `harnessOverrides` order.
 /// The restart BUDGET is deliberately absent: a harness that could widen it could hide a
@@ -235,6 +233,10 @@ const OVERRIDES: &[(&str, &str)] = &[
 /// Load the policy: the register's numbers, plus the per-run overrides IF AND ONLY IF the harness
 /// flag is set in the same environment.
 pub fn load_policy() -> Policy {
+    load_policy_from(|name| std::env::var(name).ok())
+}
+
+fn load_policy_from(env: impl Fn(&str) -> Option<String>) -> Policy {
     let row = engine_row();
     let declared = row.get("policy").expect("engine row must declare a policy block");
     let num = |key: &str| -> u64 {
@@ -267,12 +269,12 @@ pub fn load_policy() -> Policy {
         harness_active: false,
         overridden: Vec::new(),
     };
-    if std::env::var(HARNESS_FLAG).ok().as_deref() != Some("1") {
+    if env(HARNESS_FLAG).as_deref() != Some("1") {
         return policy;
     }
     policy.harness_active = true;
     for (key, var) in OVERRIDES {
-        let Some(value) = env_override(var) else { continue };
+        let Some(value) = env(var).and_then(|raw| raw.trim().parse::<u64>().ok()) else { continue };
         match *key {
             "stabilityWindowMs" => policy.stability_window_ms = value,
             "maxCooldownMs" => policy.max_cooldown_ms = value,
@@ -1016,41 +1018,28 @@ mod tests {
     /// pass just as happily if the flag were ignored entirely, which is the failure that ships a
     /// 1.5 s stability window to a user.
     ///
-    /// Serialised with the other env-touching test by `#[cfg(test)]` convention: both mutate the
-    /// process environment, so they share one lock rather than racing under the test harness's
-    /// thread pool.
+    /// Exercise the production loader with explicit environment values. Mutating process-global
+    /// variables raced other policy readers and occasionally labelled product records as harness.
     #[test]
     fn overrides_are_inert_without_the_harness_flag() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let declared = load_policy().stability_window_ms;
-        // The env lock above serialises every test in this module that touches the process
-        // environment; nothing else in this crate reads these variables during tests.
-        std::env::remove_var(HARNESS_FLAG);
-        std::env::set_var("JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS", "7");
-        std::env::set_var("JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS", "7");
-        let without = load_policy();
-        assert_eq!(
-            without.stability_window_ms, declared,
-            "an override took effect WITHOUT {HARNESS_FLAG}=1"
-        );
+        let declared = load_policy_from(|_| None).stability_window_ms;
+        let overrides = |name: &str| match name {
+            "JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS" | "JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS" => Some("7".into()),
+            _ => None,
+        };
+        let without = load_policy_from(overrides);
+        assert_eq!(without.stability_window_ms, declared,
+            "an override took effect WITHOUT {HARNESS_FLAG}=1");
         assert!(!without.harness_active);
         assert!(without.overridden.is_empty());
-
-        std::env::set_var(HARNESS_FLAG, "1");
-        let with = load_policy();
+        let with = load_policy_from(|name| {
+            if name == HARNESS_FLAG { Some("1".into()) } else { overrides(name) }
+        });
         assert_eq!(with.stability_window_ms, 7, "the flag did not enable the override");
         assert_eq!(with.max_cooldown_ms, 7);
         assert!(with.harness_active);
-        // The budget is never overridable: a harness that could widen it could hide a supervisor
-        // that never reaches `exhausted`.
         assert_eq!(with.max_restart_attempts, without.max_restart_attempts);
-
-        std::env::remove_var(HARNESS_FLAG);
-        std::env::remove_var("JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS");
-        std::env::remove_var("JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS");
     }
-
-    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     /// The budget is spent, then the terminal state is reached — and the count is what stops the
     /// loop, not the cooldown (§2). Driven through `Supervisor` rather than `decide` so the

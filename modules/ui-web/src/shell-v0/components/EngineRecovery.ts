@@ -85,7 +85,7 @@ export class EngineRecovery extends JfElement {
     const status = this.status;
     const available = status?.state === 'available';
     const updating = this.busy || [
-      'checking', 'downloading', 'preparing', 'prepared', 'head_stopped',
+      'checking', 'downloading', 'preparing', 'prepared', 'head_stopped', 'engine_unrecoverable',
       'install_launching', 'install_launched', 'reconciling',
     ].includes(status?.state ?? '');
     return html`
@@ -98,7 +98,7 @@ export class EngineRecovery extends JfElement {
           : 'JustSearch is starting or recovering. Update controls are available while you wait.'}</p>
         ${available ? html`<p>JustSearch ${status.availableVersion ?? 'update'} is available.</p>` : nothing}
         ${status?.state === 'up_to_date' ? html`<p>You have the latest version.</p>` : nothing}
-        ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Check for an update to try again.</p>` : nothing}
+        ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Automatic restart may be paused until the update is recovered.</p>` : nothing}
         ${updating ? html`<p role="status">${status?.state === 'checking' ? 'Checking for updates…' : 'Updating JustSearch…'}</p>` : nothing}
         ${this.error || status?.state === 'error' ? html`<p role="alert">${this.error
           || 'The update could not finish. Try checking for updates again.'}</p>` : nothing}

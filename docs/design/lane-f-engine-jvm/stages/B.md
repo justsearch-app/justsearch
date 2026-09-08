@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B10 landed; B11-B12 implemented and verified on the lane-F candidate; B13-B17 open"
+status: "B1-B14 and B16 implemented and verified on the lane; B15 and remaining B17 proofs open; signed dead-Engine installer round deferred as decided"
 updated: 2026-09-08
 ---
 
@@ -652,6 +652,14 @@ Design in §8.
 no-receipt witness is a distinct serde name, and a test asserts it is never `HEAD_STOPPED`; the
 sandbox exercise is recorded per §8 and §10 row 3.
 
+**2026-09-08 completion:** the branch host-level exercise is implemented, independently
+reviewed and green. The real post-staging coordinator stops/reaps an unbound owned Engine,
+reconciles a real registered child and retains distinct stop evidence through reconciliation.
+Failed normal prepare/commit never uses the dead path; uncertain termination retains the hold.
+See [the B13 record](../evidence/B/b13-updater-handoff.md). The signed installer/store-recovery
+round is deferred to the first post-merge installer round under design section 0's prior decision,
+with its procedure registered as `upgrade-dead-engine-recovery`; that packaged proof is not claimed.
+
 ### B14 — `ENGINE_RESTART_EXHAUSTED` gets a real producer
 
 The supervisor writes the terminal state into `supervisor.v1.json`; the Engine, on its next
@@ -671,6 +679,15 @@ the code after a simulated exhausted supervisor, and the equality read at
 supervisor exists again, and the `worker.lost` row (`:273-278`) — whose comment block explicitly
 says A11 made its "restart the application" wording load-bearing — restored to a self-healing
 wording; `run-ui-web-gates.mjs` green.
+
+**2026-09-08 completion under amended design section 0:** the terminal producer is the native
+host's memory snapshot/event projected into recovery UI before API discovery. It is not a stale
+supervisor-file verdict imported into a new Engine. Obsolete whole-Worker recovery vetoes and
+phantom reasons are retired; local recovery remains enabled. R7 distinguishes HTTP liveness
+(including 503) from a continuous API/index-ready stability window. Independent source review,
+frontend tests, both real supervisor adapters (11/11 each), readiness gates and the combined
+9,405-test Java suite passed. See `b14-local-recovery.md`, `recovery-ui.md` and
+`r7-host-liveness.md` under `evidence/B/`; the integrated results are in the B13 record.
 
 ### B15 — `restart_required` covers cutover, rollback and start; and who reopens the index
 
@@ -708,6 +725,11 @@ Every fingerprint the stage's own subject leaves behind, in one commit:
 
 **Acceptance:** `WholeProgramDeadCodeTest` green (its baseline shrinks, never grows);
 `git grep worker-config-snapshot` returns only labelled history; the full suite green.
+
+**2026-09-08 completion:** removed the unconsumed `isRunning` method, retained the latch with
+its actual EngineRoot await consumer, moved the supervision tests and removed the phantom
+register method. The full combined suite passed, including WholeProgramDeadCodeTest; no dead-code
+baseline grew. [The residue record](../evidence/B/b16-residue.md) records the fingerprint sweep.
 
 ### B17 — the supervision assertions are in a suite that runs
 
@@ -944,6 +966,17 @@ see that the question was asked.
 ---
 
 ## 10. What is allowed to be red after stage B, and nothing else
+
+**Integrated checkpoint, 2026-09-08:** `./gradlew.bat test --no-build-cache --rerun-tasks`
+passed 9,405 tests (25 skips), zero failures/errors, across 34 modules; the 1,525 exact `test`
+XML files and hash inventory were preserved before any filtered rerun. This excludes stress and
+installed-process integration tiers. `cargo test --lib --locked` passed 76; build the conformance
+binary with `cargo build --bin supervisor-conformance --locked` before running
+`node scripts/supervisor-conformance/run.mjs --adapter tauri`. Both that adapter and
+`--adapter dev-runner` passed 11/11. Commands, hashes and the signed-installer deferral are in
+[the integrated B13 record](../evidence/B/b13-updater-handoff.md). B15 and B17's hostile-lock,
+PROCESSING replay and remaining production shutdown proofs remain acceptance obligations.
+
 
 17.3's "branch state after" for B is: *the three restart paths work through requested restart; a
 crash comes back under the budget; children are adopted or killed.* That leaves very little

@@ -38,6 +38,7 @@ final class HeadlessAppShutdownWiringTest {
   void terminalWriterUsesLateBoundOrderedSequence(@TempDir Path tempDir) throws Exception {
     var binding = new CompletableFuture<EngineShutdownSequence>();
     var exitCode = new AtomicInteger(-1);
+    var manifestCompleted = new java.util.concurrent.atomic.AtomicBoolean();
     OperationLeaseService leases = mock(OperationLeaseService.class);
     var watcher = mock(io.justsearch.app.engine.ShutdownRequestWatcher.class);
     RuntimeManifestPublisher manifest = mock(RuntimeManifestPublisher.class);
@@ -68,7 +69,15 @@ final class HeadlessAppShutdownWiringTest {
                 instanceLock,
                 leases,
                 () -> watcher),
-            exitCode::set));
+            code -> {
+              assertTrue(manifestCompleted.get(), "manifest completion precedes process exit");
+              exitCode.set(code);
+            },
+            preliminary -> {
+              manifest.completeShutdown(
+                  preliminary.reason().wire(), preliminary.clean(), preliminary.workerOutcome());
+              manifestCompleted.set(true);
+            }));
     faultThread.join(2_000L);
 
     assertFalse(faultThread.isAlive());
@@ -87,7 +96,7 @@ final class HeadlessAppShutdownWiringTest {
             instanceLock);
     order.verify(leases).freezeAdmission(Reason.RESTART.wire());
     order.verify(watcher).close();
-    order.verify(manifest).close();
+    order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
     order.verify(api).stop();
     order.verify(health).close();
     order.verify(assembly).setStopGenerativeBackendOnClose(false);
@@ -96,6 +105,7 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(tracing).close();
     order.verify(telemetry).close();
     order.verify(instanceLock).close();
+    order.verify(manifest).completeShutdown(Reason.RESTART.wire(), true, "GRACEFUL");
   }
 
   @Test

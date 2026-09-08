@@ -307,6 +307,94 @@ final class UpgradeLifecycleContractTest {
     }
   }
 
+  @Test
+  void deadEngineReconciliationAttestsAttemptWithoutInventingNonce(@TempDir Path tmp)
+      throws Exception {
+    Map<String, Object> request = deadEngineReconciliationRequest();
+    writeDeadEngineIntent(tmp, request);
+    LocalApiServer server = reconciliationServer(tmp, true, true);
+    try {
+      HttpResponse<String> response = post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(request));
+      assertEquals(200, response.statusCode());
+      var body = JSON.readTree(response.body());
+      assertTrue(body.get("ready").asBoolean());
+      assertEquals("ENGINE_UNRECOVERABLE", body.get("stopEvidenceKind").asText());
+      assertEquals("attempt-1", body.get("attemptId").asText());
+      assertTrue(body.get("shutdownNonce") == null);
+      assertEquals(ProcessHandle.current().pid(), body.get("headPid").asLong());
+    } finally {
+      server.stop();
+    }
+  }
+
+  @Test
+  void deadEngineReconciliationRejectsMixedEvidenceAndDifferentIdentity(@TempDir Path tmp)
+      throws Exception {
+    Map<String, Object> request = deadEngineReconciliationRequest();
+    LocalApiServer server = reconciliationServer(tmp, true, true);
+    try {
+      for (String field : List.of("preparationId", "shutdownNonce", "shutdownReceipt",
+          "headShutdownReceipt", "headPid")) {
+        Map<String, Object> intent = writeDeadEngineIntent(tmp, request);
+        intent.put(field, field.equals("headPid") ? 42 : "mixed");
+        Files.writeString(tmp.resolve("upgrade/intent.v1.json"), JSON.writeValueAsString(intent));
+        HttpResponse<String> response = post(HttpClient.newHttpClient(), server,
+            "/api/upgrade/reconcile", JSON.writeValueAsString(request));
+        assertEquals(409, response.statusCode(), field);
+      }
+      writeDeadEngineIntent(tmp, request);
+      request.put("attemptId", "another-attempt");
+      assertEquals(409, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(request)).statusCode());
+      request.put("attemptId", "attempt-1");
+      request.put("shutdownNonce", "invented-nonce");
+      assertEquals(400, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(request)).statusCode());
+    } finally {
+      server.stop();
+    }
+  }
+
+  @Test
+  void reconciliationCannotSwitchBetweenPreparedAndDeadEngineEvidence(@TempDir Path tmp)
+      throws Exception {
+    LocalApiServer server = reconciliationServer(tmp, true, true);
+    try {
+      writeReconcilingIntent(tmp);
+      assertEquals(409, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(deadEngineReconciliationRequest()))
+          .statusCode());
+      writeDeadEngineIntent(tmp, deadEngineReconciliationRequest());
+      assertEquals(409, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(reconciliationRequest())).statusCode());
+    } finally {
+      server.stop();
+    }
+  }
+
+  private static Map<String, Object> deadEngineReconciliationRequest() throws Exception {
+    Map<String, Object> request = reconciliationRequest();
+    request.remove("shutdownNonce");
+    request.put("stopEvidenceKind", "ENGINE_UNRECOVERABLE");
+    return request;
+  }
+
+  private static Map<String, Object> writeDeadEngineIntent(
+      Path dataDir, Map<String, Object> request) throws Exception {
+    Map<String, Object> intent = new LinkedHashMap<>(request);
+    intent.remove("headPid");
+    intent.remove("owners");
+    intent.remove("stopEvidenceKind");
+    intent.put("phase", "RECONCILING");
+    intent.put("stopEvidence", Map.of("kind", "ENGINE_UNRECOVERABLE",
+        "attemptId", "attempt-1", "enginePid", 42, "confirmedGoneAtEpochMs", 1000));
+    Path path = dataDir.resolve("upgrade/intent.v1.json");
+    Files.createDirectories(path.getParent());
+    Files.writeString(path, JSON.writeValueAsString(intent));
+    return intent;
+  }
+
   private static LocalApiServer reconciliationServer(
       Path dataDir, boolean headReady, boolean workerReady) {
     return LocalApiServer.builder(

@@ -31,6 +31,7 @@ struct OwnedChild {
 struct HostInner {
     child: Option<OwnedChild>,
     closing: bool,
+    replacement_held: bool,
     next_generation: u64,
     binding: Binding,
     discovery: Discovery,
@@ -44,6 +45,7 @@ impl Default for HostInner {
         Self {
             child: None,
             closing: false,
+            replacement_held: false,
             next_generation: 1,
             binding: Binding::default(),
             discovery: Discovery::AwaitingSuccessor { predecessor: None },
@@ -78,6 +80,7 @@ pub(crate) struct AdmittedChild {
 pub(crate) struct EngineHost {
     inner: Mutex<HostInner>,
     watcher: Arc<(Mutex<WatcherState>, Condvar)>,
+    supervisor: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl Default for EngineHost {
@@ -85,6 +88,7 @@ impl Default for EngineHost {
         Self {
             inner: Mutex::new(HostInner::default()),
             watcher: Arc::new((Mutex::new(WatcherState::default()), Condvar::new())),
+            supervisor: Mutex::new(None),
         }
     }
 }
@@ -102,6 +106,9 @@ impl EngineHost {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
         if inner.closing {
             return Err("Engine host is closing; launch refused".into());
+        }
+        if inner.replacement_held {
+            return Err("Engine replacement is held by the updater; launch refused".into());
         }
         if inner.child.is_some() {
             return Err("Engine child is already installed".into());
@@ -311,11 +318,67 @@ impl EngineHost {
         true
     }
     pub(crate) fn should_continue(&self) -> bool {
-        !self
-            .inner
-            .lock()
-            .expect("engine host mutex poisoned")
-            .closing
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        !inner.closing && !inner.replacement_held
+    }
+
+    /// Own exactly one supervision loop. Replacement waits for this loop to end before proceeding.
+    pub(crate) fn start_supervisor(&self, run: impl FnOnce() + Send + 'static) -> Result<(), String> {
+        self.install_supervisor(run, || {})
+    }
+
+    fn install_supervisor(&self, run: impl FnOnce() + Send + 'static, before_spawn: impl FnOnce()) -> Result<(), String> {
+        let mut supervisor = self.supervisor.lock().expect("supervisor mutex poisoned");
+        if !self.should_continue() {
+            return Err("Engine host is closed or held; supervision refused".into());
+        }
+        if supervisor.is_some() {
+            return Err("A supervision generation is already installed".into());
+        }
+        before_spawn();
+        *supervisor = Some(thread::spawn(run));
+        Ok(())
+    }
+
+    /// Cancellation plus bounded join: on failure the hold remains explicit and spawns stay blocked.
+    pub(crate) fn acquire_replacement_hold(&self, timeout: Duration) -> Result<(), String> {
+        {
+            // Same order as installation and release: no new generation can pass eligibility
+            // between the hold's ownership check and publication.
+            let _supervisor = self.supervisor.lock().expect("supervisor mutex poisoned");
+            let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+            if inner.closing || inner.replacement_held {
+                return Err("Engine host is already closed or held".into());
+            }
+            inner.replacement_held = true;
+        }
+        let deadline = Instant::now() + timeout;
+        loop {
+            {
+                let mut supervisor = self.supervisor.lock().expect("supervisor mutex poisoned");
+                if supervisor.as_ref().is_none_or(JoinHandle::is_finished) {
+                    if let Some(handle) = supervisor.take() {
+                        handle.join().map_err(|_| "Supervision generation panicked; Engine remains held")?;
+                    }
+                    return Ok(());
+                }
+            }
+            if Instant::now() >= deadline {
+                return Err("Supervision did not stop in time; Engine remains held".into());
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// Used only after the updater has established that resuming the current installation is safe.
+    pub(crate) fn release_replacement_hold(&self) -> Result<(), String> {
+        let supervisor = self.supervisor.lock().expect("supervisor mutex poisoned");
+        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+        if inner.closing || !inner.replacement_held || supervisor.is_some() {
+            return Err("Cannot resume a closed, unheld or still-supervised Engine host".into());
+        }
+        inner.replacement_held = false;
+        Ok(())
     }
     pub(crate) fn take_child(&self) -> Option<Child> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
@@ -331,6 +394,27 @@ impl EngineHost {
         if let Some(mut child) = self.take_child() {
             let _ = child.kill();
             let _ = child.wait();
+        }
+    }
+
+    pub(crate) fn replacement_held(&self) -> bool {
+        self.inner.lock().expect("Engine host mutex poisoned").replacement_held
+    }
+
+    /// Installer handoff retains the exact child handle when bounded termination cannot finish.
+    pub(crate) fn stop_owned_engine(&self, timeout: Duration) -> Result<Option<u32>, String> {
+        let pid = self.child_pid();
+        self.try_reap();
+        if self.child_pid().is_none() { return Ok(pid); }
+        let mut kill_error = None;
+        self.with_child_mut(|child| {
+            if let Err(error) = child.kill() { kill_error = Some(error.to_string()); }
+        });
+        if self.wait_for_exit(timeout) {
+            Ok(pid)
+        } else {
+            Err(format!("Owned Engine did not stop; replacement remains held: {}",
+                kill_error.unwrap_or_else(|| "termination deadline elapsed".into())))
         }
     }
 
@@ -451,6 +535,47 @@ mod tests {
         PreparedCommand { command }
     }
 
+    #[test]
+    fn hold_linearizes_with_supervisor_installation_and_joins_that_generation() {
+        let host = Arc::new(EngineHost::default());
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let installing = host.clone();
+        let running = host.clone();
+        let install = thread::spawn(move || installing.install_supervisor(
+            move || while running.should_continue() { thread::sleep(Duration::from_millis(2)); },
+            move || { entered_tx.send(()).unwrap(); release_rx.recv().unwrap(); },
+        ));
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let holding = host.clone();
+        let (hold_started_tx, hold_started_rx) = std::sync::mpsc::channel();
+        let hold = thread::spawn(move || {
+            hold_started_tx.send(()).unwrap();
+            holding.acquire_replacement_hold(Duration::from_secs(2))
+        });
+        hold_started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        thread::sleep(Duration::from_millis(50));
+        let held_before_install_finished = host.replacement_held();
+        release_tx.send(()).unwrap();
+        install.join().unwrap().unwrap();
+        hold.join().unwrap().unwrap();
+        assert!(!held_before_install_finished, "hold publication overtook supervisor installation");
+        assert!(host.replacement_held());
+        assert!(host.supervisor.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn stop_witness_keeps_pid_of_an_already_exited_owned_child() {
+        let host = EngineHost::default();
+        let pid = host.admit(sleeper()).unwrap().pid;
+        // Leave the completed Child owned so the updater performs the actual reap.
+        host.with_child_mut(|child| { child.kill().unwrap(); child.wait().unwrap(); });
+        host.acquire_replacement_hold(Duration::from_secs(2)).unwrap();
+        assert_eq!(host.stop_owned_engine(Duration::from_secs(2)).unwrap(), Some(pid));
+        assert_eq!(host.child_pid(), None);
+        assert_eq!(host.stop_owned_engine(Duration::from_secs(2)).unwrap(), None);
+    }
+
     fn manifest(id: &str, pid: u32, port: u16) -> ManifestFields {
         ManifestFields {
             api_port: Some(port),
@@ -522,6 +647,52 @@ mod tests {
         host.reset_for_successor().unwrap();
         assert!(!host.should_continue());
         assert!(host.admit(sleeper()).is_err());
+    }
+
+    #[test]
+    fn replacement_hold_joins_old_supervisor_blocks_spawn_and_resumes_once() {
+        let host = Arc::new(EngineHost::default());
+        host.admit(sleeper()).unwrap(); // no manifest/API port: still an owned Engine
+        let loops = Arc::new(AtomicUsize::new(0));
+        let run_host = host.clone();
+        let run_loops = loops.clone();
+        host.start_supervisor(move || {
+            run_loops.fetch_add(1, Ordering::SeqCst);
+            while run_host.should_continue() { thread::sleep(Duration::from_millis(5)); }
+        }).unwrap();
+        assert!(host.start_supervisor(|| panic!("duplicate supervisor")).is_err());
+        host.acquire_replacement_hold(Duration::from_secs(1)).unwrap();
+        assert_eq!(loops.load(Ordering::SeqCst), 1);
+        host.kill_and_reap();
+        assert!(host.admit(sleeper()).unwrap_err().contains("held"));
+        host.release_replacement_hold().unwrap();
+        assert!(host.release_replacement_hold().is_err());
+        host.reset_for_successor().unwrap();
+        host.admit(sleeper()).unwrap();
+        let run_host = host.clone();
+        let run_loops = loops.clone();
+        host.start_supervisor(move || {
+            run_loops.fetch_add(1, Ordering::SeqCst);
+            while run_host.should_continue() { thread::sleep(Duration::from_millis(5)); }
+        }).unwrap();
+        host.acquire_replacement_hold(Duration::from_secs(1)).unwrap();
+        assert_eq!(loops.load(Ordering::SeqCst), 2);
+        host.kill_and_reap();
+        host.begin_close();
+        assert!(host.release_replacement_hold().is_err(), "quit remains permanent");
+    }
+
+    #[test]
+    fn failed_supervisor_join_keeps_replacement_held() {
+        let host = EngineHost::default();
+        let (release, wait) = std::sync::mpsc::channel();
+        host.start_supervisor(move || { wait.recv().unwrap(); }).unwrap();
+        assert!(host.acquire_replacement_hold(Duration::from_millis(25)).is_err());
+        assert!(host.release_replacement_hold().is_err());
+        assert!(host.admit(sleeper()).unwrap_err().contains("held"));
+        release.send(()).unwrap();
+        // Keep the failed hold until explicit recovery; dropping the host does not spawn anything.
+        host.begin_close();
     }
 
     #[test]

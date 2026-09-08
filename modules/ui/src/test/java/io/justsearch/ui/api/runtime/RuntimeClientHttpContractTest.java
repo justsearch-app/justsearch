@@ -122,7 +122,7 @@ class RuntimeClientHttpContractTest {
 
   private static RuntimeManifest manifest(String lifecycle) {
     return RuntimeManifestBuilder.builder()
-        .schemaVersion(1)
+        .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
         .instanceId("sdk-http-instance")
         .pid(1234L)
         .startedAt("2026-09-03T00:00:00Z")

@@ -768,6 +768,20 @@ restart policy, durable registry, or retry loop is added. Confirmed-dead current
 children retire their exact records synchronously at close, without depending
 on an asynchronous death callback winning the race.
 
+**B13 hold and stop-witness implementation cut (orchestrator, 2026-09-08).**
+Re-reading 17.8 keeps this work inside B's already-decided dead-Engine updater:
+no C2 acceptance protocol or D1 runtime replacement is needed. The shell retains
+and joins its existing supervision thread under a local replacement hold. This
+was chosen over generation tokens because a joined old loop cannot resume;
+permanent host close was rejected because failed installer launch must resume.
+The existing update intent retains mutually exclusive prepared/dead stop evidence,
+using one tagged field rather than a second file or writer. A failed normal
+prepare/commit never falls through to dead-Engine installation. Unknown child
+ownership or uncertain stop stays explicitly held; only a confirmed failed
+installer launch safely resumes one child and one loop. Tests traverse the actual
+post-staging coordinator and its durable files, including a real registered child.
+Installed Tauri/AppHandle and signed network download remain separate proof tiers.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

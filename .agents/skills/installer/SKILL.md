@@ -225,7 +225,9 @@ are reused in place.
    compatibility, and closed-set agreement with Tauri's `latest.json`.
 3. Tauri verifies the installer signature while downloading. The shell then
    independently checks byte count, SHA-256, and executable shape.
-4. Head closes mutating admission and reports active operation-lease blockers.
+4. The shell holds Engine replacement and joins the old supervision loop.
+   When the Engine API is available, Head closes mutating admission and reports
+   active operation-lease blockers.
    Worker stops ingest admission, drains accepted work, and checkpoints its
    SQLite queue.
 5. Head performs ordered shutdown and atomically writes a nonce-bound
@@ -235,12 +237,23 @@ are reused in place.
 6. The shell rehashes the staged installer, launches it with
    `ShellExecuteExW`, and persists the returned process witness before exiting.
 7. The next shell start reconciles the durable intent. A witnessed launch on
-   the target version becomes `COMMITTED`; pre-launch source state becomes
+   the target version waits for the target API to attest the exact attempt and
+   healthy durable-owner set before `COMMITTED`. Pre-launch source state becomes
    `CANCELLED`; missing or contradictory proof becomes `REPAIR_REQUIRED`.
+
+If the Engine has no API, the same authenticated staged-update path stops and
+reaps its owned Engine, then reconciles registered children by PID, process start,
+and executable before installation. Unknown identity or unconfirmed termination
+keeps replacement held. This path records `ENGINE_UNRECOVERABLE` stop evidence in
+the existing intent, with no invented preparation, nonce, or clean shutdown receipt.
+That evidence survives later phases; target reconciliation echoes its kind and
+attempt instead of a shutdown nonce. A failed installer launch resumes one child
+and one supervision loop. Other uncertain handoffs remain explicitly held.
 
 The frontend never authenticates releases. `appUpdateState.ts` projects
 shell-owned status into Settings and the global update banner. The background
-path checks only; install requires the user to activate the Settings action.
+path checks only; install requires the user to activate Settings or the desktop
+recovery surface available before the Engine API binds.
 
 Primary implementation:
 
