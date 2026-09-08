@@ -59,3 +59,42 @@ upgrade-specific (`HeadlessApp.java:1219`). Lifecycle response-before-shutdown
 ordering is an existing precedent (`LifecycleApiModule.java:44-65`). B15 must
 connect supervised restart to the promotion and install/import paths while keeping
 an honest restart-required remedy when no trusted restart owner exists.
+
+## Follow-up disposition (2026-09-08)
+
+B14's design question is now decided, not implemented. The newest dated B14/R7
+amendment in `design.md` section 0 supersedes the alternatives above: retire the
+obsolete whole-Worker supervision veto, preserve bounded local index recovery and
+fatal vetoes, and project exhaustion from the current host into the actual recovery
+UI. An old supervisor file must neither veto a fresh Engine's recovery nor seed the
+current host's UI state.
+
+R7 is a prerequisite. Both production supervisors currently use HTTP 200 as their
+liveness test (`lib.rs` at `5c1df5992`:1035-1058,1105-1135;
+`dev-runner.cjs`:1235-1249,2626-2651). The health route deliberately returns 503 for
+ERROR (`StatusLifecycleHandler.java`:1136-1155), so a responsive Engine undergoing
+local index recovery can be killed as a hang. The fix must distinguish a bounded
+valid HTTP response from essential readiness, and reset the 300-second stability
+clock when essential readiness is lost.
+
+The status shape already has the required sources: `StatusResponse.java`:15-62,
+`ReadinessDimension.java`:14-15 and `StatusLifecycleHandler.java`:1283-1287,1548-1621.
+The current envelope keys are `workerControlPlane` and `indexServing`; there are no
+literal `api` and `index` readiness keys yet. The API's existing component is
+`components.head`. Do not invent a second status representation or equate Worker
+control-plane readiness with API responsiveness. Node must also validate the new
+manifest PID against the owned child and reject async probe results from an older
+incarnation. Total response time and header/body size must be bounded; an inactivity
+timeout alone is not a total deadline. These are implementation preflight findings,
+not proof that R7 has been fixed.
+
+B15 remains unresolved. Its restart consumer must act after actual promotion:
+`MigrationControlOps.java`:74-97 accepts a cutover request and may enter SWITCHING;
+the asynchronous durable promotion is later in
+`KnowledgeServerMigrationOps.java`:259-285. Restarting merely because the earlier
+request was accepted could interrupt the promotion it was meant to activate. The
+existing `CutoverRestartEvidenceTest` proves marker/telemetry preservation, not
+successor activation. Preserve the stage-B `core.restart-worker` refusal contract
+while designing its usable requested-restart remedy, and distinguish a current
+supervised launch from stale supervisor-file residue before automatically exiting
+an otherwise unsupervised Engine.

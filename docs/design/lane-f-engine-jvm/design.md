@@ -590,6 +590,33 @@ escalation through the uncounted requested-restart path. B14 must also correct t
 index-migration documentation and the `supervisorState` Vite comment when implemented. All B14/R7
 work remains open.
 
+**Host discovery projection correction (orchestrator, 2026-09-08).** The production
+ownership review also applies manifest admission to every UI projection. A refused
+manifest must neither replace the binding nor update the tray tooltip. An admitted
+unchanged observation is distinct from refusal; repeated identical tooltip text
+does not cause repeated native mutations. Initial launch failure, replacement
+failure, manifest events and tooltip updates use the same production methods in
+tests and in the shell. The tests cover both serialized close/spawn orderings,
+child-absent discovery, delayed stdout EOF and watcher cleanup from its own thread.
+Tauri setup call sites are source-reviewed; these tests do not claim packaged UI
+execution or a current AppHandle-linking failure.
+
+**Stage B scope stop and ownership re-cut (orchestrator, 2026-09-08).** Applying
+17.8 after the review of amendment growth stops the unimplemented shared
+first-claim/accepted-instance batch. Its three-language acceptance and retention
+protocol pulls C2-shaped guarantees into an ephemeral shutdown trigger. The
+preferred replacement gives the supervisor sole file-writer ownership and keeps
+Engine-local shutdown dispatch local; it is not yet implementation-approved.
+Existing manifest lifecycle evidence may bound a responsive Engine stalled during
+local shutdown, but that production path must be proved before the replacement
+lands. Exact cross-process request-deadline recovery is not silently retained as a
+promise. The earlier accepted-marker and writer-admission paragraphs are suspended
+by this decision, including their proposed race fixtures. Reviewed local preparation
+and response-ordering protections remain necessary; their file transport may be
+removed. [The scope review](evidence/B/scope-recut.md) records alternatives, costs,
+retirements and the required proof. The previous main-development stop-rule
+disposition remains in force. No stage checkpoint or merge is authorized here.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

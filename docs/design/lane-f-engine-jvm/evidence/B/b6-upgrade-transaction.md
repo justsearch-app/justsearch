@@ -29,7 +29,7 @@ batch in `design.md` section 0.
 
 ## Falsification evidence
 
-Two deliberate defects were restored and rejected by the focused regressions:
+Three deliberate defects were restored and rejected by the focused regressions:
 
 | Deliberate defect | Raw failing output | Failing assertion |
 |---|---|---|
@@ -93,3 +93,15 @@ contain 33 selected tests: app-engine has 1 XML/10 tests and UI has 4 XML/23 tes
 failures, errors or skips. Their timestamps span 2026-09-08T07:49:31.506Z through
 2026-09-08T07:56:15.909Z. These filtered reports do not replace the saved 180 XML/1158-test
 affected-module snapshot above, which predates the deadline and preparation-reservation reviews.
+
+## Integrated static-analysis repair
+
+The integrated repository build exposed eight PMD violations: two redundant
+`Files` qualifiers, five unused named try-with-resources variables and an unused
+test helper. Commit `3721395ff` removes the qualifiers/helper and uses Java 25
+unnamed resources while preserving watcher cleanup. No rule was suppressed.
+The focused PMD and shutdown test run passed in 20s; raw output is
+`tmp/lane-f-takeover/integrated-static-repair-focused.txt`. The subsequent
+`build -x test` passed in 26s with 325 tasks (five executed); raw output is
+`tmp/lane-f-takeover/integrated-build-without-tests-green.txt`. The original
+49s failed build is preserved as `integrated-build-without-tests.txt` beside it.

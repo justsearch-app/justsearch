@@ -401,3 +401,78 @@ are not silently treated as decided by the existing draft.
 PR #708 (`62251e459`) and PR #717 (`f0d9e2481`) were rechecked OPEN/CLEAN during
 this checkpoint and remain the owner's per-PR merge calls. No merge was performed.
 No new benchmark, evaluation or capture longer than one hour was started.
+
+### Reviewed transaction and host ownership checkpoint (2026-09-08)
+
+This supersedes the preceding checkpoint's next-batch list. The primary worktree
+remains `.claude/worktrees/lane-F-A` on `worktree-lane-F-A`; main and unrelated
+worktrees were not edited. `0ecaa8496` was reviewed and pushed before the next work.
+
+**B6 transaction:** `e18760596`, `975c4f33d`, `fb2b1e967` and evidence commit
+`5c1df5992` have independent read-only sign-off. The production writer is installed
+before API exposure and persists before success is returned. The controller alone
+owns the nonce and OPEN/PERSISTING/ACKNOWLEDGED state. Dispatch follows successful
+response flush. Pending requests survive deadline expiry during that flush;
+controller-acknowledged requests retain their original deadline. A preparation
+reservation protects both the lease-before-nonce and Worker-after-nonce boundaries
+against concurrent prepare/cancel/commit, without holding the monitor over I/O.
+
+The full app-engine/UI run passed in 7m7s: 1158 tests, zero failures/errors and one
+skip. It predates the final deadline/preparation fixes. Final focused evidence is
+33 passing tests with no skips: ten watcher tests executed in the preceding run,
+then reused while the final 21s run executed 23 UI tests. Both inventories and the
+raw falsification/green logs are under `tmp/lane-f-takeover/`; see
+`evidence/B/b6-upgrade-transaction.md`. The servlet failure is injected, not a real
+socket-disconnect proof. No post-change full repository suite is claimed.
+
+**Production host ownership:** a separate sole implementer used
+`.claude/worktrees/lane-F-host-ownership`, branch `codex/lane-f-host-ownership`,
+based on `0ecaa8496`. Code checkpoint `f25dbadfa` has independent sign-off and was
+integrated into the primary branch as `5c179b5a0`; `36fb25ed3` and `203d40f67`
+integrate the evidence correction and complete raw Cargo log. The
+production core serializes real-child spawn admission with monotonic host close,
+retains predecessor discovery identity, rejects stale and child-absent manifests,
+guards stdout EOF by spawn generation, owns one cancellable/joined watcher, and
+publishes initial and replacement launch failures through the real state/event
+paths. Only admitted manifests can update the tray, and repeated tooltip text does
+not trigger repeated native updates. The library suite passed 59 tests; three
+mutations of production event/failure paths failed before restoration. The evidence
+in `evidence/B/b7-b10-independent-review.md` reconciles the inherited 56 tests and
+states the test-only Tauri resource override. Tauri setup wiring was source-reviewed,
+not executed as a packaged application.
+
+The integrated `build -x test` exposed eight PMD violations in the shutdown
+changes. `3721395ff` fixes the redundant qualifiers, preserves try-with-resources
+cleanup using unnamed resources, and removes an unused test helper. Focused PMD
+and shutdown tests passed in 20s; the repository build then passed in 26s (325
+tasks). Raw failure, repair and green build logs are under `tmp/lane-f-takeover/`.
+
+**Decisions and remaining work:** newest dated design section 0 paragraphs now
+also settle B14/R7. Retire the obsolete Java whole-Worker supervision veto while
+preserving local recovery and fatal index/schema refusals. Current host state must
+reach the real recovery UI; stale state files are not a live recovery authority.
+A bounded valid HTTP 503 response proves liveness and must not trigger a hang
+restart; essential readiness separately controls budget reset. This is decided but
+unimplemented. `evidence/B/remaining-lifecycle-investigation.md` carries the source
+findings, including the fact that B15's actual promotion occurs after the cutover
+request response.
+
+The first-claim request protocol is stopped by the newest design section 0
+decision. Read `evidence/B/scope-recut.md` before any request-protocol work. The
+preferred replacement has one supervisor file writer and local Engine dispatch;
+it first needs production proof of response ordering, requested-exit classification,
+responsive shutdown stalls and updater timeout ownership. Existing manifest STOPPING
+is a candidate signal, with overwrite and premature-deletion hazards still to fix.
+Do not implement the suspended marker/retention/claim mechanics from older amendments.
+R3 is still open; the B6 transaction does not close it. R6/R7/R8, B11/B12 ownership
+handoff, B13 updater hold/recovery UI, B14 implementation, B15's real restart consumer,
+B16 residue and B17 verification wiring remain open. Preserve the separate uncounted
+intentional-restart and counted-failure paths. Then complete the stage-B compile,
+unit, frontend, conformance, live recovery and real-model proof before claiming the
+stage checkpoint. The main control worktree and pre-edit full-suite evidence remain
+available; no relevant historical or named gap is silently converted to a pass.
+
+PRs #708 and #717 remain the owner's per-PR merge decisions. No merge was performed.
+No benchmark, evaluation or capture longer than one hour was started. All implementers
+release their branch before orchestration edits or integration; reviewers remain
+read-only and do not implement the work they review.
