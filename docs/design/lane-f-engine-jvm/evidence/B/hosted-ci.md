@@ -70,3 +70,28 @@ All 194 tasks executed. Its 1,534 XML files were copied to `tmp/b-ci-final-full-
 any further test invocation, with per-module counts and per-file hashes. The increase of four
 over the preceding 9,456-test checkpoint is the two process-identity regressions plus the two
 boot-injector regressions. No Linux execution is inferred from this Windows local run.
+
+## Second hosted run
+
+[Run 34272778959](https://github.com/justsearch-app/justsearch/actions/runs/34272778959)
+tests correction commit `9dededdbe`. Public claims passed the previously failing dead-code gate,
+then reached a later check and found the generated module-dependency document had not included
+B17's existing `indexer-worker -> app-api` edge. Regeneration changes that edge and the derived
+fan-out count only. The canonical graph check, Markdown lint, semantic docs validation, index,
+embedded skills, links and runtime-config matrix checks all pass locally after regeneration.
+Independent read-only review confirmed the generated edge and count against the Gradle declaration.
+
+B9's missing hosted proof now passes at `9dededdbe`:
+- [Windows-native job 102218265174](https://github.com/justsearch-app/justsearch/actions/runs/34272778959/job/102218265174): **10/10** auto-discovered dev-runner test files and **17/17** dev-runner conformance cases. `run-dev-runner-tests.mjs` discovers every `test-dev-runner-*.mjs`, including `test-dev-runner-death-observability.mjs`; its successful aggregate cannot omit that file at this head.
+- [Rust job 102218265260](https://github.com/justsearch-app/justsearch/actions/runs/34272778959/job/102218265260): **77/77** library tests and **17/17** Tauri conformance cases.
+- Linux platform-contracts, App/UI, search-worker, build, jseval, licenses, secrets and measured-axe jobs pass. The integration job also passes: **88 tests, zero failures/errors, 42 skips**, including the restored boot-recovery case and all five supervised Engine cases with **zero skips** in those two classes. Public claims remains red solely on the generated document corrected above.
+
+| Hosted log (ignored) | SHA-256 |
+| --- | --- |
+
+| `tmp/b-ci-second-windows.txt` | `905119120cb6094b7b4694f097811e323b60aca25b0c12289d3b747f78543926` |
+| `tmp/b-ci-second-rust.txt` | `895fcdf8ca5719058af0bf5e4ac51e3469ae10521c6886e6396ed696d2a0f4d8` |
+| `tmp/b-ci-second-public-claims.txt` | `3439fd95f8917bdb4d09bc45bf64e1201f8601b86146eab1e8388bfa9e73b1c9` |
+| `tmp/b-ci-second-integration.txt` | `411c2837b5a67dcb52c63ce7b21aa5486f4634ba9b67be69e56ad682b021c0d2` |
+| `tmp/b-ci-second-integration-summary.json` | `14be4fab15380f97b1772e68c941b39746f76254fac85e0b58f3b873e78d9fe7` |
+| `tmp/b-ci-second-integration-inventory.json` | `c1a0fefbded251a6b9af3f6e6b4fc8e8cde5153c029bfa608972053fb2d71727` |

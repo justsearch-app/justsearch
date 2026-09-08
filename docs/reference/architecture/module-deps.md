@@ -66,7 +66,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:benchmarks` -> `:modules:adapters-lucene`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:reranker`
 - `:modules:configuration` -> `:modules:core-contracts`
 - `:modules:gpu-bridge` -> `:modules:configuration`
-- `:modules:indexer-worker` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:core-contracts`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
+- `:modules:indexer-worker` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:indexing` -> `:modules:adapters-lucene`, `:modules:core`
 - `:modules:ipc-common` -> `:modules:app-api`
 - `:modules:ort-common` -> `:modules:configuration`
@@ -167,6 +167,7 @@ graph TD
   gpu-bridge --> configuration
   indexer-worker --> adapters-lucene
   indexer-worker --> ai-backend
+  indexer-worker --> app-api
   indexer-worker --> configuration
   indexer-worker --> core-contracts
   indexer-worker --> indexing
@@ -234,8 +235,8 @@ graph TD
 |--------|-------------|-------|
 | `ui` | 20 | Head REST API + orchestration bridge |
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
+| `indexer-worker` | 12 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `worker-services` | 12 |  |
-| `indexer-worker` | 11 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `app-launcher` | 10 | CLI/distribution wiring; pulls in most runtime modules |
 | `app-engine` | 9 |  |
 <!-- GENERATED:MODULE_DEPS:END -->
