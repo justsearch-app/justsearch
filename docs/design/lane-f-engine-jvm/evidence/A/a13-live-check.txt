@@ -11,3 +11,14 @@ Ingest: POST /api/knowledge/ingest docs/explanation -> accepted 30; wait_pipelin
 Search: POST /api/knowledge/search {"query":"suicide pact heartbeat worker","limit":5}
   -> totalHits 35, effectiveMode HYBRID, top hit docs/explanation/02-process-coordination.md.
 Status: docCount 35. Stop: dev-runner stop -> ok, ports closed.
+
+Re-run on the stage head b1a1853ce (2026-09-08 00:40, orchestrator).
+Launch (--clean hard --skip-build): worker READY at 4,520 ms; one JVM under the run's tree
+  before ingest, two after (HeadlessApp plus the extraction child pool). Ingest 30 docs ->
+  every stage complete; search "suicide pact heartbeat worker" -> totalHits 35, HYBRID, top
+  hit docs/explanation/02-process-coordination.md.
+A18 reload trigger, hot reload on (--hot-reload, run.json hotReload.enabled=true, classesDir
+  paired): touching <dataDir>/runtime/dev-reload.request is consumed by the Engine within 2 s;
+  the worker component stays READY and the same search answers 35 hits afterwards. With hot
+  reload off the sentinel does not poll, so the file is left untouched (expected, and the
+  reason the first attempt showed "not consumed").
