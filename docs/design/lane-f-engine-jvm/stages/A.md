@@ -2,7 +2,7 @@
 title: "Lane F stage A — spine and unplug: implementation checklist"
 stage: A
 created: 2026-09-07
-base: fe19df0d5
+base: 2845d9e83
 status: "A1-A20 landed; checkpoint review pending"
 updated: 2026-09-08
 ---
@@ -352,9 +352,19 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   `docs/explanation/23-search-pipeline-overview.svg` still renders "gRPC Request" and "gRPC to
   Worker". It is a committed Graphviz artifact with **no `.dot` source and no generator in the
   repo**, and its text is indexed by the workflow-fixture corpus baselines under
-  `evidence/baseline/fixture/`, so hand-editing two labels would silently shift a measurement
+  `evidence/baseline/fixture/`, so hand-editing two labels would shift a measurement
+
+  **Corrected at the checkpoint.** The "would shift a baseline" reasoning was applied
+  inconsistently: this stage went on to edit **three** of the fixture-corpus documents anyway
+  (`docs/explanation/23-search-pipeline-overview.md`, `19-module-architecture.md`,
+  `24-worker-inference-composition.md`). That is defensible, and the reason belongs here rather
+  than left looking like a double standard: the corpus **baseline was retaken under PR 0b**, so
+  edits landing after that retake are measured against the new baseline, not a stale one. The SVG
+  stays routed for the reason that actually applies to it — a committed Graphviz artifact with no
+  `.dot` source and no generator cannot be regenerated or reviewed as a diff. That is a
+  source-of-truth problem, not a baseline one. Superseded text follows:
   baseline. It therefore joins the canonical-doc sweep this stage already owes (§0.1, the A9
-  residue bullet and A15's banners) rather than being edited blind here. This is a routing, not a
+  residue bullet and the A15 bullet below) rather than being edited blind here. This is a routing, not a
   note: the sweep is a named, scheduled piece of work with an owner, which is the difference the
   `log-pre-existing-issues` rule turns on.
 - **A16 (a per-record log FIELD changed, flagged because a dashboard will notice).** The Logstash
@@ -439,9 +449,18 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   which is what `openRequestMdc` needs and what `EngineKnowledgeClient` fills from `Span.current()`.
 - **A9 (`KnowledgeServer` needed a lifecycle that is not a socket).** `blockUntilShutdown()` awaited
   the gRPC server's termination and `isRunning()` asked whether a `Server` object existed and was
-  not shut down. Both are now a `CountDownLatch` released by `initiateShutdown()`/`close()`.
-  `getPort()` returns -1 unconditionally, kept only until A13 removes the last caller. Under the
-  Engine none of the three is used: the composition root owns the lifecycle.
+  not shut down. Both became a `CountDownLatch` released by `initiateShutdown()`/`close()`.
+  `getPort()` returns -1 unconditionally, kept only until A13 removes the last caller.
+
+  **Corrected at the stage-A checkpoint (finding 3).** The last sentence of this bullet used to
+  read "Under the Engine none of the three is used: the composition root owns the lifecycle." That
+  sentence was true and was the defect. `initiateShutdown()` had one caller — the migration cutover
+  — and because *nothing observed* the latch it released, the cutover's reopen silently stopped
+  happening (blocker 1). "Nobody uses it" was recorded as a tidy outcome when it was a broken wire.
+  `initiateShutdown()` and its plumbing are now deleted, `close()` is the only releaser, and
+  `isRunning()` has the production consumer it lacked: `EngineRoot.close()` reads it to confirm the
+  close completed. The lesson is the one the checkpoint made a rule — an unused lifecycle hook is a
+  finding to chase, not a simplification to note.
 - **A9 (hot reload, concretely).** `DevReloadManager.performReload` loses one step and keeps the
   rest: it still clears the signal, awaits deferred model init, closes the old services,
   reconstructs from the same `InfraContext`, re-wires models, publishes and starts the new loop —
@@ -603,6 +622,7 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   | `chaos/HandleLeakDetector` (support) | deliberately not ported; rationale `EngineSoakTest.java:61-78`. Substituted oracle: reopen-succeeds + named-thread-pool count |
   | `soak/NmtMemoryTracker` (support) | `EngineSoakTest.java:237` (heap after forced GC). Loss stated at `EngineSoakTest.java:40-44` — off-heap growth is now invisible |
   | `soak/SoakTestRunner` (support) | `EngineSoakTest.java:100` — the iterate/snapshot/threshold rig inlined into the three tests |
+  | `ExtractionSandboxChaosTest` | **not an A12 deletion, and A12's body says the opposite.** A12 kept it ("Not deleted, deliberately") along with `WorkerProcessManager`, `GrpcTestClient` and `MmfTestHarness`; all four were deleted two commits later in `2302fac33` (A14-A17). Its containment half is now `app-engine/…/EngineExtractionSandboxChaosTest.java:173` (`@Tag("stress")`, so outside the default suite — see §10), and its `workerShutdownLeavesNoOrphanChild` half moved to the `IsolatedBackendFixture` tier, which needs a killable parent the Engine now is |
   | `ChaosSuiteTest` (7 nested) | split — see below |
 
   `ChaosSuiteTest`'s seven arms did not share a fate, so collapsing them into one row would hide
@@ -618,6 +638,30 @@ new citation *before* the checklist relies on it. Five corrections fall out of t
   | `SignalNoiseTests` `:483` | **gone** — MMF byte fuzzing across a process boundary; the layout classes are deleted |
   | `StalePortTests` `:540` (2), `HarnessUnitTests` `:854` (2) | **gone** — and these four are the exception to the A9 claim: they spawn nothing and *would* still have run. They died with their subject (the MMF layout, `WorkerProcessManager.isProcessAlive`), not with the server |
 
+- **A15 (the ADR is the sweep's anchor, and two invariant copies drifted from it).** ADR-0049
+  supersedes 0001 and 0002 and re-words hard invariant 1 from "the Head never touches Lucene, via
+  gRPC" to "application code never touches Lucene; index I/O belongs to the index half, via a port".
+  The stage found the invariant existed in **three** places — `CLAUDE.md`, `AGENTS.md` and
+  `governance/consult-register.v1.json:123` — and the third was missed until the checkpoint, still
+  saying "delegate index IO to the Worker via gRPC". A rule stated three times drifts in the copy
+  nobody greps. The ADR's own probe text also described `adr-0049-no-grpc-in-module-builds`
+  inaccurately; corrected at the checkpoint, plus a second absence probe on `^import io.grpc` under
+  `modules/**/*.java`, because the `.kts` probe would not have caught a returning Java import.
+- **A17 (a holding action, and what "holding" costs).** The `worker.*` readiness vocabulary and
+  `/api/debug/worker-log` are deliberately NOT renamed: the reason codes are a wire contract the FE
+  matches on, and re-cutting them is D1's, not A's. The cost is a vocabulary that names a process
+  which no longer exists — `worker.recovering` is emitted by the Engine about itself. That is
+  accepted and dated rather than quietly normalised. The checkpoint found the holding action also
+  concealed something real: `worker.restart_exhausted` has no producer at all (§10 row 1), which a
+  rename would have surfaced and a hold did not.
+- **A19 (a retired tier leaves residue inside Java files, where doc gates cannot see it).** The
+  config-snapshot tier (ordinal 450, `ORDINAL_WORKER_SNAPSHOT`) is deleted: one `ResolvedConfig` in
+  one JVM cannot disagree with itself. But the ordinal TABLE in `ResolvedConfigBuilder`'s class
+  javadoc still listed `450 | Worker config snapshot | Head→Worker propagation` after the constant
+  was gone, and `docs-validate` cannot see a javadoc. Two independent passes read that table as
+  current before the checkpoint caught it. Same class as the `KnowledgeServer` javadoc still listing
+  "Process coordination via MMF" two paragraphs above the text explaining the MMF is deleted:
+  **a sweep that greps only prose misses the prose that lives in code.**
 - **A18 (the trigger was already re-homed; what was missing was anyone checking it).** The item's
   own text called out that `server.mjs` wrote "byte 29" as a literal instead of importing
   `OFFSET_RELOAD_SIGNAL`, so the two halves could drift silently. Review S2 re-homed the trigger onto
@@ -982,8 +1026,14 @@ Consumers of the **name** `worker.log` that must follow: `scripts/jseval/jseval/
 `modules/indexer-worker/src/test/.../WorkerLogbackConfigurationTest.java:23,59-60`,
 `governance/store-recoverability.v1.json:1229` (a *note* that cites WorkerSpawner's policy as the
 precedent for llama-server.log retention — the prose must be corrected, not the classification).
-**Acceptance:** one log file under `<dataDir>/logs/`; `operation-surface` and `surface-altitude`
-gates green; `jseval ops` prints the engine log; `node scripts/ci/check-store-recoverability.mjs` green.
+**Acceptance:** one log file under `<dataDir>/logs/` **from the Engine** — corrected at the
+checkpoint, because the unqualified claim is false. `modules/app-launcher/src/main/resources/logback.xml:3`
+writes a second file, `<dataDir>/logs/app.log`, stamped `{"service":"app-launcher"}` (`:22`). That is
+the launcher's own log, not a second copy of the Engine's, and it is out of this stage's scope — but
+"one log file under `<dataDir>/logs/`" reads as a claim about the directory, and the directory holds
+two. What A16 actually collapsed is the Head/Worker pair into `engine.log`.
+`operation-surface` and `surface-altitude` gates green; `jseval ops` prints the engine log;
+`node scripts/ci/check-store-recoverability.mjs` green.
 
 ### A17 — holding action for the `worker.*` readiness vocabulary and `/api/debug/worker-log`
 
@@ -1098,8 +1148,10 @@ Stage A produces no measurement (E does). It must not make a row *unmeasurable*:
   | logging (the second log tier) | 2 |
   | **total** | **105** |
 
-  Cross-checked by source set: main java 38 + main resources 1 + test 38 + systemTest 19 +
-  soakTest 1 + integrationTest 3 + docs 1 + scripts 4 = 105.
+  Cross-checked by source set: main **37 java + 1 proto + 1 xml** (the label read "java 38 +
+  resources 1" until the checkpoint; the proto and the retired `worker.log` logback were being
+  counted as java and as an undifferentiated "resource") + test 38 + systemTest 19 + soakTest 1 +
+  integrationTest 3 + docs 1 + scripts 4 = 105.
 
   | quantity | measured | how |
   |---|---|---|
@@ -1334,22 +1386,53 @@ about, so the rows below are now statements about the branch, each with the file
 
 **Allowed red / deliberately lost until B:**
 
-1. **Crash detection and restart-under-budget of a *running* Engine.** Corrected 2026-09-08. The
-   original row claimed supervision was gone entirely and that `WORKER_RECOVERING` /
-   `WORKER_RESTART_EXHAUSTED` "have no producer". Both halves are false:
+1. **Crash detection and restart-under-budget of a *running* Engine.** Rewritten 2026-09-08 at the
+   checkpoint (finding 7) **from the call sites**, because the previous rewrite — which itself
+   corrected the original forecast — got the second half wrong by trusting a grep. Recording all
+   three versions, because the failure mode repeated:
 
-   - The **boot-recovery arm survived**. `KnowledgeServerBootstrap` still retries a failed boot under
-     a budget and still reports exhaustion (`KnowledgeServerBootstrap.java:445`, `:731`), and
-     `KnowledgeServerHealthMonitor` still emits `WORKER_RECOVERING` (`:421`) and
-     `WORKER_RESTART_EXHAUSTED` (`:343`, `:500`). These are production call sites, not tests.
-   - There is consequently **no `awaitingRecut` allowlist**, and never was one — `git grep
-     awaitingRecut` returns zero hits repo-wide. It was invented by the forecast.
+   - The forecast said both `WORKER_RECOVERING` and `WORKER_RESTART_EXHAUSTED` "have no producer".
+   - The first correction said both have live producers. It cited four hits without opening them.
+   - **What is actually true**, each hit read:
+     - `WORKER_RECOVERING` **has a producer**: `KnowledgeServerHealthMonitor.java:419-421` is a real
+       `cap.transition(CapabilityHealth.RECOVERING, …)` emission, and the monitor is live via
+       `HeadlessApp.java:595`.
+     - `WORKER_RESTART_EXHAUSTED` **has none**. All four cited sites are reads, not emissions:
+       `KnowledgeServerBootstrap.java:444-447` and `KnowledgeServerHealthMonitor.java:342-344` are
+       `.equals(...)` comparisons against `pendingReason()`; `KnowledgeServerBootstrap.java:729-732`
+       and `KnowledgeServerHealthMonitor.java:498-500` are log arguments. Nothing transitions to it.
+     - Consequently `supervisionVerdictHeld()` is permanently false, `supervisionActive()` is
+       hard-coded `false` (`KnowledgeServerBootstrap.java:460-462`), and **`BootRecoveryDecision`'s
+       `SUPERVISION_ENGAGED` veto and its terminal-verdict branch are inert until stage B.** They
+       are kept deliberately (design 7.1's supervisor lands at B), not accidentally.
+   - There is **no `awaitingRecut` allowlist** — `git grep awaitingRecut` returns zero hits
+     repo-wide. That one the forecast invented outright.
 
-   What is genuinely lost is narrower and worth stating precisely: there is no longer a second
-   process whose *exit* can be observed, so an Engine that dies mid-run takes the whole application
-   with it and nothing survives to notice, count, or restart it. Recovery now covers failures that
-   happen **during** boot, not failures that happen **after** it. A crashed Engine stays down until
-   the user starts it again.
+   `check-readiness-reason-codes` accepted a *reference* as proof of a producer, which is why two
+   passes of this document could disagree without any gate objecting. It now requires an emission
+   call site, and `WORKER_RESTART_EXHAUSTED` is listed as `awaitingProducer` with `owner:
+   lane-F/B` — so stage B inherits a red to clear instead of a claim to re-audit.
+
+   What is genuinely lost: there is no longer a second process whose *exit* can be observed, so an
+   Engine that dies mid-run takes the whole application with it and nothing survives to notice,
+   count, or restart it. Recovery covers failures **during** boot, not **after** it. A crashed
+   Engine stays down until the user starts it again.
+
+1b. **A migration cutover does not reopen the index (checkpoint blocker 1).** New named red. The
+   cutover promotes the building generation in `state.json` — durable, and a restart picks it up —
+   but the process that performed it goes on serving the previous generation. It used to end by
+   killing the Worker so the spawner would respawn onto the promotion; in one JVM that action
+   released a latch nothing read.
+   The promotion is no longer followed by a false claim: the log says RESTART REQUIRED and names the
+   promoted generation, and `MigrationStartResponse`/`MigrationRollbackResponse` carry
+   `restart_required` (renamed from `restart_scheduled`, which asserted an action nothing performed).
+   **This red has a second, worse half: it is not observable through the API.** Every migration
+   status field derives from `state.json`, including `serving_search_generation_id`, which is
+   assigned from `stateSnapshot.active_generation()` (`IndexStatusOps.java:608-611`) despite its
+   name. Measured after a cutover: `migration_state=IDLE`, `active_gen`= the promoted id,
+   `servingSearch`= the promoted id — a completed cutover by every field, while the old generation
+   is being served. Cleared by **D1**, which owns the live generation swap; D1 must also source a
+   status field from the open runtime, or the fix will be as unobservable as the defect was.
 
 2. **Restart-as-reload — but by answer, not by exit.** Corrected 2026-09-08. The original row said
    config-apply, AI install and pack import "exit the process with a `restart required` code" and
