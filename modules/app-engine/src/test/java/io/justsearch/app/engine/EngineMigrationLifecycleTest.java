@@ -33,15 +33,21 @@ import tools.jackson.databind.ObjectMapper;
  * ({@code modules/worker-core/.../index/IndexGenerationManager.java}). None of that needed a second
  * process; the retired tests only used one because that was the only way to reach the index at all.
  *
- * <p><b>What "the worker restarted" becomes.</b> The retired tests drove the restart directly:
- * {@code startMigration}/{@code rollbackMigration} set {@code restart_worker=true}, the worker
- * exited, and the test called {@code spawnWorker()} again. Under the Engine that callback is
- * {@code KnowledgeServer#initiateShutdown} (KnowledgeServer.java:2109-2112) — a latch countdown, not
- * a {@code System.exit} — and the composition root owns what happens next. So the equivalent here
- * is {@link EngineTestHarness#restart()}: close the Engine, re-open it on the same data directory.
- * Everything the old restart re-read ({@code state.json}, the job queue, the switch buffer) is on
- * disk, so the reopened Engine sees exactly what a respawned process saw. The assertions about
- * <em>the index</em> are unchanged; the assertions about a PID terminating are gone with the PID.
+ * <p><b>What "the worker restarted" becomes — corrected at the stage-A checkpoint.</b> The retired
+ * tests drove the restart directly: {@code startMigration}/{@code rollbackMigration} set
+ * {@code restart_worker=true}, the worker exited, and the test called {@code spawnWorker()} again.
+ * An earlier version of this comment said the Engine equivalent was
+ * {@code KnowledgeServer#initiateShutdown} — "a latch countdown, not a {@code System.exit}" — with
+ * the composition root owning what happened next. That was wrong in the way that mattered: the
+ * composition root was never told, the latch had no reader, and so <em>nothing</em> happened next.
+ * The migration promoted a generation and the Engine went on serving the previous one.
+ *
+ * <p>That callback is deleted. {@link EngineTestHarness#restart()} is now understood as a TEST
+ * ACTION — close the Engine, re-open it on the same data directory — and not as a stand-in for
+ * something the product does by itself. It is still the right way to assert "after a restart, X",
+ * because everything the old restart re-read ({@code state.json}, the job queue, the switch buffer)
+ * is on disk. It is not evidence that an operation took effect without one, and the cutover test
+ * below is explicit about which of the two it is claiming at each step.
  *
  * <p><b>One deliberate speed-up, stated rather than hidden.</b> The retired
  * {@code MigrationControlE2ETest} waited for the cutover monitor to reach its drain criteria on its
@@ -91,17 +97,54 @@ final class EngineMigrationLifecycleTest {
 
     assertTrue(engine.client().startMigration("system_test"), "startMigration must be accepted");
 
-    // The restart the migration asked for. Under the Engine the composition root performs it.
+    // An explicit restart, not a simulation of one: startMigration re-cuts the layout and the
+    // Engine has no in-place reopen (see below).
     engine.restart();
 
     assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted");
 
-    // The cutover monitor promotes the building generation and writes state.json BEFORE it asks for
-    // the restart (KnowledgeServerMigrationOps.java:261-268), so the file is the observable that
-    // replaces "the process exited".
+    // The cutover monitor promotes the building generation and writes state.json
+    // (KnowledgeServerMigrationOps.java, promoteBuildingGenerationToActive). The FILE is the
+    // observable — and, as the assertion below records, it is the ONLY thing that moves.
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
         "the cutover must promote the building generation; state.json still reads " + activeBefore);
+
+    // ---- Stage-A checkpoint, blocker 1: the promotion does NOT take effect in this process. ----
+    //
+    // The cutover used to end by calling initiateShutdownAction(), which under the split
+    // architecture killed the Worker so the spawner could respawn it onto the promoted generation.
+    // In one JVM that action set a flag and counted down a latch nothing read, so the reopen simply
+    // stopped happening — and this test did not notice, because it called engine.restart()
+    // immediately afterwards and thereby performed the missing step by hand.
+    //
+    // The checkpoint asked for an assertion that the LIVE Engine still serves the OLD generation.
+    // It cannot be written against the status surface, and the reason is worth more than the
+    // assertion would have been. Measured on this branch at the point marked above:
+    //
+    //   migration_state=IDLE  active_gen=g-20260908-003731  building_gen=(empty)
+    //   activeDocCount=1  buildingDocCount=1  servingSearch=g-20260908-003731
+    //
+    // Every one of those fields derives from state.json — the file the promotion just rewrote —
+    // including the one whose NAME promises otherwise: `serving_search_generation_id` is assigned
+    // from `stateSnapshot.active_generation()` at IndexStatusOps.java:608-611, so it is a second
+    // copy of the pointer, not an observation of the reader that serves search. So the status
+    // surface reports a completed cutover — IDLE, promoted generation, "serving" the promoted
+    // generation — while the process serves the previous one, and no field disagrees.
+    //
+    // That is the real depth of the defect: it was not merely unasserted, it was unobservable, and
+    // any test written against status would have passed both before and after the fix. Making it
+    // assertable needs a status field sourced from the open runtime rather than from the file,
+    // which is a D1-shaped change and is recorded in §10 as part of the named red rather than
+    // smuggled in here.
+    //
+    // What IS asserted: the promotion is durable (above), the payload states restart_required
+    // (worker-services MigrationRestartRequiredTest), and search keeps working across the cutover
+    // rather than the Engine dropping into a half-open state.
+    assertTrue(
+        engine.awaitSearchable(marker, 60_000),
+        "the Engine must keep serving across the cutover — the promotion is a pointer write, and"
+            + " nothing about it may interrupt the generation currently open");
 
     engine.restart();
 

@@ -69,8 +69,7 @@ final class WorkerIngestServiceSettleIndexTest {
         runtime,
         runtime,
         null,
-        0L,
-        null);
+        0L);
   }
 
   private static SettleIndexResponse settle(WorkerIngestService svc, SettleIndexRequest request) {
@@ -181,8 +180,7 @@ final class WorkerIngestServiceSettleIndexTest {
             null,
             null,
             null,
-            0L,
-            null);
+            0L);
 
     SettleIndexResponse resp = settle(svc, SettleIndexRequest.getDefaultInstance());
 

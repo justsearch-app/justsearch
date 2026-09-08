@@ -42,8 +42,7 @@ final class WorkerIngestServiceCollectionTagTest {
         null,
         null,
         null,
-        0L,
-        null);
+        0L);
   }
 
   private static BatchResponse submit(WorkerIngestService svc, BatchRequest request) {

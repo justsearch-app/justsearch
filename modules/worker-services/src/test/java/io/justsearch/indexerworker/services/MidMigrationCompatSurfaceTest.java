@@ -153,8 +153,7 @@ final class MidMigrationCompatSurfaceTest {
             ingest,
             search,
             null,
-            0L,
-            null);
+            0L);
 
     return service.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
   }

@@ -38,7 +38,6 @@ public record InfraContext(
     Path activeIndexPath,
     Supplier<MigrationProgressSnapshot> migrationProgressSupplier,
     long migrationSwitchingMaxDurationMs,
-    Runnable initiateShutdownAction,
     PathResolutionStore pathResolutionStore,
     DocumentIdentityStore documentIdentityStore) {
 
@@ -62,7 +61,6 @@ public record InfraContext(
       Path activeIndexPath,
       Supplier<MigrationProgressSnapshot> migrationProgressSupplier,
       long migrationSwitchingMaxDurationMs,
-      Runnable initiateShutdownAction,
       PathResolutionStore pathResolutionStore) {
     this(
         config,
@@ -76,7 +74,6 @@ public record InfraContext(
         activeIndexPath,
         migrationProgressSupplier,
         migrationSwitchingMaxDurationMs,
-        initiateShutdownAction,
         pathResolutionStore,
         DocumentIdentityStore.UNAVAILABLE);
   }
@@ -98,8 +95,7 @@ public record InfraContext(
       Path indexBasePath,
       Path activeIndexPath,
       Supplier<MigrationProgressSnapshot> migrationProgressSupplier,
-      long migrationSwitchingMaxDurationMs,
-      Runnable initiateShutdownAction) {
+      long migrationSwitchingMaxDurationMs) {
     this(
         config,
         jobQueue,
@@ -112,7 +108,6 @@ public record InfraContext(
         activeIndexPath,
         migrationProgressSupplier,
         migrationSwitchingMaxDurationMs,
-        initiateShutdownAction,
         PathResolutionStore.NOOP,
         DocumentIdentityStore.UNAVAILABLE);
   }

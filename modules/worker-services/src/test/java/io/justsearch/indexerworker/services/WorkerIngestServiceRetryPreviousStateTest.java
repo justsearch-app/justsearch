@@ -76,8 +76,7 @@ final class WorkerIngestServiceRetryPreviousStateTest {
             null,
             null,
             null,
-            0L,
-            null);
+            0L);
     svc.setPathResolutionStore(
         new PathResolutionStore() {
           @Override

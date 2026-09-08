@@ -29,11 +29,9 @@ import io.justsearch.ipc.MigrationStartResponse;
 final class MigrationControlOps {
 
   private final IndexGenerationManager indexGenerationManager;
-  private final Runnable restartWorkerCallback;
 
-  MigrationControlOps(IndexGenerationManager indexGenerationManager, Runnable restartWorkerCallback) {
+  MigrationControlOps(IndexGenerationManager indexGenerationManager) {
     this.indexGenerationManager = indexGenerationManager;
-    this.restartWorkerCallback = restartWorkerCallback;
   }
 
   MigrationStartResponse startMigration(MigrationStartRequest request) {
@@ -61,25 +59,9 @@ final class MigrationControlOps {
               .setMigrationState(ms)
               .setActiveGenerationId(active)
               .setBuildingGenerationId(building)
-              .setRestartScheduled(restart && restartWorkerCallback != null)
+              .setRestartRequired(restart)
               .build();
 
-      if (restart && restartWorkerCallback != null) {
-        // Best-effort. Since the A3 conversion this method RETURNS its response instead of
-        // writing it, so the restart is scheduled just BEFORE the adapter writes the response
-        // rather than just after; the 150 ms guard below covers the reorder.
-        new Thread(
-                () -> {
-                  try {
-                    Thread.sleep(150);
-                  } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                  }
-                  restartWorkerCallback.run();
-                },
-                "migration-start-restart")
-            .start();
-      }
       return response;
     } catch (Exception e) {
       return MigrationStartResponse.newBuilder()
@@ -199,22 +181,9 @@ final class MigrationControlOps {
                   next.active_generation() == null ? "" : next.active_generation())
               .setPreviousGenerationId(
                   next.previous_generation() == null ? "" : next.previous_generation())
-              .setRestartScheduled(restart && restartWorkerCallback != null)
+              .setRestartRequired(restart)
               .build();
 
-      if (restart && restartWorkerCallback != null) {
-        new Thread(
-                () -> {
-                  try {
-                    Thread.sleep(150);
-                  } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                  }
-                  restartWorkerCallback.run();
-                },
-                "migration-rollback-restart")
-            .start();
-      }
       return response;
     } catch (Exception e) {
       return MigrationRollbackResponse.newBuilder()

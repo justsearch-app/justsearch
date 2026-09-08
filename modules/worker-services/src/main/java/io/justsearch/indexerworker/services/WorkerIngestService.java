@@ -167,15 +167,14 @@ public final class WorkerIngestService {
       io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle,
       io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle,
       Supplier<MigrationProgressSnapshot> migrationProgressSupplier,
-      long migrationSwitchingMaxDurationMs,
-      Runnable restartWorkerCallback) {
+      long migrationSwitchingMaxDurationMs) {
     this.jobQueue = jobQueue;
     this.indexingLoop = indexingLoop;
     this.indexingPacing =
         java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.ingestLifecycle = ingestLifecycle;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
-    this.migrationOps = new MigrationControlOps(this.indexGenerationManager, restartWorkerCallback);
+    this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
     this.settleOps =

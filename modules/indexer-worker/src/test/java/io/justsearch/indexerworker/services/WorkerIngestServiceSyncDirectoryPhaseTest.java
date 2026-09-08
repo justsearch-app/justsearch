@@ -140,7 +140,7 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest {
     Files.createDirectories(indexPath);
     return new WorkerIngestService(
         jobQueue, new StubIndexingLoop(), bus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
-        lifecycle, lifecycle, null, 0L, null);
+        lifecycle, lifecycle, null, 0L);
   }
 
   private static final class StubIndexingLoop extends IndexingLoop {

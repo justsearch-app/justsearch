@@ -1175,7 +1175,11 @@ message MigrationStartResponse {
   string migration_state = 3;
   string active_generation_id = 4;
   string building_generation_id = 5;
-  bool restart_scheduled = 6;
+  // True when the caller must restart the Engine for the change to take effect.
+  // Was restart_scheduled until the stage-A checkpoint: nothing schedules a restart any
+  // more (there is no second process to respawn), so the flag now states the requirement
+  // instead of claiming an action.
+  bool restart_required = 6;
 }
 
 message MigrationCutoverRequest {
@@ -1255,7 +1259,8 @@ message MigrationRollbackResponse {
   string error = 2;
   string active_generation_id = 3;
   string previous_generation_id = 4;
-  bool restart_scheduled = 5;
+  // See MigrationStartResponse.restart_required.
+  bool restart_required = 5;
 }
 
 message UpgradeQuiescenceRequest {

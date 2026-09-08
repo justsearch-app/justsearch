@@ -180,13 +180,20 @@ public final class KnowledgeServer implements Closeable {
   @SuppressWarnings("unused")
   private io.justsearch.indexerworker.services.WorkerOpsMetricCatalog workerOpsCatalog;
   /**
-   * Signalled by {@link #initiateShutdown()} and read by {@link #isRunning()}.
+   * Released by {@link #close()} and read by {@link #isRunning()}.
    *
    * <p>Lane F stage A item A9: this used to be the gRPC {@code Server}'s own termination, and
    * "running" needed a definition that is not "a socket is bound". Item A13 deleted the standalone
-   * {@code IndexerWorker.main} that parked on this latch, so nothing blocks on it any more — it
-   * survives purely as the second conjunct of {@link #isRunning()}: the sentinel or a migration
-   * cutover releases it, and the Engine composition root owns the lifecycle around it.
+   * {@code IndexerWorker.main} that parked on this latch, so nothing blocks on it any more.
+   *
+   * <p><b>Stage-A checkpoint (blocker 1).</b> The previous sentence here said "the sentinel or a
+   * migration cutover releases it". That was the defect, not a description: the cutover released it
+   * through {@code initiateShutdown()}, which set {@code running = false} and counted this down
+   * WITHOUT reopening the index — so a cutover marked the server not-running while it went on
+   * serving the old generation, and stopped the sentinel thread as a side effect. That path is
+   * deleted. {@link #close()} is now the only releaser, which is the only event that actually means
+   * "this server is finished", and {@code EngineRoot.close()} reads {@link #isRunning()} afterwards
+   * to confirm the close completed.
    */
   private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
@@ -957,7 +964,6 @@ public final class KnowledgeServer implements Closeable {
               activeIndexPath,
               this::migrationProgressSnapshot,
               MIGRATION_SWITCHING_MAX_DURATION_MS,
-              this::initiateShutdown,
               pathResolutionStore,
               documentIdentityStore);
       // Tempdoc 885 item 3: build the duty-cycle policy from resolved config before the app
@@ -2107,11 +2113,6 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private void initiateShutdown() {
-    running = false;
-    shutdownLatch.countDown();
-  }
-
   /**
    * The composed application services (lane F stage A item A6).
    *
@@ -2438,7 +2439,6 @@ public final class KnowledgeServer implements Closeable {
                         this::finalizeEmbeddingRebuildBeforeCutover,
                         this::verifyGreenCommitMetadataBestEffort,
                         this::drainSwitchBufferBestEffort,
-                        this::initiateShutdown,
                         this::flushTelemetryBestEffort,
                         dataDir,
                         log)),

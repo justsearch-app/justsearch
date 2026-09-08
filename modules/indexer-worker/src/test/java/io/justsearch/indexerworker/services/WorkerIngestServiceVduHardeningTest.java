@@ -73,7 +73,7 @@ final class WorkerIngestServiceVduHardeningTest {
     Files.createDirectories(indexPath);
     service = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
-        lifecycle, lifecycle, null, 0L, null);
+        lifecycle, lifecycle, null, 0L);
   }
 
   @AfterEach
@@ -752,7 +752,7 @@ final class WorkerIngestServiceVduHardeningTest {
     writeSwitchingState(indexBasePath);
     return new WorkerIngestService(
         queue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
-        indexBasePath, genDir, lifecycle, lifecycle, null, 0L, null);
+        indexBasePath, genDir, lifecycle, lifecycle, null, 0L);
   }
 
   private static void writeSwitchingState(Path indexBasePath) throws Exception {

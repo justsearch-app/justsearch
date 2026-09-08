@@ -185,8 +185,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             ingestRunning,
             ctx.searchLifecycleSupplier().get(),
             ctx.migrationProgressSupplier(),
-            ctx.migrationSwitchingMaxDurationMs(),
-            ctx.initiateShutdownAction());
+            ctx.migrationSwitchingMaxDurationMs());
 
     // Tempdoc 419 / T5.3 (ADR-0028): wire the scoped reverse-lookup store. KnowledgeServer
     // constructed it; we just inject so the LookupPathByHash gRPC handler returns real data.

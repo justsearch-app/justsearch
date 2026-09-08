@@ -59,7 +59,7 @@ final class WorkerIngestServiceTest {
     Files.createDirectories(stubIndexPath);
     service = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), stubIndexBasePath, stubIndexPath,
-        null, null, null, 0L, null);
+        null, null, null, 0L);
   }
 
   @AfterEach
@@ -270,7 +270,7 @@ final class WorkerIngestServiceTest {
     Files.createDirectories(stubIndexPath);
     WorkerIngestService svc = new WorkerIngestService(
         jobQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
-        stubIndexBasePath, stubIndexPath, null, null, null, 0L, null);
+        stubIndexBasePath, stubIndexPath, null, null, null, 0L);
 
     for (boolean force : new boolean[] {false, true}) {
       SyncDirectoryRequest request = SyncDirectoryRequest.newBuilder()
@@ -338,7 +338,7 @@ final class WorkerIngestServiceTest {
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
     WorkerIngestService switchingService = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), indexBasePath, genDir,
-        null, null, null, 0L, null);
+        null, null, null, 0L);
 
     // Create a real file for the request
     Path file = tempDir.resolve("testfile.txt");
@@ -392,7 +392,7 @@ final class WorkerIngestServiceTest {
     WorkerIngestService switchingService =
         new WorkerIngestService(
             nonSqliteQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
-            indexBasePath, genDir, null, null, null, 0L, null);
+            indexBasePath, genDir, null, null, null, 0L);
 
     BatchRequest request =
         BatchRequest.newBuilder().addFilePaths(file.toAbsolutePath().toString()).build();
@@ -435,7 +435,7 @@ final class WorkerIngestServiceTest {
     WorkerIngestService switchingService =
         new WorkerIngestService(
             nonSqliteQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
-            indexBasePath, genDir, null, null, null, 0L, null);
+            indexBasePath, genDir, null, null, null, 0L);
 
     SyncDirectoryRequest request =
         SyncDirectoryRequest.newBuilder().setRootPath(tempDir.toAbsolutePath().toString()).build();
@@ -486,7 +486,7 @@ final class WorkerIngestServiceTest {
     WorkerIngestService switchingService =
         new WorkerIngestService(
             sqliteQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
-            indexBasePath, genDir, null, null, null, 0L, null);
+            indexBasePath, genDir, null, null, null, 0L);
 
     String rootPath = tempDir.toAbsolutePath().toString();
     SyncDirectoryResponse response =

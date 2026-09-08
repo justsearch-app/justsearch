@@ -87,7 +87,6 @@ final class CutoverRestartEvidenceTest {
         () -> {},
         () -> true,
         () -> {},
-        () -> {},
         flush,
         dataDir,
         LoggerFactory.getLogger(CutoverRestartEvidenceTest.class));

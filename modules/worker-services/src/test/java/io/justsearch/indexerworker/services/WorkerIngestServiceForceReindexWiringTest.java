@@ -55,8 +55,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
         null,
         null,
         null,
-        0L,
-        null);
+        0L);
   }
 
   private void scan(WorkerIngestService svc, Path root, ScanMode mode) {

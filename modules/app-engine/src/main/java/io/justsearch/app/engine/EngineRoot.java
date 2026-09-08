@@ -129,6 +129,27 @@ public final class EngineRoot implements WorkerHost {
       } catch (IOException e) {
         log.warn("Error closing the in-process index half", e);
       }
+      // Stage-A checkpoint, blocker 1. `isRunning()` had no main-source consumer: the cutover loop
+      // reads the raw `running` field (KnowledgeServer.java:2432, :2602), and the only other reader
+      // was the latch flip in the no-op `initiateShutdown` this checkpoint deleted. That left a
+      // public liveness predicate that six boot tests assert on and nothing in production
+      // consulted — so a regression in it could only ever be caught by the tests that also defined
+      // its meaning.
+      //
+      // Deleting it was the alternative, and it is the wrong one: those six assertions
+      // (PreOpenSchemaMismatchBootTest, BrakeExhaustedWorkerServesReadOnlyTest,
+      // ResumedMigrationMismatchBootTest) use it as the "did the index half actually come up"
+      // oracle, and removing the method would delete the oracle, not the dead code.
+      //
+      // So it gets the consumer it should always have had: close() is not finished until the half
+      // it closed says it is no longer running. This converts "close() returned" into "close()
+      // completed", which is the property an ordered shutdown is supposed to give us.
+      if (s.isRunning()) {
+        log.warn(
+            "The in-process index half still reports isRunning() after close() returned. The"
+                + " shutdown was not clean; a subsequent open on the same data directory may find"
+                + " the index lock still held.");
+      }
     }
   }
 }

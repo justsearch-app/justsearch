@@ -46,11 +46,11 @@ final class MigrationOps {
             } else {
                 log.info(
                         "startMigration accepted: state={} active={} building={}"
-                                + " restartScheduled={}",
+                                + " restartRequired={}",
                         resp.getMigrationState(),
                         resp.getActiveGenerationId(),
                         resp.getBuildingGenerationId(),
-                        resp.getRestartScheduled());
+                        resp.getRestartRequired());
             }
             return resp.getAccepted();
         } catch (CircuitBreakerOpenException e) {
@@ -101,10 +101,10 @@ final class MigrationOps {
                 log.warn("rollbackMigration rejected: {}", resp.getError());
             } else {
                 log.info(
-                        "rollbackMigration accepted: active={} previous={} restartScheduled={}",
+                        "rollbackMigration accepted: active={} previous={} restartRequired={}",
                         resp.getActiveGenerationId(),
                         resp.getPreviousGenerationId(),
-                        resp.getRestartScheduled());
+                        resp.getRestartRequired());
             }
             return resp.getAccepted();
         } catch (CircuitBreakerOpenException e) {

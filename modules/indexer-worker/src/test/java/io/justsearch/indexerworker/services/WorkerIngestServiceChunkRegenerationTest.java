@@ -60,7 +60,7 @@ final class WorkerIngestServiceChunkRegenerationTest {
     Files.createDirectories(indexPath);
     service = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
-        lifecycle, lifecycle, null, 0L, null);
+        lifecycle, lifecycle, null, 0L);
   }
 
   @AfterEach

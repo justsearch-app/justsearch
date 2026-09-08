@@ -65,7 +65,6 @@ public final class KnowledgeServerMigrationOps {
       Runnable finalizeEmbeddingRebuildAction,
       BooleanSupplier verifyGreenCommitMetadataSupplier,
       Runnable drainSwitchBufferAction,
-      Runnable initiateShutdownAction,
       // Tempdoc 915 (live validation D4): flush the worker metrics snapshot before the cutover
       // restart. The snapshot cadence is 60s and the cutover restarts the worker roughly 20s after
       // the migration starts, so the session that performed the cutover was discarded before any
@@ -264,8 +263,26 @@ public final class KnowledgeServerMigrationOps {
           // Best-effort cleanup of stale marker; failure is non-fatal to cutover.
         }
         preserveEvidenceBeforeRestart(context, promoted);
-        context.log().info("Migration cutover complete. Restarting worker to open new active generation...");
-        context.initiateShutdownAction().run();
+        // Stage-A checkpoint, blocker 1. This used to read "Restarting worker to open new active
+        // generation..." and then call initiateShutdownAction(). Under the split architecture that
+        // ended the Worker process and the spawner respawned it onto the promoted generation. In
+        // one JVM the action resolved to KnowledgeServer#initiateShutdown, which set `running =
+        // false` and counted down a latch NO production code reads (isRunning() had no main-source
+        // consumer) — so the cutover logged success, the pointer moved on disk, and the Engine went
+        // on serving the OLD generation until someone restarted it by hand. Worse, `running = false`
+        // silently stopped the sentinel thread, taking hot-reload polling and GPU-lifecycle
+        // monitoring with it.
+        //
+        // The promotion is durable either way — it is the state.json swap above, and a restart
+        // re-reads it. What was wrong was claiming the reopen had happened. So: say what is true.
+        // §10 records this as a named red until D1 lands the live generation swap.
+        context
+            .log()
+            .warn(
+                "Migration cutover complete: generation {} is promoted in state.json, but this"
+                    + " Engine is still serving the previous generation. RESTART REQUIRED to open"
+                    + " it. (Stage A has no in-place index reopen; design D1 adds the live swap.)",
+                promoted == null ? "(unknown)" : promoted.active_generation());
         return;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -549,8 +566,7 @@ public final class KnowledgeServerMigrationOps {
                       context.ingestLifecycle(),
                       null,
                       null,
-                      0L,
-                      null);
+                      0L);
               RecoverVduProcessingResponse resp;
               try {
                 resp =
@@ -725,8 +741,7 @@ public final class KnowledgeServerMigrationOps {
                       context.ingestLifecycle(),
                       null,
                       null,
-                      0L,
-                      null);
+                      0L);
               SyncDirectoryRequest req =
                   SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
 

@@ -22,14 +22,22 @@ import java.util.Map;
  * what the surviving half of their job collapses to — publish a config, build an {@link EngineRoot},
  * call {@link EngineRoot#start} and drive the returned {@link KnowledgeClient}.
  *
- * <p><b>{@link #restart()} is the honest translation of "the worker restarted".</b> Several
- * migration paths (start, cutover, rollback) still end in
- * {@code MigrationControlOps}' {@code restartWorkerCallback}, which is wired to
- * {@code KnowledgeServer#initiateShutdown} — a latch countdown, not a {@code System.exit}
- * (KnowledgeServer.java:2109-2112). Under the split architecture the spawner noticed the exit and
- * respawned; under the Engine the composition root owns that lifecycle. So a test that used to
- * {@code waitForTermination(pid)} + {@code spawnWorker()} closes this harness and re-opens it on
- * the same data directory, which re-reads {@code state.json} exactly as a fresh process would.
+ * <p><b>{@link #restart()} is a TEST ACTION, not a translation of anything production does.</b>
+ * This javadoc previously called it "the honest translation of 'the worker restarted'", on the
+ * grounds that the migration paths ended in a {@code restartWorkerCallback} wired to
+ * {@code KnowledgeServer#initiateShutdown}. The stage-A checkpoint found that framing was the
+ * problem: that callback set a flag and counted down a latch no production code read, so it
+ * restarted nothing and reopened nothing. Calling {@code restart()} in a test right after a cutover
+ * therefore did not simulate what the product does — it supplied, by hand, the one step the product
+ * had silently stopped doing, and every assertion downstream passed on evidence the test itself had
+ * manufactured.
+ *
+ * <p>That callback is deleted. What remains true is narrower and must be stated at each call site:
+ * closing and re-opening this harness on the same data directory re-reads {@code state.json} the
+ * way a genuinely restarted process would. So {@code restart()} is the right tool for asserting
+ * <em>"after a restart, X"</em> — and the wrong tool for asserting that an operation took effect
+ * without one. A test that wants the second thing must assert against the LIVE engine, before any
+ * restart. See {@code EngineMigrationLifecycleTest}, which now does both explicitly.
  */
 final class EngineTestHarness implements AutoCloseable {
 

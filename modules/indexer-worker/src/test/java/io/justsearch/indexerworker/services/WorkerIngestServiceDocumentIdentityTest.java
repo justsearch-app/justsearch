@@ -120,8 +120,7 @@ final class WorkerIngestServiceDocumentIdentityTest {
             runtime,
             runtime,
             null,
-            0L,
-            null);
+            0L);
     service.setDocumentIdentityStore(identityStore);
 
     UpdatePathsResponse result = rename(service, oldPath, newPath);
@@ -382,8 +381,7 @@ final class WorkerIngestServiceDocumentIdentityTest {
             activeRuntime,
             activeRuntime,
             null,
-            0L,
-            null);
+            0L);
     service.setDocumentIdentityStore(identityStore);
     return service;
   }
@@ -418,8 +416,7 @@ final class WorkerIngestServiceDocumentIdentityTest {
             activeRuntime,
             activeRuntime,
             null,
-            0L,
-            null);
+            0L);
     service.setDocumentIdentityStore(identityStore);
     return service;
   }
