@@ -3,7 +3,7 @@ title: "Lane F stage A — spine and unplug: implementation checklist"
 stage: A
 created: 2026-09-07
 base: 2845d9e83
-status: "A1-A20 landed; checkpoint fixes in review"
+status: "CHECKPOINT COMPLETE (2026-09-08): A1-A20 landed, five independent reviews recorded and their findings fixed or named in section 10; origin/main merged; go-ahead requested from the owner (design 17.6)"
 updated: 2026-09-08
 ---
 

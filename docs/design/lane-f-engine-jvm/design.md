@@ -194,6 +194,52 @@ rule are unchanged for stable fields. Captures taken before PR 0b are not compar
 after it (the request breadth and the pins changed) and the split-side baseline capture is
 retaken under PR 0b.
 
+**Stage A checkpoint (orchestrator, 2026-09-08).** Items A1 to A20 landed on `worktree-lane-F-A`
+(cut from the PR 0 head; PR 0 and PR 0b are open, green and unmerged): the Engine composes the
+index half in-process from `HeadlessApp` through `EngineRoot`; the ports are direct calls behind a
+`KnowledgeClient` facade (an abstract class in `app-services`, the lowest module both `ui` and
+`app-engine` see, catalogued in `governance/engine-ports.v1.json` with an enforcing gate; a mechanism
+detail inside 3.3, since `SearchPort` and `IndexingService` cover one of its ~89 members); the two
+streams are bounded in-process hand-offs (scan producer block-never-drop, change-feed producer
+fail-fast-and-close because it runs under the job-queue lock); the wire, the MMF bus, the spawner,
+the supervision policy, the config-snapshot tier, the second distribution, the second log and the
+chaos process manager are gone (105 files deleted, 35 renamed, 49 RPCs and 3 service blocks, 9 MMF
+fields, 2 argv builders, 1 ordinal, 1 log file); ADR-0049 supersedes ADR-0001 and ADR-0002 with
+three probes (rule 6b as a test, `libs.grpc` absent from build files, `import io.grpc` absent from
+Java); one `engine.log`, `core.engine-log`; one flag set at both spawn sites pinned by an exact-set
+test in CI (`-Xmx2g`, SerialGC, `MetaspaceSize=128m`, `UseCompactObjectHeaders` as the first cut
+17.7 leaves to the gate run, `file.encoding=UTF-8`). Proof: full suite 9,301 tests green including
+the dead-code ratchet, 30 governance gates green, live search and ingest on one JVM, the file-trigger
+reload verified live, evidence under `evidence/A/`. Five independent reviews (A1-A2, A3, A4-A5,
+A6-A9, A10-A13, the checkpoint and its re-review), every finding fixed or named. Named reds
+carried to stage B (`stages/A.md` section 10): supervision (crash detection and restart under a
+budget); restart-as-reload answers `restart_required` on the HTTP, operation and migration paths
+(a Blue/Green cutover promotes durably and the promoted generation is served after a restart, an
+honest loss until D1's live swap; and the status fields named for the served generation report the
+`state.json` pointer, so D1 must source one from the open runtime); `WORKER_RESTART_EXHAUSTED` has
+no producer (the readiness-code gate now requires an emission and carries it as `awaitingProducer`,
+owner B); `WorkerBootRecoveryE2ETest` red (its injector fired on the deleted PID validation, owner
+B); the packaged installer unverified because `build-installer.yml`'s `release-signing` environment
+rejects branch refs (a settings action). Two design facts corrected in the checklist: the
+foreground gauge had no producer from A6 to the fix pass (the gate matched RPC names against ops
+labels: the `wrong-gate` case, caught by an assertion across a real search, and there are ten
+operations, not nine); `awaitingRecut` was never created because the health monitor's boot-recovery
+arm survived.
+
+**17.8 bullet 1 fired (orchestrator, 2026-09-08).** `origin/main` moved 11 commits (81 files: 941
+sandbox rounds, 948, 949, 859, 935, the WinGet retirement) while the branch was open, so the
+handoff's halt premise no longer holds. Decision: keep the single-branch shape; merge `origin/main`
+into the stage branch at every stage boundary (done at this checkpoint: conflict-free, no changed
+path in the lane's blast radius) and re-count; revert to the incremental shape only if a merge
+conflicts inside the blast radius. **Stage B decisions (orchestrator, 2026-09-08, from `stages/B.md`'s
+questions):** the dead-Engine sandbox proof is a host-level exercise on the branch plus a dated
+deferral to the first post-merge installer run; the Tauri actuator half is tested by one extra step
+in the `shell-rust-tests` lane; the supervisor policy record lives in the supervision register as
+authority with a thin Java mirror for the drift check; `WORKER_RESTART_EXHAUSTED` is renamed
+`ENGINE_RESTART_EXHAUSTED` when B lands its producer; the supervisor state file lives at 7.1's
+location with a manifest-history mirror the updater can read after death; extraction children are
+registered, never adopted; an absent supervisor file means the unsupervised mode of 3.1.
+
 **Decision authority (owner, 2026-09-07).** After PR 0 the owner delegated every remaining
 decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
 and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the
