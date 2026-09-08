@@ -85,7 +85,13 @@
             "type" : "boolean"
           },
           "skipCause" : {
-            "type" : [ "string", "null" ]
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "type" : "string",
+              "enum" : [ "hardware", "intent", "user-declined", "dev-only", "" ]
+            }, {
+              "type" : "null"
+            } ]
           },
           "skipReason" : {
             "type" : [ "string", "null" ]

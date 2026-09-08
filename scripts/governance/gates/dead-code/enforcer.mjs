@@ -11,6 +11,13 @@
  * `npm --prefix modules/ui-web run knip:report`. A malformed report here fails
  * closed (dead-code/report-malformed).
  *
+ * Known limit (tempdoc 948, 2026-09-07): `modules/ui-web/knip.config.ts` puts
+ * `src/**` including `*.test.ts` in `project`, so a test import counts as a
+ * consumer and an export-for-testing symbol is invisible here. Deliberate:
+ * `__resetForTest`-style seams are a house pattern, and flagging them would
+ * ratchet a backlog nobody asked for. A finding here is therefore genuinely
+ * unconsumed by anything, tests included.
+ *
  * Whole-file findings are normalized to the module's declared export SURFACE
  * before they touch the ratchet (tempdoc 910 item 1) — top-level bindings plus
  * the enum / namespace / class members knip can report separately, since this

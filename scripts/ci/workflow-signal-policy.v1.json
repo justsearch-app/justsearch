@@ -75,17 +75,6 @@
       "advisory": true
     },
     {
-      "name": "Prepare WinGet Manifests",
-      "path": ".github/workflows/prepare-winget-manifests.yml",
-      "class": "release-gate",
-      "expectedTriggers": ["workflow_dispatch"],
-      "owner": "tempdoc 905 / WinGet manifest projection",
-      "failureDefault": "release-blocking-failure",
-      "staleDays": 365,
-      "blocking": false,
-      "advisory": true
-    },
-    {
       "name": "Docs lint",
       "path": ".github/workflows/docs-lint.yml",
       "class": "docs-manual-gate",

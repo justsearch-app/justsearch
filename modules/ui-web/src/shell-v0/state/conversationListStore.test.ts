@@ -206,6 +206,113 @@ describe('conversationListStore branching', () => {
     expect(getConversationListState().activeId).toBe('uc-navigated-to');
   });
 
+  /**
+   * Tempdoc 941 — a resumed thread carries the same PER-MESSAGE shape data as a live one.
+   *
+   * `FileConversationStore.enrichMessage` stamps `shapeId` per appended message (863 §4.A.5 F1)
+   * exactly because the conversation-level shape is first-wins and therefore wrong for a mixed
+   * conversation. The endpoint returns the store's maps verbatim, so the fact was already on the
+   * wire; this reader dropped it, and the frame authority then classified a reloaded RAG answer
+   * by the conversation's opening mode.
+   */
+  describe('941 — resumeConversation preserves per-message shape data', () => {
+    it('reads the top-level per-message shapeId the store stamps', async () => {
+      mockFetch(() =>
+        jsonResponse({
+          messages: [
+            { role: 'user', content: 'q', id: 'm1', shapeId: 'core.rag-ask' },
+            { role: 'assistant', content: 'a', id: 'm2', shapeId: 'core.agent-run' },
+          ],
+        }),
+      );
+      const resumed = await resumeConversation('mixed-1', 'core.free-chat');
+      expect(resumed.messages.map((m) => m.shapeId)).toEqual([
+        'core.rag-ask',
+        'core.agent-run',
+      ]);
+      // The conversation-level shape is untouched — the two are different facts.
+      expect(resumed.shapeId).toBe('core.free-chat');
+    });
+
+    it('also accepts the unified-thread spelling (attributes.shapeId)', async () => {
+      mockFetch(() =>
+        jsonResponse({
+          messages: [
+            { role: 'assistant', content: 'a', id: 'm1', attributes: { shapeId: 'core.extract' } },
+          ],
+        }),
+      );
+      const resumed = await resumeConversation('c', 'core.free-chat');
+      expect(resumed.messages[0]?.shapeId).toBe('core.extract');
+    });
+
+    it('leaves shapeId absent for a pre-863 row, and for a blank one', async () => {
+      mockFetch(() =>
+        jsonResponse({
+          messages: [
+            { role: 'user', content: 'legacy', id: 'm1' },
+            { role: 'user', content: 'blank', id: 'm2', shapeId: '   ' },
+            { role: 'user', content: 'wrongtype', id: 'm3', shapeId: 42 },
+          ],
+        }),
+      );
+      const resumed = await resumeConversation('legacy-1', 'core.free-chat');
+      // Absent, not defaulted: the caller's conversation-level fallback is the only fact
+      // available for these rows, and a stamped guess would claim otherwise.
+      expect(resumed.messages.every((m) => m.shapeId === undefined)).toBe(true);
+    });
+
+    it('941 review — returns the TRIMMED value, so a padded shapeId still narrows', async () => {
+      // The blankness test already trims; returning the raw value meant `" core.rag-ask "` passed
+      // the guard here and then failed the exact-match narrowing in `asKnownShape` — accepted at
+      // one end, silently dropped at the other.
+      mockFetch(() =>
+        jsonResponse({
+          messages: [
+            { role: 'user', content: 'q', id: 'm1', shapeId: '  core.rag-ask\n' },
+            {
+              role: 'assistant',
+              content: 'a',
+              id: 'm2',
+              attributes: { 'rag.standaloneQuestion': '  padded question  ' },
+            },
+          ],
+        }),
+      );
+      const resumed = await resumeConversation('c', 'core.free-chat');
+      expect(resumed.messages[0]?.shapeId).toBe('core.rag-ask');
+      expect(resumed.messages[1]?.standaloneQuestion).toBe('padded question');
+    });
+
+    it('carries rag.standaloneQuestion when the record has it, under either spelling', async () => {
+      mockFetch(() =>
+        jsonResponse({
+          messages: [
+            {
+              role: 'assistant',
+              content: 'a',
+              id: 'm1',
+              attributes: { 'rag.standaloneQuestion': 'What did the Q3 report say about churn?' },
+            },
+            {
+              role: 'assistant',
+              content: 'b',
+              id: 'm2',
+              attributes: { standaloneQuestion: 'Second spelling' },
+            },
+            { role: 'assistant', content: 'c', id: 'm3' },
+          ],
+        }),
+      );
+      const resumed = await resumeConversation('c', 'core.rag-ask');
+      expect(resumed.messages.map((m) => m.standaloneQuestion)).toEqual([
+        'What did the Q3 report say about churn?',
+        'Second spelling',
+        undefined,
+      ]);
+    });
+  });
+
   it('resumeConversation omits parent pointers for a root session', async () => {
     mockFetch(() => jsonResponse({ messages: [{ role: 'user', content: 'q', id: 'a' }] }));
     const resumed = await resumeConversation('root-1', 'core.free-chat');

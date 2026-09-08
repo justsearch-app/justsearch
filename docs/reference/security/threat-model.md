@@ -19,7 +19,7 @@ basis for the README's **"nothing leaves your machine"** claim. It is an NLnet-M
 
 ## Assets
 
-1. **The user's documents** (indexed content, snippets, embeddings) — the primary asset; never leaves the device.
+1. **The user's documents** (indexed content, snippets, embeddings) — the primary asset; JustSearch never sends it off the device. (An MCP client the user connects receives passages as tool results — see [what this model does not claim](#what-this-model-deliberately-does-not-claim).)
 2. **Search queries and AI conversations** — reveal user intent; local-only.
 3. **The local API** — the control surface for retrieval, ingest, and RAG (`modules/ui`).
 4. **The model files** — integrity matters (a tampered model could degrade or mislead); see [first-run](#first-run-and-supply-chain).
@@ -180,6 +180,12 @@ First run downloads models once. Integrity + availability considerations:
 
 - **Not** that the app makes zero network connections — it downloads models on first run, and runs a
   local `llama-server`. The claim is that **your documents and queries never leave the device**.
+- **Not** that a connected MCP client keeps the data local. `justsearch_search` and `justsearch_answer`
+  return file paths and passage text as tool results to whichever client the user connected (see
+  [`mcp-production-server.md`](../mcp-production-server.md) § Data exposure). A client running a
+  cloud-hosted model forwards those results to its provider; that egress is the client's, chosen by the
+  user, and outside this model's boundary. The built-in assistant and a local-model client keep the
+  loop on-device.
 - **Not** infallibility — AI answers can be wrong; the guarantee is privacy, not correctness.
 - **Not** protection against a fully compromised host OS or a malicious local user with disk access.
 

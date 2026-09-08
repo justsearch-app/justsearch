@@ -37,7 +37,17 @@ const STORAGE_KEY_BODY = 'justsearch.operationCatalog.body.v3';
 const STORAGE_KEY_ETAG = 'justsearch.operationCatalog.etag.v3';
 
 let entriesById: Map<string, Operation> = new Map();
-let bootAttempted = false;
+/**
+ * Tempdoc 941 — did the boot fetch actually GET AN ANSWER (200 or 304)?
+ *
+ * Was `bootAttempted`, tested together with "the index is non-empty". The boot seeds the index
+ * from the localStorage body BEFORE it fetches, so a boot that raced an unanswering backend left
+ * the guard set AND the index non-empty — permanently closed on whatever the previous session (or
+ * the previous VERSION) had cached. Success is recorded where success happens.
+ */
+let bootSucceeded = false;
+/** Shared in-flight boot, so a readiness-driven re-attempt joins the request rather than racing it. */
+let inFlightBoot: Promise<void> | null = null;
 let listeners: Set<() => void> = new Set();
 
 interface CachedEntry {
@@ -94,11 +104,23 @@ export async function bootOperationRegistry(
   baseUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (bootAttempted && entriesById.size > 0) {
-    return;
-  }
-  bootAttempted = true;
+  if (bootSucceeded) return;
+  if (inFlightBoot) return inFlightBoot;
+  inFlightBoot = fetchOperationCatalog(baseUrl, fetchImpl).finally(() => {
+    inFlightBoot = null;
+  });
+  return inFlightBoot;
+}
 
+/**
+ * Tempdoc 941 — re-attemptable by construction: until the backend has actually answered, calling
+ * `bootOperationRegistry` again refetches (`i18n.ts` `watchForBackendReady` does exactly that on
+ * the shell's backend-ready edge).
+ */
+async function fetchOperationCatalog(
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<void> {
   const cached = loadFromStorage();
   if (cached) {
     rebuildIndex(cached.body);
@@ -117,7 +139,10 @@ export async function bootOperationRegistry(
       headers,
     });
 
-    if (response.status === 304) return;
+    if (response.status === 304) {
+      bootSucceeded = true;
+      return;
+    }
 
     if (!response.ok) {
       console.debug(
@@ -140,6 +165,7 @@ export async function bootOperationRegistry(
       const etag = response.headers.get('ETag') ?? '';
       if (etag) saveToStorage(body, etag);
       rebuildIndex(body);
+      bootSucceeded = true;
     }
   } catch (err) {
     console.debug(
@@ -209,7 +235,8 @@ export async function refreshOperationCatalog(
 
 export function __resetForTest(): void {
   entriesById = new Map();
-  bootAttempted = false;
+  bootSucceeded = false;
+  inFlightBoot = null;
   listeners = new Set();
   try {
     if (typeof localStorage !== 'undefined') {
@@ -223,5 +250,5 @@ export function __resetForTest(): void {
 
 export function __seedForTest(catalog: OperationCatalog): void {
   rebuildIndex(catalog);
-  bootAttempted = true;
+  bootSucceeded = true;
 }

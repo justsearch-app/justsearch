@@ -647,7 +647,7 @@ Wire payload (`HealthEvent` record):
 - `i18nKey` — optional pointer into the i18n catalog above.
 - `body` — sealed Jackson discriminator (`@JsonTypeInfo` on `kind`): `lifecycle` | `condition` | `threshold`. ConditionStore (rev 3.11 §B.X.2 generalization) holds both `condition` and `threshold` bodies as persistent state; `lifecycle` bodies go to OccurrenceLog (default 200-entry ring buffer; `JUSTSEARCH_HEALTH_OCCURRENCE_BUFFER` env override).
 
-Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` test) asserts every catalog ID has an emit site (LifecycleSnapshotTap mapping, WorkerSnapshotTap mapping, HeadHealthEventsEmitter, rule file) or is in the 4-ID FE-only allowlist (`api.unreachable`, `ai.not-configured`, `embedding.not-configured`, `schema.rebuilding`).
+Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` test) asserts every catalog ID has an emit site (LifecycleSnapshotTap mapping, WorkerSnapshotTap mapping, HeadHealthEventsEmitter, rule file) or is in the 3-ID FE-only allowlist (`api.unreachable`, `ai.not-configured`, `embedding.not-configured`; `schema.rebuilding` was retired 2026-09-07 as a phantom with no emitter, tempdoc 948).
 
 ### Library Resolve-Hash (ADR-0028, scoped exemption)
 
