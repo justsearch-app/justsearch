@@ -24,9 +24,9 @@
 #[path = "../supervisor.rs"]
 #[allow(dead_code)]
 mod supervisor;
+#[path = "../engine_probe.rs"]
+mod engine_probe;
 
-use std::io::{Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -90,28 +90,6 @@ impl FakeEngineActuator {
         std::fs::rename(&tmp, path).map_err(|e| e.to_string())
     }
 
-    /// A hand-rolled loopback GET, for the same reason `lib.rs`'s `request_head_shutdown` is one:
-    /// this runs on a synchronous supervision thread with no async runtime under it.
-    fn http_ok(port: u16, path: &str, timeout: Duration) -> bool {
-        let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-        let Ok(mut stream) = TcpStream::connect_timeout(&address, timeout) else {
-            return false;
-        };
-        let _ = stream.set_write_timeout(Some(timeout));
-        let _ = stream.set_read_timeout(Some(timeout));
-        let request = format!(
-            "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
-        );
-        if stream.write_all(request.as_bytes()).is_err() {
-            return false;
-        }
-        let _ = stream.flush();
-        let mut buffer = [0u8; 64];
-        match stream.read(&mut buffer) {
-            Ok(0) | Err(_) => false,
-            Ok(n) => String::from_utf8_lossy(&buffer[..n]).split_whitespace().nth(1) == Some("200"),
-        }
-    }
 }
 
 impl Actuator for FakeEngineActuator {
@@ -144,7 +122,7 @@ impl Actuator for FakeEngineActuator {
                     .and_then(|p| p.as_u64())
                 {
                     let port = port as u16;
-                    if Self::http_ok(port, "/api/status", Duration::from_millis(800)) {
+                    if engine_probe::responds(port, "/api/health", Duration::from_millis(800)) {
                         self.api_port = Some(port);
                         return Ok(Ready {
                             pid: self.child.as_ref().map(Child::id),
@@ -179,9 +157,13 @@ impl Actuator for FakeEngineActuator {
         match self.api_port {
             // A hang is not a refusal: the socket is accepted and then nothing happens, so the miss
             // is a TIMEOUT and the probe has to have one.
-            Some(port) => Self::http_ok(port, "/api/health", Duration::from_millis(700)),
+            Some(port) => engine_probe::responds(port, "/api/health", Duration::from_millis(700)),
             None => false,
         }
+    }
+
+    fn probe_essential_ready(&mut self) -> bool {
+        self.api_port.is_some_and(|port| engine_probe::essential_ready(port, Duration::from_millis(700)))
     }
 
     fn observed_request_reason(&mut self) -> Option<String> {

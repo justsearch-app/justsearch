@@ -745,6 +745,17 @@ stays unresolved even in development, while explicit URL/environment overrides
 retain their existing precedence. The UI evidence does not prove dead-Engine
 installation; B13's replacement hold/stop witness and B14/R7 remain separate work.
 
+**R7 essential stability projection (orchestrator, 2026-09-08).** The hosts project
+existing status fields: a ready Head lifecycle, a successful current Worker sample
+(`indexAvailable`), a healthy core index, and a non-stale `indexServing` observation.
+Do not require the retrieval composite or `indexServing.state == READY`: those
+also degrade for unavailable embeddings, rebuilds and optional ranking models.
+This retains the existing status authority and avoids inventing another readiness
+dimension. Each bounded sample belongs to the same admitted child before and
+after the request; missing, stale or malformed evidence resets the stability clock.
+HTTP response receipt alone remains sufficient for liveness, independent of status
+code and readiness. There is no new restart reason or recovery authority.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

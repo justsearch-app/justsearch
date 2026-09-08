@@ -1,5 +1,6 @@
 mod binding;
 mod engine_host;
+mod engine_probe;
 mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
@@ -979,32 +980,6 @@ pub(crate) fn restart_headless_backend(
     Ok(())
 }
 
-/// A loopback GET that answers only "did it reply 200 in time".
-///
-/// Hand-rolled for the same reason `request_head_shutdown` is: the supervision loop is a
-/// synchronous OS thread with no async runtime under it, and the case it exists for — a hung Engine
-/// — is a socket that is accepted and then silent, so the probe must have a TIMEOUT rather than a
-/// refusal to read.
-fn http_get_ok(port: u16, path: &str, timeout: Duration) -> bool {
-    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-    let Ok(mut stream) = TcpStream::connect_timeout(&address, timeout) else {
-        return false;
-    };
-    let _ = stream.set_write_timeout(Some(timeout));
-    let _ = stream.set_read_timeout(Some(timeout));
-    let request =
-        format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
-    if stream.write_all(request.as_bytes()).is_err() {
-        return false;
-    }
-    let _ = stream.flush();
-    let mut buffer = [0u8; 64];
-    match stream.read(&mut buffer) {
-        Ok(0) | Err(_) => false,
-        Ok(n) => String::from_utf8_lossy(&buffer[..n]).split_whitespace().nth(1) == Some("200"),
-    }
-}
-
 /// The production [`supervisor::Actuator`] (lane F stage B item B10).
 ///
 /// The DECISIONS are `supervisor.rs`'s, and the loop is `supervisor::run_supervision` — the same
@@ -1071,15 +1046,14 @@ impl supervisor::Actuator for ShellActuator {
             if self.state.has_spawn_error() {
                 return Err("the incarnation reported a spawn error".into());
             }
-            if let Some(port) = self.state.get_port() {
-                if http_get_ok(port, "/api/status", Duration::from_millis(800)) {
-                    let binding = self.state.binding_snapshot();
-                    return Ok(supervisor::Ready {
-                        pid: self.state.child_pid(),
-                        api_port: Some(port),
-                        instance_id: binding.instance_id,
-                    });
-                }
+            if let Some(binding) = self.state.host.observe_current_binding(|port| {
+                engine_probe::responds(port, "/api/health", Duration::from_millis(800))
+            }) {
+                return Ok(supervisor::Ready {
+                    pid: self.state.child_pid(),
+                    api_port: binding.port,
+                    instance_id: binding.instance_id,
+                });
             }
             if self.now_ms() >= deadline_ms {
                 return Err("the incarnation did not publish a port and answer in time".into());
@@ -1093,10 +1067,15 @@ impl supervisor::Actuator for ShellActuator {
     }
 
     fn probe_health(&mut self) -> bool {
-        match self.state.get_port() {
-            Some(port) => http_get_ok(port, "/api/health", Duration::from_millis(1500)),
-            None => false,
-        }
+        self.state.host.observe_current_binding(|port| {
+            engine_probe::responds(port, "/api/health", Duration::from_millis(1500))
+        }).is_some()
+    }
+
+    fn probe_essential_ready(&mut self) -> bool {
+        self.state.host.observe_current_binding(|port| {
+            engine_probe::essential_ready(port, Duration::from_millis(1500))
+        }).is_some()
     }
 
     fn observed_request_reason(&mut self) -> Option<String> {

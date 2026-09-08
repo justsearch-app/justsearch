@@ -211,6 +211,25 @@ impl EngineHost {
             .binding
             .clone()
     }
+
+    /// Attribute an HTTP observation only to the same admitted child and binding throughout it.
+    pub(crate) fn observe_current_binding(&self, probe: impl FnOnce(u16) -> bool) -> Option<Binding> {
+        let (generation, binding) = {
+            let inner = self.inner.lock().expect("engine host mutex poisoned");
+            let child = inner.child.as_ref()?;
+            if inner.closing || !matches!(&inner.discovery, Discovery::Bound { pid, instance_id }
+                if *pid == child.child.id() && Some(instance_id) == inner.binding.instance_id.as_ref()) {
+                return None;
+            }
+            (child.generation, inner.binding.clone())
+        };
+        if !probe(binding.port?) {
+            return None;
+        }
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        (!inner.closing && inner.child.as_ref()?.generation == generation && inner.binding == binding)
+            .then_some(binding)
+    }
     pub(crate) fn child_pid(&self) -> Option<u32> {
         self.inner
             .lock()
@@ -479,6 +498,24 @@ mod tests {
     }
 
     #[test]
+    fn probes_require_an_admitted_binding_and_reject_close_during_response() {
+        let host = EngineHost::default();
+        assert!(host.observe_current_binding(|_| panic!("no child to probe")).is_none());
+        let child = host.admit(sleeper()).unwrap();
+        assert!(host.observe_current_binding(|_| panic!("no admitted manifest")).is_none());
+        host.observe_manifest(&manifest("current", child.pid, 40404));
+        assert!(host.observe_current_binding(|port| port == 40404).is_some());
+        assert!(host.observe_current_binding(|_| {
+            host.begin_close();
+            true
+        }).is_none());
+        if let Some(mut child) = host.take_child() {
+            child.kill().unwrap();
+            child.wait().unwrap();
+        }
+    }
+
+    #[test]
     fn incarnation_reset_never_reopens_a_closed_host() {
         let host = EngineHost::default();
         host.begin_close();
@@ -657,6 +694,9 @@ mod tests {
             })
         }
         fn probe_health(&mut self) -> bool {
+            true
+        }
+        fn probe_essential_ready(&mut self) -> bool {
             true
         }
         fn observed_request_reason(&mut self) -> Option<String> {

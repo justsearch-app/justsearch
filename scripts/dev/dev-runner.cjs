@@ -1232,7 +1232,7 @@ async function resolveDevHotReload(enabled, { buildRan = true } = {}) {
   };
 }
 
-function checkHttp200(url, timeoutMs) {
+function checkHttp200(url, timeoutMs, acceptAnyStatus = false) {
   return new Promise((resolve) => {
     const u = new URL(url);
     const req = http.request(
@@ -1244,14 +1244,17 @@ function checkHttp200(url, timeoutMs) {
         timeout: timeoutMs,
       },
       (res) => {
-        res.resume();
-        resolve(res.statusCode === 200);
+        clearTimeout(deadline);
+        resolve(acceptAnyStatus || res.statusCode === 200);
+        res.destroy();
       },
     );
+    const deadline = setTimeout(() => req.destroy(new Error('deadline')), timeoutMs);
     req.on('timeout', () => {
       req.destroy(new Error('timeout'));
     });
     req.on('error', (err) => {
+      clearTimeout(deadline);
       if (process.env.JUSTSEARCH_DEV_RUNNER_DEBUG) {
         console.error(`[checkHttp200] ${url}: ${err.code || err.message}`);
       }
@@ -1264,22 +1267,44 @@ function checkHttp200(url, timeoutMs) {
 function fetchJsonHttp(url, timeoutMs) {
   return new Promise((resolve) => {
     const u = new URL(url);
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      resolve(value);
+    };
     const req = http.request(
-      { hostname: u.hostname, port: Number(u.port), path: u.pathname + u.search, method: 'GET', timeout: timeoutMs },
+      { hostname: u.hostname, port: Number(u.port), path: u.pathname + u.search, method: 'GET' },
       (res) => {
         const chunks = [];
-        res.on('data', (c) => chunks.push(c));
+        let size = 0;
+        res.on('data', (chunk) => {
+          size += chunk.length;
+          if (size > 1024 * 1024) { finish(null); req.destroy(); return; }
+          chunks.push(chunk);
+        });
+        res.on('error', () => finish(null));
+        res.on('aborted', () => finish(null));
         res.on('end', () => {
-          if (res.statusCode !== 200) { resolve(null); return; }
-          try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-          catch { resolve(null); }
+          if (res.statusCode !== 200) { finish(null); return; }
+          try { finish(JSON.parse(Buffer.concat(chunks).toString())); }
+          catch { finish(null); }
         });
       },
     );
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(null));
+    const deadline = setTimeout(() => { finish(null); req.destroy(); }, timeoutMs);
+    req.on('error', () => finish(null));
     req.end();
   });
+}
+
+// Projection of existing status fields; indexServing can be DEGRADED for optional AI.
+function essentialStatusReady(status) {
+  return status?.components?.head?.state === 'LIFECYCLE_STATE_READY'
+    && status?.indexAvailable === true
+    && status?.worker?.core?.indexHealthy === true
+    && status?.readiness?.components?.indexServing?.stale === false;
 }
 
 // Tempdoc 819 §D: mirrors the shell's kill_child() ordered-shutdown request
@@ -1405,8 +1430,8 @@ async function fetchConfirmedIndexBasePath(apiPort) {
   return null;
 }
 
-// "Ready" here means the Engine's HTTP API is up (`/api/status` returns 200) — NOT that its
-// knowledge/index half is ready. Lane F stage A item A11 deleted the Worker child process, so
+// This startup gate means the Engine answers valid HTTP on `/api/health`, including 503;
+// index readiness is checked separately for the stability window. A11 deleted the Worker child, so
 // nothing "connects" any more; what still lags is the in-process knowledge-server start, which
 // HeadlessApp forks asynchronously (`CompletableFuture.supplyAsync(tryStartKnowledgeServer)`,
 // HeadlessApp.java:981) so it runs in PARALLEL with API construction. Until that fork drives
@@ -1416,10 +1441,10 @@ async function fetchConfirmedIndexBasePath(apiPort) {
 // MCP dev server exposes a separate worker-ready readiness level for callers that need it.)
 async function waitForBackendReady(apiPort, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  const url = `http://127.0.0.1:${apiPort}/api/status`;
+  const url = `http://127.0.0.1:${apiPort}/api/health`;
   while (Date.now() < deadline) {
     // eslint-disable-next-line no-await-in-loop
-    const ok = await checkHttp200(url, 1200);
+    const ok = await checkHttp200(url, 1200, true);
     if (ok) return true;
     // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 500));
@@ -2105,13 +2130,15 @@ async function cmdStart(opts) {
   clearStaleDiscoveryFiles();
 
   let manifestInstanceId = null;
-  const tryReadManifest = () => {
+  const tryReadManifest = (expectedPid, predecessor) => {
     try {
       const content = fs.readFileSync(manifestPath, 'utf8');
       const parsed = JSON.parse(content);
       const p = parsed?.head?.apiPort;
-      if (Number.isFinite(p) && p > 0) {
-        manifestInstanceId = parsed.instanceId ?? null;
+      if (Number.isInteger(p) && p > 0 && p <= 65535
+          && parsed.pid === expectedPid && typeof parsed.instanceId === 'string'
+          && parsed.instanceId.trim() && parsed.instanceId !== predecessor) {
+        manifestInstanceId = parsed.instanceId;
         return p;
       }
     } catch { /* not yet written or malformed */ }
@@ -2134,11 +2161,14 @@ async function cmdStart(opts) {
    */
   const awaitEngineIncarnation = async ({ portTimeoutMs, readyTimeoutMs }) => {
     let discovered = 0;
+    const awaitedChild = backend;
+    const predecessor = manifestInstanceId;
     const waitForPortDeadline = Date.now() + portTimeoutMs;
     while (discovered <= 0 && Date.now() < waitForPortDeadline) {
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 100));
-      discovered = tryReadManifest();
+      if (backend !== awaitedChild || awaitedChild.exitCode !== null) throw new Error("Engine exited during discovery");
+      discovered = tryReadManifest(awaitedChild.pid, predecessor);
     }
     if (!Number.isFinite(discovered) || discovered <= 0) {
       const seconds = Math.max(1, Math.round(portTimeoutMs / 1000));
@@ -2147,10 +2177,10 @@ async function cmdStart(opts) {
       );
     }
     const ready = await waitForBackendReady(discovered, readyTimeoutMs);
-    if (!ready) {
+    if (!ready || backend !== awaitedChild || awaitedChild.exitCode !== null) {
       const seconds = Math.max(1, Math.round(readyTimeoutMs / 1000));
       throw new Error(
-        `Backend did not become ready at http://127.0.0.1:${discovered}/api/status within ${seconds}s`);
+        `Backend did not answer at http://127.0.0.1:${discovered}/api/health within ${seconds}s`);
     }
     return { apiPort: discovered, instanceId: manifestInstanceId };
   };
@@ -2484,7 +2514,7 @@ async function cmdStart(opts) {
   let incarnation = 1;
   let restartCount = 0;
   let readyAt = null;
-  let stabilityTimer = null;
+  let essentialReadySince = null;
   let hangTimer = null;
   let requestWatchTimer = null;
   let requestDeadlineTimer = null;
@@ -2513,12 +2543,12 @@ async function cmdStart(opts) {
   };
 
   const clearSupervisorTimers = () => {
-    for (const timer of [stabilityTimer, hangTimer, requestWatchTimer, requestDeadlineTimer]) {
+    for (const timer of [hangTimer, requestWatchTimer, requestDeadlineTimer]) {
       if (!timer) continue;
       clearTimeout(timer);
       clearInterval(timer);
     }
-    stabilityTimer = null;
+    essentialReadySince = null;
     hangTimer = null;
     requestWatchTimer = null;
     requestDeadlineTimer = null;
@@ -2549,31 +2579,6 @@ async function cmdStart(opts) {
     await publishSupervisorState(state, { reason });
     onExit();
     process.exit(exitCode != null && exitCode !== 0 ? exitCode : 0);
-  };
-
-  /**
-   * The stability window (design 7.1: counted from `ready`, not from spawn).
-   *
-   * An Engine that has been ready for the whole window has recovered, so the next crash starts from
-   * a full budget. Counted from `ready` because the Engine's boot carries the encoder load: a window
-   * from spawn would be mostly consumed by booting, and a crash-on-startup loop would read as stable.
-   */
-  const armStabilityWindow = () => {
-    if (stabilityTimer) clearTimeout(stabilityTimer);
-    stabilityTimer = setTimeout(() => {
-      if (!supervising || supervisorState !== STATES.RUNNING) return;
-      const action = engineSupervisor.decide(
-        { event: 'stability-elapsed', restartCount, state: supervisorState },
-        supervisionPolicy,
-      );
-      if (action.action !== ACTIONS.RESET_BUDGET || restartCount === 0) return;
-      process.stderr.write(
-        `[dev-runner] Engine stable for ${supervisionPolicy.stabilityWindowMs}ms — restart budget reset `
-        + `(was ${restartCount}/${supervisionPolicy.maxRestartAttempts}).\n`);
-      restartCount = 0;
-      void publishSupervisorState(STATES.RUNNING);
-    }, supervisionPolicy.stabilityWindowMs);
-    stabilityTimer.unref?.();
   };
 
   /**
@@ -2623,31 +2628,58 @@ async function cmdStart(opts) {
    * `stopping` (design 7.1). The interval and the threshold are PLACEHOLDERS set with the collector
    * at stage E — this proves the path fires, never that it fires within a tuned budget.
    */
+  let probeInFlight = false;
   const armHangDetection = () => {
     if (hangTimer) clearInterval(hangTimer);
     hangTimer = setInterval(async () => {
       if (!supervising || supervisorState !== STATES.RUNNING) return;
-      const alive = await checkHttp200(`http://127.0.0.1:${apiPortActual}/api/health`, 1000);
-      if (alive) {
+      if (probeInFlight) return;
+      probeInFlight = true;
+      const probedChild = backend;
+      const probedInstance = manifestInstanceId;
+      const probedPort = apiPortActual;
+      const stillCurrent = () => supervising && supervisorState === STATES.RUNNING
+        && backend === probedChild && manifestInstanceId === probedInstance && apiPortActual === probedPort;
+      try {
+        const alive = await checkHttp200(`http://127.0.0.1:${probedPort}/api/health`, 1000, true);
+        if (!stillCurrent()) return;
+        if (alive) {
+          consecutiveHealthMisses = 0;
+          const status = await fetchJsonHttp(`http://127.0.0.1:${probedPort}/api/status`, 1000);
+          if (!stillCurrent()) return;
+          if (!essentialStatusReady(status)) { essentialReadySince = null; return; }
+          const observedAt = performance.now();
+          essentialReadySince ??= observedAt;
+          if (observedAt - essentialReadySince >= supervisionPolicy.stabilityWindowMs && restartCount > 0) {
+            const action = engineSupervisor.decide(
+              { event: 'stability-elapsed', restartCount, state: supervisorState }, supervisionPolicy);
+            if (action.action === ACTIONS.RESET_BUDGET) {
+              restartCount = 0;
+              await publishSupervisorState(STATES.RUNNING);
+            }
+          }
+          return;
+        }
+        essentialReadySince = null;
+        consecutiveHealthMisses += 1;
+        const action = engineSupervisor.decide(
+          {
+            event: 'health-miss',
+            consecutiveMisses: consecutiveHealthMisses,
+            restartCount,
+            state: supervisorState,
+          },
+          supervisionPolicy,
+        );
+        if (action.action !== ACTIONS.REQUEST_SHUTDOWN) return;
+        process.stderr.write(
+          `[dev-runner] Engine missed ${consecutiveHealthMisses} liveness polls while alive — `
+          + 'treating as a hang and requesting shutdown.\n');
         consecutiveHealthMisses = 0;
-        return;
+        await requestEngineShutdown('hang');
+      } finally {
+        probeInFlight = false;
       }
-      consecutiveHealthMisses += 1;
-      const action = engineSupervisor.decide(
-        {
-          event: 'health-miss',
-          consecutiveMisses: consecutiveHealthMisses,
-          restartCount,
-          state: supervisorState,
-        },
-        supervisionPolicy,
-      );
-      if (action.action !== ACTIONS.REQUEST_SHUTDOWN) return;
-      process.stderr.write(
-        `[dev-runner] Engine missed ${consecutiveHealthMisses} liveness polls while alive — `
-        + 'treating as a hang and requesting shutdown.\n');
-      consecutiveHealthMisses = 0;
-      await requestEngineShutdown('hang');
     }, supervisionPolicy.hangPollIntervalMs);
     hangTimer.unref?.();
   };
@@ -2678,7 +2710,7 @@ async function cmdStart(opts) {
     readyAt = nowIso();
     consecutiveHealthMisses = 0;
     await publishSupervisorState(STATES.RUNNING);
-    armStabilityWindow();
+    essentialReadySince = null;
     armHangDetection();
     armRequestWatch();
   };
@@ -3255,6 +3287,9 @@ if (require.main === module) {
       writeSelfExitStopReport,
       // Lane F stage B item B8: the supervisor's actuator helpers. The DECISION is not here —
       // scripts/dev/lib/engine-supervisor.cjs owns it and the Rust half reads the same register.
+      checkHttp200,
+      fetchJsonHttp,
+      essentialStatusReady,
       buildSupervisorState,
       writeSupervisorState,
       supervisorStatePath,

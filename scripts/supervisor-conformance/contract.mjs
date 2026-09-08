@@ -169,6 +169,7 @@ export function actuatorCases(row = engineRow()) {
  * exercising the START path and not the supervisor.
  */
 export function enginePlanFor(testCase) {
+  if (testCase.enginePlan) return testCase.enginePlan;
   const engine = testCase.engine ?? {};
   const fault = { ...engine };
   if (fault.exitAfterMs === undefined) fault.exitAfterMs = 1500;

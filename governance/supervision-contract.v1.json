@@ -406,6 +406,17 @@
           "why": "An Engine running its ordered shutdown stops answering by design; reading that as a hang would race the shutdown with a kill."
         },
         {
+          "id": "live-503-and-continuous-essential-stability",
+          "faultMode": "partial-boot",
+          "drives": ["actuator"],
+          "enginePlan": [
+            { "mode": "crash", "exitCode": 1, "exitAfterMs": 1500, "healthStatus": 503 },
+            { "mode": "honour", "healthStatus": 503, "controlEssentialReadiness": true }
+          ],
+          "expect": { "action": "reset-budget" },
+          "why": "503 proves startup and running liveness; only continuous API/index readiness resets the budget. Losing index readiness restarts the window, while optional AI is always unavailable."
+        },
+        {
           "id": "start-deadline-stops-a-partial-boot",
           "faultMode": "partial-boot",
           "drives": ["decision", "actuator"],
