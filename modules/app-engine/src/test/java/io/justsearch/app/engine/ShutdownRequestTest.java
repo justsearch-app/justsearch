@@ -40,27 +40,33 @@ final class ShutdownRequestTest {
   @DisplayName("the serialised field set is exactly the contract, and the wire names are lower-case")
   void serialisedShapeIsPinned(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.UPGRADE, 1_725_000_000_000L, "n-42", "updater").writeTo(runtime);
+    new ShutdownRequest(Reason.UPGRADE, 1_725_000_000_000L, "n-42", "updater", "prep-7")
+        .writeTo(runtime);
 
     JsonNode root = JSON.readTree(Files.readString(ShutdownRequest.pathIn(runtime)));
     Set<String> fields = new LinkedHashSet<>();
     root.propertyNames().forEach(fields::add);
 
     assertEquals(
-        Set.of("reason", "deadlineEpochMs", "nonce", "issuedBy"),
+        Set.of("reason", "deadlineEpochMs", "nonce", "issuedBy", "preparationId"),
         fields,
         "the Rust and Node writers agree with this parser by SHAPE and nothing else — a field"
             + " added, removed or renamed here without updating them produces a file the Engine"
             + " rejects, which reads to a user as a shutdown request that did nothing");
     assertEquals("upgrade", root.get("reason").stringValue(), "the wire form is lower-case");
     assertEquals(1_725_000_000_000L, root.get("deadlineEpochMs").asLong());
+    assertEquals(
+        "prep-7",
+        root.get("preparationId").stringValue(),
+        "item B6 carries the preparation id through the file so the receipt written on the far side"
+            + " is still nonce- AND preparation-bound");
   }
 
   @Test
   @DisplayName("the optional fields are omitted rather than written as null")
   void optionalFieldsAreOmitted(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.QUIT, 1L, null, null).writeTo(runtime);
+    new ShutdownRequest(Reason.QUIT, 1L, null, null, null).writeTo(runtime);
 
     JsonNode root = JSON.readTree(Files.readString(ShutdownRequest.pathIn(runtime)));
     Set<String> fields = new LinkedHashSet<>();
@@ -73,7 +79,7 @@ final class ShutdownRequestTest {
   void everyReasonRoundTrips(@TempDir Path tempDir) throws Exception {
     for (Reason reason : Reason.values()) {
       Path runtime = runtimeDir(tempDir.resolve(reason.wire()));
-      new ShutdownRequest(reason, 7L, null, "test").writeTo(runtime);
+      new ShutdownRequest(reason, 7L, null, "test", null).writeTo(runtime);
       Optional<ShutdownRequest> read = ShutdownRequest.read(runtime);
       assertTrue(read.isPresent(), reason + " must round-trip");
       assertEquals(reason, read.get().reason());
@@ -135,7 +141,7 @@ final class ShutdownRequestTest {
   @DisplayName("clear() removes a consumed request and tolerates an absent one")
   void clearRemovesTheRequest(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.RESTART, 1L, null, null).writeTo(runtime);
+    new ShutdownRequest(Reason.RESTART, 1L, null, null, null).writeTo(runtime);
     assertTrue(Files.exists(ShutdownRequest.pathIn(runtime)));
 
     ShutdownRequest.clear(runtime);
@@ -149,7 +155,7 @@ final class ShutdownRequestTest {
   @DisplayName("the write is atomic: no staging file is left behind")
   void writeLeavesNoStagingFile(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.HANG, 5L, null, "supervisor").writeTo(runtime);
+    new ShutdownRequest(Reason.HANG, 5L, null, "supervisor", null).writeTo(runtime);
 
     try (var entries = Files.list(runtime)) {
       assertEquals(

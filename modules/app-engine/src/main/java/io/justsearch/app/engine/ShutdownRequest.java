@@ -39,7 +39,8 @@ import tools.jackson.databind.ObjectMapper;
  * stop the product. An unreadable request is logged and ignored; the supervisor's deadline still
  * covers the case where ignoring it was wrong.
  */
-public record ShutdownRequest(Reason reason, long deadlineEpochMs, String nonce, String issuedBy) {
+public record ShutdownRequest(
+    Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId) {
 
   private static final Logger log = LoggerFactory.getLogger(ShutdownRequest.class);
   private static final ObjectMapper JSON = new ObjectMapper();
@@ -141,7 +142,11 @@ public record ShutdownRequest(Reason reason, long deadlineEpochMs, String nonce,
       }
       return Optional.of(
           new ShutdownRequest(
-              reason.get(), deadline.asLong(), text(root, "nonce"), text(root, "issuedBy")));
+              reason.get(),
+              deadline.asLong(),
+              text(root, "nonce"),
+              text(root, "issuedBy"),
+              text(root, "preparationId")));
     } catch (Exception malformedOrUnreadable) {
       // Deliberately broad and deliberately non-fatal: a half-written file caught mid-rename, a
       // truncated write, a file another process holds. None of them is a reason to stop.
@@ -183,6 +188,11 @@ public record ShutdownRequest(Reason reason, long deadlineEpochMs, String nonce,
     }
     if (issuedBy != null) {
       sb.append(",\n  \"issuedBy\": \"").append(issuedBy).append('"');
+    }
+    if (preparationId != null) {
+      // Item B6. The receipt written on the far side of this file is preparation- AND nonce-bound,
+      // and the updater rejects one that is not — so both identifiers have to survive the trip.
+      sb.append(",\n  \"preparationId\": \"").append(preparationId).append('"');
     }
     return sb.append("\n}\n").toString();
   }

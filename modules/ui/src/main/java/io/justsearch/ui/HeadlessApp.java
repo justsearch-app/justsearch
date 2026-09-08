@@ -1110,10 +1110,52 @@ public class HeadlessApp {
               System::exit);
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
-      upgradeShutdownBridge.install(shutdownCoordinator);
-      // Tempdoc 805 G.1: the same coordinator answers the shell's normal-quit request — one
-      // ordered-shutdown routine, two callers.
+      // Item B6 (design 7.3). commit-shutdown becomes the FRONT half of the sequence: it validates
+      // the nonce, freezes admission and reports blockers, and then writes the request file rather
+      // than running the ordered close itself. The watcher below is what runs it. Routing the
+      // upgrade through the same file as the supervisor means there is one trigger path to reason
+      // about, not two that must be kept in step.
+      final Path runtimeDir = configPhase.dataDir().resolve("runtime");
+      upgradeShutdownBridge.install(
+          (preparationId, shutdownNonce) -> {
+            try {
+              new io.justsearch.app.engine.ShutdownRequest(
+                      io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE,
+                      System.currentTimeMillis()
+                          + io.justsearch.app.engine.ShutdownRequestWatcher.UPGRADE_DEADLINE_MS,
+                      shutdownNonce,
+                      "upgrade-controller",
+                      preparationId)
+                  .writeTo(runtimeDir);
+            } catch (Exception e) {
+              // The updater reads a MISSING receipt as "did not stop cleanly", which is the safe
+              // reading — so a failed write degrades to the same fail-closed signal as a failed
+              // shutdown rather than to a silent success.
+              log.error("Could not write the upgrade shutdown request; the Engine will not stop", e);
+            }
+          });
+      // Tempdoc 805 G.1: the shell's normal-quit request. Unchanged — it is already cooperative and
+      // in-process, so routing it through the file would add a poll's latency for nothing.
       lifecycleShutdownBridge.install(shutdownCoordinator::shutdownAndExit);
+
+      // Item B3's watcher, started here because this is after the API front is up. It consumes the
+      // request the upgrade path (and, from B8/B10, the supervisor) writes.
+      final io.justsearch.app.engine.ShutdownRequestWatcher shutdownRequestWatcher =
+          new io.justsearch.app.engine.ShutdownRequestWatcher(
+              runtimeDir,
+              request -> true,
+              request -> {
+                if (request.reason()
+                        == io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
+                    && request.preparationId() != null) {
+                  shutdownSequence.runAndExitWithReceipt(
+                      request.preparationId(), request.nonce());
+                } else {
+                  shutdownSequence.runAndExit(request.reason());
+                }
+              },
+              io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS);
+      shutdownRequestWatcher.start();
 
       Runtime.getRuntime()
           .addShutdownHook(

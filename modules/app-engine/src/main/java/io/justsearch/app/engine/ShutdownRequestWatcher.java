@@ -42,6 +42,16 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
   /** Poll cadence. A shutdown that starts a second late is not a defect; a busy loop is. */
   public static final long DEFAULT_POLL_INTERVAL_MS = 1_000L;
 
+  /**
+   * The deadline {@code commit-shutdown} stamps on its request (item B6).
+   *
+   * <p>Generous on purpose. The updater has already waited for every lease to drain before it
+   * committed, so what remains is the ordered close itself — closing the index and checkpointing
+   * SQLite over a large corpus. A deadline that expires mid-close would have the supervisor kill an
+   * Engine that is writing the index, which is the one thing the ordered shutdown exists to avoid.
+   */
+  public static final long UPGRADE_DEADLINE_MS = 120_000L;
+
   private final Path runtimeDir;
   private final Consumer<ShutdownRequest> onRequest;
   private final Predicate<ShutdownRequest> accepts;
