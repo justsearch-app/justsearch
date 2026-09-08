@@ -718,7 +718,16 @@ public interface JobQueue extends Closeable {
    * <p>Implementations that do not use a write-ahead log may return {@code true}. A false result
    * blocks the handoff.
    */
-  default boolean checkpointForUpgrade() {
+  /**
+   * Drains the write-ahead log into the database file.
+   *
+   * <p>Renamed off {@code checkpointForUpgrade} at lane F stage B item B5. The old name said WHO
+   * called it rather than what it does, and it was load-bearing: the ordinary close did not
+   * checkpoint at all, so an Engine that exited any way other than through the upgrade barrier
+   * left its WAL for the next start to replay. Design 7.3 step 7 makes the checkpoint part of
+   * every ordered close.
+   */
+  default boolean checkpointWal() {
     return true;
   }
 

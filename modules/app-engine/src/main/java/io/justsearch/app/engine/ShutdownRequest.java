@@ -69,6 +69,25 @@ public record ShutdownRequest(Reason reason, long deadlineEpochMs, String nonce,
       return name().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Whether the ordered shutdown stops llama-server for this reason (design 7.3 step 6).
+     *
+     * <p>{@code quit} and {@code upgrade} stop it: the installer must be able to overwrite the
+     * binary, and nothing may hold VRAM behind a closed product. {@code restart} and {@code hang}
+     * leave it running for the next Engine to adopt (7.2) — the model is loaded and the VRAM is
+     * warm, and making a restarted Engine reload it costs about forty seconds of encoder load for
+     * no gain.
+     *
+     * <p>Expressed as a switch over every constant rather than a set membership test, so adding a
+     * fifth reason is a compile error here instead of a silent default.
+     */
+    public boolean stopsGenerativeBackend() {
+      return switch (this) {
+        case QUIT, UPGRADE -> true;
+        case RESTART, HANG -> false;
+      };
+    }
+
     static Optional<Reason> fromWire(String raw) {
       if (raw == null) {
         return Optional.empty();

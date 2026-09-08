@@ -1334,12 +1334,50 @@ public class InferenceLifecycleManager
 
   // ==================== Lifecycle ====================
 
+  /**
+   * Whether {@link #close()} stops llama-server. Design 7.3 step 6, stage B item B5.
+   *
+   * <p>Default {@code true}, which is exactly what close() did unconditionally before B5 — so every
+   * caller that does not set this keeps today's behaviour.
+   *
+   * <p>The reason it is a directive set before the close rather than an argument to it: this
+   * manager is closed through an {@code AutoCloseable} loop over a dozen handles
+   * ({@code OrchestrationHandles.close()}), so there is no signature on the path from the ordered
+   * shutdown down to here that could carry a reason without changing every handle's contract.
+   */
+  private volatile boolean stopServerOnClose = true;
+
+  /**
+   * Sets whether the generative backend is stopped when this manager closes.
+   *
+   * <p>{@code false} leaves llama-server RUNNING for the next Engine to adopt (design 7.2). That is
+   * what {@code restart} and {@code hang} want: the model is loaded, the VRAM is warm, and a
+   * restarted Engine that has to reload it pays ~40s of encoder load for nothing.
+   * {@code quit} and {@code upgrade} want the opposite — the installer must be able to overwrite
+   * the binary, and nothing may hold VRAM behind a closed product.
+   */
+  public void setStopServerOnClose(boolean stopServerOnClose) {
+    this.stopServerOnClose = stopServerOnClose;
+  }
+
+  /** Whether {@link #close()} will stop llama-server. */
+  public boolean stopsServerOnClose() {
+    return stopServerOnClose;
+  }
+
   /** Closes this manager and releases all resources. */
   @Override
   public void close() {
     synchronized (runner.lock()) {
-      LOG.info("Closing InferenceLifecycleManager...");
-      serverOps.stopLlamaServer();
+      LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
+      if (stopServerOnClose) {
+        serverOps.stopLlamaServer();
+      } else {
+        LOG.info(
+            "Leaving llama-server running for adoption by the next Engine (design 7.2). It holds"
+                + " its port and its VRAM; a restarted Engine reconciles it from the child"
+                + " registry rather than reloading the model.");
+      }
       onlineOps.shutdown();
       serverOps.shutdown();
       httpClient.close();

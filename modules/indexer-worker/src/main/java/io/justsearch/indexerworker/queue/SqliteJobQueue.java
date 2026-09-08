@@ -2131,6 +2131,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       if (connection != null) {
         try {
+          // Design 7.3 step 7 / item B5: drain the WAL on EVERY ordered close, not just the
+          // upgrade barrier. Before B5 the only caller was WorkerUpgradeQuiescence, so an Engine
+          // that exited any other way left frames for the next start to replay.
+          checkpointWalBestEffort();
           connection.close();
           log.info("SqliteJobQueue closed");
         } catch (SQLException e) {
@@ -2197,8 +2201,27 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         lastDbErrorAtMs);
   }
 
+  /**
+   * The close-path checkpoint. Never throws and never blocks the close.
+   *
+   * <p>Separate from {@link #checkpointWal()} because the two callers want opposite things on
+   * failure: the upgrade barrier must REFUSE to proceed when frames remain (a half-drained WAL
+   * under a binary swap is how a queue comes back inconsistent), while a close that cannot drain
+   * must still close — the alternative is an Engine that will not shut down because SQLite is busy,
+   * and the WAL is replayed on the next open anyway.
+   */
+  private void checkpointWalBestEffort() {
+    try {
+      if (!checkpointWal()) {
+        log.info("WAL not fully drained on close; the next open replays the remaining frames");
+      }
+    } catch (RuntimeException e) {
+      log.warn("WAL checkpoint on close failed (closing anyway): {}", e.getMessage());
+    }
+  }
+
   @Override
-  public boolean checkpointForUpgrade() {
+  public boolean checkpointWal() {
     lock.lock();
     try {
       ensureOpen();
@@ -2208,13 +2231,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         // owns frames and the upgrade must wait rather than pretending the queue is closed over.
         boolean complete = result.next() && result.getInt(1) == 0;
         if (!complete) {
-          log.warn("Upgrade WAL checkpoint could not drain all frames");
+          log.warn("WAL checkpoint could not drain all frames");
         }
         return complete;
       }
     } catch (SQLException e) {
       recordDbError();
-      log.warn("Upgrade WAL checkpoint failed: {}", e.getMessage());
+      log.warn("WAL checkpoint failed: {}", e.getMessage());
       return false;
     } finally {
       lock.unlock();
