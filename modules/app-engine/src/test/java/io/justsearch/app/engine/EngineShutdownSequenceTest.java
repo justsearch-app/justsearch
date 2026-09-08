@@ -99,6 +99,39 @@ final class EngineShutdownSequenceTest {
   }
 
   @Test
+  @DisplayName("an absent index half is already closed and reports graceful")
+  void absentIndexHalfReportsGraceful(@TempDir Path dataDir) {
+    var sequence =
+        new EngineShutdownSequence(dataDir, List.of(ok("telemetry")), ignored -> {});
+
+    var result = sequence.run(Reason.QUIT);
+
+    assertTrue(result.clean());
+    assertEquals("GRACEFUL", result.workerOutcome());
+  }
+
+  @Test
+  @DisplayName("an exception closing the index half reports failed rather than unknown")
+  void throwingIndexHalfReportsFailed(@TempDir Path dataDir) {
+    var sequence =
+        new EngineShutdownSequence(
+            dataDir,
+            List.of(
+                new Step(
+                    EngineShutdownSequence.INDEX_HALF_STEP,
+                    ignored -> {
+                      throw new IllegalStateException("close failed");
+                    })),
+            ignored -> {});
+
+    var result = sequence.run(Reason.QUIT);
+
+    assertFalse(result.clean());
+    assertEquals("FAILED", result.workerOutcome());
+    assertEquals(List.of("index-half", "worker-failed"), result.errors());
+  }
+
+  @Test
   @DisplayName("every reason reaches every step")
   void everyReasonReachesTheSteps(@TempDir Path dataDir) {
     for (Reason reason : Reason.values()) {

@@ -141,9 +141,12 @@ public final class EngineShutdownSequence {
         // exception closing telemetry must not leave the index lock held.
         log.warn("Ordered shutdown step {} failed: {}", step.name(), e.toString());
         errors.add(step.name());
+        if (INDEX_HALF_STEP.equals(step.name())) {
+          outcomes.put(INDEX_HALF_STEP, "FAILED");
+        }
       }
     }
-    String workerOutcome = outcomes.getOrDefault(INDEX_HALF_STEP, "UNKNOWN");
+    String workerOutcome = outcomes.getOrDefault(INDEX_HALF_STEP, "GRACEFUL");
     if (!"GRACEFUL".equals(workerOutcome) && !"UNKNOWN".equals(workerOutcome)) {
       errors.add("worker-" + workerOutcome.toLowerCase(Locale.ROOT));
     }
