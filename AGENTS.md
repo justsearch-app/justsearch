@@ -13,8 +13,8 @@ Canonical entry points: `docs/llms.txt` for documentation and
 
 ## Hard invariants
 
-1. **Application code never touches Lucene.** Index I/O belongs to the index
-   half, via a port (ADR-0049).
+1. **Application code never touches Lucene.** Index I/O is the index half's,
+   via a port (ADR-0049).
 2. **Preserve the local API trust boundary.** Bind to loopback, enforce the Host
    allowlist, validate MCP Origin, and require the per-boot mutation token where
    ADR-0046 requires it.
