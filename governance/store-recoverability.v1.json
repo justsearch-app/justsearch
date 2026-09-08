@@ -1065,13 +1065,15 @@
       "reconciliation": "SHELL_ACCEPTS_ONLY_CURRENT_PREPARATION_ID_AND_RECEIPT_NONCE",
       "status": "READY",
       "implementationSources": [
-        "modules/ui/src/main/java/io/justsearch/ui/HeadShutdownCoordinator.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineShutdownSequence.java",
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
       ],
       "tests": [
-        "modules/ui/src/test/java/io/justsearch/ui/HeadShutdownCoordinatorTest.java"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSequenceTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/UpgradeShutdownViaRequestFileTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "note": "Lane F stage B item B4 moved the writer from HeadShutdownCoordinator (modules/ui) to EngineShutdownSequence (app-engine): design 7.3 puts the ordered close in the composition root. The receipt CONTRACT is unchanged - same filename, same schemaVersion 1, same nonce and preparation binding - only its owner moved."
     },
     {
       "id": "inference-runtime-projections",

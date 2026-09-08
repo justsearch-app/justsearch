@@ -10,7 +10,7 @@ Canonical entry points: `docs/llms.txt` (docs index), `docs/tempdocs/` (active w
 ## Hard Invariants (Do Not Violate)
 
 <!-- generated:agent-invariants:start — source: AGENTS.md; run: node scripts/docs/agent-instructions-sync.mjs -->
-1. **Application code never touches Lucene.** Index I/O belongs to the index half, via a port (ADR-0049). <!-- rule:head-never-touches-lucene -->
+1. **Application code never touches Lucene.** Index I/O is the index half's via a port (ADR-0049). <!-- rule:head-never-touches-lucene -->
 2. **Preserve the local API trust boundary.** Bind to loopback, enforce the Host allowlist, validate MCP Origin, and require the per-boot mutation token where ADR-0046 requires it. <!-- rule:loopback-only-network -->
 3. **Do not resurrect legacy endpoints.** `/api/search` and `/api/settings` are removed contracts. <!-- rule:no-legacy-endpoints -->
 4. **Verify, do not guess.** Use `/api/debug/state` and `/api/health` for lifecycle state and `/infra/capabilities` for `host.*` contract versions. <!-- rule:verify-dont-guess -->
