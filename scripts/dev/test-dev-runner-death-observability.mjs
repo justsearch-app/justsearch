@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -277,6 +278,140 @@ function testBuildHeadJavaOptsOverride() {
   console.log('test-dev-runner-death-observability: buildHeadJavaOpts honors overrides — PASS');
 }
 
+// --- B9 (lane F stage B): the three assertions a supervised run has to survive ------------------
+
+/**
+ * Everything above this line is fs-local and takes milliseconds. This one is not: it starts the REAL
+ * dev-runner against the conformance harness's fake engine, lets the Engine crash once, and asserts
+ * on the artifacts a supervised restart leaves behind.
+ *
+ * Why it cannot be fs-local. The three properties lane F item B9 names — the stop report joins to
+ * run.json by run id, a restart preserves the run id and the lease's continuity, and incarnation N's
+ * engine.log is preserved before N+1 can append to it — are all properties of what the supervisor
+ * DOES, not of what its helpers return. Each one is trivially satisfiable by a fixture and only
+ * meaningful against a real restart: the run id is only interesting because a restart could have
+ * minted a new one, and the log snapshot is only interesting because a second incarnation really did
+ * write to the shared file afterwards.
+ *
+ * About 6 seconds, no Gradle, no Engine dist, no network.
+ */
+async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence() {
+  const repoRoot = path.resolve(__dirname, '..', '..');
+  const root = fs.mkdtempSync(path.join(repoRoot, 'tmp', 'dev-runner-b9-'));
+  const dataDir = path.join(root, 'data');
+  const stateRoot = path.join(root, 'state');
+  fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+  fs.mkdirSync(stateRoot, { recursive: true });
+  const planPath = path.join(root, 'plan.json');
+  fs.writeFileSync(
+    planPath,
+    JSON.stringify({
+      incarnations: [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { mode: 'honour' }],
+    }),
+    'utf8',
+  );
+
+  const child = spawn(
+    process.execPath,
+    [
+      path.join(repoRoot, 'scripts', 'dev', 'dev-runner.cjs'), 'start',
+      '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
+      // A real port, not 0: the runner refuses --ui-port 0 outright, and the frontend stand-in
+      // ignores it anyway. Picked high and fixed rather than probed — nothing binds it here.
+      '--ui-port', '5599',
+      '--data-dir', dataDir, '--session-id', 'test-dev-runner-death-observability',
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        JUSTSEARCH_SUPERVISOR_HARNESS: '1',
+        JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS: '600000',
+        JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS: '100',
+        JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS: '400',
+        JUSTSEARCH_SUPERVISOR_HANG_POLL_INTERVAL_MS: '2000',
+        JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
+        JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([
+          process.execPath,
+          path.join(repoRoot, 'scripts', 'supervisor-conformance', 'fake-engine.mjs'),
+        ]),
+        JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([
+          process.execPath, '-e', 'setInterval(() => {}, 60000)',
+        ]),
+        JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '15000',
+        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '15000',
+        CI: '',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  let stderr = '';
+  child.stderr.on('data', (b) => { stderr += b.toString(); });
+  // The dev-runner reports a refused start as JSON on STDOUT, so a failure message that quoted only
+  // stderr would say 'no second incarnation' with nothing after it.
+  child.stdout.on('data', (b) => { stderr += b.toString(); });
+
+  try {
+    const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
+    const deadline = Date.now() + 40_000;
+    let state = null;
+    for (;;) {
+      try {
+        state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      } catch { /* not written yet */ }
+      if (state?.state === 'running' && state.incarnation === 2) break;
+      assert.ok(Date.now() < deadline, `no second incarnation reached running.\n${stderr.slice(-2000)}`);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.equal(state.restartCount, 1, 'the crash must be charged to the budget exactly once');
+
+    const runDir = path.join(stateRoot, 'runs', state.runId);
+    const runJson = JSON.parse(fs.readFileSync(path.join(runDir, 'run.json'), 'utf8'));
+
+    // (1) The stop report joins to run.json. Before item B8 the report was the runner's LAST act, so
+    //     a run with more than one death had at most one; now it is per incarnation, and the join key
+    //     is what lets a reader put the two files side by side at all.
+    const stopReport = JSON.parse(
+      fs.readFileSync(path.join(runDir, 'incarnations', '1', 'stop-report.json'), 'utf8'),
+    );
+    assert.equal(stopReport.runId, runJson.runId, 'stop-report runId must equal run.json runId');
+    assert.equal(stopReport.incarnation, 1);
+    assert.equal(stopReport.backendExitCode, 1, 'the crash exit code is recorded, not inferred');
+
+    // (2) The run id and the LEASE survive the child. This is design 7.6's dev-runner sentence, and
+    //     it is what stops another session reading a recovering stack as an abandoned one.
+    assert.equal(state.runId, runJson.runId, 'a restart must not mint a new run id');
+    const active = JSON.parse(fs.readFileSync(path.join(stateRoot, 'active.json'), 'utf8'));
+    assert.equal(active.runId, runJson.runId, 'the lease still names the same run after the restart');
+    assert.ok(active.lease.sequence >= 1, 'the lease sequence was reset by the restart');
+    assert.ok(
+      Date.parse(active.lease.expiresAt) > Date.parse(active.lease.renewedAt),
+      'the lease is not live across the restart',
+    );
+
+    // (3) Incarnation 1's engine.log is preserved BEFORE incarnation 2 can append to the shared file.
+    //     engine.log is one file keyed to the dataDir and Logback appends, so without the
+    //     per-incarnation snapshot the only surviving copy would be the one containing both.
+    const preserved = fs.readFileSync(
+      path.join(runDir, 'incarnations', '1', 'logs', 'engine.log'), 'utf8',
+    );
+    const shared = fs.readFileSync(path.join(dataDir, 'logs', 'engine.log'), 'utf8');
+    assert.ok(preserved.includes('incarnation=1'), 'incarnation 1 evidence is in its own snapshot');
+    assert.ok(
+      !preserved.includes('incarnation=2'),
+      'the snapshot was taken AFTER incarnation 2 started writing — it is not incarnation 1 evidence',
+    );
+    assert.ok(shared.includes('incarnation=2'), 'incarnation 2 really did append to the shared log');
+    console.log('test-dev-runner-death-observability: a supervised restart keeps the run id, the lease and each incarnation\'s log — PASS');
+  } finally {
+    try { child.kill(); } catch { /* already gone */ }
+    await new Promise((r) => setTimeout(r, 300));
+    try { fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
+  }
+}
+
 async function main() {
   await testPreserveEngineLogBasic();
   await testPreserveEngineLogMissingCases();
@@ -286,6 +421,7 @@ async function main() {
   await testWriteSelfExitStopReportWritesToDisk();
   testBuildHeadJavaOptsDefaults();
   testBuildHeadJavaOptsOverride();
+  await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence();
   console.log('test-dev-runner-death-observability: ALL PASS');
 }
 

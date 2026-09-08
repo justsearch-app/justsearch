@@ -136,6 +136,16 @@ jobs:
       - name: Test agent-analytics instrument (node)
         run: node scripts/agent-analytics/run-all-tests.mjs
 
+      # Lane F stage B item B7. The DECISION half of design 7.1's supervisor contract: the register's
+      # exit table is checked against the Java that produces those integers, every declared case runs
+      # through the JS decision seam, the per-run policy overrides are proven inert without their
+      # flag, and the fake engine is proven to really exit, hang and answer as its modes claim. Pure
+      # Node, no child of the product, so it belongs in this cross-platform lane; the ACTUATOR halves
+      # need real children and run on the Windows lanes (dev-runner: Windows-native tests; Tauri:
+      # Shell crate tests).
+      - name: Supervisor conformance self-test (contract + decision table)
+        run: node scripts/supervisor-conformance/run.mjs --self-test
+
       - name: Verify Codex agent parity
         run: node scripts/ci/check-codex-agent-parity.mjs
 
@@ -1116,6 +1126,29 @@ jobs:
 
       - name: Evidence capture exits cleanly after Windows fetch teardown
         run: node --test scripts/release/evidence-capture-exit.test.mjs
+
+      # Lane F stage B item B9. These nine files previously ran in CI NOWHERE: `test:dev-runner`
+      # named TWO of them by hand and was invoked from `onramp-smoke.yml` alone, whose trigger is
+      # `workflow_dispatch` only — manual, i.e. only when someone remembered. That is the exact
+      # failure mode tempdoc 745 D6 names for the agent-analytics suite ("a layer nothing invokes is
+      # dead regardless of its quality"), and item B8 has just put a supervisor state machine behind
+      # them. The runner auto-discovers `test-dev-runner-*.mjs`, so a new test is covered the moment
+      # it lands.
+      #
+      # HERE and not in `public-claims`, which is what stages/B.md's B9 proposed: that lane is
+      # ubuntu, and dev-runner.cjs is Windows-first by its own header — the paths these tests
+      # exercise (cuda12 resolution, taskkill, the handle-release cooldown) either do not exist or
+      # do not mean the same thing on Linux. The trigger coverage B9 asked for is unchanged: this
+      # job runs on the same `pull_request` and `push` as that one. Recorded in B.md §0.1.
+      - name: Dev-runner suite (auto-discovered)
+        run: npm ci --audit=false && npm run test:dev-runner
+
+      # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
+      # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
+      # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
+      # process handle closing — is a real constraint rather than a no-op.
+      - name: Supervisor conformance (dev-runner adapter)
+        run: node scripts/supervisor-conformance/run.mjs --adapter dev-runner
 
       - name: Setup Java
         uses: actions/setup-java@v5
