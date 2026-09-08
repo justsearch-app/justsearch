@@ -48,6 +48,10 @@ const SHARED_FLAGS = [
   '-XX:-UsePerfData',
   '-Dfile.encoding=UTF-8',
   '-XX:+HeapDumpOnOutOfMemoryError',
+  // Lane F stage B item B1: the flag that makes an out-of-memory death distinguishable from a
+  // boot failure (3 rather than 1). It has to be on BOTH spawn sites or the supervisor's exit
+  // classification is right in development and wrong in production, or the reverse.
+  '-XX:+ExitOnOutOfMemoryError',
 ];
 
 /** The packaged heap. Sized at the A13 follow-up; the stage-E gate run re-sizes it on measurement. */

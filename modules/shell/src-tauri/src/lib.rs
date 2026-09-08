@@ -795,6 +795,17 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         ))
         .arg("-XX:+HeapDumpOnOutOfMemoryError")
         .arg(format!("-XX:HeapDumpPath={}/", crash_dir.to_string_lossy()))
+        // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
+        // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so the
+        // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
+        // (Measured on Temurin 25.0.2: 3 with the flag, 1 without.) EngineExit classifies 3 as
+        // TRANSIENT, so it is retried under cooldown rather than going straight to exhausted.
+        .arg("-XX:+ExitOnOutOfMemoryError")
+        // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
+        // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so
+        // the supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
+        // (Measured on Temurin 25.0.2: 3 with the flag, 1 without.) EngineExit classifies 3 as
+        // TRANSIENT, so it is retried under cooldown rather than going straight to exhausted.
         // The packaged shell is the production trust boundary: Head must mint a per-boot
         // session token and enforce it on every mutating loopback request. Browser development
         // uses the separate dev-stack launch path and does not pass through this command.

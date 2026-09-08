@@ -35,6 +35,20 @@ dependencies {
   implementation(project(":modules:telemetry"))
 }
 
+// Lane F stage B item B1. EngineExitTest reads modules/ui's HeadlessApp.java as TEXT, to pin that
+// every System.exit on the boot path names an EngineExit constant rather than a bare integer. The
+// dependency edge runs ui -> app-engine, so nothing in this module's test classpath changes when
+// HeadlessApp does: without this declaration the task stays UP-TO-DATE and replays its last green
+// result. Verified by observing exactly that — the falsification run reported BUILD SUCCESSFUL in
+// 542ms against a deliberately reverted call site. A guard that cannot notice the change it exists
+// to notice is the defect it was written to prevent.
+tasks.named<Test>("test") {
+  inputs
+    .file(rootProject.file("modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"))
+    .withPropertyName("headlessAppExitSites")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 testing {
   suites {
     val test by getting(JvmTestSuite::class) {

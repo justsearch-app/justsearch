@@ -714,6 +714,12 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     heapBound ? `-Xmx${heapBound}` : null,
     '-XX:+HeapDumpOnOutOfMemoryError',
     logsDir ? `-XX:HeapDumpPath=${logsDir}` : null,
+    // Lane F stage B item B1. Without this the JVM lets an OutOfMemoryError reach the default
+    // uncaught-exception handler, which exits 1 — the SAME code as a boot failure, so a
+    // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
+    // (Measured on Temurin 25.0.2: 3 with the flag, 1 without.) Classified TRANSIENT by
+    // app-engine's EngineExit table, i.e. retried under cooldown.
+    '-XX:+ExitOnOutOfMemoryError',
     // Hot reload's JDWP listener. Lane F item A11: this flag was built by
     // WorkerSpawner.addDevHotReloadFlags for the Worker CHILD's command line. Deleting the
     // spawner deleted the listener, so from A11 until here HotSwapPush had nothing to connect

@@ -890,7 +890,7 @@ public class HeadlessApp {
 
   @SuppressWarnings("PMD.SystemPrintln")
   public static void main(String[] args) {
-    // Install crash reporter before anything else â€” catches uncaught exceptions on any thread.
+    // Install crash reporter before anything else - catches uncaught exceptions on any thread.
     Thread.setDefaultUncaughtExceptionHandler(
         (thread, throwable) -> {
           io.justsearch.telemetry.CrashReporter.writeCrashReport(
@@ -898,7 +898,7 @@ public class HeadlessApp {
               "head",
               thread,
               throwable);
-          System.exit(1);
+          System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
         });
     io.justsearch.telemetry.CrashReporter.pruneOldCrashReports(
         io.justsearch.telemetry.CrashReporter.defaultCrashDir(), 30);
@@ -952,7 +952,7 @@ public class HeadlessApp {
             configPhase.dataDir());
         log.error("Refusing to start. Stop the other instance first.");
         log.error("Lock file: {}/app.lock", configPhase.dataDir());
-        System.exit(2);
+        System.exit(io.justsearch.app.engine.EngineExit.DATA_DIR_LOCKED);
         return;
       }
 
@@ -1126,7 +1126,7 @@ public class HeadlessApp {
 
     } catch (Exception e) {
       log.error("Fatal error in HeadlessApp", e);
-      System.exit(1);
+      System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
     } finally {
       try {
         if (apiServer != null) {
