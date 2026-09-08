@@ -108,3 +108,11 @@ Use this when auditing doc freshness rather than reacting to a single edit.
 | API expansion | Tempdoc adds response fields; the contract map is incomplete | Frontend/agent consumers miss new capabilities |
 | New invariant | Tempdoc establishes a pipeline rule; the invariants doc is missing it | Agents violate the rule unknowingly |
 | Phantom path | A doc names a directory/file that no longer exists (or never did) | Agents route work to a location that isn't there |
+
+## Current decisions and evidence
+
+Keep current decisions in their owning sections and a short dated index linking
+rationale and superseded alternatives. Handoffs summarize current state and next
+actions; private transcripts are optional background. Keep bulky logs in retained
+artifacts with access/retention limits, not repeated in design prose. Follow
+`docs/reference/contributing/agent-workflow.md` when recording acceptance proof.

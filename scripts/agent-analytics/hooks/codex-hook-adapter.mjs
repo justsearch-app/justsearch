@@ -103,6 +103,10 @@ export function toolAliases(toolName) {
 }
 
 export function matcherMatches(matcher, toolName) {
+  return matchesNames(matcher, toolAliases(toolName));
+}
+
+function matchesNames(matcher, names) {
   if (matcher == null || matcher === '') return true;
   let re;
   try {
@@ -110,7 +114,17 @@ export function matcherMatches(matcher, toolName) {
   } catch {
     return false;
   }
-  return toolAliases(toolName).some((name) => re.test(name));
+  return names.some((name) => typeof name === 'string' && re.test(name));
+}
+
+export function eventMatcherMatches(matcher, input) {
+  // Lifecycle matchers use event fields, never tool aliases. Codex hooks reference:
+  // https://learn.chatgpt.com/docs/hooks (checked 2026-09-08).
+  const field = {
+    SubagentStart: 'agent_type', SubagentStop: 'agent_type',
+    SessionStart: 'source', PreCompact: 'trigger', PostCompact: 'trigger',
+  }[input.hook_event_name];
+  return field ? matchesNames(matcher, [input[field]]) : matcherMatches(matcher, input.tool_name);
 }
 
 export function extractExitCode(response) {
@@ -260,7 +274,7 @@ async function main() {
   }
 
   for (const group of groups) {
-    if (!matcherMatches(group.matcher, input.tool_name)) continue;
+    if (!eventMatcherMatches(group.matcher, input)) continue;
     for (const binding of group.hooks ?? []) {
       if (CODEX_EXCLUDED_HOOKS.has(binding.hookId)) continue;
       const catalog = manifest.hooks?.[binding.hookId];

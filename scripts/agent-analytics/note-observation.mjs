@@ -67,7 +67,7 @@ export function today(d = new Date()) {
 
 /**
  * The routing table an agent sees instead of a "logged to …" line. Pure; the test
- * seam. Mirrors `rule:log-pre-existing-issues` in CLAUDE.md — that rule is the
+ * seam. Mirrors `rule:log-pre-existing-issues` in the canonical agent-workflow.md — that rule is the
  * authority; this is its delivery at the moment an agent reaches for the old habit.
  */
 export function renderRouting(description) {

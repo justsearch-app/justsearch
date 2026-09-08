@@ -12,8 +12,8 @@ For each phase:
 1. **Before writing code** — pre-implementation spec-tightening pass.
    Re-read the spec for phase N with phase N-1's lessons in hand. For
    every claim about the codebase (field paths, method signatures,
-   visibility, type semantics), verify verbatim against source. Record
-   corrections in a `§B.<letter>` appendix with primary-source citations.
+   visibility, type semantics), verify verbatim against source. Update
+   owning sections with primary-source citations; keep a short dated index.
 
 2. **After code is in** — post-implementation critical-analysis pass.
    Walk the diff with "what would catch what tests missed?" lens.
@@ -23,8 +23,8 @@ For each phase:
    healthy), stale-flag short-circuits, asymmetric lifecycle
    (`start()` without `stop()`), WARN dedup.
 
-If the post-impl pass finds 0 actionable findings, record that as
-evidence the pre-impl pass worked. Slice 430 Phases 6-10 produced 5
+If the post-impl pass finds 0 actionable findings, record the review result
+without attributing it to the earlier pass. Slice 430 Phases 6-10 produced 5
 consecutive zero-finding outcomes.
 
 ## For Resource-instance slices
@@ -76,10 +76,9 @@ work remains expected practice — but no gate fails the build if it is skipped
 Auto-verifiable items (build green, unit tests, schema idempotency) →
 implementing agent verifies.
 
-Dev-stack-driven items (live SSE, condition transitions, FE consumer
-rendering) → document the procedure as a runnable user-driven smoke;
-the autonomous-implementation pattern holds (the dev-stack
-ownership/lease model is designed for human coordination).
+Dev-stack-driven items require actual live proof under an owned lease when
+available. An unexecuted smoke procedure is an explicit remaining item. Reconcile
+all acceptance evidence using `docs/reference/contributing/agent-workflow.md`.
 
 Don't silently mark the gate "passed" because unit tests are green.
 

@@ -32,26 +32,20 @@ export function buildGuidance(input = {}) {
     : `${process.platform}.`;
   const isCodex = process.env.JUSTSEARCH_AGENT_HARNESS === 'codex-cli';
 
-  // Inheritance is AGENT-TYPE-DEPENDENT (re-verified 2026-07-16, tempdoc 743 Phase-2
-  // probes — supersedes the tempdoc 423 §14.16 "no inheritance" finding, which the
-  // platform obsoleted): general-purpose/custom agents now receive the full CLAUDE.md +
-  // .claude/rules natively; Explore/Plan (and fork) agents receive NONE of it, so for
-  // those this brief is the ONLY project-aware context. The SubagentStart payload carries
-  // no agent-type field (verified), so this hook cannot discriminate and injects for all
-  // types — for inheriting types the brief is redundant-but-harmless; do NOT state that
-  // CLAUDE.md is absent (a probe showed subagents repeat that claim over their own
-  // context contents). Conditional skipping is a founder-gated decision (743 P-B, D-2).
-  // Keep this guidance under ~10K chars (hook output cap).
+  // Claude Explore/Plan omit project instructions; the manifest targets those
+  // roles. Forks inherit parent history. Client hooks and instruction delivery
+  // are distinct; repository subprocess tests do not prove runtime loading.
+  // See docs/reference/contributing/agent-workflow.md (checked 2026-09-08).
 
   const sections = [];
 
   sections.push(
     isCodex
-      ? '## JustSearch — Codex subagent baseline brief (AGENTS.md remains the project authority; this is the guaranteed minimum for the spawned role)'
-      : '## JustSearch — subagent baseline brief (injected for every agent type; if the full CLAUDE.md also appears in your context, that copy governs — this is the guaranteed-minimum subset for agent types that do not inherit it)',
+      ? '## JustSearch — Codex subagent baseline brief (AGENTS.md remains the project authority; read it and the governing design before work)'
+      : '## JustSearch — subagent baseline brief (for roles selected by the hook binding; read AGENTS.md and the governing design before work)',
   );
 
-  // Projected LIVE from CLAUDE.md's Hard Invariants (single authority — never
+  // Projected LIVE from AGENTS.md's hard invariants (single authority — never
   // hand-copy; a hand-copy silently drifted to 4-of-6 before tempdoc 620 Part V).
   const invariants = hardInvariants();
   if (invariants.length) {
@@ -60,15 +54,7 @@ export function buildGuidance(input = {}) {
       ...invariants.map((t, i) => `${i + 1}. ${t}`),
     );
   } else {
-    sections.push(
-      '### Hard invariants (do not violate)',
-      '1. Head process never performs Lucene index IO directly — delegate through service/Worker abstractions.',
-      '2. Local API binds to 127.0.0.1 only (loopback).',
-      '3. Do not resurrect removed endpoints (`/api/search`, `/api/settings`).',
-      '4. Verify, do not guess — use `/api/debug/state` and `/api/health`, not log grepping.',
-      '5. Frontend is Lit web components, not React (the React stack is retired, ADR-0032).',
-      '6. No per-language search levers — search analysis is locale-invariant (ADR-0043).',
-    );
+    sections.push('Project invariants could not be loaded. Read AGENTS.md before editing; report missing instructions to the parent.');
   }
 
   sections.push(
@@ -78,7 +64,7 @@ export function buildGuidance(input = {}) {
     '- Explore existing helpers before creating new ones. The most common mistake is reinventing utilities that exist two packages over.',
     '- Do not introduce backwards-compatibility shims, dead-code comments, or speculative abstractions.',
     '- Default to writing no comments. Only add WHY-comments for non-obvious invariants.',
-    '- Execute synchronously end-to-end within your turns: use bounded in-turn condition-polls for waits; NEVER stop your turn to "wait for" an external event or monitor — a stopped agent receives no events and stalls until manually resumed.',
+    '- Execute synchronously end-to-end within your turns: use bounded in-turn condition-polls for waits; NEVER stop your turn to "wait for" an external event or monitor — use the available wait/resume tools; do not present an unmonitored stop as continuing work.',
   );
 
   if (isCodex) {
@@ -91,10 +77,9 @@ export function buildGuidance(input = {}) {
   } else {
     sections.push(
       '### Subagent-specific risk profile',
-      '- **No hooks fire in your context.** The parent\'s repeat-guard, intervene, build-counter, and the ssot/docs/lockfile regen pointers DO NOT protect you.',
-      '- Destructive git commands (e.g., `git reset --hard`) in the main worktree are not intercepted for you. Don\'t run them.',
-      '- You don\'t get auto-Read-limit injection. Be explicit with offset/limit on files >8KB; large files include modules/ui-web/src/shell-v0/views/UnifiedChatView.ts (~5,400 lines), SummaryController.java, LuceneIndexRuntime.java, baseline-economics.mjs.',
-      '- You don\'t get repeat-guard. If you find yourself reading the same file 3 times, stop and reconsider.',
+      '- Session-wide Claude tool hooks apply inside subagents; actual coverage depends on client configuration, trust, and matchers. Never assume a safety boundary from prose.',
+      '- Do not run destructive git or modify files outside the assigned worktree and scope. The parent owns publication and shared-state decisions.',
+      '- Read large files in bounded sections. If repeated reads or correction rounds stop making progress, return the unresolved cause to the parent.',
     );
   }
 
@@ -121,6 +106,7 @@ export function buildGuidance(input = {}) {
 
   sections.push(
     '### Reporting',
+    'Keep the deliverable stable; return material scope growth or lifecycle/concurrency ambiguity to the parent before continuing. Report acceptance items, tested revision, environment, actual results, and missing proof. CI wiring is not a successful run.',
     'Stop after answering what was asked. Don\'t gold-plate. Return a concise summary; the parent relays it to the user.',
   );
 

@@ -2,22 +2,162 @@
 description: "Merge the current tempdoc's work into main: verify fully, separate managed review evidence from the public squash record, merge, and check post-merge CI."
 ---
 
-Now investigate main and plan out the merge — pull the latest main first and run the full verification suite (not just a compile check) against it, since other agents may have merged changes that shifted shared baselines since you started; a subset of gates passing isn't the same as the full suite passing. Run `node scripts/ci/run-publish-preflight.mjs --check` to confirm every required status context has an explicit local-subset or hosted-only classification; use `--list` to inspect the boundary and `--run` when you need the complete deterministic candidate-side subset. Hosted-only classifications never waive the corresponding GitHub check. Before pushing anything, scan your diff for anything that looks like a real credential, API key, internal-only URL, or local-only file path that shouldn't be public — the secret-scan CI lane only catches this after the push is already public, not before. Also scan outward-facing text in the diff (README, docs/business, marketing-style wording) for quantitative claims: every number must be traceable to a reproducible measurement run it can cite — remove numbers you can't source, don't soften or approximate them.
+# Publish
 
-Keep the PR title and complete body permanently suitable as the public squash commit. The body contains only the durable reason, observable outcomes, and any applicable standalone `Session-Id: <your session uuid>` line. Mutable scope/risk, verification evidence, and review state belong in one managed PR comment created from `.github/pr-review-record-template.md`, never temporarily in the PR body. Prepare a working review file, run `node scripts/ci/pr-review-record.mjs upsert --pr <number> --file <review-file>`, and then repeat it with `--execute --confirm <fresh-sha256>`. The command owns its hidden PR/head/body marker and refuses duplicates, foreign ownership, or state changes visible at its final preflight/read-back. GitHub comment updates have no compare-and-swap precondition, so the authenticated comment owner must be the sole writer from dry-run through read-back; do not manually edit that comment concurrently. Repeat the upsert after any head, public-body, evidence, or review-state change.
+Publish only the work in the active tempdoc or explicitly named change set.
+Invoking this skill does not broaden the change or authorize a release,
+deployment, destructive cleanup, or unrelated maintenance.
 
-Run `node scripts/ci/pr-review-record.mjs check --pr <number>` and `node scripts/ci/preview-squash-message.mjs --pr <number>` while preparing the record, and fix every finding. The enqueue gateway repeats both live checks immediately before it requests the queue. Never restore review text to the PR body after enqueue. After merge, compare the landed public message semantically rather than byte-for-byte: GitHub may hard-wrap long lines and append its own attribution, but the durable content must remain intact and review-only content must be absent.
+## Authorization boundary
 
-## CI-wait pattern
+Before pushing, opening or updating a pull request, or enqueuing a merge, verify
+that the user's current request explicitly authorizes that action. A direct,
+unambiguous request to run `$publish` for the current work supplies authorization
+for the ordinary branch push, pull-request, and merge-queue workflow. If the
+request is only to inspect, prepare, or dry-run publication, stop before the
+first external mutation.
 
-WAITING turns (CI-watch, notification acks) measured at 12.5% of all session tokens across a 4-week window (tempdoc 746, T1) — watch CI deliberately, not by chained blind polling. Prefer the harness's **Monitor tool** for a PR's checks or a workflow run when it's available — it notifies on completion without burning turns on manual re-checks — **but know its documented failure mode: long-running Monitor streams have repeatedly ended without ever firing (tempdoc 746 §Upstream bug draft), so pair any Monitor expected to run >15 min with a long ScheduleWakeup fallback (1200s+), and treat a never-firing Monitor as that bug, not as "still running."** Wakeup hygiene (743 P-M(a)): ONE fallback per wait, cancel it (`ScheduleWakeup stop:true`) as soon as the primary signal arrives — armed-but-stale wakeups fire against a full cache for nothing; and inside a dynamic /loop, an iteration that ends without rescheduling already gets a native ~20-min self-fallback (harness ≥2.1.202), so don't stack a manual one on top of it. For multi-hour supervised runs, prefer `node scripts/dev/run-watcher.mjs` (heartbeat + one-line `check` verdicts: PROGRESSING / STALLED-OR-DEAD / DONE) over hand-rolled marker greps — it makes a dead watcher legible instead of silent. Falling back to a shell watcher, two traps bite:
+The root agent performs the final merge action. Bounded preparation may be
+delegated only when active system and session rules permit it; never delegate
+merging, evidence judgment, destructive git operations, or shared-state cleanup.
 
-- **Registration race** — `gh pr checks <N> --watch` launched right after a push can exit immediately with "no checks reported on the branch" because CI hasn't registered yet; that's not a failure. Prefer `node scripts/dev/run-gh.mjs checks-wait <N> --required-only` (backgrounded via `run_in_background`) over a hand-rolled poll loop: it pre-polls until checks register, then decodes the documented `gh pr checks --required` 0=pass/1=fail/8=pending bitwise exit contract (tempdoc 743 P-K) restricted to `required_status_checks.contexts`, and exits 0/1/TIMEOUT accordingly, so the notification returns control instead of blocking the turn. Use `--required-only` for merge gating: an advisory (non-required) lane cannot change mergeability, so rerunning it can never fix the thing blocking the merge — 829 F1 found every attempt-1 rerun triggered by a red advisory lane was unnecessary because the lane was never in the required set. A red advisory lane must be **reported** and investigated on its own merits, never `gh run rerun --failed`-rolled to green just to turn the gate green — that masks a real advisory-tier signal without addressing it. Correspondingly, don't treat `mergeStateStatus: CLEAN` as the only mergeable state: `UNSTABLE` with only non-required checks failing is also mergeable — before merging at `UNSTABLE`, verify with `gh pr checks <N> --required` that the failing context is genuinely non-required, don't assume it from the status string alone.
-- **Merging goes through the validated live GitHub merge-queue gateway** (ruleset `main-merge-queue`, SQUASH method, validated by PR #468; `strict` up-to-date-before-merging is now false). Once the PR's own required checks are green, run `node scripts/dev/run-gh.mjs enqueue <n>`. It revalidates the live squash record and managed review record, then issues the ordinary strategy-free queue request. Direct `gh pr merge` bypasses that proof and is blocked by the shared agent hook. The queue runs its own `merge-group` CI pass against the PR merged with the current `main` and merges autonomously on success, so `origin/main` moving during your wait is no longer a merge blocker. A queue **rejection** (the entry drops out of the queue and the PR stays open/unmerged) means the merge-group run failed — pull that run and investigate before re-enqueuing; don't blind-retry the enqueue.
-- **Use one bounded process for each publication wait.** After enqueue, run `node scripts/dev/run-gh.mjs merge-wait <N>`; it emits only state transitions and returns the landed SHA on success. After fetching `origin/main`, run `node scripts/dev/run-gh.mjs run-wait-sha <landed-sha> --workflow CI --branch main --event push` for exact-SHA post-merge evidence. A completed non-success conclusion is a real failure. If GitHub cancels that push run because a later main push superseded it, inspect the cancellation and then wait on main's newest SHA explicitly; do not silently reinterpret cancellation as success.
+## Prepare the candidate
 
-Full quirk catalog (registration races, batch-PR serial re-CI, the worktree-lock false-failure message): `agent-guide.md` §3.7 History publication.
+1. Run the world-state report and verify the current worktree, branch, base, and
+   active tempdoc. Never publish from a dirty shared `main` checkout.
+2. Fetch the remote and incorporate the latest `origin/main` into the candidate
+   without discarding work. Resolve conflicts by preserving both current project
+   behavior and the tempdoc's acceptance contract.
+3. Review the complete branch diff and ensure it contains only intended files.
+4. Run the full repository verification suite against the caught-up candidate,
+   not merely a compilation check. Also run every subject-specific gate required
+   by `AGENTS.md` and the contributing documentation.
 
-Then proceed accordingly with the merge and move yourself into main as well. Then think about what maintenance/cleanup work you should do and proceed with it as well — `node scripts/agent-analytics/world-state.mjs`'s WORKTREES section will flag any sibling worktree reading as STRANDED-FINISHED or DIRTY-IDLE, worth a heads-up if it's yours or a known collaborator's. Finally think about whether there might be any remaining work left before we close out your session. If there's uncommitted content on main, branch protection now blocks direct pushes to main for everyone, including admins, so route it through a worktree + PR (squash merge, no required reviewers) instead of committing it directly — but only do this if it's simply documentational content, or not changed within the last 5 minutes. If that content is dated working history (`docs/tempdocs/**`, `docs/observations*`), batch it into the periodic `docs(tempdocs): …` / `chore(observations): fold …` PR rather than opening a bespoke single-file PR — a standalone one-file tempdoc PR is the thing `docs-ride-along` (branch-safety.md) exists to prevent, and this instruction previously read as licence to create one. Canonical-doc updates may stand alone. After merging, confirm public CI on main is actually green with the exact-SHA waiter, not just that your own PR's checks passed — if main is red, fixing it is part of this task, not something to leave for later. The final-main check remains mandatory: recent history contains cases where merge-group was green but the same landed SHA failed on main.
+Run `node scripts/ci/run-publish-preflight.mjs --check` to verify the required
+status contexts have explicit local-subset or hosted-only classifications. Use
+`--list` to inspect that boundary and `--run` for the deterministic candidate
+subset. Hosted-only classification never waives the corresponding hosted check.
 
-After all of that work is done, I want you to think about your tempdoc and specifically about what potential followup tempdocs you could imagine opening, whether any tempdocs should be updated, or if there's any small followup work you should consider that doesn't require its own tempdoc. Strongly consider delegating the mechanical PR-preparation work (catch-up merge, verification suites, scans, PR create, squash-message preview) to a subagent — but the merge click itself stays with the orchestrator: CLAUDE.md's model-routing rule names merge/publish as never-delegate actions, and `no-merge-without-authorization` requires the authorized session to perform it.
+## Pre-publication review
+
+Before the first push, scan the diff for credentials, API keys, internal-only
+URLs, machine-local paths, generated local state, and other material that must
+not become public. A later CI secret scan is not a safe substitute.
+
+Review outward-facing prose for quantitative claims. Every number must point to
+a reproducible measurement or primary evidence; remove unsupported claims rather
+than approximating them.
+
+Create or update the pull request with a precise, commit-safe title and body.
+The complete body is the public squash body: keep only the durable reason,
+observable outcomes, and any applicable standalone `Session-Id: <session uuid>`
+line there. Do not put mutable verification evidence, review state, provider
+prose, task lists, or operational logs in the body.
+
+Prepare the rich record from `.github/pr-review-record-template.md` in a working
+file outside the public body. Dry-run the exact create/update, then pass its fresh
+fingerprint back to the command:
+
+```text
+node scripts/ci/pr-review-record.mjs upsert --pr <number> --file <review-file>
+node scripts/ci/pr-review-record.mjs upsert --pr <number> --file <review-file> --execute --confirm <fresh-sha256>
+```
+
+The command owns the hidden PR/head/body marker, updates only the authenticated
+actor's comment, and refuses duplicate or stale state visible at final preflight
+or read-back. GitHub comment updates have no compare-and-swap precondition, so
+the authenticated comment owner must be the sole writer from dry-run through
+read-back; do not edit that comment concurrently. Run the upsert again after any
+head, public-body, evidence, or review-state change. Run both strict
+publication checks while preparing the record so findings can be corrected:
+
+```text
+node scripts/ci/pr-review-record.mjs check --pr <number>
+node scripts/ci/preview-squash-message.mjs --pr <number>
+```
+
+Fix every reported title, body, attribution, freshness, ownership, template, or
+process-residue defect before enqueueing the merge. The enqueue gateway repeats
+both checks against live state immediately before requesting the queue. Never
+temporarily swap the rich review record through the PR body and never restore it
+after enqueue.
+
+## Acceptance reconciliation
+
+Before claiming completion, reconcile each required proof with its tested
+revision, environment, result, and accessible artifact or run URL. Consult the
+active checklist and `docs/reference/contributing/agent-workflow.md`; do not
+create a second evidence register. Distinguish local tests from actual hosted
+runs. Start required hosted/platform checks early when authorized. Preserve
+results before targeted reruns overwrite them; disclose local-only artifacts
+and retention limits. Explicit deferral remains an open item at its destination.
+
+## Claude wait adapter
+
+When available, Claude's Monitor tool can track a bounded check or workflow.
+Retain one fallback for long waits and cancel it when the primary signal arrives;
+do not leave an unmonitored stop presented as active work. The repository shell
+watchers below remain the portable fallback. After enqueue, use
+`node scripts/dev/run-gh.mjs merge-wait <N>`. For the landed revision use
+`node scripts/dev/run-gh.mjs run-wait-sha <sha> --workflow CI --branch main --event push`.
+A cancelled run is not success; inspect whether a later push superseded it and
+explicitly verify the replacement revision when that is the actual cause.
+
+## Wait for CI
+
+Avoid chained blind polling. Start the repository's bounded watcher and retain
+the returned terminal/session identifier:
+
+```text
+node scripts/dev/run-gh.mjs checks-wait <number> --required-only
+```
+
+Wait on that session using the available terminal wait mechanism. The wrapper
+handles the registration race where GitHub initially reports no checks and
+implements the required-check exit contract. For a multi-hour supervised run,
+use `node scripts/dev/run-watcher.mjs` so progress, stalls, and completion remain
+observable.
+
+Immediately after a push, only a subset of required checks may have registered.
+Before treating a green aggregate as proof, also wait for the CI workflow on the
+exact current PR head: `node scripts/dev/run-gh.mjs run-wait-sha <head-sha>
+--workflow CI --event pull_request`. Confirm the head still matches and all
+required contexts are present and green. An earlier head or only the CLA check
+is insufficient; use `run-publish-preflight.mjs --list` for the required inventory.
+
+A failing advisory check must be reported and investigated on its own merits,
+but it is not a merge gate. Never rerun or mask an advisory failure merely to
+make the overall check list green. If GitHub reports `UNSTABLE`, use
+`gh pr checks <number> --required` to prove that every failure is genuinely
+non-required before continuing.
+
+A component publication checkpoint does not end a larger authorized assignment.
+After completing its publication checks, continue the next assigned work item;
+use session-closeout only when actually ending or handing off.
+
+## Merge queue and completion
+
+When the pull request's required checks are green, run
+`node scripts/dev/run-gh.mjs enqueue <number>`. This repository-owned gateway
+revalidates the live squash title/body and managed review record, then invokes
+the ordinary strategy-free merge-queue request. Direct `gh pr merge` bypasses
+that proof and is blocked by the shared agent hook. If the entry leaves the queue
+while the pull request remains open, inspect the failed merge-group run and fix
+the cause before re-enqueueing. Do not blind-retry.
+
+After the queue reports success:
+
+1. Fetch `origin/main` and verify the published content by diff, not branch
+   ancestry alone. Compare the landed message semantically: GitHub may reflow
+   long lines and append its own attribution, but review-only content must be
+   absent and the durable public content must remain intact.
+2. Confirm public CI on `main` is green. A new failure caused by this publication
+   remains part of the task.
+3. Update the tempdoc outcome and identify any genuine follow-up work. Do not
+   create speculative follow-up tempdocs merely to empty a checklist.
+4. Report what was published, the verification evidence, the merge result, and
+   any remaining risk. Clean up only worktrees and branches owned by this task,
+   and only when the repository's safety rules permit it.
+
+The full GitHub and merge-queue quirk catalog remains in
+`docs/reference/contributing/agent-guide.md` §3.7.
