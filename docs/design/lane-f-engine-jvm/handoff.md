@@ -631,3 +631,12 @@ or copy its older files over this integrated primary. Raw outputs remain in igno
 `tmp/`; tracked evidence contains summaries and hashes. Main and other worktrees
 remain untouched. PRs #708 and #717 are merged; PR 0b still enters at the recorded
 main-integration checkpoint. User authorization now permits autonomous merges.
+
+
+B15 precursor after that push: the existing manifest handoff survives late readiness
+writes and finally close, and is cleared by a fresh incarnation. A new publisher
+regression proves this, including a failing negative control; 26 publisher tests
+and UI test PMD pass. There is no production transport change yet. The independent
+review found that a local `restart` handoff also accompanies fatal writer exits:
+never copy it into the host-owned requested-reason slot, which makes restarts free.
+See the new design section 0 constraint and `scope-recut.md` for the bounded next cut.

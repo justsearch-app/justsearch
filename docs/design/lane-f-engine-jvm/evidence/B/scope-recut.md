@@ -99,3 +99,30 @@ and keep decisions in the process that owns the child. It earns its place if
 these proofs pass while claim/acceptance/cleanup machinery disappears. Reconsider
 it if a current requirement needs independently recoverable intent after the host
 itself dies; do not build a general single-writer framework in this lane.
+
+## B15 precursor proof after B11–B14 integration (2026-09-08)
+
+The existing `shutdownHandoff` is a narrower candidate than changing aggregate
+lifecycle into another stop authority. `RuntimeManifestPublisherTest.
+pendingShutdownSurvivesLateReadinessWritesButNotANewIncarnation` exercises pending
+restart, three late readiness publications, finally close, and a successor seed.
+It passes on production B11 code. Temporarily dropping the handoff in
+`publishLifecycle` fails the exact handoff equality assertion; restored publisher
+tests (26) and UI test PMD pass. No production code changed in this proof.
+Independent read-only review signed off its scope and discriminating assertions.
+
+Independent host/design review identified the required exit priority: a terminal
+writer fault runs the ordered RESTART close and therefore publishes a restart
+handoff too. Copying that reason into the current supervisor requested-reason slot
+would make the fatal exit free. Observe local handoff separately from host intent;
+a local timeout and fatal exit are charged, while a dedicated clean requested-restart
+exit covers death before the host's first manifest observation. Move publication
+before blocking close steps, keep upgrade dispatch after successful response flush,
+and bind any deadline to the admitted PID/instance without refreshing it on polls.
+Those production bindings and the four proofs above remain unimplemented here.
+
+| Ignored artifact | SHA-256 |
+| --- | --- |
+| `tmp/b15-handoff-lifetime-proof.txt` | `63f7f9d6d00cca4e166a74ac662d3f35b53563e1b34178e191f570366720b70b` |
+| `tmp/b15-handoff-lifetime-negative.txt` | `e514d84846e75135db99e5ca5a2820996dfebadcaab508bf369b65b7caf5b5bd` |
+| `tmp/b15-handoff-lifetime-restored.txt` | `a823ac4e3e102da3b4fecd6082199ebe02342fe465cbe0561c4a45035e421b65` |

@@ -782,6 +782,17 @@ installer launch safely resumes one child and one loop. Tests traverse the actua
 post-staging coordinator and its durable files, including a real registered child.
 Installed Tauri/AppHandle and signed network download remain separate proof tiers.
 
+**B15 handoff reuse constraint (orchestrator, 2026-09-08).** The B11 manifest's
+existing shutdown handoff survives late readiness publications and final cleanup,
+and a successor ownership seed removes it; a discriminating test now proves this.
+Prefer that existing field over a new STOPPING authority, marker or schema. The
+handoff can bound a locally initiated close, but cannot classify its exit as free:
+the terminal-writer fatal path also publishes `restart`. Fatal exits and an expired
+local-close deadline remain charged; only an explicit clean requested-restart exit
+may be uncounted without a host-owned request. The single-writer transport cut still
+needs its remaining production proofs before implementation lands. This narrows the
+stopped batch without moving any C2/D1 mechanism forward; see `evidence/B/scope-recut.md`.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

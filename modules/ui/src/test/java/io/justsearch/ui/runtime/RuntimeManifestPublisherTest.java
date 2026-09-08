@@ -246,6 +246,31 @@ class RuntimeManifestPublisherTest {
   }
 
   @Test
+  void pendingShutdownSurvivesLateReadinessWritesButNotANewIncarnation(@TempDir Path tmp)
+      throws IOException {
+    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
+    publisher.publishHead(54321, "test-token");
+    publisher.markShutdownPending("restart");
+    var original = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+
+    // Capability callbacks can still fire while ordered close is draining. The handoff,
+    // unlike aggregate readiness, must survive all those projections and finally cleanup.
+    publisher.publishLifecycle("LIFECYCLE_STATE_READY");
+    publisher.publishWorkerFailed("closing", "LIFECYCLE_STATE_DEGRADED");
+    publisher.publishAi("ready", false, null, true, "LIFECYCLE_STATE_READY", null, null, null, null);
+    publisher.close();
+    var retained = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+    assertEquals(original.get("shutdownHandoff"), retained.get("shutdownHandoff"));
+    assertEquals(original.get("instanceId"), retained.get("instanceId"));
+
+    RuntimeManifestPublisher successor = new RuntimeManifestPublisher(tmp);
+    RuntimeManifest seed = successor.publishOwnershipSeed();
+    assertNotEquals(publisher.instanceId(), seed.instanceId());
+    assertNull(seed.shutdownHandoff(), "a successor must not inherit a predecessor shutdown intent");
+  }
+
+  @Test
   void terminalShutdownDeletesOnlyAfterChildrenAreGoneAndIndexIsGraceful(@TempDir Path tmp)
       throws IOException {
     MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
