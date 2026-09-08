@@ -29,10 +29,10 @@ recovery exercise (section 0, 2026-09-08).**
 
 - **E0.1 — Run length is bounded to fifty-five minutes** *(owner constraint, 2026-09-07: no
   benchmark, eval, soak or capture over one hour)*. 17.7's locked soak ("two hours of indexing, a
-  scripted agent and a reconfigure every fifteen minutes") is satisfied by **two fifty-five-minute
+  scripted agent and a reconfigure every fifteen minutes") is measured across **three forty-minute
   runs on separate occasions**, each a self-contained record; the zero-crash and no-heap-growth
-  requirements of the memory row hold across both runs together, and the record says so. This is
-  a constraint on continuous duration, not a relaxation of the row.
+  requirements of the memory row hold across all three runs together. This is 120 minutes of
+  observed workload, not a continuous two-hour run; the record states the interruption boundaries.
 - **E0.2 — The split side is measured at E, not read from the baseline.** 16 says "paired runs on
   the same corpus and machine"; the PR 0 baseline (`evidence/baseline/`, 2026-09-07) was taken on
   the PR 0 branch head, at the split Head's `512m` heap, before PR 0b's pins. For every paired row
@@ -88,16 +88,16 @@ is a new run, not an amendment.
 | indexing-progress fraction | ninety percent of split | split side's docs/s and chunks/s at E under the same foreground load; baseline sanity: primary indexing 127.4 docs/s, embedding complete at 209.7 s on scifact | `evidence/baseline/scifact/summary.json` `ingest.pipeline_summary` |
 | warm-start budget | baseline index-ready plus five seconds | 7.6 s (`worker_ready_ms=7631` on warm restart) plus 5 s = **12.6 s** from the first cooldown's end to `index` ready | `evidence/pr0/after/restart-startup.txt` |
 | crash-to-API-restored | first cooldown plus the warm-start budget | 1 s (`cooldownIncrementMs`) plus 12.6 s = **13.6 s** to `api`; `index` within the same budget | `supervision-contract.v1.json:164` |
-| soak | two hours (17.7) → two fifty-five-minute runs (E0.1) | indexing of the reference corpus, the scripted agent from `admission-loop.mjs` at a fixed rate, a reconfigure every fifteen minutes (three per run), under the chosen collector | E0.1 |
+| soak | two hours (17.7) → three forty-minute runs (E0.1) | indexing of the reference corpus, the scripted agent from `admission-loop.mjs` at a fixed rate, a reconfigure every fifteen minutes (two per run), under the chosen collector | E0.1 |
 | floor machine | lowest GPU class the lower-memory guidance names | the class named in `docs/` lower-memory guidance at E's start; simulated by device-memory cap if no machine (E0.4) | E0.4 |
 | corpus | the jseval reference corpus | `scifact` (5,183 documents, 300 queries) for the quality and indexing rows; the 91-document fixture corpus for the workflow fixture; the 100-document lock workload (B17) for the recovery rows | `evidence/baseline/README.md` |
-| semantic-availability bound | paired first, absolute second | the split's semantic outage for the same reindex on the same machine, measured at E; the absolute ceiling the owner names once that number exists (recorded in `values.json` as `null` until then, and the row reports the paired verdict only) | 17.7 |
+| semantic-availability bound | paired first, absolute second | the split's semantic outage for the same reindex on the same machine, measured at E; an absolute ceiling fixed by the orchestrator from the split reference before the candidate gate run, with its value and rationale recorded in `values.json`; both bounds are required | 17.7 |
 | retained-state and admission caps | first cut by the implementer, confirmed at E | the C1 values from `governance/retained-state.v1.json` and the admission config, confirmed or changed by the aggregate-bound and memory rows | C1 |
 | session-gate aging threshold and background batch bound | first cut at D2, final at E | the D2 values, confirmed or changed by the request-time-encoders row | D2 |
 | allowed-difference classes | exactly three | `new-reason-code`, `equal-score-order`, `generative-text` — already code constants (`workflow_fixture.py:224`); none added after a diff | PR 0b |
 | noise-pair gate | three captures per side, `maxNoisyFraction` 0.05, `scoreTieEpsilon` 0.001 | unchanged from PR 0b | `lane-f-workflow-fixture.v1.json` |
 | collector, heap, `UseCompactObjectHeaders` | gate run | chosen by §5's protocol, then written to both spawn sites and the exact-set pin before the gate rows run | §5 |
-| hang poll interval and count | set with the collector from the soak's worst safepoint pause | interval × count ≥ 3 × the worst `Total time for which application threads were stopped` seen across both soak runs, with interval ≥ 10 s; written to `governance/supervision-contract.v1.json` `:170-171` (both supervisors read it; no code change) | §5 |
+| hang poll interval and count | set with the collector from the soak's worst safepoint pause | interval × count ≥ 3 × the worst `Total time for which application threads were stopped` seen across all three soak runs, with interval ≥ 10 s; written to `governance/supervision-contract.v1.json` `:170-171` (both supervisors read it; no code change) | §5 |
 
 ---
 
@@ -152,7 +152,7 @@ held under a declared lease of the run's length. Order:
 | **R1 paired latency and memory** | search p95, memory (steady state), indexing progress | `head-flag-run.sh` on `main` then on the lane, same day, same heap and collector, the status sampler running; `analyze-head-run.cjs` on both; the paired comparison written by a new `compare-head-runs.cjs` (p95 ratio per mode, RSS per phase, docs/s) | 2 × 25 min |
 | **R2 fixture gate** | semantic non-regression, layer 2 | `fixture-pair.sh <side> compact 33221 3` on the lane (three cycles), `fixture-gate.sh evidence/baseline/fixture-pr0b/side-a <lane-side> report.json`; the split side recaptured only per E0.2 | one side per run, about 45 min |
 | **R3 quality baselines** | semantic non-regression, layer 1 | `python -m jseval run --dataset scifact --modes lexical,hybrid --pipeline --start-backend --clean --settle-index` on each tree; `jseval compare <main-run> <lane-run> --fail-on-regression`; `relevance-gate` against the stored baseline | 2 × 12 min |
-| **R4a, R4b soak** | memory (zero crashes, no heap growth), indexing progress under load, admission rejections, hang parameters' input | `soak-run.sh`: start with GC and safepoint logging, ingest the reference corpus, the scripted agent at a fixed rate, a reconfigure every fifteen minutes, stop at 55 min; the analyzer reports crashes (`supervisor.v1.json` `restartCount` must be 0), live-after-GC trend (slope over the run, must be ≤ 0 after warm-up), worst safepoint pause | 2 × 55 min, separate occasions |
+| **R4a, R4b, R4c soak** | memory (zero crashes, no heap growth), indexing progress under load, admission rejections, hang parameters' input | `soak-run.sh`: start with GC and safepoint logging, ingest the reference corpus, the scripted agent at a fixed rate, a reconfigure every fifteen minutes, stop at 40 min; the analyzer reports crashes (`supervisor.v1.json` `restartCount` must be 0), live-after-GC trend (slope over the run, must be ≤ 0 after warm-up), worst safepoint pause | 3 × 40 min, separate occasions |
 | **R5 recovery** | recovery process, recovery workflow, hang graceful, hang forced, resume conditions | `run.mjs --adapter dev-runner` and `--adapter tauri` under the E hang parameters; `:modules:system-tests:integrationTest` for B17's five and C2's six scenarios; the client re-entry runs (webview via ui-shot, MCPB bridge, CLI, the generic MCP harness) each scripted to: search, kill, wait for `restarting`→`running`, re-bootstrap, search again; work-loss units read from the operations table | about 40 min |
 | **R6 lifecycle rows** | reconfigure, stuck component, generation transition, semantic availability, combined low-memory reindex, combined delayed retry | D1's harness on the reference machine, then on the floor (E0.4) | 2 × 45 min |
 | **R7 request-time encoders and aggregate bound** | request-time encoders, aggregate bound, durability | `encoder-latency-probe.sh` idle then during bulk embedding; `admission-loop.mjs` both arms; D2's cursor and durability tests | 30 min |
@@ -179,7 +179,7 @@ the instantiated values, and what stays unmeasurable at E with the reason.
 3. **memory** — R1 (steady state) and R4a+R4b (soak): commit charge within the section 8 budget
    document (C1-13, `evidence/C1/memory-budget.md`) through the run; machine-wide sum (Engine +
    llama-server + children) ≤ split's sum for the same phase; live-after-GC slope ≤ 0 after the
-   first fifteen minutes; `restartCount` 0 across both soak runs. Working set reported beside,
+   first fifteen minutes; `restartCount` 0 across all three soak runs. Working set reported beside,
    never as the metric.
 4. **recovery, process** — R5: the conformance cases for the three exit classes and the budget
    under the E hang values; the installed writer scenario's crash-to-`api` and crash-to-`index`
@@ -251,8 +251,7 @@ the instantiated values, and what stays unmeasurable at E with the reason.
     only on matching identity.
 
 **Unmeasurable at E, named:** Linux whole-Engine recovery (no Linux machine in the run; recorded
-as the gap section 16 already names); the floor machine if simulated (E0.4); the semantic-availability
-absolute ceiling until the owner names it; the Tauri AppHandle setup and events (source-reviewed,
+as the gap section 16 already names); the floor machine if simulated (E0.4); the Tauri AppHandle setup and events (source-reviewed,
 not executed, as B recorded).
 
 ---
@@ -332,7 +331,7 @@ Stage F's report reads only this directory and the stage records.
 1. Linux whole-Engine recovery (named gap; no Linux machine).
 2. The floor machine, if simulated (E0.4), named as such.
 3. The signed dead-Engine round, if signing prevents the candidate (carried by F).
-4. The semantic-availability absolute ceiling until the owner names it (the paired verdict stands).
+4. The semantic-availability ceiling must be fixed before the candidate gate run and is not an allowed proof gap.
 
 Not allowed: any gate row failing without a section 2 remedy and re-run recorded in
 `decision.md`; a row marked passed on a subset of its clauses; a run over the bound.
@@ -353,8 +352,10 @@ the fix.
 
 - **Q1 — the floor machine.** Whether a machine of the lower-memory guidance's GPU class is
   available at E. If not, E0.4 applies and the report says so. (No decision needed now.)
-- **Q2 — the semantic-availability absolute ceiling.** The owner names it once R6's paired
-  number exists; until then the row reports the paired verdict only.
+- **Q2 — the semantic-availability absolute ceiling.** Under delegated authority, the orchestrator
+  fixes the absolute ceiling from the measured split reference before the candidate gate run,
+  records the value and rationale in `values.json`, and requires both bounds. No owner decision
+  or null-valued ceiling is left pending. A missing split measurement is work for E to perform.
 
 ---
 

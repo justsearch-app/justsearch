@@ -52,7 +52,18 @@ dependencies {
 // this module, so without the declaration the task stays UP-TO-DATE when only the register moves —
 // which is precisely the edit the drift check exists to catch. Same reasoning as the HeadlessApp
 // input above, applied to the other file this module's tests read as data rather than as classpath.
+tasks.named<ProcessResources>("processResources") {
+  from(rootProject.file("governance/retained-state.v1.json")) {
+    into("engine")
+  }
+}
+
 tasks.named<Test>("test") {
+  inputs.files(
+    rootProject.file("scripts/dev/dev-runner.cjs"),
+    rootProject.file("scripts/dev/test-dev-runner-head-java-opts.mjs"),
+    rootProject.file("modules/shell/src-tauri/src/lib.rs"),
+  ).withPropertyName("resourcePolicyLaunchers").withPathSensitivity(PathSensitivity.RELATIVE)
   inputs
     .file(rootProject.file("modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"))
     .withPropertyName("headlessAppExitSites")

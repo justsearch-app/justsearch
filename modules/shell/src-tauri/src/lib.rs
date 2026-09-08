@@ -784,6 +784,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .arg("-Xmx2g")
         .arg("-XX:+UseSerialGC")
         .arg("-XX:MetaspaceSize=128m")
+        .arg("-XX:MaxDirectMemorySize=256m")
         .arg("-XX:+UseCompactObjectHeaders")
         .arg("-XX:-UsePerfData")
         .arg("-Dfile.encoding=UTF-8")

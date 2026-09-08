@@ -727,3 +727,23 @@ stage before it move the code. All five later-stage files follow the C1/C2 shape
 corrections, §1 ledger, §3 items with runnable acceptance, §7 harness, §9 allowed reds, §11
 decisions, §12 batches (the briefs). The Codex agent implements from §12 of the current stage
 and never from a draft two stages ahead.
+
+C1 batch 1 complete (2026-09-08 continuation, checkpoint containing this note): integrated
+main's workflow policy as `315afda5b` and the later design commits through `395078f04`, preserving
+B's hosted correction. The original Claude transcript led to the newer design worktree; it and
+the secondary recovery worktree remain preserved. `evidence/C1/batch-1.md` records implementation,
+review corrections, local test counts, raw output paths and proof limits. Core 82, app-api 199,
+Engine 133, focused provenance/gate 17, resource loader 3 and Rust 77 pass; repository compile,
+exact launch flags, the admission oracle's 26 synthetic cases, docs and eight generated sets pass.
+No live C1 admission/pacing proof exists yet; batches 3 and 4 own those runs, with batch 4 repeating
+after bounded executors. All five retained kinds remain awaiting their actual D1/D2 owners.
+
+Continue immediately with C1 batch 2. Q2 is corrected to explicit required context parameters:
+the single KnowledgeClient implementor owns mutable stores, caches, callbacks and an executor,
+so the proposed bound view was not the one-class change the draft claimed. C1-3 compares the
+alternatives and records the new design. The app-api contract gains core as an API dependency;
+regenerate dependency locks and the canonical module graph with that change. Provenance must
+survive asynchronous enqueue to a terminal ledger row, including recovery; a ledger-only
+constructor change cannot establish an agent-originated ingest. The root is tracing that queue
+ownership seam before implementing V14. C2 remains separate operations.db, with jobs identity
+unchanged. E observes three forty-minute runs to honor the original one-hour per-run ceiling.

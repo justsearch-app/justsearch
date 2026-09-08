@@ -45,6 +45,7 @@ const { splitJvmOptions } = require('./lib/engine-java-launch.cjs');
 const SHARED_FLAGS = [
   '-XX:+UseSerialGC',
   '-XX:MetaspaceSize=128m',
+  '-XX:MaxDirectMemorySize=256m',
   '-XX:+UseCompactObjectHeaders',
   '-XX:-UsePerfData',
   '-Dfile.encoding=UTF-8',

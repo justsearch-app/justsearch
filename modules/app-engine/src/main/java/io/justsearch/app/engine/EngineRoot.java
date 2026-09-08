@@ -49,6 +49,17 @@ import org.slf4j.LoggerFactory;
  * Nothing else in the repo may construct an implementation of a port.
  */
 public final class EngineRoot implements WorkerHost {
+  private final EngineResourcePolicy resources = EngineResourcePolicy.load();
+
+  /** Targets and live counters share one root; future producers explicitly report no live count. */
+  public io.justsearch.core.context.RetainedStateBudget retainedState() {
+    return resources.retained();
+  }
+
+  /** Policy targets; admission and executor consumers will be connected in later C1 batches. */
+  public java.util.Map<String, Integer> executionLimits() {
+    return resources.execution();
+  }
 
   private static final Logger log = LoggerFactory.getLogger(EngineRoot.class);
 

@@ -722,7 +722,7 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     // deliberate divergence is -Xmx: lib.rs pins 2g because a packaged JVM's default (1/4 of
     // physical RAM) is wrong in both directions, while the dev-runner keeps NO default heap
     // (tempdoc 730 Increment-4) and honours JUSTSEARCH_HEAD_HEAP when set.
-    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:+UseCompactObjectHeaders -XX:-UsePerfData'
+    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:MaxDirectMemorySize=256m -XX:+UseCompactObjectHeaders -XX:-UsePerfData'
       + ' -Dfile.encoding=UTF-8',
     headAotOpts,
     // Tempdoc 606 Piece 2b: the Head echoes this on /api/runtime/manifest so a
