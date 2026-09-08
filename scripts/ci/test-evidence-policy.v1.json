@@ -85,7 +85,7 @@
     {
       "tag": "load-sensitive",
       "tier": "local-timing-evidence",
-      "owner": "search/GPL ranking owners (LambdaMartBenchmarkTest); app-services power owners (EnergyStatePollerTest); app-engine (EngineFileLockContentionTest is the sibling stress tag)",
+      "owner": "search/GPL ranking owners (LambdaMartBenchmarkTest); app-services power owners (EnergyStatePollerTest); app-engine (EngineExtractionSandboxChaosTest is the sibling stress tag)",
       "reason": "Tests whose assertion is a claim about the MACHINE rather than about the code - wall-clock latency, or that a background thread made progress inside a window. A concurrent build on the same host fails them without the measured code changing, so a failure of this shape says nothing about the subject. Two subjects under this tag, each with the same evidence: LambdaMartBenchmarkTest p50 (four failures in one session under a sibling-worktree Gradle build, green on every isolated re-run) and EnergyStatePollerTest restartability (three failures, every one under concurrent load, green on every isolated re-run). Both quarantined at FULL assertion strength into their own runner rather than given a looser threshold: widening the budget hides the instrument limit instead of naming it.",
       "cadence": "local, on an otherwise idle machine, before changing scoring/inference hot paths"
     }

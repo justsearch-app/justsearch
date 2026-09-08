@@ -90,7 +90,7 @@ import org.slf4j.LoggerFactory;
  * <p><b>"The Worker never restarts" has no in-process form, and its replacement is stronger.</b>
  * The retired test compared {@code grpcClient.getWorkerPid()} before and after each failure. Here
  * the index half is this JVM: if it died there would be no result to assert on
- * (the same reasoning {@link EngineFileLockContentionTest} recorded for its own PID checks). What
+ * (B17's hostile-file-lock test instead needs an installed, killable Engine). What
  * replaces it is the product-facing claim the PID check stood in for — the SAME
  * {@code KnowledgeClient} keeps answering, and the file submitted after each failure is indexed and
  * becomes searchable, three times over, with a monotonically rising doc count.
@@ -104,7 +104,7 @@ import org.slf4j.LoggerFactory;
  * <p><b>Why {@code @Tag("stress")}.</b> This test deliberately wedges a parser for a whole
  * {@code TimeboxedContentExtractor.DEFAULT_TIMEOUT} (60&nbsp;s) and then exhausts a child heap, so
  * it runs for minutes by construction and its budgets are wall-clock. That is the same trade
- * {@link EngineFileLockContentionTest} made: the opt-in stress runner
+ * the former embedded file-lock test made: the opt-in stress runner
  * ({@code -PincludeStress=true}, registered in {@code scripts/ci/stress-suite-policy.v1.json})
  * keeps the assertions at full strength instead of putting a multi-minute wall-clock test in the
  * default inner loop.

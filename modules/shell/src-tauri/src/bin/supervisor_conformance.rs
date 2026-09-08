@@ -10,6 +10,11 @@
 //! `run_supervision` loop `lib.rs` runs, against a real child (the harness's fake engine), and
 //! `scripts/supervisor-conformance/adapters/tauri.mjs` judges the artifacts it leaves behind.
 //!
+//! B17 additionally routes child ownership, manifest admission, exit observation, state publication
+//! and local handoff validation through the same EngineHost methods as ShellActuator. The fake
+//! Engine supplies controlled faults; Tauri AppHandle setup and graphical event delivery are not
+//! executed by this binary.
+//!
 //! It includes `supervisor.rs` by path rather than through `shell_lib`, so nothing here links the
 //! Tauri runtime — which on Windows cannot be linked into a test-shaped binary at all (see
 //! `BackendState::tray_id`'s note in `lib.rs`).
@@ -26,9 +31,16 @@
 mod supervisor;
 #[path = "../engine_probe.rs"]
 mod engine_probe;
+#[path = "../binding.rs"]
+#[allow(dead_code)]
+mod binding;
+#[path = "../engine_host.rs"]
+#[allow(dead_code)]
+mod engine_host;
 
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use supervisor::{
@@ -39,13 +51,12 @@ fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
-struct FakeEngineActuator {
+struct EngineHostActuator {
     node: PathBuf,
     fake_engine: PathBuf,
     plan: PathBuf,
     data_dir: PathBuf,
-    child: Option<Child>,
-    api_port: Option<u16>,
+    host: Arc<engine_host::EngineHost>,
     started: Instant,
     run_ms: u64,
     /// Stop once an incarnation at least this high has reached `running`; 0 means "run to a
@@ -61,7 +72,7 @@ struct FakeEngineActuator {
     ready_at: Option<Instant>,
 }
 
-impl FakeEngineActuator {
+impl EngineHostActuator {
     // Joined literally, for the reason `ShellActuator` states: this file is scanned by
     // check-runtime-manifest-closure, and a `runtime_dir()` helper would hide the artifact names
     // from it.
@@ -94,49 +105,37 @@ impl FakeEngineActuator {
 
 }
 
-impl Actuator for FakeEngineActuator {
+impl Actuator for EngineHostActuator {
     fn spawn_engine(&mut self) -> Result<u32, String> {
         // Every incarnation starts from a clean discovery surface: a restarted Engine that inherited
         // the dead one's manifest would be discovered at the dead one's port with the dead one's
         // session token — the residue tempdoc 805 G.1 named on this side of the product.
         let _ = std::fs::remove_file(self.manifest_path());
-        let child = Command::new(&self.node)
+        self.host.reset_for_successor()?;
+        let mut command = Command::new(&self.node);
+        command
             .arg(&self.fake_engine)
             .env("JUSTSEARCH_DATA_DIR", &self.data_dir)
             .env("JUSTSEARCH_API_PORT", "0")
             .env("JUSTSEARCH_FAKE_ENGINE_PLAN", &self.plan)
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| format!("spawn fake engine failed: {e}"))?;
-        let pid = child.id();
-        self.child = Some(child);
-        self.api_port = None;
-        Ok(pid)
+            .stderr(Stdio::null());
+        self.host.admit(engine_host::PreparedCommand { command }).map(|child| child.pid)
     }
 
     fn await_ready(&mut self, deadline_ms: u64) -> Result<Ready, String> {
         loop {
-            if let Some(manifest) = self.read_manifest() {
-                if let Some(port) = manifest
-                    .get("head")
-                    .and_then(|h| h.get("apiPort"))
-                    .and_then(|p| p.as_u64())
-                {
-                    let port = port as u16;
-                    if engine_probe::responds(port, "/api/health", Duration::from_millis(800)) {
-                        self.api_port = Some(port);
-                        self.ready_at = Some(Instant::now());
-                        return Ok(Ready {
-                            pid: self.child.as_ref().map(Child::id),
-                            api_port: Some(port),
-                            instance_id: manifest
-                                .get("instanceId")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string()),
-                        });
-                    }
-                }
+            if let Some(manifest) = binding::read_manifest_if_present(&self.manifest_path()) {
+                self.host.observe_manifest(&manifest);
+            }
+            if let Some(binding) = self.host.observe_current_binding(|port|
+                engine_probe::responds(port, "/api/health", Duration::from_millis(800))) {
+                self.ready_at = Some(Instant::now());
+                return Ok(Ready {
+                    pid: self.host.child_pid(),
+                    api_port: binding.port,
+                    instance_id: binding.instance_id,
+                });
             }
             if now_ms() >= deadline_ms {
                 return Err("the incarnation did not publish a port and answer in time".into());
@@ -146,31 +145,21 @@ impl Actuator for FakeEngineActuator {
     }
 
     fn poll_exit(&mut self) -> Option<i32> {
-        let child = self.child.as_mut()?;
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                self.child = None;
-                Some(status.code().unwrap_or(1))
-            }
-            _ => None,
-        }
+        self.host.try_reap()
     }
 
     fn probe_health(&mut self) -> bool {
-        match self.api_port {
-            // A hang is not a refusal: the socket is accepted and then nothing happens, so the miss
-            // is a TIMEOUT and the probe has to have one.
-            Some(port) => engine_probe::responds(port, "/api/health", Duration::from_millis(700)),
-            None => false,
-        }
+        self.host.observe_current_binding(|port|
+            engine_probe::responds(port, "/api/health", Duration::from_millis(700))).is_some()
     }
 
     fn probe_essential_ready(&mut self) -> bool {
-        self.api_port.is_some_and(|port| engine_probe::essential_ready(port, Duration::from_millis(700)))
+        self.host.observe_current_binding(|port|
+            engine_probe::essential_ready(port, Duration::from_millis(700))).is_some()
     }
 
     fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String> {
-        supervisor::shutdown_handoff_reason(&self.read_manifest()?, current)
+        self.host.observed_shutdown_reason(&self.read_manifest()?, current)
     }
 
     fn take_host_request(&mut self) -> Option<String> {
@@ -191,37 +180,19 @@ impl Actuator for FakeEngineActuator {
 
     fn force_kill(&mut self) {
         self.forced_kill = true;
-        let Some(child) = self.child.as_mut() else { return };
-        let pid = child.id();
-        #[cfg(windows)]
-        {
-            // `/T` because the Engine owns children whose handles are the reason the next
-            // incarnation's boot can fail; item B12 replaces this with kill-by-identity.
-            let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .status();
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = pid;
-        }
-        let _ = child.kill();
+        self.host.with_child_mut(|child| { let _ = child.kill(); });
     }
 
     fn wait_for_handle_release(&mut self) -> bool {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
-            let alive = match self.child.as_mut() {
-                None => false,
-                Some(child) => matches!(child.try_wait(), Ok(None)),
-            };
+            let alive = self.host.child_pid().is_some();
             let log_free = {
                 let log = self.data_dir.join("logs").join("engine.log");
                 !log.exists()
                     || std::fs::OpenOptions::new().append(true).open(&log).is_ok()
             };
             if !alive && log_free {
-                self.child = None;
                 return true;
             }
             if Instant::now() >= deadline {
@@ -244,8 +215,15 @@ impl Actuator for FakeEngineActuator {
     fn publish_state(&mut self, record: &StateRecord) {
         self.last_state = record.state.clone();
         self.last_incarnation = record.incarnation;
-        let json = serde_json::to_string_pretty(record).unwrap_or_default();
-        let _ = Self::write_atomic(&self.state_path(), &format!("{json}\n"));
+        if record.state == "running" {
+            let manifest = self.read_manifest().expect("running Engine manifest");
+            let current = self.host.observe_current_binding(|_| true).expect("running owned binding");
+            assert_eq!(record.pid, self.host.child_pid());
+            assert_eq!(record.instance_id, current.instance_id);
+            assert_eq!(manifest.get("pid").and_then(|v| v.as_u64()), record.pid.map(u64::from));
+            assert_eq!(manifest.get("instanceId").and_then(|v| v.as_str()), record.instance_id.as_deref());
+        }
+        self.host.publish_state(Some(&self.state_path()), record, |_| {});
     }
 
     fn should_continue(&mut self) -> bool {
@@ -283,13 +261,12 @@ fn main() {
 
     let policy = load_policy();
     let mut sup = Supervisor::new(policy);
-    let mut actuator = FakeEngineActuator {
+    let mut actuator = EngineHostActuator {
         node,
         fake_engine,
         plan,
         data_dir,
-        child: None,
-        api_port: None,
+        host: Arc::new(engine_host::EngineHost::default()),
         started: Instant::now(),
         run_ms,
         stop_after_incarnation,
@@ -330,7 +307,5 @@ fn main() {
     println!("{summary}");
 
     // Never leave a child behind: the harness runs ten of these back to back.
-    if actuator.child.is_some() {
-        actuator.force_kill();
-    }
+    actuator.host.kill_and_reap();
 }

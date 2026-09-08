@@ -3,9 +3,10 @@
  *
  * It drives `modules/shell/src-tauri`'s `supervisor-conformance` binary, which runs the SAME
  * `run_supervision` loop `lib.rs` runs, over the same `decide` the register's decision table pins —
- * against a real child (the fake engine). That is the whole answer to `stages/B.md` Q2: `cargo test
- * --lib` proves the decisions, this proves the actuator, and "one contract, two implementations" is
- * false while either half of either implementation is unrun.
+ * against a real child with a controlled fake workload. B17 binds the driver to the production
+ * EngineHost child ownership, manifest admission, exit, state publication and handoff methods.
+ * This proves those lifecycle bindings; AppHandle setup and graphical events remain outside
+ * this executable proof.
  *
  * The binary is built by the CI step that precedes this one (`cargo build --bin
  * supervisor-conformance --locked`); locally, run that first. If it is missing this adapter reports

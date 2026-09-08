@@ -237,6 +237,18 @@ impl EngineHost {
         (!inner.closing && inner.child.as_ref()?.generation == generation && inner.binding == binding)
             .then_some(binding)
     }
+    /// Admit local shutdown intent only from this host's current child and manifest binding.
+    pub(crate) fn observed_shutdown_reason(
+        &self,
+        manifest: &serde_json::Value,
+        current: &supervisor::Ready,
+    ) -> Option<String> {
+        let reason = supervisor::shutdown_handoff_reason(manifest, current)?;
+        let binding = self.observe_current_binding(|_| true)?;
+        (self.child_pid() == current.pid && binding.instance_id == current.instance_id)
+            .then_some(reason)
+    }
+
     pub(crate) fn child_pid(&self) -> Option<u32> {
         self.inner
             .lock()

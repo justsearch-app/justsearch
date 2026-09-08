@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B14 and B16 implemented and verified on the lane; B15 and remaining B17 proofs open; signed dead-Engine installer proof assigned to final validation in stage E"
+status: "B1-B16 complete; B17 recovery proofs implemented and reviewed, final integrated verification pending; signed dead-Engine installer proof assigned to final validation in stage E"
 updated: 2026-09-08
 ---
 
@@ -744,6 +744,13 @@ baseline grew. [The residue record](../evidence/B/b16-residue.md) records the fi
 
 ### B17 — the supervision assertions are in a suite that runs
 
+**2026-09-08 implementation checkpoint:** the hostile-lock workload now runs against
+the installed supervised Engine; a separate test proves PROCESSING after actual death
+and replay through the successor. The Tauri adapter now calls production EngineHost
+lifecycle/binding methods. Both independent reviews are clear; installed cases 5/5 and
+Tauri adapter 17/17 pass. [The proof record](../evidence/B/b17-recovery-proofs.md) states
+the remaining stage-end unit/stress/main-integration verification and execution limits.
+
 - [x] **B17-R1: terminal writer escalation (moved from D1, 2026-09-08).** The narrow
   repair and bounded proof are recorded in design section 0 and
   `evidence/B/writer-recovery-investigation.md`. Its completion does not close B17:
@@ -756,7 +763,7 @@ behind `stress` or `load-sensitive` (I9). It must be a unit-level test in the de
 with `./gradlew.bat test -PincludeStress=true`; or an installed-process `integrationTest` invoked
 explicitly. Terminal-writer recovery uses the last tier:
 `./gradlew.bat :modules:system-tests:integrationTest --tests
-io.justsearch.systemtests.supervision.TerminalWriterSupervisedRecoveryE2ETest
+io.justsearch.systemtests.supervision.EngineSupervisedRecoveryE2ETest
 -PskipWebBuild=true --console=plain`.
 
 **Acceptance:** `node scripts/ci/verify-stress-suite-policy.mjs` green; §10's "what a green suite

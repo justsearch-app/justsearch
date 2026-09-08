@@ -664,3 +664,11 @@ race. Both changes received independent review. Full units 9416/0; the last coun
 fail-closed correction passed its focused regression, final build and both installed cases.
 See `evidence/B/b15-requested-restart.md` for exact limits and hashes. B15 is complete;
 B17's hostile-lock relocation, PROCESSING-at-death replay and final stage checks remain.
+
+B17 implementation checkpoint (2026-09-08): hostile-lock and PROCESSING-at-death proofs
+now run in `EngineSupervisedRecoveryE2ETest` (five installed cases passed). The Tauri
+adapter uses production EngineHost lifecycle and identity methods (17/17); both reviews
+are clear. No production recovery protocol was added. The next action is merge current
+origin/main into this lane, then run the full suite with stress enabled and rerun the
+installed-process suite against that integrated candidate. B17 is not yet closed.
+`evidence/B/b17-recovery-proofs.md` records the checkpoint; raw outputs stay ignored.

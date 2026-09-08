@@ -3,24 +3,34 @@ package io.justsearch.systemtests.supervision;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Timeout;
 
-/** Real installed-Engine proof for terminal Lucene writer recovery through the dev supervisor. */
+/** Installed Engine proofs for durable recovery, migration and hostile filesystem survival. */
 @Timeout(7 * 60)
-final class TerminalWriterSupervisedRecoveryE2ETest {
+final class EngineSupervisedRecoveryE2ETest {
 
   @ParameterizedTest
-  @ValueSource(strings = {"writer", "migration"})
+  @ValueSource(strings = {"writer", "migration", "lock-boot", "lock-ingest", "processing"})
   void supervisedRecoveryUsesTheCorrectExitAndReopensDurableState(String scenario) throws Exception {
+    if ("lock-boot".equals(scenario)) {
+      assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
+          "mandatory file-locking contention at boot is a Windows property");
+    }
+    if ("processing".equals(scenario)) {
+      assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
+          "the repository's process identity collector currently supports Windows only");
+    }
     Path repo = repositoryRoot();
     Path work =
         repo.resolve("tmp/lane-f-takeover/writer-junit-" + UUID.randomUUID()).normalize();
@@ -36,19 +46,55 @@ final class TerminalWriterSupervisedRecoveryE2ETest {
             .redirectOutput(outputFile.toFile());
     builder.environment().put("JUSTSEARCH_WRITER_RECOVERY_WORK", work.toString());
     builder.environment().put("JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario);
-    Process process = builder.start();
+    if ("processing".equals(scenario)) {
+      Path childArgs = work.resolve("processing-child-args.txt");
+      Files.writeString(childArgs, "-Xmx128m\n-Dfile.encoding=UTF-8\n-cp\n\""
+          + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n"
+          + io.justsearch.indexerworker.fixtures.ChaosExtractionSandboxChild.class.getName() + "\n");
+      String javaExe = Path.of(System.getProperty("java.home"), "bin", "java.exe").toString();
+      builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_MODE", "process");
+      builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_POOL", "1");
+      builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND",
+          "\"" + javaExe + "\" \"@" + childArgs + "\"");
+      builder.environment().put("JUSTSEARCH_PROCESSING_TEST_ARGFILE", childArgs.toString());
+      builder.environment().put("JUSTSEARCH_PROCESSING_TEST_ENTERED", work.resolve("processing-entered").toString());
+    }
+    FileIntruder intruder = scenario.startsWith("lock-") ? new FileIntruder(work.resolve("data")) : null;
+    boolean intruderStarted = false;
+    if ("lock-boot".equals(scenario)) {
+      Files.createDirectories(work.resolve("data"));
+      intruder.start(5, 10);
+      intruderStarted = true;
+    }
+    Process process = null;
     int exit;
     boolean interrupted = false;
     try {
-      if (!process.waitFor(330, TimeUnit.SECONDS)) {
-        throw new AssertionError("writer recovery fixture exceeded 330 seconds");
+      process = builder.start();
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(330);
+      while (!process.waitFor(100, TimeUnit.MILLISECONDS)) {
+        if (intruder != null) {
+          if (!intruderStarted && Files.exists(work.resolve("intruder-start"))) {
+            intruder.start(3, 50);
+            intruderStarted = true;
+            Files.writeString(work.resolve("intruder-started"), "ready");
+          }
+          if (Files.exists(work.resolve("intruder-stop"))) {
+            intruder.close();
+            Files.writeString(work.resolve("intruder-stopped"), "closed");
+          }
+        }
+        if (System.nanoTime() >= deadline) {
+          throw new AssertionError("Engine recovery fixture exceeded 330 seconds");
+        }
       }
       exit = process.exitValue();
     } catch (InterruptedException e) {
       interrupted = true;
       throw e;
     } finally {
-      if (process.isAlive()) {
+      if (intruder != null) intruder.close();
+      if (process != null && process.isAlive()) {
         process.destroyForcibly();
         try {
           process.waitFor(10, TimeUnit.SECONDS);
@@ -70,8 +116,14 @@ final class TerminalWriterSupervisedRecoveryE2ETest {
     if ("writer".equals(scenario)) {
       assertTrue(output.contains("QUEUE_BEFORE_DEATH"), output);
       assertTrue(output.contains("fatal_or_uncaught"), output);
-    } else {
+    } else if ("migration".equals(scenario)) {
       assertTrue(output.contains("MIGRATION_PASS"), output);
+    } else if ("processing".equals(scenario)) {
+      assertTrue(output.contains("PROCESSING_AFTER_DEATH"), output);
+      assertTrue(output.contains("PROCESSING_REPLAY_PASS"), output);
+    } else {
+      assertTrue(output.contains("LOCK_SURVIVAL_PASS"), output);
+      assertTrue(intruder.acquiredLockCount() > 0, "the attack must acquire real filesystem locks");
     }
     assertTrue(output.contains("PASS"), output);
     assertTrue(output.contains("\"portsClosed\":true"), output);

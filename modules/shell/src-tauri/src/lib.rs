@@ -1181,10 +1181,7 @@ impl supervisor::Actuator for ShellActuator {
     fn observed_shutdown_reason(&mut self, current: &supervisor::Ready) -> Option<String> {
         let raw = std::fs::read_to_string(self.data_dir.join("runtime").join("manifest.json")).ok()?;
         let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
-        let reason = supervisor::shutdown_handoff_reason(&parsed, current)?;
-        let binding = self.state.host.observe_current_binding(|_| true)?;
-        (self.state.child_pid() == current.pid && binding.instance_id == current.instance_id)
-            .then_some(reason)
+        self.state.host.observed_shutdown_reason(&parsed, current)
     }
 
     fn write_shutdown_request(

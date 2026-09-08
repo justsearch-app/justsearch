@@ -4,6 +4,8 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
+import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
+import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 
 const repo = process.cwd();
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
@@ -11,7 +13,8 @@ const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
 const state = path.join(work, 'state');
 const data = path.join(work, 'data');
-const indexBase = path.join(work, 'index');
+const lockScenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO?.startsWith('lock-');
+const indexBase = path.join(lockScenario ? data : work, 'index');
 const aiEnabled = process.env.JUSTSEARCH_WRITER_RECOVERY_AI_ENABLED === '1';
 fs.mkdirSync(path.join(data, 'runtime'), { recursive: true });
 fs.mkdirSync(state, { recursive: true });
@@ -34,8 +37,8 @@ const env = {
   ]),
   JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '30000',
   JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '60000',
-  JUSTSEARCH_BACKFILL_MAX_DOCS_BEFORE_COMMIT: '1',
-  JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS: '600000',
+  JUSTSEARCH_BACKFILL_MAX_DOCS_BEFORE_COMMIT: lockScenario ? '50' : '1',
+  JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS: lockScenario ? '1000' : '600000',
   JUSTSEARCH_INDEX_BASE_PATH: indexBase,
   JUSTSEARCH_AI_EMBED_ENABLED: 'false',
   JUSTSEARCH_NER_ENABLED: 'false',
@@ -47,6 +50,12 @@ const env = {
   AI_OFFLINE: 'true',
   CI: '',
 };
+if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
+if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
+  // Observe durable state after actual Engine death and before its successor claims it.
+  env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
+  env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
+}
 delete env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND;
 if (aiEnabled) {
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;
@@ -166,7 +175,13 @@ try {
       return response.status === 200 ? response : null;
     } catch { return null; }
   });
-  if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
+  if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
+    await exerciseProcessingReplay({ work, data, first, manifest, apiPort, readJson, waitFor,
+      request, post, requireThat, acceptedCount, matchingHit, jobStateFor });
+  } else if (lockScenario) {
+    await exerciseHostileLocks({ work, data, first, readJson, waitFor, request, post,
+      requireThat, acceptedCount });
+  } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
     await exerciseMigrationRestart({ work, data, indexBase, first, manifest, apiPort,
       readJson, waitFor, request, post, requireThat, acceptedCount, matchingHit,
       output: () => output });
@@ -268,6 +283,11 @@ try {
   fixtureFailure = error;
 }
 try {
+  if (lockScenario) {
+    fs.writeFileSync(path.join(work, 'intruder-stop'), 'stop');
+    await waitFor('JUnit releases hostile locks before owned cleanup', 10000,
+      () => fs.existsSync(path.join(work, 'intruder-stopped')));
+  }
   const cleanupRunId = resolveOwnedRunId();
   requireThat(cleanupRunId, `could not resolve owned run identity under ${state}`);
   const stopArgs = [runner, 'stop', '--json', '--session-id', 'writer-recovery-live',

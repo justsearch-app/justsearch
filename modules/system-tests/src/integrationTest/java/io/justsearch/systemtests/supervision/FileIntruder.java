@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-package io.justsearch.app.engine;
+package io.justsearch.systemtests.supervision;
 
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The "File Intruder" — simulates external processes (antivirus, indexers, backup agents) that
@@ -25,13 +26,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Release and repeat
  * </ol>
  *
- * <p><b>Lane F stage A item A12 — copied verbatim in behaviour from
- * {@code systemtests.torture.FileIntruder}</b>, which is deleted with the rest of the system-tests
- * torture tier. The intruder never had anything to do with the second process: it locks files on
- * disk, and the Engine's index half opens exactly the same files it did. Two things changed and
- * neither is behaviour: the SLF4J logging is gone (this module's test source set does not declare
- * an SLF4J dependency, and the log lines were debug-only), and the class is package-private in
- * {@code io.justsearch.app.engine} rather than public.
+ * <p>Lane F B17 moves the unchanged locking workload from the embedded Engine stress test into
+ * the installed-process integration tier. A terminal writer fault must be allowed to terminate
+ * its Engine and recover through the real supervisor without terminating the JUnit owner.
  *
  * <p><b>{@code .lock} files are deliberately skipped</b> (the original's "too rude" comment). That
  * exclusion is load-bearing here: {@code IndexRootLock} holds
@@ -43,6 +40,7 @@ final class FileIntruder implements AutoCloseable {
 
   private final Path targetDir;
   private final AtomicBoolean running = new AtomicBoolean(false);
+  private final AtomicLong acquiredLocks = new AtomicLong();
   private final List<Thread> intruderThreads = new ArrayList<>();
   private final Random random = new Random();
 
@@ -52,6 +50,10 @@ final class FileIntruder implements AutoCloseable {
 
   FileIntruder(Path targetDir) {
     this.targetDir = targetDir;
+  }
+
+  long acquiredLockCount() {
+    return acquiredLocks.get();
   }
 
   /**
@@ -126,6 +128,7 @@ final class FileIntruder implements AutoCloseable {
       try {
         FileLock lock = channel.tryLock(0, Long.MAX_VALUE, !exclusive);
         if (lock != null) {
+          acquiredLocks.incrementAndGet();
           activeLocks.add(lock);
           Thread.sleep(random.nextInt(durationMs) + 1);
           lock.release();

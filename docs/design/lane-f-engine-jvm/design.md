@@ -880,6 +880,20 @@ is introduced. Disabling metadata verification or stamping without embeddings wa
 rejected. The earlier disabled-embedding fixture remains a negative observation,
 not evidence of completed migration.
 
+**B17 proof placement (orchestrator, 2026-09-08).** Move hostile-file-lock survival
+from embedded EngineRoot tests to the installed-process integration tier, retaining
+the 5-thread/10ms boot attack, 3-thread/50ms indexing attack, 100-document workload
+and 180-second search bound. Whole-Engine fatal recovery cannot be exercised inside
+the test owner's JVM. Require actual locks acquired; release the intruder before
+owned cleanup. Separately hold a real claimed job inside the existing chaos parser,
+crash only the fixture's identity-verified Engine, and require PROCESSING after death
+before the successor starts. This distinguishes durable replay from a transient
+pre-death observation or a synthetic database edit. Harness-only cooldown and parser
+argfile changes remain test controls; no production fault endpoint is added.
+The Tauri conformance driver now calls the production EngineHost lifecycle/binding
+methods instead of owning another Child slot. Its fake workload stays intentional;
+AppHandle setup/events and signed installation remain outside that execution claim.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

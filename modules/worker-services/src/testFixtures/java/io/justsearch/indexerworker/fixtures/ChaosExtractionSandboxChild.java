@@ -80,6 +80,10 @@ public final class ChaosExtractionSandboxChild {
       System.out.println("chaos child handling " + name);
 
       if (name.contains("chaos-hang")) {
+        String entered = System.getenv("JUSTSEARCH_PROCESSING_TEST_ENTERED");
+        if (entered != null && !entered.isBlank()) {
+          java.nio.file.Files.writeString(Path.of(entered), request.path());
+        }
         while (true) {
           LockSupport.parkNanos(1_000_000_000L);
         }

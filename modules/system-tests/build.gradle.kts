@@ -178,6 +178,8 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   dependsOn(":modules:ui:installDist")
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
 
   // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
   // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from
