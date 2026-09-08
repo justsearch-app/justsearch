@@ -1,6 +1,6 @@
 ---
 title: "Agent workflow contract: continuity, bounded delegation, and evidenced completion"
-status: implementing
+status: implemented
 created: 2026-09-08
 updated: 2026-09-08
 ---
@@ -48,23 +48,24 @@ identify artifacts but do not make unavailable evidence inspectable.
 - [x] Hook subprocess tests cover Claude/Codex delivery without claiming a live
       client probe; fresh Codex roles read the governing contract explicitly.
 - [x] Canonical docs, generated outputs, budgets, and relevant Node checks pass.
-- [ ] Independent review resolves substantive findings; publication evidence
+- [x] Independent review resolves substantive findings; publication evidence
       distinguishes local, hosted, queue, and post-merge results.
 
 ## Verification evidence
 
 | Requirement | Environment / revision | Result and evidence | Remaining limit |
 | --- | --- | --- | --- |
-| Projection and delivery | Windows candidate based on `f938c4eb2e9b`, with this task's delta | `agent-instructions-projection.test.mjs`, `subagent-guide.test.mjs` (9 checks), `check-codex-agent-parity.mjs` (8 checks), analytics suite (55 test files): pass | Repository output tested; no live client injection or obedience claim |
-| Documentation and script checks | Same local candidate | `lint:scripts`, `docs-validate`, `verify-canonical-doc-links`, canonical Markdown lint, prompt budgets, premerge-table, tempdoc-number, publication classification, PR-record and squash-message tests: pass. `regen-all --check --except notices`: 7 sets pass | Notice generation and hosted checks belong to publication verification |
+| Projection and delivery | Windows `3739454ef2d5`; final evidence-only doc delta | `agent-instructions-projection.test.mjs`, `subagent-guide.test.mjs` (9 checks), `check-codex-agent-parity.mjs` (8 checks), analytics suite (55 test files): pass | Repository output tested; no live client injection or obedience claim |
+| Documentation and script checks | Same local candidate | `lint:scripts`, `docs-validate`, `verify-canonical-doc-links`, canonical Markdown lint, prompt budgets, premerge-table, tempdoc-number, publication classification, PR-record and squash-message tests: pass. All 8 generated sets pass, including notices with the installed stable Rust toolchain | Hosted final-head checks recorded in PR |
 | Integrated application checks | Same candidate; Windows local environment | `gradlew.bat build -x test` and `gradlew.bat test`: both successful | Local logs under ignored `tmp/agent-build.txt` and `tmp/agent-tests.txt`; workstation-only access/retention |
-| Independent review | `0e16c0c5b` plus reviewed correction delta | Two findings: adapter selection bypassed by leaf tests; stale nested-hook denial. Corrected both. Adapter regression failed before the fix and all 17 adapter checks pass afterward; model-guard regression passes | Follow-up review and hosted final revision pending |
-| Publication | Hosted candidate and landed revision | Pending | No publication claim yet |
+| Independent review | `0e16c0c5b` plus correction delta committed as `3739454ef2d5` | Two findings corrected: adapter selection bypassed by leaf tests; stale nested-hook denial. Adapter regression failed before the fix and all 17 adapter checks pass afterward. Follow-up reviewer independently checked routing and found no unresolved substantive issue | Reviewer inspected execution paths and ran a focused behavior probe; did not independently rerun full suites |
+| Publication | Hosted candidate and landed revision | Managed review record on [PR 719](https://github.com/justsearch-app/justsearch/pull/719) owns current hosted, queue, and post-merge results | Pending at this commit-time snapshot; no premature publication claim |
 
 ## Next action
 
-Resolve independent review, run hosted checks on the publication candidate,
-validate the managed review record, then verify queue and post-merge results.
+Implementation and independent review are complete. Finish publication checks
+and update the managed PR record through queue and exact landed-revision CI;
+that live record owns the publication outcome after this dated snapshot.
 Keep unrelated main-checkout changes and active migration worktrees untouched.
 
 ## Verification qualifications
