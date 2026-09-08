@@ -645,6 +645,14 @@ green checkpoint. [The investigation](evidence/B/writer-recovery-investigation.m
 records the evidence and the detection, supervised restart and replay still to
 demonstrate. No new file protocol or generic fault framework is approved.
 
+**Split baseline publication (orchestrator, 2026-09-08).** PRs #708 and #717
+have landed through the merge queue under delegated authority. Each landed tree
+equals its reviewed candidate. [The publication record](evidence/publication.md)
+contains the fresh suite inventories, review and hosted results. This does not
+advance the Stage B checkpoint: PR 0b still enters the primary lane at its recorded
+main-integration checkpoint, and the writer-recovery and shutdown proofs remain
+open. Publication of the split baseline is not integration into the Engine branch.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

@@ -5,6 +5,8 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
+Latest state: [Publication and recovery checkpoint](#publication-and-recovery-checkpoint-2026-09-08).
+
 Two handoffs live in this file. The first (2026-09-07) is from the design orchestrator to the
 first implementation orchestrator and is kept as written. The second, **"Implementation
 orchestrator handoff (2026-09-08)"** at the end, is from that orchestrator to its successor and
@@ -514,3 +516,51 @@ unpublished because all its reviewed content is integrated in the primary branch
 it is not an outstanding implementation lane. The clean main-control worktree
 remains available for future comparisons. Unrelated worktrees and main were left
 untouched.
+
+## Publication and recovery checkpoint (2026-09-08)
+
+Both split-baseline PRs have landed under the delegated merge authority:
+
+- #708: `0824e365411960597d2af2f87ba55cf17381426f`, matching reviewed candidate
+  `30e027c6105489d49cf5427f5a80188aee0902bb` over the entire tree.
+- #717: `f938c4eb2e9b487bd0965859108d239c30e8601f`, matching reviewed candidate
+  `a6bda3224274dd768a3ded741b28fca7b43c9de4`. That candidate is byte-identical to
+  the fully tested `7c8cc01a50f10c684cfe26b47274bed778c855be`; the merge of the
+  #708 squash changed ancestry only. Independent review verified the conflict
+  resolutions, merge parents and unchanged 71-path diff before push.
+
+Read [the publication record](evidence/publication.md) for candidate, queue and
+main-push CI, all 33 module counts and the original log hashes. The fresh Java
+runs passed 9,301 and 9,337 tests respectively; Python passed 3,536 and 3,637.
+All original Java XML files were preserved before filtered reruns. These are
+split-mode PR results and do not clear the Stage B stress failure.
+
+The primary branch's recovery-documentation checkpoint is `508030d79`. Its only
+test-source edit is a Javadoc correction: the old scheduler explanation is scoped
+as a hypothesis, and the proven closed-writer failure remains a blocker. The
+comment-only edit passed formatting; no full-suite rerun or recovery success is
+claimed. The Codex workflow instructions match this branch's own canonical PR 0
+reference. **PR 0b is not yet integrated into the primary branch.** The premature
+PR 0b instruction copy was reverted before push; carry the published code and
+matching instructions together at the lane's main-integration checkpoint.
+
+The next recovery proof is the whole-Engine fatal-fault route, using the existing
+transient-exit budget and startup queue replay. Read
+[writer-recovery-investigation.md](evidence/B/writer-recovery-investigation.md)
+before implementing: generic lock IO is not a fatal-writer diagnosis, failed
+queue transitions can leave PROCESSING rows, and automatic production restart
+must be exercised. The existing runtime swap is not a proven shortcut. D1 live
+replacement has not moved into B.
+
+The shared first-claim/accepted-marker batch stays stopped. The single-writer
+shutdown direction still needs the response, exit, stalled-close and updater
+proofs in [scope-recut.md](evidence/B/scope-recut.md). B11-B17 and their live,
+real-model and installer proof obligations remain open in the stage checklist.
+
+The owned main-control worktree is clean at the published `f938c4eb2` for future
+comparisons. The host branch remains clean at `bb0409520`, wholly integrated into
+the primary branch and intentionally unpublished separately. No lane implementer
+or owned Gradle run remains active. The registered-process sweep found no owned helper
+to reap and retained the ownerless telemetry sink (PID 14468). No development
+stack or new capture campaign was started for publication. Unrelated worktrees
+and the shared main checkout remain untouched.
