@@ -47,10 +47,19 @@ dependencies {
 // result. Verified by observing exactly that — the falsification run reported BUILD SUCCESSFUL in
 // 542ms against a deliberately reverted call site. A guard that cannot notice the change it exists
 // to notice is the defect it was written to prevent.
+// Lane F stage B item B7. EngineSupervisionPolicyTest reads governance/supervision-contract.v1.json
+// and holds its `engine` row to EngineSupervisionPolicy and EngineExit. The register is outside
+// this module, so without the declaration the task stays UP-TO-DATE when only the register moves —
+// which is precisely the edit the drift check exists to catch. Same reasoning as the HeadlessApp
+// input above, applied to the other file this module's tests read as data rather than as classpath.
 tasks.named<Test>("test") {
   inputs
     .file(rootProject.file("modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"))
     .withPropertyName("headlessAppExitSites")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  inputs
+    .file(rootProject.file("governance/supervision-contract.v1.json"))
+    .withPropertyName("supervisionContractRegister")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

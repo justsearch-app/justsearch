@@ -166,6 +166,15 @@ testing {
 // assertions and its timings are untouched, and `loadSensitiveUnitTest` below is where it runs.
 tasks.named<Test>("test") {
   useJUnitPlatform { excludeTags("load-sensitive") }
+  // Lane F stage B item B7. SupervisionContractTest reads governance/supervision-contract.v1.json
+  // as DATA — it is not on any classpath — so an edit to the register alone leaves this task
+  // UP-TO-DATE and replays the last green result. That is exactly the edit the register's drift and
+  // guard-resolution checks exist to catch, so it is declared as an input. (Ride-along fix found
+  // while widening the test at B7: the gap predates this item.)
+  inputs
+    .file(rootProject.file("governance/supervision-contract.v1.json"))
+    .withPropertyName("supervisionContractRegister")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // The other half of the quarantine: the only task that RUNS the load-sensitive tag. Deliberately

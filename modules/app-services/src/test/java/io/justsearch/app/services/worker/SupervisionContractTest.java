@@ -102,24 +102,51 @@ class SupervisionContractTest {
 
   /**
    * The complement: every entry that is NOT retired has its declared policy block checked against
-   * the live record. Today that is the Brain, whose check is {@link #brainPolicyMatchesCode()};
-   * this test fails if a third process is added without one, so the drift check cannot be skipped
-   * by omission.
+   * code somewhere. This test fails if a process is added without one, so the drift check cannot be
+   * skipped by omission.
+   *
+   * <p><b>Two shapes are accepted, and the second is not a loosening.</b> The Brain's check is
+   * {@link #brainPolicyMatchesCode()}, in this class. The Engine's cannot be: lane F stage B item
+   * B7 puts its mirror in {@code app-engine}, and the module edge runs {@code app-engine ->
+   * app-services}, so importing it here would invert the dependency for a test. A live row may
+   * therefore instead <em>name</em> its drift check in a {@code driftCheck} field, and the name has
+   * to resolve to a real test file — the same resolution the guards get. What is not accepted is a
+   * live row with neither, which is the only case this test ever existed to catch.
    */
   @Test
-  @DisplayName("every live (non-retired) process has a policy-drift check in this class")
+  @DisplayName("every live (non-retired) process has a policy-drift check, here or named")
   void everyLiveProcessHasADriftCheck() throws IOException {
+    Set<String> checkedInThisClass = Set.of("brain");
+    Path repo = repoRoot();
     Set<String> live = new HashSet<>();
+    List<String> failures = new ArrayList<>();
     for (JsonNode proc : register().get("processes")) {
-      if (!"retired".equals(proc.path("status").asText())) {
-        live.add(proc.get("id").asText());
+      if ("retired".equals(proc.path("status").asText())) {
+        continue;
+      }
+      String id = proc.get("id").asText();
+      live.add(id);
+      if (checkedInThisClass.contains(id)) {
+        continue;
+      }
+      String named = proc.path("driftCheck").asText("");
+      if (named.isBlank()) {
+        failures.add(
+            id
+                + ": live process with no policy-drift check. Add one to this class and list the id"
+                + " in checkedInThisClass, or name it in the row's `driftCheck` field.");
+      } else if (!testFileExists(repo, named)) {
+        failures.add(id + ": driftCheck does not resolve to a test file: " + named);
       }
     }
     assertEquals(
-        Set.of("brain"),
+        Set.of("brain", "engine"),
         live,
-        "a live process without a policy-drift assertion in this class would declare a contract"
-            + " nothing enforces; add the assertion, then widen this set");
+        "the live process set changed. That is allowed, but not silently: every id here must have a"
+            + " drift check, and the set is pinned so a row cannot appear (or vanish) unremarked.");
+    if (!failures.isEmpty()) {
+      fail("supervision-contract drift-check failures:\n  " + String.join("\n  ", failures));
+    }
   }
 
   @Test
@@ -249,9 +276,22 @@ class SupervisionContractTest {
             + "survive the retirement for stage B's Engine supervisor to inherit");
   }
 
-  /** True if {@code fqcn} resolves to a *.java under any module's test/integrationTest/systemTest. */
-  private static boolean testFileExists(Path repo, String fqcn) {
-    String suffix = fqcn.replace('.', '/') + ".java";
+  /**
+   * True if {@code guard} names a real file: either a repo-relative path (it contains a {@code /})
+   * or an FQCN resolving to a *.java under any module's test/integrationTest/systemTest.
+   *
+   * <p><b>Why paths are accepted at all</b> (lane F stage B item B7): the Engine supervisor has two
+   * implementations and neither is a JVM, so the tests that exercise its fault-matrix rows are a
+   * Node conformance harness and a Rust {@code #[cfg(test)]} table. An FQCN-only resolver would have
+   * left every engine row on a sentinel — that is, unguarded with a note saying so — which is the
+   * outcome the resolution check exists to prevent. A path still has to EXIST, so the register can
+   * no more name a Node file that is not there than it can name a missing Java class.
+   */
+  private static boolean testFileExists(Path repo, String guard) {
+    if (guard.contains("/")) {
+      return Files.exists(repo.resolve(guard));
+    }
+    String suffix = guard.replace('.', '/') + ".java";
     Path modules = repo.resolve("modules");
     if (!Files.isDirectory(modules)) {
       return false;
