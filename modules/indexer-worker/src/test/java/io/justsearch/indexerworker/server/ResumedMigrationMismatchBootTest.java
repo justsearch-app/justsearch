@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
@@ -71,11 +70,9 @@ final class ResumedMigrationMismatchBootTest {
     server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
-    assertTrue(server.isRunning(), "the Worker must come up: a mismatched Green is a rebuild to"
-        + " redo, not a reason to exit");
     assertNotNull(
         server.appServices(),
-        "and it finished starting: a Worker with no service surface is a Worker gone");
+        "a mismatched Green must still build the service surface on Blue");
     assertFalse(
         server.rebuildBrakeExhaustedForTest(),
         "and it must not have short-circuited to the braked path — that would pass this test for"

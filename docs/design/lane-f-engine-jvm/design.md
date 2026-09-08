@@ -726,6 +726,18 @@ supervisor-file reader. The orphan reason enum, UI row and producer exemption ar
 removed in the same cut, as the readiness gate requires. The current-host UI
 projection and R7 host probes remain in B13-B14; this cut does not close B14.
 
+**B16 residue disposition (orchestrator, 2026-09-08).** Delete the unconsumed
+`KnowledgeServer.isRunning()` API and its state-only tests; boot tests assert the
+already-existing service surface instead. Retain `shutdownLatch`: stage A's final
+checkpoint gave it a real `EngineRoot.close()` consumer through `awaitClosed`, so
+deleting it would remove completion evidence. The worker-config snapshot entries
+in the named four files are already labelled retirement history, with no writer,
+reader or allowlist entry; keep that history. Remove the phantom method name from
+the retired supervision row and re-home its contract test into the supervision
+package within the same module. The whole-program dead-code rule ratchets classes,
+not methods: require no baseline growth, and accept an unchanged baseline when no
+class is removed. This closes residue without adding a replacement lifecycle API.
+
 **B11 terminal cleanup truth (orchestrator, 2026-09-08).** A process whose
 registration failed cannot be preserved for adoption. Its exact handle remains
 owned through bounded cleanup retries, including a final JVM callback; another
