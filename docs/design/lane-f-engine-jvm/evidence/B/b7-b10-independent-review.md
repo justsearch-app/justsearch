@@ -68,8 +68,9 @@ This batch intentionally excludes R3 request acceptance/deadline protocol, R6 UI
 liveness/readiness semantics, R8 dev-runner teardown, B11/B13 managed-child/updater work and any
 updater overhaul. It does not change the shared exit policy or supervision register.
 
-Mutation checks were run against the actual shared production seams, then each mutation was
-restored before the final green run:
+Complete captured output is preserved in `host-ownership-cargo.log`. Mutation checks were run
+against the actual shared production seams, then each mutation was restored before the final green
+run:
 
 ```text
 mutation: suppress observe_manifest_with_sinks restart callback
@@ -99,5 +100,5 @@ The final green used `TAURI_CONFIG={"bundle":{"resources":[]}}` only in the test
 the verified clean worktree does not contain the generated `resources/headless/**/*` payload. The
 first un-overridden attempt failed solely in `tauri-build` with `glob pattern
 resources/headless/**/* path not found`; no Cargo or package configuration was weakened. The unit
-suite executes the shared host core and writer but cannot instantiate Tauri's `run()` setup; the
+suite executes the shared host core and writer but does not instantiate Tauri's `run()` setup; the
 `run()` call into `publish_terminal_spawn_failure` remains source-reviewed production wiring.
