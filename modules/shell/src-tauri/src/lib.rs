@@ -1178,9 +1178,14 @@ impl supervisor::Actuator for ShellActuator {
         {
             let _ = pid;
         }
-        if let Some(mut child) = self.state.child.lock().expect("child mutex poisoned").take() {
+        // Kill WITHOUT taking the handle, and without waiting on it. The supervision loop learns
+        // about the death the same way it learns about every other one — the next `poll_exit` —
+        // and a `force_kill` that reaped the child here would leave the loop in `stopping` forever,
+        // waiting for an exit that had already been consumed. (The conformance binary's actuator
+        // gets this right for the same reason; this is the divergence between the two that the
+        // shared loop cannot catch, because the loop is shared and the actuators are not.)
+        if let Some(child) = self.state.child.lock().expect("child mutex poisoned").as_mut() {
             let _ = child.kill();
-            let _ = child.wait();
         }
     }
 

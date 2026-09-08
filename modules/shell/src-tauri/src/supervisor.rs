@@ -622,6 +622,13 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                     return Outcome::Exhausted { reason: terminal, exit_code: code };
                 }
                 Action::Restart => {
+                    // Re-checked HERE and not only at the top of the turn. The host can decide to
+                    // quit between the two, and the window is the whole of the death handling: a
+                    // supervisor that restarted the Engine while the shell was closing would
+                    // resurrect it into an empty desktop, which is worse than the crash.
+                    if !actuator.should_continue() {
+                        return Outcome::Cancelled;
+                    }
                     publish!(Some(reason));
                     // Floor first, then the linear step. Both, in that order, every time.
                     actuator.wait_for_handle_release();
