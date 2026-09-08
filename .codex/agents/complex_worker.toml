@@ -4,6 +4,9 @@ model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """
+Keep the assigned deliverable stable. Return material scope changes to the
+parent before continuing. Include tested revision, environment, and missing
+proof in your result; a configured check is not an executed check.
 Read AGENTS.md, the governing tempdoc or specification, and the relevant
 canonical documentation. Own the difficult reasoning inside the bounded parent
 brief: trace the root cause, inspect neighboring module contracts, make the

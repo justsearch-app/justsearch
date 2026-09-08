@@ -37,6 +37,11 @@ merging, evidence judgment, destructive git operations, or shared-state cleanup.
    not merely a compilation check. Also run every subject-specific gate required
    by `AGENTS.md` and the contributing documentation.
 
+Run `node scripts/ci/run-publish-preflight.mjs --check` to verify the required
+status contexts have explicit local-subset or hosted-only classifications. Use
+`--list` to inspect that boundary and `--run` for the deterministic candidate
+subset. Hosted-only classification never waives the corresponding hosted check.
+
 ## Pre-publication review
 
 Before the first push, scan the diff for credentials, API keys, internal-only
@@ -81,6 +86,16 @@ both checks against live state immediately before requesting the queue. Never
 temporarily swap the rich review record through the PR body and never restore it
 after enqueue.
 
+## Acceptance reconciliation
+
+Before claiming completion, reconcile each required proof with its tested
+revision, environment, result, and accessible artifact or run URL. Consult the
+active checklist and `docs/reference/contributing/agent-workflow.md`; do not
+create a second evidence register. Distinguish local tests from actual hosted
+runs. Start required hosted/platform checks early when authorized. Preserve
+results before targeted reruns overwrite them; disclose local-only artifacts
+and retention limits. Explicit deferral remains an open item at its destination.
+
 ## Wait for CI
 
 Avoid chained blind polling. Start the repository's bounded watcher and retain
@@ -96,11 +111,22 @@ implements the required-check exit contract. For a multi-hour supervised run,
 use `node scripts/dev/run-watcher.mjs` so progress, stalls, and completion remain
 observable.
 
+Immediately after a push, only a subset of required checks may have registered.
+Before treating a green aggregate as proof, also wait for the CI workflow on the
+exact current PR head: `node scripts/dev/run-gh.mjs run-wait-sha <head-sha>
+--workflow CI --event pull_request`. Confirm the head still matches and all
+required contexts are present and green. An earlier head or only the CLA check
+is insufficient; use `run-publish-preflight.mjs --list` for the required inventory.
+
 A failing advisory check must be reported and investigated on its own merits,
 but it is not a merge gate. Never rerun or mask an advisory failure merely to
 make the overall check list green. If GitHub reports `UNSTABLE`, use
 `gh pr checks <number> --required` to prove that every failure is genuinely
 non-required before continuing.
+
+A component publication checkpoint does not end a larger authorized assignment.
+After completing its publication checks, continue the next assigned work item;
+use session-closeout only when actually ending or handing off.
 
 ## Merge queue and completion
 

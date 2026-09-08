@@ -18,7 +18,7 @@
  *   - Top-level Agent spawns: guarded (all three paths tested — unpinned blocked,
  *     fable blocked, haiku passed).
  *   - Nested spawns: ALSO guarded — verified live, a sonnet subagent's unpinned
- *     child was blocked by this hook (an exception to the general "parent hooks
+ *     child was blocked by this hook (historically described as an exception to "parent hooks
  *     don't fire in subagents" lesson; see agent-lessons.md).
  *   - NOT verified: fork-type subagents (ignore `model` entirely per #74788) and
  *     the background-agent dispatch-picker path (#64493).
@@ -51,8 +51,8 @@ export function evaluateAgentSpawn(toolInput) {
       'Agent spawn has no explicit `model`. An unpinned spawn inherits the MAIN session model ' +
       '(currently fable-tier — credits-billed; verified live, claude-code#74788). Re-call with an ' +
       'explicit model: "sonnet" (implementation floor), "haiku" (cheap/self-evident), or "opus". ' +
-      'If your subagent may spawn its own children, instruct it to pin their models too — this ' +
-      'guard cannot see nested spawns.',
+      'Nested spawns must pin their models too; session-wide hook coverage still depends ' +
+      'on the active client configuration and matching tool path.',
   };
 }
 

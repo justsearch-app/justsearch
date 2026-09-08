@@ -1,15 +1,12 @@
-<!-- budget: always-loaded; cross-harness authority for Codex and other AGENTS.md clients. -->
+<!-- budget: always-loaded; shared policy authority. -->
 
 # JustSearch agent instructions
 
-This file is the shared project contract for Codex CLI, the ChatGPT desktop
-app, the Codex IDE extension, and other agents that support `AGENTS.md`.
-Claude Code also has harness-specific delivery in `CLAUDE.md` and
-`.claude/rules/`; where wording differs, preserve the invariant and use the
-mechanism native to the active harness.
+Shared policy for Codex and Claude Code; generated into `CLAUDE.md`.
+Use native tools; specific guidance lives outside the shared block.
 
-Canonical entry points: `docs/llms.txt` for documentation and
-`docs/tempdocs/` for active work. Tempdocs are dated history, not current truth.
+Use `docs/llms.txt`. Verify dated tempdoc claims
+against canonical docs and code.
 
 ## Hard invariants
 
@@ -28,67 +25,67 @@ Canonical entry points: `docs/llms.txt` for documentation and
    fields, stopwords, spelling dictionaries, or curated synonym authorities.
    The multilingual model stack supplies multilingual behavior.
 
+## Task execution
+
+Continue authorized work after checkpoints, commits, reviews, merges, and status
+answers. Stop only at scope completion, user pause/handoff, or when no useful
+work can proceed without an external dependency. Session-closeout does not
+create a stopping point. Preserve decisions and authorization across compaction;
+a pending approval blocks only dependent actions. Distinguish platform
+interruptions from voluntary stops. Explanations are not automatically handoffs.
+
+An explicitly authorized migration can supersede a named shipped architecture
+rule within its assigned scope. Record the target, superseded rule, and proof in
+the governing design; trust boundaries and permissions still apply.
+
 ## Start every substantial task
 
-1. Read this file, `docs/llms.txt`, and the relevant canonical documentation.
-2. Run `node scripts/agent-analytics/world-state.mjs` before choosing a tempdoc
-   number, worktree, shared dev stack, or concurrent lane.
-3. Inspect the owning module and neighboring implementations before creating a
-   new helper, representation, registry, or schema.
-4. For non-trivial implementation, create or adopt an active tempdoc and treat
-   every checked item as part of the acceptance contract.
-
-Codex users may invoke `$justsearch-start` for this orientation. Claude users
-may invoke `/start`. A named Claude-only tool or command is never an executable
-instruction in Codex; use the equivalent Codex capability.
+Read this file and relevant canonical docs. Run
+`node scripts/agent-analytics/world-state.mjs` before selecting a tempdoc number,
+worktree, shared stack, or concurrent lane. Inspect the owning module and nearby
+implementations before creating helpers, registries, schemas, or representations.
+Adopt an active tempdoc for non-trivial implementation; every acceptance item is
+part of the contract. Orientation: Codex `$justsearch-start`, Claude `/start`.
+Translate tool-specific commands to the active harness.
 
 ## Implementation discipline
 
-- Fix root causes. Never hide a failure by deleting code, weakening a test,
-  suppressing a warning, broadening a catch, or removing validation.
-- Treat a failing test after your change as evidence against the change. Ask
-  before changing a test whose intent you believe is wrong.
-- Before creating a second representation of existing data, find its register
-  or source of truth and decide whether the new form is a projection or an
-  intentional fork.
-- Interrogate experiments and benchmarks. Establish why a result occurred,
-  including expected-looking results, before using it as evidence.
-- Keep changes scoped. Do not reformat unrelated files or modify another
-  session's uncommitted work.
-- A structural silent-failure class is actionable after one proven incident;
-  do not defer it behind an invented recurrence threshold.
-- When replacing a feature or workflow, sweep its code, configuration, gates,
-  baselines, ignore entries, and docs in the same change.
-- Load the relevant skill. `.agents/skills` and `.claude/skills` are the manual
-  Codex and Claude authorities. Review both when shared behavior changes.
+- Fix root causes; never hide failure by deleting validation, weakening tests,
+  suppressing warnings, or broadening catches. If a failing test's intent seems
+  wrong, explain why and ask before changing it.
+- Find the source of truth before introducing another representation. Decide
+  whether the new form is a projection or an intentional fork.
+- Establish why results occurred, including expected-looking results.
+- Keep changes scoped and preserve other sessions' work.
+- A proven structural failure is actionable without a recurrence threshold.
+  Before adding a state machine, persistent marker, writer, or cross-language
+  contract, compare simpler ownership and record the trade-off. A real defect
+  establishes the need for a fix, not its first proposed mechanism's scope.
+- Retire superseded code, configuration, gates, baselines, ignore entries, and
+  docs in the same change. Load relevant skills; review both `.agents/skills`
+  and `.claude/skills` when shared behavior changes.
 
 ## Worktrees and git safety
 
-The main checkout stays on `main`. Feature work happens in a dedicated
-worktree and branch; never share a worktree between sessions.
+The main checkout stays on `main`; use a dedicated worktree and branch per
+session. Verify directory, branch, and base before editing. Never switch branches,
+reset hard, clean, restore the whole tree, or delete/move/restore others' files in
+main. Never force-push. Stage explicit paths, not `git add -A`.
 
-- Do not switch branches, reset hard, clean, or restore the whole tree in the
-  main checkout.
-- Never delete, move, or restore files in the main checkout that you did not
-  create. They may belong to another active session.
-- Never force-push anywhere.
-- After creating or resuming a worktree, verify its directory, branch, and base
-  before editing.
-- Stage explicit paths, never `git add -A`, when other work may be present.
-- Implementing work does not authorize merging or publishing. Obtain explicit
-  per-action authorization before opening/merging a PR or pushing a release.
-- Squash-merged work must be checked by content diff, not branch ancestry.
-
-Full worktree and publication rules: `.claude/rules/branch-safety.md` and
-`docs/reference/contributing/agent-guide.md`. Those documents describe policy;
-translate Claude-specific command names to the active harness.
+Implementation does not authorize publication or merging. Require explicit
+per-action authorization before opening/merging a PR or pushing a release;
+preserve authorization already given within its stated scope. Check squash-
+merged work by content diff, not ancestry. Details:
+`docs/reference/contributing/agent-guide.md`, `.claude/rules/branch-safety.md`.
 
 ## Delegation
 
-Delegate only bounded work with a self-contained brief, acceptance criteria,
-constraints, and a requirement for primary-source `file:line` evidence.
-Exploration, independent research, review, and separable implementation chunks
-are suitable. Shared-state changes, migrations, destructive git, merge/release
+Delegate bounded work with a stable deliverable, assigned files/worktree,
+constraints, acceptance checks, and primary-source `file:line` evidence. Scope
+growth or new lifecycle/concurrency/ownership ambiguity returns to the parent
+before implementation continues. Consolidate feedback; after two substantive
+correction rounds, reassess the brief, design, and owner. Never waive defects.
+Exploration, review, and separable implementation are suitable. Shared-state changes, migrations, destructive git, merge/release
 work, and unsupervised dev-stack ownership are not.
 
 Codex roles: `explorer`/`worker` (Luna/high),
@@ -99,65 +96,57 @@ System or session restrictions on delegation override repository preferences.
 
 ## Shared development stack
 
-Only one JustSearch dev stack and one Gradle build may run at a time across
-agents. Before starting the stack, use the `justsearch-dev` MCP `quick_health`
-tool. Do not take over a conflicting lease without explicit user direction.
-Declare an adequate lease for long work and stop an owned stack when finished.
-Never kill registered helper processes directly; use the repository sweep
-mechanism so identity and ownership are checked.
+Only one dev stack and one Gradle build may run across agents. Before starting,
+use `justsearch-dev` MCP `quick_health`; never take over a conflicting lease
+without explicit user direction. Declare adequate leases and stop owned stacks
+when finished. Use the repository sweep to check process identity and ownership;
+never directly kill registered helpers.
 
-Codex, desktop, and IDE clients obtain the project MCP server from
-`.codex/config.toml`. Claude obtains it from `.mcp.json`. If `justsearch-dev` is
-not visible, fix the client configuration rather than bypassing its ownership
-contract with ad-hoc process commands.
+Codex MCP config is `.codex/config.toml`; Claude uses `.mcp.json`. If the server
+is unavailable, fix client configuration instead of bypassing stack ownership.
 
 ## Verification
 
-Do not declare completion while relevant checks are red.
+Reconcile every acceptance item with result, tested revision, required environment,
+and accessible evidence before claiming completion. Distinguish implementation,
+local proof, hosted proof, and authorized deferral. CI wiring is not a successful
+run. Name advisory failures and platform gaps; a deferral needs a decision and
+destination. Required red or unperformed checks prevent completion.
 
-- Compilation: `./gradlew.bat build -x test`
-- Multi-module changes: `./gradlew.bat test`
+- Compile: `./gradlew.bat build -x test`
+- Multi-module: `./gradlew.bat test`
 - Affected module: `./gradlew.bat :modules:<module>:test`
-- Frontend: from `modules/ui-web`, run `npm run typecheck` and
-  `npm run test:unit:run`
-- Agent/governance changes: run the subject-specific Node checks documented in
-  `CLAUDE.md` and `docs/reference/contributing/common-workflows.md`
+- Frontend, from `modules/ui-web`: `npm run typecheck`, `npm run test:unit:run`
+- Agent/governance: subject-specific Node checks in `CLAUDE.md` and
+  `docs/reference/contributing/common-workflows.md`
 
-For AI-facing behavior, use every available tier: compile/unit tests, live API
-tests, then a real model query. `AI_OFFLINE` is not end-to-end verification when
-the development tooling can activate the local model. For audit-driven fixes,
-add a runnable regression test; a static audit is only a hypothesis.
+AI-facing behavior needs compile/unit, live API, and a real model query;
+`AI_OFFLINE` is insufficient when model activation is available. Compact profile
+proves plumbing; quality verification requires standard. Audit-driven fixes need
+runnable regressions. For non-trivial control-flow/governance changes, confirm
+the gate fires, independently re-read evidence, and refute wrong-reason passes.
 
-After non-trivial control-flow or governance changes, perform a critical pass:
-confirm the gate fires in the intended scenario, independently re-read the
-evidence behind the change, and ensure the test cannot pass for the wrong
-reason.
+Run focused checks during implementation and integrated checks at coherent
+boundaries; start required hosted/platform checks early when authorized. Reuse
+results only while revision and assumptions still apply. Preserve suite output
+before targeted reruns overwrite it. Keep summaries/commands in Git and bulky
+artifacts at an accessible location with retention limits; hashes are not access.
 
-## Prompt and tooling surfaces
+## Prompt, tooling, and documentation ownership
 
-- `AGENTS.md`: shared, compact project policy.
-- `CLAUDE.md` and `.claude/rules`: Claude-specific delivery and legacy routing.
-- `.agents/skills`: manually maintained Codex project skills.
-- `.claude/skills`: manually maintained Claude Code project skills.
-- `governance/agent-hooks.v1.json`: single hook policy and binding authority.
-- `.codex/hooks.json`: generated Codex hook projection; review and trust changes
-  with `/hooks` before they run.
-- `.codex/config.toml`: shared project Codex/MCP settings. Never commit secrets.
-- Exact MCP schemas come from server implementation and contract tests, not
-  copied prose.
+`AGENTS.md` is shared policy; `CLAUDE.md` contains its generated projection.
+Each harness's rules/skills own scoped guidance. `governance/agent-hooks.v1.json`
+owns hook policy; `.codex/hooks.json` is generated (review/trust with `/hooks`).
+Never commit secrets to shared config. MCP schemas live in code/contract tests.
+Follow blocking hooks' remedies; `JUSTSEARCH_DISABLE_HOOKS=1` is recovery only.
+Instruction loading, conversation inheritance, and hook execution are separate;
+verify delivery instead of trusting a subagent's self-report.
 
-Codex project hooks normalize `apply_patch`, shell, MCP, and subagent calls into
-the shared policy layer. If a hook blocks or redirects an operation, follow its
-remedy instead of retrying the same call. `JUSTSEARCH_DISABLE_HOOKS=1` remains
-the recovery kill switch.
+Canonical docs must match shipped behavior. Update them with governed changes;
+regenerate derived docs and skills. Keep current decisions in owning sections,
+with a short dated index linking rationale. Handoffs name current state and next
+steps without requiring private transcripts or replay of amendments.
 
-## Documentation ownership
-
-Canonical documentation under `docs/explanation`, `docs/reference`,
-`docs/how-to`, and `docs/decisions` must match shipped behavior. Update it in
-the same change when a governed behavior changes. Regenerate derived docs and
-skills rather than editing generated regions directly.
-
-Use `docs/reference/contributing/agent-prompt-surface-governance.md` for the
-ownership map and `docs/reference/contributing/common-workflows.md` for exact
-regeneration commands.
+References under `docs/reference/contributing/`: `agent-workflow.md` (execution
+and evidence), `agent-prompt-surface-governance.md` (ownership), and
+`common-workflows.md` (regeneration).

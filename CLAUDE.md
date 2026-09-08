@@ -7,90 +7,165 @@ delivery surface for that contract plus Claude-specific workflow details.
 
 Canonical entry points: `docs/llms.txt` (docs index), `docs/tempdocs/` (active work).
 
-## Hard Invariants (Do Not Violate)
+<!-- generated:agent-contract:start — source: AGENTS.md; run: node scripts/docs/agent-instructions-sync.mjs -->
+## Shared project contract
 
-<!-- generated:agent-invariants:start — source: AGENTS.md; run: node scripts/docs/agent-instructions-sync.mjs -->
-1. **Head never touches Lucene.** All index I/O belongs to the Worker and is reached through gRPC. <!-- rule:head-never-touches-lucene -->
-2. **Preserve the local API trust boundary.** Bind to loopback, enforce the Host allowlist, validate MCP Origin, and require the per-boot mutation token where ADR-0046 requires it. <!-- rule:loopback-only-network -->
-3. **Do not resurrect legacy endpoints.** `/api/search` and `/api/settings` are removed contracts. <!-- rule:no-legacy-endpoints -->
-4. **Verify, do not guess.** Use `/api/debug/state` and `/api/health` for lifecycle state and `/infra/capabilities` for `host.*` contract versions. <!-- rule:verify-dont-guess -->
-5. **The frontend is Lit, not React.** The active UI is the `shell-v0` web-components stack. <!-- rule:frontend-stack-is-lit -->
-6. **Search analysis is locale-invariant.** Do not add per-language analyzers, fields, stopwords, spelling dictionaries, or curated synonym authorities. The multilingual model stack supplies multilingual behavior. <!-- rule:language-agnostic-analysis -->
-<!-- generated:agent-invariants:end -->
+Shared policy for Codex and Claude Code; generated into `CLAUDE.md`.
+Use native tools; specific guidance lives outside the shared block.
 
-## Agent Discipline
+Use `docs/llms.txt`. Verify dated tempdoc claims
+against canonical docs and code.
 
-### Explore Before Implementing <!-- rule:explore-before-implementing -->
+## Hard invariants
 
-Before new code, check for existing infrastructure:
+1. **Head never touches Lucene.** All index I/O belongs to the Worker and is
+   reached through gRPC.
+2. **Preserve the local API trust boundary.** Bind to loopback, enforce the Host
+   allowlist, validate MCP Origin, and require the per-boot mutation token where
+   ADR-0046 requires it.
+3. **Do not resurrect legacy endpoints.** `/api/search` and `/api/settings` are
+   removed contracts.
+4. **Verify, do not guess.** Use `/api/debug/state` and `/api/health` for
+   lifecycle state and `/infra/capabilities` for `host.*` contract versions.
+5. **The frontend is Lit, not React.** The active UI is the `shell-v0`
+   web-components stack.
+6. **Search analysis is locale-invariant.** Do not add per-language analyzers,
+   fields, stopwords, spelling dictionaries, or curated synonym authorities.
+   The multilingual model stack supplies multilingual behavior.
 
-1. **The module you're working in** for helpers and patterns.
-2. **Related modules** — how other controllers handle errors; how neighboring services are structured.
-3. **`docs/llms.txt`** and canonical docs for documented patterns.
+## Task execution
 
-Failure mode to avoid: creating a new utility function when an identical one exists two packages over. This is the single most common agent mistake in this codebase.
+Continue authorized work after checkpoints, commits, reviews, merges, and status
+answers. Stop only at scope completion, user pause/handoff, or when no useful
+work can proceed without an external dependency. Session-closeout does not
+create a stopping point. Preserve decisions and authorization across compaction;
+a pending approval blocks only dependent actions. Distinguish platform
+interruptions from voluntary stops. Explanations are not automatically handoffs.
 
-**Before authoring a new *representation* of existing data** (a record/type/projection/span/schema that describes something already modelled — e.g. "what the search pipeline did"), check the relevant register and decide **projection vs fork**: a projection derives from the one canonical source; a fork is a second authority that will drift. For search-execution, the register is `governance/execution-surfaces.v1.json` (the `execution-surface` gate fails the build on an unregistered referencer of the canonical `SearchTrace`). This is the discovery step that prevents the representation-drift class (tempdoc 553); prose-tier (~70%) — the gates are the guarantee. Honest limit: a register only covers *declared* concepts, so judgment still applies for genuinely new ones (and per AHA, only unify what shares a reason to change — don't over-DRY scaffolding).
+An explicitly authorized migration can supersede a named shipped architecture
+rule within its assigned scope. Record the target, superseded rule, and proof in
+the governing design; trust boundaries and permissions still apply.
 
-### Fix Root Causes, Not Symptoms <!-- rule:fix-root-causes-not-symptoms -->
+## Start every substantial task
 
-**Never resolve a build or test failure by making the failure invisible instead of impossible** — deleting or commenting the failing code, weakening or disabling the test, suppressing the warning, broadening the catch, removing the validation "in the way". (The suppression subset is ratcheted in CI by `check-suppression-ratchet.mjs`; the rest is review-caught.)
+Read this file and relevant canonical docs. Run
+`node scripts/agent-analytics/world-state.mjs` before selecting a tempdoc number,
+worktree, shared stack, or concurrent lane. Inspect the owning module and nearby
+implementations before creating helpers, registries, schemas, or representations.
+Adopt an active tempdoc for non-trivial implementation; every acceptance item is
+part of the contract. Orientation: Codex `$justsearch-start`, Claude `/start`.
+Translate tool-specific commands to the active harness.
 
-**If a test fails after your changes**, the test is probably right and your code is wrong. Investigate its intent; if you genuinely believe it's wrong, explain why and ask the user before modifying it.
+## Implementation discipline
 
-### Verify Your Work <!-- rule:verify-your-work -->
+- Fix root causes; never hide failure by deleting validation, weakening tests,
+  suppressing warnings, or broadening catches. If a failing test's intent seems
+  wrong, explain why and ask before changing it.
+- Find the source of truth before introducing another representation. Decide
+  whether the new form is a projection or an intentional fork.
+- Establish why results occurred, including expected-looking results.
+- Keep changes scoped and preserve other sessions' work.
+- A proven structural failure is actionable without a recurrence threshold.
+  Before adding a state machine, persistent marker, writer, or cross-language
+  contract, compare simpler ownership and record the trade-off. A real defect
+  establishes the need for a fix, not its first proposed mechanism's scope.
+- Retire superseded code, configuration, gates, baselines, ignore entries, and
+  docs in the same change. Load relevant skills; review both `.agents/skills`
+  and `.claude/skills` when shared behavior changes.
 
-Confirm a change works before moving on: compile plus the affected modules' tests at minimum, the full suite after multi-module changes, the frontend typecheck + unit tests after `modules/ui-web` changes, `/ui-check` for visual work (commands: Quick Commands below). Never declare a task complete on a broken build or failing tests.
+## Worktrees and git safety
 
-**Use every verification tier available to you, including the LLM.** <!-- rule:use-every-verification-tier --> When verifying AI-facing features (chat surfaces, RAG, conversation shapes), do not stop at `AI_OFFLINE` and declare "verified up to the LLM boundary" — `ai_activate` loads the runtime in seconds; load the model, send a real query, confirm the full response renders. Compile + unit tests verify code; live-stack API tests verify plumbing; only end-to-end with a running model verifies feature correctness. Before declaring a verification tier unavailable, check whether a tool provides it. The compact chat profile (dev default) satisfies this for plumbing/feature-shape checks; quality-sensitive verification (RAG quality, prompt-format, VLM extraction, eval work) needs `ai_activate {chatProfile:"standard"}`. Handle: `ai-offline-isnt-a-wall` (see `docs/reference/contributing/agent-postmortems.md`).
+The main checkout stays on `main`; use a dedicated worktree and branch per
+session. Verify directory, branch, and base before editing. Never switch branches,
+reset hard, clean, restore the whole tree, or delete/move/restore others' files in
+main. Never force-push. Stage explicit paths, not `git add -A`.
 
-**Audit-driven fixes need a runnable test, not just a passing audit.** <!-- rule:audit-driven-fixes-need-test --> When a subagent audit concludes "X is the only blocker for Y" (or any similar narrow lifecycle claim — "field F is/isn't rebuilt", "state machine accepts/rejects T", "method M is the sole consumer"), the fix is not complete until a regression test exercising Y is green. Static audits are hypotheses; the test is truth. Handle: `audit-without-test` (see `docs/reference/contributing/agent-postmortems.md` §1).
+Implementation does not authorize publication or merging. Require explicit
+per-action authorization before opening/merging a PR or pushing a release;
+preserve authorization already given within its stated scope. Check squash-
+merged work by content diff, not ancestry. Details:
+`docs/reference/contributing/agent-guide.md`, `.claude/rules/branch-safety.md`.
 
-**Critical-analysis pass is required for non-trivial changes.** <!-- rule:critical-analysis-pass --> After implementing a change that modifies control flow, adds/removes behavioral code, or was implemented based on a subagent audit, perform a critical-analysis pass before declaring complete. Re-examine each change for: (a) wrong-gate / wrong-flag mistakes — does the gate actually fire in the target scenario? `grep` the set-site, don't just trust the symbol exists; (b) audit conclusions that weren't independently verified — did you re-read the code the subagent's claim depends on? (c) test precision — does the assertion distinguish "passes for the right reason" from "passes for a wrong reason"? Handles: `wrong-gate` (§2), `audit-without-test` (§1) in `docs/reference/contributing/agent-postmortems.md`.
+## Delegation
 
-### Interrogate Results <!-- rule:interrogate-results -->
+Delegate bounded work with a stable deliverable, assigned files/worktree,
+constraints, acceptance checks, and primary-source `file:line` evidence. Scope
+growth or new lifecycle/concurrency/ownership ambiguity returns to the parent
+before implementation continues. Consolidate feedback; after two substantive
+correction rounds, reassess the brief, design, and owner. Never waive defects.
+Exploration, review, and separable implementation are suitable. Shared-state changes, migrations, destructive git, merge/release
+work, and unsupervised dev-stack ownership are not.
 
-When an experiment, benchmark, test, or diagnostic produces a result, investigate what caused it before acting on it or reporting it as a finding. The result is data — the cause is what matters.
+Codex roles: `explorer`/`worker` (Luna/high),
+`complex_worker` (Sol/medium), and `reviewer` (Sol/high). Set `fork_turns` to
+`"none"` or a positive integer; omitted/`"all"` inherits the parent model and
+effort and bypasses role pins. Workers return escalation evidence to the parent.
+System or session restrictions on delegation override repository preferences.
 
-- **Improvements**: A benchmark shows 2x speedup. Was it your change, or a warm cache, different baseline, or uncontrolled variable? Establish the causal link.
-- **Regressions**: A metric dropped 15%. Is the measurement sound? Did conditions change between runs? Don't report a regression without understanding what caused it.
-- **Expected results**: A test fails in the way you predicted, or a metric matches your hypothesis. This is the most dangerous case — confirmation feels validating, so there's no instinct to dig deeper. Verify the result happened *for the reason you think*, not a different one.
+## Shared development stack
 
-Failure mode to avoid: treating correlation as causation. The experiment produced the number you expected, so you move on — without establishing that your change was the reason, or that the result means what you think it means.
+Only one dev stack and one Gradle build may run across agents. Before starting,
+use `justsearch-dev` MCP `quick_health`; never take over a conflicting lease
+without explicit user direction. Declare adequate leases and stop owned stacks
+when finished. Use the repository sweep to check process identity and ownership;
+never directly kill registered helpers.
 
-### Structural Defects Don't Need Repeat Incidents <!-- rule:structural-defects-no-repeat -->
+Codex MCP config is `.codex/config.toml`; Claude uses `.mcp.json`. If the server
+is unavailable, fix client configuration instead of bypassing stack ownership.
 
-YAGNI applies to speculative abstractions, not to known structural defects. One documented silent bug proves the bug-class — critique a structural tempdoc's substance (wrong diagnosis, wrong mechanism, wrong scope), not its urgency. **Do not re-introduce "wait-for-more-evidence" triggers under different names** ("low historical rate", "wait for Y first", "cheaper intermediate step", "bridging measure") — every deferral framing is the same move: converting a correctness argument into a cost-benefit argument. Don't convert one into the other unless asked, and if the user disregards a tempdoc's own trigger list, do not invent new ones.
+## Verification
 
-### Tempdocs Are Dated History, Not Current Truth <!-- rule:tempdocs-are-dated-history -->
+Reconcile every acceptance item with result, tested revision, required environment,
+and accessible evidence before claiming completion. Distinguish implementation,
+local proof, hosted proof, and authorized deferral. CI wiring is not a successful
+run. Name advisory failures and platform gaps; a deferral needs a decision and
+destination. Required red or unperformed checks prevent completion.
 
-`docs/tempdocs/` is append-only design history, not canonical truth — a tempdoc reflects its writing date, and newer tempdocs and shipped code supersede older ones. Newer tempdocs have higher numbers; always check the highest-numbered tempdoc first to gauge how stale an older one really is. Before trusting a tempdoc's claim as current, check its frontmatter (`status`/`created`/`updated`) and verify against `main` + canonical docs. (`verify-don't-guess`, applied to docs.)
+- Compile: `./gradlew.bat build -x test`
+- Multi-module: `./gradlew.bat test`
+- Affected module: `./gradlew.bat :modules:<module>:test`
+- Frontend, from `modules/ui-web`: `npm run typecheck`, `npm run test:unit:run`
+- Agent/governance: subject-specific Node checks in `CLAUDE.md` and
+  `docs/reference/contributing/common-workflows.md`
 
-### Route Out-of-Scope Findings, Don't Log Them <!-- rule:log-pre-existing-issues -->
+AI-facing behavior needs compile/unit, live API, and a real model query;
+`AI_OFFLINE` is insufficient when model activation is available. Compact profile
+proves plumbing; quality verification requires standard. Audit-driven fixes need
+runnable regressions. For non-trivial control-flow/governance changes, confirm
+the gate fires, independently re-read evidence, and refute wrong-reason passes.
 
-There is no inbox (tempdoc 872 retired the observations store: 565 notes, none read). A finding outside your task goes where it is acted on, at discovery — a note is not knowledge, it is a deferred fix:
+Run focused checks during implementation and integrated checks at coherent
+boundaries; start required hosted/platform checks early when authorized. Reuse
+results only while revision and assumptions still apply. Preserve suite output
+before targeted reruns overwrite it. Keep summaries/commands in Git and bulky
+artifacts at an accessible location with retention limits; hashes are not access.
 
-- **Wrong doc/comment, verified one-line fix** → fix it in place; it rides along in your PR.
-- **Red or flaky verification command on `main`** → fix it, or quarantine the flaky test in its own runner with a tracked item; main being red is a defect.
-- **Platform/process lesson** → a hook if it is a must/never, else `.claude/rules/agent-lessons.md`.
-- **Product defect you won't fix now** → the owning tempdoc's open-items section (or its domain register).
-- **Do not investigate further** — route and return to your task. Issues caused by your change are yours to fix.
+## Prompt, tooling, and documentation ownership
 
-Predictable evasion: "I'll log it in my tempdoc for later triage" — a triage nobody is scheduled to run is the pile again.
+`AGENTS.md` is shared policy; `CLAUDE.md` contains its generated projection.
+Each harness's rules/skills own scoped guidance. `governance/agent-hooks.v1.json`
+owns hook policy; `.codex/hooks.json` is generated (review/trust with `/hooks`).
+Never commit secrets to shared config. MCP schemas live in code/contract tests.
+Follow blocking hooks' remedies; `JUSTSEARCH_DISABLE_HOOKS=1` is recovery only.
+Instruction loading, conversation inheritance, and hook execution are separate;
+verify delivery instead of trusting a subagent's self-report.
 
-### Retire With a Sweep <!-- rule:retire-with-a-sweep -->
+Canonical docs must match shipped behavior. Update them with governed changes;
+regenerate derived docs and skills. Keep current decisions in owning sections,
+with a short dated index linking rationale. Handoffs name current state and next
+steps without requiring private transcripts or replay of amendments.
 
-A PR abandoning or replacing a feature, tier, or approach must sweep the retiree's fingerprints — grep its names/paths across code, config, gates, baselines, ignore-lists, docs — and delete or label every hit in the same PR. Residue outliving its reason becomes false authority (tempdoc 742: ~350 files, two inert gates). Predictable evasion: "a follow-up PR will clean it up" — 742's corpus is follow-ups that never came.
+References under `docs/reference/contributing/`: `agent-workflow.md` (execution
+and evidence), `agent-prompt-surface-governance.md` (ownership), and
+`common-workflows.md` (regeneration).
+<!-- generated:agent-contract:end -->
 
-### Before Appending to CLAUDE.md or `.claude/rules/` <!-- rule:before-appending-to-rules -->
+## Claude delegation adapter
 
-This file is loaded every session; the always-loaded-budget ratchet caps its bytes because bloat makes rules *less* followed (Anthropic: *"Bloated CLAUDE.md files cause Claude to ignore your actual instructions!"*). Before adding a rule, gate it: (1) **Broad applicability** — would a fresh agent on a *different* task need it? Otherwise route it: platform constraint → `agent-lessons.md`; named reference case → `agent-postmortems.md`; domain workflow → a skill; out-of-scope finding → route it (see above). (2) **Already-said** — grep these files first; edit the existing line, don't duplicate. (3) **Enforcement** — a load-bearing must/never belongs in a hook or gate (~100% adherence), not more prose (~70%). Add what passes to the smallest scope that holds it, and name a new must-rule's predictable evasion inline — pre-empting the specific excuse raises adherence more than restating the rule.
-
-### Delegating to Subagents (Agent Tool) <!-- rule:delegating-to-subagents -->
-
-Parent hooks do **not** fire inside a subagent, and task-specific context is inherited by no type — so the brief in the Agent prompt is mandatory and self-contained (plan, acceptance criteria, constraints), and must require primary-source `file:line` evidence for load-bearing claims: subagent findings are a starting point, not a result (`audit-without-test`). Which types inherit `CLAUDE.md` + `.claude/rules/`: `agent-lessons.md` (`subagents-no-inheritance`) — do not restate it here.
-
-No-hooks consequences: never delegate destructive git; no repeat-guard/build-counter/Read-limits — don't delegate long iterative refactor loops; no regen pointers — after a subagent edits `SSOT/catalogs/`, canonical docs, or `build.gradle.kts`, run the relevant regen step yourself; `isolation: "worktree"` base-ref caveats ([claude-code#50850](https://github.com/anthropics/claude-code/issues/50850)) — verify the base (`verify-worktree-base`).
+Project instructions, history, and hook execution have separate delivery rules;
+see `.claude/rules/agent-lessons.md` and the canonical agent-workflow reference.
+The parent owns scope decisions, acceptance judgment, and repository-wide
+regeneration after child edits. Verify isolated worktree bases before editing.
 
 **Model routing (delegation economics).** Binds the ORCHESTRATOR — whatever model runs the main loop.
 
@@ -125,7 +200,7 @@ Full architecture: `docs/explanation/01-system-overview.md`. Key API endpoints: 
 | Frontend typecheck + tests | `cd modules/ui-web && npm run typecheck && npm run test:unit:run` |
 | Pipeline profiling (full lifecycle) | `cd scripts/jseval && python -m jseval run --start-backend --clean --pipeline --json` |
 | Hot-reload after edit | `reload` (requires `hotReload: true` on dev-stack start) |
-| Pre-merge gate | `./gradlew.bat build -x test` from main before merge |
+| Pre-merge gate | `./gradlew.bat build -x test` from the candidate worktree |
 
 `spotlessCheck` and `pmdAll` (PMD over **every** Java source set, main and test) run in `check`/`build`. `spotlessApply` fixes whitespace, **not** Java formatting.
 

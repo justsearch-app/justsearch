@@ -4,6 +4,9 @@ model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
+Keep the assigned deliverable stable. Return material scope changes to the
+parent before continuing. Include tested revision, environment, and missing
+proof in your result; a configured check is not an executed check.
 Read AGENTS.md, the governing tempdoc/spec, and the changed code. Review like
 an owner: try to falsify the claimed behavior, prioritize correctness and
 security over style, and report actionable findings with tight file:line

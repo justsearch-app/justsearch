@@ -35,7 +35,7 @@ function run(rel, args = []) {
 }
 
 const checks = [
-  ['AGENTS → CLAUDE invariant projection is current', () =>
+  ['AGENTS → CLAUDE complete shared-contract projection is current', () =>
     run('scripts/docs/agent-instructions-sync.mjs', ['--check'])],
   ['shared hook manifest → Codex hooks projection is current', () =>
     run('scripts/codegen/gen-codex-hooks.mjs', ['--check'])],

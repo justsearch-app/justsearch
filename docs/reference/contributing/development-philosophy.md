@@ -59,5 +59,5 @@ Without this, operators see "unset" when the runtime is silently using the defau
 - When you record an architectural decision with alternatives: create an ADR in `docs/decisions/`.
 - After adding/changing canonical docs: run `node scripts/docs/llmstxt-generate.mjs` to regenerate the index.
 - When the Gradle module graph changes (`settings.gradle.kts` or `modules/**/build.gradle.kts`): run `node scripts/architecture/module-deps.mjs --update-canonical` and verify with `--check-canonical`.
-- When you write notes/ideas: use `docs/tempdocs/` (noncanonical); an out-of-scope finding is routed per CLAUDE.md `rule:log-pre-existing-issues` (fix in place / rules / owning tempdoc) — there is no inbox helper.
+- When you write notes/ideas: use `docs/tempdocs/` (noncanonical); route out-of-scope findings through [agent-workflow](agent-workflow.md#route-findings-at-discovery) (fix in place / rules / owning tempdoc) — there is no inbox helper.
 - Full guide (frontmatter, CI checks, doc types): `docs/reference/contributing/writing-docs-for-ai.md`
