@@ -360,3 +360,44 @@ trip it; a `DERIVED`/`AUTHORED` identity change does.
 - **Design amendments** go in section 0 as dated paragraphs, newest last; the checklist's
   section 0.1 takes per-item corrections; `verified-facts.md` takes corrected citations at stage
   start. Three places, three purposes; do not collapse them.
+
+### Codex orchestration checkpoint (2026-09-08)
+
+The takeover verified the actual worktree at `.claude/worktrees/lane-F-A`, branch
+`worktree-lane-F-A`, starting clean and pushed at `1ffd6cc2d`. The main checkout was
+left on main with its unrelated changes intact. A separate, owned
+`codex/lane-f-main-verification` worktree at `83b9e5fd5` supplied the main control;
+it remains available for comparison, not implementation.
+
+Both initial verification questions are resolved in
+`evidence/B/takeover-verification.md`. The forensic test explicitly uses CPU FP32;
+fresh isolated main and lane controls passed around 17s without timeout changes.
+The old 1433/9001 count was a mixed post-rerun XML inventory, not the preceding
+full-suite inventory. A fresh pre-edit full suite passed with 9334 tests, zero
+failures/errors and 25 skips, and its XML was preserved before targeted runs.
+
+The first sole-implementer shutdown batch is reviewed through `d23e94bdd` and
+released with a clean tree and no active Gradle wrapper. See
+`evidence/B/shutdown-review-checkpoint.md` for commits, primary-source evidence,
+the 3965-test affected-module inventory, post-final-edit targeted verification,
+falsification limits and all remaining findings. Strict boot cleanup's placement
+has source/helper evidence, not a live boot-failure proof. Stage B is still open.
+
+The independent B7–B10 findings are in
+`evidence/B/b7-b10-independent-review.md`. Dated design section 0 now settles the
+B6 acknowledgement/nonce transaction, first-claim-wins request protocol, focused
+production host ownership, v2 child ownership handoff, and B13 process hold/evidence/UI
+corrections. B section 0.1 records the corresponding per-item amendments. The next
+implementation batches are B6 transaction and the coordinated request protocol,
+then production supervisor ownership and the remaining lifecycle items. One
+implementer owns the branch at a time; reviewers remain read-only.
+
+Before B14/B15 implementation, resolve the source-backed questions in
+`evidence/B/remaining-lifecycle-investigation.md`: stale supervisor state is not a
+current recovery owner, a supervision veto needs an actual recovery owner, and
+promotion response flags currently lose their restart consumer. These questions
+are not silently treated as decided by the existing draft.
+
+PR #708 (`62251e459`) and PR #717 (`f0d9e2481`) were rechecked OPEN/CLEAN during
+this checkpoint and remain the owner's per-PR merge calls. No merge was performed.
+No new benchmark, evaluation or capture longer than one hour was started.

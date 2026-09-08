@@ -322,6 +322,227 @@ must fail for the reported scenarios; the conformance binary's distinct actuator
 cannot stand in for those tests. These fixes follow the inherited shutdown fix
 batch, before B11-B17. No merge or stage-B checkpoint is implied by their acceptance.
 
+**Upgrade request persistence and acknowledgement (orchestrator, 2026-09-08).**
+The B6 production-wiring review found that commit acknowledged success before its
+asynchronous file write, then swallowed write failure, leaving a committed barrier
+with no shutdown. It also found that a direct file with a live preparation ID and
+wrong nonce passed the new acceptance predicate. The HTTP nonce test did not cover
+that direct-file path. Both findings are accepted for fixes.
+
+`UpgradeController` remains the sole preparation/nonce/commit authority. The existing
+`UpgradeShutdownBridge` will forward a verifier callback installed by the controller
+before route registration; it must not keep a second nonce. The writer is installed
+after the instance lock and strict predecessor clear, before API startup, because it
+requires only the already-known runtime directory. Late watcher startup must preserve
+a current request written in the intervening boot window.
+
+Commit will use short synchronized OPEN/PERSISTING/ACKNOWLEDGED transitions, with
+synchronous request persistence before writing/flushing the success response and
+ACKNOWLEDGED only after successful flush. No servlet or filesystem I/O runs while
+holding the controller monitor: a stalled response must not block the dedicated
+watcher from observing a supervisor hang request. The watcher acceptance contract
+becomes ACCEPT/DEFER/REFUSE. Matching preparation and nonce while PERSISTING returns
+DEFER, leaving the file and one-shot guard untouched; ACKNOWLEDGED plus the current
+frozen lease preparation permits ACCEPT; wrong identifiers or OPEN returns REFUSE.
+Unprepared supervisor requests retain the plain path. Persistence failure restores
+OPEN, returns a non-success response, and leaves the same capability retryable or
+cancellable. Response-write failure restores OPEN and must not dispatch; any retained
+unacknowledged file is refused. An unavailable bridge verifier fails closed.
+
+The commit tests must traverse production factories and cover persistence failure,
+response-write failure, a direct wrong-nonce file, deferred acceptance during flush,
+and a valid request written before watcher startup. Death before the Engine's accepted
+instance marker remains fail-closed to supervisors and cannot fabricate an upgrade
+receipt. Single-slot writer admission and conditional cleanup/marking are a separate
+coupled obligation of the accepted-request protocol batch; tri-state verification alone
+does not make read-then-delete or read-then-replace safe against another writer.
+
+**Shutdown request writer admission (orchestrator, 2026-09-08).**
+The accepted-instance protocol above needs first-claim-wins admission in all three
+languages. Unconditional replacement lets a refused request's cleanup delete a newer
+one or an old acceptance marker overwrite it. The fixed request path will therefore
+be claimed with atomic create-new; an occupied slot returns BUSY without changing it.
+The winner writes the fixed `shutdown-request.v1.json.tmp` staging file in the same
+directory (the existing Java name, shared by all three writers) and atomically
+replaces its own empty claim. Other writers never replace an occupied slot. Readers
+defer empty or malformed in-flight content without consuming the one-shot guard.
+Failure removes the winner's staging and any still-empty claim and propagates;
+a complete published request is preserved if publication's outcome is uncertain.
+Atomic replacement is
+required for this channel, with explicit failure on unsupported filesystems instead
+of a non-atomic fallback. This avoids adding a hard-link filesystem requirement or a
+cross-process lock service. The occupied-slot invariant permits one fixed staging
+name: only its claimant publishes, then only the single watcher may mark it. A successful
+rename consumes that writer's staging file; success must not subsequently delete the
+staging path because the watcher may already be using it. Failure cleanup remains
+within the writer's ownership interval. Strict predecessor boot/death cleanup removes
+both the request and its fixed staging residue, with the existing staging artifact's
+closure/recoverability treatment asserted. Staging is write mechanics, not a second
+request or receipt authority, and unique staging files must not accumulate after crashes.
+
+Only the Engine's single watcher clears an expired/refused complete request or
+replaces it with the accepted-instance marker. The occupied slot excludes another
+writer during that read/clear/mark interval. Accepted requests remain through death;
+supervisors read their accepted reason and original deadline before classifying the
+exit, then clear only after the owned Engine is dead and before a successor starts.
+Strict Engine boot cleanup precedes its own writers and API exposure. A supervisor
+whose own request finds BUSY still owns its in-memory reason and original deadline
+and must force-stop at that deadline if cooperation cannot happen. Controller BUSY
+is a failed commit, so the preparation remains retryable/cancellable. The first
+claim wins the slot; the sequence's first accepted reason still owns
+resource shutdown.
+
+Java, Rust, Node and their conformance fixtures will change in one reviewed protocol
+batch. Tests will pause publication after claim, cleanup after reading A, and marker
+write after reading A; B must receive BUSY and leave A untouched in each interval,
+then may publish after legitimate removal. They also cover an upgrade response
+stalled in PERSISTING while a supervisor hang request is BUSY but its force deadline
+still fires, marker-write failure leaving the watcher unfired, retained acceptance
+read at exit, and empty claim residue cleared at the predecessor boundary. The
+request gains required `schemaVersion: 1` with unknown/missing versions refused and
+the field shape pinned across writers. Publication and marker rewrites use real JSON
+string encoding, including optional strings read from the request, so quoting cannot
+turn an accepted request into malformed retained evidence. An accepted record whose
+deadline has elapsed still supplies the terminating incarnation's reason; its deadline
+means force-stop now if still alive, not forget the accepted reason after death.
+The same batch will replace sequence exit
+literals with `EngineExit.OK` and new `REQUESTED_UNCLEAN = 4`, classified REQUESTED
+in the supervision register and both supervisors; exact drift tests must reject a
+Java constant/table mismatch. The existing shutdown-request recoverability row is
+asserted, without making a second durable-store ownership change before C2.
+
+**Production supervisor ownership fixes (orchestrator, 2026-09-08).**
+R1, R2, R4, R5 and R9 will be implemented through a focused, Tauri-free production
+host core, not by moving the whole shell or updater. One mutex will own the real
+Engine child and the monotonic host-closing flag. The final close check, prepared
+command spawn, pipe extraction and child installation occur under that mutex:
+close wins and no child starts, or spawn wins and close observes and reaps that
+child. Incarnation reset must never clear host closing. Discovery will distinguish
+awaiting a successor from awaiting the installed child's manifest and a bound
+incarnation. Reset retains the predecessor instance ID and clears its port/token;
+no manifest is accepted while no successor is installed, and the successor's
+manifest PID must match the installed child and its instance ID must differ from
+the retained predecessor (including PID reuse). The real observation and event path
+must emit exactly one restart event when the new identity arrives. One host-owned
+manifest watcher survives incarnation changes, has explicit cancellation and join,
+and cannot be started twice or after host close. A watcher holding the host alive
+must not depend on the host's destructor to cancel itself.
+
+Asynchronous stdout-close diagnostics also belong to their spawning incarnation.
+The existing drain captures shared state and can set a spawn error after reset;
+the production core must reject that callback once its child has been replaced,
+using a monotonic spawn generation rather than a reusable PID.
+A regression delays the old child's EOF notification until a successor is installed
+and verifies that the successor's discovery state is unchanged.
+
+Initial and replacement launch failures will both publish a terminal supervisor
+transition through the same production state writer and a narrow injectable event
+sink. Resolve the data directory before launch; if that resolution itself fails,
+report the terminal state in memory and to the UI because no file destination is
+available. The existing conformance binary proves the shared loop with a distinct
+actuator and real child timing; it does not prove the shell's bindings. Tests will
+exercise the production host operations, including stale discovery, both sides of
+the close/spawn race, both launch failures, and watcher ownership. A later updater
+replacement hold is releasable and must remain distinct from permanent host close.
+
+**Managed child ownership and manifest handoff (orchestrator, 2026-09-08).**
+B11/B12 will put the child record and narrow registration contract in `app-api`,
+with one mutable registry at the composition root and `RuntimeManifestPublisher`
+as its sole persisted writer. No second child file or history-based adoption
+authority is introduced. The manifest becomes schema version 2; its public
+projection also moves to a v2 schema and excludes child identifiers and private
+shutdown handoff data. The root SSOT schema remains authoritative and its existing
+sync/generation paths update consumers. This breaking constituent change raises
+the runtime contract from 0.2.0 to 0.3.0, rather than maintaining a separate public
+v1 representation while the private manifest moves to v2.
+
+The canonical manifest must survive an intentional warm handoff. The publisher
+will capture the predecessor before its first publication. The existing early
+manifest shutdown step will mark shutdown pending, while child updates remain
+writable through resource teardown. A narrow sequence completion callback runs inside
+the memoized sequence, including the JVM-hook path, after the ordinary steps. It
+receives their aggregate result; the publisher reads the current registry itself.
+Only an error-free result with a GRACEFUL index outcome can mark handoff complete.
+Persistence failure enters the sequence's error accounting, makes its final result
+unclean, and leaves pending evidence. A
+RESTART/HANG keeps surviving ownership in the same canonical manifest; QUIT/UPGRADE
+deletes it only when registered children are confirmed gone and the preliminary
+aggregate is clean with a GRACEFUL index outcome. Failed cleanup retains
+ownership evidence. The publisher's ordinary/finally close must obey this disposition
+and cannot erase it. An abrupt JVM death never calls the completion callback, so
+pending or ordinary crash residue remains unclean. The per-instance snapshots,
+NDJSON and start log stay diagnostic history.
+
+Capturing predecessor records only in memory is insufficient: the first successor
+publication must carry every unreconciled record forward, so another crash during
+startup cannot erase the sole ownership record. Removal requires confirmed death
+or proved identity mismatch; failed termination of an identity-matched child keeps
+its record. Registration persistence failure after spawn must stop and reap the
+just-spawned child and fail activation, never return an unregistered managed child
+as healthy. PID, process start time and executable identity must all match before
+acting on a live process. Reused PIDs or mismatched executables are left untouched.
+The first v2 carry-forward publication must precede any child-capable asynchronous
+bootstrap, including the existing early worker future. Publishing only once the API
+binds is too late. An explicit pre-bind ownership seed is published after the instance
+lock, then enriched when the API binds; the current single-use `publishHead` cannot
+serve both moments unchanged. A race test must hold that seed publication and show that child startup
+cannot escape registration or erase predecessor records. No origin-instance field
+is required for process safety; the recorded OS and configuration identities suffice.
+
+Managed llama adoption compares a `declaredConfigHash` of applied launch inputs;
+`realizedArgvHash` records the actual final launch command for diagnosis. They are
+different projections of the same launch: context step-down and reasoning-budget
+fallback can change realized argv without changing applied configuration. Current
+free-VRAM observation is diagnostic and does not choose the automatic context rung;
+the earlier suspected VRAM-driven comparison mismatch was refuted. The declared
+hash covers normalized executable/model/mmproj paths, port, effective GPU policy,
+VDU mode, automatic or explicit context setting, thinking/reasoning inputs, slots,
+KV type and a fixed-launch-flags version. No global settings revision is invented
+before C2. Identity-matched configuration mismatch stops the old managed child and
+starts from applied A. Extraction children are registered and never adopted.
+
+The documented external llama path remains unmanaged: existing health and `/props`
+validation and the disallow-external policy remain in force, but an unregistered
+external process is never claimed or terminated by managed-child reconciliation.
+Managed reconciliation runs first. This is an explicit exception for the existing
+BYO contract, not permission to adopt an unregistered process as owned. Both
+supervisors must separate killing the Engine alone on recoverable death/hang from
+identity-checked child cleanup on terminal exit; process-tree killing cannot remain
+on the recovery path because it would defeat warm adoption.
+
+**Dead-Engine update path and recovery UI (orchestrator, 2026-09-08).**
+B13's draft assertion that no API port means nothing needs stopping is false. A
+booting Engine can own handles before binding. The updater must acquire an
+exclusive, releasable replacement hold, block further spawns, end the current
+supervision generation, and stop/reap the owned Engine before reconciling registered
+children and launching the installer. The hold must not reuse permanent host close.
+If installer launch fails, one resume operation starts both a child and exactly one
+new supervision generation; starting an unsupervised replacement is insufficient.
+Every failure after taking the hold and before confirmed installer launch must
+either resume once when safe or remain terminal with the held/owned state explicit;
+no failure silently releases ordinary supervision into child reconciliation.
+
+An ENGINE_UNRECOVERABLE phase alone loses its evidence when later phases replace
+it. The existing upgrade intent will retain a tagged, mutually exclusive stop
+witness through install launch, reconciliation and commit. The normal prepared
+path keeps all existing preparation, nonce, receipt and PID checks. The dead-Engine
+path requires that normal evidence be absent and must never invent a nonce or
+HEAD_STOPPED receipt. Reconciliation carries the evidence kind and attempt identity,
+requiring a shutdown nonce echo only for the prepared path; release, durable-store
+ownership and per-boot mutation-token checks remain. Mixed evidence is refused.
+The host proof must traverse the production coordinator after staging/authentication
+with injected launch/backend edges, not a copied state-machine implementation.
+
+The current UI returns a static alert before mounting Settings when the first Engine
+never binds. The supervisor bridge must therefore be installed before API resolution,
+with subscribe-then-snapshot initialization from a read-only shell command and a guard
+against stale snapshot overwrite. Packaged boot with no API mounts a local recovery
+surface using existing host update status/check/install commands and update state;
+it must not fabricate an API base URL or start the normal shell's API work against
+an empty binding. Tests cover a terminal state published before UI subscription,
+later events, snapshot ordering, and installation from that recovery surface. The
+browser-only unresolved-API behavior is unaffected by this packaged recovery path.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.
@@ -424,7 +645,7 @@ coordination cost for this product's envelope. A paired run (16) can overturn th
 
 ### 3.1 Processes
 
-```
+```text
 Tauri shell (Rust)  supervises ->  Engine JVM  --(HTTP/MCP)-->  webview, MCP clients, later: paired devices
                                       |
                                       |-- inference contract ---> [stage 1] ORT sessions in-process
@@ -457,7 +678,7 @@ The merge makes it possible, for the first time, to say what the one process loo
 Three rings, each a module set with an ArchUnit-pinned direction of dependency (outer depends on
 inner, never the reverse):
 
-```
+```text
 API front  bind, Host/Origin checks, auth, request identity, admission, HTTP, SSE, MCP (today: ui)
   Core     ports (3.3), engine context (3.4), orchestration (agent loop, conversation, RAG,
            operations), index runtime, durable stores, pacing, executors

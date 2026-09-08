@@ -294,11 +294,27 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   package-visible writer, live-lease acceptance predicate and dispatcher are the same factories
   used by `HeadlessApp`. A prepared upgrade dispatches only when its `preparationId` equals the
   currently frozen `OperationLeaseService` snapshot; an HTTP nonce mismatch writes no request.
-  Two B6 gaps remain for the next coupled protocol batch: a correctly prepared direct file can
+  Three B6 gaps remain for the next coupled protocol batch: a correctly prepared direct file can
   still carry the wrong nonce, and a request persistence failure happens after the HTTP success
   response has committed, leaving the upgrade frozen without a retry or cancellation path.
+  The writer is also installed after API exposure, so a commit can reach an uninstalled bridge.
+  Current-boot request preservation at watcher startup is already fixed; early writer installation
+  and the controller's persistence/acknowledgement transaction remain open.
   The now-unused upgrade method and `UpgradeShutdownAction` implementation were removed from
   `HeadShutdownCoordinator`.
+- **The B7/B10 follow-up must prove the shell's production ownership paths.** The conformance
+  binary exercises the shared supervisor loop through a distinct actuator. The host-core,
+  binding, child-close race, launch-failure and watcher-lifetime requirements in `design.md` §0
+  add production-path evidence; they do not replace the existing conformance harness.
+- **B11/B12 require a durable ownership handoff, not only new manifest fields.** The first v2
+  ownership seed carries unreconciled predecessor children before child-capable bootstrap. The
+  shutdown completion callback retains surviving ownership through restart/hang and failed close.
+  The public projection moves to v2 without private child data; managed configuration comparison
+  and the existing unmanaged external-server exception follow the dated decisions in `design.md` §0.
+- **B13's no-port branch still needs exclusive process ownership.** No bound API port does not
+  prove the Engine is absent. A releasable replacement hold, persistent mutually exclusive stop
+  evidence, one supervised resume after failure, and a packaged recovery UI available before API
+  binding are part of B13's acceptance. The older section 8 claims are amended by `design.md` §0.
 
 ---
 
