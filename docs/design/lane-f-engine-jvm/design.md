@@ -543,6 +543,53 @@ an empty binding. Tests cover a terminal state published before UI subscription,
 later events, snapshot ordering, and installation from that recovery surface. The
 browser-only unresolved-API behavior is unaffected by this packaged recovery path.
 
+**Upgrade acknowledgement deadline correction (orchestrator, 2026-09-08).** A request's
+force deadline is computed when the request is created, before synchronous persistence and before
+the HTTP response is flushed. The watcher must therefore consult the controller verifier before
+generic expiry handling. An exact request observed while its reservation is PERSISTING remains
+DEFERred even after its deadline, so a blocked flush cannot delete it. After the flush succeeds,
+the same exact request maps to the watcher-only ACCEPT_COMMITTED outcome while its preparation
+remains the live frozen lease; this outcome dispatches even if the deadline has elapsed. Ordinary
+ACCEPT requests remain subject to expiry and REFUSE remains fail-closed. Dispatch still follows
+the user-visible acknowledgement, and it carries the unchanged original deadline so the
+supervisor's later accepted-instance protocol can interpret an elapsed deadline as force now.
+This adds no nonce, phase or deadline authority. Accepted-instance retention and cross-language
+supervisor observation remain in the separate protocol batch above.
+
+**Upgrade preparation reservation correction (orchestrator, 2026-09-08).** The controller's
+sole-authority rule also covers the complete prepare transaction. A short PREPARING reservation
+serializes admission freeze, cancellation request, nonce publication, Worker prepare and response
+publication against another prepare, cancel or commit. Competing calls receive a retryable
+conflict. The reservation is acquired and released under the controller monitor, including release
+in `finally`; lease, Worker and servlet work runs outside it. Repeating prepare after completion
+preserves the live preparation and nonce. This prevents a delayed repeated prepare from publishing
+an old nonce after cancel and a new freeze, and prevents delayed Worker prepare from recreating an
+orphan Worker barrier after Head admission was released.
+
+**B14/R7 supervision and readiness correction (orchestrator, 2026-09-08, from independent
+`review_b7_b10`).** B14 must retire the obsolete Java whole-Worker supervision veto chain
+`SUPERVISION_ENGAGED`/`RESTART_EXHAUSTED`, including the phantom
+`worker.restart_exhausted` producer and its exemption. It must preserve the fatal index/schema
+veto, operator override, bounded local four-attempt/backoff policy and
+`worker.spawn_recovery_exhausted`. Host restart exhaustion must project the frontend-derived
+`engine.restart_exhausted` row from the current host's retained in-memory `StateRecord`: the Tauri
+bridge subscribes early, then snapshots, and guards a current event against a stale snapshot. It
+must never seed this state from an old supervisor file or inject a predecessor failure into Java
+readiness. The uppercase external contract `ENGINE_RESTART_EXHAUSTED` remains unchanged, and the
+existing no-API recovery UI requirement applies. This contract needs no new owner or launch
+identity.
+
+R7 treats the current-child binding plus any bounded valid HTTP response, including 503, as
+startup/running liveness; only lack of a response charges start or hang. Essential API and index
+readiness alone own the continuous 300-second stability clock, and loss of either resets it.
+Production tests must cover 503 during startup and running, timeout, an old supervisor file unable
+to veto local recovery, preservation of the fatal veto, a real host event/snapshot reaching the
+real no-API UI, and the readiness gate's frontend-derived row without an awaiting producer. D1's
+later essential-recovery escalation uses a counted fault reason and must not route failure
+escalation through the uncounted requested-restart path. B14 must also correct the canonical
+index-migration documentation and the `supervisorState` Vite comment when implemented. All B14/R7
+work remains open.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

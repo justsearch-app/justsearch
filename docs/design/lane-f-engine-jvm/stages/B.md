@@ -293,13 +293,22 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
 - **The B6 review fixes exercise production request seams rather than copied test lambdas.** The
   package-visible writer, live-lease acceptance predicate and dispatcher are the same factories
   used by `HeadlessApp`. A prepared upgrade dispatches only when its `preparationId` equals the
-  currently frozen `OperationLeaseService` snapshot; an HTTP nonce mismatch writes no request.
-  Three B6 gaps remain for the next coupled protocol batch: a correctly prepared direct file can
-  still carry the wrong nonce, and a request persistence failure happens after the HTTP success
-  response has committed, leaving the upgrade frozen without a retry or cancellation path.
-  The writer is also installed after API exposure, so a commit can reach an uninstalled bridge.
-  Current-boot request preservation at watcher startup is already fixed; early writer installation
-  and the controller's persistence/acknowledgement transaction remain open.
+  currently frozen `OperationLeaseService` snapshot and carries the controller-owned nonce.
+  The writer is installed before API exposure. Commit reserves a short PERSISTING phase, persists
+  synchronously before writing the response, and reaches ACKNOWLEDGED only after a successful
+  flush; persistence and response failures restore OPEN so retry or cancellation remains possible.
+  A controller-owned PREPARING reservation also spans freeze, cancellation request, nonce
+  publication, Worker prepare and response publication. Competing prepare/cancel/commit calls get
+  a retryable conflict, the reservation releases in `finally`, and repeated prepare preserves the
+  existing capability.
+  The watcher defers the exact request during PERSISTING, including after its force deadline, and
+  accepts it after acknowledgement while the preparation remains live. Plain accepted requests
+  retain generic expiry protection, and missing/null verification fails closed. Production-path
+  tests cover direct wrong/missing nonces, persistence and flush failure, a request written before
+  watcher startup, and response-before-dispatch ordering.
+  First-claim request publication, accepted-instance marking/retention, schema and named exit
+  changes, and Java/Rust/Node supervisor observation remain the separate protocol batch in
+  `design.md` section 0; this transaction fix does not solve the shared single-slot race.
   The now-unused upgrade method and `UpgradeShutdownAction` implementation were removed from
   `HeadShutdownCoordinator`.
 - **The B7/B10 follow-up must prove the shell's production ownership paths.** The conformance
