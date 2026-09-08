@@ -3,7 +3,8 @@ title: "Lane F stage A — spine and unplug: implementation checklist"
 stage: A
 created: 2026-09-07
 base: fe19df0d5
-status: "IN PROGRESS (stage started 2026-09-07 on worktree-lane-F-A from the PR 0 head; A1-A3 landed; corrections in section 0.1)"
+status: "A1-A20 landed; checkpoint review pending"
+updated: 2026-09-08
 ---
 
 # Lane F stage A — spine and unplug: implementation checklist
