@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.services.execute;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchHit;
@@ -68,6 +69,56 @@ final class SearchExecutorChunkBranchLeversTest {
       SearchResult bm25 = new SearchResult(List.of(chunkHit("c", "p")), 1, 0);
       SearchResult empty = new SearchResult(List.of(), 0, 0);
       assertTrue(SearchExecutor.collectRawLegTopNParents(bm25, empty, empty, 0).isEmpty());
+    }
+  }
+
+  @Nested
+  @DisplayName("isCandidateBudgetSaturated (lane F PR 0b — the exhaustive-kNN carve-out)")
+  class CandidateBudgetSaturation {
+
+    /** A leg result with a returned-hit count and an independently chosen totalHits. */
+    private SearchResult leg(int returnedHits, long totalHits) {
+      List<SearchHit> hits =
+          java.util.stream.IntStream.range(0, returnedHits)
+              .mapToObj(i -> chunkHit("c" + i, "p" + i))
+              .collect(Collectors.toList());
+      return new SearchResult(hits, totalHits, 0);
+    }
+
+    @Test
+    @DisplayName("default: a totalHits above the budget saturates (unchanged behaviour)")
+    void totalHitsAboveBudgetSaturates() {
+      assertTrue(SearchExecutor.isCandidateBudgetSaturated(leg(2, 500), 100, false));
+    }
+
+    @Test
+    @DisplayName("exhaustive dense leg: the same totalHits no longer saturates")
+    void exhaustiveIgnoresTotalHits() {
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(leg(2, 500), 100, true));
+    }
+
+    @Test
+    @DisplayName("exhaustive mode still saturates on the RETURNED hit count")
+    void exhaustiveStillHonoursReturnedHitCount() {
+      // The hit count measures how hard the leg pushed against the budget; the switch does not
+      // touch it, so the retry branch keeps firing on the case it was written for.
+      assertTrue(SearchExecutor.isCandidateBudgetSaturated(leg(10, 10), 10, true));
+    }
+
+    @Test
+    @DisplayName("a below-budget leg is not saturated in either mode")
+    void belowBudgetNeverSaturates() {
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(leg(3, 7), 100, false));
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(leg(3, 7), 100, true));
+    }
+
+    @Test
+    @DisplayName("null result / non-positive budget are not saturated in either mode")
+    void degenerateInputs() {
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(null, 100, false));
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(null, 100, true));
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(leg(5, 500), 0, false));
+      assertFalse(SearchExecutor.isCandidateBudgetSaturated(leg(5, 500), 0, true));
     }
   }
 

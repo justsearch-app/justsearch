@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -301,6 +302,12 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
     boolean recordsToThread =
         Boolean.TRUE.equals(body.get(ConversationEngine.RECORDS_TO_THREAD_KEY));
 
+    // Lane F PR 0b — the optional per-run sampling override. Unlike `effort` (a rung NAME the
+    // backend sizes) these are the raw knobs, so they are VALIDATED rather than coerced: a client
+    // that sends `sampling: {"temperature": "hot"}` gets the same IllegalArgumentException 400 the
+    // `messages` checks above raise, not a silently ignored field.
+    AgentRequest.SamplingOverride sampling = extractSamplingOverride(body);
+
     return new AgentRequest(
         messages,
         selectedTools,
@@ -312,7 +319,123 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
         autonomyLevel,
         docIds,
         effort,
-        recordsToThread);
+        recordsToThread,
+        sampling);
+  }
+
+  /** The closed key set of the chat request's {@code sampling} override (lane F PR 0b). */
+  private static final Set<String> SAMPLING_KEYS = Set.of("temperature", "top_p", "seed");
+
+  /**
+   * Parses the body's optional {@code sampling} object (lane F PR 0b).
+   *
+   * <p>Absent or explicitly null is null — no override, byte-identical to the behaviour before the
+   * field existed. Everything else is VALIDATED, not coerced, and a violation throws
+   * {@link IllegalArgumentException}, which {@code AgentController} turns into the same
+   * {@code BAD_REQUEST} SSE error shape every other bad field produces. Specifically refused:
+   *
+   * <ul>
+   *   <li>a value that is not a JSON object;
+   *   <li>an UNKNOWN key. The backend would silently ignore {@code topP} or {@code temp}, leaving
+   *       the run sampling at the agent preset while the caller believes it pinned it — a capture
+   *       that reports a pin it never applied is worse than one that reports none;
+   *   <li>a non-numeric value, INCLUDING a numeric string. {@code "0.0"} is a typed-wrong request,
+   *       not a request to coerce; accepting it would make the contract "validated" in name only;
+   *   <li>{@code NaN} or an infinity. Both pass a naive range check ({@code NaN} compares false
+   *       against every bound) and would reach llama-server as a nonsense sampler setting;
+   *   <li>a non-integral or out-of-{@code long}-range seed. Truncating {@code 1.5} to {@code 1}, or
+   *       wrapping {@code 1e30}, would pin the run to a seed the caller never asked for — the one
+   *       failure mode a seed exists to prevent;
+   *   <li>a temperature or top_p outside {@link io.justsearch.app.api.SamplingParams}' own bounds,
+   *       checked HERE so it is a 400 at the boundary rather than an exception thrown mid-run,
+   *       several LLM calls in.
+   * </ul>
+   */
+  private static AgentRequest.SamplingOverride extractSamplingOverride(Map<String, Object> body) {
+    Object raw = body.get("sampling");
+    if (raw == null) {
+      return null;
+    }
+    if (!(raw instanceof Map<?, ?> map)) {
+      throw new IllegalArgumentException("sampling must be a JSON object");
+    }
+    List<String> unknown = new ArrayList<>();
+    for (Object key : map.keySet()) {
+      String name = String.valueOf(key);
+      if (!SAMPLING_KEYS.contains(name)) {
+        unknown.add(name);
+      }
+    }
+    if (!unknown.isEmpty()) {
+      Collections.sort(unknown);
+      throw new IllegalArgumentException(
+          "sampling carries unknown key(s) " + unknown + "; the closed set is "
+              + new java.util.TreeSet<>(SAMPLING_KEYS));
+    }
+    Double temperature =
+        samplingBoundedDouble(map.get("temperature"), "sampling.temperature", 0.0, 2.0);
+    Double topP = samplingBoundedDouble(map.get("top_p"), "sampling.top_p", 0.0, 1.0);
+    Long seed = samplingSeed(map.get("seed"));
+    return new AgentRequest.SamplingOverride(temperature, topP, seed);
+  }
+
+  /** A finite {@code double} inside {@code [min, max]}, or null when the key is absent/null. */
+  private static Double samplingBoundedDouble(
+      Object value, String field, double min, double max) {
+    if (value == null) {
+      return null;
+    }
+    if (isNotAcceptedNumber(value)) {
+      throw new IllegalArgumentException(
+          field + " must be a JSON number, got " + describe(value));
+    }
+    double d = ((Number) value).doubleValue();
+    if (!Double.isFinite(d)) {
+      throw new IllegalArgumentException(field + " must be finite, got " + d);
+    }
+    if (d < min || d > max) {
+      throw new IllegalArgumentException(
+          field + " must be " + min + "-" + max + ", got " + d);
+    }
+    return d;
+  }
+
+  /** An exact {@code long} seed, or null when the key is absent/null. */
+  private static Long samplingSeed(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (isNotAcceptedNumber(value)) {
+      throw new IllegalArgumentException(
+          "sampling.seed must be a JSON integer, got " + describe(value));
+    }
+    if (value instanceof Integer || value instanceof Long || value instanceof Short
+        || value instanceof Byte) {
+      return ((Number) value).longValue();
+    }
+    if (value instanceof java.math.BigInteger big) {
+      try {
+        return big.longValueExact();
+      } catch (ArithmeticException e) {
+        throw new IllegalArgumentException(
+            "sampling.seed must fit in a 64-bit integer, got " + big);
+      }
+    }
+    double d = ((Number) value).doubleValue();
+    if (!Double.isFinite(d) || d != Math.rint(d) || d < Long.MIN_VALUE || d > Long.MAX_VALUE) {
+      throw new IllegalArgumentException(
+          "sampling.seed must be an integer that fits in 64 bits, got " + value);
+    }
+    return (long) d;
+  }
+
+  /** True for anything that must NOT be read as a number — notably a Boolean or a String. */
+  private static boolean isNotAcceptedNumber(Object value) {
+    return value instanceof Boolean || !(value instanceof Number);
+  }
+
+  private static String describe(Object value) {
+    return value instanceof String s ? "\"" + s + "\"" : String.valueOf(value);
   }
 
   /** Tempdoc S7 — parse the body's optional {@code docIds} array; absent/malformed = empty (unscoped). */

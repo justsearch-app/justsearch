@@ -112,12 +112,21 @@ def cmd_workflow_fixture_capture(ctx, base_url, fixture, out_path, session_token
               default=lambda: str(DEFAULT_FIXTURE),
               show_default="scripts/jseval/lane-f-workflow-fixture.v1.json",
               help="Fixture definition carrying the declared field classes.")
+@click.option("--baseline-noise", type=click.Path(exists=True, resolve_path=True), multiple=True,
+              help="Another SAME-BUILD capture of the baseline side; repeatable. A field is "
+                   "noisy when ANY TWO of a side captures disagree, and it is then excluded "
+                   "from the verdict. Two captures under-sample; three is the default.")
+@click.option("--candidate-noise", type=click.Path(exists=True, resolve_path=True),
+              multiple=True,
+              help="Another SAME-BUILD capture of the candidate side; repeatable "
+                   "(see --baseline-noise).")
 @click.option("--report-out", type=click.Path(resolve_path=True), default=None,
               help="Write the full diff result JSON to this path.")
 @click.option("--json", "json_out", is_flag=True,
               help="Emit the full diff result JSON on stdout.")
 @click.pass_context
-def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, json_out):
+def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, baseline_noise,
+                              candidate_noise, report_out, json_out):
     """Diff two captures under the fixture's declared equality relation.
 
     A field with no declared class must be byte-equal; an undeclared field is a
@@ -126,13 +135,28 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, jso
     compare (an empty section on both sides, a non-200 request, a zero-hit query, or a
     declaration the capture never emits) — two identical failures are byte-equal, so
     without it a broken backend would read as "no semantic regression".
+    With --baseline-noise / --candidate-noise (repeatable; each another fresh-corpus capture of
+    that same side on the same build) the differ measures determinism instead of assuming it: a
+    field ANY TWO of a side captures disagree on is reported noisy-<side>, counted separately,
+    and excluded from the verdict, because a difference the same build produces against itself
+    cannot evidence a difference between two builds. Two captures under-sample -- a field can be
+    stable across one pair and unstable on the next draw -- so the default is three per side, and
+    a side that brings only one capture is refused rather than judged stable by default. Noise
+    louder than the fixture maxNoisyFraction fails the run outright, so "almost nothing was
+    compared" can never read as "nothing regressed".
+
     Exit 0 = pass, 1 = regression / missing field / unhealthy capture, 2 = usage error.
     """
     from .. import workflow_fixture as wf
 
     try:
         definition = wf.load_fixture(fixture)
-        result = wf.diff(baseline, candidate, definition)
+        # `multiple=True` always yields a tuple; an EMPTY one means the flag was not passed at
+        # all, which must stay "no noise gating" rather than "a side with zero captures".
+        result = wf.diff(
+            baseline, candidate, definition,
+            baseline_noise=list(baseline_noise) or None,
+            candidate_noise=list(candidate_noise) or None)
     except (wf.WorkflowFixtureError, OSError, ValueError) as exc:
         click.echo(f"workflow-fixture diff: {exc}", err=True)
         sys.exit(2)
@@ -151,8 +175,34 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, jso
         click.echo(
             f"{'PASS' if result['pass'] else 'FAIL'}  "
             f"equal={counts['equal']} allowed={counts['allowed']} "
+            f"noisy={counts.get('noisy', 0)} "
             f"REGRESSION={counts['REGRESSION']} missing={counts['missing']}"
         )
+        per_side = result.get("captures_per_side") or {}
+        if per_side:
+            click.echo(
+                f"  captures per side: baseline={per_side.get('baseline')} "
+                f"candidate={per_side.get('candidate')}"
+            )
+        by_side = result.get("noisy_by_side") or {}
+        if any(by_side.values()):
+            both = by_side.get("both", 0)
+            # Per-side totals INCLUDE `both`, because a field noisy on both sides is noisy on
+            # each — the same arithmetic the ceiling uses. Printing only the exclusive counts
+            # made a side look quieter than the gate itself judged it.
+            click.echo(
+                "  noisy (excluded from the verdict): "
+                + f"baseline={by_side.get('baseline', 0) + both} "
+                + f"candidate={by_side.get('candidate', 0) + both} "
+                + f"(of which both={both}) "
+                + f"(ceiling {result.get('maxNoisyFraction')})"
+            )
+            for entry in result["fields"]:
+                if str(entry.get("status", "")).startswith("noisy-"):
+                    click.echo(
+                        f"  {entry['status']}  {entry['record']}  {entry['field']}"
+                        f"  (cross-side: {entry.get('crossSideStatus')})"
+                    )
         for klass, n in result["allowed_by_class"].items():
             if n:
                 click.echo(f"  allowed:{klass} = {n}")
@@ -166,6 +216,28 @@ def cmd_workflow_fixture_diff(ctx, baseline, candidate, fixture, report_out, jso
                        f"  — {entry['reason']}")
 
     sys.exit(0 if result["pass"] else 1)
+
+
+@workflow_fixture_group.command("side-captures")
+@click.argument("directory", type=click.Path(file_okay=False, resolve_path=True))
+def side_captures_cmd(directory):
+    """Print one side's capture files, primary first, one absolute path per line.
+
+    `fixture-gate.sh` used a `capture-*.json` shell glob and so also picked up the cycle
+    script's per-capture diagnostics (`capture-1-ai-status.json`), reporting six captures per
+    side for three and marking the three non-captures UNHEALTHY. The selection rule now has one
+    definition, in `workflow_fixture.select_side_captures`, where a test can point a decoy at
+    it — a shell glob cannot be unit-tested and had already drifted once.
+    """
+    # Imported inside the command, as the other two are: the module pulls in httpx.
+    from .. import workflow_fixture as wf
+    try:
+        captures = wf.select_side_captures(directory)
+    except wf.WorkflowFixtureError as exc:
+        click.echo(f"workflow-fixture side-captures: {exc}", err=True)
+        sys.exit(2)
+    for capture in captures:
+        click.echo(str(capture))
 
 
 COMMANDS = [workflow_fixture_group]

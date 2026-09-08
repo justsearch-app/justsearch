@@ -1348,7 +1348,58 @@ public enum EnvRegistry {
         "index.identity.deletion_grace_ms",
         "JUSTSEARCH_INDEX_IDENTITY_DELETION_GRACE_MS",
         "2592000000",
-        LifecycleStage.PERMANENT);
+        LifecycleStage.PERMANENT),
+
+    // ============ Exact kNN capture switch (lane F PR 0b) ============
+
+    /**
+     * Make every kNN query EXACT instead of approximate (default false — today's behaviour).
+     *
+     * <p>Lane F PR 0b, the deterministic-capture switch. HNSW is approximate, and Lucene 10.4's
+     * {@code AbstractKnnVectorQuery.getLeafResults} has NO exact path for an UNFILTERED query at
+     * any {@code k}: raising {@code index.vector.ef_search} widens the beam but cannot pin the
+     * result, so two index builds of the same corpus can return different neighbours at the
+     * top-k margin. With a filter present the query takes {@code exactSearch} when the filter's
+     * cost is within the per-leaf top-k, which {@code k >= reader.maxDoc()} guarantees for every
+     * leaf. So this switch does two things at {@code ReadPathOps}'s one kNN factory: raises
+     * {@code k} to at least {@code maxDoc} and supplies a {@code MatchAllDocsQuery} filter when
+     * the caller had none.
+     *
+     * <p>Only the APPROXIMATION changes, not the pipeline's branches: in this mode the dense
+     * leg's inflated {@code totalHits} is excluded from the candidate-budget saturation test
+     * ({@code SearchExecutor#isCandidateBudgetSaturated}), so the chunk-retry branch fires on
+     * exactly the same queries it did with the switch off.
+     *
+     * <p>ONE display-only number does move with it: {@code RagContextOps} reports the dense leg's
+     * {@code totalHits} (plus the union leg's size) as the RAG meta's {@code chunks_found}
+     * ({@code RAGContext.java:355}), so in exhaustive mode that field reads as the whole
+     * vector-bearing corpus. It is already documented as a composite that "may exceed the returned
+     * chunks list" and nothing branches on it — {@code chunks_used} is the number that matters.
+     *
+     * <p>Cost is O(vectors) per query. It is a capture/diagnostic knob, not a production default.
+     */
+    INDEX_VECTOR_EXHAUSTIVE_SEARCH("index.vector.exhaustive_search",
+        "JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH", LifecycleStage.PERMANENT),
+
+    // ============ ORT intra-op thread pin (lane F PR 0b) ============
+
+    /**
+     * Fixed intra-op thread count for every ONNX Runtime session; unset (the default) leaves
+     * ORT's own choice, which is today's behaviour.
+     *
+     * <p>ORT sizes the intra-op pool from hardware concurrency. On the CPU execution provider
+     * that count decides how a GEMM's reduction is partitioned, and a different partition sums
+     * the same floats in a different ORDER — so an embedding's low bits move with the thread
+     * count. Within one machine the count is stable, so this changes nothing there; ACROSS two
+     * machines, or a machine whose available parallelism differs between runs, it is a silent
+     * source of vector drift. A deterministic capture pins it (lane F: alongside the CPU
+     * execution-provider pins) so bit-stability does not depend on the host's core count.
+     *
+     * <p>Applies to CPU and CUDA sessions alike ({@code SessionOptionsApplier.applyBase}); it is
+     * only load-bearing for CPU, where the reduction happens on those threads.
+     */
+    ORT_INTRA_OP_THREADS("justsearch.onnxruntime.intra_op_threads",
+        "JUSTSEARCH_ORT_INTRA_OP_THREADS", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

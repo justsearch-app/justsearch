@@ -39,6 +39,13 @@ import java.util.Objects;
  *     the run meta — which is where the thread projection reads it to suppress its own synthesised
  *     copies of turns the record already holds. False for every run the engine does not record:
  *     standalone runs, background runs, and every run written before the stamp existed.
+ * @param sampling lane F PR 0b — the caller's optional sampling override for THIS run, applied over
+ *     the {@code SamplingParams.AGENT} constant every agent LLM call otherwise uses. Null (the
+ *     absent field) is byte-identical to the behaviour before the field existed. It exists because
+ *     the agent path is shape-driven and never reaches the chat path's request-derived sampling, so
+ *     a capture had no way to hold the trajectory still: the same narrow question completed in 3
+ *     iterations in one capture and hit the iteration cap in the next. Each component is
+ *     independently nullable — an override that sets only {@code seed} keeps AGENT's 0.7 / 0.8.
  */
 public record AgentRequest(
     List<Map<String, Object>> messages,
@@ -51,7 +58,29 @@ public record AgentRequest(
     String autonomyLevel,
     List<String> docIds,
     String effort,
-    boolean recordsToThread) {
+    boolean recordsToThread,
+    SamplingOverride sampling) {
+
+  /**
+   * A per-run sampling override, every component independently optional (lane F PR 0b).
+   *
+   * <p>Deliberately NOT {@code SamplingParams}: this is the WIRE shape a caller may send, carrying
+   * only the three knobs a reproducible capture needs. {@code SamplingParams} additionally carries
+   * backend-owned decisions ({@code tool_choice}, grammar, {@code response_format}, thinking
+   * suppression) that the agent loop computes per turn and a request must never be able to set —
+   * folding these three into that record on the wire would hand a client all of them.
+   *
+   * @param temperature sampling temperature, or null to keep the agent preset's
+   * @param topP nucleus sampling mass, or null to keep the agent preset's
+   * @param seed llama-server RNG seed, or null to omit it (today's behaviour)
+   */
+  public record SamplingOverride(Double temperature, Double topP, Long seed) {
+
+    /** True when the override would change nothing — every component absent. */
+    public boolean isEmpty() {
+      return temperature == null && topP == null && seed == null;
+    }
+  }
 
   public AgentRequest {
     Objects.requireNonNull(messages, "messages");
@@ -63,6 +92,40 @@ public record AgentRequest(
     docIds = docIds == null ? List.of() : List.copyOf(docIds);
     // initialAgentId, maxHandoffs, conversationId, autonomyLevel, effort null are valid —
     // defaulted at runtime (effort's default is the Standard rung, AgentBudgetPolicy).
+    // An override with every component absent is normalised to null so "no override" has ONE
+    // representation and downstream sites never have to distinguish the two (lane F PR 0b).
+    sampling = (sampling == null || sampling.isEmpty()) ? null : sampling;
+  }
+
+  /**
+   * Back-compat constructor (pre-lane-F-PR-0b, no {@code sampling}) — delegates with null, which is
+   * exactly "use {@code SamplingParams.AGENT} unchanged", the behaviour every caller had.
+   */
+  public AgentRequest(
+      List<Map<String, Object>> messages,
+      List<String> selectedToolNames,
+      int maxIterations,
+      List<AgentProfile> agentProfiles,
+      String initialAgentId,
+      Integer maxHandoffs,
+      String conversationId,
+      String autonomyLevel,
+      List<String> docIds,
+      String effort,
+      boolean recordsToThread) {
+    this(
+        messages,
+        selectedToolNames,
+        maxIterations,
+        agentProfiles,
+        initialAgentId,
+        maxHandoffs,
+        conversationId,
+        autonomyLevel,
+        docIds,
+        effort,
+        recordsToThread,
+        null);
   }
 
   /**

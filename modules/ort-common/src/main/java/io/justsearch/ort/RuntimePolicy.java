@@ -93,7 +93,22 @@ public record RuntimePolicy(
       int interOpThreads,
       boolean allowSpinning,
       boolean forceSpinningStop,
-      boolean useDeviceAllocatorForInitializers) {}
+      boolean useDeviceAllocatorForInitializers,
+      Integer intraOpThreads) {
+
+    /**
+     * Back-compat constructor (pre-lane-F-PR-0b): {@code intraOpThreads} unset, which is
+     * ONNX Runtime's own default and therefore today's behaviour exactly.
+     */
+    public Session(
+        int interOpThreads,
+        boolean allowSpinning,
+        boolean forceSpinningStop,
+        boolean useDeviceAllocatorForInitializers) {
+      this(interOpThreads, allowSpinning, forceSpinningStop, useDeviceAllocatorForInitializers,
+          null);
+    }
+  }
 
   /**
    * Diagnostic observability knobs (tempdoc 397 §14.24 FB). Both fields default to

@@ -200,8 +200,13 @@ final class AgentLlmCaller {
       // must not grow one: at a hard ceiling the run is over either way, and a synthesis attempt is
       // still the right thing. Fixing it HERE makes the invariant structural — a no-tools call is
       // never tool-forced — instead of a guard every future call site has to remember.
+      //
+      // Lane F PR 0b: `agentBaseSampling`, not the bare constant. It applies only the run's
+      // temperature / top_p / seed override and NEVER tool_choice or grammar, so B2's invariant is
+      // untouched while the finalize — which produces the run's visible answer — stops being the
+      // one turn a pinned capture leaves unpinned.
       LlmCallResult result =
-          callLlmWithTools(session, List.of(), sink, SamplingParams.AGENT);
+          callLlmWithTools(session, List.of(), sink, agentBaseSampling(session));
       String text = result.textContent();
       return text != null && !text.isBlank() ? text : null;
     } catch (Exception e) {
@@ -275,17 +280,46 @@ final class AgentLlmCaller {
    * when the active agent should be forced to produce a tool call.
    */
   static SamplingParams resolveAgentSampling(AgentSession session) {
+    SamplingParams base = agentBaseSampling(session);
     if (!AgentTurnPolicy.shouldForceToolCall(session)) {
-      return SamplingParams.AGENT;
+      return base;
     }
     // Direction I: apply grammar alongside tool_choice=required for belt-and-suspenders
     // enforcement. Grammar is only forwarded to the server when the tools list is empty
     // (OnlineModeOps guard); when tools are present, tool_choice alone is used.
     // Direction D: suppress thinking-prompt on E0a turns — Organizer acts mechanically.
-    return SamplingParams.AGENT
+    return base
         .withToolChoice("required")
         .withGrammar(AgentLoopService.TOOL_CALL_GRAMMAR)
         .withEnableThinking(false);
+  }
+
+  /**
+   * The agent preset with THIS run's optional sampling override applied (lane F PR 0b) — the ONE
+   * place {@code SamplingParams.AGENT} becomes a run's actual sampling.
+   *
+   * <p>It is a shared helper rather than three copies because the two forced-tool turns in {@code
+   * AgentStepRunner} (the DECIDING commit and the PRIMARY text-only handoff escalation) build their
+   * sampling inline from the same constant. A version that only threaded the override through this
+   * class would pin the ordinary turns and leave those two unpinned — the run would still drift,
+   * and the capture would report a pinned seed while doing it.
+   *
+   * <p>Each component is independently optional: an override that sets only {@code seed} keeps the
+   * preset's 0.7 / 0.8. A null override returns the constant itself.
+   */
+  static SamplingParams agentBaseSampling(AgentSession session) {
+    var override = session == null ? null : session.samplingOverride();
+    if (override == null) {
+      return SamplingParams.AGENT;
+    }
+    return new SamplingParams(
+        override.temperature() != null ? override.temperature() : SamplingParams.AGENT.temperature(),
+        override.topP() != null ? override.topP() : SamplingParams.AGENT.topP(),
+        SamplingParams.AGENT.toolChoice(),
+        SamplingParams.AGENT.grammar(),
+        SamplingParams.AGENT.enableThinking(),
+        SamplingParams.AGENT.responseFormat(),
+        override.seed());
   }
 
   /**

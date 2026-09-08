@@ -287,9 +287,8 @@ public final class ReadPathOps {
       throw new IllegalArgumentException("queryVector must not be null or empty");
     }
     int effectiveLimit = limit <= 0 ? 10 : limit;
-    int queryK = resolveVectorQueryK(effectiveLimit);
     KnnFloatVectorQuery knnQuery =
-        new KnnFloatVectorQuery(SchemaFields.VECTOR, queryVector, queryK);
+        buildKnnQuery(SchemaFields.VECTOR, queryVector, effectiveLimit, null);
     return search(knnQuery, effectiveLimit, null, RuntimeSearchSort.RELEVANCE, null);
   }
 
@@ -298,10 +297,60 @@ public final class ReadPathOps {
       throw new IllegalArgumentException("queryVector must not be null or empty");
     }
     int effectiveLimit = limit <= 0 ? 10 : limit;
-    int queryK = resolveVectorQueryK(effectiveLimit);
     KnnFloatVectorQuery knnQuery =
-        new KnnFloatVectorQuery(SchemaFields.VECTOR, queryVector, queryK, filter);
+        buildKnnQuery(SchemaFields.VECTOR, queryVector, effectiveLimit, filter);
     return search(knnQuery, effectiveLimit, null, RuntimeSearchSort.RELEVANCE, null);
+  }
+
+  /**
+   * The one site that builds a {@link KnnFloatVectorQuery} ON THE PRODUCT READ PATH — the doc-level
+   * dense leg (both overloads above) and the chunk dense leg
+   * ({@code ChunkSearchOps#searchChunkVector}) all come through here, so
+   * {@code index.vector.exhaustive_search} cannot be honoured at one site and silently skipped at
+   * another (lane F PR 0b).
+   *
+   * <p>Two BENCHMARK harnesses build their own query and deliberately bypass this factory —
+   * {@code EngineVectorIndexBench} (a sentinel recall probe) and {@code VectorQuantizationGate} —
+   * because each pins its own {@code k} and is measuring the approximation itself. They are not a
+   * gap: a bench that inherited a global exact-search switch would stop measuring HNSW.
+   *
+   * <p>Default (switch off) is byte-identical to the three inline constructions it replaced:
+   * {@code k = resolveVectorQueryK(limit)} and the caller's own filter, which for a null filter is
+   * exactly what Lucene's 3-arg constructor does ({@code this(field, target, k, null)}).
+   *
+   * <p>Switch on, the query is made EXACT. Lucene 10.4's {@code AbstractKnnVectorQuery
+   * .getLeafResults} has no exact branch for an unfiltered query at any {@code k}; with a filter it
+   * takes {@code exactSearch} once the filter's cost is within the per-leaf top-k, so this raises
+   * {@code k} to at least {@code reader.maxDoc()} (which bounds every leaf) and substitutes a
+   * {@code MatchAllDocsQuery} when the caller supplied no filter. The extra reader acquisition is
+   * paid only in that mode.
+   */
+  KnnFloatVectorQuery buildKnnQuery(String field, float[] queryVector, int limit, Query filter) {
+    int queryK = resolveVectorQueryK(limit);
+    if (!session.vectorExhaustiveSearch) {
+      return new KnnFloatVectorQuery(field, queryVector, queryK, filter);
+    }
+    // This reads maxDoc from a searcher acquired HERE, and the search below acquires a second one.
+    // An NRT reopen between the two would leave k sized for the older reader: still >= that
+    // reader's maxDoc, so the query stays exact over everything the first reader saw, but a
+    // document added in between could in principle fall outside k. Deliberately not held across
+    // both — pinning one searcher for the whole call would mean bypassing the reopen-on-demand
+    // seam that every other read goes through. Harmless for the switch's purpose: a deterministic
+    // capture runs against a quiesced index, which is a precondition the fixture already states.
+    int maxDoc;
+    try {
+      maxDoc = withSearcher(searcher -> searcher.getIndexReader().maxDoc());
+    } catch (IOException e) {
+      throw new IndexRuntimeIOException(
+          LuceneRuntimeUtils.classifyIOException(e),
+          "Failed to read maxDoc for exhaustive vector search",
+          e);
+    }
+    return new KnnFloatVectorQuery(
+        field,
+        queryVector,
+        Math.max(queryK, Math.max(1, maxDoc)),
+        filter != null ? filter : new org.apache.lucene.search.MatchAllDocsQuery());
   }
 
   int resolveVectorQueryK(int limit) {
@@ -319,8 +368,41 @@ public final class ReadPathOps {
       Set<String> projectionFields,
       RuntimeSearchSort sort,
       String cursorToken) {
+    return search(query, limit, projectionFields, sort, cursorToken, null);
+  }
+
+  /**
+   * {@link #search} with an explicit Lucene {@link Sort}, overriding the one
+   * {@code RuntimeSearchSort} would build (lane F PR 0b).
+   *
+   * <p>The chunk kNN leg needs this. {@code buildRuntimeSort(RELEVANCE, idField)} breaks a score
+   * tie on {@code doc_id}, and on a CHUNK row that is {@code ChunkIds.newChunkDocId()} =
+   * {@code "chunk:" + UUID.randomUUID()} — stable within one index, uncorrelated between two. The
+   * bare chunk searches were fixed to sort on {@code parent_doc_id} then {@code chunk_index}, but
+   * the dense leg reaches Lucene through THIS method and kept the doc-level sort, so it still
+   * ordered its ties by the per-ingest UUID. Under {@code index.vector.exhaustive_search} that is
+   * at its worst: the leg returns the whole corpus, so every exact-score tie it can have (chunks
+   * with identical vectors — duplicated text — tie exactly) is in the result.
+   *
+   * <p>A cursor is REFUSED alongside an override: {@code decodeSearchAfterCursor} decodes the
+   * cursor against the {@code RuntimeSearchSort}, so a cursor decoded under one sort and applied
+   * under another would silently page through the wrong order. No caller needs both — the chunk
+   * legs do not paginate — so this fails loudly rather than defining the combination.
+   */
+  SearchResult search(
+      Query query,
+      int limit,
+      Set<String> projectionFields,
+      RuntimeSearchSort sort,
+      String cursorToken,
+      Sort sortOverride) {
     if (query == null) {
       return new SearchResult(List.of(), 0, 0, null);
+    }
+    if (sortOverride != null && cursorToken != null && !cursorToken.isBlank()) {
+      throw new IllegalArgumentException(
+          "a search-after cursor cannot be combined with an explicit Sort override: the cursor is "
+              + "encoded against the RuntimeSearchSort and would be decoded under a different order");
     }
     final int effectiveLimit = limit <= 0 ? 10 : limit;
     RuntimeSearchSort effectiveSort = sort == null ? RuntimeSearchSort.RELEVANCE : sort;
@@ -329,7 +411,8 @@ public final class ReadPathOps {
     try {
       return withSearcher(
           searcher -> {
-            Sort luceneSort = buildRuntimeSort(effectiveSort, idField);
+            Sort luceneSort =
+                sortOverride != null ? sortOverride : buildRuntimeSort(effectiveSort, idField);
             long requestedLong = (long) effectiveLimit + 1L;
             int requested = (int) Math.min(Integer.MAX_VALUE, Math.max(1L, requestedLong));
             org.apache.lucene.search.ScoreDoc after =
@@ -431,8 +514,11 @@ public final class ReadPathOps {
             }
 
             String nextCursor = null;
+            // An overridden Sort also suppresses the OUTBOUND cursor, for the same reason the
+            // inbound one is refused: the encoder is keyed on effectiveSort, so a cursor minted
+            // here would describe a position in an order these hits were not in.
             boolean hasMore = topDocs.scoreDocs.length > effectiveLimit;
-            if (hasMore && !hits.isEmpty()) {
+            if (hasMore && !hits.isEmpty() && sortOverride == null) {
               // Use the last returned hit (not the lookahead doc) to construct the next cursor.
               org.apache.lucene.search.ScoreDoc last = topDocs.scoreDocs[take - 1];
               nextCursor =

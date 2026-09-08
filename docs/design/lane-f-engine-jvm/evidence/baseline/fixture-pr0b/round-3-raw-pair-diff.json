@@ -1,0 +1,2813 @@
+{
+  "allowed_by_class": {
+    "equal-score-order": 10,
+    "generative-text": 3,
+    "new-reason-code": 0
+  },
+  "baseline_provenance": {
+    "aiRuntimeState": "completed",
+    "available": true,
+    "chatProfile": "compact",
+    "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
+    "corpusRootSource": "option",
+    "docCountAtEnd": 97,
+    "docCountAtStart": 96,
+    "docCountSource": "embedding.docCount",
+    "indexAvailable": true,
+    "observed_at": "2026-09-07T15:43:31.974786400Z",
+    "pathsOutsideCorpusRoot": 0,
+    "pathsOutsideCorpusRootExamples": [],
+    "pinSources": {
+      "index.hybrid.candidate_limit_max": "env_var",
+      "index.hybrid.chunk_collapse_limit_multiplier": "env_var",
+      "index.hybrid.leg_arbitration_enabled": "env_var",
+      "index.hybrid.leg_recall_complete_enabled": "env_var",
+      "index.vector.exhaustive_search": "env_var",
+      "justsearch.llm.slots": "env_var",
+      "justsearch.rerank.chunks.deadline_ms": "env_var",
+      "justsearch.rerank.deadline_ms": "env_var",
+      "justsearch.rerank.top_k": "env_var"
+    },
+    "pins": {
+      "index.hybrid.candidate_limit_max": "5000",
+      "index.hybrid.chunk_collapse_limit_multiplier": "50",
+      "index.hybrid.leg_arbitration_enabled": "false",
+      "index.hybrid.leg_recall_complete_enabled": "false",
+      "index.vector.exhaustive_search": "true",
+      "justsearch.llm.slots": "1",
+      "justsearch.rerank.chunks.deadline_ms": "60000",
+      "justsearch.rerank.deadline_ms": "60000",
+      "justsearch.rerank.top_k": "100"
+    },
+    "rawRootExample": "f:\\justsearch-public\\.claude\\worktrees\\lane-f-0b\\docs\\explanation\\02-process-coordination.md",
+    "sampling": {
+      "seed": 20260907,
+      "temperature": 0.0
+    },
+    "samplingApplied": {
+      "c01": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c02": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c03": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      }
+    },
+    "schema_version": 1,
+    "service": "JustSearch Local API",
+    "status": "ok",
+    "worker.buildStamp": "7dcbdcff5f941439"
+  },
+  "candidate_provenance": {
+    "aiRuntimeState": "completed",
+    "available": true,
+    "chatProfile": "compact",
+    "corpusRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-0b",
+    "corpusRootSource": "option",
+    "docCountAtEnd": 97,
+    "docCountAtStart": 96,
+    "docCountSource": "embedding.docCount",
+    "indexAvailable": true,
+    "observed_at": "2026-09-07T15:47:44.082665500Z",
+    "pathsOutsideCorpusRoot": 0,
+    "pathsOutsideCorpusRootExamples": [],
+    "pinSources": {
+      "index.hybrid.candidate_limit_max": "env_var",
+      "index.hybrid.chunk_collapse_limit_multiplier": "env_var",
+      "index.hybrid.leg_arbitration_enabled": "env_var",
+      "index.hybrid.leg_recall_complete_enabled": "env_var",
+      "index.vector.exhaustive_search": "env_var",
+      "justsearch.llm.slots": "env_var",
+      "justsearch.rerank.chunks.deadline_ms": "env_var",
+      "justsearch.rerank.deadline_ms": "env_var",
+      "justsearch.rerank.top_k": "env_var"
+    },
+    "pins": {
+      "index.hybrid.candidate_limit_max": "5000",
+      "index.hybrid.chunk_collapse_limit_multiplier": "50",
+      "index.hybrid.leg_arbitration_enabled": "false",
+      "index.hybrid.leg_recall_complete_enabled": "false",
+      "index.vector.exhaustive_search": "true",
+      "justsearch.llm.slots": "1",
+      "justsearch.rerank.chunks.deadline_ms": "60000",
+      "justsearch.rerank.deadline_ms": "60000",
+      "justsearch.rerank.top_k": "100"
+    },
+    "rawRootExample": "f:\\justsearch-public\\.claude\\worktrees\\lane-f-0b\\docs\\explanation\\02-process-coordination.md",
+    "sampling": {
+      "seed": 20260907,
+      "temperature": 0.0
+    },
+    "samplingApplied": {
+      "c01": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c02": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      },
+      "c03": {
+        "seed": 20260907,
+        "temperature": 0.0,
+        "top_p": 0.8
+      }
+    },
+    "schema_version": 1,
+    "service": "JustSearch Local API",
+    "status": "ok",
+    "worker.buildStamp": "7dcbdcff5f941439"
+  },
+  "counts": {
+    "REGRESSION": 2,
+    "allowed": 13,
+    "equal": 207,
+    "missing": 0
+  },
+  "declared_not_captured": [],
+  "fields": [
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q01",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q02",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q03",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "baseline": [
+        {
+          "score": 1.0,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1739:3710",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "195:687",
+              "1407:1816"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.7777267098426819,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3453:5405",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "795:1218"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.6819201111793518,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "5047:6658",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "607:1013"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-pipeline-invariants.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-pipeline-invariants.md",
+            "path": "docs/reference/contracts/search-pipeline-invariants.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.6481261253356934,
+          "value": {
+            "chunkIndex": "0",
+            "chunkSpan": "0:1980",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "243:645",
+              "1473:1881"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.svg",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.svg",
+            "path": "docs/explanation/23-search-pipeline-overview.svg",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.6132549047470093,
+          "value": {
+            "chunkIndex": "33",
+            "chunkSpan": "57152:58977",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:373",
+              "1036:1497"
+            ],
+            "extractionReasonCode": null,
+            "filename": "environment-variables.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/configuration/environment-variables.md",
+            "path": "docs/reference/configuration/environment-variables.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.5897129774093628,
+          "value": {
+            "chunkIndex": null,
+            "chunkSpan": null,
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:395",
+              "681:1017"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-syntax.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": null,
+            "path": "ssot/docs/help/search-syntax.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.50380939245224,
+          "value": {
+            "chunkIndex": "43",
+            "chunkSpan": "73210:75129",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "733:1155"
+            ],
+            "extractionReasonCode": null,
+            "filename": "jseval-pipeline-reference.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/jseval-pipeline-reference.md",
+            "path": "docs/reference/jseval-pipeline-reference.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.49761372804641724,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36005:36733",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "191:728"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.48477813601493835,
+          "value": {
+            "chunkIndex": "9",
+            "chunkSpan": "14903:16736",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:418",
+              "1129:1598"
+            ],
+            "extractionReasonCode": null,
+            "filename": "18-adapters-lucene-deep-dive.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "path": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.4756885766983032,
+          "value": {
+            "chunkIndex": "32",
+            "chunkSpan": "54171:56150",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "792:1219"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "score": 1.0,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1739:3710",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "195:687",
+              "1407:1816"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.md",
+            "path": "docs/explanation/23-search-pipeline-overview.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.7833737134933472,
+          "value": {
+            "chunkIndex": "2",
+            "chunkSpan": "3453:5405",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "795:1218"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.6808738708496094,
+          "value": {
+            "chunkIndex": "3",
+            "chunkSpan": "5047:6658",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "607:1013"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-pipeline-invariants.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/search-pipeline-invariants.md",
+            "path": "docs/reference/contracts/search-pipeline-invariants.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.6472074389457703,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1795:3085",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "235:638"
+            ],
+            "extractionReasonCode": null,
+            "filename": "23-search-pipeline-overview.svg",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/explanation/23-search-pipeline-overview.svg",
+            "path": "docs/explanation/23-search-pipeline-overview.svg",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.6131288409233093,
+          "value": {
+            "chunkIndex": "33",
+            "chunkSpan": "57152:58977",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:373",
+              "1036:1497"
+            ],
+            "extractionReasonCode": null,
+            "filename": "environment-variables.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/configuration/environment-variables.md",
+            "path": "docs/reference/configuration/environment-variables.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.5899158120155334,
+          "value": {
+            "chunkIndex": null,
+            "chunkSpan": null,
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:395",
+              "681:1017"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-syntax.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": null,
+            "path": "ssot/docs/help/search-syntax.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.5065615177154541,
+          "value": {
+            "chunkIndex": "43",
+            "chunkSpan": "73210:75129",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "733:1155"
+            ],
+            "extractionReasonCode": null,
+            "filename": "jseval-pipeline-reference.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/jseval-pipeline-reference.md",
+            "path": "docs/reference/jseval-pipeline-reference.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.49343907833099365,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36005:36733",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "191:728"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.48235976696014404,
+          "value": {
+            "chunkIndex": "9",
+            "chunkSpan": "14903:16736",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:418",
+              "1129:1598"
+            ],
+            "extractionReasonCode": null,
+            "filename": "18-adapters-lucene-deep-dive.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "path": "docs/explanation/18-adapters-lucene-deep-dive.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.47753390669822693,
+          "value": {
+            "chunkIndex": "32",
+            "chunkSpan": "54171:56150",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "792:1219"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        }
+      ],
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "the tie-group partition differs (baseline [1, 1, 1, 1, 1, 1, 2] vs candidate [1, 1, 1, 1, 1, 1, 1, 1] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "record": "queries/q04",
+      "status": "REGRESSION"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q04",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q05",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q05",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q06",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q06",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q07",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q07",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q08",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q08",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "baseline": [
+        {
+          "score": 0.9553362131118774,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "11981:13885",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "544:1051"
+            ],
+            "extractionReasonCode": null,
+            "filename": "indexing-throughput.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/performance/indexing-throughput.md",
+            "path": "docs/reference/performance/indexing-throughput.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.9548451900482178,
+          "value": {
+            "chunkIndex": "36",
+            "chunkSpan": "61267:63278",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "680:1129"
+            ],
+            "extractionReasonCode": null,
+            "filename": "jseval-pipeline-reference.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/jseval-pipeline-reference.md",
+            "path": "docs/reference/jseval-pipeline-reference.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.9073103070259094,
+          "value": {
+            "chunkIndex": "8",
+            "chunkSpan": "13884:15760",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "599:1035"
+            ],
+            "extractionReasonCode": null,
+            "filename": "04-storage-engine.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/04-storage-engine.md",
+            "path": "docs/explanation/04-storage-engine.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.9001966714859009,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6780:8589",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:314",
+              "594:1049",
+              "1416:1809"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8856164216995239,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6946:8699",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "140:543",
+              "1223:1629"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8773563504219055,
+          "value": {
+            "chunkIndex": "6",
+            "chunkSpan": "10218:12073",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "234:651",
+              "1303:1755"
+            ],
+            "extractionReasonCode": null,
+            "filename": "10-ui-ux-design.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/10-ui-ux-design.md",
+            "path": "docs/explanation/10-ui-ux-design.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8350605368614197,
+          "value": {
+            "chunkIndex": "120",
+            "chunkSpan": "205671:207679",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "17:486",
+              "668:1146",
+              "1689:2008"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-quality-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-quality-register.md",
+            "path": "docs/reference/search-quality-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.824873685836792,
+          "value": {
+            "chunkIndex": "19",
+            "chunkSpan": "32669:34444",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "760:1169"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8183584809303284,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36167:38080",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "158:567",
+              "1177:1595"
+            ],
+            "extractionReasonCode": null,
+            "filename": "05-ai-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/05-ai-architecture.md",
+            "path": "docs/explanation/05-ai-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8172983527183533,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1820:3790",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:228",
+              "594:1051",
+              "1452:1880"
+            ],
+            "extractionReasonCode": null,
+            "filename": "health-readiness-contract.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "path": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "score": 0.9573392868041992,
+          "value": {
+            "chunkIndex": "7",
+            "chunkSpan": "11981:13885",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "544:1051"
+            ],
+            "extractionReasonCode": null,
+            "filename": "indexing-throughput.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/performance/indexing-throughput.md",
+            "path": "docs/reference/performance/indexing-throughput.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.9538605213165283,
+          "value": {
+            "chunkIndex": "8",
+            "chunkSpan": "14220:16180",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "731:1172"
+            ],
+            "extractionReasonCode": null,
+            "filename": "jseval-pipeline-reference.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/jseval-pipeline-reference.md",
+            "path": "docs/reference/jseval-pipeline-reference.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.9065714478492737,
+          "value": {
+            "chunkIndex": "8",
+            "chunkSpan": "13884:15760",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "599:1035"
+            ],
+            "extractionReasonCode": null,
+            "filename": "04-storage-engine.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/04-storage-engine.md",
+            "path": "docs/explanation/04-storage-engine.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.9002237915992737,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6780:8589",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:314",
+              "594:1049",
+              "1416:1809"
+            ],
+            "extractionReasonCode": null,
+            "filename": "api-contract-map.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/api-contract-map.md",
+            "path": "docs/reference/api-contract-map.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8835214972496033,
+          "value": {
+            "chunkIndex": "4",
+            "chunkSpan": "6946:8699",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "140:543",
+              "1223:1629"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-and-rag-reason-codes.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path"
+            ],
+            "parentDocId": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "path": "docs/reference/contracts/search-and-rag-reason-codes.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8747340440750122,
+          "value": {
+            "chunkIndex": "6",
+            "chunkSpan": "10218:12073",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "234:651",
+              "1303:1755"
+            ],
+            "extractionReasonCode": null,
+            "filename": "10-ui-ux-design.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/10-ui-ux-design.md",
+            "path": "docs/explanation/10-ui-ux-design.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8412947058677673,
+          "value": {
+            "chunkIndex": "120",
+            "chunkSpan": "205671:207679",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "17:486",
+              "668:1146",
+              "1689:2008"
+            ],
+            "extractionReasonCode": null,
+            "filename": "search-quality-register.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/reference/search-quality-register.md",
+            "path": "docs/reference/search-quality-register.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8223496079444885,
+          "value": {
+            "chunkIndex": "19",
+            "chunkSpan": "32669:34444",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "760:1169"
+            ],
+            "extractionReasonCode": null,
+            "filename": "03-knowledge-server.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/03-knowledge-server.md",
+            "path": "docs/explanation/03-knowledge-server.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8178148865699768,
+          "value": {
+            "chunkIndex": "21",
+            "chunkSpan": "36167:38080",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "158:567",
+              "1177:1595"
+            ],
+            "extractionReasonCode": null,
+            "filename": "05-ai-architecture.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview"
+            ],
+            "parentDocId": "docs/explanation/05-ai-architecture.md",
+            "path": "docs/explanation/05-ai-architecture.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        },
+        {
+          "score": 0.8122248649597168,
+          "value": {
+            "chunkIndex": "1",
+            "chunkSpan": "1820:3790",
+            "contentTruncated": "0",
+            "excerptSpans": [
+              "0:228",
+              "594:1051",
+              "1452:1880"
+            ],
+            "extractionReasonCode": null,
+            "filename": "health-readiness-contract.v1.md",
+            "isChunk": null,
+            "matchedFields": [
+              "content_preview",
+              "path",
+              "title"
+            ],
+            "parentDocId": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "path": "docs/reference/contracts/health-readiness-contract.v1.md",
+            "stageIds": [
+              "sparse-retrieval",
+              "dense-retrieval",
+              "fusion",
+              "chunk-merge",
+              "branch-fusion"
+            ]
+          }
+        }
+      ],
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "the tie-group partition differs (baseline [2, 2, 2, 1] vs candidate [2, 2, 2, 1, 2] at epsilon 0.01) — a hit crossed a tie-group boundary AND the delivered order changed",
+      "record": "queries/q09",
+      "status": "REGRESSION"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q09",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q10",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q10",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q11",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q11",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.hitCount",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "equal-score-order",
+      "field": "queries.hits[]",
+      "reason": "equal-score hits reordered within their tie group; every hit is otherwise identical",
+      "record": "queries/q12",
+      "status": "allowed:equal-score-order"
+    },
+    {
+      "class": "exact",
+      "field": "queries.httpStatus",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.matchCount",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.decisionKind",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.degradationFlags",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.degradationReasons",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.effectiveMode",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageIds",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "queries.trace.stageReasons",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "queries.trace.stageStatuses",
+      "reason": "byte-equal",
+      "record": "queries/q12",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.requested",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionCancelTrigger",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionDisposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionState",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "chatTurns.cancel.terminalReasonCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationScorer",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.citationSentences",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationTargets",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.disposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.errorCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.eventNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.finalResponse",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.iterationsUsed",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.reasoningText",
+      "reason": "generative text differs (no fixed seed on the chat path)",
+      "record": "chatTurns/c01",
+      "status": "allowed:generative-text"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextIncludedChars",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextInclusion",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceExcerptDigests",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourcePaths",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceRefs",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceSpans",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalPayloadParseError",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.toolArguments",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolCallsExecuted",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolErrorCodes",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolTruncatedForModel",
+      "reason": "byte-equal",
+      "record": "chatTurns/c01",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.requested",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionCancelTrigger",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionDisposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionState",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "chatTurns.cancel.terminalReasonCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationScorer",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.citationSentences",
+      "reason": "generative text differs (no fixed seed on the chat path)",
+      "record": "chatTurns/c02",
+      "status": "allowed:generative-text"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationTargets",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.disposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.errorCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.eventNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.finalResponse",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.iterationsUsed",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.reasoningText",
+      "reason": "generative text differs (no fixed seed on the chat path)",
+      "record": "chatTurns/c02",
+      "status": "allowed:generative-text"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextIncludedChars",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextInclusion",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceExcerptDigests",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourcePaths",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceRefs",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceSpans",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalPayloadParseError",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.toolArguments",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolCallsExecuted",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolErrorCodes",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolTruncatedForModel",
+      "reason": "byte-equal",
+      "record": "chatTurns/c02",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.requested",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionCancelTrigger",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionDisposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.sessionState",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.cancel.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "new-reason-code",
+      "field": "chatTurns.cancel.terminalReasonCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationScorer",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.citationSentences",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.citationTargets",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.disposition",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.errorCode",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.eventNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.finalResponse",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.httpStatus",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.iterationsUsed",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.reasoningText",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextIncludedChars",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceContextInclusion",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceExcerptDigests",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourcePaths",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceRefs",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.sourceSpans",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalEvent",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.terminalPayloadParseError",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "generative-text",
+      "field": "chatTurns.toolArguments",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolCallsExecuted",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolErrorCodes",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolNames",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    },
+    {
+      "class": "exact",
+      "field": "chatTurns.toolTruncatedForModel",
+      "reason": "byte-equal",
+      "record": "chatTurns/c03",
+      "status": "equal"
+    }
+  ],
+  "fixture_id": "lane-f-workflow-fixture",
+  "fixture_version": 1,
+  "health": {
+    "ok": true,
+    "problems": []
+  },
+  "pass": false,
+  "schema": "jseval.workflow-fixture-diff.v1"
+}

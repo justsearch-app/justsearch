@@ -36,6 +36,16 @@ final class SessionOptionsApplier {
   static void applyBase(RuntimePolicy runtime, SessionOptions opts) throws OrtException {
     RuntimePolicy.Session session = runtime.session();
     opts.setInterOpNumThreads(session.interOpThreads());
+    // Lane F PR 0b — pin the intra-op pool when asked. ORT otherwise sizes it from hardware
+    // concurrency, and on the CPU execution provider the intra-op thread count decides how a
+    // GEMM's reduction is partitioned: a different partition sums the same floats in a different
+    // ORDER, so the low bits of an embedding move with the thread count. That is invisible on one
+    // machine and a silent difference across two, which is exactly what a deterministic capture
+    // cannot tolerate. Null (the default, and every caller before this) leaves ORT's own choice
+    // untouched, so behaviour is unchanged unless the knob is set.
+    if (session.intraOpThreads() != null) {
+      opts.setIntraOpNumThreads(session.intraOpThreads());
+    }
     opts.addConfigEntry(
         "session.intra_op.allow_spinning", session.allowSpinning() ? "1" : "0");
     opts.setMemoryPatternOptimization(runtime.arena().memoryPatternOptimization());

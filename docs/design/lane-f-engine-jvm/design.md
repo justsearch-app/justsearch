@@ -194,6 +194,15 @@ rule are unchanged for stable fields. Captures taken before PR 0b are not compar
 after it (the request breadth and the pins changed) and the split-side baseline capture is
 retaken under PR 0b.
 
+**PR 0b acceptance (2026-09-07, 22:40, after the second review).** Under the noise-pair reference
+with three captures per side on one build: PASS, 216 fields equal, 3 allowed, 0 regressions, 3 and
+2 noisy fields per side (1.4 and 0.9 percent; ceiling 5 percent), the noise being 3 of 12 hit lists
+at the rerank-window boundary and no chat field (the chunk dense leg's tie-break, found by the
+second review, had been the larger half of the earlier 7-per-side noise); two captures per side were shown to under-sample (two false regressions on
+the same build), so three is the default. The split-side baseline is retaken as
+`evidence/baseline/fixture-pr0b/` (six captures and the gate). Stage E captures each side three
+times under the same pins and gates with `fixture-gate.sh`.
+
 **Decision authority (owner, 2026-09-07).** After PR 0 the owner delegated every remaining
 decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
 and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the

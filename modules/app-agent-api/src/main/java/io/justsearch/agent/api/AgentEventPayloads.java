@@ -187,7 +187,7 @@ public final class AgentEventPayloads {
       case AgentEvent.ContextGatePending e ->
           Map.of("promptTokens", e.promptTokens(), "contextWindow", e.contextWindow());
       case AgentEvent.ContextCompacted e -> Map.of("droppedMessages", e.droppedMessages());
-      case AgentEvent.SessionStarted e -> Map.of("sessionId", e.sessionId());
+      case AgentEvent.SessionStarted e -> sessionStartedPayload(e);
       case AgentEvent.HandoffProposed e ->
           Map.of(
               "fromAgentId", e.fromAgentId(),
@@ -333,6 +333,31 @@ public final class AgentEventPayloads {
    * never "included". That also keeps every record persisted before this field readable as what it
    * is — silent — rather than retroactively described.
    */
+  /**
+   * {@code session_started} — the run id, plus the sampling the run will ACTUALLY use when it was
+   * resolved (lane F PR 0b).
+   *
+   * <p>Each sampling key is OMITTED when null rather than written as an explicit null, so a run
+   * that pinned nothing produces the same one-key payload it produced before this echo existed and
+   * a reader can tell "this build does not report applied sampling" from "this run applied none".
+   * That distinction is the whole point: a capture must be able to prove the pin it requested was
+   * the pin the backend used, not merely that it asked.
+   */
+  private static Map<String, Object> sessionStartedPayload(AgentEvent.SessionStarted e) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("sessionId", e.sessionId());
+    if (e.samplingTemperature() != null) {
+      payload.put("samplingTemperature", e.samplingTemperature());
+    }
+    if (e.samplingTopP() != null) {
+      payload.put("samplingTopP", e.samplingTopP());
+    }
+    if (e.samplingSeed() != null) {
+      payload.put("samplingSeed", e.samplingSeed());
+    }
+    return payload;
+  }
+
   private static Map<String, Object> sourceMap(AgentEvent.AgentSource s) {
     var m = new LinkedHashMap<String, Object>();
     m.put("parentDocId", s.parentDocId());

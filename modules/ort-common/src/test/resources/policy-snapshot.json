@@ -15,7 +15,8 @@
       "interOpThreads" : 1,
       "allowSpinning" : false,
       "forceSpinningStop" : true,
-      "useDeviceAllocatorForInitializers" : true
+      "useDeviceAllocatorForInitializers" : true,
+      "intraOpThreads" : null
     },
     "profiling" : {
       "ortProfilingDir" : null,

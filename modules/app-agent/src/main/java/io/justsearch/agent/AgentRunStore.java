@@ -176,6 +176,14 @@ public final class AgentRunStore {
       // pre-859 record, and reading it as Standard is exactly the documented fallback rather than a
       // guess. An upcaster inserting `effort: null` would say the same thing more loudly.
       meta.put("effort", request.effort());
+      // Lane F PR 0b — the run's sampling pin, persisted for exactly the reason the rung above is:
+      // a resume or a fork rebuilds its AgentRequest from this snapshot, and a field the rebuild
+      // does not carry is silently dropped. A resumed capture turn that quietly reverted to the
+      // agent preset's 0.7 with no seed would report a pinned run while sampling freely — the same
+      // omission shape 859 hit with `effort`, which is why it is written beside it.
+      // Absence stays meaningful and needs no schema bump: a pre-PR-0b record simply has no pin,
+      // and reading it as "no override" is the documented default rather than a guess.
+      meta.put("sampling", samplingMeta(request.sampling()));
       meta.put("initialBudget", initialBudget);
       meta.put("iterationsUsed", 0);
       meta.put("toolCallsExecuted", 0);
@@ -754,6 +762,26 @@ public final class AgentRunStore {
 
   private static Map<String, Object> toPayload(AgentEvent event) {
     return AgentEventPayloads.withTrace(AgentEventPayloads.base(event), event.trace());
+  }
+
+  /**
+   * The run's sampling pin as a JSON object, or null when the run declared none (lane F PR 0b).
+   *
+   * <p>Written with the SAME wire key names the request uses ({@code temperature} / {@code top_p} /
+   * {@code seed}) rather than the record's Java component names, so the persisted shape and the
+   * request shape are one thing a reader can compare by eye. A {@code LinkedHashMap} because null
+   * components must survive: an override that pinned only the seed has to read back as exactly
+   * that, not as a temperature the run never asked for.
+   */
+  static Map<String, Object> samplingMeta(AgentRequest.SamplingOverride sampling) {
+    if (sampling == null) {
+      return null;
+    }
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("temperature", sampling.temperature());
+    m.put("top_p", sampling.topP());
+    m.put("seed", sampling.seed());
+    return m;
   }
 
   private static List<Map<String, Object>> toProfileMaps(List<AgentProfile> profiles) {

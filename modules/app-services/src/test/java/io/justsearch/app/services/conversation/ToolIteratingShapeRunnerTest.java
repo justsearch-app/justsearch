@@ -2,6 +2,8 @@ package io.justsearch.app.services.conversation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.AgentRequest;
 import java.util.List;
@@ -57,5 +59,147 @@ final class ToolIteratingShapeRunnerTest {
         ToolIteratingShapeRunner.parseRequest(
             Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))));
     assertEquals(List.of(), r.docIds());
+  }
+
+  // ==================== sampling override (lane F PR 0b) ====================
+
+  private static Map<String, Object> bodyWithSampling(Object sampling) {
+    Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("messages", List.of(Map.of("role", "user", "content", "hi")));
+    body.put("sampling", sampling);
+    return body;
+  }
+
+  @Test
+  @DisplayName("parseRequest carries the sampling override through to the AgentRequest")
+  void parseRequestCarriesSamplingOverride() {
+    AgentRequest r =
+        ToolIteratingShapeRunner.parseRequest(
+            bodyWithSampling(Map.of("temperature", 0.0, "top_p", 0.5, "seed", 20260907)));
+    assertEquals(0.0, r.sampling().temperature());
+    assertEquals(0.5, r.sampling().topP());
+    assertEquals(20260907L, r.sampling().seed());
+  }
+
+  @Test
+  @DisplayName("parseRequest accepts a partial sampling override (absent knobs stay null)")
+  void parseRequestAcceptsPartialSamplingOverride() {
+    AgentRequest r = ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 7)));
+    assertNull(r.sampling().temperature());
+    assertNull(r.sampling().topP());
+    assertEquals(7L, r.sampling().seed());
+  }
+
+  @Test
+  @DisplayName("parseRequest leaves sampling null when absent (byte-identical to pre-PR-0b)")
+  void parseRequestDefaultsSamplingWhenAbsent() {
+    AgentRequest r =
+        ToolIteratingShapeRunner.parseRequest(
+            Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))));
+    assertNull(r.sampling());
+  }
+
+  @Test
+  @DisplayName("parseRequest normalises an all-absent sampling object to null")
+  void parseRequestNormalisesEmptySamplingToNull() {
+    // One representation of "no override", so no downstream site has to distinguish the two.
+    assertNull(ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of())).sampling());
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects a malformed sampling override (same 400 shape as bad messages)")
+  void parseRequestRejectsMalformedSampling() {
+    // Not an object.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling("hot")));
+    // Object with a non-numeric value.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ToolIteratingShapeRunner.parseRequest(
+                bodyWithSampling(Map.of("temperature", "hot"))));
+    // Out of the range SamplingParams itself enforces — refused at the boundary rather than
+    // thrown mid-run, several LLM calls in.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("temperature", 5.0))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("top_p", 1.5))));
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects an unknown key inside sampling")
+  void parseRequestRejectsUnknownSamplingKey() {
+    // The backend would silently ignore `topP`, leaving the run at the agent preset while the
+    // caller believes it pinned it — a capture that reports a pin it never applied.
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ToolIteratingShapeRunner.parseRequest(
+                    bodyWithSampling(Map.of("topP", 0.5))));
+    assertTrue(e.getMessage().contains("topP"), "the message must name the offending key");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("temp", 0.0))));
+  }
+
+  @Test
+  @DisplayName("parseRequest does not COERCE a numeric string — the contract is validated")
+  void parseRequestRejectsNumericStrings() {
+    for (Object bad :
+        List.of(Map.of("temperature", "0.0"), Map.of("top_p", "0.5"), Map.of("seed", "7"))) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(bad)),
+          () -> "a typed-wrong request must be refused, not coerced: " + bad);
+    }
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects NaN and infinite temperature / top_p")
+  void parseRequestRejectsNonFiniteSampling() {
+    // NaN compares FALSE against every bound, so a naive range check waves it through and it
+    // reaches llama-server as a nonsense sampler setting.
+    for (Double bad : List.of(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ToolIteratingShapeRunner.parseRequest(
+                  bodyWithSampling(Map.of("temperature", bad))),
+          () -> "temperature " + bad + " must be refused");
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("top_p", bad))),
+          () -> "top_p " + bad + " must be refused");
+    }
+  }
+
+  @Test
+  @DisplayName("parseRequest rejects a non-integral or out-of-range seed rather than truncating it")
+  void parseRequestRejectsUnrepresentableSeed() {
+    // Truncating 1.5 to 1, or wrapping 1e30, pins the run to a seed the caller never asked for —
+    // the one failure mode a seed exists to prevent.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 1.5))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 1e30))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", Double.NaN))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", true))));
+    // An integral double IS representable and must still be accepted — a JSON parser is free to
+    // hand back 7 as 7.0, and refusing that would reject a well-formed request.
+    assertEquals(
+        7L,
+        ToolIteratingShapeRunner.parseRequest(bodyWithSampling(Map.of("seed", 7.0)))
+            .sampling()
+            .seed());
   }
 }

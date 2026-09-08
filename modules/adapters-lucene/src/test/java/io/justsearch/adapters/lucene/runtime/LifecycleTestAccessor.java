@@ -82,6 +82,10 @@ final class LifecycleTestAccessor {
     return session.vectorEfSearchOverrideOrNull;
   }
 
+  boolean vectorExhaustiveSearch() {
+    return session.vectorExhaustiveSearch;
+  }
+
   Analyzer indexAnalyzer() {
     LifecycleSnapshot snap = currentSnapshot();
     return snap != null ? snap.indexAnalyzer() : null;

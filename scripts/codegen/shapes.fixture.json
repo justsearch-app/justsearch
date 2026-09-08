@@ -14,6 +14,30 @@
             "objectType": null
           },
           {
+            "name": "samplingTemperature",
+            "type": "NUMBER",
+            "optional": true,
+            "enumValues": [],
+            "elementType": null,
+            "objectType": null
+          },
+          {
+            "name": "samplingTopP",
+            "type": "NUMBER",
+            "optional": true,
+            "enumValues": [],
+            "elementType": null,
+            "objectType": null
+          },
+          {
+            "name": "samplingSeed",
+            "type": "NUMBER",
+            "optional": true,
+            "enumValues": [],
+            "elementType": null,
+            "objectType": null
+          },
+          {
             "name": "trace",
             "type": "OBJECT",
             "optional": true,

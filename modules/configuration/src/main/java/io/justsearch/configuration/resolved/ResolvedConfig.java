@@ -337,8 +337,19 @@ public record ResolvedConfig(
      *
      * @param ortProfilingDir directory for per-session profile files; null = disabled
      * @param verboseLogging enables ORT VERBOSE-level session logging
+     * @param intraOpThreads fixed ONNX Runtime intra-op thread count; null (the default) leaves
+     *     ORT's own hardware-derived choice, i.e. today's behaviour. Lane F PR 0b: on the CPU
+     *     execution provider the intra-op count decides how a GEMM's reduction is partitioned, so
+     *     it decides the summation ORDER and therefore an embedding's low bits. Pinned for
+     *     deterministic captures so bit-stability does not depend on the host's core count.
      */
-    public record Profiling(Path ortProfilingDir, boolean verboseLogging) {}
+    public record Profiling(Path ortProfilingDir, boolean verboseLogging, Integer intraOpThreads) {
+
+      /** Back-compat constructor (pre-lane-F-PR-0b): no intra-op pin. */
+      public Profiling(Path ortProfilingDir, boolean verboseLogging) {
+        this(ortProfilingDir, verboseLogging, null);
+      }
+    }
 
     /**
      * Enrichment-backfill pacing knobs (tempdoc 710 Wave-1.5 Move 4). Previously bare literals in
@@ -656,6 +667,12 @@ public record ResolvedConfig(
    * @param vectorHnswM HNSW M parameter
    * @param vectorHnswEfConstruction HNSW ef_construction parameter
    * @param vectorEfSearch ef_search parameter
+   * @param vectorExhaustiveSearch when true, every kNN query is made EXACT rather than approximate
+   *     — {@code ReadPathOps}'s kNN factory raises {@code k} to at least {@code reader.maxDoc()}
+   *     and supplies a {@code MatchAllDocsQuery} filter when the caller had none, which is the
+   *     only branch Lucene 10.4 exposes with an exact path (lane F PR 0b, the deterministic-capture
+   *     switch). Default false = today's approximate HNSW behaviour. O(vectors) per query: a
+   *     capture/diagnostic knob, not a production default.
    * @param vectorQuantizationEnabled whether vector quantization is enabled
    * @param indexAutoRecovery whether auto-recovery is enabled for corrupted index
    * @param schemaMismatchPolicy schema mismatch handling policy
@@ -699,6 +716,7 @@ public record ResolvedConfig(
       Integer vectorHnswM,
       Integer vectorHnswEfConstruction,
       Integer vectorEfSearch,
+      boolean vectorExhaustiveSearch,
       Boolean vectorQuantizationEnabled,
       boolean indexAutoRecovery,
       String schemaMismatchPolicy,

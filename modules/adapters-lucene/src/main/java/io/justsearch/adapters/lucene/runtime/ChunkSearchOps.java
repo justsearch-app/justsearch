@@ -67,6 +67,65 @@ public final class ChunkSearchOps {
   }
 
   /**
+   * Runs a bare (postings-based) CHUNK search under a tie-break that is stable across index
+   * builds. The kNN chunk leg needs the same sort and gets it separately, by handing this same
+   * {@code buildChunkTieBreakSort} to {@code ReadPathOps.search} (see
+   * {@link #searchChunkVector}) — it reaches Lucene through the read path rather than through
+   * this helper. The order is:
+   * score DESC, then {@code parent_doc_id}, then {@code chunk_index}, then the doc id
+   * ({@code LuceneRuntimeUtils#buildChunkTieBreakSort}, which explains why the doc id alone is not
+   * enough on a chunk row — it is a fresh {@code UUID.randomUUID()} per ingest).
+   *
+   * <p>Before this existed these legs called {@code searcher.search(query, n)}, whose only
+   * tie-break is Lucene's INTERNAL docId — a number a different segment layout renumbers. Two
+   * index builds of the same documents therefore returned different members of a BM25/SPLADE tie
+   * group, and because {@code SearchExecutor#collapseChunkHitsToParents} is first-seen-wins and
+   * the fused {@code totalHits} is the candidate-union size, one swapped chunk moved both the
+   * evidence selection and the reported hit count (lane F PR 0b; the whole-document leg was
+   * already sorted, which is why only the chunk legs drifted).
+   *
+   * <p>{@code doDocScores = true} keeps every returned score exactly what the bare overload
+   * produced, and WAND/block-max pruning is RETAINED. A leading score comparator does not cost it:
+   * {@code TopFieldCollector}'s constructor sets {@code scoreMode = TOP_SCORES} and
+   * {@code canSetMinScore = true} whenever
+   * {@code firstComparator.getClass() == FieldComparator.RelevanceComparator.class &&
+   * reverseMul[0] == 1 && totalHitsThreshold != Integer.MAX_VALUE} — all three hold here
+   * ({@code SortField.FIELD_SCORE} is a non-reversed relevance comparator and the threshold is
+   * Lucene's default 1000). Verified against the shipped lucene-core 10.4.0 bytecode, not inferred.
+   *
+   * <p>What changes is therefore the order of equal-score hits and, past the {@code totalHits}
+   * threshold, a small margin in the reported {@code totalHits}. The margin has one cause:
+   * {@code updateMinCompetitiveScore} passes the bottom entry's RAW score to
+   * {@code setMinCompetitiveScore}, with no {@code Math.nextUp} — because with a secondary
+   * comparator a later doc that ties the bottom score can still win on the tie-break, so it may
+   * not be skipped. Docs equal to the bottom score are consequently visited and counted, where a
+   * docId-tie-broken {@code TopScoreDocCollector} would have excluded them.
+   */
+  private org.apache.lucene.search.TopDocs searchChunksWithStableTieBreak(
+      org.apache.lucene.search.IndexSearcher searcher, Query query, int limit)
+      throws IOException {
+    return searcher.search(
+        query, limit, LuceneRuntimeUtils.buildChunkTieBreakSort(idField), true);
+  }
+
+  /**
+   * The whole-document sibling of {@link #searchChunksWithStableTieBreak}: score DESC then the doc
+   * id, the sort the document read path already uses
+   * ({@code LuceneRuntimeUtils#buildRuntimeSort(RELEVANCE, idField)}).
+   *
+   * <p>A whole-document row's {@code doc_id} IS deterministic — it is the normalized absolute path
+   * ({@code IndexingDocumentOps.java:162,172,174}) — so it needs neither of the two chunk
+   * comparators, and adding them would only cost two missing-docvalues reads per hit. The
+   * {@code totalHits}-margin note on the chunk helper applies here too.
+   */
+  private org.apache.lucene.search.TopDocs searchDocsWithStableTieBreak(
+      org.apache.lucene.search.IndexSearcher searcher, Query query, int limit)
+      throws IOException {
+    return searcher.search(
+        query, limit, LuceneRuntimeUtils.buildRuntimeSort(RuntimeSearchSort.RELEVANCE, idField), true);
+  }
+
+  /**
    * Finds parent document IDs that match a filter query.
    *
    * <p>Used for two-stage RAG retrieval: first find matching parent docs via document-level
@@ -132,7 +191,7 @@ public final class ChunkSearchOps {
                 BooleanClause.Occur.FILTER);
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchChunksWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             return buildChunkHits(searcher, topDocs, startTime);
           });
@@ -199,7 +258,7 @@ public final class ChunkSearchOps {
             }
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchChunksWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
             return buildChunkHits(searcher, topDocs, startTime);
           });
     } catch (IOException e) {
@@ -264,7 +323,7 @@ public final class ChunkSearchOps {
             }
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchChunksWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             return buildChunkHits(searcher, topDocs, startTime);
           });
@@ -316,7 +375,7 @@ public final class ChunkSearchOps {
             }
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchChunksWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             return buildChunkHits(searcher, topDocs, startTime);
           });
@@ -483,7 +542,7 @@ public final class ChunkSearchOps {
                 BooleanClause.Occur.MUST_NOT);
 
             org.apache.lucene.search.TopDocs topDocs =
-                searcher.search(queryBuilder.build(), effectiveLimit);
+                searchDocsWithStableTieBreak(searcher, queryBuilder.build(), effectiveLimit);
 
             org.apache.lucene.index.StoredFields storedFields = searcher.storedFields();
 
@@ -542,12 +601,16 @@ public final class ChunkSearchOps {
       }
     }
 
-    int queryK = readPathOps.resolveVectorQueryK(effectiveLimit);
     KnnFloatVectorQuery knnQuery =
-        new KnnFloatVectorQuery(SchemaFields.CHUNK_VECTOR, queryVector, queryK, filter);
+        readPathOps.buildKnnQuery(SchemaFields.CHUNK_VECTOR, queryVector, effectiveLimit, filter);
 
+    // Lane F PR 0b: the CHUNK tie-break, not the document one. This leg reaches Lucene through
+    // ReadPathOps.search, whose RELEVANCE sort breaks ties on doc_id — a per-ingest UUID on a
+    // chunk row. Exhaustive mode makes it acute: the leg returns the whole corpus, so every
+    // identical-vector tie is present and every one of them was ordered at random per build.
     return readPathOps.search(knnQuery, effectiveLimit, null,
-        RuntimeSearchSort.RELEVANCE, null);
+        RuntimeSearchSort.RELEVANCE, null,
+        LuceneRuntimeUtils.buildChunkTieBreakSort(idField));
   }
 
   /**

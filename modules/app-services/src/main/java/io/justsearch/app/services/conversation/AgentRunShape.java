@@ -63,7 +63,16 @@ public final class AgentRunShape {
   // Every agent event additionally carries the optional shared trace envelope (ofTraced).
   private static final List<EventDescriptor> EVENT_SCHEMA =
       List.of(
-          EventDescriptor.ofTraced("session_started", EventField.string("sessionId")),
+          // Lane F PR 0b — the three applied-sampling fields are OPTIONAL because they are omitted
+          // whenever the run resolved no value for them, which is every run that pins no seed. A
+          // reader can therefore distinguish "this build does not report applied sampling" from
+          // "this run applied none" — the distinction a capture needs to prove its pin took effect.
+          EventDescriptor.ofTraced(
+              "session_started",
+              EventField.string("sessionId"),
+              EventField.number("samplingTemperature").asOptional(),
+              EventField.number("samplingTopP").asOptional(),
+              EventField.number("samplingSeed").asOptional()),
           EventDescriptor.ofTraced("chunk", EventField.string("text")),
           EventDescriptor.ofTraced("reasoning_chunk", EventField.string("text")),
           EventDescriptor.ofTraced(
