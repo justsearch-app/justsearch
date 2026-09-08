@@ -146,7 +146,7 @@ public final class EngineShutdownSequence {
         }
       }
     }
-    String workerOutcome = outcomes.getOrDefault(INDEX_HALF_STEP, "GRACEFUL");
+    String workerOutcome = outcomes.getOrDefault(INDEX_HALF_STEP, "UNKNOWN");
     if (!"GRACEFUL".equals(workerOutcome) && !"UNKNOWN".equals(workerOutcome)) {
       errors.add("worker-" + workerOutcome.toLowerCase(Locale.ROOT));
     }

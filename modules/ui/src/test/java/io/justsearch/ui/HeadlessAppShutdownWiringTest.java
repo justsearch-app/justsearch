@@ -45,6 +45,30 @@ final class HeadlessAppShutdownWiringTest {
   }
 
   @Test
+  @DisplayName("an absent production index half reports graceful")
+  void absentProductionIndexHalfReportsGraceful() {
+    var sequence =
+        new EngineShutdownSequence(
+            Path.of("build", "shutdown-wiring", "absent-index"),
+            HeadlessApp.orderedShutdownSteps(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                OperationLeaseService.noOp(),
+                () -> null),
+            ignored -> {});
+
+    var result = sequence.run(Reason.QUIT);
+
+    assertEquals("GRACEFUL", result.workerOutcome());
+  }
+
+  @Test
   @DisplayName("boot discards a request left by the prior Engine incarnation")
   void bootDiscardsPreexistingShutdownRequest(@TempDir Path tempDir) throws Exception {
     Path runtime = Files.createDirectories(tempDir.resolve("runtime"));

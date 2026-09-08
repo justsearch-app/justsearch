@@ -99,15 +99,15 @@ final class EngineShutdownSequenceTest {
   }
 
   @Test
-  @DisplayName("an absent index half is already closed and reports graceful")
-  void absentIndexHalfReportsGraceful(@TempDir Path dataDir) {
+  @DisplayName("an omitted index step remains unknown")
+  void omittedIndexStepReportsUnknown(@TempDir Path dataDir) {
     var sequence =
         new EngineShutdownSequence(dataDir, List.of(ok("telemetry")), ignored -> {});
 
     var result = sequence.run(Reason.QUIT);
 
     assertTrue(result.clean());
-    assertEquals("GRACEFUL", result.workerOutcome());
+    assertEquals("UNKNOWN", result.workerOutcome());
   }
 
   @Test

@@ -1343,7 +1343,10 @@ public class HeadlessApp {
         // re-ordering cannot silently change which step the updater reads.
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             io.justsearch.app.engine.EngineShutdownSequence.INDEX_HALF_STEP,
-            reason -> knowledgeServer == null ? null : knowledgeServer.closeForUpgrade().name()),
+            reason ->
+                knowledgeServer == null
+                    ? "GRACEFUL"
+                    : knowledgeServer.closeForUpgrade().name()),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "tracing",
             reason -> {
