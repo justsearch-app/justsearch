@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B6 landed (the Engine side); B7-B17 open"
+status: "B1-B10 landed (the Engine side, the contract, and both supervisors); B11-B17 open"
 updated: 2026-09-08
 ---
 
@@ -145,6 +145,131 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   runs. Implemented sequence-first so each commit is green on its own terms; the watcher was inert
   for one commit and went live at B6, which is stated in B3's commit body rather than left as a
   gap a reader has to notice.
+- **B7's drift check could not go in `SupervisionContractTest`, and the reason is an edge, not a
+  preference.** §9 asks for an `enginePolicyMatchesCode()` there. That class is in `app-services`
+  and the dependency runs `app-engine -> app-services`
+  (`modules/app-engine/build.gradle.kts:26`, `implementation(project(":modules:app-services"))`),
+  so importing the mirror would invert the edge for a test. The row now NAMES its check in a
+  `driftCheck` field and `everyLiveProcessHasADriftCheck` requires a live row to be checked in that
+  class **or** to name a check that resolves — so "cannot be skipped by omission" survives while the
+  edge does not move. Two consequences worth stating: the live-process set is still pinned
+  (`{brain, engine}`), and guard resolution had to learn about repo-relative PATHS, because every
+  test that exercises an engine row is Node or Rust and an FQCN-only resolver would have left the
+  whole row on sentinels — unguarded, with a note saying so.
+- **`EngineSupervisionPolicy` had to be a pure constant holder, and that is honest rather than a
+  dodge.** A record with defaults — `BrainSupervisionPolicy`'s shape — has no production caller,
+  and `WholeProgramDeadCodeTest` would have failed the build for it (correctly: §10 forbids growing
+  that baseline). `isConstantHolder` exempts a namespace of `static final` constants because javac
+  inlines them, which is exactly what this class is. The register's `authorityNote` says outright
+  that nothing in Java calls it.
+- **§2's cooldown ceiling is inert at §2's budget.** With `maxRestartAttempts` 3 the linear ramp
+  reaches 3000 ms on the last attempt, so `maxCooldownMs: 5000` never binds. It is declared anyway —
+  it bounds the ramp if the attempt budget is ever raised — but the register and the mirror both say
+  so, and the one conformance case that reaches it raises the budget explicitly. A ceiling that
+  looks load-bearing and is not is the kind of number a later reader tunes for nothing.
+- **The dev-runner's FIRST incarnation is not supervised, and cannot be.** `start` is synchronous
+  for its caller, so a first incarnation that never publishes a port already fails the command with
+  an error a human reads; the supervisor has no caller to fail. `startDeadlineMs` therefore governs
+  RESTART incarnations only. The same distinction does not exist on the Tauri side, where the shell
+  spawns the Engine at setup and nobody is waiting — so there the deadline covers the first boot too.
+- **B8's port-wait loop stopped short-circuiting on an explicit `--api-port`.** It used to, which
+  meant such a start never read the manifest at all and recorded `portSource: unresolved` with a
+  null `instanceId`. A supervisor needs the instanceId on every incarnation to tell one boot from
+  the next, and the manifest is deleted before each spawn, so waiting for it is now the readiness
+  signal in both cases. Timeouts and the failure message are unchanged.
+- **`lastExit.class` records the class the BUDGET used, not the integer's.** An Engine asked to stop
+  for a hang runs its ordered shutdown and exits 0 — the code of a clean quit. Recording that as
+  `REQUESTED` would tell a reader the death was free when it was charged. Both implementations carry
+  `codeClass`/`codeReason` beside it so neither reading has to be inferred from the other.
+- **Q5's mirror is a sibling JSONL, not `RuntimeManifestPublisher`'s per-instance mirror.** That
+  mirror is Java-written and keyed by `instanceId`, and the case that needs the terminal record
+  hardest is the one where no instance ever published a manifest — so there is no key. The
+  supervisor writes `runtime/instances/supervisor-history.v1.jsonl`: same directory (already
+  sanctioned), same append-only shape, keyed by time instead of by an identity the failure mode may
+  have prevented from existing. Written by the dev-runner; the shell's terminal record is the live
+  file, which is what the updater (B13) reads.
+- **`dev-runner.cjs` refuses a `--data-dir` outside the repo root**, and the refusal is reported as
+  JSON on STDOUT. The conformance harness's work directories therefore live under the repo's
+  gitignored `tmp/`, not `os.tmpdir()`. Worth recording because of how it presented: every
+  dev-runner case failed with "supervisor never reached running" and an EMPTY stderr, which is a
+  message that actively misleads. Both adapters now quote stdout too.
+- **B9's runner discovers NINE files, not eight.** B8 added `test-dev-runner-supervisor.mjs`. The
+  runner asserts a FLOOR rather than a count, so the next file is not a two-file change and the
+  assertion still fails when discovery breaks — which is the only failure a runner would otherwise
+  report as a green.
+- **B9's CI step went to `windows-native-tests`, not `public-claims`.** Same workflow, same
+  `pull_request` + `push` triggers, so the coverage B9 asked for is unchanged. The reason is the
+  runner's subject: `dev-runner.cjs` is Windows-first by its own header, and cuda12 resolution,
+  `taskkill` and the handle-release cooldown either do not exist or do not mean the same thing on
+  ubuntu — and a Linux run could not be verified from this branch. The dev-runner conformance
+  ADAPTER joins it there for the same reason. `public-claims` gets the harness `--self-test`, which
+  is pure Node and was otherwise running nowhere.
+- **`check-runtime-manifest-closure`'s Rust scan had never scanned anything.** Its glob was
+  `modules/shell/src-tauri/src/**/*.rs`, and the file's own glob translator turns `**` into `.*`
+  followed by a required `/` — so it matched `src/bin/foo.rs` and never `src/lib.rs`, and until B10
+  every Rust file in the crate lived directly under `src/`. `lib.rs`'s SKIP_PATHS entry was
+  therefore hiding a file the scan could not have seen. Found by doing what B10 asks in the order it
+  asks: remove the entry, plant an unsanctioned artifact name, and observe. The check stayed green.
+  Glob and entry both fixed; the same falsification now reds. §6's row asked for the two writers to
+  be checked rather than exempt, and for the Rust one that required fixing the scan first.
+- **A Tauri incarnation that died WHILE STARTING was read as a start-deadline hang.** `await_ready`
+  failing does not mean the child is up and silent; it can mean the child is gone. The loop then
+  wrote a `hang` request — and `hang` is the one requested reason that is counted — so a
+  NON_TRANSIENT death was rewritten as a counted transient one and spent the whole budget. Only the
+  actuator half could surface this; the decision table cannot, because the two events look identical
+  to `decide`. This is Q2's argument for option (a) paying for itself on the first run.
+- **The stage's own harness assertions needed falsifying twice.** Two of them passed for the wrong
+  reason: the dev-runner adapter matched `/forcing\./` against the supervisor's own "…then a forced
+  kill" narration, so every graceful hang recovery reported itself as forced; and a concurrent
+  liveness probe (1 s timeout, 200 ms interval) could arm several request deadlines of which only
+  the last was tracked, so an untracked one could `taskkill` an incarnation that had done nothing
+  wrong. The second was a real supervisor defect found through a test that was itself wrong.
+- **No conformance case covers "`exhausted` kills the registered children".** §7 lists it, and it
+  cannot be written at B10: the child registry is B11 and reconciliation is B12, so there is nothing
+  to kill and nothing to assert was left alone. Named here rather than added as a case both adapters
+  would have to skip — "a case skipped for one adapter fails the harness" makes an unimplementable
+  case a permanent red, not a placeholder. The engine row's `external-adoption` fault mode carries
+  the same deferral with a dated sentinel.
+- **The same "died while starting" race exists in the dev-runner, and the critical-analysis pass is
+  what found it there.** After the Rust fix above, re-reading the JS path showed the mirror image:
+  `startNextIncarnation`'s await is still pending when a fast-dying incarnation's own exit handler
+  decides a restart and advances the counter, so the stale rejection would have requested a shutdown
+  of an incarnation that had just started and done nothing wrong. Guarded by an incarnation witness.
+  Neither adapter caught it — the case that comes closest (`start-deadline-stops-a-partial-boot`)
+  passes either way, because the wrong request lands on an incarnation the case does not inspect.
+  Recorded because it is the second instance of one class: **an asynchronous start racing a
+  synchronous death handler**, in two languages, from one design.
+- **The loop is shared between the two Rust actuators; the ACTUATORS are not, and the conformance
+  run only exercises one of them.** `run_supervision` is the same code in production and under the
+  harness — which is the point of the trait — but `ShellActuator` binds it to the real child and
+  `FakeEngineActuator` binds it to the fake engine, and no test drives the first. The
+  critical-analysis pass found two divergences that only the unexercised half had: `force_kill`
+  TOOK and reaped the child handle, so the next `poll_exit` would have returned `None` forever and
+  the loop would have sat in `stopping` waiting for an exit it had already consumed; and the
+  shutdown check ran only at the top of a turn, leaving a 50 ms window in which a death observed
+  just as the shell began quitting would have restarted the Engine into a closing desktop. Both
+  fixed. The general finding is the one to carry into B11-B13: a shared loop makes the DECISIONS
+  common and the bindings divergent, so the actuator that CI cannot reach needs reading, not
+  assuming.
+- **NAMED RED, not stage B's: `OnnxEmbeddingEncoderLongDocForensicTest.longDocEmbedWithSpansMatchesBaseEmbed`.**
+  The full `./gradlew.bat cleanTest test --no-build-cache` at the end of B10 reported one failing
+  task. Two cases in it timed out; one (`OnnxEmbeddingEncoderBoundedTokenizeTest`, a 10-minute
+  budget) passed on an isolated re-run and was load starvation, the way `agent-lessons.md` predicts.
+  The other is DETERMINISTIC: run alone on an otherwise idle machine it takes **68.4 s against its
+  own `@Timeout(30, SECONDS)`** — a 2.3x overshoot, not a race. It is not this stage's: `git diff
+  origin/main..HEAD -- .../indexerworker/embed/onnx/` is empty, and the one file the branch touches
+  in `embed/` (`EmbeddingFingerprint.java`) changed at stage A's checkpoint. Deliberately NOT
+  "fixed" by raising the number: 68 s for an 8192-token embed is the signature of a CPU fallback,
+  so the budget may be right and the machine wrong, and widening a timeout to make a red go away is
+  the move `fix-root-causes-not-symptoms` names. Recorded here and reported rather than acted on,
+  because acting on it means deciding whether the encoder is meant to be on the GPU in a unit test —
+  which is tempdoc 710's question, not stage B's. **Everything else is green: 1433 result files,
+  9001 tests, 1 failure, 0 errors, 19 skipped.**
+- **Open item for B11/B12: each Tauri restart starts another `watch_manifest` thread.**
+  `spawn_headless_backend` starts one per spawn and the loop exits only on a spawn error, so a
+  supervised restart leaves the previous watcher polling. The duplicates are idempotent (both call
+  `observe_manifest`, which is provenance-checked) but they accumulate, and two watchers can both
+  emit `backend-restart` for one instance change. Pre-existing shape, made reachable by B10.
 
 ---
 

@@ -140,7 +140,12 @@ jobs:
 
       # Fast, model-less anti-regression: dev inference resolution must NEVER fall back to a CPU
       # baseline (tempdoc 656 Move 1/2). No stack, no models needed — runs before the heavier smoke.
-      - name: Dev-runner runtime resolution regression test
+      #
+      # Lane F stage B item B9 widened what this runs: `test:dev-runner` named two files by hand and
+      # now points at a runner that discovers all of `scripts/dev/test-dev-runner-*.mjs`. The step's
+      # name follows, because the old one named a subset of what it does. The cuda12 resolution
+      # regression is still in there — it is one of the discovered files, not a separate invocation.
+      - name: Dev-runner suite (auto-discovered; includes the cuda12 resolution regression)
         run: npm run test:dev-runner
 
       - name: Onramp doctor (diagnostic — reports the tier)
