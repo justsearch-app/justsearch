@@ -3,7 +3,6 @@ package io.justsearch.ui;
 
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
-import io.justsearch.ui.api.UpgradeShutdownAction;
 
 /**
  * The {@code ui}-facing adapter onto {@link EngineShutdownSequence} (stage B item B4).
@@ -13,14 +12,10 @@ import io.justsearch.ui.api.UpgradeShutdownAction;
  * {@code Supplier}. Design 7.3 puts that ownership in the composition root, because the sequence
  * spans all three rings and the root is the only place allowed to see all of them.
  *
- * <p>What is left here is the part that genuinely belongs to {@code ui}: {@link
- * UpgradeShutdownAction} is a {@code ui.api} interface, and {@code app-engine} cannot implement it
- * without inverting the {@code ui -> app-engine} edge. So the adapter stays and delegates. It holds
- * no state — every guarantee the old class made (run once, exit once, receipt nonce-bound) is now
- * made by the sequence, and duplicating any of them here would create a second authority for the
- * same question.
+ * <p>The remaining adapter is the normal-quit entry point used by the lifecycle API. It holds no
+ * state; every run-once and exit-once guarantee belongs to the sequence.
  */
-public final class HeadShutdownCoordinator implements UpgradeShutdownAction {
+public final class HeadShutdownCoordinator {
 
   /** Kept for callers that referenced the receipt name through this class. */
   public static final String RECEIPT_FILE = EngineShutdownSequence.RECEIPT_FILE;
@@ -37,11 +32,5 @@ public final class HeadShutdownCoordinator implements UpgradeShutdownAction {
    */
   public void shutdownAndExit() {
     sequence.runAndExit(Reason.QUIT);
-  }
-
-  /** The updater's path: the same ordered close, then the nonce-bound receipt, then exit. */
-  @Override
-  public void shutdown(String preparationId, String shutdownNonce) {
-    sequence.runAndExitWithReceipt(preparationId, shutdownNonce);
   }
 }

@@ -1123,24 +1123,7 @@ public class HeadlessApp {
       // upgrade through the same file as the supervisor means there is one trigger path to reason
       // about, not two that must be kept in step.
       final Path runtimeDir = configPhase.dataDir().resolve("runtime");
-      upgradeShutdownBridge.install(
-          (preparationId, shutdownNonce) -> {
-            try {
-              new io.justsearch.app.engine.ShutdownRequest(
-                      io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE,
-                      System.currentTimeMillis()
-                          + io.justsearch.app.engine.ShutdownRequestWatcher.UPGRADE_DEADLINE_MS,
-                      shutdownNonce,
-                      "upgrade-controller",
-                      preparationId)
-                  .writeTo(runtimeDir);
-            } catch (Exception e) {
-              // The updater reads a MISSING receipt as "did not stop cleanly", which is the safe
-              // reading — so a failed write degrades to the same fail-closed signal as a failed
-              // shutdown rather than to a silent success.
-              log.error("Could not write the upgrade shutdown request; the Engine will not stop", e);
-            }
-          });
+      upgradeShutdownBridge.install(upgradeShutdownRequestWriter(runtimeDir));
       // Tempdoc 805 G.1: the shell's normal-quit request. Unchanged — it is already cooperative and
       // in-process, so routing it through the file would add a poll's latency for nothing.
       lifecycleShutdownBridge.install(shutdownCoordinator::shutdownAndExit);
@@ -1149,17 +1132,8 @@ public class HeadlessApp {
       // request the upgrade path (and, from B8/B10, the supervisor) writes.
       startShutdownRequestWatcher(
               runtimeDir,
-              request -> true,
-              request -> {
-                if (request.reason()
-                        == io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
-                    && request.preparationId() != null) {
-                  shutdownSequence.runAndExitWithReceipt(
-                      request.preparationId(), request.nonce());
-                } else {
-                  shutdownSequence.runAndExit(request.reason());
-                }
-              },
+              shutdownRequestAcceptance(operationLeasesRef),
+              shutdownRequestDispatcher(shutdownSequence),
               io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
               shutdownRequestWatcherRef::set);
 
@@ -1234,6 +1208,53 @@ public class HeadlessApp {
       // Tempdoc 501 Phase 18: api-port.txt is gone, the manifest publisher's
       // close() (above) handles its own file cleanup.
     }
+  }
+
+  /** Returns the production upgrade front half that persists a nonce-bound shutdown request. */
+  static io.justsearch.ui.api.UpgradeShutdownAction upgradeShutdownRequestWriter(Path runtimeDir) {
+    return (preparationId, shutdownNonce) -> {
+      try {
+        new io.justsearch.app.engine.ShutdownRequest(
+                io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE,
+                System.currentTimeMillis()
+                    + io.justsearch.app.engine.ShutdownRequestWatcher.UPGRADE_DEADLINE_MS,
+                shutdownNonce,
+                "upgrade-controller",
+                preparationId)
+            .writeTo(runtimeDir);
+      } catch (Exception e) {
+        // A missing receipt is the updater's fail-closed signal, so a failed request write must not
+        // be presented as a successful shutdown.
+        log.error("Could not write the upgrade shutdown request; the Engine will not stop", e);
+      }
+    };
+  }
+
+  /** Accepts prepared upgrades only while their exact lease preparation remains live. */
+  static java.util.function.Predicate<io.justsearch.app.engine.ShutdownRequest>
+      shutdownRequestAcceptance(io.justsearch.app.api.OperationLeaseService operationLeases) {
+    return request -> {
+      if (request.reason() != io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
+          || request.preparationId() == null) {
+        return true;
+      }
+      io.justsearch.app.api.OperationLeaseSnapshot snapshot = operationLeases.snapshot();
+      return snapshot.admissionFrozen()
+          && java.util.Objects.equals(request.preparationId(), snapshot.preparationId());
+    };
+  }
+
+  /** Returns the production request-file back half that selects receipt or plain shutdown. */
+  static java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequest>
+      shutdownRequestDispatcher(io.justsearch.app.engine.EngineShutdownSequence sequence) {
+    return request -> {
+      if (request.reason() == io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
+          && request.preparationId() != null) {
+        sequence.runAndExitWithReceipt(request.preparationId(), request.nonce());
+      } else {
+        sequence.runAndExit(request.reason());
+      }
+    };
   }
 
   /** Builds and starts the production watcher after clearing a prior incarnation's request. */
