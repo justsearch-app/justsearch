@@ -1070,7 +1070,7 @@
       ],
       "tests": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSequenceTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/UpgradeShutdownViaRequestFileTest.java"
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppUpgradeShutdownWiringTest.java"
       ],
       "fixtures": [],
       "note": "Lane F stage B item B4 moved the writer from HeadShutdownCoordinator (modules/ui) to EngineShutdownSequence (app-engine): design 7.3 puts the ordered close in the composition root. The receipt CONTRACT is unchanged - same filename, same schemaVersion 1, same nonce and preparation binding - only its owner moved."
@@ -1479,7 +1479,8 @@
       "status": "READY",
       "implementationSources": [
         "scripts/dev/dev-runner.cjs",
-        "modules/shell/src-tauri/src/lib.rs"
+        "modules/shell/src-tauri/src/lib.rs",
+        "modules/shell/src-tauri/src/engine_host.rs"
       ],
       "tests": [
         "scripts/dev/test-dev-runner-supervisor.mjs",

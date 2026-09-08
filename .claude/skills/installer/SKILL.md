@@ -79,7 +79,7 @@ Entry point: `modules/shell/src-tauri/src/lib.rs`
 - **Role**: Starts core services and exposes the local REST API via `LocalApiServer`.
 - **Port**:
   - Uses an **ephemeral** port (`0`) by default in bundled/desktop mode.
-  - Prints `JUSTSEARCH_API_PORT=<port>` to stdout on startup (used for port discovery).
+  - Prints `JUSTSEARCH_API_PORT=<port>` to stdout for diagnostics; discovery reads the admitted runtime manifest.
 
 ### 1.4 Knowledge Worker (background indexing + embeddings)
 
@@ -162,7 +162,13 @@ The shell opens `engine.log` **before** spawning Java so startup failures are re
    - uses `resources/headless/runtime/bin/java.exe`
    - runs `io.justsearch.ui.HeadlessApp` with a classpath of `ui-headless.jar` + `lib/*`
 4. The shell sets `JUSTSEARCH_HOME` to the user-writable app data directory and creates the folder skeleton.
-5. The shell reads backend stdout and parses `JUSTSEARCH_API_PORT=<port>`; it stores the port in shared state.
+5. The shell admits the runtime manifest only for its current child and stores that binding.
+
+The shell and development host treat a bounded valid HTTP response from that binding,
+including 503, as liveness during startup and operation. A silent or malformed response
+counts as a miss. The restart budget resets after 300 continuous seconds of ready API
+and healthy, non-stale index observations. Loss of either starts the window over;
+unavailable optional AI does not prevent the reset.
 
 See: `modules/shell/src-tauri/src/lib.rs`
 

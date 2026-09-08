@@ -222,13 +222,22 @@ function start() {
       return;
     }
     if (url === '/api/health') {
-      res.writeHead(200, { 'content-type': 'application/json' });
+      res.writeHead(behaviour.healthStatus ?? 200, { 'content-type': 'application/json' });
       res.end('{"status":"UP"}');
       return;
     }
     if (url === '/api/status') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ lifecycle: 'READY', instanceId, ready: true }));
+      let indexHealthy = true;
+      if (behaviour.controlEssentialReadiness) {
+        try { indexHealthy = JSON.parse(fs.readFileSync(path.join(dataDir, 'fake-essential-ready.json'), 'utf8')).ready === true; }
+        catch { indexHealthy = false; }
+      }
+      res.end(JSON.stringify({ lifecycle: 'READY', instanceId, ready: true,
+        components: { head: { state: 'LIFECYCLE_STATE_READY' } }, indexAvailable: true,
+        worker: { core: { indexHealthy } },
+        readiness: { components: { indexServing: { state: 'DEGRADED', stale: false }, ai: { state: 'NOT_READY' } } },
+      }));
       return;
     }
     res.writeHead(404, { 'content-type': 'application/json' });

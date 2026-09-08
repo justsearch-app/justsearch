@@ -19,6 +19,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 import { enginePlanFor } from '../contract.mjs';
+import { proveEssentialStability } from '../essential-stability.mjs';
 
 export const name = 'tauri';
 
@@ -99,6 +100,15 @@ export async function runCase({ testCase, policy, io }) {
   });
 
   try {
+    if (testCase.id === 'live-503-and-continuous-essential-stability') {
+      problems.push(...await proveEssentialStability({
+        dataDir, statePath: path.join(dataDir, 'runtime', 'supervisor.v1.json'), policy, io,
+      }));
+      // Finish the real loop through its ordinary quit request so its owned child is reaped.
+      io.writeShutdownRequest(dataDir, { reason: 'quit', deadlineEpochMs: Date.now() + policy.gracefulStopDeadlineMs });
+      await Promise.race([run.exited, io.sleep(5000)]);
+      return { problems };
+    }
     // A case that declares a `request` is driven by that request rather than by a fault: this is the
     // requested path, written by someone who is not the supervisor (item B15's escalation, item B6's
     // commit-shutdown), which is the shape the supervisor must not charge to the crash budget.

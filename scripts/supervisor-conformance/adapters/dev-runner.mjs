@@ -24,6 +24,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 import { enginePlanFor } from '../contract.mjs';
+import { proveEssentialStability } from '../essential-stability.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -182,6 +183,11 @@ export async function runCase({ testCase, policy, io }) {
     }
     if (running.policyProfile !== 'harness') {
       problems.push(`the supervisor ran on the PRODUCT policy (${running.policyProfile}); the overrides did not reach it`);
+    }
+
+    if (testCase.id === 'live-503-and-continuous-essential-stability') {
+      problems.push(...await proveEssentialStability({ dataDir: run.dataDir, statePath: run.statePath, policy, io }));
+      return { problems };
     }
 
     // A case that declares a `request` is driven by that request rather than by a fault: this is the

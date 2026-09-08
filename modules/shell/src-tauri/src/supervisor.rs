@@ -520,6 +520,8 @@ pub trait Actuator {
     fn poll_exit(&mut self) -> Option<i32>;
     /// A cheap liveness probe (design 7.1: the hang path reads only this). `false` is one miss.
     fn probe_health(&mut self) -> bool;
+    /// API and index readiness; optional AI readiness does not own the restart budget.
+    fn probe_essential_ready(&mut self) -> bool;
     /// A request file written by someone who is NOT this supervisor — the Engine escalating for
     /// itself (7.6), or `commit-shutdown` (item B6). Charging those deaths to the crash budget is
     /// the double-accounting 627 U3 left open, arriving from the other side.
@@ -583,7 +585,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
         Ok(ready) => {
             current = ready;
             supervisor.observe(Event::Ready, None);
-            ready_at = Some(actuator.now_ms());
+            ready_at = None;
             next_health_poll = actuator.now_ms() + supervisor.policy.hang_poll_interval_ms;
             publish!(None);
         }
@@ -658,7 +660,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                                 current.pid = pid;
                             }
                             supervisor.observe(Event::Ready, None);
-                            ready_at = Some(actuator.now_ms());
+                            ready_at = None;
                             next_health_poll =
                                 actuator.now_ms() + supervisor.policy.hang_poll_interval_ms;
                             publish!(None);
@@ -714,20 +716,24 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
         }
 
         if supervisor.state == State::Running {
-            if let Some(at) = ready_at {
-                if now.saturating_sub(at) >= supervisor.policy.stability_window_ms
-                    && supervisor.restart_count > 0
-                {
-                    supervisor.observe(Event::StabilityElapsed, None);
-                    ready_at = Some(now);
-                    publish!(None);
-                }
-            }
             if now >= next_health_poll {
                 next_health_poll = now + supervisor.policy.hang_poll_interval_ms;
                 if actuator.probe_health() {
                     supervisor.consecutive_misses = 0;
+                    if actuator.probe_essential_ready() {
+                        let observed_at = actuator.now_ms();
+                        let at = *ready_at.get_or_insert(observed_at);
+                        if observed_at.saturating_sub(at) >= supervisor.policy.stability_window_ms
+                            && supervisor.restart_count > 0
+                        {
+                            supervisor.observe(Event::StabilityElapsed, None);
+                            publish!(None);
+                        }
+                    } else {
+                        ready_at = None;
+                    }
                 } else {
+                    ready_at = None;
                     supervisor.consecutive_misses += 1;
                     let decision = supervisor.observe(Event::HealthMiss, None);
                     if decision.action == Action::RequestShutdown {

@@ -16,6 +16,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
+import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -35,6 +37,9 @@ const {
   buildStopReport,
   computeOwnershipVerdict,
   cleanupRegisteredChildrenForTerminal,
+  checkHttp200,
+  fetchJsonHttp,
+  essentialStatusReady,
 } = require(path.join(__dirname, 'dev-runner.cjs')).__test;
 const engineSupervisor = require(path.join(__dirname, 'lib', 'engine-supervisor.cjs'));
 
@@ -318,6 +323,41 @@ function testTerminalChildCleanupRequiresAllIdentityAxes() {
 }
 
 async function main() {
+  const server = http.createServer((_req, res) => { res.writeHead(503); res.end(); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/health`;
+  try {
+    assert.equal(await checkHttp200(url, 500, true), true, '503 proves liveness');
+    assert.equal(await checkHttp200(url, 500), false, 'ordinary readiness callers still require 200');
+    assert.equal(await fetchJsonHttp(url, 500), null);
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+  const sockets = new Set();
+  const silent = net.createServer((socket) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
+  await new Promise((resolve) => silent.listen(0, '127.0.0.1', resolve));
+  try {
+    const silentUrl = `http://127.0.0.1:${silent.address().port}/api/health`;
+    assert.equal(await checkHttp200(silentUrl, 50, true), false, 'accepted silence is not liveness');
+    assert.equal(await fetchJsonHttp(silentUrl, 50), null, 'readiness has an absolute deadline');
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await new Promise((resolve) => silent.close(resolve));
+  }
+  const status = {
+    components: { head: { state: 'LIFECYCLE_STATE_READY' } }, indexAvailable: true,
+    worker: { core: { indexHealthy: true } },
+    readiness: { components: { indexServing: { state: 'DEGRADED', stale: false }, ai: { state: 'NOT_READY' } } },
+  };
+  assert.equal(essentialStatusReady(status), true, 'optional AI does not prevent stability');
+  status.worker.core.indexHealthy = false;
+  assert.equal(essentialStatusReady(status), false);
+  status.worker.core.indexHealthy = true;
+  status.readiness.components.indexServing.stale = true;
+  assert.equal(essentialStatusReady(status), false);
+  status.readiness.components.indexServing.stale = false;
+  status.components.head.state = 'LIFECYCLE_STATE_STOPPING';
+  assert.equal(essentialStatusReady(status), false);
+  assert.equal(essentialStatusReady(null), false);
+  console.log('test-dev-runner-supervisor: bounded liveness and essential readiness — PASS');
   testStateRecordsWhichPolicyItRanUnder();
   await testTerminalStateIsMirroredAndNonTerminalIsNot();
   await testRequestReasonIsReadNeverGuessed();
