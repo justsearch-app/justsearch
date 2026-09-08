@@ -121,7 +121,7 @@ declarations leave the build files (its item A14), and `check-readiness-reason-c
 producer direction that the deleted Worker classes satisfy today, so stage A carries a holding
 allowlist for the orphaned `WORKER_*` codes until D1 re-cuts the vocabulary (its item A17).
 
-**Owner items from the first live fixture captures (2026-09-07, PR 0).** Four captures on one
+**Findings from the first live fixture captures (2026-09-07, PR 0), decided.** Four captures on one
 build (`evidence/baseline/fixture/`): two on one index, then two on two fresh ingests of the same
 91 documents. Every capture agreed on the cancelled turn's outcome and on the rank order of the
 hits both sides returned; they disagreed on three things 16 calls deterministic, none of them
@@ -130,24 +130,75 @@ nondeterminism in the dense and cross-encoder legs; max delta 0.0094 over 118 id
 hits), so the fixture instantiates "equal-score" as within a declared epsilon (0.01) and does
 not diff the score: a mechanism detail inside the class. (b) Evidence selection at the top-10
 margin differs between two fresh index builds of the same documents: `totalHits` moved on four
-of twelve queries and one tie-group member was replaced on two, which is the dense leg's
-approximate nearest-neighbour search (Lucene HNSW, `index.vector.hnsw.*`; no exact mode exists)
-plus the fusion cutoff. (c) The chat trajectory is not pinned: the same narrow question
-completed in 3 iterations in one capture and hit the iteration cap in the next, because
-`ConversationEngine.java:1154` hard-codes `new SamplingParams(0.8, 0.95, ...)` and no settings
-key or request field carries a temperature or seed; citation targets, sources, tool counts and
+of twelve queries and one tie-group member was replaced on two. *(corrected 2026-09-07, PR 0b
+investigation)*: the first reading blamed the dense leg's HNSW; the code says otherwise. The
+chunk BM25 and SPLADE legs call `searcher.search(q, n)` with no `Sort`
+(`ChunkSearchOps.java:266-267, 318-319` and three more sites), so equal scores break on Lucene's
+internal docId, which a different segment layout renumbers; the whole-document leg already sorts
+by score then the stable id (`LuceneRuntimeUtils.java:354-355`). Downstream the parent collapse
+is first-seen-wins and `totalHits` is the fused candidate-union size, so one swapped chunk moves
+both. HNSW is a second, smaller source, and Lucene 10.4 has no unfiltered exact path at any `k`
+(`AbstractKnnVectorQuery.getLeafResults`), so raising `index.vector.ef_search` (the real key;
+there is no `hnsw.ef_search`) cannot pin it; a `k >= maxDoc` plus a match-all filter takes the
+filtered exact branch. A wall-clock cross-encoder deadline (`CrossEncoderReranker.java:244-252`,
+200 ms) can also skip the rerank on a slow call. (c) The chat trajectory is not pinned: the
+same narrow question completed in 3 iterations in one capture and hit the iteration cap in the
+next. *(corrected, same investigation)*: `/api/chat/agent` is shape-driven and never reaches
+`ConversationEngine.parseSamplingParams`; the agent's sampling is the constant
+`SamplingParams.AGENT` (0.7 / 0.8) returned by `AgentLlmCaller.resolveAgentSampling`
+(`AgentLlmCaller.java:277-288`) and built inline at `AgentStepRunner.java:595,635`, read from no
+request field; `SamplingParams` has no `seed`, and the streaming body sent to llama-server
+carries none (`OnlineModeOps.java:726-762`). Citation targets, sources, tool counts and
 disposition all follow from it. 16 lists evidence selection and citation targets among the
 byte-equal fields and 17.7 names "generative text under a fixed seed" as a class, on the premise
-that both are deterministic across two runs. Neither is. The fixture keeps those fields `exact`
-and records the instability; the choices are the owner's (17.6, a gate row), before the first
-paired capture at stage E: for (b) a fixture-only retrieval pin (raise `hnsw.ef_search` to the
-chunk count for both captures, or an exact-scan flag added for the fixture) versus a margin
-rule on the last ranks; for (c) a backend sampling override for the fixture (temperature 0 plus
-a seed on the chat request, small, in stage D2's request-time paths or a PR 0 follow-up) versus
-moving the chat `exact` fields under `generative-text`. The orchestrator recommends the two
-pins, since they keep 16's relation and the class list unchanged. Until then the split-side
-baseline capture stands as taken (compact profile; the standard model's 11 GB resident set
-tripped the dev machine's memory guard), with its stability diff beside it.
+that both are deterministic across two runs. Neither is.
+
+**Decided (orchestrator, 2026-09-07, with the owner's agreement): PR 0b**, one small follow-up
+to PR 0 on `main`, before stage A merges, so the split side of every paired row is captured
+under it and 16's relation and the three-class list stay unchanged. Contents: (1) the chunk
+legs sort by score then stable id like the document leg, unconditionally, a correctness fix
+that rides on both sides; (2) `index.vector.exhaustive_search` (boot-time, env-settable) makes
+every kNN query exact through the filtered branch and, in that mode, the dense leg's
+`totalHits` no longer counts as saturation so only the approximation changes, not the
+pipeline's branches; (3) an optional `sampling` field on the chat request (temperature, top-p,
+seed) threaded like `effort` through `AgentRequest` to `AgentLlmCaller` and the two inline
+sites, with `seed` added to `SamplingParams` and written to the llama-server body; absent by
+default, nothing else changes; (4) the fixture declares `sampling` (temperature 0, fixed seed)
+and records it in provenance, and its capture runs set the exhaustive switch, one llama-server
+slot and a high reranker deadline. Acceptance: two fresh-corpus captures on one build diff
+clean on every `exact` field; the baseline capture is retaken under the pins, and
+`totalHits` / `stageCardinality` are expected to move against the pre-pin capture. Until PR 0b
+lands the capture in `evidence/baseline/` stands as taken (compact profile; the standard model's
+11 GB resident set tripped the dev machine's memory guard), with its stability diff beside it.
+
+**PR 0b outcome and the gating reference (orchestrator, 2026-09-07 evening).** Six paired
+runs on one build (`evidence/baseline/fixture/` after PR 0b lands) took the fixture from 37
+cross-build regressions to a residual of 2 to 5, and established what is and is not
+deterministic in split mode: the chat trajectory is byte-stable once sampling is pinned and its
+retrieved context is identical (both ordinary turns identical in four consecutive pairs); the
+cross-encoder score is bit-stable across index builds (117 identity-matched hits, delta 0.0000);
+the residual is index-time GPU embedding jitter moving fusion candidates at the rerank-window
+boundary, which no budget pin removes (the window was widened to 4K; the per-leg budgets, the
+Jaccard arbitration and the recall-complete splice were pinned; one pin, `rerank.top_k=100`,
+silently dropped the reranker with an ORT arena failure, now refused by the capture-health check).
+CPU encoders would make the vectors bit-stable but measured 38 percent of document embeddings in
+15 minutes at four threads on the 91-document corpus, outside the run budget; the keys stay as a
+documented instrument. **Decided:** 16's "byte-equal for deterministic fields" is instantiated with
+determinism measured, not assumed: each side of the paired diff captures twice on two fresh
+ingests of the corpus (GPU encoders, the pins on); a field that differs within a side's own pair
+is noise on that side and cannot count as a regression across sides; the declared relation applies
+to every field stable within both sides' pairs; a side whose noise pair exceeds a declared
+fraction of noisy fields (0.05, about ten fields on the shipped fixture) is refused as too noisy to gate; the raw counts are reported
+beside the verdict. No allowed-difference class is added; the three classes and the byte-equal
+rule are unchanged for stable fields. Captures taken before PR 0b are not comparable to captures
+after it (the request breadth and the pins changed) and the split-side baseline capture is
+retaken under PR 0b.
+
+**Decision authority (owner, 2026-09-07).** After PR 0 the owner delegated every remaining
+decision in this lane to the implementation orchestrator: "owner item" is retired as a category,
+and 17.6's clause that a change to 15, 16 or 17.3 waits for the owner's word now reads that the
+orchestrator decides it and records the decision, dated, in this section with its reasoning.
+The merge go-aheads (17.6, handoff rule 1) are unchanged.
 
 ## 0.1 Forces that shaped the design
 
@@ -1680,7 +1731,9 @@ picks it up:
 - **Design errors found mid-stage.** The design is amended in place with a dated line in
   section 0 naming the stage that found the error and what changed. An amendment inside a
   decided line (a mechanism detail, a citation) proceeds; a change to a decision (15), a gate
-  row (16) or the stage table (17.3) waits for the owner's word before the stage continues.
+  row (16) or the stage table (17.3) is decided by the implementation orchestrator and recorded
+  in section 0 with its reasoning (owner delegation, 2026-09-07; it previously waited for the
+  owner's word). Merge go-aheads are not delegated.
 - **Drift.** `git merge origin/main` weekly and once more before stage E; never a rebase of the
   pushed branch (`agent-lessons.md`). With development halted, PR 0 is the only expected source
   of conflict.
@@ -1722,7 +1775,7 @@ PR 0 baseline or the gate run confirms, not a design fact, and the "by" column s
 | failed-unit default at activation: `index.migration.cutover.max_failed_jobs` moves from -1 (unlimited, today) to 0, or the owner names another value | 7.4, 17.9 | **0**: today's value activates with documents missing and nobody told; with gaps reported and replay cheap, refusing is right and the row above is the escape hatch | D1 |
 | which readiness representation survives as the authority's name (`LifecycleSnapshotV1` or `ReadinessEnvelopeView`) and which becomes its projection | 7.6, 17.9 | **the envelope**, whose ten dimensions are already component-shaped; the lifecycle snapshot becomes its projection | D1 |
 | `UseCompactObjectHeaders` in the Engine's flag set (the Worker carries it today, the Head does not) | 8, 17.9 | gate run, with the collector | E |
-| deterministic capture for the workflow fixture: a retrieval pin for the dense leg (`hnsw.ef_search` at the chunk count, or an exact-scan flag) and a sampling override (temperature 0 plus seed on the chat request), or the affected fields move under a margin rule / `generative-text` | 16, 0 (PR 0 owner items) | **open**: orchestrator recommends the two pins; neither control exists today (`ChunkSearchOps.java:546`, `ConversationEngine.java:1154`) | E, before the first paired capture |
+| deterministic capture for the workflow fixture | 16, 0 | **decided 2026-09-07**: PR 0b lands the chunk-leg stable tie-break (unconditional), an exhaustive-kNN switch, a `sampling` request override with seed, candidate-budget pins and an applied-sampling echo; the gating reference is a same-build noise pair per side (section 0); CPU encoders measured too slow and stay an instrument | PR 0b; the baseline is retaken under it |
 
 ### 17.8 What would re-cut this sequencing
 
