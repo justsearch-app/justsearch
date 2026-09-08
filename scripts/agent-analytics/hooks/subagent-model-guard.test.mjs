@@ -37,6 +37,10 @@ check('whitespace model blocked', { model: '  ' }, true);
 check('null tool_input blocked', null, true);
 check('non-string model blocked', { model: 42 }, true);
 
+const missingModelReason = evaluateAgentSpawn({}).reason;
+assert.match(missingModelReason, /Nested spawns must pin their models/);
+assert.doesNotMatch(missingModelReason, /cannot see nested|No hooks fire/);
+
 if (failures.length > 0) {
   console.error(`subagent-model-guard.test: ${failures.length} FAILED, ${passed} passed`);
   for (const f of failures) console.error(`  x ${f}`);

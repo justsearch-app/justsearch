@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildResponse,
   extractExitCode,
+  eventMatcherMatches,
   forcePushRefusal,
   matcherMatches,
   patchTargets,
@@ -55,6 +56,19 @@ test('normalizes structured and model-facing exit codes', () => {
   assert.equal(extractExitCode({ metadata: { exitCode: 3 } }), 3);
   assert.equal(extractExitCode('Process exited with code 2'), 2);
   assert.equal(extractExitCode('no exit information'), null);
+});
+
+test('lifecycle matchers use event fields without tool aliases or tool-name fallback', () => {
+  for (const [event, field, value] of [
+    ['SubagentStart', 'agent_type', 'explorer'], ['SubagentStop', 'agent_type', 'explorer'],
+    ['SessionStart', 'source', 'resume'], ['PreCompact', 'trigger', 'auto'],
+    ['PostCompact', 'trigger', 'auto'],
+  ]) {
+    assert.equal(eventMatcherMatches(value, { hook_event_name: event, [field]: value }), true);
+    assert.equal(eventMatcherMatches(value, { hook_event_name: event, tool_name: value }), false);
+  }
+  assert.equal(eventMatcherMatches('^Agent$', { hook_event_name: 'SubagentStart', agent_type: 'spawn_agent' }), false);
+  assert.equal(eventMatcherMatches('Bash', { hook_event_name: 'PreToolUse', tool_name: 'exec_command' }), true);
 });
 
 test('combines context and rewrite fields into one Codex response', () => {
@@ -174,6 +188,32 @@ test('end-to-end adapter injects Codex session id into justsearch-dev calls', ()
   assert.equal(output.hookSpecificOutput.permissionDecision, 'allow');
   assert.equal(output.hookSpecificOutput.updatedInput.sessionId, sessionId);
 });
+
+for (const agentType of ['explorer', 'Plan', 'worker']) {
+  test(`SubagentStart routes by agent_type: ${agentType}`, () => {
+    const result = spawnSync(process.execPath, [ADAPTER], {
+      cwd: REPO_ROOT, encoding: 'utf8', timeout: 15000, windowsHide: true,
+      env: { ...process.env, JUSTSEARCH_DISABLE_HOOKS: '0' },
+      input: JSON.stringify({
+        hook_event_name: 'SubagentStart', session_id: `codex-start-${process.pid}`,
+        agent_id: `fixture-${agentType}`, agent_type: agentType,
+        cwd: REPO_ROOT, permission_mode: 'default',
+      }),
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = result.stdout.trim() ? JSON.parse(result.stdout) : {};
+    const context = output.hookSpecificOutput?.additionalContext ?? '';
+    if (agentType === 'worker') {
+      assert.equal(context, '', 'a role outside the manifest matcher must not get the baseline');
+    } else {
+      assert.equal(output.hookSpecificOutput?.hookEventName, 'SubagentStart');
+      assert.match(context, /Codex subagent baseline brief/);
+      assert.match(context, /AGENTS\.md/);
+      assert.match(context, /tested revision.*missing proof/);
+      assert.match(context, /locale-invariant/);
+    }
+  });
+}
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} failure(s):\n${failures.join('\n\n')}`);

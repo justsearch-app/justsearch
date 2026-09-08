@@ -156,6 +156,7 @@ version when a runtime probe disagrees or a client update changes delivery.
 
 Sources: [Codex AGENTS discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md),
 [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents),
+[Codex hooks](https://learn.chatgpt.com/docs/hooks),
 [Claude memory](https://code.claude.com/docs/en/memory), and
 [Claude subagents](https://code.claude.com/docs/en/sub-agents).
 
@@ -168,10 +169,12 @@ hook parity from matching Markdown.
 ## Delivery checks and runtime probe
 
 `agent-instructions-sync --check` checks the complete shared projection. The
-analytics suite tests marker failure, non-invariant drift, and the real
-SubagentStart subprocess envelope for both harness branches. It checks that the
-emitted brief contains required instructions and preserves its size budget. These
-are repository tests, not a simulated claim of model compliance or client trust.
+analytics suite tests marker failure and non-invariant drift. Leaf-script
+subprocess tests check both harness branches and the guidance size budget. A
+separate Codex adapter subprocess test exercises the manifest matcher, selected
+handler, and emitted SubagentStart context, including a nonmatching role. Its
+lifecycle matchers use agent type, session source, or compaction trigger as
+appropriate. These are repository tests, not proof of client loading or trust.
 
 When verifying a client upgrade or suspected missing instructions:
 

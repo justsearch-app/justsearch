@@ -51,8 +51,8 @@ export function evaluateAgentSpawn(toolInput) {
       'Agent spawn has no explicit `model`. An unpinned spawn inherits the MAIN session model ' +
       '(currently fable-tier — credits-billed; verified live, claude-code#74788). Re-call with an ' +
       'explicit model: "sonnet" (implementation floor), "haiku" (cheap/self-evident), or "opus". ' +
-      'If your subagent may spawn its own children, instruct it to pin their models too — this ' +
-      'guard cannot see nested spawns.',
+      'Nested spawns must pin their models too; session-wide hook coverage still depends ' +
+      'on the active client configuration and matching tool path.',
   };
 }
 

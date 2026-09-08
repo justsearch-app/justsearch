@@ -26,6 +26,11 @@ Extend existing hook delivery tests to exercise the real subprocess envelope and
 both harness branches. These prove repository output, not host installation or
 model obedience. Document the separate live delivery probe and its limits.
 
+Independent review exposed an adapter gap: SubagentStart matched tool names,
+so selected agent types never reached the guidance handler. Use event-specific
+matcher fields and test the complete adapter path with matching and nonmatching
+roles. This fixes existing binding delivery without expanding the role matcher.
+
 Do not create an evidence database or a prose-compliance classifier. The existing
 task checklist and managed PR review record own requirements and evidence. A
 review must reconcile them, including environment and tested revision. Hashes
@@ -53,7 +58,7 @@ identify artifacts but do not make unavailable evidence inspectable.
 | Projection and delivery | Windows candidate based on `f938c4eb2e9b`, with this task's delta | `agent-instructions-projection.test.mjs`, `subagent-guide.test.mjs` (9 checks), `check-codex-agent-parity.mjs` (8 checks), analytics suite (55 test files): pass | Repository output tested; no live client injection or obedience claim |
 | Documentation and script checks | Same local candidate | `lint:scripts`, `docs-validate`, `verify-canonical-doc-links`, canonical Markdown lint, prompt budgets, premerge-table, tempdoc-number, publication classification, PR-record and squash-message tests: pass. `regen-all --check --except notices`: 7 sets pass | Notice generation and hosted checks belong to publication verification |
 | Integrated application checks | Same candidate; Windows local environment | `gradlew.bat build -x test` and `gradlew.bat test`: both successful | Local logs under ignored `tmp/agent-build.txt` and `tmp/agent-tests.txt`; workstation-only access/retention |
-| Independent review | Candidate diff | Pending | Review must inspect actual claims |
+| Independent review | `0e16c0c5b` plus reviewed correction delta | Two findings: adapter selection bypassed by leaf tests; stale nested-hook denial. Corrected both. Adapter regression failed before the fix and all 17 adapter checks pass afterward; model-guard regression passes | Follow-up review and hosted final revision pending |
 | Publication | Hosted candidate and landed revision | Pending | No publication claim yet |
 
 ## Next action
@@ -61,3 +66,13 @@ identify artifacts but do not make unavailable evidence inspectable.
 Resolve independent review, run hosted checks on the publication candidate,
 validate the managed review record, then verify queue and post-merge results.
 Keep unrelated main-checkout changes and active migration worktrees untouched.
+
+## Verification qualifications
+
+One overlapping analytics run failed while publication preflight reinstalled
+Node dependencies: both errors were missing gray-matter files during replacement.
+The subsequent preflight analytics run passed all 55 files. Keep dependency
+installation and dependent tests sequential. The preflight later stopped at
+Cargo metadata because no default toolchain was selected; the installed stable
+toolchain was selected for the resumed command only. Neither failure justified
+changing a test, removing a check, or changing the machine-wide default.
