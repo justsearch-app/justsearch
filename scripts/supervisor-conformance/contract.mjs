@@ -26,6 +26,7 @@ const supervisor = require(path.join(HERE, '..', 'dev', 'lib', 'engine-superviso
 
 export const {
   ACTIONS,
+  shutdownHandoffReason,
   STATES,
   HARNESS_FLAG,
   OVERRIDE_ENV,

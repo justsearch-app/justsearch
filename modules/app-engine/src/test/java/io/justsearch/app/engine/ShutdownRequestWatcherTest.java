@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
+import static io.justsearch.app.engine.ShutdownRequestTest.writeRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,7 +39,7 @@ final class ShutdownRequestWatcherTest {
   void everyReasonReachesTheOrderedShutdown(@TempDir Path tempDir) throws Exception {
     for (Reason reason : Reason.values()) {
       Path runtime = runtimeDir(tempDir.resolve(reason.wire()));
-      new ShutdownRequest(reason, Long.MAX_VALUE, null, "test", null).writeTo(runtime);
+      writeRequest(new ShutdownRequest(reason, Long.MAX_VALUE, null, "test", null), runtime);
 
       // A real sequence over a fake step, so this covers the whole path the production wiring
       // takes — watcher -> sequence -> step — rather than just the watcher's callback.
@@ -81,7 +82,7 @@ final class ShutdownRequestWatcherTest {
       assertFalse(watcher.hasFired());
 
       // The watcher must still be working: a good request written afterwards is acted on.
-      new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null).writeTo(runtime);
+      writeRequest(new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null), runtime);
       watcher.pollOnce();
       assertEquals(Reason.QUIT, ran.get().reason(), "one bad file must not end the watch");
     }
@@ -91,8 +92,7 @@ final class ShutdownRequestWatcherTest {
   @DisplayName("a refused request is ignored and deleted, not re-read every poll")
   void refusedRequestIsIgnoredAndCleared(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "wrong-nonce", "updater", null)
-        .writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "wrong-nonce", "updater", null), runtime);
     var ran = new AtomicReference<ShutdownRequest>();
 
     try (var watcher =
@@ -111,8 +111,7 @@ final class ShutdownRequestWatcherTest {
   void nullAcceptanceDecisionIsRefused(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
     var ran = new AtomicReference<ShutdownRequest>();
-    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep")
-        .writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep"), runtime);
 
     try (var watcher = new ShutdownRequestWatcher(runtime, ignored -> null, ran::set, 50L)) {
       watcher.pollOnce();
@@ -123,23 +122,23 @@ final class ShutdownRequestWatcherTest {
   }
 
   @Test
-  @DisplayName("a deferred request remains pending without consuming the one-shot guard")
-  void deferredRequestRemainsForLaterAcceptance(@TempDir Path tempDir) throws Exception {
+  @DisplayName("a refused request does not consume the next valid host request")
+  void refusedRequestDoesNotConsumeTheOneShotGuard(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    var decision = new AtomicReference<>(ShutdownRequestWatcher.Acceptance.DEFER);
+    var decision = new AtomicReference<>(ShutdownRequestWatcher.Acceptance.REFUSE);
     var ran = new AtomicReference<ShutdownRequest>();
-    new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep")
-        .writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep"), runtime);
 
     try (var watcher = new ShutdownRequestWatcher(runtime, ignored -> decision.get(), ran::set, 50L)) {
       watcher.pollOnce();
-      assertTrue(Files.exists(ShutdownRequest.pathIn(runtime)));
+      assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
       assertFalse(watcher.hasFired());
       assertTrue(ran.get() == null);
 
+      writeRequest(new ShutdownRequest(Reason.RESTART, Long.MAX_VALUE, null, "supervisor", null), runtime);
       decision.set(ShutdownRequestWatcher.Acceptance.ACCEPT);
       watcher.pollOnce();
-      assertEquals("nonce", ran.get().nonce());
+      assertEquals(Reason.RESTART, ran.get().reason());
       assertTrue(watcher.hasFired());
     }
   }
@@ -148,7 +147,7 @@ final class ShutdownRequestWatcherTest {
   @DisplayName("the request is consumed before the sequence runs")
   void requestIsConsumedBeforeActing(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.RESTART, Long.MAX_VALUE, null, "supervisor", null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.RESTART, Long.MAX_VALUE, null, "supervisor", null), runtime);
     var fileStillPresentWhenActing = new AtomicReference<Boolean>();
 
     try (var watcher =
@@ -179,9 +178,9 @@ final class ShutdownRequestWatcherTest {
             r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> count.incrementAndGet(),
             50L)) {
-      new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null).writeTo(runtime);
+      writeRequest(new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null), runtime);
       watcher.pollOnce();
-      new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null).writeTo(runtime);
+      writeRequest(new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, null, null), runtime);
       watcher.pollOnce();
     }
 
@@ -197,7 +196,7 @@ final class ShutdownRequestWatcherTest {
     Path runtime = runtimeDir(tempDir);
     var threadName = new AtomicReference<String>();
     var latch = new CountDownLatch(1);
-    new ShutdownRequest(Reason.HANG, Long.MAX_VALUE, null, "supervisor", null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.HANG, Long.MAX_VALUE, null, "supervisor", null), runtime);
 
     try (var watcher =
         new ShutdownRequestWatcher(
@@ -227,7 +226,7 @@ final class ShutdownRequestWatcherTest {
     var watcherRef = new AtomicReference<ShutdownRequestWatcher>();
     var interruptedAfterClose = new AtomicReference<Boolean>();
     var laterStepRan = new CountDownLatch(1);
-    new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null), runtime);
 
     var watcher =
         new ShutdownRequestWatcher(
@@ -254,7 +253,7 @@ final class ShutdownRequestWatcherTest {
   void expiredRequestIsDiscarded(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
     var ran = new AtomicReference<ShutdownRequest>();
-    new ShutdownRequest(Reason.RESTART, 1L, null, "stale-supervisor", null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.RESTART, 1L, null, "stale-supervisor", null), runtime);
 
     try (var watcher =
         new ShutdownRequestWatcher(

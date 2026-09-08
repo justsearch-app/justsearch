@@ -978,7 +978,6 @@ public class HeadlessApp {
       // the watcher shut this incarnation down immediately.
       final Path runtimeDir = configPhase.dataDir().resolve("runtime");
       clearPriorShutdownRequest(runtimeDir, Files::deleteIfExists);
-      upgradeShutdownBridge.install(upgradeShutdownRequestWriter(runtimeDir));
 
       // Tempdoc 501 Phase 1: instantiate the runtime manifest publisher as soon as the dataDir
       // is known. The first manifest write happens after the API server binds (Phase 2 below);
@@ -1172,20 +1171,12 @@ public class HeadlessApp {
                       preliminary.workerOutcome()));
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
-      // Item B6 (design 7.3). commit-shutdown becomes the FRONT half of the sequence: it validates
-      // the nonce, freezes admission and reports blockers, and then writes the request file rather
-      // than running the ordered close itself. The watcher below is what runs it. Routing the
-      // upgrade through the same file as the supervisor means there is one trigger path to reason
-      // about, not two that must be kept in step.
-      // Tempdoc 805 G.1: the shell's normal-quit request. Unchanged — it is already cooperative and
-      // in-process, so routing it through the file would add a poll's latency for nothing.
-      lifecycleShutdownBridge.install(shutdownCoordinator::shutdownAndExit);
 
       // Item B3's watcher, started here because this is after the API front is up. It consumes the
-      // request the upgrade path (and, from B8/B10, the supervisor) writes.
+      // request written by the owning supervisor. Prepared upgrades dispatch locally.
       startShutdownRequestWatcher(
           runtimeDir,
-          shutdownRequestAcceptance(upgradeShutdownBridge),
+          shutdownRequestAcceptance(),
           shutdownRequestDispatcher(shutdownSequence),
           io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
           shutdownRequestWatcherRef::set);
@@ -1203,6 +1194,9 @@ public class HeadlessApp {
                   },
                    "justsearch-headless-shutdown"));
       terminalWriterShutdown.complete(shutdownSequence);
+      // Expose local shutdown only after the watcher and JVM hook are owned by the sequence.
+      upgradeShutdownBridge.install(shutdownSequence::runAndExitWithReceipt);
+      lifecycleShutdownBridge.install(shutdownCoordinator::shutdownAndExit);
 
       latch.await();
       log.info("HeadlessApp stopped.");
@@ -1265,54 +1259,21 @@ public class HeadlessApp {
     }
   }
 
-  /** Returns the production upgrade front half that persists a nonce-bound shutdown request. */
-  static io.justsearch.ui.api.UpgradeShutdownAction upgradeShutdownRequestWriter(Path runtimeDir) {
-    return (preparationId, shutdownNonce) -> {
-      try {
-        new io.justsearch.app.engine.ShutdownRequest(
-                io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE,
-                System.currentTimeMillis()
-                    + io.justsearch.app.engine.ShutdownRequestWatcher.UPGRADE_DEADLINE_MS,
-                shutdownNonce,
-                "upgrade-controller",
-                preparationId)
-            .writeTo(runtimeDir);
-      } catch (java.io.IOException e) {
-        throw new java.io.UncheckedIOException("could not persist upgrade shutdown request", e);
-      }
-    };
-  }
-
-  /** Accepts prepared upgrades only while their exact lease preparation remains live. */
+  /** The host file cannot authorize or forge a prepared upgrade receipt. */
   static java.util.function.Function<
           io.justsearch.app.engine.ShutdownRequest,
           io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance>
-      shutdownRequestAcceptance(io.justsearch.ui.api.UpgradeShutdownBridge bridge) {
-    return request -> {
-      if (request.reason() != io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
-          || request.preparationId() == null) {
-        return io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT;
-      }
-      return switch (bridge.verify(request.preparationId(), request.nonce())) {
-        case ACCEPT ->
-            io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT_COMMITTED;
-        case DEFER -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.DEFER;
-        case REFUSE -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE;
-      };
-    };
+      shutdownRequestAcceptance() {
+    return request ->
+        request.preparationId() == null && request.nonce() == null
+            ? io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT
+            : io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE;
   }
 
-  /** Returns the production request-file back half that selects receipt or plain shutdown. */
+  /** Host requests use plain shutdown; only the acknowledged local controller can request a receipt. */
   static java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequest>
       shutdownRequestDispatcher(io.justsearch.app.engine.EngineShutdownSequence sequence) {
-    return request -> {
-      if (request.reason() == io.justsearch.app.engine.ShutdownRequest.Reason.UPGRADE
-          && request.preparationId() != null) {
-        sequence.runAndExitWithReceipt(request.preparationId(), request.nonce());
-      } else {
-        sequence.runAndExit(request.reason());
-      }
-    };
+    return request -> sequence.runAndExit(request.reason());
   }
 
   @FunctionalInterface
@@ -1374,6 +1335,12 @@ public class HeadlessApp {
               shutdownRequestWatcher) {
     return List.of(
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "runtime-manifest",
+            reason -> {
+              if (manifestPublisher != null) manifestPublisher.markShutdownPending(reason.wire());
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operation-admission",
             reason -> {
               operationLeases.freezeAdmission(reason.wire());
@@ -1385,12 +1352,6 @@ public class HeadlessApp {
               io.justsearch.app.engine.ShutdownRequestWatcher watcher =
                   shutdownRequestWatcher.get();
               if (watcher != null) watcher.close();
-              return null;
-            }),
-        new io.justsearch.app.engine.EngineShutdownSequence.Step(
-            "runtime-manifest",
-            reason -> {
-              if (manifestPublisher != null) manifestPublisher.markShutdownPending(reason.wire());
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

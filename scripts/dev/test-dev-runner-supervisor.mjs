@@ -31,7 +31,6 @@ const {
   supervisorStatePath,
   supervisorHistoryPath,
   writeShutdownRequestFile,
-  readShutdownRequestReason,
   waitForEngineHandleRelease,
   preserveEngineLog,
   buildStopReport,
@@ -125,27 +124,20 @@ async function testTerminalStateIsMirroredAndNonTerminalIsNot() {
 
 // --- the request file -------------------------------------------------------------------------
 
-async function testRequestReasonIsReadNeverGuessed() {
+async function testHostRequestWriterAndHandoffAdmission() {
   const root = tempRoot('request');
   try {
     const dataDir = path.join(root, 'data');
-    assert.equal(readShutdownRequestReason(dataDir), null, 'absent file -> no reason');
-
     await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1 });
-    assert.equal(readShutdownRequestReason(dataDir), 'restart');
-
-    const target = path.join(dataDir, 'runtime', 'shutdown-request.v1.json');
-    fs.writeFileSync(target, '{ this is not json', 'utf8');
-    assert.equal(readShutdownRequestReason(dataDir), null, 'a file caught mid-write is ignored, not guessed');
-
-    fs.writeFileSync(target, JSON.stringify({ reason: 'reboot' }), 'utf8');
-    assert.equal(
-      readShutdownRequestReason(dataDir),
-      null,
-      'an unknown reason must NOT be treated as a request: charging a death to the wrong class is '
-      + 'how a crash loop becomes invisible',
-    );
-    console.log('test-dev-runner-supervisor: the request reason is read, never guessed — PASS');
+    const body = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'), 'utf8'));
+    assert.deepEqual(body, { schemaVersion: 1, reason: 'restart', deadlineEpochMs: 1, issuedBy: 'dev-runner' });
+    const manifest = { schemaVersion: 2, pid: 42, instanceId: 'boot',
+      shutdownHandoff: { state: 'pending', reason: 'restart' } };
+    assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 42, 'boot'), 'restart');
+    assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 43, 'boot'), null);
+    assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 42, 'new-boot'), null);
+    assert.equal(engineSupervisor.shutdownHandoffReason({ ...manifest, shutdownHandoff: { state: 'pending', reason: 'reboot' } }, 42, 'boot'), null);
+    console.log('test-dev-runner-supervisor: host writer shape and current-instance handoff admission — PASS');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -360,7 +352,7 @@ async function main() {
   console.log('test-dev-runner-supervisor: bounded liveness and essential readiness — PASS');
   testStateRecordsWhichPolicyItRanUnder();
   await testTerminalStateIsMirroredAndNonTerminalIsNot();
-  await testRequestReasonIsReadNeverGuessed();
+  await testHostRequestWriterAndHandoffAdmission();
   await testHandleReleaseWaitsForALiveProcess();
   await testEachIncarnationKeepsItsOwnEngineLog();
   testStopReportCarriesTheIncarnationOnlyWhenSupervised();

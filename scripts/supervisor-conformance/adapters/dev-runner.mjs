@@ -107,6 +107,7 @@ async function driveCase({ testCase, policy, io }) {
         JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, io.fakeEngine]),
         JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify(IDLE_FRONTEND),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+        JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
         // and a case that hangs for either is a case nobody will run.
         JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '10000',
@@ -151,6 +152,9 @@ async function driveCase({ testCase, policy, io }) {
 }
 
 const RESTART_CASES = new Set([
+  'local-handoff-bounds-responsive-close-with-churn',
+  'completed-local-handoff-still-bounds-native-exit',
+  'local-handoff-fatal-exit-remains-counted',
   'fileless-clean-local-restart-is-not-counted',
   'crash-1-restarts-under-budget',
   'oom-3-restarts-under-budget',
@@ -192,16 +196,6 @@ export async function runCase({ testCase, policy, io }) {
       return { problems };
     }
 
-    // A case that declares a `request` is driven by that request rather than by a fault: this is the
-    // requested path, written by someone who is not the supervisor (item B15's escalation, item B6's
-    // commit-shutdown), which is exactly the shape the supervisor must not charge to the crash budget.
-    if (testCase.request) {
-      io.writeShutdownRequest(run.dataDir, {
-        reason: testCase.request.reason,
-        deadlineEpochMs: Date.now() + policy.gracefulStopDeadlineMs,
-      });
-    }
-
     if (RESTART_CASES.has(testCase.id)) {
       const restarted = await watchSupervisor({
         statePath: run.statePath,
@@ -241,6 +235,17 @@ export async function runCase({ testCase, policy, io }) {
         if (!testCase.request && fs.existsSync(path.join(run.dataDir, 'runtime', 'shutdown-request.v1.json'))) {
           problems.push('fileless restart left a shutdown request');
         }
+      }
+      if (['local-handoff-bounds-responsive-close-with-churn',
+        'completed-local-handoff-still-bounds-native-exit'].includes(testCase.id)) {
+        if (!(/FORCED KILL:/.test(run.output.stderr)) || restarted.lastExit?.reason !== 'hang'
+            || restarted.lastExit?.class !== 'TRANSIENT' || !restarted.lastExit?.counted) {
+          problems.push('responsive local close was not force-killed and charged as a hang');
+        }
+      }
+      if (testCase.id === 'local-handoff-fatal-exit-remains-counted'
+          && ((/FORCED KILL:/.test(run.output.stderr)) || restarted.lastExit?.reason !== 'fatal_or_uncaught')) {
+        problems.push('local fatal exit was misclassified or force-killed before its own completion');
       }
       if (testCase.id === 'oom-3-restarts-under-budget' && restarted.lastExit?.reason !== 'out_of_memory') {
         problems.push(`lastExit.reason ${restarted.lastExit?.reason}, expected out_of_memory`);

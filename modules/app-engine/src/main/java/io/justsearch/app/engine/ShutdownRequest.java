@@ -3,10 +3,8 @@ package io.justsearch.app.engine;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -30,7 +28,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p><b>Two writers, one shape, no shared code.</b> The Tauri supervisor (Rust) and the dev-runner
  * (Node) both write this file, and neither can call this class. They agree by SHAPE, which is why
- * the field set is pinned by a test rather than left to a comment: a fourth writer that spells
+ * the field set is pinned by a test rather than left to a comment: a writer that spells
  * {@code deadlineEpochMs} as {@code deadline_ms} produces a file this parser rejects, and a
  * rejected request is a shutdown that silently does not happen.
  *
@@ -47,9 +45,6 @@ public record ShutdownRequest(
 
   /** The file name inside {@code <dataDir>/runtime/}. */
   public static final String FILENAME = "shutdown-request.v1.json";
-
-  /** The staging name for the atomic write; never read. */
-  private static final String TMP_FILENAME = FILENAME + ".tmp";
 
   /**
    * Why the Engine is being asked to stop. The wire form is the lower-case name; design 7.3 step 6
@@ -158,43 +153,6 @@ public record ShutdownRequest(
   private static String text(JsonNode root, String field) {
     JsonNode n = root.get(field);
     return n == null || !n.isString() ? null : n.stringValue();
-  }
-
-  /**
-   * Writes the request atomically (staging file, then rename), creating the runtime directory.
-   *
-   * <p>Atomic because the reader polls: a consumer that catches a half-written file would see a
-   * malformed request, log it, and — correctly — ignore the shutdown it was being asked to perform.
-   */
-  public void writeTo(Path runtimeDir) throws IOException {
-    Files.createDirectories(runtimeDir);
-    Path tmp = runtimeDir.resolve(TMP_FILENAME);
-    Files.writeString(tmp, toJson(), StandardCharsets.UTF_8);
-    try {
-      Files.move(tmp, pathIn(runtimeDir), StandardCopyOption.ATOMIC_MOVE,
-          StandardCopyOption.REPLACE_EXISTING);
-    } catch (AtomicMoveNotSupportedException e) {
-      Files.move(tmp, pathIn(runtimeDir), StandardCopyOption.REPLACE_EXISTING);
-    }
-  }
-
-  /** The exact JSON shape the Rust and Node writers must also produce. */
-  public String toJson() {
-    StringBuilder sb = new StringBuilder(160);
-    sb.append("{\n  \"reason\": \"").append(reason.wire()).append("\",\n");
-    sb.append("  \"deadlineEpochMs\": ").append(deadlineEpochMs);
-    if (nonce != null) {
-      sb.append(",\n  \"nonce\": \"").append(nonce).append('"');
-    }
-    if (issuedBy != null) {
-      sb.append(",\n  \"issuedBy\": \"").append(issuedBy).append('"');
-    }
-    if (preparationId != null) {
-      // Item B6. The receipt written on the far side of this file is preparation- AND nonce-bound,
-      // and the updater rejects one that is not — so both identifiers have to survive the trip.
-      sb.append(",\n  \"preparationId\": \"").append(preparationId).append('"');
-    }
-    return sb.append("\n}\n").toString();
   }
 
   /**

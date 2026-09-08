@@ -1178,14 +1178,13 @@ impl supervisor::Actuator for ShellActuator {
         }).is_some()
     }
 
-    fn observed_request_reason(&mut self) -> Option<String> {
-        let raw = std::fs::read_to_string(self.shutdown_request_path()).ok()?;
+    fn observed_shutdown_reason(&mut self, current: &supervisor::Ready) -> Option<String> {
+        let raw = std::fs::read_to_string(self.data_dir.join("runtime").join("manifest.json")).ok()?;
         let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
-        let reason = parsed.get("reason")?.as_str()?.to_string();
-        // An unknown reason is IGNORED, never guessed at: guessing from a file caught mid-write
-        // could stop the product, and the supervisor's own deadline covers the case where ignoring
-        // it was wrong.
-        matches!(reason.as_str(), "quit" | "restart" | "upgrade" | "hang").then_some(reason)
+        let reason = supervisor::shutdown_handoff_reason(&parsed, current)?;
+        let binding = self.state.host.observe_current_binding(|_| true)?;
+        (self.state.child_pid() == current.pid && binding.instance_id == current.instance_id)
+            .then_some(reason)
     }
 
     fn write_shutdown_request(

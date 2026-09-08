@@ -254,6 +254,28 @@ function start() {
     const publishDelay = behaviour.mode === 'slow-start' ? behaviour.slowStartMs : 0;
     setTimeout(() => publishManifest(port), publishDelay);
 
+    if (behaviour.localHandoffAfterMs !== undefined) {
+      setTimeout(() => {
+        const writeHandoff = (state, stale = false) => {
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          manifest.schemaVersion = 2;
+          manifest.instanceId = stale ? `${instanceId}-stale` : instanceId;
+          manifest.shutdownHandoff = state == null ? null
+            : { state, reason: 'restart', changedAt: new Date().toISOString() };
+          writeJsonAtomic(manifestPath, manifest);
+        };
+        writeHandoff(behaviour.localHandoffState ?? 'pending', behaviour.staleHandoff === true);
+        log('published local shutdown handoff while HTTP remains responsive');
+        if (behaviour.churnHandoff) {
+          // Once admitted: stale replacement, disappearance, then continuously refreshed stamps.
+          // None may cancel or extend the host's already-latched deadline.
+          setTimeout(() => writeHandoff('pending', true), 200);
+          setTimeout(() => writeHandoff(null), 400);
+          setTimeout(() => setInterval(() => writeHandoff('pending'), 100), 600);
+        }
+      }, behaviour.localHandoffAfterMs);
+    }
+
     if (behaviour.mode === 'hang-soft' || behaviour.mode === 'hang-hard') {
       setTimeout(() => {
         answering = false;

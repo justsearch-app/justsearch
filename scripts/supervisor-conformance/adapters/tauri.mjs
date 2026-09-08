@@ -47,6 +47,9 @@ export async function available({ io }) {
 }
 
 const RESTART_CASES = new Set([
+  'local-handoff-bounds-responsive-close-with-churn',
+  'completed-local-handoff-still-bounds-native-exit',
+  'local-handoff-fatal-exit-remains-counted',
   'fileless-clean-local-restart-is-not-counted',
   'crash-1-restarts-under-budget',
   'oom-3-restarts-under-budget',
@@ -56,7 +59,7 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation }) {
+function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
   const child = spawn(
     binary,
     [
@@ -65,6 +68,7 @@ function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncar
       '--plan', planPath,
       '--node', process.execPath,
       '--run-ms', '25000',
+      '--request-reason', requestReason ?? '',
       // A restart case is answered the moment a second incarnation is running; a terminal case has
       // to be allowed to REACH its terminal state, so it gets no early stop at all. Passing this in
       // rather than baking it into the binary is what stops the budget-exhaustion case being cut
@@ -99,6 +103,7 @@ export async function runCase({ testCase, policy, io }) {
     io,
     env: { ...process.env, ...io.harnessOverrides },
     stopAfterIncarnation: RESTART_CASES.has(testCase.id) ? 2 : 0,
+    requestReason: testCase.request?.reason,
   });
 
   try {
@@ -107,24 +112,11 @@ export async function runCase({ testCase, policy, io }) {
         dataDir, statePath: path.join(dataDir, 'runtime', 'supervisor.v1.json'), policy, io,
       }));
       // Finish the real loop through its ordinary quit request so its owned child is reaped.
-      io.writeShutdownRequest(dataDir, { reason: 'quit', deadlineEpochMs: Date.now() + policy.gracefulStopDeadlineMs });
+      const manifest = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'manifest.json'));
+      await fetch(`http://127.0.0.1:${manifest.head.apiPort}/api/lifecycle/shutdown`, { method: 'POST' });
       await Promise.race([run.exited, io.sleep(5000)]);
       return { problems };
     }
-    // A case that declares a `request` is driven by that request rather than by a fault: this is the
-    // requested path, written by someone who is not the supervisor (item B15's escalation, item B6's
-    // commit-shutdown), which is the shape the supervisor must not charge to the crash budget.
-    if (testCase.request) {
-      await io.waitFor(
-        () => io.readJsonIfPresent(path.join(dataDir, 'runtime', 'supervisor.v1.json'))?.state === 'running',
-        { timeoutMs: 20_000, what: 'the tauri supervisor to reach running' },
-      ).catch(() => null);
-      io.writeShutdownRequest(dataDir, {
-        reason: testCase.request.reason,
-        deadlineEpochMs: Date.now() + policy.gracefulStopDeadlineMs,
-      });
-    }
-
     const code = await Promise.race([run.exited, io.sleep(45_000).then(() => 'TIMEOUT')]);
     if (code === 'TIMEOUT') {
       return { problems: [`the conformance binary never finished.\n        stderr: ${run.output.stderr.slice(-1200)}`] };
@@ -192,6 +184,17 @@ export async function runCase({ testCase, policy, io }) {
         if (!testCase.request && fs.existsSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'))) {
           problems.push('fileless restart left a shutdown request');
         }
+      }
+      if (['local-handoff-bounds-responsive-close-with-churn',
+        'completed-local-handoff-still-bounds-native-exit'].includes(testCase.id)) {
+        if (!(summary.forcedKill === true) || summary.lastExit?.reason !== 'hang'
+            || summary.lastExit?.class !== 'TRANSIENT' || !summary.lastExit?.counted) {
+          problems.push('responsive local close was not force-killed and charged as a hang');
+        }
+      }
+      if (testCase.id === 'local-handoff-fatal-exit-remains-counted'
+          && ((summary.forcedKill === true) || summary.lastExit?.reason !== 'fatal_or_uncaught')) {
+        problems.push('local fatal exit was misclassified or force-killed before its own completion');
       }
       if (testCase.id === 'oom-3-restarts-under-budget' && summary.lastExit?.reason !== 'out_of_memory') {
         problems.push(`lastExit.reason ${summary.lastExit?.reason}, expected out_of_memory`);

@@ -73,8 +73,8 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
 6. **`commit-shutdown` already does not wait for a second process.**
    `UpgradeController.commitShutdown` (`modules/ui/.../api/UpgradeController.java:97-139`) takes
    one synchronous status snapshot (`:180-193`) and 409s if not ready; the polling is the
-   caller's. What B changes is the *tail*: it writes the request file instead of invoking the
-   coordinator inline. Smaller than 7.3's sentence reads.
+   caller's. The original B tail used the request file; the dated B15 single-writer decision
+   supersedes that transport with direct local dispatch after response flush.
 7. **The `supervision-contract` register carries a phantom method.**
    `governance/supervision-contract.v1.json:78` cites
    `KnowledgeServerBootstrap.supervisionEngagedOnLastAttempt`, which does not exist in code
@@ -88,7 +88,8 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
 - **Scope stop (2026-09-08).** The newest design section 0 amendment suspends the
   unimplemented shared first-claim/accepted-marker protocol. Read
   `evidence/B/scope-recut.md` before the next B2/B3/B6/R3 batch. The preferred
-  single-writer cut needs production proof before replacing the current transport.
+  single-writer cut is being implemented under B15 with controller and real-host proofs;
+  migration callers still remain open.
 - **B17's explicit stress run found a new blocking red (2026-09-08).** The
   integrated 9,364-test inventory has two failures, preserved in
   `evidence/B/integrated-verification.md`. The obsolete drain classifier is repaired
@@ -331,7 +332,8 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   package-visible writer, live-lease acceptance predicate and dispatcher are the same factories
   used by `HeadlessApp`. A prepared upgrade dispatches only when its `preparationId` equals the
   currently frozen `OperationLeaseService` snapshot and carries the controller-owned nonce.
-  The writer is installed before API exposure. Commit reserves a short PERSISTING phase, persists
+  Historical B6 transport (superseded by B15 local dispatch below): the writer was installed
+  before API exposure. Commit reserved a short PERSISTING phase, persisted
   synchronously before writing the response, and reaches ACKNOWLEDGED only after a successful
   flush; persistence and response failures restore OPEN so retry or cancellation remains possible.
   A controller-owned PREPARING reservation also spans freeze, cancellation request, nonce
@@ -443,9 +445,9 @@ scripts/dev/test-dev-runner-head-java-opts.mjs` green.
 ### B2 — the shutdown request file
 
 `<dataDir>/runtime/shutdown-request.v1.json`: `reason` (`quit` | `restart` | `upgrade` | `hang`),
-`deadlineEpochMs`, optional `nonce`, `issuedBy`. Written by the supervisor and by
-`commit-shutdown` (B6); read by the Engine. One writer helper shared by the Rust and JS halves
-by *shape*, not by code (they cannot share a library).
+`deadlineEpochMs`, `issuedBy`, schema version 1. Written only by the owning supervisor;
+read by the Engine. Rust and Node share the shape, not a library. Legacy optional nonce
+and preparation fields remain parseable for explicit refusal; B6 dispatches locally.
 
 **Acceptance:** a schema test pins the field set; `check-runtime-manifest-closure` is green with
 the new artifact added to `ALLOWED_RUNTIME_ARTIFACTS` (`scripts/ci/check-runtime-manifest-closure.mjs:42-51`)
@@ -456,8 +458,8 @@ and a `tempdoc-ref` justification comment; a `store-recoverability.v1.json` entr
 
 A dedicated single-thread executor in the composition root, started after `api` readiness,
 polling the request file. **Never the API pool** (7.3: a hung engine answers no HTTP). On a
-valid request it runs B4's sequence with the request's reason; an invalid or nonce-mismatched
-file is logged and ignored, never acted on.
+valid host request it runs B4's sequence with the request's reason; invalid or prepared
+capability-bearing files are refused. No controller-phase deferral remains.
 
 **Acceptance:** a test drives each of the four reasons through a fake sequence and asserts the
 reason reaches step 6 (B5); a test asserts an unparseable file does not shut anything down; a
@@ -506,16 +508,17 @@ and `:modules:indexer-worker:test` green.
 
 ### B6 — `commit-shutdown` as the front half
 
-`UpgradeController.commitShutdown` (`UpgradeController.java:97-139`) keeps its nonce validation
-(`ownsNonce`, `:239-242`), its one-shot claim (`claimCommit`, `:244-248`) and its blocker
-reporting (`blocking`, `:222-227` — every active lease drains). Its tail changes: instead of
-invoking the coordinator on a daemon thread (`:135-138`), it writes B2's request file with
-`reason: "upgrade"` and the nonce. The receipt contract and `head-shutdown-receipt.v1.json`
-(`HeadShutdownCoordinator.java:20`) are untouched.
+`UpgradeController.commitShutdown` keeps nonce validation, its one-shot local reservation
+and blocker reporting. Resolve the bound shutdown action before acknowledgement, flush the
+response, then dispatch the ordered sequence on its own thread. The receipt stays nonce- and
+preparation-bound. Failed flush restores the open preparation for retry or cancellation.
+The owning host is the only request-file writer; the Engine has no writer or watcher verifier.
 
-**Acceptance:** the updater state-machine tests (`modules/shell/src-tauri/src/updater.rs:1796`
-`mod tests`, and the Java-side upgrade tests) green unchanged; a test asserts a nonce mismatch
-writes **no** file; a test asserts the receipt still carries the nonce.
+**Acceptance:** updater state-machine and Java upgrade-barrier tests green; blocked-flush proof
+shows no early dispatch and exactly one after success; failed flush dispatches nothing and permits
+retry/cancel; an unbound action returns non-success; wrong capabilities cannot dispatch; real HTTP
+commit reaches the matching receipt without a request file. Register the watcher and JVM hook
+before exposing the local action. The existing manifest handoff bounds local shutdown in both hosts.
 
 ### B7 — the supervisor contract, the fake engine, the conformance harness
 
@@ -692,6 +695,11 @@ frontend tests, both real supervisor adapters (11/11 each), readiness gates and 
 `r7-host-liveness.md` under `evidence/B/`; the integrated results are in the B13 record.
 
 ### B15 — `restart_required` covers cutover, rollback and start; and who reopens the index
+
+Clean restart exit is committed in `86d369c25`; [the checkpoint record](../evidence/B/b15-requested-restart.md)
+states its limits. Local dispatch and host handoff bounds are reviewed and verified in the next
+checkpoint recorded there (Java full 9405/0, both adapters 17/17); migration consumers and
+promotion/reopen proof remain open.
 
 Two obligations 17.3 row B hands B through the restart-required settings of 7.4:
 

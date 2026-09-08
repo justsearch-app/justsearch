@@ -247,7 +247,17 @@ function decide(observation, policy) {
   }
 }
 
+/** A current-incarnation handoff bounds close; the exit code alone certifies a clean restart. */
+function shutdownHandoffReason(manifest, pid, instanceId) {
+  if (!pid || !instanceId || manifest?.schemaVersion !== 2
+      || manifest.pid !== pid || manifest.instanceId !== instanceId) return null;
+  const handoff = manifest.shutdownHandoff;
+  if (!['pending', 'ready', 'incomplete'].includes(handoff?.state)) return null;
+  return ['quit', 'restart', 'upgrade', 'hang'].includes(handoff.reason) ? handoff.reason : null;
+}
+
 module.exports = {
+  shutdownHandoffReason,
   ACTIONS,
   STATES,
   HARNESS_FLAG,

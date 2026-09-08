@@ -57,6 +57,8 @@ struct FakeEngineActuator {
     last_incarnation: u32,
     forced_kill: bool,
     requests_written: Vec<String>,
+    host_request: Option<String>,
+    ready_at: Option<Instant>,
 }
 
 impl FakeEngineActuator {
@@ -124,6 +126,7 @@ impl Actuator for FakeEngineActuator {
                     let port = port as u16;
                     if engine_probe::responds(port, "/api/health", Duration::from_millis(800)) {
                         self.api_port = Some(port);
+                        self.ready_at = Some(Instant::now());
                         return Ok(Ready {
                             pid: self.child.as_ref().map(Child::id),
                             api_port: Some(port),
@@ -166,13 +169,13 @@ impl Actuator for FakeEngineActuator {
         self.api_port.is_some_and(|port| engine_probe::essential_ready(port, Duration::from_millis(700)))
     }
 
-    fn observed_request_reason(&mut self) -> Option<String> {
-        let raw = std::fs::read_to_string(self.request_path()).ok()?;
-        let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
-        let reason = parsed.get("reason")?.as_str()?.to_string();
-        // An unknown reason is IGNORED, never guessed at: guessing from a file caught mid-write
-        // could stop the product, and the deadline covers the case where ignoring it was wrong.
-        matches!(reason.as_str(), "quit" | "restart" | "upgrade" | "hang").then_some(reason)
+    fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String> {
+        supervisor::shutdown_handoff_reason(&self.read_manifest()?, current)
+    }
+
+    fn take_host_request(&mut self) -> Option<String> {
+        if self.ready_at?.elapsed() < Duration::from_millis(500) { return None; }
+        self.host_request.take()
     }
 
     fn write_shutdown_request(&mut self, reason: &str, deadline_epoch_ms: u64) -> Result<(), String> {
@@ -294,6 +297,8 @@ fn main() {
         last_incarnation: 0,
         forced_kill: false,
         requests_written: Vec::new(),
+        host_request: arg("--request-reason").filter(|s| !s.is_empty()),
+        ready_at: None,
     };
 
     // The shell spawns the Engine at setup and the loop picks it up from `await_ready`, so the

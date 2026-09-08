@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui;
 
+import static io.justsearch.ui.HeadlessAppShutdownWiringTest.writeRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.engine.EngineShutdownSequence;
@@ -19,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,223 +33,118 @@ final class HeadlessAppUpgradeShutdownWiringTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @Test
-  @DisplayName("a wrong commit nonce never reaches the production request writer")
-  void nonceMismatchWritesNoRequestFile(@TempDir Path dataDir) throws Exception {
-    Path runtimeDir = Files.createDirectories(dataDir.resolve("runtime"));
+  void wrongNonceAndStalePreparationNeverDispatch(@TempDir Path dataDir) throws Exception {
+    var sequence = new EngineShutdownSequence(dataDir, List.of(), ignored -> {});
     var bridge = new UpgradeShutdownBridge();
-    bridge.install(HeadlessApp.upgradeShutdownRequestWriter(runtimeDir));
-    LocalApiServer server =
-        LocalApiServer.builder(
-                new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
-                dataDir.resolve("index"))
-            .upgradeShutdownAction(bridge)
-            .build();
+    bridge.install(sequence::runAndExitWithReceipt);
+    LocalApiServer server = server(dataDir, bridge);
     try {
       HttpClient client = HttpClient.newHttpClient();
       var prepared = JSON.readTree(post(client, server, "/api/upgrade/prepare", "{}").body());
-      String body =
-          "{\"schemaVersion\":1,\"preparationId\":\""
-              + prepared.get("preparationId").asText()
-              + "\",\"shutdownNonce\":\"wrong\"}";
-
-      assertEquals(409, post(client, server, "/api/upgrade/commit-shutdown", body).statusCode());
-      assertFalse(Files.exists(ShutdownRequest.pathIn(runtimeDir)));
+      for (String field : List.of("preparationId", "shutdownNonce")) {
+        var wrong = JSON.readTree(capabilityBody(prepared)).deepCopy();
+        ((tools.jackson.databind.node.ObjectNode) wrong).put(field, "wrong");
+        assertEquals(409, post(client, server, "/api/upgrade/commit-shutdown", wrong.toString()).statusCode());
+        assertNull(sequence.resultIfRun());
+        assertFalse(Files.exists(ShutdownRequest.pathIn(dataDir.resolve("runtime"))));
+      }
     } finally {
       server.stop();
     }
   }
 
   @Test
-  @DisplayName("a persistence failure precedes success and leaves the capability cancellable")
-  void persistenceFailureReturnsNonSuccessAndLeavesCapabilityOpen(@TempDir Path dataDir)
+  void unboundActionReturnsNonSuccessAndLeavesCapabilityCancellable(@TempDir Path dataDir)
       throws Exception {
-    Path runtimeDir = dataDir.resolve("runtime");
-    Files.writeString(runtimeDir, "blocks directory creation");
     var bridge = new UpgradeShutdownBridge();
-    bridge.install(HeadlessApp.upgradeShutdownRequestWriter(runtimeDir));
-    LocalApiServer server =
-        LocalApiServer.builder(
-                new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
-                dataDir.resolve("index"))
-            .upgradeShutdownAction(bridge)
-            .build();
+    LocalApiServer server = server(dataDir, bridge);
     try {
       HttpClient client = HttpClient.newHttpClient();
       var prepared = JSON.readTree(post(client, server, "/api/upgrade/prepare", "{}").body());
-
-      assertEquals(
-          503,
-          post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared))
-              .statusCode());
-      assertEquals(
-          200,
-          post(client, server, "/api/upgrade/cancel", capabilityBody(prepared)).statusCode());
+      var refused = post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared));
+      assertEquals(503, refused.statusCode());
+      assertEquals("UPGRADE_SHUTDOWN_NOT_READY", JSON.readTree(refused.body()).get("errorCode").asText());
+      assertEquals(200, post(client, server, "/api/upgrade/cancel", capabilityBody(prepared)).statusCode());
     } finally {
       server.stop();
     }
   }
 
   @Test
-  @DisplayName("an acknowledged request dispatches with its original identifiers after expiry")
-  void productionFactoriesCarryUpgradeRequestToReceipt(@TempDir Path dataDir) throws Exception {
+  void acknowledgedLocalActionWritesTheNonceBoundReceiptWithoutARequestFile(@TempDir Path dataDir)
+      throws Exception {
     Path runtimeDir = Files.createDirectories(dataDir.resolve("runtime"));
     var bridge = new UpgradeShutdownBridge();
-    bridge.install(HeadlessApp.upgradeShutdownRequestWriter(runtimeDir));
-    LocalApiServer server =
-        LocalApiServer.builder(
-                new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
-                dataDir.resolve("index"))
-            .upgradeShutdownAction(bridge)
-            .build();
-    var sequence =
-        new EngineShutdownSequence(
-            dataDir,
-            List.of(
-                new EngineShutdownSequence.Step(
-                    EngineShutdownSequence.INDEX_HALF_STEP, ignored -> "GRACEFUL")),
-            ignored -> {});
-
+    var exited = new CountDownLatch(1);
+    var sequence = new EngineShutdownSequence(dataDir,
+        List.of(new EngineShutdownSequence.Step(EngineShutdownSequence.INDEX_HALF_STEP,
+            ignored -> "GRACEFUL")), ignored -> exited.countDown());
+    // This is the same late-bound method reference installed by the production composition root.
+    bridge.install(sequence::runAndExitWithReceipt);
+    LocalApiServer server = server(dataDir, bridge);
     try {
       HttpClient client = HttpClient.newHttpClient();
       var prepared = JSON.readTree(post(client, server, "/api/upgrade/prepare", "{}").body());
-      String preparationId = prepared.get("preparationId").asText();
-      assertEquals(200, post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared)).statusCode());
-      assertTrue(Files.isRegularFile(ShutdownRequest.pathIn(runtimeDir)));
-      var persisted = ShutdownRequest.read(runtimeDir).orElseThrow();
-      new ShutdownRequest(
-              persisted.reason(),
-              1L,
-              persisted.nonce(),
-              persisted.issuedBy(),
-              persisted.preparationId())
-          .writeTo(runtimeDir);
-
-      try (var _ =
-          HeadlessApp.startShutdownRequestWatcher(
-              runtimeDir,
-              HeadlessApp.shutdownRequestAcceptance(bridge),
-              HeadlessApp.shutdownRequestDispatcher(sequence),
-              20L,
-              ignored -> {})) {
+      var committed = post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared));
+      assertEquals(200, committed.statusCode());
+      assertTrue(JSON.readTree(committed.body()).get("shutdownAccepted").asBoolean());
+      assertTrue(exited.await(2, TimeUnit.SECONDS));
       Path receipt = dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE);
-      assertTrue(waitForFile(receipt), "the production watcher must dispatch the written request");
       var body = JSON.readTree(Files.readString(receipt));
-      assertEquals(preparationId, body.get("preparationId").asText());
-        assertEquals(prepared.get("shutdownNonce").asText(), body.get("shutdownNonce").asText());
-      }
-    } finally {
-      server.stop();
-    }
-  }
-
-  @Test
-  @DisplayName("a prepared upgrade must match the current frozen lease snapshot")
-  void stalePreparationIsRefusedBeforeDispatch(@TempDir Path dataDir) throws Exception {
-    Path runtimeDir = Files.createDirectories(dataDir.resolve("runtime"));
-    var bridge = new UpgradeShutdownBridge();
-    bridge.install(HeadlessApp.upgradeShutdownRequestWriter(runtimeDir));
-    LocalApiServer server =
-        LocalApiServer.builder(
-                new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
-                dataDir.resolve("index"))
-            .upgradeShutdownAction(bridge)
-            .build();
-    var sequence = new EngineShutdownSequence(dataDir, List.of(), ignored -> {});
-
-    try {
-      HttpClient client = HttpClient.newHttpClient();
-      post(client, server, "/api/upgrade/prepare", "{}");
-      try (var _ =
-          HeadlessApp.startShutdownRequestWatcher(
-              runtimeDir,
-              HeadlessApp.shutdownRequestAcceptance(bridge),
-              HeadlessApp.shutdownRequestDispatcher(sequence),
-              20L,
-              ignored -> {})) {
-      HeadlessApp.upgradeShutdownRequestWriter(runtimeDir).shutdown("stale-preparation", "nonce-1");
-      TimeUnit.MILLISECONDS.sleep(200);
+      assertEquals(prepared.get("preparationId").asText(), body.get("preparationId").asText());
+      assertEquals(prepared.get("shutdownNonce").asText(), body.get("shutdownNonce").asText());
       assertFalse(Files.exists(ShutdownRequest.pathIn(runtimeDir)));
-      assertEquals(null, sequence.resultIfRun());
-      }
     } finally {
       server.stop();
     }
   }
 
   @Test
-  @DisplayName("direct wrong or missing nonce requests are refused before dispatch")
-  void directInvalidNonceRequestsAreRefused(@TempDir Path dataDir) throws Exception {
+  void evenTheCurrentPreparedCapabilityCannotAuthorizeAFileRequest(@TempDir Path dataDir)
+      throws Exception {
     Path runtimeDir = Files.createDirectories(dataDir.resolve("runtime"));
-    var bridge = new UpgradeShutdownBridge();
-    bridge.install(HeadlessApp.upgradeShutdownRequestWriter(runtimeDir));
-    LocalApiServer server =
-        LocalApiServer.builder(
-                new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
-                dataDir.resolve("index"))
-            .upgradeShutdownAction(bridge)
-            .build();
     var sequence = new EngineShutdownSequence(dataDir, List.of(), ignored -> {});
+    var bridge = new UpgradeShutdownBridge();
+    bridge.install(sequence::runAndExitWithReceipt);
+    LocalApiServer server = server(dataDir, bridge);
     try {
       HttpClient client = HttpClient.newHttpClient();
       var prepared = JSON.readTree(post(client, server, "/api/upgrade/prepare", "{}").body());
-      String preparationId = prepared.get("preparationId").asText();
-      assertEquals(
-          200,
-          post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared))
-              .statusCode());
-      Files.delete(ShutdownRequest.pathIn(runtimeDir));
-      try (var watcher =
-          HeadlessApp.startShutdownRequestWatcher(
-              runtimeDir,
-              HeadlessApp.shutdownRequestAcceptance(bridge),
-              HeadlessApp.shutdownRequestDispatcher(sequence),
-              20L,
-              ignored -> {})) {
-        for (String nonce : new String[] {"wrong", null}) {
-          new ShutdownRequest(
-                  Reason.UPGRADE,
-                  Long.MAX_VALUE,
-                  nonce,
-                  "direct-file-test",
-                  preparationId)
-              .writeTo(runtimeDir);
+      try (var watcher = HeadlessApp.startShutdownRequestWatcher(runtimeDir,
+          HeadlessApp.shutdownRequestAcceptance(), HeadlessApp.shutdownRequestDispatcher(sequence),
+          20L, ignored -> {})) {
+        for (String nonce : new String[] {null, "wrong", prepared.get("shutdownNonce").asText()}) {
+          writeRequest(new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, nonce, "direct-file-test",
+              prepared.get("preparationId").asText()), runtimeDir);
           assertTrue(waitForAbsent(ShutdownRequest.pathIn(runtimeDir)));
           assertFalse(watcher.hasFired());
+          assertNull(sequence.resultIfRun());
         }
       }
-      assertEquals(null, sequence.resultIfRun());
+      assertFalse(Files.exists(dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE)));
     } finally {
       server.stop();
     }
   }
 
   @Test
-  @DisplayName("an unavailable bridge verifier fails closed")
-  void missingVerifierRefusesPreparedRequest() {
-    var bridge = new UpgradeShutdownBridge();
-    var request =
-        new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "test", "prep");
-
-    assertEquals(
-        io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.REFUSE,
-        HeadlessApp.shutdownRequestAcceptance(bridge).apply(request));
-  }
-
-  @Test
-  @DisplayName("plain and unprepared supervisor shutdowns never forge an upgrade receipt")
-  void unpreparedShutdownsUseThePlainProductionDispatchPath(@TempDir Path tempDir) {
-    for (Reason reason : List.of(Reason.QUIT, Reason.UPGRADE)) {
+  void hostShutdownsUsePlainDispatchAndNeverForgeAReceipt(@TempDir Path tempDir) {
+    for (Reason reason : Reason.values()) {
       Path dataDir = tempDir.resolve(reason.wire());
       var sequence = new EngineShutdownSequence(dataDir, List.of(), ignored -> {});
-      var request =
-          new ShutdownRequest(reason, Long.MAX_VALUE, null, "supervisor", null);
-
+      var request = new ShutdownRequest(reason, Long.MAX_VALUE, null, "supervisor", null);
+      assertEquals(io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+          HeadlessApp.shutdownRequestAcceptance().apply(request));
       HeadlessApp.shutdownRequestDispatcher(sequence).accept(request);
-
       assertTrue(sequence.resultIfRun() != null);
-      assertFalse(
-          Files.exists(dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE)));
+      assertFalse(Files.exists(dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE)));
     }
+  }
+
+  private static LocalApiServer server(Path dataDir, UpgradeShutdownBridge bridge) {
+    return LocalApiServer.builder(new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
+            dataDir.resolve("index"))
+        .upgradeShutdownAction(bridge).build();
   }
 
   private static HttpResponse<String> post(
@@ -258,16 +156,6 @@ final class HeadlessAppUpgradeShutdownWiringTest {
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build(),
         HttpResponse.BodyHandlers.ofString());
-  }
-
-  private static boolean waitForFile(Path path) throws Exception {
-    for (int i = 0; i < 100; i++) {
-      if (Files.isRegularFile(path)) {
-        return true;
-      }
-      TimeUnit.MILLISECONDS.sleep(20);
-    }
-    return false;
   }
 
   private static boolean waitForAbsent(Path path) throws Exception {

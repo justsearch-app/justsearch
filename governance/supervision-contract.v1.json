@@ -285,6 +285,38 @@
           "why": "A clean local restart remains identifiable if the Engine exits before its host observes the manifest handoff. Neither Engine nor fixture writes a shutdown request."
         },
         {
+          "id": "local-handoff-bounds-responsive-close-with-churn",
+          "faultMode": "hang",
+          "drives": ["actuator"],
+          "engine": { "mode": "honour", "localHandoffAfterMs": 800, "churnHandoff": true },
+          "expect": { "action": "restart", "counted": true },
+          "why": "The current Engine announces close while HTTP remains healthy. Stale identity, disappearance and refreshed handoff timestamps cannot cancel or extend its latched deadline; forced death is charged."
+        },
+        {
+          "id": "completed-local-handoff-still-bounds-native-exit",
+          "faultMode": "hang",
+          "drives": ["actuator"],
+          "engine": { "mode": "honour", "localHandoffAfterMs": 800, "localHandoffState": "ready" },
+          "expect": { "action": "restart", "counted": true },
+          "why": "A completed ordered close can still hang in native shutdown hooks. The existing ready handoff bounds process exit without granting a free restart."
+        },
+        {
+          "id": "local-handoff-fatal-exit-remains-counted",
+          "faultMode": "clean-exit",
+          "drives": ["actuator"],
+          "engine": { "mode": "crash", "exitCode": 1, "exitAfterMs": 1700, "localHandoffAfterMs": 800 },
+          "expect": { "action": "restart", "counted": true },
+          "why": "A restart handoff also precedes terminal writer exit 1. Observation must not overwrite host intent or make a fatal close free."
+        },
+        {
+          "id": "stale-local-handoff-cannot-arm-close",
+          "faultMode": "clean-exit",
+          "drives": ["actuator"],
+          "engine": { "mode": "clean-exit", "exitCode": 0, "exitAfterMs": 2800, "localHandoffAfterMs": 800, "staleHandoff": true },
+          "expect": { "action": "stop", "counted": false },
+          "why": "Same PID with a stale per-boot instance cannot arm a close deadline: the healthy Engine must live past that false deadline and reach its own clean exit."
+        },
+        {
           "id": "clean-exit-0-stops",
           "faultMode": "clean-exit",
           "drives": ["decision", "actuator"],

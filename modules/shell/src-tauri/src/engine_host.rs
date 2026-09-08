@@ -870,7 +870,7 @@ mod tests {
         fn probe_essential_ready(&mut self) -> bool {
             true
         }
-        fn observed_request_reason(&mut self) -> Option<String> {
+        fn observed_shutdown_reason(&mut self, _current: &supervisor::Ready) -> Option<String> {
             None
         }
         fn write_shutdown_request(&mut self, _reason: &str, _deadline: u64) -> Result<(), String> {

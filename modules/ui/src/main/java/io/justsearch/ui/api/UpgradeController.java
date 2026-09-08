@@ -55,9 +55,6 @@ final class UpgradeController {
     this.workerClient = workerClient;
     this.reconciliation =
         new UpgradeReconciliationProbe(dataDir, runningVersion, headReady, workerReady);
-    if (orderlyShutdown instanceof UpgradeShutdownBridge bridge) {
-      bridge.installVerifier(this::verifyShutdownRequest);
-    }
   }
 
   void reconcile(Context ctx) {
@@ -138,8 +135,16 @@ final class UpgradeController {
       preparationMismatch(ctx);
       return;
     }
+    Thread dispatch;
     try {
-      orderlyShutdown.shutdown(preparationId, request.shutdownNonce());
+      UpgradeShutdownAction action =
+          orderlyShutdown instanceof UpgradeShutdownBridge bridge
+              ? bridge.boundAction()
+              : orderlyShutdown;
+      dispatch =
+          Thread.ofPlatform()
+              .name("engine-upgrade-shutdown")
+              .unstarted(() -> action.shutdown(preparationId, request.shutdownNonce()));
     } catch (RuntimeException e) {
       restoreOpen(reservation);
       ctx.status(503)
@@ -147,8 +152,8 @@ final class UpgradeController {
               Map.of(
                   "shutdownAccepted", false,
                   "preparationId", preparationId,
-                  "error", "Upgrade shutdown request could not be persisted",
-                  "errorCode", "UPGRADE_SHUTDOWN_PERSIST_FAILED"));
+                  "error", "Upgrade shutdown action is not ready",
+                  "errorCode", "UPGRADE_SHUTDOWN_NOT_READY"));
       return;
     }
     try {
@@ -164,6 +169,9 @@ final class UpgradeController {
       throw e;
     }
     acknowledge(reservation);
+    // Starting after the successful flush keeps API close off its own request thread. A failure
+    // from here cannot undo an acknowledgement; absence of the nonce-bound receipt holds install.
+    dispatch.start();
   }
 
   private static Map<String, Object> response(
@@ -275,46 +283,23 @@ final class UpgradeController {
         || commitPhase != CommitPhase.OPEN
         || preparationInProgress
         || cancellationInProgress) return null;
-    commitPhase = CommitPhase.PERSISTING;
+    commitPhase = CommitPhase.ACKNOWLEDGING;
     commitReservation = new CommitReservation(request.preparationId(), request.shutdownNonce());
     return commitReservation;
   }
 
   private synchronized void restoreOpen(CommitReservation reservation) {
-    if (commitPhase == CommitPhase.PERSISTING && commitReservation == reservation) {
+    if (commitPhase == CommitPhase.ACKNOWLEDGING && commitReservation == reservation) {
       commitPhase = CommitPhase.OPEN;
       commitReservation = null;
     }
   }
 
   private synchronized void acknowledge(CommitReservation reservation) {
-    if (commitPhase != CommitPhase.PERSISTING || commitReservation != reservation) {
+    if (commitPhase != CommitPhase.ACKNOWLEDGING || commitReservation != reservation) {
       throw new IllegalStateException("upgrade commit reservation is no longer active");
     }
     commitPhase = CommitPhase.ACKNOWLEDGED;
-  }
-
-  private UpgradeShutdownBridge.Verification verifyShutdownRequest(
-      String preparationId, String nonce) {
-    CommitPhase phase;
-    synchronized (this) {
-      if (!java.util.Objects.equals(preparationId, noncePreparationId)
-          || !java.util.Objects.equals(nonce, shutdownNonce)) {
-        return UpgradeShutdownBridge.Verification.REFUSE;
-      }
-      phase = commitPhase;
-    }
-    if (phase == CommitPhase.PERSISTING) {
-      return UpgradeShutdownBridge.Verification.DEFER;
-    }
-    if (phase != CommitPhase.ACKNOWLEDGED) {
-      return UpgradeShutdownBridge.Verification.REFUSE;
-    }
-    OperationLeaseSnapshot snapshot = leases.snapshot();
-    return snapshot.admissionFrozen()
-            && java.util.Objects.equals(preparationId, snapshot.preparationId())
-        ? UpgradeShutdownBridge.Verification.ACCEPT
-        : UpgradeShutdownBridge.Verification.REFUSE;
   }
 
   private synchronized boolean reserveCancellation(UpgradeRequest request) {
@@ -374,7 +359,7 @@ final class UpgradeController {
 
   private enum CommitPhase {
     OPEN,
-    PERSISTING,
+    ACKNOWLEDGING,
     ACKNOWLEDGED
   }
 

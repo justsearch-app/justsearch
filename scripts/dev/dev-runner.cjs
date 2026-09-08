@@ -953,15 +953,6 @@ async function writeShutdownRequestFile(dataDir, { reason, deadlineEpochMs, issu
 }
 
 /**
- * The reason of a request file currently on disk, or null.
- *
- * The supervisor reads the file it did not necessarily write: item B15's escalation path has the
- * ENGINE asking for its own restart, and `commit-shutdown` (B6) writes an `upgrade` request. A
- * supervisor that only knew about its own requests would charge those deaths to the crash budget.
- * An unparseable or unknown-reason file answers null — never a guess, for the reason the store
- * register states: guessing a reason from a file caught mid-write could stop the product.
- */
-/**
  * The forced half of design 7.1's hang path: the deadline expired, so the request was not enough.
  *
  * Kill the Engine PID only. Its registered children intentionally survive recoverable death/hang
@@ -1039,17 +1030,6 @@ function terminatePid(pid) {
     stdio: 'ignore', windowsHide: true,
   });
   return result.status === 0;
-}
-
-function readShutdownRequestReason(dataDir) {
-  let parsed;
-  try {
-    parsed = JSON.parse(fs.readFileSync(shutdownRequestPath(dataDir), 'utf8'));
-  } catch {
-    return null;
-  }
-  const reason = parsed?.reason;
-  return ['quit', 'restart', 'upgrade', 'hang'].includes(reason) ? reason : null;
 }
 
 // Tempdoc 606 Piece 2 (provenance): capture, at spawn, WHICH code the launched
@@ -2570,7 +2550,7 @@ async function cmdStart(opts) {
   let readyAt = null;
   let essentialReadySince = null;
   let hangTimer = null;
-  let requestWatchTimer = null;
+  let handoffWatchTimer = null;
   let requestDeadlineTimer = null;
   let consecutiveHealthMisses = 0;
   let observedRequestReason = null;
@@ -2597,14 +2577,14 @@ async function cmdStart(opts) {
   };
 
   const clearSupervisorTimers = () => {
-    for (const timer of [hangTimer, requestWatchTimer, requestDeadlineTimer]) {
+    for (const timer of [hangTimer, handoffWatchTimer, requestDeadlineTimer]) {
       if (!timer) continue;
       clearTimeout(timer);
       clearInterval(timer);
     }
     essentialReadySince = null;
     hangTimer = null;
-    requestWatchTimer = null;
+    handoffWatchTimer = null;
     requestDeadlineTimer = null;
   };
 
@@ -2741,26 +2721,42 @@ async function cmdStart(opts) {
     hangTimer.unref?.();
   };
 
-  /**
-   * Watch for a request file the supervisor did NOT write.
-   *
-   * Item B15's escalation has the Engine asking for its own restart, and `commit-shutdown` (B6)
-   * writes an `upgrade` request. A supervisor that only knew about its own requests would charge
-   * those deaths to the crash budget — the double-accounting 627 U3 left unresolved, arriving from
-   * the other direction. The poll is fast (50 ms) because the Engine deletes the file the moment it
-   * consumes it, so the window is short by design and missing it would be a silent misclassification.
-   */
-  const armRequestWatch = () => {
-    if (requestWatchTimer) clearInterval(requestWatchTimer);
-    requestWatchTimer = setInterval(() => {
-      if (!supervising) return;
-      const reason = readShutdownRequestReason(dataDir);
-      if (!reason || reason === observedRequestReason) return;
-      observedRequestReason = reason;
-      process.stderr.write(`[dev-runner] observed an out-of-band shutdown request: reason=${reason}\n`);
+  /** Latch the admitted Engine's handoff once; later manifest writes cannot extend close. */
+  const armHandoffWatch = () => {
+    if (handoffWatchTimer) clearInterval(handoffWatchTimer);
+    const startedAt = performance.now();
+    handoffWatchTimer = setInterval(() => {
+      if (!supervising || supervisorState !== STATES.RUNNING) return;
+      // Harness-only host input exercises the production owner/writer after readiness. It does
+      // not write the Engine's channel from the adapter or add a product command artifact.
+      const hostRequest = harnessActive && incarnation === 1
+        ? process.env.JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON : null;
+      if (hostRequest && performance.now() - startedAt >= 500
+          && ['quit', 'restart', 'upgrade', 'hang'].includes(hostRequest)) {
+        void requestEngineShutdown(hostRequest);
+        return;
+      }
+      let manifest;
+      try {
+        manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'manifest.json'), 'utf8'));
+      } catch { return; }
+      const reason = engineSupervisor.shutdownHandoffReason(manifest, backend?.pid, manifestInstanceId);
+      if (!reason) return;
+      const closingChild = backend;
+      const closingInstance = manifestInstanceId;
+      supervisorState = STATES.STOPPING;
       void publishSupervisorState(STATES.STOPPING, { reason });
+      requestDeadlineTimer = setTimeout(() => {
+        if (!supervising || supervisorState !== STATES.STOPPING
+            || backend !== closingChild || manifestInstanceId !== closingInstance) return;
+        // A local close that exceeds the bound is a charged hang, including exit-code races.
+        observedRequestReason = 'hang';
+        process.stderr.write(`[dev-runner] FORCED KILL: Engine-local ${reason} close exceeded its deadline.\n`);
+        forceKillEngineTree(closingChild.pid);
+      }, supervisionPolicy.gracefulStopDeadlineMs);
+      requestDeadlineTimer.unref?.();
     }, 50);
-    requestWatchTimer.unref?.();
+    handoffWatchTimer.unref?.();
   };
 
   const enterRunning = async () => {
@@ -2769,7 +2765,7 @@ async function cmdStart(opts) {
     await publishSupervisorState(STATES.RUNNING);
     essentialReadySince = null;
     armHangDetection();
-    armRequestWatch();
+    armHandoffWatch();
   };
 
   /** Start the next incarnation, keeping the run id, the lease and the four log streams. */
@@ -3357,7 +3353,6 @@ if (require.main === module) {
       supervisorHistoryPath,
       shutdownRequestPath,
       writeShutdownRequestFile,
-      readShutdownRequestReason,
       waitForEngineHandleRelease,
       forceKillEngineTree,
       cleanupRegisteredChildrenForTerminal,

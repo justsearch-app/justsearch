@@ -532,10 +532,10 @@ pub trait Actuator {
     fn probe_health(&mut self) -> bool;
     /// API and index readiness; optional AI readiness does not own the restart budget.
     fn probe_essential_ready(&mut self) -> bool;
-    /// A request file written by someone who is NOT this supervisor — the Engine escalating for
-    /// itself (7.6), or `commit-shutdown` (item B6). Charging those deaths to the crash budget is
-    /// the double-accounting 627 U3 left open, arriving from the other side.
-    fn observed_request_reason(&mut self) -> Option<String>;
+    /// Current admitted Engine's shutdown handoff. It bounds close but never grants a free restart.
+    fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String>;
+    /// A host command delivered to this loop; fixture actuators use the same owned write path.
+    fn take_host_request(&mut self) -> Option<String> { None }
     /// Item B2's out-of-band channel: the Engine's watcher reads this and runs the ordered shutdown.
     fn write_shutdown_request(&mut self, reason: &str, deadline_epoch_ms: u64) -> Result<(), String>;
     /// The deadline expired, so the request was not enough.
@@ -708,6 +708,10 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
         if let Some(deadline) = request_deadline {
             if now >= deadline {
                 request_deadline = None;
+                // An Engine-local close deadline is a hang, even if exit 4 races the kill.
+                if supervisor.requested_reason.is_none() {
+                    supervisor.requested_reason = Some("hang".into());
+                }
                 let decision = supervisor.observe(Event::RequestDeadlineElapsed, None);
                 if decision.action == Action::ForceKill {
                     actuator.force_kill();
@@ -717,10 +721,20 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
             }
         }
 
-        if let Some(reason) = actuator.observed_request_reason() {
-            if supervisor.requested_reason.as_deref() != Some(reason.as_str()) {
+        if supervisor.state == State::Running {
+            if let Some(reason) = actuator.take_host_request()
+                .filter(|r| matches!(r.as_str(), "quit" | "restart" | "upgrade" | "hang")) {
                 supervisor.requested_reason = Some(reason.clone());
                 supervisor.state = State::Stopping;
+                let deadline = now + supervisor.policy.graceful_stop_deadline_ms;
+                request_deadline = Some(deadline);
+                let _ = actuator.write_shutdown_request(&reason, deadline);
+                publish!(Some(reason));
+            } else if let Some(reason) = actuator.observed_shutdown_reason(&current) {
+                // Stopping is the latch: later writes, deletion, or changedAt refresh cannot
+                // cancel or extend this deadline. Requested reason stays host-owned.
+                supervisor.state = State::Stopping;
+                request_deadline = Some(now + supervisor.policy.graceful_stop_deadline_ms);
                 publish!(Some(reason));
             }
         }
@@ -760,6 +774,22 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
 
         actuator.sleep(TICK_MS);
     }
+}
+
+/// Read the existing manifest handoff only for the admitted PID and per-boot instance.
+/// Completion states still bound exit: native shutdown hooks can hang after ordered close.
+pub fn shutdown_handoff_reason(manifest: &serde_json::Value, current: &Ready) -> Option<String> {
+    if manifest.get("schemaVersion")?.as_u64()? != 2
+        || manifest.get("pid")?.as_u64()? != u64::from(current.pid?)
+        || manifest.get("instanceId")?.as_str()? != current.instance_id.as_deref()? {
+        return None;
+    }
+    let handoff = manifest.get("shutdownHandoff")?;
+    if !matches!(handoff.get("state")?.as_str()?, "pending" | "ready" | "incomplete") {
+        return None;
+    }
+    let reason = handoff.get("reason")?.as_str()?;
+    matches!(reason, "quit" | "restart" | "upgrade" | "hang").then(|| reason.to_string())
 }
 
 /// Epoch milliseconds as an ISO-8601 UTC instant, so both supervisors' state files carry the same
@@ -912,6 +942,27 @@ pub fn conformance_cases() -> Vec<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn handoff_requires_current_identity_and_a_known_state_and_reason() {
+        let current = Ready { pid: Some(42), instance_id: Some("boot".into()), api_port: Some(9000) };
+        let valid = serde_json::json!({ "schemaVersion": 2, "pid": 42, "instanceId": "boot",
+            "shutdownHandoff": { "state": "pending", "reason": "restart", "changedAt": "ignored" } });
+        for state in ["pending", "ready", "incomplete"] {
+            let mut candidate = valid.clone();
+            candidate["shutdownHandoff"]["state"] = state.into();
+            assert_eq!(shutdown_handoff_reason(&candidate, &current).as_deref(), Some("restart"));
+        }
+        for (field, value) in [("pid", serde_json::json!(43)), ("instanceId", serde_json::json!("stale")),
+            ("schemaVersion", serde_json::json!(1)), ("shutdownHandoff", serde_json::Value::Null)] {
+            let mut candidate = valid.clone(); candidate[field] = value;
+            assert!(shutdown_handoff_reason(&candidate, &current).is_none(), "{field}");
+        }
+        for field in ["state", "reason"] {
+            let mut candidate = valid.clone(); candidate["shutdownHandoff"][field] = "unknown".into();
+            assert!(shutdown_handoff_reason(&candidate, &current).is_none(), "{field}");
+        }
+    }
 
     /// The decision half of the contract, driven by the register's OWN case list.
     ///

@@ -94,9 +94,9 @@ final class HeadlessAppShutdownWiringTest {
             tracing,
             telemetry,
             instanceLock);
+    order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
     order.verify(leases).freezeAdmission(Reason.RESTART.wire());
     order.verify(watcher).close();
-    order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
     order.verify(api).stop();
     order.verify(health).close();
     order.verify(assembly).setStopGenerativeBackendOnClose(false);
@@ -158,9 +158,8 @@ final class HeadlessAppShutdownWiringTest {
   @DisplayName("boot discards a request left by the prior Engine incarnation")
   void bootDiscardsPreexistingShutdownRequest(@TempDir Path tempDir) throws Exception {
     Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
-    new io.justsearch.app.engine.ShutdownRequest(
-            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null)
-        .writeTo(runtime);
+    writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null), runtime);
     HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
     var fired = new CountDownLatch(1);
 
@@ -182,9 +181,8 @@ final class HeadlessAppShutdownWiringTest {
   void currentIncarnationRequestSurvivesWatcherStart(@TempDir Path tempDir) throws Exception {
     Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
     HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
-    new io.justsearch.app.engine.ShutdownRequest(
-            Reason.RESTART, Long.MAX_VALUE, null, "current-incarnation", null)
-        .writeTo(runtime);
+    writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "current-incarnation", null), runtime);
     var fired = new CountDownLatch(1);
 
     try (var _ =
@@ -202,9 +200,8 @@ final class HeadlessAppShutdownWiringTest {
   @DisplayName("boot does not start the watcher when a predecessor request cannot be removed")
   void failedBootClearPreventsWatcherStart(@TempDir Path tempDir) throws Exception {
     Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
-    new io.justsearch.app.engine.ShutdownRequest(
-            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null)
-        .writeTo(runtime);
+    writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null), runtime);
     var watcherStarted = new java.util.concurrent.atomic.AtomicBoolean();
 
     assertThrows(
@@ -268,14 +265,28 @@ final class HeadlessAppShutdownWiringTest {
             request -> sequence.run(request.reason()),
             20L,
             watcherRef::set)) {
-      new io.justsearch.app.engine.ShutdownRequest(
-              Reason.QUIT, Long.MAX_VALUE, null, "test", null)
-          .writeTo(runtime);
+      writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+              Reason.QUIT, Long.MAX_VALUE, null, "test", null), runtime);
       assertTrue(laterStep.await(2, TimeUnit.SECONDS));
       assertFalse(laterStepInterrupted.get());
       Thread thread = callbackThread.get();
       thread.join(2_000L);
       assertFalse(thread.isAlive(), "the production close step must terminate the watcher thread");
     }
+  }
+  /** Host-file fixture only; the Engine has no production request writer. */
+  static void writeRequest(io.justsearch.app.engine.ShutdownRequest request, Path runtimeDir)
+      throws java.io.IOException {
+    var fields = new java.util.LinkedHashMap<String, Object>();
+    fields.put("reason", request.reason().wire());
+    fields.put("deadlineEpochMs", request.deadlineEpochMs());
+    if (request.nonce() != null) fields.put("nonce", request.nonce());
+    if (request.issuedBy() != null) fields.put("issuedBy", request.issuedBy());
+    if (request.preparationId() != null) fields.put("preparationId", request.preparationId());
+    Files.createDirectories(runtimeDir);
+    Path staged = runtimeDir.resolve("shutdown-request.v1.json.tmp");
+    Files.writeString(staged, new tools.jackson.databind.ObjectMapper().writeValueAsString(fields));
+    Files.move(staged, io.justsearch.app.engine.ShutdownRequest.pathIn(runtimeDir),
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
   }
 }

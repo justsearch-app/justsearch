@@ -21,11 +21,9 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Stage B item B2 — the shutdown request file's shape and its refusal to guess.
  *
- * <p>Three writers will produce this file — this class, the Tauri supervisor in Rust, and the
- * dev-runner in Node — and only the first can be type-checked against the parser. So the field set
- * is pinned here explicitly: a writer that spells a field differently produces a file the Engine
- * ignores, and an ignored shutdown request is a shutdown that silently does not happen. The pin is
- * what turns that into a test failure instead of a support ticket.
+ * <p>The owning Rust or Node supervisor writes the file. Test fixtures exercise the parser's
+ * legacy optional fields as well as its minimal shape; production admission refuses prepared
+ * capabilities from this channel. Upgrade receipts are authorized by the local controller.
  */
 @DisplayName("ShutdownRequest — the out-of-band shutdown channel (stage B item B2)")
 final class ShutdownRequestTest {
@@ -40,9 +38,12 @@ final class ShutdownRequestTest {
   @DisplayName("the serialised field set is exactly the contract, and the wire names are lower-case")
   void serialisedShapeIsPinned(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.UPGRADE, 1_725_000_000_000L, "n-42", "updater", "prep-7")
-        .writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.UPGRADE, 1_725_000_000_000L, "n-42", "updater", "prep-7"), runtime);
 
+    assertEquals(
+        new ShutdownRequest(Reason.UPGRADE, 1_725_000_000_000L, "n-42", "updater", "prep-7"),
+        ShutdownRequest.read(runtime).orElseThrow(),
+        "legacy optional fields must reach production admission for explicit refusal");
     JsonNode root = JSON.readTree(Files.readString(ShutdownRequest.pathIn(runtime)));
     Set<String> fields = new LinkedHashSet<>();
     root.propertyNames().forEach(fields::add);
@@ -58,16 +59,18 @@ final class ShutdownRequestTest {
     assertEquals(
         "prep-7",
         root.get("preparationId").stringValue(),
-        "item B6 carries the preparation id through the file so the receipt written on the far side"
-            + " is still nonce- AND preparation-bound");
+        "the parser preserves the legacy preparation id for explicit refusal, while the local controller"
+            + " remains nonce- AND preparation-bound");
   }
 
   @Test
   @DisplayName("the optional fields are omitted rather than written as null")
   void optionalFieldsAreOmitted(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.QUIT, 1L, null, null, null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.QUIT, 1L, null, null, null), runtime);
 
+    assertEquals(new ShutdownRequest(Reason.QUIT, 1L, null, null, null),
+        ShutdownRequest.read(runtime).orElseThrow(), "minimal host request must parse");
     JsonNode root = JSON.readTree(Files.readString(ShutdownRequest.pathIn(runtime)));
     Set<String> fields = new LinkedHashSet<>();
     root.propertyNames().forEach(fields::add);
@@ -79,7 +82,7 @@ final class ShutdownRequestTest {
   void everyReasonRoundTrips(@TempDir Path tempDir) throws Exception {
     for (Reason reason : Reason.values()) {
       Path runtime = runtimeDir(tempDir.resolve(reason.wire()));
-      new ShutdownRequest(reason, 7L, null, "test", null).writeTo(runtime);
+      writeRequest(new ShutdownRequest(reason, 7L, null, "test", null), runtime);
       Optional<ShutdownRequest> read = ShutdownRequest.read(runtime);
       assertTrue(read.isPresent(), reason + " must round-trip");
       assertEquals(reason, read.get().reason());
@@ -141,7 +144,7 @@ final class ShutdownRequestTest {
   @DisplayName("clear() removes a consumed request and tolerates an absent one")
   void clearRemovesTheRequest(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.RESTART, 1L, null, null, null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.RESTART, 1L, null, null, null), runtime);
     assertTrue(Files.exists(ShutdownRequest.pathIn(runtime)));
 
     ShutdownRequest.clear(runtime);
@@ -155,7 +158,7 @@ final class ShutdownRequestTest {
   @DisplayName("the write is atomic: no staging file is left behind")
   void writeLeavesNoStagingFile(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
-    new ShutdownRequest(Reason.HANG, 5L, null, "supervisor", null).writeTo(runtime);
+    writeRequest(new ShutdownRequest(Reason.HANG, 5L, null, "supervisor", null), runtime);
 
     try (var entries = Files.list(runtime)) {
       assertEquals(
@@ -164,5 +167,20 @@ final class ShutdownRequestTest {
           "the reader polls, so a half-written file would be read as malformed and the shutdown"
               + " would be ignored — the write stages and renames, and leaves nothing else");
     }
+  }
+  /** Host-file fixture only; the Engine has no production request writer. */
+  static void writeRequest(ShutdownRequest request, Path runtimeDir)
+      throws java.io.IOException {
+    var fields = new java.util.LinkedHashMap<String, Object>();
+    fields.put("reason", request.reason().wire());
+    fields.put("deadlineEpochMs", request.deadlineEpochMs());
+    if (request.nonce() != null) fields.put("nonce", request.nonce());
+    if (request.issuedBy() != null) fields.put("issuedBy", request.issuedBy());
+    if (request.preparationId() != null) fields.put("preparationId", request.preparationId());
+    Files.createDirectories(runtimeDir);
+    Path staged = runtimeDir.resolve("shutdown-request.v1.json.tmp");
+    Files.writeString(staged, new ObjectMapper().writeValueAsString(fields));
+    Files.move(staged, ShutdownRequest.pathIn(runtimeDir),
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
   }
 }

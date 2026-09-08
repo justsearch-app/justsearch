@@ -1429,7 +1429,7 @@
       "pathVerification": "COMPOSED",
       "pathVerificationNote": "ShutdownRequest.pathIn resolves the literal \"shutdown-request.v1.json\" against an injected <dataDir>/runtime directory; the dataDir prefix is configuration-resolved, not a literal in this component.",
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
-      "encryptionNote": "Four fields, none of them user content: a reason enum, an epoch-millis deadline, an optional updater nonce and an issuer label. The nonce is a per-upgrade correlation token the updater already holds on both sides, not a secret, and the file exists only for the seconds between a supervisor deciding to stop the Engine and the Engine consuming it.",
+      "encryptionNote": "Host-owned schema version, reason, deadline and issuer fields contain no user content. Legacy nonce/preparation fields are parsed only for explicit refusal; acknowledged upgrades dispatch locally and never write this channel.",
       "owner": "SHELL",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1445,10 +1445,12 @@
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "DELETE_AND_RECOMPUTE",
-      "reconciliation": "There is nothing to reconcile: the file is a request, not a record. The Engine deletes it on consumption and the supervisor rewrites it if it still wants the Engine to stop. A malformed or unknown-reason file is logged and IGNORED rather than guessed at, because guessing a reason from a file caught mid-write could stop the product; the supervisor’s own deadline-then-kill covers the case where ignoring it was wrong.",
+      "reconciliation": "There is nothing to reconcile: the file is a request, not a record. The owning host keeps request intent and its deadline in memory; the Engine deletes the file on consumption. No host reads it back to classify death, and the Engine does not write it. A malformed or unknown-reason file is logged and IGNORED rather than guessed at, because guessing a reason from a file caught mid-write could stop the product; the supervisor’s own deadline-then-kill covers the case where ignoring it was wrong.",
       "status": "READY",
       "implementationSources": [
-        "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java"
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java",
+        "modules/shell/src-tauri/src/lib.rs",
+        "scripts/dev/dev-runner.cjs"
       ],
       "tests": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java"

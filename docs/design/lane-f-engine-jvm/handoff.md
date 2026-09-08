@@ -642,3 +642,15 @@ and UI test PMD pass. There is no production transport change yet. The independe
 review found that a local `restart` handoff also accompanies fatal writer exits:
 never copy it into the host-owned requested-reason slot, which makes restarts free.
 See the new design section 0 constraint and `scope-recut.md` for the bounded next cut.
+
+
+B15 transport checkpoint (2026-09-08): clean restart exit 4 is pushed in `86d369c25`.
+The following reviewed cut removes Engine-written shutdown requests, dispatches upgrades
+locally after response flush, and bounds current-incarnation manifest handoff with each
+host's existing Stopping deadline. Both adapters 17/17, Rust 77/77, fresh Java full suite
+9405/0; preserved XML and hashes in `evidence/B/b15-requested-restart.md`. Production
+Tauri AppHandle binding remains source-reviewed, not claimed as installed proof.
+B15 is still open for migration start/rollback/cutover consumers and actual promoted
+search after restart, including publication-failure refusal. B17 remains open as above.
+The scope-recut's controller and local-host proof obligations are now covered by this cut;
+no shared request-slot/accepted-marker mechanism was introduced. Root is sole implementer.

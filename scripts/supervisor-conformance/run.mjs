@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   HARNESS_FLAG,
+  shutdownHandoffReason,
   OVERRIDE_ENV,
   FAKE_ENGINE,
   actuatorCases,
@@ -381,7 +382,27 @@ function selfTestCaseListShape() {
   record('contract', 'every declared case is well-formed and the live fault modes are driven', problems);
 }
 
+function selfTestHandoffIdentity() {
+  const valid = { schemaVersion: 2, pid: 42, instanceId: 'boot',
+    shutdownHandoff: { state: 'pending', reason: 'restart', changedAt: 'ignored' } };
+  const problems = [];
+  for (const state of ['pending', 'ready', 'incomplete']) {
+    const candidate = structuredClone(valid); candidate.shutdownHandoff.state = state;
+    if (shutdownHandoffReason(candidate, 42, 'boot') !== 'restart') problems.push(`refused ${state}`);
+  }
+  for (const [field, value] of [['pid', 43], ['instanceId', 'stale'], ['schemaVersion', 1], ['shutdownHandoff', null]]) {
+    const candidate = { ...valid, [field]: value };
+    if (shutdownHandoffReason(candidate, 42, 'boot') !== null) problems.push(`accepted wrong ${field}`);
+  }
+  for (const field of ['state', 'reason']) {
+    const candidate = structuredClone(valid); candidate.shutdownHandoff[field] = 'unknown';
+    if (shutdownHandoffReason(candidate, 42, 'boot') !== null) problems.push(`accepted unknown ${field}`);
+  }
+  record('manifest handoff', 'requires admitted identity and known shutdown state/reason', problems);
+}
+
 async function selfTest() {
+  selfTestHandoffIdentity();
   selfTestExitTable();
   selfTestCaseListShape();
   selfTestDecisionTable();

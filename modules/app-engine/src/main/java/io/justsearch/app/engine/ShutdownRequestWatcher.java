@@ -38,9 +38,6 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
   /** Admission decision for a well-formed request. */
   public enum Acceptance {
     ACCEPT,
-    /** Accepts a controller-acknowledged transaction even when its force deadline has elapsed. */
-    ACCEPT_COMMITTED,
-    DEFER,
     REFUSE
   }
 
@@ -52,16 +49,6 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
   /** Poll cadence. A shutdown that starts a second late is not a defect; a busy loop is. */
   public static final long DEFAULT_POLL_INTERVAL_MS = 1_000L;
 
-  /**
-   * The deadline {@code commit-shutdown} stamps on its request (item B6).
-   *
-   * <p>Generous on purpose. The updater has already waited for every lease to drain before it
-   * committed, so what remains is the ordered close itself — closing the index and checkpointing
-   * SQLite over a large corpus. A deadline that expires mid-close would have the supervisor kill an
-   * Engine that is writing the index, which is the one thing the ordered shutdown exists to avoid.
-   */
-  public static final long UPGRADE_DEADLINE_MS = 120_000L;
-
   private final Path runtimeDir;
   private final Consumer<ShutdownRequest> onRequest;
   private final Function<ShutdownRequest, Acceptance> acceptance;
@@ -72,8 +59,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
 
   /**
    * @param runtimeDir the {@code <dataDir>/runtime/} directory to watch
-   * @param acceptance whether a well-formed request should be acted on, retained for a pending
-   *     acknowledgement, or refused and deleted
+   * @param acceptance whether a well-formed host request should be acted on or refused and deleted
    * @param onRequest what to run when a request is accepted; in production, the ordered shutdown
    */
   public ShutdownRequestWatcher(
@@ -127,15 +113,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
       }
       ShutdownRequest req = request.get();
       Acceptance decision = acceptance.apply(req);
-      if (decision == Acceptance.DEFER) {
-        log.debug(
-            "Deferring shutdown request with reason {} (issuedBy={}) until acknowledgement",
-            req.reason().wire(),
-            req.issuedBy());
-        return;
-      }
-      if (decision != Acceptance.ACCEPT_COMMITTED
-          && req.deadlineEpochMs() < System.currentTimeMillis()) {
+      if (req.deadlineEpochMs() < System.currentTimeMillis()) {
         log.warn(
             "Ignoring expired shutdown request with reason {} (issuedBy={}, deadlineEpochMs={})",
             req.reason().wire(),
@@ -144,7 +122,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
         ShutdownRequest.clear(runtimeDir);
         return;
       }
-      if (decision != Acceptance.ACCEPT && decision != Acceptance.ACCEPT_COMMITTED) {
+      if (decision != Acceptance.ACCEPT) {
         log.warn(
             "Ignoring a shutdown request with reason {} (issuedBy={}): it was refused by the"
                 + " acceptance check, most likely a nonce that does not match this Engine's"
