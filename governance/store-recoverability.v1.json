@@ -1421,6 +1421,37 @@
       ],
       "fixtures": [],
       "note": "Added at lane F item A19, and the reason it did not exist before is worth recording rather than quietly fixing: this write site was only ever COVERED by accident. KnowledgeServerBootstrap.java appeared in the retired worker-config-snapshot row's implementationSources (it was one of the files that handled the snapshot), so the coverage check saw the file as classified and never asked what ELSE it wrote. Removing that row exposed a genuine, unrelated durable artifact at KnowledgeServerBootstrap.java:867,901. The gate was right both times; the register was carrying a false negative. Deliberately NON_ATOMIC and untested: it is a one-token marker whose worst failure is re-ingesting a handful of bundled help files, so hardening it would cost more than the outcome it prevents — but that is now a stated judgement rather than an unexamined gap."
+    },
+    {
+      "id": "engine-shutdown-request",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "ShutdownRequest.pathIn resolves the literal \"shutdown-request.v1.json\" against an injected <dataDir>/runtime directory; the dataDir prefix is configuration-resolved, not a literal in this component.",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Four fields, none of them user content: a reason enum, an epoch-millis deadline, an optional updater nonce and an issuer label. The nonce is a per-upgrade correlation token the updater already holds on both sides, not a secret, and the file exists only for the seconds between a supervisor deciding to stop the Engine and the Engine consuming it.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "runtime/shutdown-request.v1.json"
+      ],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "RESET",
+      "format": "JSON request v1",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java",
+      "futureVersionRefusalTest": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "DELETE_AND_RECOMPUTE",
+      "reconciliation": "There is nothing to reconcile: the file is a request, not a record. The Engine deletes it on consumption and the supervisor rewrites it if it still wants the Engine to stop. A malformed or unknown-reason file is logged and IGNORED rather than guessed at, because guessing a reason from a file caught mid-write could stop the product; the supervisor’s own deadline-then-kill covers the case where ignoring it was wrong.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java"
+      ],
+      "tests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java"
+      ],
+      "fixtures": []
     }
   ],
   "nonDurableWriteSites": [

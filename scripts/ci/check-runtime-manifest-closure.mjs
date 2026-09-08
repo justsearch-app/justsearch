@@ -52,6 +52,13 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   // allowlist entry for a file no code writes is a sanction for nothing; it is removed rather
   // than relabelled so a reappearance fails this gate.
   ['instances', 'tempdoc 501 §3.7 — per-instance history directory (mirror of tmp/dev-runner/runs/)'],
+  // Lane F stage B item B2 (design 7.3). Not a discovery surface: it carries a shutdown REQUEST
+  // (reason, deadline, optional nonce, issuer) from the supervisor to the Engine. It exists
+  // because the cooperative trigger is HTTP and the case a supervisor exists for is an Engine
+  // that answers no HTTP, and Windows has no graceful signal for a JVM. Written by the Tauri
+  // supervisor and the dev-runner, read and deleted by the Engine.
+  ['shutdown-request.v1.json', 'lane F stage B item B2 (design 7.3) — out-of-band shutdown request from the supervisor to the Engine'],
+  ['shutdown-request.v1.json.tmp', 'lane F stage B item B2 — atomic-rename staging file for shutdown-request.v1.json'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 

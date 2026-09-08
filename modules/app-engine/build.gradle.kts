@@ -33,6 +33,11 @@ dependencies {
   implementation(project(":modules:worker-core"))
   implementation(project(":modules:configuration"))
   implementation(project(":modules:telemetry"))
+  // Item B2: ShutdownRequest parses the supervisor request file. Declared explicitly rather than
+  // leaned on transitively — the composed halves are `implementation`, so their Jackson edge is
+  // not on this module's compile classpath by construction.
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.core)
 }
 
 // Lane F stage B item B1. EngineExitTest reads modules/ui's HeadlessApp.java as TEXT, to pin that
