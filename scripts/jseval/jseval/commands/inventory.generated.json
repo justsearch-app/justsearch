@@ -370,5 +370,9 @@
   {
     "name": "utility-status",
     "group": "utility"
+  },
+  {
+    "name": "workflow-fixture",
+    "group": "workflow-fixture"
   }
 ]

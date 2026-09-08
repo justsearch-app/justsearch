@@ -36,6 +36,7 @@ _GROUP_MODULES = (
     "release",
     "ops",
     "index_cache_cmd",
+    "workflow_fixture",
 )
 # Pre-existing command modules that live at jseval.* (registered here too).
 _LEGACY_MODULES = ("qu_spike", "qu_v3_eval")
@@ -44,7 +45,8 @@ _LEGACY_MODULES = ("qu_spike", "qu_v3_eval")
 # The 2 legacy modules share one explicit label (they have no group module).
 _MODULE_GROUP_LABEL = {"eval_cmds": "eval", "qu_spike": "query-understanding",
                        "qu_v3_eval": "query-understanding",
-                       "index_cache_cmd": "index-cache"}
+                       "index_cache_cmd": "index-cache",
+                       "workflow_fixture": "workflow-fixture"}
 
 # Logical order groups appear in (``--help`` + catalog). Module order, with the
 # legacy group last.

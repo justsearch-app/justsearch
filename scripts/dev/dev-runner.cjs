@@ -728,7 +728,12 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
   const heapBound = headHeap && String(headHeap).trim() ? String(headHeap).trim() : null;
   return [
     existingJavaOpts,
-    headAotOpts ? '-XX:+UseSerialGC -XX:-UsePerfData' : '-XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:-UsePerfData',
+    // Lane F PR 0 (design 17.2): one flag set with or without the AOT cache. TieredStopAtLevel=1
+    // is gone (its 48 MiB C1-only code cache caused the CodeCache-threshold full GCs 917 Derisk 1
+    // measured, and it conflicted with the AOT cache); MetaspaceSize=128m stops the
+    // Metaspace-threshold full GCs at start. lib.rs carries the same set; the pairing is pinned by
+    // scripts/dev/test-dev-runner-head-java-opts.mjs.
+    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:-UsePerfData',
     headAotOpts,
     // Tempdoc 606 Piece 2b: the Head echoes this on /api/runtime/manifest so a
     // stale old Head answering on a reused port is detectable (build mismatch).
@@ -1723,10 +1728,9 @@ async function cmdStart(opts) {
         ...(devHotReload.enabled ? {
           JUSTSEARCH_DEV_DEBUG_PORT: String(devHotReload.debugPort),
         } : {}),
-        // Head startup flags: SerialGC (small heap, no throughput need),
-        // -XX:-UsePerfData (skip hsperfdata file).
-        // TieredStopAtLevel=1 is only used when AOT cache is absent — it conflicts
-        // with AOT (bypasses C2, wasting the pre-linked classes and method profiles).
+        // Head startup flags: SerialGC (small heap, no throughput need), MetaspaceSize=128m,
+        // -XX:-UsePerfData (skip hsperfdata file); tiered compilation left at its default
+        // (lane F PR 0), so the set no longer forks on AOT-cache presence.
         // S1: Pass dev AOT cache flag when available.
         // Tempdoc 730 B3: bounded -Xmx + HeapDumpOnOutOfMemoryError, dumping into THIS run's own
         // logs dir (JUSTSEARCH_HEAD_HEAP overrides the 2g default for constrained devices).
