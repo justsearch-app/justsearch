@@ -111,6 +111,13 @@ implements the required-check exit contract. For a multi-hour supervised run,
 use `node scripts/dev/run-watcher.mjs` so progress, stalls, and completion remain
 observable.
 
+Immediately after a push, only a subset of required checks may have registered.
+Before treating a green aggregate as proof, also wait for the CI workflow on the
+exact current PR head: `node scripts/dev/run-gh.mjs run-wait-sha <head-sha>
+--workflow CI --event pull_request`. Confirm the head still matches and all
+required contexts are present and green. An earlier head or only the CLA check
+is insufficient; use `run-publish-preflight.mjs --list` for the required inventory.
+
 A failing advisory check must be reported and investigated on its own merits,
 but it is not a merge gate. Never rerun or mask an advisory failure merely to
 make the overall check list green. If GitHub reports `UNSTABLE`, use
