@@ -35,10 +35,11 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const { buildHeadJavaOpts } = require(path.join(__dirname, 'dev-runner.cjs')).__test;
 
 /**
- * The flags BOTH spawn sites must carry. `-Xmx` is deliberately absent: it is the one documented
- * divergence (lib.rs pins 2g because a packaged JVM's 1/4-of-RAM default is wrong in both
- * directions; the dev-runner keeps no default per tempdoc 730 Increment-4 and honours
- * JUSTSEARCH_HEAD_HEAP).
+ * The flags BOTH spawn sites must carry, in the order the dev-runner emits them.
+ *
+ * `-Xmx` is deliberately absent: it is one of the documented divergences (lib.rs pins 2g because a
+ * packaged JVM's 1/4-of-RAM default is wrong in both directions; the dev-runner keeps no default per
+ * tempdoc 730 Increment-4 and honours JUSTSEARCH_HEAD_HEAP). See PACKAGED_ONLY_FLAGS for the rest.
  */
 const SHARED_FLAGS = [
   '-XX:+UseSerialGC',
@@ -46,10 +47,37 @@ const SHARED_FLAGS = [
   '-XX:+UseCompactObjectHeaders',
   '-XX:-UsePerfData',
   '-Dfile.encoding=UTF-8',
+  '-XX:+HeapDumpOnOutOfMemoryError',
 ];
 
 /** The packaged heap. Sized at the A13 follow-up; the stage-E gate run re-sizes it on measurement. */
 const PACKAGED_HEAP = '-Xmx2g';
+
+/**
+ * Flags lib.rs passes that the dev-runner correctly does NOT, each with the reason it is a
+ * divergence rather than drift. This list exists because the lib.rs check below is now an EXACT
+ * set: a flag has to be either shared or explicitly excused, and "nobody listed it" is no longer a
+ * third option. `--sun-misc-unsafe-memory-access` and `--enable-native-access` were exactly that
+ * third option until this change — passed by the packaged spawn, pinned by nothing.
+ *
+ *  - `-Xmx2g` — tempdoc 730 Increment-4, above.
+ *  - `--sun-misc-unsafe-memory-access=warn` / `--enable-native-access=ALL-UNNAMED` — the dev-runner
+ *    DOES get both, just not through JAVA_OPTS. It launches the Gradle start script
+ *    (`modules/ui/build/install/ui/bin/ui.bat`, dev-runner.cjs:1647), whose DEFAULT_JVM_OPTS are
+ *    `application { applicationDefaultJvmArgs }` in modules/ui/build.gradle.kts:1943-1946 — which
+ *    is these two flags. lib.rs invokes `java -cp ... io.justsearch.ui.HeadlessApp` directly
+ *    (lib.rs:826-828), bypassing the start script, so it must pass them itself. Adding them to
+ *    SHARED_FLAGS would assert them on the dev-runner's JAVA_OPTS line, where they would be
+ *    duplicates of what the start script already supplies.
+ *  - `-Djustsearch.prod=true` — the packaged trust boundary. Setting it in dev would turn the dev
+ *    stack into the production surface, which is the opposite of what it is for.
+ */
+const PACKAGED_ONLY_FLAGS = [
+  PACKAGED_HEAP,
+  '--sun-misc-unsafe-memory-access=warn',
+  '--enable-native-access=ALL-UNNAMED',
+  '-Djustsearch.prod=true',
+];
 
 function flags(opts) {
   return buildHeadJavaOpts(opts).split(/\s+/).filter(Boolean);
@@ -68,9 +96,9 @@ function main() {
   //    lib.rs is exactly the drift item A13 shipped, so adding one must fail until both sides move.
   assert.deepEqual(
     flags(base),
-    [...SHARED_FLAGS, '-XX:+HeapDumpOnOutOfMemoryError'],
+    SHARED_FLAGS,
     'the dev-runner Engine flag set changed; update lib.rs and SHARED_FLAGS together, or explain '
-      + 'the divergence here the way -Xmx is explained',
+      + 'the divergence in PACKAGED_ONLY_FLAGS the way -Xmx is explained',
   );
 
   // 2. The AOT cache does not fork the set.
@@ -114,28 +142,41 @@ function main() {
     'enabling hot reload adds the listener and changes nothing else',
   );
 
-  // 6. The packaged spawn site carries the same shared set. Source-level, and honest about it.
+  // 6. The packaged spawn site, as an EXACT SET. Source-level, and honest about it.
+  //
+  //    This used to assert only that each shared flag APPEARS in lib.rs, which is a subset check:
+  //    it caught a flag going missing from the packaged spawn but not a flag being ADDED there and
+  //    never reaching the dev-runner — the same one-sided drift assertion 1 exists to prevent, left
+  //    open on the other side. Two flags sat in that blind spot (lib.rs:784,786) from the day they
+  //    were added: passed by the shipped app, asserted by nothing, absent from every list here.
+  //    They are now in PACKAGED_ONLY_FLAGS with the reason they belong there.
   const libRsPath = path.join(repoRoot, 'modules', 'shell', 'src-tauri', 'src', 'lib.rs');
   const libRs = fs.readFileSync(libRsPath, 'utf8');
   // Only `.arg("...")` calls count — a flag named in a comment is not a flag that is passed.
   const argCalls = [...libRs.matchAll(/\.arg\("([^"]+)"\)/g)].map((m) => m[1]);
-  for (const flag of [...SHARED_FLAGS, PACKAGED_HEAP]) {
-    const n = argCalls.filter((a) => a === flag).length;
-    assert.equal(
-      n,
-      1,
-      `lib.rs must pass ${flag} exactly once (found ${n}). The packaged Engine is both halves of `
-        + 'the product; a flag that lives only in the dev-runner is a flag the shipped app does not '
-        + 'have.',
-    );
-  }
-  assert.ok(
-    !argCalls.some((a) => a.startsWith('-Xmx') && a !== PACKAGED_HEAP),
-    `lib.rs must pin exactly ${PACKAGED_HEAP}; a different -Xmx means the heap was re-sized without `
-      + 'updating this pin (the stage-E gate run is where that number is allowed to move)',
+  // JVM options only, and defined by EXCLUSION rather than by an allowed prefix set: `-X`/`-D`/`--`
+  // would silently drop a flag spelled any other way (`-verbose:gc`, `-ea`, `-server`), which is
+  // the same "not on any list, so not checked" hole this assertion exists to close. So: everything
+  // starting with `-` counts, minus the two classpath spellings. `-cp` and the main class that
+  // follows it are launch STRUCTURE, not tuning; the classpath VALUE and the `.arg(format!(...))`
+  // sites (ErrorFile, HeapDumpPath, AOTCache) interpolate at runtime, are not string literals, and
+  // never match the regex above.
+  const CLASSPATH_ARGS = new Set(['-cp', '-classpath', '--class-path']);
+  const libRsFlags = argCalls.filter((a) => a.startsWith('-') && !CLASSPATH_ARGS.has(a));
+  assert.deepEqual(
+    [...libRsFlags].sort(),
+    [...SHARED_FLAGS, ...PACKAGED_ONLY_FLAGS].sort(),
+    'the packaged Engine flag set in lib.rs no longer matches SHARED_FLAGS + PACKAGED_ONLY_FLAGS. '
+      + 'The packaged Engine is both halves of the product: a flag only the dev-runner has is a '
+      + 'flag the shipped app lacks, and a flag only lib.rs has is one no dev run ever exercises. '
+      + 'Add it to SHARED_FLAGS and to dev-runner.cjs, or to PACKAGED_ONLY_FLAGS with its reason. '
+      + `A changed -Xmx lands here too — lib.rs must pin exactly ${PACKAGED_HEAP}, and the stage-E `
+      + 'gate run is where that number is allowed to move.',
   );
+  // deepEqual on sorted arrays already rejects a duplicate (it lengthens the array), so the
+  // "exactly once" property the old loop asserted per flag is subsumed rather than dropped.
 
-  console.log('test-dev-runner-head-java-opts: OK (dev-runner set exact; lib.rs cross-checked)');
+  console.log('test-dev-runner-head-java-opts: OK (dev-runner set exact; lib.rs set exact)');
 }
 
 main();

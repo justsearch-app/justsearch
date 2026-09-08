@@ -462,7 +462,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /**
-     * Tempdoc 825: whether a gRPC client is bound. This is the discriminator between the health
+     * Tempdoc 825: whether a knowledge-port client is bound (it was a gRPC client until lane F
+     * stage A item A6 made the port an in-process call). This is the discriminator between the health
      * monitor's two arms — a bound client means the bootstrap is up and {@link #checkHealth()} owns
      * it; no client means {@code start()} never completed and the boot-recovery arm owns it.
      */

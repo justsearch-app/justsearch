@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.ErrorClass;
+import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.RestartRequiredException;
 import io.justsearch.app.services.worker.WorkerRecoveryAuthority;
 import java.util.List;
 import java.util.Map;
@@ -186,6 +188,51 @@ final class InferenceHandlersWorkerRestartTest {
     ArgumentCaptor<Object> json = ArgumentCaptor.forClass(Object.class);
     verify(ctx).json(json.capture());
     return (Map<String, Object>) json.getValue();
+  }
+
+  /**
+   * The restart-as-reload answer itself, which nothing asserted until now. Every case above pins
+   * the pre-bind states — no bootstrap, no client — and each ends before the handler's last
+   * statement, so the ONE arm an operator hits on a healthy Engine ran untested: index half up,
+   * client bound, request arrives, answer is 409 + {@code restart_required}.
+   *
+   * <p>Both halves matter and neither implies the other. The STATUS is what a caller branches on
+   * before it parses anything, and 409 (not 503, not 200) says "your request conflicts with the
+   * state, and no retry changes that". The CODE is what a caller keys off once it has the body —
+   * {@link RestartRequiredException#CODE} exists as a constant precisely so a consumer is not
+   * matching on wording, and asserting the constant rather than the literal is what keeps this
+   * test from passing while the wire value drifts.
+   */
+  @Test
+  @DisplayName("with the index half bound, restart answers 409 restart_required")
+  void boundIndexHalfAnswers409RestartRequired() {
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    when(bootstrap.hasClient()).thenReturn(true);
+    InferenceHandlers handlers =
+        new InferenceHandlers(
+            mock(io.justsearch.app.api.OnlineAiService.class),
+            bootstrap,
+            mock(io.justsearch.gpu.GpuCapabilitiesService.class),
+            mock(io.justsearch.app.api.EnterprisePolicyService.class),
+            mock(io.justsearch.app.services.settings.UiSettingsStore.class),
+            null,
+            null,
+            null);
+    Context ctx = mockContext();
+
+    handlers.handleRestartWorker(ctx);
+
+    verify(ctx).status(409);
+    Map<String, Object> body = capturedBody(ctx);
+    assertEquals(
+        RestartRequiredException.CODE,
+        body.get("code"),
+        "the machine-readable handle a caller keys off must be on the body, not only in the prose");
+    assertEquals(ErrorClass.PERMANENT.name(), body.get("errorClass"));
+    assertEquals(false, body.get("retryable"), "no number of retries reloads an in-process index");
+    assertTrue(
+        String.valueOf(body.get("error")).contains("restart JustSearch"),
+        "the message must name the one remedy that works: " + body.get("error"));
   }
 
   @Test

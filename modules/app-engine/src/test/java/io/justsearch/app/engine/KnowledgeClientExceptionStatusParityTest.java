@@ -3,10 +3,13 @@ package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.indexerworker.services.WorkerServiceException;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -67,6 +70,133 @@ final class KnowledgeClientExceptionStatusParityTest {
           () -> KnowledgeClientException.Status.valueOf(s.name()),
           "EngineKnowledgeClient.translate cannot carry " + s.name() + " across the port boundary");
     }
+  }
+
+  // ==================== The two "is the worker unreachable?" classifiers ====================
+
+  /**
+   * Two independent places decide, from a {@link KnowledgeClientException}, whether the index half
+   * is unreachable — and they decide different things with the answer:
+   *
+   * <ul>
+   *   <li>{@code GplJobCoordinator.isTransientWorkerUnavailable} aborts the GPL pass so the run is
+   *       retried later. A false negative writes a zero-feature triple into the training set.
+   *   <li>{@code AgentToolErrors.isWorkerUnreachable} maps to {@code SERVICE_UNAVAILABLE} rather
+   *       than {@code INTERNAL_ERROR}. A false negative tells the model "internal error, do not
+   *       retry" for the one condition where retrying is correct.
+   * </ul>
+   *
+   * <p>Both were retargeted at lane F item A14 / the lane F review from gRPC-shaped predicates that
+   * had stopped matching anything, and both were rewritten to the same rule against the same type —
+   * separately, in different modules, with no shared code and nothing comparing them. That is two
+   * hand-copies of one rule, which is the {@code KnowledgeClientException}-vs-{@code
+   * WorkerServiceException} shape this class already exists for, one level up. This module is again
+   * the only place both are visible: {@code app-services} reaches {@code app-agent} on its {@code
+   * api} surface, so an {@code implementation} edge to {@code app-services} puts both on this test's
+   * classpath, and neither {@code app-services} nor {@code app-agent} can see the other's classifier
+   * from where it lives.
+   *
+   * <p>Reflection, because both methods are deliberately non-public (one package-private, one
+   * private) and widening them to be testable would enlarge a production surface to serve a test.
+   * The lookup failing is itself asserted, so a rename cannot turn this into a check of nothing.
+   */
+  private static Method classifier(String className, String methodName) {
+    try {
+      Method m = Class.forName(className).getDeclaredMethod(methodName, Throwable.class);
+      m.setAccessible(true);
+      return m;
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError(
+          "the classifier this test compares is gone or renamed: "
+              + className
+              + "#"
+              + methodName
+              + ". If it genuinely moved, retarget this test — do not delete it. A vanished "
+              + "classifier is the drift it exists to catch, not a reason to stop looking.",
+          e);
+    }
+  }
+
+  private static boolean classify(Method m, Throwable t) {
+    try {
+      return (Boolean) m.invoke(null, t);
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError("invoking " + m.getName() + " threw", e);
+    }
+  }
+
+  private static Method gplClassifier() {
+    return classifier(
+        "io.justsearch.app.services.gpl.GplJobCoordinator", "isTransientWorkerUnavailable");
+  }
+
+  private static Method agentClassifier() {
+    return classifier("io.justsearch.agent.tools.AgentToolErrors", "isWorkerUnreachable");
+  }
+
+  @Test
+  @DisplayName("both unreachable-classifiers agree on EVERY status, and on which ones are true")
+  void bothUnreachableClassifiersAgreeOnEveryStatus() {
+    Method gpl = gplClassifier();
+    Method agent = agentClassifier();
+    Set<KnowledgeClientException.Status> gplTrue = new LinkedHashSet<>();
+    Set<KnowledgeClientException.Status> agentTrue = new LinkedHashSet<>();
+
+    for (KnowledgeClientException.Status s : KnowledgeClientException.Status.values()) {
+      KnowledgeClientException e = new KnowledgeClientException(s, "probe");
+      boolean g = classify(gpl, e);
+      boolean a = classify(agent, e);
+      assertEquals(
+          g,
+          a,
+          "the two hand-copies of the unreachable rule disagree about "
+              + s
+              + ": GplJobCoordinator.isTransientWorkerUnavailable="
+              + g
+              + ", AgentToolErrors.isWorkerUnreachable="
+              + a
+              + ". One of them is wrong; decide which and fix that one, do not relax this "
+              + "assertion. If the difference is deliberate, pin it here with the reason.");
+      if (g) {
+        gplTrue.add(s);
+      }
+      if (a) {
+        agentTrue.add(s);
+      }
+    }
+
+    // "They agree" is satisfied perfectly by two classifiers that both answer false to everything
+    // — which is EXACTLY the state item A14 found (a gRPC-typed predicate no live exception could
+    // match). So the agreed-true set is pinned by name, not just by equality.
+    assertEquals(
+        Set.of(
+            KnowledgeClientException.Status.UNAVAILABLE,
+            KnowledgeClientException.Status.DEADLINE_EXCEEDED),
+        gplTrue,
+        "the transient-unreachable set is UNAVAILABLE + DEADLINE_EXCEEDED (the 1:1 successors of "
+            + "the gRPC codes both classifiers used to match). An empty set here means a "
+            + "classifier stopped matching anything, which fails nothing else in the build.");
+    assertEquals(gplTrue, agentTrue, "…and the second classifier's true-set is the same one");
+  }
+
+  @Test
+  @DisplayName("the ONE deliberate difference, pinned rather than papered over")
+  void theAgentClassifierAlsoNameMatchesOpenSetTransportFailures() {
+    // Not a divergence on the status axis: for every KnowledgeClientException the two agree (above).
+    // AgentToolErrors carries ONE extra arm, by design and with its reason stated in its javadoc —
+    // it also name-matches *UnavailableException / *ConnectException, which are open sets any
+    // library may contribute to and therefore cannot be matched by a type it chose to depend on.
+    // GplJobCoordinator has no such arm because its input is narrow: the one call it guards is
+    // KnowledgeClient.search, whose failures arrive already translated.
+    Throwable openSet = new DocumentService.UnavailableException("index unreachable");
+
+    assertTrue(
+        classify(agentClassifier(), openSet),
+        "AgentToolErrors must keep classifying a *UnavailableException as unreachable");
+    assertFalse(
+        classify(gplClassifier(), openSet),
+        "GplJobCoordinator deliberately does NOT carry the name-match arm — if this flips, the "
+            + "asymmetry above is no longer the documented one and the javadocs need re-reading");
   }
 
   @Test

@@ -397,6 +397,17 @@ jobs:
           npm run test:lint-ps1
           npm run lint:ps1
 
+      # The Engine launch-flag pins (scripts/dev/test-dev-runner-{runtime-resolution,head-java-opts}).
+      # These ran in NO per-PR lane: the only caller of `npm run test:dev-runner` was
+      # onramp-smoke.yml, which is `workflow_dispatch:` only (manual, heavy — it starts the full
+      # stack). So the check that the dev-runner's and lib.rs's JVM flag sets have not drifted, which
+      # exists BECAUSE they silently drifted at item A13, was itself only run when someone remembered
+      # to press a button. Here instead: pure Node, no stack, no models, no Gradle — dev-runner.cjs
+      # already loads in this ubuntu job (the dev-MCP step below requires it), so the lane is proven.
+      # onramp-smoke keeps its copy; it runs the same command as a fail-fast before its heavy smoke.
+      - name: Dev-runner launch-flag pins (Engine JVM flag sets, both spawn sites)
+        run: npm run test:dev-runner
+
       # Required dev-MCP contract: generated runtime freshness/licensing, exact dependency-free
       # launcher topology, typed observation truth, canonical inventory sync, pure helper logic,
       # and real stdio handler projection. No suite starts the shared dev stack or runs Gradle.
