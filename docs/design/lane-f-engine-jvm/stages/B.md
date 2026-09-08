@@ -294,6 +294,9 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   package-visible writer, live-lease acceptance predicate and dispatcher are the same factories
   used by `HeadlessApp`. A prepared upgrade dispatches only when its `preparationId` equals the
   currently frozen `OperationLeaseService` snapshot; an HTTP nonce mismatch writes no request.
+  Two B6 gaps remain for the next coupled protocol batch: a correctly prepared direct file can
+  still carry the wrong nonce, and a request persistence failure happens after the HTTP success
+  response has committed, leaving the upgrade frozen without a retry or cancellation path.
   The now-unused upgrade method and `UpgradeShutdownAction` implementation were removed from
   `HeadShutdownCoordinator`.
 

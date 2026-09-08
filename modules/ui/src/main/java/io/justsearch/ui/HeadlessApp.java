@@ -1115,11 +1115,11 @@ public class HeadlessApp {
                   knowledgeServerHealthMonitorRef,
                   knowledgeServerRef,
                   manifestPublisherRef,
-                   infraPhase.tracingBootstrap(),
-                   telemetryRef,
-                   appInstanceLockRef,
-                   operationLeasesRef,
-                   shutdownRequestWatcherRef::get),
+                  infraPhase.tracingBootstrap(),
+                  telemetryRef,
+                  appInstanceLockRef,
+                  operationLeasesRef,
+                  shutdownRequestWatcherRef::get),
               System::exit);
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
@@ -1136,11 +1136,11 @@ public class HeadlessApp {
       // Item B3's watcher, started here because this is after the API front is up. It consumes the
       // request the upgrade path (and, from B8/B10, the supervisor) writes.
       startShutdownRequestWatcher(
-              runtimeDir,
-              shutdownRequestAcceptance(operationLeasesRef),
-              shutdownRequestDispatcher(shutdownSequence),
-              io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
-              shutdownRequestWatcherRef::set);
+          runtimeDir,
+          shutdownRequestAcceptance(operationLeasesRef),
+          shutdownRequestDispatcher(shutdownSequence),
+          io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
+          shutdownRequestWatcherRef::set);
 
       Runtime.getRuntime()
           .addShutdownHook(
@@ -1310,12 +1310,12 @@ public class HeadlessApp {
           KnowledgeServerHealthMonitor healthMonitor,
           KnowledgeServerBootstrap knowledgeServer,
           RuntimeManifestPublisher manifestPublisher,
-           io.justsearch.telemetry.TracingBootstrap tracing,
-           Telemetry telemetry,
-           AppInstanceLock appInstanceLock,
-           io.justsearch.app.api.OperationLeaseService operationLeases,
-           java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
-               shutdownRequestWatcher) {
+          io.justsearch.telemetry.TracingBootstrap tracing,
+          Telemetry telemetry,
+          AppInstanceLock appInstanceLock,
+          io.justsearch.app.api.OperationLeaseService operationLeases,
+          java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
+              shutdownRequestWatcher) {
     return List.of(
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operation-admission",
