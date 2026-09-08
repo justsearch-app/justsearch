@@ -10,3 +10,10 @@ Think deeply and theorize what the correct design should look like for the ideas
 After settling the design, step back and judge its reach. Think about whether this design is an instance of a principle or seam that already exists elsewhere in the system. If so, conform to it rather than creating a parallel version. Analyse whether this design reveals a principle, invariant, or recurring shape that is likely to apply beyond the immediate problem. If so, name it plainly, state where else it would apply, and note whether existing code already violates it, but do not build the generalized structure now unless the present problem already requires it. Record the principle and its candidate scope; separating "recognizing a general principle" from "building general structure" is deliberate, so a real insight is captured without becoming premature abstraction. Whenever you name a principle, also state what observable evidence would show it earning its keep, and the condition under which it should be retired — a principle without a retirement condition tends to become self-justifying apparatus.
 
 At the end I want you to think about and summarise your findings for me in two parts, shortly and in plain language: first part should be about your actual design regarding the tempdoc's purpose. Second part should be all about your judgement regarding the design's reach.
+
+Before adding a state machine, persistent marker, writer, or cross-language
+contract, compare simpler ownership and state which acceptance item requires the
+mechanism. An authorized architecture migration names the shipped rule it
+supersedes and its scope; it does not waive trust boundaries. Maintain current
+decisions in owning sections and a short dated index linking rationale and
+alternatives, following `docs/reference/contributing/agent-workflow.md`.

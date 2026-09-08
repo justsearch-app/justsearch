@@ -1,58 +1,52 @@
 #!/usr/bin/env node
-/** Project cross-harness invariants from AGENTS.md into Claude's adapter. */
-
+/** Project the complete shared AGENTS.md contract into Claude's adapter. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { hardInvariants } from '../agent-analytics/lib/hard-invariants.mjs';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..', '..');
-const CLAUDE = path.join(ROOT, 'CLAUDE.md');
-const START = '<!-- generated:agent-invariants:start — source: AGENTS.md; run: node scripts/docs/agent-instructions-sync.mjs -->';
-const END = '<!-- generated:agent-invariants:end -->';
-const RULE_IDS = [
-  'head-never-touches-lucene',
-  'loopback-only-network',
-  'no-legacy-endpoints',
-  'verify-dont-guess',
-  'frontend-stack-is-lit',
-  'language-agnostic-analysis',
-];
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+export const CONTRACT_START = '<!-- generated:agent-contract:start — source: AGENTS.md; run: node scripts/docs/agent-instructions-sync.mjs -->';
+export const CONTRACT_END = '<!-- generated:agent-contract:end -->';
 
-export function renderInvariantProjection() {
-  const invariants = hardInvariants();
-  if (invariants.length !== RULE_IDS.length) {
-    throw new Error(`expected ${RULE_IDS.length} AGENTS.md invariants, found ${invariants.length}`);
+export function projectContract(current, source) {
+  const claude = current.replace(/\r\n/g, '\n');
+  const agents = source.replace(/\r\n/g, '\n');
+  if (!/^# JustSearch agent instructions$/m.test(agents)
+      || !/^## Hard invariants$/m.test(agents) || !/^## Verification$/m.test(agents)) {
+    throw new Error('AGENTS.md shared contract is missing required sections');
   }
-  return [
-    START,
-    ...invariants.map((text, index) => `${index + 1}. ${text} <!-- rule:${RULE_IDS[index]} -->`),
-    END,
-  ].join('\n');
+  const starts = claude.split(CONTRACT_START);
+  const ends = claude.split(CONTRACT_END);
+  if (starts.length !== 2 || ends.length !== 2
+      || claude.indexOf(CONTRACT_START) >= claude.indexOf(CONTRACT_END)) {
+    throw new Error('CLAUDE.md requires exactly one ordered shared-contract marker pair');
+  }
+  if (claude.includes('generated:agent-invariants:')) {
+    throw new Error('obsolete partial invariant projection must be removed');
+  }
+  // The first line is a maintainer budget comment, not part of the policy.
+  const body = agents.slice(agents.indexOf('# JustSearch agent instructions'))
+    .replace(/^# JustSearch agent instructions/, '## Shared project contract').trimEnd();
+  return starts[0] + CONTRACT_START + '\n' + body + '\n' + CONTRACT_END + ends[1];
 }
 
 export function expectedClaude() {
-  const current = fs.readFileSync(CLAUDE, 'utf8').replace(/\r\n/g, '\n');
-  const start = current.indexOf(START);
-  const end = current.indexOf(END);
-  if (start < 0 || end < start) throw new Error('CLAUDE.md invariant projection markers are missing');
-  return current.slice(0, start) + renderInvariantProjection() + current.slice(end + END.length);
+  return projectContract(fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8'),
+    fs.readFileSync(path.join(ROOT, 'AGENTS.md'), 'utf8'));
 }
 
 function main() {
   const expected = expectedClaude();
-  const current = fs.readFileSync(CLAUDE, 'utf8').replace(/\r\n/g, '\n');
+  const file = path.join(ROOT, 'CLAUDE.md');
   if (process.argv.includes('--check')) {
-    if (current !== expected) {
-      console.error('agent-instructions-sync --check: CLAUDE.md invariants drifted from AGENTS.md');
-      process.exit(1);
+    if (fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') !== expected) {
+      throw new Error('CLAUDE.md shared contract drifted; run node scripts/docs/agent-instructions-sync.mjs');
     }
-    console.log('agent-instructions-sync --check: OK');
-    return;
+    console.log('agent-instructions-sync --check: OK (complete shared contract)');
+  } else {
+    fs.writeFileSync(file, expected, 'utf8');
+    console.log('agent-instructions-sync: projected complete shared contract');
   }
-  fs.writeFileSync(CLAUDE, expected, 'utf8');
-  console.log('agent-instructions-sync: projected AGENTS.md invariants into CLAUDE.md');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

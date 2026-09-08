@@ -16,6 +16,8 @@
  */
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { buildGuidance, GUIDANCE_CHAR_CAP } from './subagent-guide.mjs';
 
 let passed = 0;
@@ -82,6 +84,29 @@ run('session id is threaded into the attribution section when present', () => {
   assert.ok(buildGuidance({ session_id: 'sess-abc' }).includes('sess-abc'));
   assert.ok(!/Session attribution/.test(buildGuidance({})));
 });
+
+for (const harness of ['claude-code', 'codex-cli']) {
+  run(`${harness}: subprocess emits the actual SubagentStart envelope`, () => {
+    const result = spawnSync(process.execPath,
+      [fileURLToPath(new URL('./subagent-guide.mjs', import.meta.url))], {
+        input: JSON.stringify({ session_id: 'delivery-probe', agent_type: 'Explore' }),
+        encoding: 'utf8', timeout: 10000, windowsHide: true,
+        env: { ...process.env, JUSTSEARCH_AGENT_HARNESS: harness },
+      });
+    assert.equal(result.status, 0, result.stderr);
+    const envelope = JSON.parse(result.stdout).hookSpecificOutput;
+    assert.equal(envelope.hookEventName, 'SubagentStart');
+    const brief = envelope.additionalContext;
+    assert.ok(brief.includes('AGENTS.md') && brief.includes('delivery-probe'));
+    assert.ok(brief.includes('loopback') && brief.includes('locale-invariant'));
+    assert.ok(brief.includes('tested revision') && brief.includes('missing proof'));
+    assert.ok(brief.includes('return material scope growth'));
+    assert.ok(!/No hooks fire|receive NONE|injected for every agent type/.test(brief));
+    assert.ok(brief.length > 2000 && brief.length < GUIDANCE_CHAR_CAP);
+    if (harness === 'claude-code') assert.ok(brief.includes('Session-wide Claude tool hooks apply'));
+    else assert.ok(brief.includes('Codex subagent risk profile'));
+  });
+}
 
 if (failures.length > 0) {
   console.error(`subagent-guide.test: ${failures.length} FAILED, ${passed} passed`);

@@ -18,7 +18,7 @@
  *   - Top-level Agent spawns: guarded (all three paths tested — unpinned blocked,
  *     fable blocked, haiku passed).
  *   - Nested spawns: ALSO guarded — verified live, a sonnet subagent's unpinned
- *     child was blocked by this hook (an exception to the general "parent hooks
+ *     child was blocked by this hook (historically described as an exception to "parent hooks
  *     don't fire in subagents" lesson; see agent-lessons.md).
  *   - NOT verified: fork-type subagents (ignore `model` entirely per #74788) and
  *     the background-agent dispatch-picker path (#64493).

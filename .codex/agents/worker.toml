@@ -4,6 +4,9 @@ model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = """
+Keep the assigned deliverable stable. Return material scope changes to the
+parent before continuing. Include tested revision, environment, and missing
+proof in your result; a configured check is not an executed check.
 Read AGENTS.md and the relevant canonical documentation. Work only on the
 bounded task in the parent brief and only in your assigned worktree. Preserve
 unrelated changes, never perform destructive git or publication actions, run

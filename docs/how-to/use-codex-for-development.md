@@ -73,7 +73,7 @@ when continuing the same outcome.
 
 | Claude Code surface | Codex equivalent in this repository | Authority |
 | --- | --- | --- |
-| `CLAUDE.md` and always-loaded rules | `AGENTS.md` | `AGENTS.md`; Claude's hard-invariant block is generated from it |
+| `CLAUDE.md` and always-loaded rules | `AGENTS.md` | `AGENTS.md`; Claude's complete shared contract is generated from it |
 | `.claude/skills/*` and slash skills | `.agents/skills/*`; invoke with `$skill-name` | Each harness-specific skill tree owns its own instructions |
 | `.mcp.json` local dev tools | `.codex/config.toml` → `justsearch-dev` | shared MCP server implementation |
 | `.claude/settings*.json` hooks | `.codex/hooks.json` | `governance/agent-hooks.v1.json` |
