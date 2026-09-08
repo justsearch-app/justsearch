@@ -692,10 +692,10 @@ The secondary recovery worktree remains preserved and must not overwrite this br
 Hosted-proof correction (2026-09-08): the B-complete wording above omitted B9's hosted PR-run
 acceptance. Draft PR 1 is now [718](https://github.com/justsearch-app/justsearch/pull/718), with
 no change to final merge placement. Its first run exposed real CI/platform/test-wiring gaps;
-`evidence/B/hosted-ci.md` records the causes, fixes and current verification. At `9dededdbe`,
-B9 and all hosted runtime jobs pass (run 34272778959); the sole remaining failure is a generated
-dependency-document projection, now regenerated and independently reviewed. C1 waits for that
-final documentation check to pass. Design section 0 is now a short Stage B decision index into owning sections;
+`evidence/B/hosted-ci.md` records the causes, fixes and current verification. All 13 hosted jobs
+pass at `84b8c0b6f` (run 34274192421), including B9 and advisory installed integration; the
+generated dependency-document correction is also green. Stage B acceptance is complete and C1
+can start under 17.6. The subsequent checkpoint commit changes only these evidence/status notes. Design section 0 is now a short Stage B decision index into owning sections;
 the pre-consolidation chronology is preserved at `be47faa40`. Paired installer skills and their
 canonical source now label the old config snapshot as inert history. E explicitly owns any
 unproved supported-OS whole-Engine recovery coverage as well as signed installer/store proof.

@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B17 implemented and independently reviewed; local checks green; B9 and all hosted runtime jobs green at 9dededdbe on draft PR 718; generated-doc follow-up CI pending; signed dead-Engine installer proof assigned to stage E"
+status: "B1-B17 implemented and independently reviewed; local checks green; all 13 hosted jobs green at 84b8c0b6f on draft PR 718; Stage B acceptance complete; signed dead-Engine installer proof assigned to stage E"
 updated: 2026-09-08
 ---
 

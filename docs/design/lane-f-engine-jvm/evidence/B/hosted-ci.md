@@ -5,7 +5,7 @@ B9's distinct requirement for the death-observability step to pass on a hosted P
 No CI workflow had run for that head. The two older branch workflow-dispatch runs were installer
 attempts, not evidence for these steps. [Draft PR 718](https://github.com/justsearch-app/justsearch/pull/718)
 opens PR 1 early to obtain that tier; it does not authorize an intermediate implementation merge.
-C1 waits for this hosted acceptance correction.
+C1 waited for this hosted acceptance correction; the final verified result below closes it.
 
 The first [CI run 34269384198](https://github.com/justsearch-app/justsearch/actions/runs/34269384198)
 at `be47faa40` had six failed jobs. The failures are preserved in ignored `tmp/b-ci-*.txt`:
@@ -95,3 +95,23 @@ B9's missing hosted proof now passes at `9dededdbe`:
 | `tmp/b-ci-second-integration.txt` | `411c2837b5a67dcb52c63ce7b21aa5486f4634ba9b67be69e56ad682b021c0d2` |
 | `tmp/b-ci-second-integration-summary.json` | `14be4fab15380f97b1772e68c941b39746f76254fac85e0b58f3b873e78d9fe7` |
 | `tmp/b-ci-second-integration-inventory.json` | `c1a0fefbded251a6b9af3f6e6b4fc8e8cde5153c029bfa608972053fb2d71727` |
+
+## Final hosted acceptance
+
+[Run 34274192421](https://github.com/justsearch-app/justsearch/actions/runs/34274192421)
+passed **all 13 jobs** at `84b8c0b6fd509531a55418e820dd546c23b64f80`, including required
+Public claims and the advisory installed integration tier. The final integration XML again
+contains **88 tests, zero failures/errors, 42 skips**; boot recovery is **1/1** and supervised
+Engine recovery **5/5**, both with zero skips. B9's hosted-run obligation is closed. C1 is next;
+E retains signed installer/store and unproved supported-OS recovery coverage.
+
+The subsequent checkpoint commit changes only evidence/status prose, not runtime code, tests,
+workflow or generated projections. This is proof of the named source head, not a claim that
+another full suite ran after the notes were written. Closeout found no owned processes to reap;
+the shared ownerless OTLP sink was reported and retained by the registered sweep.
+
+| Final hosted artifact (ignored) | SHA-256 |
+| --- | --- |
+| `tmp/b-ci-final-hosted-jobs.json` | `113d78a10d1e55ce0b8a4cec06041d9e668f045205890620ab4627a8c5d91b59` |
+| `tmp/b-ci-final-integration-summary.json` | `808530d4fa791efc2fc2569bd2ae2746b2bcdace74e7d15af46b4fbc86b2830d` |
+| `tmp/b-ci-final-integration-inventory.json` | `48a1504332d4ca36d07e6275f80d128e823408eabddf198dddb7bfc6fb8a1032` |

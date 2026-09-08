@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED design; A/B implemented; B hosted runtime proof green at 9dededdbe on draft PR 718; generated-doc follow-up CI pending; C1-F remain. Section 0 indexes dated decisions; owning sections carry current contracts."
+status: "LOCKED design; A/B complete at the agreed proof tier; hosted CI green at 84b8c0b6f on draft PR 718; C1-F remain. Section 0 indexes dated decisions; owning sections carry current contracts."
 created: 2026-09-06
 updated: 2026-09-08
 lane: F (decision re-examination programme, wave 4)
@@ -310,7 +310,7 @@ it is history, not a second current contract. Evidence records retain the experi
 | 2026-09-08 | Publish PRs 708/717 and integrate main at the checkpoint without changing stage order. | §17.6; [publication](evidence/publication.md), [B17](evidence/B/b17-recovery-proofs.md) |
 | 2026-09-08 | Owner delegates lane decisions, continuation and merges; preserve independent review and the merge queue. | §17.6 |
 | 2026-09-08 | Move signed installer/user-store proof to E, carried through F only if final-main signing is required. | §16; §17.3 |
-| 2026-09-08 | Correct B's missing hosted-proof claim and open draft PR 718 before C1; B9 and all runtime jobs pass at 9dededdbe, with generated-doc CI follow-up pending. Final merge stays at F. | §17.3; §17.6; [hosted CI](evidence/B/hosted-ci.md) |
+| 2026-09-08 | Correct B's missing hosted-proof claim and open draft PR 718 before C1; B9 and all 13 hosted jobs pass at 84b8c0b6f after the CI corrections. Final merge stays at F. | §17.3; §17.6; [hosted CI](evidence/B/hosted-ci.md) |
 | 2026-09-08 | Capture child identity from the OS and restore the existing production-disabled boot test counter at index composition; fix hosted platform/tooling gaps without relaxing gates. | §7.2; §7.3; [hosted CI](evidence/B/hosted-ci.md) |
 
 ## 0.1 Forces that shaped the design
@@ -1879,7 +1879,7 @@ is the split side of every paired row in 16 and is stored under
 
 PR 1 is opened as draft at the B checkpoint (PR #718, 2026-09-08), so hosted CI runs before C1.
 This changes PR creation timing, not stage order, readiness for merge, or the single final merge.
-B9's hosted step passed on draft PR 718 at `9dededdbe` (run 34272778959); the final generated-document correction still needs its hosted check before C1.
+B9's hosted step and all other jobs passed on draft PR 718 at `84b8c0b6f` (run 34274192421); the Stage B hosted acceptance correction is closed and C1 can start.
 
 Stage order is risk-first: the spine is the change most likely to surface an unknown, so it
 precedes the compensation work that assumes one process. (Sequencing stages are lettered A to
