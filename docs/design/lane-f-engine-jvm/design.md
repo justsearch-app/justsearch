@@ -288,32 +288,32 @@ The B7-B10 review also exposed a protocol race: the Engine deleted an accepted s
 request before either supervisor was guaranteed to read its reason, and both supervisors
 ignored an externally written request's deadline. **Decided:** retain an accepted request
 through the terminating incarnation; the watcher's existing one-shot guard prevents repeat
-dispatch, and boot clears the predecessor's request before starting the watcher. Expired
-and refused requests are still cleared. Both supervisors read the request before classifying
+dispatch, and boot must clear the predecessor's request before starting the watcher. Expired
+and refused requests must still be cleared. Both supervisors must read the request before classifying
 an exit and enforce its original deadline, including when the Engine consumed it before
 the supervisor's next poll. **Acceptance distinction (same-day refute-first correction):**
-presence is not acceptance. Before dispatch, the Engine atomically marks the existing request
+presence is not acceptance. Before dispatch, the Engine must atomically mark the existing request
 with `acceptedByInstanceId` from its `RuntimeManifestPublisher.instanceId()`; externally
 written requests influence a supervisor only when that marker matches the terminating
 incarnation. A refused request must never arm a supervisor deadline or change exit
-classification. A supervisor's own request remains authoritative in its in-memory state
+classification. A supervisor's own request will remain authoritative in its in-memory state
 without an Engine acknowledgement, since a hung Engine cannot acknowledge. A failed marker
-write must not dispatch or consume the watcher's one-shot guard. The supervisor reads the
+write must not dispatch or consume the watcher's one-shot guard. The supervisor must read the
 accepted record before clearing predecessor discovery state or spawning the replacement.
 This uses the existing request artifact, not a second receipt or authority. The old
-consume-before-callback test becomes a stronger acceptance-plus-retention-plus-one-shot
+consume-before-callback test will become a stronger acceptance-plus-retention-plus-one-shot
 test, paired with the stale-at-boot test; this changes the protocol, not its protection
 against shutting down the next incarnation. The Java retention change and supervisor
-observation/deadline tests belong to one reviewed follow-up batch.
+observation/deadline tests will belong to one reviewed follow-up batch.
 
 **B7-B10 review disposition (orchestrator, 2026-09-08).**
 The independent source review at `1ffd6cc2d` is recorded in
 `evidence/B/b7-b10-independent-review.md`. R1-R3 and R5-R9 are accepted for fixes;
 R4 is the cross-cutting proof obligation for the production bindings, not another
-claim of product failure. The fixes preserve predecessor identity while clearing
-its port/token, make host closing monotonic and serialize it with spawn admission,
-publish terminal spawn failure, install the supervisor-state consumer in the real
-UI boot path, end supervision before deliberate runner teardown, and bound the
+claim of product failure. The fixes will preserve predecessor identity while clearing
+its port/token, will make host closing monotonic and serialize it with spawn admission,
+will publish terminal spawn failure, will install the supervisor-state consumer in the real
+UI boot path, will end supervision before deliberate runner teardown, and will bound the
 manifest watcher's lifetime. API responsiveness still permits `running`; the
 300-second budget reset instead requires continuous readiness of both essential
 components (`api`, `index`) and loses that clock when either ceases to be ready.

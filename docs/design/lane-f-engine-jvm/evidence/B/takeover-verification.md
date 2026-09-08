@@ -44,8 +44,8 @@ log establishing CUDA fallback, and the explicit CPU setup makes that explanatio
 inapplicable to this test.
 
 Local raw logs and preserved XML are under `tmp/lane-f-takeover/` in the lane and
-the `lane-F-main-verification` comparison worktree. The full-suite result must be
-captured before another targeted run replaces a module's XML output.
+the `lane-F-main-verification` comparison worktree. The full-suite result was captured before
+releasing the implementer; the snapshot path is below.
 
 ## Inherited test-count discrepancy
 

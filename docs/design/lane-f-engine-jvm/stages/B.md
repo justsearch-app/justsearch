@@ -276,6 +276,25 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   deferred to C1 because the interactive context/admission front does not exist in stage B. The
   shutdown binding's javadoc therefore describes concrete steps rather than claiming that all
   eight conceptual steps are already implemented.
+- **The B3 review fixes make request lifetime and watcher ownership explicit.** Expired requests
+  are refused and cleared before dispatch, a prior incarnation's request is cleared once before
+  watcher startup, and the watcher is itself an ordered shutdown step. Closing it from its own
+  callback uses orderly executor shutdown so the remaining close steps are not interrupted.
+  Accepted-request retention and supervisor observation remain the separately decided follow-up
+  protocol in `design.md` §0.
+- **The B4 review fixes classify the index half from observable close behavior.** No index half
+  means it is already closed and reports `GRACEFUL`; an exception from the index-half step reports
+  `FAILED` and makes the sequence unclean rather than falling through to `UNKNOWN`.
+- **The B5 review fixes connect the reason table to the real inference lifecycle.** The production
+  ordered step sets the close directive before `HeadAssembly.close()`, the assembly delegates to
+  its held `InferenceLifecycleManager`, and the manager's real `close()` reaches `LlamaServerOps`
+  only for `QUIT` and `UPGRADE`. `RESTART` and `HANG` preserve the generative backend.
+- **The B6 review fixes exercise production request seams rather than copied test lambdas.** The
+  package-visible writer, live-lease acceptance predicate and dispatcher are the same factories
+  used by `HeadlessApp`. A prepared upgrade dispatches only when its `preparationId` equals the
+  currently frozen `OperationLeaseService` snapshot; an HTTP nonce mismatch writes no request.
+  The now-unused upgrade method and `UpgradeShutdownAction` implementation were removed from
+  `HeadShutdownCoordinator`.
 
 ---
 
