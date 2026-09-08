@@ -312,11 +312,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
               "Boot recovery attempt {} due in {}ms",
               decision.nextAttempt(),
               decision.waitMs());
-      case STAND_DOWN ->
-          // Review F2(a): this cycle only. No narration, no latch — the next tick re-asks, so a
-          // supervised arc that ends without bringing the worker back does not strand recovery.
-          log.info(
-              "Boot recovery yielding this cycle: a supervisor is live and holds the restart budget");
       case ATTEMPT -> attemptBootRecovery(false, false);
       case GIVE_UP -> narrateGiveUp(decision.veto());
     }
@@ -331,18 +326,14 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * @param operatorRequested when true, the {@link BootRecoveryDecision.Veto#INDEX_FATAL} veto is
    *     withheld: the operator's remedy for both fatal index causes is a settings or filesystem
    *     change the NEXT spawn reads, so an explicit request is the one input that can make a
-   *     deterministic refusal stop being deterministic (tempdoc 915 R1). The budget and the two
-   *     supervision vetoes are untouched — this is a reason to try again, not a reason to try more.
+   *     deterministic refusal stop being deterministic (tempdoc 915 R1). The local
+   *     attempt bound remains unchanged — this is a reason to try again, not to try more.
    */
   private BootRecoveryDecision.Input currentRecoveryInput(boolean operatorRequested) {
     long sinceLastAttempt =
         lastRecoveryAttemptMs < 0 ? Long.MAX_VALUE : nowMs.getAsLong() - lastRecoveryAttemptMs;
     return new BootRecoveryDecision.Input(
         bootstrap.hasClient(),
-        bootstrap.supervisionActive(),
-        LifecycleReasonCode.WORKER_RESTART_EXHAUSTED
-            .code()
-            .equals(bootstrap.workerCapability().pendingReason()),
         !operatorRequested && bootstrap.indexFatalCode() != null,
         recoveryAttemptsMade,
         // Withholding the veto is not enough on its own: the give-up it produced has already latched,
@@ -474,31 +465,14 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     }
   }
 
-  /**
-   * The one terminal narration of this arc. A veto means another authority's verdict already stands
-   * ({@code worker.restart_exhausted}, or supervision holding the budget), so we stop trying WITHOUT
-   * overwriting it — tempdoc 825 §D5 decision 2.
-   */
+  /** Narrates the local budget exhaustion or the fatal index cause once per recovery arc. */
   private void narrateGiveUp(BootRecoveryDecision.Veto veto) {
     if (recoveryGaveUp) {
       // The terminal state is narrated exactly once per arc. Reachable when a manual request and a
       // periodic tick both resolve to GIVE_UP before either has run.
       return;
     }
-    // The latch is set per-arm, not up front: a SUPERVISION_ENGAGED give-up must never latch
-    // (review F2(a) — that is the permanent-silence bug), so it stays out of the two arms below.
     switch (veto) {
-      case RESTART_EXHAUSTED ->
-          // Permanent and silent BY DESIGN, and honest only because the state is already on the wire
-          // under supervision's own terminal code — which the fixture now fails fast on too, so this
-          // path no longer costs a blind wait (review F2(b)).
-      {
-        latchGaveUp(veto);
-        log.warn(
-            "Boot recovery giving up: supervision has already declared {} — that verdict is"
-                + " terminal and is not superseded",
-            LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code());
-      }
       // Tempdoc 915 R1. The one veto this authority NARRATES, because it is the one whose cause the
       // Head owns and may never have said out loud: the bootstrap latched it from the dying worker's
       // fatal-reason marker, and that read can land inside a suppressed boot arc (all three
@@ -527,11 +501,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
               .transition(CapabilityHealth.DEGRADED, cause.code(), bootstrap.indexFatalDetail());
         }
       }
-      case SUPERVISION_ENGAGED ->
-          // Unreachable: a live supervisor yields STAND_DOWN, which never reaches this method
-          // (review F2(a)). Kept for switch totality, and it must NOT latch a give-up, so it is
-          // deliberately not routed here by the decision.
-          log.warn("Boot recovery give-up requested while a supervisor is live — ignoring");
       case NONE -> {
         latchGaveUp(veto);
         log.error(
@@ -595,9 +564,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * the periodic arm uses, so a manual request can never race a tick into two concurrent spawns, and
    * returns what the recovery authority decided rather than blocking an HTTP request on a spawn.
    *
-   * <p>An operator's explicit request also clears the backoff wait — but not the budget, and not the
-   * vetoes: "the operator asked" is a reason to try sooner, never a reason to try more times than the
-   * declared policy or to overrule supervision's terminal verdict.
+   * <p>An operator's explicit request clears the backoff wait and may retry a repaired fatal index
+   * cause, but cannot exceed the local attempt budget.
    */
   @Override
   public Verdict requestRecoveryNow() {
@@ -618,22 +586,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     try {
       return switch (decision.action()) {
         case NONE -> recoveryGaveUp ? Verdict.EXHAUSTED : Verdict.NOT_APPLICABLE;
-        // Review F2(c): a live supervisor is a TEMPORARY refusal — say so, and do not latch anything.
-        // The operator can retry in a moment; the caller renders it differently from the terminal one.
-        case STAND_DOWN -> Verdict.VETOED_SUPERVISION;
         case GIVE_UP -> {
           // Narrate on the executor (the arm's own thread) so the manual path lands the same
           // terminal state the periodic path would, exactly once, and no capability write happens
           // off-thread.
           executor.execute(() -> narrateGiveUp(decision.veto()));
-          yield switch (decision.veto()) {
-            case RESTART_EXHAUSTED -> Verdict.VETOED_RESTART_EXHAUSTED;
-            case SUPERVISION_ENGAGED -> Verdict.VETOED_SUPERVISION;
-            // INDEX_FATAL is withheld from the operator input above, so this arm is unreachable from
-            // here by construction; it is mapped to the terminal answer for switch totality rather
-            // than growing a Verdict constant no caller can ever observe.
-            case NONE, INDEX_FATAL -> Verdict.EXHAUSTED;
-          };
+          yield Verdict.EXHAUSTED;
         }
         // WAIT is an ATTEMPT whose backoff has not elapsed; the request is what makes it due. The
         // decision is re-run on the executor before anything spawns, so this is a hint, not a

@@ -1229,7 +1229,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Tempdoc 837 §3.2: the worker twin of {@link #resolveInferenceReasonCode}. Every reason-bearing
    * worker {@code transition(...)} site now passes a {@link LifecycleReasonCode}, so this forwards
    * whatever specific cause the producer knew — {@code worker.lost} (it was serving and stopped),
-   * {@code worker.index_corrupt}, {@code worker.restart_exhausted}, {@code worker.shut_down} — and
+   * {@code worker.index_corrupt}, {@code worker.spawn_recovery_exhausted}, {@code worker.shut_down} — and
    * falls back to the caller's generic code only for an unrecognized reason. Replaces the inlined
    * one-code special case (tempdoc 627) that could publish exactly {@code worker.restart_exhausted}
    * and collapsed everything else onto {@code worker.spawn.failed}.
@@ -1292,7 +1292,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     LifecycleSnapshotV1.Component worker = switch (workerCapability.health()) {
       case READY -> new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY, null);
       // Tempdoc 837 §3.2 (was 627's one-code special case): forward whichever specific cause the
-      // producer set — worker.lost, worker.index_corrupt, worker.restart_exhausted — and fall back to
+      // producer set — worker.lost, worker.index_corrupt, worker.spawn_recovery_exhausted — and fall back to
       // worker.spawn.failed only for an unrecognized reason. worker.spawn.failed thereby becomes TRUE
       // for the first time: it now fires only when the worker actually failed to start.
       case DEGRADED -> new LifecycleSnapshotV1.Component(

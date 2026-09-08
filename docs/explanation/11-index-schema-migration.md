@@ -213,8 +213,8 @@ reports it as such:
 - The refusing Worker writes `<dataDir>/worker-fatal-reason` = `index_schema_mismatch` before it
   exits, the same way an unrecoverable corruption writes `index_corrupt`.
 - `KnowledgeServerBootstrap` **latches** the verdict when it reads that marker. The marker is deleted
-  as it is read and the read happens before the two narration guards (`narrationSuppressed()`,
-  `supervisionVerdictHeld()`) decide whether the verdict is applied — so without the latch, the three
+  as it is read and the read happens before `narrationSuppressed()` decides whether the verdict is
+  applied — so without the latch, the three
   suppressed `startWithRetry` attempts each consumed a freshly-rewritten marker and the one call
   allowed to narrate found nothing and reported the generic `worker.spawn.failed`. The latch is
   cleared when the capability reaches READY, and by nothing else.
@@ -227,14 +227,14 @@ reports it as such:
 index directory, so every attempt would read the same bytes and refuse the same way — the budget buys
 delay and nothing else. This is a **915 decision, not an inherited one**: before it, neither fatal
 index cause short-circuited the ladder, and 915 R1 unified the two axes rather than forking them. The
-veto is ranked below supervision's terminal `worker.restart_exhausted` (which is already on the wire
-under its own code) and above the attempt budget, and unlike the other two vetoes it is *narrated* —
-it is the one whose cause the Head owns and might otherwise never say out loud.
+veto is ranked above the local attempt budget and its specific cause is narrated. The external host
+supervises the whole Engine process; a predecessor's supervisor state is not an input to this local
+recovery ladder.
 
 An **operator** request (`POST /api/worker/restart` → `WorkerRecoveryAuthority`) is exempt from this
 veto and re-opens that one terminal state, because the documented remedy for both fatal index causes
-is a settings or filesystem change the next spawn will read. The attempt budget and the supervision
-vetoes are untouched: an operator asking is a reason to try again, never a reason to try more times.
+is a settings or filesystem change the next attempt will read. The local attempt budget is unchanged:
+an operator asking is a reason to try again, never a reason to try more times.
 
 ### Repeat-rebuild brake
 
@@ -515,4 +515,3 @@ The UI and dev tooling should treat `GET /api/status` as the primary “what’s
 Key fields include migration state/pointers, per-generation counts, switch-buffer depth, and queue drain breakdowns.
 
 See `docs/explanation/08-observability.md` for the current `/api/status` field map.
-

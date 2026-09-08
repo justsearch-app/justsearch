@@ -28,15 +28,9 @@ public enum LifecycleReasonCode {
   WORKER_UNAVAILABLE("worker.unavailable"),
   WORKER_HEALTH_EMBEDDING_NOT_READY("worker.health.embedding_not_ready"),
   WORKER_HEALTH_EMBEDDING_PROBE_MISSING("worker.health.embedding_probe_missing"),
-  // Tempdoc 627 — terminal give-up: the supervisor exhausted its restart budget and stopped trying.
-  // Distinct from transient worker.unavailable (which retries); this state does not self-recover.
-  WORKER_RESTART_EXHAUSTED("worker.restart_exhausted"),
   // Tempdoc 825 — the Head's BOOT-recovery budget is spent: the worker never started, the bounded
   // re-attempt loop (KnowledgeServerHealthMonitor's boot-recovery arm) tried and stopped trying.
-  // Deliberately NOT worker.restart_exhausted: that is SUPERVISION's verdict about a worker that was
-  // running, and collapsing the two would destroy the distinction the fixture fail-fast keys on. It is
-  // the terminal twin of worker.spawn.failed, which after this tempdoc means "failed, recovery still
-  // pending or in flight".
+  // The terminal twin of worker.spawn.failed, which permits local recovery attempts.
   WORKER_SPAWN_RECOVERY_EXHAUSTED("worker.spawn_recovery_exhausted"),
   // Tempdoc 627 — transient: a supervised restart is in flight (capability RECOVERING). Distinct from
   // worker.spawn.failed so the FE verdict renders a routine self-heal as a calm "Restarting…" transient
@@ -240,7 +234,6 @@ public enum LifecycleReasonCode {
       // subsequent spawn failure.
       case WORKER_SPAWN_FAILED,
           WORKER_LOST,
-          WORKER_RESTART_EXHAUSTED,
           // Tempdoc 825: terminal, and the last thing anyone learned about the worker — a later
           // TRANSIENT write (a stray worker.starting) must not erase why we stopped trying.
           WORKER_SPAWN_RECOVERY_EXHAUSTED,

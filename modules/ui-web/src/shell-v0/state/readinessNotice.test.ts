@@ -402,7 +402,7 @@ describe('warrantsSearchDegradationBanner (round-14 finding 9)', () => {
 
   it('warn / error / unreachable keep the banner (the gate is severity, not "no banner ever")', () => {
     expect(warrantsSearchDegradationBanner(degraded('warn', ['worker.health.embedding_not_ready']))).toBe(true);
-    expect(warrantsSearchDegradationBanner(degraded('error', ['worker.restart_exhausted']))).toBe(true);
+    expect(warrantsSearchDegradationBanner(degraded('error', ['worker.spawn_recovery_exhausted']))).toBe(true);
     expect(
       warrantsSearchDegradationBanner({ kind: 'unreachable', severity: 'error', reasons: ['binding.unreachable'] }),
     ).toBe(true);

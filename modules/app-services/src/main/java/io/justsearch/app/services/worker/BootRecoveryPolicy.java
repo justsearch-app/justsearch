@@ -2,15 +2,9 @@
 package io.justsearch.app.services.worker;
 
 /**
- * Declared BOOT-recovery policy for the Worker process (tempdoc 825) — the sibling of
- * the Worker's former {@code SupervisionPolicy} (deleted at item A11), for the one state
- * supervision could not reach: the worker NEVER started, so
- * there is no spawner holding a restart budget and no process to supervise.
- *
- * <p>The two policies are deliberately separate authorities over disjoint states, not two budgets for
- * the same one: {@code SupervisionPolicy} governed a worker that was running and faulted (the spawner
- * owns it), this one governs the Head re-attempting a bootstrap that failed. The handover between
- * them is a veto, not a shared counter — see {@link BootRecoveryDecision}.
+ * Bounded recovery policy for an index half whose local bootstrap failed. The external host owns
+ * whole-Engine restarts; its state neither vetoes this local ladder nor shares its attempt count.
+ * See {@link BootRecoveryDecision} for the fatal-index boundary and operator retry behavior.
  *
  * @param maxAttempts hard cap on boot-recovery attempts before the terminal give-up
  *     ({@code worker.spawn_recovery_exhausted}). Bounded rather than unbounded-with-capped-backoff so

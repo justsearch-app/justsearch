@@ -91,8 +91,8 @@ public final class WorkerCapability implements Capability {
    * corrupt" is observable exactly once per crash: whichever caller wins the race gets it, and a
    * later overwrite would destroy it PERMANENTLY (a restart cannot re-derive it — the marker is
    * gone). So while health is non-READY, a held {@link LifecycleReasonCode#WORKER_INDEX_CORRUPT}
-   * (class {@code STICKY}) is retained against any incoming reason: the supervised-restart narration
-   * ({@code worker.recovering}) and the terminal give-up ({@code worker.restart_exhausted}) are
+   * (class {@code STICKY}) is retained against any incoming reason: the local-recovery narration
+   * ({@code worker.recovering}) and the terminal give-up ({@code worker.spawn_recovery_exhausted}) are
    * downstream symptoms of the corruption, not competing causes.
    *
    * <p>The rule is bounded by recovery, not by a timer: READY clears the reason outright, so no
