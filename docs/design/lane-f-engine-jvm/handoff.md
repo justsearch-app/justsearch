@@ -617,8 +617,10 @@ that binary explicitly before adapter runs. The two B11 stale UI assertions were
 corrected to the new public schema and completion ordering and independently reviewed.
 
 B11–B14 and B16 are complete at the permitted branch proof tier. The signed
-installer/user-store exercise is still owed in the first post-merge installer round,
-registered under `upgrade-dead-engine-recovery`. B15 and remaining B17 work are next:
+installer/user-store exercise is assigned to final validation in stage E, registered under
+`upgrade-dead-engine-recovery`; the 2026-09-08 final-validation amendment in design section 0
+supersedes the earlier first-post-merge scheduling. Stage F carries the gap if main-only signing
+requires the actual run to wait for the first eligible installer after the final merge. B15 and remaining B17 work are next:
 actual promotion → requested whole-Engine restart → promoted generation served;
 hostile-lock survival through real supervision; PROCESSING as well as PENDING replay;
 and the single-writer shutdown re-cut's four production proofs. Read `scope-recut.md`

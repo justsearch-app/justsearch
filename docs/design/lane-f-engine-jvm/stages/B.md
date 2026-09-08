@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B14 and B16 implemented and verified on the lane; B15 and remaining B17 proofs open; signed dead-Engine installer round deferred as decided"
+status: "B1-B14 and B16 implemented and verified on the lane; B15 and remaining B17 proofs open; signed dead-Engine installer proof assigned to final validation in stage E"
 updated: 2026-09-08
 ---
 
@@ -657,8 +657,10 @@ reviewed and green. The real post-staging coordinator stops/reaps an unbound own
 reconciles a real registered child and retains distinct stop evidence through reconciliation.
 Failed normal prepare/commit never uses the dead path; uncertain termination retains the hold.
 See [the B13 record](../evidence/B/b13-updater-handoff.md). The signed installer/store-recovery
-round is deferred to the first post-merge installer round under design section 0's prior decision,
-with its procedure registered as `upgrade-dead-engine-recovery`; that packaged proof is not claimed.
+round is assigned to stage E under design section 0's final-validation amendment, with its
+procedure registered as `upgrade-dead-engine-recovery`. If main-only signing still prevents the
+final candidate artifact, the first eligible signed installer after the final merge supplies the
+run; stage F carries the gap until it passes. That packaged proof is not claimed here.
 
 ### B14 — `ENGINE_RESTART_EXHAUSTED` gets a real producer
 

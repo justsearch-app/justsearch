@@ -61,7 +61,10 @@ production still reads the environment. No assertion or product policy was weake
 
 This is the branch host-level proof permitted by design section 0's dated B-stage
 sandbox decision. It is not a signed installer, packaged AppHandle, or recovered
-user-store proof. The first post-merge signed installer round must induce a
+user-store proof. Scheduling amendment, 2026-09-08: stage E owns this final-validation
+exercise; if main-only signing prevents a final candidate artifact, run it on the
+first eligible signed installer after the final merge and carry the gap through
+stage F until it passes. The signed installer round must induce a
 non-transient Engine boot failure, update through the pre-API recovery UI, verify
 child reconciliation, and open/search all inherited stores. The exact procedure is
 registered in `governance/sandbox-coverage.v1.json` and remains owed until executed.
