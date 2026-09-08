@@ -1092,20 +1092,24 @@ public class HeadlessApp {
       final KnowledgeServerHealthMonitor knowledgeServerHealthMonitorRef = workerResult.healthMonitor();
       final RuntimeManifestPublisher manifestPublisherRef = manifestPublisher;
       final AppInstanceLock appInstanceLockRef = appInstanceLock;
-      final HeadShutdownCoordinator shutdownCoordinator =
-          new HeadShutdownCoordinator(
+      // Item B4: the ordered close is the composition root's (design 7.3). What is bound here is
+      // each step to the object it closes — those objects live in this module and app-services, so
+      // they cannot move into the root without inverting the ui -> app-engine edge.
+      final io.justsearch.app.engine.EngineShutdownSequence shutdownSequence =
+          new io.justsearch.app.engine.EngineShutdownSequence(
               configPhase.dataDir(),
-              () ->
-                  performOrderedShutdown(
-                      apiServerRef,
-                      bootstrapRef,
-                      knowledgeServerHealthMonitorRef,
-                      knowledgeServerRef,
-                      manifestPublisherRef,
-                      infraPhase.tracingBootstrap(),
-                      telemetryRef,
-                      appInstanceLockRef),
+              orderedShutdownSteps(
+                  apiServerRef,
+                  bootstrapRef,
+                  knowledgeServerHealthMonitorRef,
+                  knowledgeServerRef,
+                  manifestPublisherRef,
+                  infraPhase.tracingBootstrap(),
+                  telemetryRef,
+                  appInstanceLockRef),
               System::exit);
+      final HeadShutdownCoordinator shutdownCoordinator =
+          new HeadShutdownCoordinator(shutdownSequence);
       upgradeShutdownBridge.install(shutdownCoordinator);
       // Tempdoc 805 G.1: the same coordinator answers the shell's normal-quit request — one
       // ordered-shutdown routine, two callers.
@@ -1116,7 +1120,10 @@ public class HeadlessApp {
               new Thread(
                   () -> {
                     log.info("Shutting down HeadlessApp...");
-                    shutdownCoordinator.shutdownNormally();
+                    // The hook fires DURING an exit the endpoint or the watcher may already have
+                    // started; run() is memoised, so this joins that shutdown rather than starting
+                    // a second one.
+                    shutdownSequence.run(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT);
                     latch.countDown();
                   },
                   "justsearch-headless-shutdown"));
@@ -1183,65 +1190,73 @@ public class HeadlessApp {
 
   private record KnowledgeServerStartResult(KnowledgeServerBootstrap bootstrap, String startError) {}
 
-  private static HeadShutdownCoordinator.ShutdownResult performOrderedShutdown(
-      LocalApiServer apiServer,
-      HeadAssembly bootstrap,
-      KnowledgeServerHealthMonitor healthMonitor,
-      KnowledgeServerBootstrap knowledgeServer,
-      RuntimeManifestPublisher manifestPublisher,
-      io.justsearch.telemetry.TracingBootstrap tracing,
-      Telemetry telemetry,
-      AppInstanceLock appInstanceLock) {
-    List<String> errors = new java.util.ArrayList<>();
-    String workerOutcome = "GRACEFUL";
-    try {
-      if (manifestPublisher != null) manifestPublisher.close();
-    } catch (Exception e) {
-      errors.add("runtime-manifest");
-    }
-    try {
-      if (apiServer != null) apiServer.stop();
-    } catch (Exception e) {
-      errors.add("local-api");
-    }
-    try {
-      if (healthMonitor != null) healthMonitor.close();
-    } catch (Exception e) {
-      errors.add("worker-health-monitor");
-    }
-    try {
-      if (bootstrap != null) bootstrap.close();
-    } catch (Exception e) {
-      errors.add("head-assembly");
-    }
-    try {
-      if (knowledgeServer != null) {
-        workerOutcome = knowledgeServer.closeForUpgrade().name();
-        if (!"GRACEFUL".equals(workerOutcome)) {
-          errors.add("worker-" + workerOutcome.toLowerCase(java.util.Locale.ROOT));
-        }
-      }
-    } catch (Exception e) {
-      workerOutcome = "FAILED";
-      errors.add("worker");
-    }
-    try {
-      if (tracing != null) tracing.close();
-    } catch (Exception e) {
-      errors.add("tracing");
-    }
-    try {
-      if (telemetry != null) telemetry.close();
-    } catch (Exception e) {
-      errors.add("telemetry");
-    }
-    try {
-      if (appInstanceLock != null) appInstanceLock.close();
-    } catch (Exception e) {
-      errors.add("app-instance-lock");
-    }
-    return new HeadShutdownCoordinator.ShutdownResult(
-        errors.isEmpty(), workerOutcome, errors);
+  /**
+   * The eight ordered steps of design 7.3, bound to the objects they close.
+   *
+   * <p>The ORDER and the error accounting belong to {@link
+   * io.justsearch.app.engine.EngineShutdownSequence}; what belongs here is the binding, because
+   * these eight types live in this module and in app-services and the root may not import them.
+   * Each step is named for the resource it releases, since that name is what appears in the
+   * receipt's {@code errors} list and in the log line a support session reads.
+   */
+  private static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
+      orderedShutdownSteps(
+          LocalApiServer apiServer,
+          HeadAssembly bootstrap,
+          KnowledgeServerHealthMonitor healthMonitor,
+          KnowledgeServerBootstrap knowledgeServer,
+          RuntimeManifestPublisher manifestPublisher,
+          io.justsearch.telemetry.TracingBootstrap tracing,
+          Telemetry telemetry,
+          AppInstanceLock appInstanceLock) {
+    return List.of(
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "runtime-manifest",
+            reason -> {
+              if (manifestPublisher != null) manifestPublisher.close();
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "local-api",
+            reason -> {
+              if (apiServer != null) apiServer.stop();
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "worker-health-monitor",
+            reason -> {
+              if (healthMonitor != null) healthMonitor.close();
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "head-assembly",
+            reason -> {
+              if (bootstrap != null) bootstrap.close();
+              return null;
+            }),
+        // The one step whose outcome the receipt reports. Named INDEX_HALF_STEP in the sequence so
+        // re-ordering cannot silently change which step the updater reads.
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            io.justsearch.app.engine.EngineShutdownSequence.INDEX_HALF_STEP,
+            reason -> knowledgeServer == null ? null : knowledgeServer.closeForUpgrade().name()),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "tracing",
+            reason -> {
+              if (tracing != null) tracing.close();
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "telemetry",
+            reason -> {
+              if (telemetry != null) telemetry.close();
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "app-instance-lock",
+            reason -> {
+              if (appInstanceLock != null) appInstanceLock.close();
+              return null;
+            }));
   }
 
   private static KnowledgeServerStartResult tryStartKnowledgeServer(
