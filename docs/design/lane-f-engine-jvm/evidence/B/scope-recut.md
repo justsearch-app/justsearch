@@ -126,3 +126,20 @@ Those production bindings and the four proofs above remain unimplemented here.
 | `tmp/b15-handoff-lifetime-proof.txt` | `63f7f9d6d00cca4e166a74ac662d3f35b53563e1b34178e191f570366720b70b` |
 | `tmp/b15-handoff-lifetime-negative.txt` | `e514d84846e75135db99e5ca5a2820996dfebadcaab508bf369b65b7caf5b5bd` |
 | `tmp/b15-handoff-lifetime-restored.txt` | `a823ac4e3e102da3b4fecd6082199ebe02342fe465cbe0561c4a45035e421b65` |
+
+## Proof disposition at the B17 checkpoint (2026-09-08)
+
+The four obligations above are discharged by the reviewed B13/B15/B17 cuts:
+
+1. Response-flush dispatch, failure rollback and its negative control are recorded in
+   [B15](b15-requested-restart.md).
+2. Fileless requested restart and charged fatal exit pass on both 17-case adapters;
+   B17 now routes the Tauri driver through production EngineHost binding methods.
+3. Both adapters exercise the admitted local-handoff deadline, including a completed
+   handoff with stalled native exit and a stale handoff that cannot arm the deadline.
+4. [B13](b13-updater-handoff.md) covers the exclusive host hold, failure/race paths,
+   receipt requirement and owned reconciliation.
+
+[B17](b17-recovery-proofs.md) records the final integrated runs and their limits.
+Tauri AppHandle setup/events remain source-reviewed; signed installer/user-store proof
+stays assigned to E. No shared request-slot or accepted-instance marker was introduced.

@@ -914,6 +914,17 @@ Stage A's deletions while adding PR 0b's approved knobs. No new process boundary
 or later-stage mechanism is needed. The main-development trigger remains active,
 but this reconciliation does not require changing the checkpoint order.
 
+**Stage B completion (orchestrator, 2026-09-08).** B1–B17 are complete at the agreed
+branch proof tier after main integration. The final unit/stress run is 9,456/0;
+installed recovery is 5/5 and both production supervisor adapters are 17/17.
+The bounded jseval development smoke also passes. Keep the checkpoint order:
+C1 supplies interactive admission/cancellation, C2 durable operations, and D1 the
+component/readiness re-cut and live reconfiguration. Signed installer/user-store
+proof stays in E (carried through F if signing needs the final main merge).
+Do not expand B to implement those later contracts; its existing host ownership,
+ordered shutdown and requested whole-Engine restart now have their required proof.
+See `evidence/B/b17-recovery-proofs.md` for exact verification limits and hashes.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

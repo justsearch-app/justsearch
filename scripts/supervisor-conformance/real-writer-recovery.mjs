@@ -162,12 +162,15 @@ function resolveOwnedRunId() {
 let fixtureFailure;
 try {
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
-  const first = await waitFor('first running incarnation', 90000, async () => {
+  const initial = await waitFor('first running incarnation with matching manifest', 90000, async () => {
     const s = readJson(supervisorFile);
-    return s?.state === 'running' ? s : null;
+    const m = readJson(path.join(data, 'runtime', 'manifest.json'));
+    return s?.state === 'running' && m?.pid === s.pid && m?.instanceId === s.instanceId
+      && m?.head?.apiPort === s.apiPort ? { supervisor: s, manifest: m } : null;
   });
+  const first = initial.supervisor;
   ownedRunId = first.runId;
-  const manifest = readJson(path.join(data, 'runtime', 'manifest.json'));
+  const manifest = initial.manifest;
   const apiPort = manifest.head.apiPort;
   const healthBefore = await waitFor('initial healthy Engine', 60000, async () => {
     try {

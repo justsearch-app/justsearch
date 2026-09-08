@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B16 complete; B17 recovery proofs implemented and reviewed, final integrated verification pending; signed dead-Engine installer proof assigned to final validation in stage E"
+status: "B1-B17 complete and independently reviewed; integrated unit/stress, installed recovery and development smoke checks green; signed dead-Engine installer proof assigned to stage E"
 updated: 2026-09-08
 ---
 
@@ -744,18 +744,19 @@ baseline grew. [The residue record](../evidence/B/b16-residue.md) records the fi
 
 ### B17 — the supervision assertions are in a suite that runs
 
-**2026-09-08 implementation checkpoint:** the hostile-lock workload now runs against
+**Complete, 2026-09-08:** the hostile-lock workload now runs against
 the installed supervised Engine; a separate test proves PROCESSING after actual death
 and replay through the successor. The Tauri adapter now calls production EngineHost
 lifecycle/binding methods. Both independent reviews are clear; installed cases 5/5 and
-Tauri adapter 17/17 pass. [The proof record](../evidence/B/b17-recovery-proofs.md) states
-the remaining stage-end unit/stress/main-integration verification and execution limits.
+Tauri adapter 17/17 pass. Main's accepted PR 0b is integrated; the full unit/stress suite,
+final installed rerun and development smoke check pass.
+[The proof record](../evidence/B/b17-recovery-proofs.md) records exact counts, hashes and limits.
 
 - [x] **B17-R1: terminal writer escalation (moved from D1, 2026-09-08).** The narrow
   repair and bounded proof are recorded in design section 0 and
-  `evidence/B/writer-recovery-investigation.md`. Its completion does not close B17:
-  hostile-lock fixture relocation, both durable replay outcomes, the second real
-  supervisor binding and the remaining stage checks stay in this item.
+  `evidence/B/writer-recovery-investigation.md`. B17 also completes hostile-lock fixture
+  relocation, both durable replay outcomes, the second production supervisor binding
+  and the stage checks; the narrow repair alone was not the acceptance proof.
 
 Any test B writes that needs a real kill, a real hang or a real spawn must not silently land
 behind `stress` or `load-sensitive` (I9). It must be a unit-level test in the default suite; an
@@ -985,15 +986,18 @@ see that the question was asked.
 
 ## 10. What is allowed to be red after stage B, and nothing else
 
-**Integrated checkpoint, 2026-09-08:** `./gradlew.bat test --no-build-cache --rerun-tasks`
-passed 9,405 tests (25 skips), zero failures/errors, across 34 modules; the 1,525 exact `test`
-XML files and hash inventory were preserved before any filtered rerun. This excludes stress and
-installed-process integration tiers. `cargo test --lib --locked` passed 76; build the conformance
-binary with `cargo build --bin supervisor-conformance --locked` before running
-`node scripts/supervisor-conformance/run.mjs --adapter tauri`. Both that adapter and
-`--adapter dev-runner` passed 11/11. Commands, hashes and the signed-installer deferral are in
-[the integrated B13 record](../evidence/B/b13-updater-handoff.md). B15 and B17's hostile-lock,
-PROCESSING replay and remaining production shutdown proofs remain acceptance obligations.
+**Final integrated checkpoint, 2026-09-08:** `./gradlew.bat test -PincludeStress=true
+--no-build-cache --rerun-tasks --console=plain` passed 9,456 tests (25 skips), zero
+failures/errors, across 34 modules. The 1,533 exact `test` XML files and hash inventory
+were preserved before later runs. This includes stress and extraction chaos, but excludes
+the separate installed-process tier: B17's explicit `EngineSupervisedRecoveryE2ETest`
+invocation passed all five scenarios. `build -x test` (including Spotless/PMD), frontend
+typecheck and 6,462 unit tests, UI gates 27/27, fixture tests 192/192 and dev-runner tests
+10/10 pass. `cargo test --lib --locked` passed 77; after rebuilding the conformance binary,
+both `--adapter tauri` and `--adapter dev-runner` passed 17/17. The bounded
+`jseval run --start-backend` smoke passed fresh ingestion and three lexical queries.
+Commands, hashes, review scope and execution limits are in
+[the B17 record](../evidence/B/b17-recovery-proofs.md).
 
 
 17.3's "branch state after" for B is: *migration start, rollback and completed cutover work through requested restart; a
@@ -1015,11 +1019,11 @@ room, and B is additive, so the list is short.
    admission front that can identify and cancel those turns with a reason code. B freezes all new
    mutation admission first for every shutdown reason; the cancellation half remains unmeasurable
    until that C1 contract exists.
-4. **The dead-Engine sandbox round may be unrunnable on the branch** — `build-installer.yml:57`'s
-   `environment: release-signing` refuses every ref but `main`, and a local build is blocked by
-   Smart App Control. This is the same wall that left A13's packaging steps "changed, locally
-   reasoned, never executed" (`stages/A.md` §10 row 5). It is an **unrunnable check, not a red**,
-   and it is a checkpoint proof, so it needs the owner's word (Q1), not an agent's judgement.
+4. **Signed dead-Engine installer/user-store proof is assigned to stage E.** The owner's
+   2026-09-08 deferral is recorded in design section 0 and registered as
+   `upgrade-dead-engine-recovery`. B requires the host-level handoff/reconciliation proofs;
+   signed installation remains an explicit final-validation obligation. If main-only signing
+   prevents the stage-E run, F carries it to the first eligible installer after the final merge.
 5. **`core.restart-worker` still answers `restart_required`** rather than restarting anything
    (`RestartWorkerHandler.java:61,74`). D1 retires the operation; B only makes the *requested
    restart* that answers it real (B15).

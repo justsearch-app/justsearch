@@ -672,3 +672,19 @@ are clear. No production recovery protocol was added. The next action is merge c
 origin/main into this lane, then run the full suite with stress enabled and rerun the
 installed-process suite against that integrated candidate. B17 is not yet closed.
 `evidence/B/b17-recovery-proofs.md` records the checkpoint; raw outputs stay ignored.
+
+B completion (2026-09-08): B1–B17 are complete. B17 is `b8094f9cf`; main/PR 0b
+`f938c4eb2` is integrated by `39f598efa`, with all conflict resolutions independently
+reviewed. The following closeout corrects a fixture-only transient manifest read and
+records final proof: full units plus stress 9,456/0 (25 skips), installed recovery 5/5,
+Rust 77/77, both supervisor adapters 17/17, frontend 6,462/0, fixture tests 192/192,
+build/governance/generated checks green, and a fresh jseval start/ingest/query/stop smoke.
+Exact XML and raw logs remain ignored; hashes and limits are in the B17 evidence record.
+No dev stack remains owned. The root is sole implementer and both final reviews are clear.
+
+Next is C1: re-verify its draft citations and inherited facts under 17.6 before implementing
+its bounded batches. C2, D1 and final E/F proofs retain their assigned scope. Signed
+dead-Engine installer/user-store proof is deferred to E, carried through F only if main-only
+signing requires the final merge. Keep the one-branch checkpoint sequence until F/PR 1;
+autonomous merge authority does not require publishing the implementation at each stage.
+The secondary recovery worktree remains preserved and must not overwrite this branch.

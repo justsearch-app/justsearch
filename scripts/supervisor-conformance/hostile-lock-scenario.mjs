@@ -27,8 +27,8 @@ export async function exerciseHostileLocks(c) {
       && manifest?.pid === supervisor.pid && manifest?.instanceId === supervisor.instanceId
       ? manifest.head.apiPort : null;
   };
-  const port = currentPort();
-  requireThat(port, 'a healthy owned incarnation must exist before submitting the corpus');
+  const port = await waitFor('a readable owned binding before submitting the corpus', 10000,
+    currentPort);
   const ingested = await post(port, '/api/knowledge/ingest', { paths });
   requireThat(ingested.status === 200 && acceptedCount(ingested) > 0,
     `documents under lock contention must be accepted: ${JSON.stringify(ingested)}`);
