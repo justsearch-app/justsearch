@@ -11,21 +11,71 @@
     "table": "CAUSE_ROWS"
   },
   "noWordingExempt": [
-    { "code": "local_api.session_token_missing", "why": "Fail-closed boot refusal (tempdoc 884 item 23): the Head throws at LocalApiServer construction before the loopback bind, so no readiness envelope, ConditionStore or SSE stream exists to carry it. The operator sees it in the fatal log line and the process exit; there is no UI to word it in." },
-    { "code": "settings.reset_from_corrupt", "why": "Head-owned ConditionStore condition (SettingsRecoveryNotice, tempdoc 882 item 24); never on the readiness envelope, so never reaches wordCauses. The user sees it on the Health surface, which renders conditions with the Java-side message." },
-    { "code": "worker.not_configured", "why": "NOT_CONFIGURED state on INDEX_SERVING -> verdict 'checking', never rendered by wordCauses (PART X)" },
-    { "code": "worker.not_started", "why": "NOT_CONFIGURED state on INDEX_SERVING -> verdict 'checking'" },
-    { "code": "worker.unavailable", "why": "NOT_READY state on INDEX_SERVING -> verdict 'checking' (reproduced live: no banner)" },
-    { "code": "index.not_healthy", "why": "NOT_READY state on INDEX_SERVING -> verdict 'checking'" },
-    { "code": "telemetry.unavailable", "why": "TELEMETRY dimension -> 'telemetry' composite, which the verdict never reads" },
-    { "code": "telemetry.metrics.stale", "why": "telemetry composite, not verdict-consumed" },
-    { "code": "telemetry.metrics.high_failure_rate", "why": "telemetry composite, not verdict-consumed" },
-    { "code": "telemetry.disk_space_low", "why": "telemetry composite, not verdict-consumed" }
+    {
+      "code": "local_api.session_token_missing",
+      "why": "Fail-closed boot refusal (tempdoc 884 item 23): the Head throws at LocalApiServer construction before the loopback bind, so no readiness envelope, ConditionStore or SSE stream exists to carry it. The operator sees it in the fatal log line and the process exit; there is no UI to word it in."
+    },
+    {
+      "code": "settings.reset_from_corrupt",
+      "why": "Head-owned ConditionStore condition (SettingsRecoveryNotice, tempdoc 882 item 24); never on the readiness envelope, so never reaches wordCauses. The user sees it on the Health surface, which renders conditions with the Java-side message."
+    },
+    {
+      "code": "worker.not_configured",
+      "why": "NOT_CONFIGURED state on INDEX_SERVING -> verdict 'checking', never rendered by wordCauses (PART X)"
+    },
+    {
+      "code": "worker.not_started",
+      "why": "NOT_CONFIGURED state on INDEX_SERVING -> verdict 'checking'"
+    },
+    {
+      "code": "worker.unavailable",
+      "why": "NOT_READY state on INDEX_SERVING -> verdict 'checking' (reproduced live: no banner)"
+    },
+    {
+      "code": "index.not_healthy",
+      "why": "NOT_READY state on INDEX_SERVING -> verdict 'checking'"
+    },
+    {
+      "code": "telemetry.unavailable",
+      "why": "TELEMETRY dimension -> 'telemetry' composite, which the verdict never reads"
+    },
+    {
+      "code": "telemetry.metrics.stale",
+      "why": "telemetry composite, not verdict-consumed"
+    },
+    {
+      "code": "telemetry.metrics.high_failure_rate",
+      "why": "telemetry composite, not verdict-consumed"
+    },
+    {
+      "code": "telemetry.disk_space_low",
+      "why": "telemetry composite, not verdict-consumed"
+    }
   ],
   "feDerived": [
-    { "code": "no_documents", "why": "Tempdoc 596 §17 — FE-only control-availability code; not emitted by the readiness producer" },
-    { "code": "conversations.locked", "why": "Tempdoc 629 #3 — FE-only: the locked-chat affordance words itself from CAUSE_ROWS; the backend never emits it as a readiness reason" },
-    { "code": "binding.unreachable", "why": "Tempdoc 637 #1 — FE-only: the FE detects a dead/replaced FE→backend binding (passive staleness → verdict 'unreachable') and words it from CAUSE_ROWS; the backend cannot emit it (it is unreachable by definition)" },
-    { "code": "memory.locked", "why": "Tempdoc 806 W1 — FE-only sibling of conversations.locked: the learned-memory store is encrypted + locked (GET /api/memory answers locked:true; mutations 423). The Memory surface words its locked state from CAUSE_ROWS; the backend never emits it as a readiness reason" }
+    {
+      "code": "no_documents",
+      "why": "Tempdoc 596 §17 — FE-only control-availability code; not emitted by the readiness producer"
+    },
+    {
+      "code": "conversations.locked",
+      "why": "Tempdoc 629 #3 — FE-only: the locked-chat affordance words itself from CAUSE_ROWS; the backend never emits it as a readiness reason"
+    },
+    {
+      "code": "binding.unreachable",
+      "why": "Tempdoc 637 #1 — FE-only: the FE detects a dead/replaced FE→backend binding (passive staleness → verdict 'unreachable') and words it from CAUSE_ROWS; the backend cannot emit it (it is unreachable by definition)"
+    },
+    {
+      "code": "memory.locked",
+      "why": "Tempdoc 806 W1 — FE-only sibling of conversations.locked: the learned-memory store is encrypted + locked (GET /api/memory answers locked:true; mutations 423). The Memory surface words its locked state from CAUSE_ROWS; the backend never emits it as a readiness reason"
+    }
+  ],
+  "emissionDirectionNote": "Lane F stage A checkpoint. checkProducers asks whether a code is MENTIONED; checkEmissions asks whether it is PRODUCED — mentioned in a value position rather than only compared against or logged. The weaker question let two passes of a design document disagree about whether WORKER_RESTART_EXHAUSTED had a producer while this gate certified both. awaitingProducer is the declared escape hatch: a code whose producer is scheduled but unwritten stays visible and owned instead of being indistinguishable from a live one. The gate also reds when a declared entry gains a producer, so the list cannot rot into a permanent exemption.",
+  "awaitingProducer": [
+    {
+      "code": "worker.restart_exhausted",
+      "owner": "lane-F/B",
+      "why": "Lane F stage A deleted the Worker process and with it the only thing that could give up on restarting it. All four main-source sites are consumers: KnowledgeServerBootstrap.java:444-447 and KnowledgeServerHealthMonitor.java:342-344 compare it against pendingReason(); KnowledgeServerBootstrap.java:729-732 and KnowledgeServerHealthMonitor.java:498-500 pass it to a logger. Nothing transitions to it, so supervisionVerdictHeld() is permanently false and BootRecoveryDecision SUPERVISION_ENGAGED plus its terminal-verdict branch are inert. Kept rather than deleted because design 7.1 lands a real supervisor with a kill path and a restart budget at stage B, which is the producer. Stage B clears this entry by adding the emit site."
+    }
   ]
 }
