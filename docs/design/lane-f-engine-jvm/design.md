@@ -628,6 +628,23 @@ drain-retry fixture defect is repaired without production changes. Exact evidenc
 and the still-red suite inventory are in
 [the integrated verification record](evidence/B/integrated-verification.md).
 
+**Merge authority delegated (owner, 2026-09-08).** The owner explicitly authorizes
+the lane orchestrator to make merge decisions autonomously. This supersedes the
+earlier per-PR approval requirement, including PRs #708 and #717. The orchestrator
+still owns verification, independent review, the repository merge queue and
+post-merge checks. The open stage-B recovery finding remains blocking for that
+stage; it does not make the separately scoped split-mode PRs dependent on another
+owner reply.
+
+**Writer recovery scope (orchestrator, 2026-09-08).** Prove whole-Engine fault
+recovery before importing D1's component reopening. The existing transient-exit
+budget and startup queue replay are a smaller ownership cut; the cost is a full
+application outage. The existing runtime swap has unresolved failed-open and
+loop-handoff semantics. This chooses the next proof, not an implementation or a
+green checkpoint. [The investigation](evidence/B/writer-recovery-investigation.md)
+records the evidence and the detection, supervised restart and replay still to
+demonstrate. No new file protocol or generic fault framework is approved.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

@@ -58,14 +58,14 @@ import org.junit.jupiter.api.io.TempDir;
  * Measured on 2026-09-07, in this order: both methods pass in ~10 s under
  * {@code :modules:app-engine:test} (three consecutive runs, isolated and whole-module), and both
  * blew their 180 s liveness budget during a concurrent whole-repo {@code ./gradlew test}, where
- * other modules' forked test JVMs load the machine. The cause is in this test's own instrument, not
- * in the product: {@link FileIntruder} promises "holds a lock for ~10-50 ms", and that promise is a
- * claim about the OS scheduler. When the box is saturated the holding thread is not scheduled to
- * release on time, the holds stretch, and the writer starves — so the test stops measuring "the
- * index half survives an antivirus-shaped intruder" and starts measuring "how loaded is this
- * machine". Quarantining it into the opt-in stress runner
+ * other modules' forked test JVMs load the machine. Those timeouts were attributed to scheduler-
+ * stretched lock holds: {@link FileIntruder}'s "~10-50 ms" hold duration depends on its thread
+ * being scheduled to release the lock. That was a load-sensitivity hypothesis, not proof excluding
+ * a product failure. The preserved 2026-09-08 stress run instead shows a locked-file commit failure
+ * followed by a closed writer that never recovers (lane-F evidence/B/integrated-verification.md).
+ * That failure blocks the lane's recovery claim even though this test is opt-in. The stress runner
  * ({@code -PincludeStress=true}, registered in {@code scripts/ci/stress-suite-policy.v1.json}) keeps
- * the assertions at full strength rather than stretching the budget until a real starvation defect
+ * the assertions at full strength rather than stretching the budget until a real recovery defect
  * would also pass — the same trade the repo already made for the {@code load-sensitive} latency
  * gates (modules/app-services/build.gradle.kts:151-178).
  */

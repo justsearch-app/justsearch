@@ -1,5 +1,10 @@
 # Lane F handoff: from the design orchestrator to the implementation orchestrator
 
+**Current authority (owner, 2026-09-08): merges are delegated to the orchestrator.**
+The earlier per-PR approval requirements below are historical and superseded.
+The orchestrator verifies, reviews and merges autonomously through the repository
+queue; no owner reply is needed for #708 or #717.
+
 Two handoffs live in this file. The first (2026-09-07) is from the design orchestrator to the
 first implementation orchestrator and is kept as written. The second, **"Implementation
 orchestrator handoff (2026-09-08)"** at the end, is from that orchestrator to its successor and

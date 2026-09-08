@@ -85,9 +85,10 @@ at :617. Adding that monitor alone would not supply recovery:
 `KnowledgeServerHealthMonitor.java`:237-246 selects boot retry only when there is
 no client. With a client, the health path checks queue access and reader count
 (`WorkerHealthService.java`:200-225), not writer usability. A readable stale
-searcher can therefore conceal a closed writer. Write failures do enter durable
-retry state (`JobBatchWriter.java`:191-207; `SqliteJobQueue.java`:997-1025), but
-retrying against the same closed writer cannot recover it.
+searcher can therefore conceal a closed writer. Write failures attempt a durable
+retry transition (`JobBatchWriter.java`:191-207; `SqliteJobQueue.java`:997-1025).
+If that transaction fails, the row remains PROCESSING for startup recovery
+(`IngestionOutcomeJournal.java`:217-238). Neither case repairs the closed writer.
 
 This is owned by the index-runtime/KnowledgeServer recovery investigation, not
 silently covered by B14's boot retry. It blocks the stage-B verification claim.
