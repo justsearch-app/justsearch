@@ -135,6 +135,7 @@ public final class KnowledgeServer implements Closeable {
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
   private final WorkerSignalBus injectedSignalBus;
+  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
   private JobQueue jobQueue;
 
   // Tempdoc 550 Thesis II / 575 §4.3b (liveness): periodic reaper re-queues PROCESSING rows orphaned by a
@@ -311,7 +312,7 @@ public final class KnowledgeServer implements Closeable {
    * @param config Worker configuration
    */
   public KnowledgeServer(WorkerConfig config) {
-    this(config, null);
+    this(config, null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   /**
@@ -328,9 +329,17 @@ public final class KnowledgeServer implements Closeable {
    * @param signalBus the bus to use, or {@code null} to build one over a private gauge
    */
   public KnowledgeServer(WorkerConfig config, WorkerSignalBus signalBus) {
+    this(config, signalBus, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public KnowledgeServer(
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this.config = config;
     this.dataDir = config.dataDir();
     this.injectedSignalBus = signalBus;
+    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
   }
 
   /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
@@ -1168,7 +1177,8 @@ public final class KnowledgeServer implements Closeable {
         infraCtx,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
-        indexingPacing);
+        indexingPacing,
+        childRegistry);
   }
 
   /** Tempdoc 885 item 3: the process-scoped duty-cycle policy, built from resolved config. */

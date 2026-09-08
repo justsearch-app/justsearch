@@ -171,7 +171,7 @@ final class RouteContractPolicy {
               Stability.PUBLIC_CONTRACT,
               "getRuntimeManifest",
               Map.of(
-                  200, "runtime-manifest-public.v1.json",
+                  200, "runtime-manifest-public.v2.json",
                   403, "api-error-response.v1.json",
                   500, "api-error-response.v1.json",
                   503, "api-error-response.v1.json")),
@@ -181,7 +181,7 @@ final class RouteContractPolicy {
               Stability.PUBLIC_CONTRACT,
               "getWellKnownRuntimeManifest",
               Map.of(
-                  200, "runtime-manifest-public.v1.json",
+                  200, "runtime-manifest-public.v2.json",
                   403, "api-error-response.v1.json",
                   500, "api-error-response.v1.json",
                   503, "api-error-response.v1.json")),

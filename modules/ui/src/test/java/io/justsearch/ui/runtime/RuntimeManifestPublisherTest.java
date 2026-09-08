@@ -9,11 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.RuntimeManifest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -68,21 +73,14 @@ class RuntimeManifestPublisherTest {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, null);
 
-    // Lane F item A11 + the review's grpcPort decision: the only production caller
-    // (RuntimeManifestListenerWiring) passes null, because the index half is composed in this JVM
-    // and there is no port. Pinning 12345 here pinned the publisher's ability to carry a number
-    // nothing supplies — which would keep reading as "the manifest reports a worker port" long
-    // after it stopped being able to.
+    // Lane F B11 removed grpcPort: the index half is composed in this JVM and has no process port.
     RuntimeManifest updated =
-        publisher.publishWorkerReady(null, tmp.resolve("index").toString(), "LIFECYCLE_STATE_READY");
+        publisher.publishWorkerReady(tmp.resolve("index").toString(), "LIFECYCLE_STATE_READY");
 
     assertEquals(54321, updated.head().apiPort());
     assertEquals("LIFECYCLE_STATE_READY", updated.lifecycle());
     assertNotNull(updated.worker());
     assertEquals("ready", updated.worker().state());
-    assertNull(
-        updated.worker().grpcPort(),
-        "there is no worker port to report; NON_NULL keeps the field out of the JSON entirely");
     assertEquals(tmp.resolve("index").toString(), updated.worker().indexBasePath());
     assertNotNull(updated.worker().readyAt());
     assertNull(updated.worker().spawnError(), "spawnError null when state=ready");
@@ -101,7 +99,6 @@ class RuntimeManifestPublisherTest {
     assertNotNull(updated.worker());
     assertEquals("failed", updated.worker().state());
     assertEquals("native library missing", updated.worker().spawnError());
-    assertNull(updated.worker().grpcPort(), "no grpcPort when worker failed");
     assertNull(updated.worker().readyAt(), "no readyAt when worker failed");
   }
 
@@ -133,7 +130,7 @@ class RuntimeManifestPublisherTest {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     assertThrows(
         IllegalStateException.class,
-        () -> publisher.publishWorkerReady(12345, "/tmp/index", "READY"));
+        () -> publisher.publishWorkerReady("/tmp/index", "READY"));
     assertThrows(
         IllegalStateException.class,
         () -> publisher.publishWorkerFailed("oops", "DEGRADED"));
@@ -150,12 +147,12 @@ class RuntimeManifestPublisherTest {
   void manifestFileIsValidJsonWithExpectedShape(@TempDir Path tmp) throws IOException {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, "tok");
-    publisher.publishWorkerReady(12345, "/tmp/index", "READY");
+    publisher.publishWorkerReady("/tmp/index", "READY");
 
     String content = Files.readString(publisher.manifestPath());
     JsonNode root = new ObjectMapper().readTree(content);
 
-    assertEquals(1, root.get("schemaVersion").asInt());
+    assertEquals(2, root.get("schemaVersion").asInt());
     assertEquals(publisher.instanceId(), root.get("instanceId").asText());
     assertTrue(root.get("pid").asLong() > 0);
     assertEquals("READY", root.get("lifecycle").asText());
@@ -168,7 +165,7 @@ class RuntimeManifestPublisherTest {
         54321,
         root.get("head").get("apiPort").asInt(),
         "head.apiPort is the non-JVM API-port discovery contract (tempdoc 501 §6 / 930)");
-    assertEquals(12345, root.get("worker").get("grpcPort").asInt());
+    assertNull(root.get("worker").get("grpcPort"));
     assertEquals("ready", root.get("worker").get("state").asText());
   }
 
@@ -185,6 +182,215 @@ class RuntimeManifestPublisherTest {
   }
 
   @Test
+  void predecessorChildrenAreCarriedByThePreBindSeed(@TempDir Path tmp) throws IOException {
+    Path runtime = tmp.resolve("runtime");
+    Files.createDirectories(runtime);
+    ManagedChild child =
+        new ManagedChild(
+            "predecessor-child",
+            ManagedChild.Kind.EXTRACTION,
+            424242,
+            "2026-09-08T00:00:00Z",
+            ManagedChild.normalizePath(Path.of("java")),
+            null,
+            null,
+            null,
+            "argv");
+    Files.writeString(
+        runtime.resolve("manifest.json"),
+        "{\"schemaVersion\":2,\"pid\":424241,\"startedAt\":\"2026-09-08T00:00:00Z\","
+            + "\"children\":["
+            + new ObjectMapper().writeValueAsString(child)
+            + "]}");
+
+    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
+    RuntimeManifest seed = publisher.publishOwnershipSeed();
+
+    assertEquals(java.util.List.of(child), registry.snapshot());
+    assertEquals(java.util.List.of(child), seed.children());
+    assertNull(seed.head().apiPort(), "the durable ownership seed precedes API bind");
+    JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+    assertEquals("predecessor-child", disk.get("children").get(0).get("id").asText());
+  }
+
+  @Test
+  void futureManifestSchemaIsRefusedBeforePublication(@TempDir Path tmp) throws IOException {
+    Path runtime = tmp.resolve("runtime");
+    Files.createDirectories(runtime);
+    Files.writeString(runtime.resolve("manifest.json"), "{\"schemaVersion\":3,\"pid\":424242}");
+
+    assertThrows(IllegalStateException.class, () -> new RuntimeManifestPublisher(tmp));
+  }
+
+  @Test
+  void restartRetainsOwnershipAndFinallyCloseCannotEraseIt(@TempDir Path tmp) throws IOException {
+    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
+    publisher.publishOwnershipSeed();
+    ManagedChild child =
+        new ManagedChild(
+            "warm-child", ManagedChild.Kind.LLAMA_SERVER, 424242,
+            "2026-09-08T00:00:00Z", ManagedChild.normalizePath(Path.of("llama-server")),
+            "http://127.0.0.1:8080", "model.gguf", "declared", "argv");
+    registry.register(child);
+    publisher.markShutdownPending("restart");
+
+    publisher.completeShutdown("restart", true, "GRACEFUL");
+    publisher.close();
+
+    assertTrue(Files.isRegularFile(publisher.manifestPath()));
+    JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+    assertEquals("ready", disk.get("shutdownHandoff").get("state").asText());
+    assertEquals("warm-child", disk.get("children").get(0).get("id").asText());
+  }
+
+  @Test
+  void terminalShutdownDeletesOnlyAfterChildrenAreGoneAndIndexIsGraceful(@TempDir Path tmp)
+      throws IOException {
+    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
+    publisher.publishOwnershipSeed();
+    ManagedChild child =
+        new ManagedChild(
+            "live-child", ManagedChild.Kind.EXTRACTION, 424242,
+            "2026-09-08T00:00:00Z", ManagedChild.normalizePath(Path.of("java")),
+            null, null, null, "argv");
+    registry.register(child);
+    publisher.markShutdownPending("quit");
+    assertThrows(IOException.class, () -> publisher.completeShutdown("quit", true, "GRACEFUL"));
+    publisher.close();
+    assertTrue(Files.isRegularFile(publisher.manifestPath()), "failed child cleanup retains evidence");
+
+    registry.remove(child.id());
+    publisher.completeShutdown("quit", true, "GRACEFUL");
+    assertFalse(Files.exists(publisher.manifestPath()));
+  }
+
+  @Test
+  void shutdownWaitingForRegistryDoesNotHoldPublisher(@TempDir Path tmp) throws Exception {
+    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
+    publisher.publishOwnershipSeed();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread completion = new Thread(() -> {
+      try { publisher.completeShutdown("restart", true, "GRACEFUL"); }
+      catch (Throwable error) { failure.set(error); }
+    }, "contended-manifest-shutdown");
+    try (var tasks = Executors.newSingleThreadExecutor()) {
+      java.util.concurrent.Future<?> pending;
+      synchronized (registry) {
+        completion.start();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (completion.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+          Thread.sleep(1);
+        }
+        assertEquals(Thread.State.BLOCKED, completion.getState());
+        pending = tasks.submit(() -> { publisher.markShutdownPending("restart"); return null; });
+        // Former publisher->registry code holds publisher here and times this operation out.
+        // Release the registry even on failure so the negative control cannot strand test threads.
+        pending.get(1, TimeUnit.SECONDS);
+      }
+      completion.join(5000);
+      assertFalse(completion.isAlive());
+      assertNull(failure.get());
+    }
+  }
+
+  @Test
+  void childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention(@TempDir Path tmp)
+      throws Exception {
+    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
+    publisher.publishOwnershipSeed();
+    CountDownLatch childCommitEntered = new CountDownLatch(1);
+    CountDownLatch releaseChildCommit = new CountDownLatch(1);
+    publisher.addListener(
+        manifest -> {
+          if (manifest.children() != null && !manifest.children().isEmpty()) {
+            childCommitEntered.countDown();
+            try {
+              releaseChildCommit.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+        });
+    ManagedChild child =
+        new ManagedChild(
+            "contended-child", ManagedChild.Kind.EXTRACTION, 424242,
+            "2026-09-08T00:00:00Z", ManagedChild.normalizePath(Path.of("java")),
+            "stdio", null, null, "argv");
+
+    try (var tasks = Executors.newFixedThreadPool(2)) {
+      var registration =
+          tasks.submit(
+              () -> {
+                registry.register(child);
+                return null;
+              });
+      assertTrue(childCommitEntered.await(5, TimeUnit.SECONDS));
+      var shutdown =
+          tasks.submit(
+              () -> {
+                publisher.completeShutdown("restart", true, "GRACEFUL");
+                return null;
+              });
+      assertThrows(TimeoutException.class, () -> shutdown.get(100, TimeUnit.MILLISECONDS));
+
+      releaseChildCommit.countDown();
+      registration.get(5, TimeUnit.SECONDS);
+      shutdown.get(5, TimeUnit.SECONDS);
+    }
+
+    JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+    assertEquals("contended-child", disk.path("children").get(0).path("id").asText());
+    assertEquals("ready", disk.path("shutdownHandoff").path("state").asText());
+  }
+
+  @Test
+  void shutdownDispositionCoversEveryReasonAndCompletionOutcome(@TempDir Path tmp)
+      throws IOException {
+    for (String reason : java.util.List.of("restart", "hang")) {
+      RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp.resolve(reason));
+      publisher.publishOwnershipSeed();
+      publisher.markShutdownPending(reason);
+      publisher.completeShutdown(reason, true, "GRACEFUL");
+      publisher.close();
+      JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+      assertEquals("ready", disk.path("shutdownHandoff").path("state").asText());
+    }
+
+    for (String reason : java.util.List.of("quit", "upgrade")) {
+      RuntimeManifestPublisher publisher =
+          new RuntimeManifestPublisher(tmp.resolve(reason + "-clean"));
+      publisher.publishOwnershipSeed();
+      publisher.markShutdownPending(reason);
+      publisher.completeShutdown(reason, true, "GRACEFUL");
+      assertFalse(Files.exists(publisher.manifestPath()));
+    }
+
+    for (String reason : java.util.List.of("restart", "hang", "quit", "upgrade")) {
+      RuntimeManifestPublisher publisher =
+          new RuntimeManifestPublisher(tmp.resolve(reason + "-unclean"));
+      publisher.publishOwnershipSeed();
+      publisher.markShutdownPending(reason);
+      assertThrows(IOException.class, () -> publisher.completeShutdown(reason, false, "GRACEFUL"));
+      publisher.close();
+      assertTrue(Files.exists(publisher.manifestPath()));
+    }
+
+    RuntimeManifestPublisher nonGraceful =
+        new RuntimeManifestPublisher(tmp.resolve("non-graceful-index"));
+    nonGraceful.publishOwnershipSeed();
+    nonGraceful.markShutdownPending("quit");
+    assertThrows(
+        IOException.class, () -> nonGraceful.completeShutdown("quit", true, "FORCED"));
+    nonGraceful.close();
+    assertTrue(Files.exists(nonGraceful.manifestPath()));
+  }
+
+  @Test
   void listenerOnlyFiresForFuturePublishes(@TempDir Path tmp) throws IOException {
     RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp);
     publisher.publishHead(54321, null);
@@ -198,9 +404,9 @@ class RuntimeManifestPublisherTest {
             + "Replay-on-register conflates 'snapshot' and 'change event' semantics and causes "
             + "spurious SSE UPDATE frames at controller-init time (Phase 2 live-verify finding).");
 
-    publisher.publishWorkerReady(99, "/tmp/idx", "READY");
+    publisher.publishWorkerReady("/tmp/idx", "READY");
     assertNotNull(seen.get(), "listener must fire on subsequent publish");
-    assertEquals(99, seen.get().worker().grpcPort());
+    assertEquals("/tmp/idx", seen.get().worker().indexBasePath());
   }
 
   /**
@@ -220,7 +426,7 @@ class RuntimeManifestPublisherTest {
         });
 
     // Should not throw — notifyListeners catches per-listener exceptions.
-    publisher.publishWorkerReady(7777, "/tmp/idx", "READY");
+    publisher.publishWorkerReady("/tmp/idx", "READY");
 
     // start.log must contain BOTH the publishHead and the publishWorkerReady
     // entries — Phase 34's reorder put appendStartLog before notifyListeners
@@ -233,7 +439,7 @@ class RuntimeManifestPublisherTest {
         content.contains("publishHead apiPort=54321"),
         "start.log must record publishHead: " + content);
     assertTrue(
-        content.contains("publishWorkerReady grpcPort=7777"),
+        content.contains("publishWorkerReady lifecycle=READY"),
         "start.log must record publishWorkerReady even though the listener threw: " + content);
   }
 
@@ -248,7 +454,7 @@ class RuntimeManifestPublisherTest {
   void startLogRecordsTimestampedEventNarrative(@TempDir Path tmp) throws IOException {
     try (RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp)) {
       publisher.publishHead(54321, null);
-      publisher.publishWorkerReady(9000, "/tmp/idx", "READY");
+      publisher.publishWorkerReady("/tmp/idx", "READY");
       Path startLog =
           tmp.resolve("runtime").resolve("instances").resolve(publisher.instanceId()).resolve("start.log");
       assertTrue(Files.isRegularFile(startLog));
@@ -277,7 +483,7 @@ class RuntimeManifestPublisherTest {
     }
     assertTrue(content.contains("publisher-constructed"), "missing constructed entry");
     assertTrue(content.contains("publishHead apiPort=54321"), "missing publishHead entry");
-    assertTrue(content.contains("publishWorkerReady grpcPort=9000"), "missing publishWorkerReady entry");
+    assertTrue(content.contains("publishWorkerReady lifecycle=READY"), "missing publishWorkerReady entry");
     assertTrue(content.contains("publisher-close"), "missing close entry");
   }
 
@@ -312,7 +518,7 @@ class RuntimeManifestPublisherTest {
 
     assertThrows(
         IOException.class,
-        () -> publisher.publishWorkerReady(7777, "/tmp/idx", "READY"),
+        () -> publisher.publishWorkerReady("/tmp/idx", "READY"),
         "write failure must propagate");
 
     assertEquals(

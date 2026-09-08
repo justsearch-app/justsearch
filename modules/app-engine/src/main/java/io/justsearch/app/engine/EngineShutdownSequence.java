@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
 import org.slf4j.Logger;
@@ -67,6 +68,11 @@ public final class EngineShutdownSequence {
     String run(Reason reason) throws Exception;
   }
 
+  @FunctionalInterface
+  public interface CompletionAction {
+    void complete(Result preliminary) throws Exception;
+  }
+
   /**
    * A named step. The name is what appears in {@code errors}, so it is a diagnostic surface: it
    * should say which resource did not close, not which method threw.
@@ -88,6 +94,7 @@ public final class EngineShutdownSequence {
   private final Path receiptPath;
   private final List<Step> steps;
   private final IntConsumer exit;
+  private final CompletionAction completion;
   private final AtomicReference<Result> result = new AtomicReference<>();
   private final Object exitAuthority = new Object();
   private boolean exitRequested;
@@ -100,9 +107,15 @@ public final class EngineShutdownSequence {
    * @param exit how to end the process; injected so tests can observe the code without dying
    */
   public EngineShutdownSequence(Path dataDir, List<Step> steps, IntConsumer exit) {
+    this(dataDir, steps, exit, ignored -> {});
+  }
+
+  public EngineShutdownSequence(
+      Path dataDir, List<Step> steps, IntConsumer exit, CompletionAction completion) {
     this.receiptPath = dataDir.resolve("upgrade").resolve(RECEIPT_FILE);
     this.steps = List.copyOf(steps);
     this.exit = exit;
+    this.completion = Objects.requireNonNull(completion, "completion");
   }
 
   /**
@@ -153,6 +166,14 @@ public final class EngineShutdownSequence {
       errors.add("worker-" + workerOutcome.toLowerCase(Locale.ROOT));
     }
     boolean clean = errors.isEmpty();
+    Result preliminary = new Result(clean, workerOutcome, errors, reason, outcomes);
+    try {
+      completion.complete(preliminary);
+    } catch (Exception e) {
+      log.warn("Ordered shutdown completion failed: {}", e.toString());
+      errors.add("shutdown-completion");
+      clean = false;
+    }
     log.info(
         "Ordered shutdown complete (reason={}, clean={}, errors={})", reason.wire(), clean, errors);
     return new Result(clean, workerOutcome, errors, reason, outcomes);

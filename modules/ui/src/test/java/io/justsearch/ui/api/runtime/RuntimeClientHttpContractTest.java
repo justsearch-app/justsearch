@@ -54,8 +54,8 @@ class RuntimeClientHttpContractTest {
   @Test
   void manifestAndWellKnownHandlersSerializeThePublicSchema() throws Exception {
     current.set(manifest("LIFECYCLE_STATE_READY"));
-    assertGet("/api/runtime/manifest", 200, "runtime-manifest-public.v1.json");
-    assertGet("/.well-known/justsearch/manifest.json", 200, "runtime-manifest-public.v1.json");
+    assertGet("/api/runtime/manifest", 200, "runtime-manifest-public.v2.json");
+    assertGet("/.well-known/justsearch/manifest.json", 200, "runtime-manifest-public.v2.json");
 
     current.set(null);
     assertGet("/api/runtime/manifest", 503, "api-error-response.v1.json");

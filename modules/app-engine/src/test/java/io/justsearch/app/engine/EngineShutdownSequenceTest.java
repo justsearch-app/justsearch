@@ -147,6 +147,31 @@ final class EngineShutdownSequenceTest {
   }
 
   @Test
+  @DisplayName("completion persistence participates in the memoized shutdown result")
+  void completionFailureMakesShutdownUnclean(@TempDir Path dataDir) {
+    var completionCalls = new AtomicInteger();
+    var sequence =
+        new EngineShutdownSequence(
+            dataDir,
+            List.of(new Step(EngineShutdownSequence.INDEX_HALF_STEP, ignored -> "GRACEFUL")),
+            ignored -> {},
+            preliminary -> {
+              completionCalls.incrementAndGet();
+              assertTrue(preliminary.clean());
+              assertEquals("GRACEFUL", preliminary.workerOutcome());
+              throw new java.io.IOException("manifest persistence failed");
+            });
+
+    var first = sequence.run(Reason.QUIT);
+    var second = sequence.run(Reason.QUIT);
+
+    assertFalse(first.clean());
+    assertEquals(List.of("shutdown-completion"), first.errors());
+    assertEquals(first, second);
+    assertEquals(1, completionCalls.get());
+  }
+
+  @Test
   @DisplayName("an exception closing the index half reports failed rather than unknown")
   void throwingIndexHalfReportsFailed(@TempDir Path dataDir) {
     var sequence =

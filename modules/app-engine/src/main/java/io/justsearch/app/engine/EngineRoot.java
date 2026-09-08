@@ -87,10 +87,27 @@ public final class EngineRoot implements WorkerHost {
   /** Process composition whose terminal-writer path is owned by the enclosing Head lifecycle. */
   public static EngineRoot forProcess(
       long deadlineMs, int batchSize, IntConsumer terminalWriterFaultAction) {
-    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction);
+    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public static EngineRoot forProcess(
+      long deadlineMs,
+      int batchSize,
+      IntConsumer terminalWriterFaultAction,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction, childRegistry);
   }
 
   private EngineRoot(long deadlineMs, int batchSize, IntConsumer exitAction) {
+    this(deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  private EngineRoot(
+      long deadlineMs,
+      int batchSize,
+      IntConsumer exitAction,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
         gauge -> {
           WorkerConfig workerConfig = WorkerConfig.load();
@@ -100,7 +117,8 @@ public final class EngineRoot implements WorkerHost {
           // rather than watching a path nobody writes.
           return new KnowledgeServer(
               workerConfig,
-              new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")));
+              new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
+              childRegistry);
         },
         deadlineMs,
         batchSize,

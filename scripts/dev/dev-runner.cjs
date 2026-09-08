@@ -964,22 +964,81 @@ async function writeShutdownRequestFile(dataDir, { reason, deadlineEpochMs, issu
 /**
  * The forced half of design 7.1's hang path: the deadline expired, so the request was not enough.
  *
- * `/T` because the Engine owns children (llama-server, the extraction pool) whose handles are the
- * reason the next incarnation's boot can fail; leaving the tree behind would turn a hang into a
- * DATA_DIR_LOCKED on the restart. Item B12 replaces this blunt subtree kill with kill-by-identity
- * once the child registry exists.
+ * Kill the Engine PID only. Its registered children intentionally survive recoverable death/hang
+ * for identity-safe startup reconciliation and warm adoption.
  */
 function forceKillEngineTree(pid) {
   if (!pid) return;
   try {
     if (process.platform === 'win32') {
-      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+      spawnSync('taskkill', ['/PID', String(pid), '/F'], { stdio: 'ignore', windowsHide: true });
     } else {
       process.kill(pid, 'SIGKILL');
     }
   } catch (err) {
     process.stderr.write(`[dev-runner] force kill of ${pid} failed: ${err?.message ?? err}\n`);
   }
+}
+
+/** Terminal-only cleanup of children whose three recorded OS identity axes still match. */
+function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessIdentity, terminate = terminatePid) {
+  let children;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'manifest.json'), 'utf8'));
+    children = Array.isArray(manifest?.children) ? manifest.children : [];
+  } catch {
+    return [];
+  }
+  const outcomes = [];
+  for (const child of children) {
+    const identity = inspect(child?.pid);
+    if (!identity || !identity.alive) {
+      outcomes.push({ id: child?.id, outcome: 'dead' });
+      continue;
+    }
+    const expectedStart = Date.parse(child?.startedAt);
+    const actualStart = Date.parse(identity.startedAt);
+    const expectedExe = normalizeExecutable(child?.executable);
+    const actualExe = normalizeExecutable(identity.executable);
+    if (!Number.isFinite(expectedStart) || !Number.isFinite(actualStart)
+        || !expectedExe || !actualExe) {
+      outcomes.push({ id: child?.id, outcome: 'unknown-identity' });
+      continue;
+    }
+    if (Math.abs(expectedStart - actualStart) > 1000 || expectedExe !== actualExe) {
+      outcomes.push({ id: child?.id, outcome: 'identity-mismatch' });
+      continue;
+    }
+    outcomes.push({ id: child?.id, outcome: terminate(child.pid) ? 'terminated' : 'termination-failed' });
+  }
+  return outcomes;
+}
+
+function normalizeExecutable(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = path.resolve(value).toLowerCase();
+  return normalized;
+}
+
+function inspectProcessIdentity(pid) {
+  if (!Number.isInteger(Number(pid)) || Number(pid) <= 0 || process.platform !== 'win32') return null;
+  const script = [
+    '$p=Get-Process -Id ([int]$args[0]) -ErrorAction Stop',
+    '[pscustomobject]@{executable=$p.Path;startedAt=$p.StartTime.ToUniversalTime().ToString("o");alive=$true}|ConvertTo-Json -Compress',
+  ].join(';');
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script, String(pid)], {
+    encoding: 'utf8', windowsHide: true,
+  });
+  if (result.status !== 0) return { alive: false };
+  try { return JSON.parse(result.stdout); } catch { return null; }
+}
+
+function terminatePid(pid) {
+  if (process.platform !== 'win32') return false;
+  const result = spawnSync('taskkill', ['/PID', String(pid), '/F'], {
+    stdio: 'ignore', windowsHide: true,
+  });
+  return result.status === 0;
 }
 
 function readShutdownRequestReason(dataDir) {
@@ -2086,21 +2145,16 @@ async function cmdStart(opts) {
   // preferred because it carries instanceId (cross-linked into run.json so
   // restarts are detectable across orchestrator views).
   //
-  // Delete any stale files from a previous run to prevent reading the wrong
-  // port when using --clean=none (the previous backend may have bound a
-  // different ephemeral port).
+  // Preserve the predecessor manifest: schema v2 carries the managed-child ownership handoff.
+  // Discovery below accepts only the current spawned Engine PID, so stale ports cannot bind.
   const runtimeDir = path.join(dataDir, 'runtime');
   const manifestPath = path.join(runtimeDir, 'manifest.json');
   // Pre-spawn cleanup. api-port.txt is the deprecated mirror (Phase 8) but
   // we still unlink it so a stale --clean=none restart doesn't leave a
   // misleading file around for any legacy consumer.
   //
-  // Lane F stage B item B8: this now runs before EVERY incarnation, not only the first. A restarted
-  // Engine that inherited the dead one's manifest would be discovered at the dead one's port with
-  // the dead one's session token, which is the residue tempdoc 805 G.1 named on the Tauri side.
   const clearStaleDiscoveryFiles = () => {
     try { fs.unlinkSync(path.join(runtimeDir, 'api-port.txt')); } catch { /* ok if absent */ }
-    try { fs.unlinkSync(manifestPath); } catch { /* ok if absent */ }
   };
   clearStaleDiscoveryFiles();
 
@@ -2110,7 +2164,7 @@ async function cmdStart(opts) {
       const content = fs.readFileSync(manifestPath, 'utf8');
       const parsed = JSON.parse(content);
       const p = parsed?.head?.apiPort;
-      if (Number.isFinite(p) && p > 0) {
+      if (Number.isFinite(p) && p > 0 && parsed?.pid === backend?.pid) {
         manifestInstanceId = parsed.instanceId ?? null;
         return p;
       }
@@ -2129,8 +2183,8 @@ async function cmdStart(opts) {
    * when `--api-port` named an explicit port. It used to, which meant an explicit-port start never
    * read the manifest at all and recorded `portSource: unresolved` with a null instanceId. A
    * supervisor needs the instanceId on every incarnation to tell one boot from the next, and the
-   * manifest is deleted before each spawn, so waiting for it is now the readiness signal in both
-   * cases. The failure message and the timeouts are unchanged.
+   * the manifest must name the current child PID, so a retained predecessor ownership record can
+   * never be mistaken for this incarnation's discovery state.
    */
   const awaitEngineIncarnation = async ({ portTimeoutMs, readyTimeoutMs }) => {
     let discovered = 0;
@@ -2613,6 +2667,9 @@ async function cmdStart(opts) {
         `[dev-runner] FORCED KILL: the Engine ignored the ${reason} request for `
         + `${supervisionPolicy.gracefulStopDeadlineMs}ms.\n`);
       forceKillEngineTree(backend?.pid);
+      if (reason === 'quit' || reason === 'upgrade') {
+        cleanupRegisteredChildrenForTerminal(dataDir);
+      }
     }, supervisionPolicy.gracefulStopDeadlineMs);
     requestDeadlineTimer.unref?.();
   };
@@ -2937,7 +2994,10 @@ async function stopRun(opts) {
       return;
     }
     await new Promise((resolve) => {
-      const p = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+      const args = role === 'frontend'
+        ? ['/PID', String(pid), '/T', '/F']
+        : ['/PID', String(pid), '/F'];
+      const p = spawn('taskkill', args, { windowsHide: true });
       let stderr = '';
       if (p.stderr) {
         p.stderr.on('data', (b) => {
@@ -2993,6 +3053,7 @@ async function stopRun(opts) {
   } else {
     await taskkill(backendRootPid, 'backend');
   }
+  if (dataDirAbs) cleanupRegisteredChildrenForTerminal(dataDirAbs);
 
   // Tempdoc 819 §D: best-effort cleanup — the marker's job (letting the supervisor's exit handler
   // know not to write a racing report) is done once we reach here regardless of outcome: either
@@ -3264,6 +3325,7 @@ if (require.main === module) {
       readShutdownRequestReason,
       waitForEngineHandleRelease,
       forceKillEngineTree,
+      cleanupRegisteredChildrenForTerminal,
       engineSupervisor,
       // Tempdoc 819 §D: graceful ordered-shutdown-before-taskkill helpers.
       postLifecycleShutdown,

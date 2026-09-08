@@ -13,7 +13,7 @@ export interface ApiRoute {
   readonly requiredCapabilities: readonly string[];
 }
 
-/** Every route the Head exposes, keyed by "<METHOD> <path>". Snapshot schema v2.0. */
+/** Every route the Head exposes, keyed by "<METHOD> <path>". Snapshot schema v?. */
 export const API_ROUTES = {
   "DELETE /api/ai/install/packages/{packageId}/decline": { method: "DELETE", path: "/api/ai/install/packages/{packageId}/decline", cohort: "ai-runtime", requiredCapabilities: [] },
   "DELETE /api/authorizations/grants": { method: "DELETE", path: "/api/authorizations/grants", cohort: "resource", requiredCapabilities: [] },

@@ -76,12 +76,15 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   private final int maxStderrBytes;
   private final int maxRequestsPerChild;
   private final ExtractionMetricCatalog catalog;
+  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
 
   private final Slot[] allSlots;
   private final BlockingQueue<Slot> freeSlots;
   private final ExecutorService readers;
   private final AtomicLong spawnCount = new AtomicLong();
   private final AtomicLong restartCount = new AtomicLong();
+  private final List<Process> unregisteredChildren =
+      java.util.Collections.synchronizedList(new ArrayList<>());
   private final Thread shutdownHook;
   private volatile boolean closed;
 
@@ -93,6 +96,19 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int poolSize,
       int maxRequestsPerChild,
       ExtractionMetricCatalog catalog) {
+    this(command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public PersistentExtractionSandbox(
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      int poolSize,
+      int maxRequestsPerChild,
+      ExtractionMetricCatalog catalog,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
         command,
         policy,
@@ -102,7 +118,8 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
         maxRequestsPerChild,
         catalog,
         responseByteCeiling(policy),
-        DEFAULT_MAX_STDERR_BYTES);
+        DEFAULT_MAX_STDERR_BYTES,
+        childRegistry);
   }
 
   PersistentExtractionSandbox(
@@ -115,6 +132,21 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       ExtractionMetricCatalog catalog,
       int maxResponseBytes,
       int maxStderrBytes) {
+    this(command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
+        maxResponseBytes, maxStderrBytes, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  PersistentExtractionSandbox(
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      int poolSize,
+      int maxRequestsPerChild,
+      ExtractionMetricCatalog catalog,
+      int maxResponseBytes,
+      int maxStderrBytes,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     if (command == null || command.isEmpty()) {
       throw new IllegalArgumentException("Sandbox command must not be empty");
     }
@@ -127,6 +159,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     this.maxRequestsPerChild =
         maxRequestsPerChild > 0 ? maxRequestsPerChild : DEFAULT_MAX_REQUESTS_PER_CHILD;
     this.catalog = catalog;
+    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
 
     int size = Math.max(1, poolSize);
     this.allSlots = new Slot[size];
@@ -361,6 +394,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   private void finishDiscard(Slot slot, Child child, String reason) {
     child.close();
+    unregister(child);
     if (slot.child == child) {
       slot.child = null;
     }
@@ -403,34 +437,110 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     List<String> argv = new ArrayList<>(command);
     argv.add(ExtractionSandboxChild.PARENT_PID_FLAG + ProcessHandle.current().pid());
     Process process = new ProcessBuilder(argv).start();
+    io.justsearch.app.api.runtime.ManagedChild registered;
+    try {
+      registered =
+          io.justsearch.app.api.runtime.ManagedChild.fromProcess(
+              process,
+              io.justsearch.app.api.runtime.ManagedChild.Kind.EXTRACTION,
+              Path.of(argv.get(0)),
+              "stdio",
+              null,
+              null,
+              hashArgv(argv));
+      childRegistry.register(registered);
+    } catch (IOException | RuntimeException failure) {
+      throw rollbackFailedRegistration(process, failure);
+    }
     spawnCount.incrementAndGet();
     if (catalog != null) {
       catalog.sandboxSpawnTotal.increment(EmptyTags.INSTANCE);
     }
     log.info("Extraction sandbox child spawned (pid={})", process.pid());
-    return new Child(process, maxStderrBytes);
+    return new Child(process, maxStderrBytes, registered.id());
   }
 
   @Override
   public void close() {
     closed = true;
+    boolean stopped = killAll();
+    readers.shutdownNow();
+    if (!stopped) {
+      // Keep the JVM callback and exact handles reachable for the final cleanup attempt.
+      throw new IllegalStateException("Extraction children survived terminal cleanup");
+    }
     try {
       Runtime.getRuntime().removeShutdownHook(shutdownHook);
     } catch (IllegalStateException e) {
       // Already shutting down — the hook is running or has run.
     }
-    killAll();
-    readers.shutdownNow();
   }
 
-  private void killAll() {
+  private boolean killAll() {
+    boolean stopped = true;
     for (Slot slot : allSlots) {
       Child child = slot.child;
       if (child != null) {
-        slot.child = null;
-        child.process.destroyForcibly();
-        child.close();
+        exitCodeAfterKill(child);
+        if (child.process.isAlive()) {
+          stopped = false;
+        } else {
+          slot.child = null;
+          child.close();
+          unregister(child);
+        }
       }
+    }
+    synchronized (unregisteredChildren) {
+      for (Process process : unregisteredChildren) {
+        terminateAndWait(process);
+      }
+      unregisteredChildren.removeIf(process -> !process.isAlive());
+      return stopped && unregisteredChildren.isEmpty();
+    }
+  }
+
+  IOException rollbackFailedRegistration(Process process, Throwable failure) {
+    if (!terminateAndWait(process)) {
+      unregisteredChildren.add(process);
+      log.error(
+          "Unregistered extraction child PID {} survived registration rollback; retaining handle",
+          process.pid());
+    }
+    return failure instanceof IOException io
+        ? io
+        : new IOException("could not register extraction child", failure);
+  }
+
+  private static boolean terminateAndWait(Process process) {
+    process.destroyForcibly();
+    try {
+      return process.waitFor(5, TimeUnit.SECONDS) && !process.isAlive();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
+  private void unregister(Child child) {
+    if (child.process.isAlive()) return;
+    try {
+      childRegistry.remove(child.managedChildId);
+    } catch (IOException e) {
+      log.warn("Could not persist extraction child exit; retaining ownership record", e);
+    }
+  }
+
+  private static String hashArgv(List<String> argv) {
+    try {
+      java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+      for (String arg : argv) {
+        digest.update(arg.getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+      }
+      return java.util.HexFormat.of().formatHex(digest.digest());
+    } catch (java.security.NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException(impossible);
     }
   }
 
@@ -461,14 +571,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     private final OutputStream stdin;
     private final InputStream stdout;
     private final StderrTail stderr;
+    private final String managedChildId;
     private int requests;
 
-    Child(Process process, int maxStderrBytes) {
+    Child(Process process, int maxStderrBytes, String managedChildId) {
       this.process = process;
       this.pid = process.pid();
       this.stdin = process.getOutputStream();
       this.stdout = process.getInputStream();
       this.stderr = new StderrTail(process.getErrorStream(), maxStderrBytes);
+      this.managedChildId = managedChildId;
     }
 
     void close() {

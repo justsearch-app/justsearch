@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Tempdoc 519 §7 / Step 6: typed record holding {@link AutoCloseable} handles for the bootstrap's
  * background-behavior starts. Each non-null handle is closed in reverse construction order
- * (LIFO) by {@link #close()}; close failures are logged and swallowed.
+ * (LIFO) by {@link #close()}; close failures are aggregated after every handle is attempted.
  *
  * <p>Items whose stop semantics aren't a plain {@code close()} (e.g., a thread's interrupt+join,
  * or a listener-removal coupled to another shutdown) are wrapped at construction site into a
@@ -42,8 +42,8 @@ public record OrchestrationHandles(
   private static final Logger log = LoggerFactory.getLogger(OrchestrationHandles.class);
 
   /**
-   * Closes all non-null handles in reverse construction order. Close failures are logged and
-   * swallowed so a single bad handle does not block the rest of the teardown.
+   * Closes all non-null handles in reverse construction order. Close failures are aggregated so a single bad handle
+   * does not block the remaining teardown or let ordered shutdown claim a clean receipt.
    */
   @Override
   public void close() {
@@ -63,6 +63,7 @@ public record OrchestrationHandles(
     ordered.add(indexingJobsBridge);
     ordered.add(agentToolHandlers);
     Collections.reverse(ordered);
+    IllegalStateException failure = null;
     for (AutoCloseable handle : ordered) {
       if (handle == null) {
         continue;
@@ -71,8 +72,11 @@ public record OrchestrationHandles(
         handle.close();
       } catch (Exception e) {
         log.warn("OrchestrationHandles close failed for {}: {}", handle.getClass().getSimpleName(), e.getMessage());
+        if (failure == null) failure = new IllegalStateException("Head resource cleanup failed");
+        failure.addSuppressed(e);
       }
     }
+    if (failure != null) throw failure;
   }
 
   /** Returns an empty handles record where all fields are {@code null}. */

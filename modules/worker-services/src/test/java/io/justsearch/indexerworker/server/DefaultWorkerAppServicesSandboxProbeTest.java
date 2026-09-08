@@ -94,7 +94,11 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
     Files.writeString(file, "content that must still be extracted", StandardCharsets.UTF_8);
 
     try (TimeboxedContentExtractor extractor =
-        DefaultWorkerAppServices.buildContentExtractor(null, catalog, OcrMetricCatalog.noop())) {
+        DefaultWorkerAppServices.buildContentExtractor(
+            null,
+            catalog,
+            OcrMetricCatalog.noop(),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop())) {
       assertTrue(warnedAboutTheProbe(), "a failed probe must be visible in the log");
       assertEquals(1L, probeFailures(), "a failed probe must be recorded as probe_failed");
 
@@ -116,7 +120,11 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
     Files.writeString(file, "no child process here", StandardCharsets.UTF_8);
 
     try (TimeboxedContentExtractor extractor =
-        DefaultWorkerAppServices.buildContentExtractor(null, catalog, OcrMetricCatalog.noop())) {
+        DefaultWorkerAppServices.buildContentExtractor(
+            null,
+            catalog,
+            OcrMetricCatalog.noop(),
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop())) {
       assertEquals("no child process here", extractor.extract(file).content().trim());
       assertEquals(0L, probeFailures(), "in_process spawns nothing, so nothing can fail a probe");
       assertTrue(logs.list.stream().noneMatch(e -> e.getFormattedMessage().contains("startup probe")));

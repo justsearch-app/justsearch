@@ -174,7 +174,7 @@ impl BackendState {
         {
             if let Some(pid) = self.host.child_pid() {
                 let _ = Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .args(["/PID", &pid.to_string(), "/F"])
                     .creation_flags(CREATE_NO_WINDOW)
                     .status();
             }
@@ -1005,6 +1005,63 @@ fn http_get_ok(port: u16, path: &str, timeout: Duration) -> bool {
     }
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagedChildRecord {
+    pid: u32,
+    started_at: String,
+    executable: String,
+}
+
+/// Terminal fallback only: terminate registered children after the OS confirms PID, start instant
+/// and executable. Recoverable supervision never calls this function.
+fn cleanup_registered_children_for_terminal(data_dir: &std::path::Path) {
+    let path = data_dir.join("runtime").join("manifest.json");
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let Ok(root) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return;
+    };
+    let Some(children) = root.get("children").and_then(|v| v.as_array()) else {
+        return;
+    };
+    for value in children {
+        let Ok(child) = serde_json::from_value::<ManagedChildRecord>(value.clone()) else {
+            continue;
+        };
+        terminal_kill_if_identity_matches(&child);
+    }
+}
+
+#[cfg(windows)]
+fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) {
+    // Values cross the process boundary as environment variables, never interpolated command text.
+    // Unknown access, parse failure, PID reuse, or executable mismatch exits without Stop-Process.
+    let script = r#"
+$ErrorActionPreference='Stop'
+$p=Get-Process -Id ([int]$env:JUSTSEARCH_CHILD_PID)
+$expected=[DateTimeOffset]::Parse($env:JUSTSEARCH_CHILD_STARTED).ToUnixTimeMilliseconds()
+$actual=([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds()
+if ([Math]::Abs($actual-$expected) -gt 1000) { exit 10 }
+$want=[IO.Path]::GetFullPath($env:JUSTSEARCH_CHILD_EXE).TrimEnd('\').ToLowerInvariant()
+$got=[IO.Path]::GetFullPath($p.Path).TrimEnd('\').ToLowerInvariant()
+if ($want -ne $got) { exit 11 }
+Stop-Process -Id $p.Id -Force -ErrorAction Stop
+Wait-Process -Id $p.Id -Timeout 5 -ErrorAction SilentlyContinue
+"#;
+    let _ = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .env("JUSTSEARCH_CHILD_PID", child.pid.to_string())
+        .env("JUSTSEARCH_CHILD_STARTED", &child.started_at)
+        .env("JUSTSEARCH_CHILD_EXE", &child.executable)
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+#[cfg(not(windows))]
+fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) {}
+
 /// The production [`supervisor::Actuator`] (lane F stage B item B10).
 ///
 /// The DECISIONS are `supervisor.rs`'s, and the loop is `supervisor::run_supervision` — the same
@@ -1130,11 +1187,10 @@ impl supervisor::Actuator for ShellActuator {
         let Some(pid) = self.state.child_pid() else { return };
         #[cfg(windows)]
         {
-            // `/T` because the Engine owns children (llama-server, the extraction pool) whose
-            // handles are the reason the next incarnation's boot can fail. Item B12 replaces this
-            // blunt subtree kill with kill-by-identity once the child registry exists.
+            // Engine-only kill: registered children survive recoverable death/hang and are
+            // reconciled by PID + start instant + executable identity on the next boot.
             let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .args(["/PID", &pid.to_string(), "/F"])
                 .creation_flags(CREATE_NO_WINDOW)
                 .status();
         }
@@ -1798,9 +1854,12 @@ pub fn run() {
         .expect("error while building tauri application")
         // Explicit cleanup on app exit — kill backend to prevent orphan processes.
         // This fires when app.exit() is called (e.g., from tray menu "Quit").
-        .run(move |_app, event| {
+        .run(move |app, event| {
             if let tauri::RunEvent::Exit = event {
                 state_for_close.kill_child();
+                if let Ok(data_dir) = resolve_app_data_dir(app) {
+                    cleanup_registered_children_for_terminal(&data_dir);
+                }
             }
         });
 }
@@ -1810,6 +1869,51 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    #[cfg(windows)]
+    fn owned_sleep_child() -> (std::process::Child, ManagedChildRecord) {
+        let child = Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 30",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .unwrap();
+        let query = format!(
+            "$p=Get-Process -Id {}; [pscustomobject]@{{started=$p.StartTime.ToUniversalTime().ToString('o'); executable=$p.Path}} | ConvertTo-Json -Compress",
+            child.id()
+        );
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &query])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .unwrap();
+        let identity: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let record = ManagedChildRecord {
+            pid: child.id(),
+            started_at: identity["started"].as_str().unwrap().to_string(),
+            executable: identity["executable"].as_str().unwrap().to_string(),
+        };
+        (child, record)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn terminal_child_cleanup_kills_only_matching_identity() {
+        let (mut matched, record) = owned_sleep_child();
+        terminal_kill_if_identity_matches(&record);
+        assert!(matched.try_wait().unwrap().is_some());
+
+        let (mut unrelated, mut mismatch) = owned_sleep_child();
+        mismatch.executable.push_str(".unrelated");
+        terminal_kill_if_identity_matches(&mismatch);
+        assert!(unrelated.try_wait().unwrap().is_none());
+        unrelated.kill().unwrap();
+        let _ = unrelated.wait();
+    }
 
     /// Lane F stage B item B10 adds a SECOND shell event and this pins the first one against it.
     ///

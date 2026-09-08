@@ -305,8 +305,20 @@ public final class HeadAssembly implements AutoCloseable {
       // Tempdoc 627 Deliverable 10: the one shared WorkerCapability created before the async
       // worker-start fork. Null on the standalone/test paths (CapabilityPhase then builds its own).
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability) {
+    this(telemetry, configManager, knowledgeServer, settingsStore, sharedWorkerCapability,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public HeadAssembly(
+      Telemetry telemetry,
+      ConfigManagerBootstrap configManager,
+      KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry) {
     Objects.requireNonNull(telemetry, "telemetry");
     this.telemetry = telemetry;
+    Objects.requireNonNull(managedChildRegistry, "managedChildRegistry");
     Objects.requireNonNull(configManager, "configManager");
     ConfigSnapshot snapshot = configManager.currentSnapshot();
     ResolvedConfig rc = ConfigStore.global().get();
@@ -377,7 +389,8 @@ public final class HeadAssembly implements AutoCloseable {
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
         inferenceConfigured
-            ? io.justsearch.app.services.bootstrap.phases.InferenceDecision.createInferenceManager(telemetry)
+            ? io.justsearch.app.services.bootstrap.phases.InferenceDecision.createInferenceManager(
+                telemetry, managedChildRegistry)
             : null;
     this.inferenceManager = manager;
     // Tempdoc 518 Wave B + Slice 2 (ported from main 17545ad2a + 3a5355216) — install the

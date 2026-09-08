@@ -141,6 +141,10 @@ a committed document and an accepted document after one charged dev-runner
 restart. A separate native-enabled run confirms model initialization/warm-up and
 ordinary ordered stop without the earlier native crash/hang failure.
 
+The 9,379-case run predates the final listener-not-yet-bound NRT correction.
+After that correction, all 709 adapters-lucene cases, PMD, the build and a rebuilt
+installed-process regression passed; no second full-suite run is claimed.
+
 Read [the repair record](writer-recovery-investigation.md) for exact commands,
 hashes, negative tests and source attribution. This is B17-R1, explicitly moved
 earlier from D1 under 17.8. It does not clear the original mandatory-lock stress

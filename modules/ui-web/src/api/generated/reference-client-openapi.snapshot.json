@@ -29,7 +29,7 @@
         "$ref": "/api/schemas/runtime-live-response.v1.json"
       },
       "runtime-manifest-public": {
-        "$ref": "/api/schemas/runtime-manifest-public.v1.json"
+        "$ref": "/api/schemas/runtime-manifest-public.v2.json"
       },
       "runtime-ready-response": {
         "$ref": "/api/schemas/runtime-ready-response.v1.json"
@@ -3881,7 +3881,7 @@
   },
   "x-justsearch-route-source": {
     "routeCount": 243,
-    "routeDigest": "sha256:2b2e3ec3b79c74a06157b861152c91e1277be9d6d0e1823106d811af8e9ae0df"
+    "routeDigest": "sha256:d9eac490a2cfa06aad7217cd4b5b5236ec6da389747fdbd99423ee508c642403"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

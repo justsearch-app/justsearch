@@ -248,15 +248,15 @@ tasks.named<ProcessResources>("processResources") {
   }
 }
 
-// Slice 3a.1.9 §A.6a: SchemaController serves classpath copies of SSOT/schemas/*.v1.json.
+// Slice 3a.1.9 §A.6a: SchemaController serves versioned classpath copies of SSOT/schemas.
 // Mirror the repo-root SSOT/schemas/ into modules/ui/src/main/resources/SSOT/schemas/ at
 // build time so the schemas are on the head's classpath. Same convention as
 // adapters-lucene's syncSsotCatalogs (catalogs dual-copy, tempdoc 393 §3.6).
 val syncSsotSchemas by tasks.registering(Sync::class) {
   group = "build"
-  description = "Mirror SSOT/schemas/*.v1.json from the repo root into ui resources."
+  description = "Mirror SSOT/schemas/*.vN.json from the repo root into ui resources."
   from(rootProject.file("SSOT/schemas")) {
-    include("*.v1.json")
+    include("*.v*.json")
   }
   into(layout.projectDirectory.dir("src/main/resources/SSOT/schemas"))
 }

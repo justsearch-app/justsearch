@@ -123,7 +123,8 @@ public class InferenceLifecycleManager
   // ==================== Constructors ====================
 
   public InferenceLifecycleManager(InferenceConfig config) {
-    this(config, NoopInferenceTelemetryEvents.INSTANCE);
+    this(config, NoopInferenceTelemetryEvents.INSTANCE,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   /**
@@ -136,6 +137,13 @@ public class InferenceLifecycleManager
   }
 
   public InferenceLifecycleManager(InferenceConfig config, InferenceTelemetryEvents events) {
+    this(config, events, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public InferenceLifecycleManager(
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this.events = Objects.requireNonNull(events, "events");
     this.config = config;
     this.gpuCapabilitiesService = new GpuCapabilitiesService();
@@ -194,7 +202,8 @@ public class InferenceLifecycleManager
             this::handleMaxCrashOffline,
             // goOfflineFromExternalFailure — same.
             this::handleExternalFailureOffline,
-            this.events);
+            this.events,
+            childRegistry);
 
     LOG.info(
         "InferenceLifecycleManager created with config: serverPort={}, contextSize={}, gpuLayers={}",
@@ -1370,18 +1379,25 @@ public class InferenceLifecycleManager
   public void close() {
     synchronized (runner.lock()) {
       LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
-      if (stopServerOnClose) {
-        serverOps.stopLlamaServer();
-      } else {
-        LOG.info(
-            "Leaving llama-server running for adoption by the next Engine (design 7.2). It holds"
-                + " its port and its VRAM; a restarted Engine reconciles it from the child"
-                + " registry rather than reloading the model.");
+      RuntimeException terminationFailure = null;
+      try {
+        serverOps.closeUnregisteredChild();
+        if (stopServerOnClose) {
+          serverOps.stopLlamaServer();
+        } else {
+          LOG.info(
+              "Leaving llama-server running for adoption by the next Engine (design 7.2). It holds"
+                  + " its port and its VRAM; a restarted Engine reconciles it from the child"
+                  + " registry rather than reloading the model.");
+        }
+      } catch (RuntimeException failure) {
+        terminationFailure = failure;
       }
       onlineOps.shutdown();
       serverOps.shutdown();
       httpClient.close();
       runner.runForceOffline(TransitionReason.SHUTDOWN, null);
+      if (terminationFailure != null) throw terminationFailure;
       LOG.info("InferenceLifecycleManager closed");
     }
   }

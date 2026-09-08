@@ -34,6 +34,7 @@ const {
   preserveEngineLog,
   buildStopReport,
   computeOwnershipVerdict,
+  cleanupRegisteredChildrenForTerminal,
 } = require(path.join(__dirname, 'dev-runner.cjs')).__test;
 const engineSupervisor = require(path.join(__dirname, 'lib', 'engine-supervisor.cjs'));
 
@@ -282,6 +283,40 @@ function testARestartIsNotAnAbandonedStack() {
   console.log('test-dev-runner-supervisor: a supervised restart is not an abandoned stack — PASS');
 }
 
+function testTerminalChildCleanupRequiresAllIdentityAxes() {
+  const root = tempRoot('managed-child-cleanup');
+  try {
+    const dataDir = path.join(root, 'data');
+    fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({
+      schemaVersion: 2,
+      children: [
+        { id: 'match', pid: 101, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+        { id: 'reused', pid: 102, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+        { id: 'unrelated', pid: 103, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+        { id: 'unknown', pid: 104, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+      ],
+    }));
+    const identities = new Map([
+      [101, { alive: true, startedAt: '2026-09-08T10:00:00.500Z', executable: 'c:\\bin\\llama.exe' }],
+      [102, { alive: true, startedAt: '2026-09-08T11:00:00.000Z', executable: 'c:\\bin\\llama.exe' }],
+      [103, { alive: true, startedAt: '2026-09-08T10:00:00.000Z', executable: 'c:\\other\\java.exe' }],
+      [104, { alive: true }],
+    ]);
+    const killed = [];
+    const outcomes = cleanupRegisteredChildrenForTerminal(
+      dataDir, (pid) => identities.get(pid), (pid) => { killed.push(pid); return true; },
+    );
+    assert.deepEqual(killed, [101]);
+    assert.deepEqual(outcomes.map((o) => o.outcome), [
+      'terminated', 'identity-mismatch', 'identity-mismatch', 'unknown-identity',
+    ]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  console.log('test-dev-runner-supervisor: terminal cleanup is identity-safe — PASS');
+}
+
 async function main() {
   testStateRecordsWhichPolicyItRanUnder();
   await testTerminalStateIsMirroredAndNonTerminalIsNot();
@@ -290,6 +325,7 @@ async function main() {
   await testEachIncarnationKeepsItsOwnEngineLog();
   testStopReportCarriesTheIncarnationOnlyWhenSupervised();
   testARestartIsNotAnAbandonedStack();
+  testTerminalChildCleanupRequiresAllIdentityAxes();
   console.log('test-dev-runner-supervisor: ALL PASS');
 }
 

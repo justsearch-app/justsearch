@@ -75,7 +75,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * post-ctor wireMigrationActiveSupplier/wireEmbeddingTelemetryEvents paths can go away.
    */
   public DefaultWorkerAppServices(InfraContext ctx) {
-    this(ctx, null, null, IndexingPacing.unthrottled());
+    this(ctx, null, null, IndexingPacing.unthrottled(),
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   /**
@@ -93,6 +94,17 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       java.util.function.BooleanSupplier migrationActiveSupplier,
       io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
       IndexingPacing indexingPacing) {
+    this(ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public DefaultWorkerAppServices(
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     // Tempdoc 410 §13 Slice B — publish the operator-resolved IngestionSkipPolicy before any
     // ingestion path can call it. WorkerScanOps and WorkerIngestionAuthority fire during gRPC
     // handling that always happens after this constructor returns, so installing here is safe.
@@ -106,7 +118,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     var extractionCatalog = new ExtractionMetricCatalog(ctx.metricRegistry());
     var ocrCatalog = new OcrMetricCatalog(ctx.metricRegistry());
     var ingestionOutcomeCatalog = new IngestionOutcomeMetricCatalog(ctx.metricRegistry());
-    var contentExtractor = buildContentExtractor(ctx, extractionCatalog, ocrCatalog);
+    var contentExtractor = buildContentExtractor(ctx, extractionCatalog, ocrCatalog, childRegistry);
 
     this.indexingPacing = java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     // Tempdoc 406 Phase 4a: services capture the current runtime via ctx.suppliers.
@@ -496,7 +508,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   static TimeboxedContentExtractor buildContentExtractor(
       @SuppressWarnings("unused") InfraContext ctx,
       ExtractionMetricCatalog catalog,
-      OcrMetricCatalog ocrCatalog) {
+      OcrMetricCatalog ocrCatalog,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     String mode = EnvRegistry.EXTRACTION_SANDBOX_MODE.getString("auto").trim();
     OcrRoutingConfig ocrConfig = resolvedOcrConfig();
     logEffectiveOcrConfig(ocrConfig);
@@ -529,7 +542,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // but working session.
     Optional<String> probeFailure =
         ExtractionSandboxFactory.probeChildCommand(
-            command, extractionPolicy, ocrConfig, ExtractionSandboxFactory.PROBE_TIMEOUT);
+            command, extractionPolicy, ocrConfig, ExtractionSandboxFactory.PROBE_TIMEOUT,
+            childRegistry);
     if (probeFailure.isPresent()) {
       log.warn(
           "Extraction sandbox child failed its startup probe ({}); falling back to in_process "
@@ -551,7 +565,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         catalog,
         ocrCatalog,
         command,
-        poolSettings);
+        poolSettings,
+        childRegistry);
   }
 
   private static ExtractionSandboxFactory.Mode parseSandboxMode(String mode) {

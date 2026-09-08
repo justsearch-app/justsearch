@@ -1,10 +1,13 @@
 package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.runtime.ManagedChild;
+import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.telemetry.catalog.TestMetricRegistry;
 import java.io.File;
 import java.io.InputStream;
@@ -50,6 +53,108 @@ final class PersistentExtractionSandboxTest {
     Path path = tempDir.resolve(name);
     Files.writeString(path, "sandbox child content");
     return path;
+  }
+
+  @Test
+  @Timeout(20)
+  void registrationPersistenceFailureReapsTheJustSpawnedChild() throws Exception {
+    java.util.concurrent.atomic.AtomicReference<ManagedChild> attempted =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    ManagedChildRegistry failingRegistry =
+        new ManagedChildRegistry() {
+          @Override
+          public List<ManagedChild> snapshot() {
+            return List.of();
+          }
+
+          @Override
+          public void register(ManagedChild child) throws java.io.IOException {
+            attempted.set(child);
+            throw new java.io.IOException("simulated manifest persistence failure");
+          }
+
+          @Override
+          public void remove(String childId) {}
+        };
+    try (PersistentExtractionSandbox sandbox =
+        new PersistentExtractionSandbox(
+            javaCommand(ExtractionSandboxChild.class),
+            TikaExtractionPolicy.defaults(),
+            OcrRoutingConfig.disabled(),
+            Duration.ofSeconds(5),
+            1,
+            500,
+            null,
+            failingRegistry)) {
+      assertThrows(java.io.IOException.class, () -> sandbox.extract(file("registration-fails.txt")));
+    }
+
+    ManagedChild child = attempted.get();
+    assertTrue(child != null, "the failure must occur after a real process has been spawned");
+    ProcessHandle handle = ProcessHandle.of(child.pid()).orElse(null);
+    assertTrue(handle == null || !handle.isAlive(), "an unregistered child must be reaped");
+  }
+
+  @Test
+  void failedRegistrationRollbackRetainsHandleForCloseRetry() {
+    RetryKillProcess process = new RetryKillProcess();
+    PersistentExtractionSandbox sandbox =
+        sandbox(List.of("unused-command"), Duration.ofSeconds(1));
+
+    sandbox.rollbackFailedRegistration(process, new java.io.IOException("disk full"));
+    assertTrue(process.isAlive());
+    assertEquals(1, process.destroyCalls);
+
+    sandbox.close();
+    assertFalse(process.isAlive());
+    assertEquals(2, process.destroyCalls);
+  }
+
+  @Test
+  void survivingRollbackMakesCloseFailAndKeepsHandleForFinalRetry() {
+    RetryKillProcess process = new RetryKillProcess();
+    process.killAfter = Integer.MAX_VALUE;
+    PersistentExtractionSandbox sandbox = sandbox(List.of("unused-command"), Duration.ofSeconds(1));
+    try {
+      sandbox.rollbackFailedRegistration(process, new java.io.IOException("disk full"));
+      assertThrows(IllegalStateException.class, sandbox::close);
+      assertTrue(process.isAlive());
+      assertEquals(2, process.destroyCalls);
+      process.killAfter = 3;
+      sandbox.close();
+      assertFalse(process.isAlive());
+      assertEquals(3, process.destroyCalls);
+    } finally {
+      process.killAfter = 0;
+      sandbox.close();
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void realExtractionChildIsRegisteredBeforeUseAndRemovedAfterDeath() throws Exception {
+    List<ManagedChild> owned = new java.util.concurrent.CopyOnWriteArrayList<>();
+    ManagedChildRegistry registry =
+        new ManagedChildRegistry() {
+          @Override public List<ManagedChild> snapshot() { return List.copyOf(owned); }
+          @Override public void register(ManagedChild child) { owned.add(child); }
+          @Override public void remove(String childId) { owned.removeIf(c -> c.id().equals(childId)); }
+        };
+    PersistentExtractionSandbox sandbox =
+        new PersistentExtractionSandbox(
+            javaCommand(ExtractionSandboxChild.class), TikaExtractionPolicy.defaults(),
+            OcrRoutingConfig.disabled(), Duration.ofSeconds(30), 1, 500, null, registry);
+    sandbox.extract(file("registered.txt"));
+    assertEquals(1, owned.size());
+    ManagedChild child = owned.getFirst();
+    assertEquals(ManagedChild.Kind.EXTRACTION, child.kind());
+    assertTrue(ProcessHandle.of(child.pid()).orElseThrow().isAlive());
+
+    sandbox.close();
+
+    assertTrue(owned.isEmpty(), "confirmed child death removes the persisted ownership record");
+    assertTrue(ProcessHandle.of(child.pid()).isEmpty()
+        || !ProcessHandle.of(child.pid()).orElseThrow().isAlive());
   }
 
   @Test
@@ -503,6 +608,27 @@ final class PersistentExtractionSandboxTest {
     public static void main(String[] args) {
       // Intentionally empty: the JVM exits immediately.
     }
+  }
+
+  private static final class RetryKillProcess extends Process {
+    private boolean alive = true;
+    private int destroyCalls;
+    private int killAfter = 2;
+
+    @Override public OutputStream getOutputStream() { return OutputStream.nullOutputStream(); }
+    @Override public InputStream getInputStream() { return InputStream.nullInputStream(); }
+    @Override public InputStream getErrorStream() { return InputStream.nullInputStream(); }
+    @Override public int waitFor() { alive = false; return 0; }
+    @Override public boolean waitFor(long timeout, TimeUnit unit) { return !alive; }
+    @Override public int exitValue() { if (alive) throw new IllegalThreadStateException(); return 0; }
+    @Override public void destroy() { destroyForcibly(); }
+    @Override public Process destroyForcibly() {
+      destroyCalls++;
+      if (destroyCalls >= killAfter) alive = false;
+      return this;
+    }
+    @Override public boolean isAlive() { return alive; }
+    @Override public long pid() { return 424243L; }
   }
 
   /**

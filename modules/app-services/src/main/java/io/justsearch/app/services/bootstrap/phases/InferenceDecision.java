@@ -43,6 +43,12 @@ public final class InferenceDecision {
 
   /** Constructs the live inference manager, or returns null when AI is disabled / lite mode. */
   public static InferenceLifecycleManager createInferenceManager(Telemetry telemetry) {
+    return createInferenceManager(telemetry,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public static InferenceLifecycleManager createInferenceManager(
+      Telemetry telemetry, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     boolean aiEnabled = decideInferenceConfigured();
     boolean liteMode =
         Boolean.parseBoolean(
@@ -62,6 +68,7 @@ public final class InferenceDecision {
         BootstrapHelpers.currentResolvedConfig(),
         System.getProperty("user.dir"),
         telemetry,
-        log);
+        log,
+        childRegistry);
   }
 }

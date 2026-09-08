@@ -60,6 +60,17 @@ public final class BootstrapInferenceFactory {
       String userDir,
       Telemetry telemetry,
       Logger log) {
+    return createInferenceManager(aiEnabled, resolvedConfig, userDir, telemetry, log,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public static InferenceLifecycleManager createInferenceManager(
+      boolean aiEnabled,
+      ResolvedConfig resolvedConfig,
+      String userDir,
+      Telemetry telemetry,
+      Logger log,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     if (!aiEnabled) {
       log.info("AI features disabled via configuration");
       return null;
@@ -96,7 +107,7 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      return new InferenceLifecycleManager(config, events);
+      return new InferenceLifecycleManager(config, events, childRegistry);
 
     } catch (Exception e) {
       log.warn("Failed to create InferenceLifecycleManager; AI features unavailable", e);

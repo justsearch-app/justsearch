@@ -130,7 +130,7 @@ final class SchemaControllerTest {
     assertTrue(names.contains("api-error-response.v1.json"));
     assertTrue(names.contains("lifecycle-snapshot.v1.json"));
     assertTrue(names.contains("runtime-live-response.v1.json"));
-    assertTrue(names.contains("runtime-manifest-public.v1.json"));
+    assertTrue(names.contains("runtime-manifest-public.v2.json"));
     assertTrue(names.contains("runtime-ready-response.v1.json"));
     assertEquals(17, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));

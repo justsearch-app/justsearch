@@ -111,8 +111,7 @@ public final class RuntimeManifestListenerWiring {
       // Branch on the client, which is what "worker ready" actually means here.
       if (knowledgeServer != null && knowledgeServer.hasClient()) {
         Path idx = indexBasePathSupplier.get();
-        publisher.publishWorkerReady(
-            null, idx != null ? idx.toString() : null, lifecycleStr);
+        publisher.publishWorkerReady(idx != null ? idx.toString() : null, lifecycleStr);
       } else {
         String reason =
             knowledgeServerStartError != null && !knowledgeServerStartError.isBlank()
@@ -131,8 +130,7 @@ public final class RuntimeManifestListenerWiring {
             LifecycleState ls = LifecycleProjection.derive(workCap, infCap);
             if (curr == CapabilityHealth.READY) {
               Path idx = indexBasePathSupplier.get();
-              publisher.publishWorkerReady(
-                  null, idx != null ? idx.toString() : null, ls.name());
+              publisher.publishWorkerReady(idx != null ? idx.toString() : null, ls.name());
             } else if (curr == CapabilityHealth.OFFLINE
                 || curr == CapabilityHealth.DEGRADED
                 || curr == CapabilityHealth.RECOVERING) {
@@ -207,10 +205,7 @@ public final class RuntimeManifestListenerWiring {
     return "retrieval-only";
   }
 
-  // Lane F stage A item A11: readGrpcPort() is gone with the memory-mapped signal bus it read from.
-  // The index half is composed inside this JVM by EngineRoot — there is no worker process, no port
-  // and no channel — so the manifest's `worker.grpcPort` is published as null (the field is already
-  // declared nullable, see RuntimeManifestPublisher#publishWorkerReady) rather than as a fabricated
-  // 0/-1. Nothing here reports a pid either: the manifest's own `pid` is this process's, and
+  // Lane F B11 removed the obsolete worker grpcPort. The index half is composed inside this JVM;
+  // nothing here reports a pid either: the manifest's own `pid` is this process's, and
   // RuntimeManifestPublisher already takes it from ProcessHandle.current().
 }

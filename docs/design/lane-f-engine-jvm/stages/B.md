@@ -3,7 +3,7 @@ title: "Lane F stage B — lifecycle: implementation checklist"
 stage: B
 created: 2026-09-08
 base: dafc4a484
-status: "B1-B10 landed (the Engine side, the contract, and both supervisors); B11-B17 open"
+status: "B1-B10 landed; B11-B12 implemented and verified on the lane-F candidate; B13-B17 open"
 updated: 2026-09-08
 ---
 
@@ -604,6 +604,15 @@ proving a v2 reader handles a v1 file that has no `children`;
 (`currentVersion: 2`, `readableLegacyVersions: [1]`, `:843-844`) and `check-store-recoverability`
 green; `RuntimeManifestPublisherTest` (the declared `futureVersionRefusalTest`, `:846`) green.
 
+**2026-09-08 status:** implemented. The v2 private manifest owns managed-child and shutdown
+handoff records, while the public v2 projection omits those fields and the mutation token. The
+composition root creates one mutable registry and the publisher remains the only persistent
+writer. A synchronous pre-bind seed carries predecessor ownership forward before worker or
+inference child-capable bootstrap can start; registration persists before healthy publication
+and a failed registration reaps the new process. Runtime contract `0.3.0`, the root/resource
+schema copies, generated clients, and recoverability metadata moved together. Exact commands
+and limitations are in [the B11-B12 evidence](../evidence/B/b11-b12-managed-child-registry.md).
+
 ### B12 — reconciliation on start: adopt or kill by identity
 
 At Engine start, walk the registry. Adopt a child whose **PID plus start instant** match
@@ -624,6 +633,16 @@ match + config mismatch → stopped and respawned from A; identity mismatch → 
 by an unrelated process → **not** killed (the `AppInstanceLock` start-instant rule is what makes
 this safe, and it is the adverse precondition that must be tested); a test asserts the death path
 does **not** kill children (7.2: adoption could never fire otherwise).
+
+**2026-09-08 correction and status:** implemented under the newer section 0 amendments, which
+supersede the earlier “identity mismatch → killed” sentence above. Reconciliation acts only when
+PID, start instant, and executable identity match. A mismatched or unknown live identity is never
+terminated; a confirmed dead or mismatched record may be removed. Managed llama adoption also
+requires bounded health/props and the applied declared-config hash. Extraction children are
+registered and never adopted. Failed termination retains ownership. Restart/hang supervision
+preserves registered children, while terminal cleanup is identity checked. Shutdown deletes the
+manifest only after confirmed child death and clean GRACEFUL quit/upgrade completion; other
+outcomes retain the handoff.
 
 ### B13 — the dead-Engine updater path
 

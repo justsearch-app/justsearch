@@ -717,6 +717,18 @@ Each has one implementer and independent review. New findings are separate
 items; after two worker review rounds the orchestrator takes the diff. New raw
 logs remain outside Git; committed evidence carries summaries and hashes.
 
+**B11 terminal cleanup truth (orchestrator, 2026-09-08).** A process whose
+registration failed cannot be preserved for adoption. Its exact handle remains
+owned through bounded cleanup retries, including a final JVM callback; another
+launch is refused while it survives. Terminal close reports failure after trying
+remaining resources, and the existing ordered shutdown therefore retains an
+incomplete handoff instead of issuing a clean receipt. Logging and swallowing
+Head teardown failures was rejected because it hid this proven surviving-child
+case. This is B11 ownership completion, not D1 local runtime recovery: no new
+restart policy, durable registry, or retry loop is added. Confirmed-dead current
+children retire their exact records synchronously at close, without depending
+on an asynchronous death callback winning the race.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

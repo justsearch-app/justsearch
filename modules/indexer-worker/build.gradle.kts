@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":modules:app-api"))
   implementation(project(":modules:worker-core"))
   implementation(project(":modules:worker-services"))
   implementation(project(":modules:configuration"))

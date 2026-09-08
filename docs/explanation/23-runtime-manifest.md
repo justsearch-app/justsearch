@@ -52,15 +52,24 @@ document with these fields:
   Projection of `LifecycleProjection.derive(WorkerCapability,
   InferenceCapability)`. Updated whenever either capability transitions.
 - `head` — `apiPort`, `apiBaseUrl`, `sessionToken` (filesystem only;
-  see below), `readyAt`. Always present.
+  see below), `readyAt`. Always present. The pre-bind ownership seed has
+  these binding fields absent; the API-bind publication fills all three together.
 - `worker` — `state` (`"pending"` | `"ready"` | `"failed"`),
-  `grpcPort` (always `null` since lane F item A11 — the field is retained
-  for schema stability but has no producer, `RuntimeManifestListenerWiring`),
   `indexBasePath`, `readyAt`, `spawnError`. Null until
   the first worker-state publish; the `state` discriminator is the
   authoritative tri-state surface (state=`failed` carries
   `spawnError` with the upstream reason). Updates on every
   `WorkerCapability` transition.
+- `children` — filesystem-only managed child records containing child id,
+  kind, PID, process start instant, executable identity, endpoint, and
+  declared/realized configuration hashes. The successor carries predecessor
+  records forward before child-capable bootstrap and reconciles them by all
+  three OS identity axes before adoption or termination.
+- `shutdownHandoff` — filesystem-only `pending`, `ready`, or `incomplete`
+  disposition. The ordered shutdown marks pending early and completes the
+  handoff only after all close outcomes are known. Restart/hang retains live
+  ownership; quit/upgrade deletes the canonical manifest only after registered
+  children are confirmed gone and the index reports `GRACEFUL`.
 - `ai` — `phase` (`CapabilityHealth.name()` — `PENDING` / `READY` /
   `DEGRADED` / `OFFLINE` / `RECOVERING`), `required` (boolean —
   is inference configured?), `pendingReason` (string), `readyAt`
@@ -79,7 +88,7 @@ document with these fields:
   manifest-schema / lifecycle-schema / MCP-protocol / MCP-tool-surface
   versions. A projection over existing version single-sources
   (`RuntimeContract.current()` in `app-api`), nullable and `NON_NULL`, so it
-  is additive at schema v1. This is the field an external agent reads to learn
+  is carried at schema v2. This is the field an external agent reads to learn
   "what is promised, at what version." Full definition, compatibility matrix,
   stability policy, and surface classification:
   [The Runtime Contract](28-runtime-contract.md) +

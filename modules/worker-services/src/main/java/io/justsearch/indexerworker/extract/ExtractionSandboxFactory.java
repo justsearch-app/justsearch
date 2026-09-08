@@ -102,6 +102,20 @@ public final class ExtractionSandboxFactory {
       OcrMetricCatalog ocrMetricCatalog,
       List<String> processCommand,
       PoolSettings poolSettings) {
+    return create(mode, policy, ocrConfig, timeout, catalog, ocrMetricCatalog, processCommand,
+        poolSettings, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public static TimeboxedContentExtractor create(
+      Mode mode,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      ExtractionMetricCatalog catalog,
+      OcrMetricCatalog ocrMetricCatalog,
+      List<String> processCommand,
+      PoolSettings poolSettings,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     TikaExtractionPolicy effectivePolicy = policy == null ? TikaExtractionPolicy.defaults() : policy;
     OcrRoutingConfig effectiveOcrConfig =
         ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig;
@@ -123,7 +137,8 @@ public final class ExtractionSandboxFactory {
             effectiveTimeout,
             effectivePool.poolSize(),
             effectivePool.maxRequestsPerChild(),
-            catalog);
+            catalog,
+            childRegistry);
     // The sandbox owns the deadline; the timebox is only a backstop for a sandbox that itself
     // wedges. See PROCESS_TIMEBOX_GRACE.
     Duration backstop = effectiveTimeout.plus(PROCESS_TIMEBOX_GRACE);
@@ -167,6 +182,16 @@ public final class ExtractionSandboxFactory {
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
       Duration timeout) {
+    return probeChildCommand(command, policy, ocrConfig, timeout,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public static Optional<String> probeChildCommand(
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     Path probeFile = null;
     try {
       // Scratch, not state: a JVM temp file written and deleted inside this method, outside the
@@ -177,7 +202,8 @@ public final class ExtractionSandboxFactory {
       Files.writeString(probeFile, PROBE_MARKER, StandardCharsets.UTF_8);
       // maxRequestsPerChild = 1: this child is for the probe alone and is discarded with the pool.
       try (PersistentExtractionSandbox sandbox =
-          new PersistentExtractionSandbox(command, policy, ocrConfig, timeout, 1, 1, null)) {
+          new PersistentExtractionSandbox(command, policy, ocrConfig, timeout, 1, 1, null,
+              childRegistry)) {
         String content = sandbox.extract(probeFile).result().content();
         if (content == null || !content.contains(PROBE_MARKER)) {
           return Optional.of("child answered without the probe content");

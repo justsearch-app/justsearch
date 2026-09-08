@@ -7,6 +7,7 @@ plugins {
 }
 
 dependencies {
+  api(project(":modules:app-api"))
   api(project(":modules:worker-core"))
   api(project(":modules:adapters-lucene"))
   api(project(":modules:ipc-common"))

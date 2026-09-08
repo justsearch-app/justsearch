@@ -8,6 +8,7 @@ import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
 import io.justsearch.app.util.AppInstanceLock;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.configuration.SystemPropertyUtils;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -41,6 +42,22 @@ import org.slf4j.bridge.SLF4JBridgeHandler;
  */
 public class HeadlessApp {
   private static final Logger log = LoggerFactory.getLogger(HeadlessApp.class);
+
+  @FunctionalInterface
+  interface IoAction {
+    void run() throws java.io.IOException;
+  }
+
+  static <T> java.util.concurrent.CompletableFuture<T>
+      startChildCapableAsyncAfterOwnershipReconciliation(
+          RuntimeManifestPublisher publisher,
+          IoAction reconciliation,
+          java.util.function.Supplier<T> bootstrap)
+          throws java.io.IOException {
+    publisher.publishOwnershipSeed();
+    reconciliation.run();
+    return java.util.concurrent.CompletableFuture.supplyAsync(bootstrap);
+  }
 
   // Tempdoc 502 §3.3: Typed phase outputs. Each record captures the outputs of one boot phase,
   // enabling independent testing of each phase.
@@ -424,6 +441,7 @@ public class HeadlessApp {
       InfraPhaseResult infraPhase,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
       RuntimeManifestPublisher manifestPublisher,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.ui.api.UpgradeShutdownBridge upgradeShutdownBridge,
       io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge)
@@ -433,7 +451,8 @@ public class HeadlessApp {
 
     HeadAssembly bootstrap =
         new HeadAssembly(
-            telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability);
+            telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
+            childRegistry);
     log.info("HeadAssembly started (degraded — Worker connecting in background).");
 
     var headInfra = bootstrap.headInfraRegistry();
@@ -969,7 +988,25 @@ public class HeadlessApp {
       // is known. The first manifest write happens after the API server binds (Phase 2 below);
       // the worker fields are filled in after Phase 3 (Worker connect). The publisher cleans
       // up its files in the shutdown finally block.
-      manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir());
+      io.justsearch.ui.runtime.MutableManagedChildRegistry childRegistry =
+          new io.justsearch.ui.runtime.MutableManagedChildRegistry();
+      manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir(), childRegistry);
+      String declaredLlamaConfigHashCandidate = null;
+      if (io.justsearch.app.services.bootstrap.phases.InferenceDecision
+          .decideInferenceConfigured()) {
+        io.justsearch.app.inference.InferenceConfig inferenceConfig =
+            io.justsearch.app.inference.InferenceConfig.fromEnvironment(
+                io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
+                    configPhase.resolvedConfig(), SystemAccess.sysProp("user.dir", ".")));
+        int effectiveGpuLayers =
+            Boolean.parseBoolean(SystemAccess.sysProp("policy.gpu_acceleration_enabled", "true"))
+                ? inferenceConfig.gpuLayers()
+                : 0;
+        declaredLlamaConfigHashCandidate =
+            io.justsearch.app.inference.ManagedLlamaConfigIdentity.declaredHash(
+                inferenceConfig, configPhase.resolvedConfig(), effectiveGpuLayers);
+      }
+      final String declaredLlamaConfigHash = declaredLlamaConfigHashCandidate;
 
       tPhase = System.nanoTime();
       long settingsMs = (tPhase - t0) / 1_000_000;
@@ -991,8 +1028,15 @@ public class HeadlessApp {
 
       // Start Knowledge Server asynchronously — spawn runs in parallel with API construction.
       java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture =
-          java.util.concurrent.CompletableFuture.supplyAsync(
-              () -> tryStartKnowledgeServer(sharedWorkerCapability, terminalWriterShutdown));
+          startChildCapableAsyncAfterOwnershipReconciliation(
+              manifestPublisher,
+              () ->
+                  new io.justsearch.ui.runtime.ManagedChildReconciler(
+                          childRegistry, declaredLlamaConfigHash)
+                      .reconcile(),
+              () ->
+                  tryStartKnowledgeServer(
+                      sharedWorkerCapability, terminalWriterShutdown, childRegistry));
 
       // Phase 2: Build API server (degraded mode — no Worker yet)
       ApiPhaseResult apiPhase =
@@ -1000,6 +1044,7 @@ public class HeadlessApp {
               infraPhase,
               settingsStore,
               manifestPublisher,
+              childRegistry,
               sharedWorkerCapability,
               upgradeShutdownBridge,
               lifecycleShutdownBridge);
@@ -1123,7 +1168,12 @@ public class HeadlessApp {
                   appInstanceLockRef,
                   operationLeasesRef,
                   shutdownRequestWatcherRef::get),
-              System::exit);
+              System::exit,
+              preliminary ->
+                  manifestPublisherRef.completeShutdown(
+                      preliminary.reason().wire(),
+                      preliminary.clean(),
+                      preliminary.workerOutcome()));
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
       // Item B6 (design 7.3). commit-shutdown becomes the FRONT half of the sequence: it validates
@@ -1344,7 +1394,7 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "runtime-manifest",
             reason -> {
-              if (manifestPublisher != null) manifestPublisher.close();
+              if (manifestPublisher != null) manifestPublisher.markShutdownPending(reason.wire());
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
@@ -1399,7 +1449,8 @@ public class HeadlessApp {
   private static KnowledgeServerStartResult tryStartKnowledgeServer(
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
-          terminalWriterShutdown) {
+          terminalWriterShutdown,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
     // no monitor — the "boot brick" of 821 §O.4. The instance is restartable by construction
@@ -1421,7 +1472,8 @@ public class HeadlessApp {
               io.justsearch.app.engine.EngineRoot.forProcess(
                   ksConfig.deadlineMs(),
                   ksConfig.batchSize(),
-                  terminalWriterFaultAction(terminalWriterShutdown)));
+                  terminalWriterFaultAction(terminalWriterShutdown),
+                  childRegistry));
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.

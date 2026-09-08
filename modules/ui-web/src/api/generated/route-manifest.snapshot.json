@@ -2,7 +2,7 @@
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
   "count": 243,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:2b2e3ec3b79c74a06157b861152c91e1277be9d6d0e1823106d811af8e9ae0df",
+  "routeDigest": "sha256:d9eac490a2cfa06aad7217cd4b5b5236ec6da389747fdbd99423ee508c642403",
   "routes": [
     {
       "method": "GET",
@@ -3310,13 +3310,13 @@
       "cohort": "runtime",
       "owningModule": "ResourceApiModule",
       "requiredCapabilities": [],
-      "responseSchema": "runtime-manifest-public.v1.json",
+      "responseSchema": "runtime-manifest-public.v2.json",
       "stability": "public-contract",
       "sdkOperationId": "getWellKnownRuntimeManifest",
       "requestSchema": null,
       "queryParameters": [],
       "responseSchemas": {
-        "200": "runtime-manifest-public.v1.json",
+        "200": "runtime-manifest-public.v2.json",
         "403": "api-error-response.v1.json",
         "500": "api-error-response.v1.json",
         "503": "api-error-response.v1.json"
@@ -3418,13 +3418,13 @@
       "cohort": "runtime",
       "owningModule": "ResourceApiModule",
       "requiredCapabilities": [],
-      "responseSchema": "runtime-manifest-public.v1.json",
+      "responseSchema": "runtime-manifest-public.v2.json",
       "stability": "public-contract",
       "sdkOperationId": "getRuntimeManifest",
       "requestSchema": null,
       "queryParameters": [],
       "responseSchemas": {
-        "200": "runtime-manifest-public.v1.json",
+        "200": "runtime-manifest-public.v2.json",
         "403": "api-error-response.v1.json",
         "500": "api-error-response.v1.json",
         "503": "api-error-response.v1.json"
@@ -3491,6 +3491,5 @@
       "responseSchemas": null,
       "lifecycle": null
     }
-  ],
-  "schemaVersion": "2.0"
+  ]
 }

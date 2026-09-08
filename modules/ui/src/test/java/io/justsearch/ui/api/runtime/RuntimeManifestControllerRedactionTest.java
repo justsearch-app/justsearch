@@ -17,6 +17,7 @@ import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestWorkerInfoBuilder;
 import io.justsearch.ui.runtime.RuntimeManifestPublisher;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -216,5 +217,37 @@ class RuntimeManifestControllerRedactionTest {
         RuntimeContract.current().constituents().mcpToolSurfaceVersion(),
         publicView.runtimeContract().constituents().mcpToolSurfaceVersion(),
         "constituent versions must be intact on the public view");
+  }
+
+  @Test
+  void publicProjectionOmitsPrivateManagedChildAndHandoffFields() throws Exception {
+    RuntimeManifest manifest =
+        RuntimeManifestBuilder.builder()
+            .schemaVersion(2)
+            .instanceId("instance-private")
+            .pid(1234L)
+            .startedAt("2026-09-08T12:00:00Z")
+            .dataDir("C:\\private")
+            .head(new RuntimeManifest.HeadInfo(54321, "http://127.0.0.1:54321", "token",
+                "2026-09-08T12:00:01Z", null))
+            .children(
+                List.of(
+                    new io.justsearch.app.api.runtime.ManagedChild(
+                        "private-id", io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER,
+                        4321L, "2026-09-08T12:00:00Z", "c:\\private\\llama.exe",
+                        "http://127.0.0.1:8081", "c:\\private\\model.gguf", "declared", "argv")))
+            .shutdownHandoff(
+                new RuntimeManifest.ShutdownHandoff("pending", "restart", "2026-09-08T12:01:00Z"))
+            .build();
+
+    String publicJson =
+        new tools.jackson.databind.ObjectMapper()
+            .writeValueAsString(manifest.publicProjection());
+
+    assertFalse(publicJson.contains("private-id"));
+    assertFalse(publicJson.contains("children"));
+    assertFalse(publicJson.contains("shutdownHandoff"));
+    assertFalse(publicJson.contains("token"));
+    assertEquals(2, manifest.publicProjection().schemaVersion());
   }
 }

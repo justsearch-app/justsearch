@@ -82,7 +82,7 @@ public final class SchemaController {
           // RouteContractPolicy for both /api/indexing-jobs/failed routes.
           "failed-indexing-jobs-response.v1.json",
           // Tempdoc 899 D6: canonical schemas for the six-operation runtime client projection.
-          "runtime-manifest-public.v1.json",
+          "runtime-manifest-public.v2.json",
           "runtime-ready-response.v1.json",
           "runtime-live-response.v1.json",
           "lifecycle-snapshot.v1.json",
