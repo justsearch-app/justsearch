@@ -93,6 +93,12 @@ function resolveBehaviour(args, env) {
     exitAfterMs: num(args.exitAfterMs ?? env.JUSTSEARCH_FAKE_ENGINE_EXIT_AFTER_MS, 500),
     hangAfterMs: num(args.hangAfterMs ?? env.JUSTSEARCH_FAKE_ENGINE_HANG_AFTER_MS, 500),
     slowStartMs: num(args.slowStartMs ?? env.JUSTSEARCH_FAKE_ENGINE_SLOW_START_MS, 60_000),
+    // How often the fake watcher reads the request file. A FIXTURE cadence, not a subject one: the
+    // Engine deletes the file the instant it consumes it, so a supervisor and an Engine polling at
+    // the same rate race over a window neither controls. Widening the Engine's side widens the
+    // window the SUPERVISOR has to observe the request in — it does not make the supervisor's
+    // observation easier to fake, because the supervisor still has to read the file itself.
+    requestPollMs: num(args.requestPollMs ?? env.JUSTSEARCH_FAKE_ENGINE_REQUEST_POLL_MS, 100),
   };
   let incarnation = 1;
   if (planPath && fs.existsSync(planPath)) {
@@ -136,7 +142,20 @@ const instanceId = crypto.randomUUID();
 const sessionToken = crypto.randomUUID();
 
 function log(message) {
-  process.stdout.write(`[fake-engine] ${message}\n`);
+  // Timestamped because every question anyone asks of this process is a timing question: did it
+  // answer before it hung, did it read the request before the deadline, did it exit before the kill.
+  const line = `[fake-engine] ${new Date().toISOString()} ${message}`;
+  process.stdout.write(`${line}\n`);
+  // ... and APPENDED to <dataDir>/logs/engine.log, because that is what the real Engine's Logback
+  // does and it is what item B1's per-run log preservation preserves. Without a real appending log
+  // there would be nothing for the per-incarnation snapshot to be a snapshot OF, and the assertion
+  // that incarnation N's evidence survives incarnation N+1 would be vacuous.
+  try {
+    fs.mkdirSync(path.join(dataDir, 'logs'), { recursive: true });
+    fs.appendFileSync(path.join(dataDir, 'logs', 'engine.log'), `${line}\n`, 'utf8');
+  } catch {
+    /* the log is evidence, not a dependency */
+  }
 }
 
 log(
@@ -266,7 +285,7 @@ function start() {
       /* the supervisor rewrites it if it still wants us gone */
     }
     orderlyExit(0, `shutdown request reason=${reason}`);
-  }, 100).unref();
+  }, behaviour.requestPollMs).unref();
   // The interval is unref'd on purpose: the listening server is what holds the event loop open, so
   // once the server closes the process can exit instead of being pinned by a poll that has nothing
   // left to poll for.

@@ -113,8 +113,18 @@ function writeShutdownRequest(dataDir, { reason, deadlineEpochMs, issuedBy = 'su
   return target;
 }
 
+/**
+ * Under the repo's gitignored `tmp/`, not under `os.tmpdir()`.
+ *
+ * Not a preference: `dev-runner.cjs`'s `resolveDataDir` REFUSES a `--data-dir` outside the repo root
+ * (a path-traversal guard), so a work dir in the system temp directory makes every dev-runner case
+ * fail with an error the adapter cannot even see — the refusal is reported as JSON on stdout, and an
+ * adapter watching stderr reads it as silence. Found exactly that way.
+ */
 function makeWorkDir(label) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `supervisor-conformance-${label}-`));
+  const root = path.join(repoRoot, 'tmp', 'supervisor-conformance');
+  fs.mkdirSync(root, { recursive: true });
+  return fs.mkdtempSync(path.join(root, `${label}-`));
 }
 
 /** Write a per-incarnation behaviour plan for the fake engine, and return its path. */
@@ -395,7 +405,21 @@ async function runAdapter(name) {
   }
   const adapter = await import(`file://${modulePath}`);
   const policy = loadPolicy({ env: { ...process.env, ...HARNESS_OVERRIDES } });
-  const cases = actuatorCases();
+  // `--case <id>` narrows a run while DEBUGGING one implementation. It is not a skip mechanism: the
+  // filter is applied here and a filtered run reports how many cases it left out, so a green from a
+  // narrowed run cannot be mistaken for a green from the contract.
+  const only = process.argv.includes('--case') ? process.argv[process.argv.indexOf('--case') + 1] : null;
+  const declared = actuatorCases();
+  const cases = only ? declared.filter((c) => c.id === only) : declared;
+  if (only) {
+    process.stdout.write(
+      `supervisor-conformance: NARROWED to \`${only}\` — ${declared.length - cases.length} case(s) not run.\n`,
+    );
+    if (cases.length === 0) {
+      process.stderr.write(`no actuator case with id \`${only}\`\n`);
+      process.exit(2);
+    }
+  }
 
   const available = adapter.available ? await adapter.available({ io }) : { ok: true };
   if (!available.ok) {

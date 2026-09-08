@@ -155,13 +155,13 @@ function decideOnExit(observation, policy) {
   if (requested === 'restart') {
     // No cooldown ramp: nothing crashed. The actuator still waits for the process handle to close,
     // which is the floor under EVERY restart and is not a number this function can express.
-    return { action: ACTIONS.RESTART, reason: 'restart', cooldownMs: 0, counted: false };
+    return { action: ACTIONS.RESTART, reason: 'restart', exitClass: 'REQUESTED', cooldownMs: 0, counted: false };
   }
   if (requested === 'upgrade') {
-    return { action: ACTIONS.STOP, reason: 'upgrade', counted: false };
+    return { action: ACTIONS.STOP, reason: 'upgrade', exitClass: 'REQUESTED', counted: false };
   }
   if (requested === 'quit') {
-    return { action: ACTIONS.STOP, reason: 'quit', counted: false };
+    return { action: ACTIONS.STOP, reason: 'quit', exitClass: 'REQUESTED', counted: false };
   }
 
   // `hang` is the one requested reason that IS counted: the request was the recovery, and the thing
@@ -173,19 +173,20 @@ function decideOnExit(observation, policy) {
   if (exitClass === 'REQUESTED') {
     // Exit 0 with nothing outstanding: the ordered shutdown ran because something else asked for it
     // (the HTTP trigger, a signal). Restarting here would fight the user.
-    return { action: ACTIONS.STOP, reason, counted: false };
+    return { action: ACTIONS.STOP, reason, exitClass, counted: false };
   }
   if (exitClass === 'NON_TRANSIENT') {
-    return { action: ACTIONS.EXHAUSTED, reason, counted: false };
+    return { action: ACTIONS.EXHAUSTED, reason, exitClass, counted: false };
   }
 
   const attempt = (observation.restartCount ?? 0) + 1;
   if (attempt > policy.maxRestartAttempts) {
-    return { action: ACTIONS.EXHAUSTED, reason, counted: false };
+    return { action: ACTIONS.EXHAUSTED, reason, exitClass, counted: false };
   }
   return {
     action: ACTIONS.RESTART,
     reason,
+    exitClass,
     cooldownMs: Math.min(policy.cooldownIncrementMs * attempt, policy.maxCooldownMs),
     counted: true,
   };

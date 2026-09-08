@@ -59,6 +59,15 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   // supervisor and the dev-runner, read and deleted by the Engine.
   ['shutdown-request.v1.json', 'lane F stage B item B2 (design 7.3) — out-of-band shutdown request from the supervisor to the Engine'],
   ['shutdown-request.v1.json.tmp', 'lane F stage B item B2 — atomic-rename staging file for shutdown-request.v1.json'],
+  // Lane F stage B item B8 (design 7.1). Not a discovery surface and deliberately not an API: it
+  // carries the supervisor's state (starting / running / stopping / restarting / exhausted, the
+  // restart count, the last exit reason), and the moment it matters is the moment the Engine is down
+  // and can answer nothing. Written by the dev-runner and the Tauri shell — the two implementations
+  // of design 7.1's one supervisor contract — and read by the updater's dead-Engine path (B13),
+  // quick_health, jseval and the dev MCP. Beside the port manifest because a reader that has the
+  // manifest's directory has this one too.
+  ['supervisor.v1.json', 'lane F stage B item B8 (design 7.1) — the supervisor state a dead Engine cannot report'],
+  ['supervisor.v1.json.tmp', 'lane F stage B item B8 — atomic-rename staging file for supervisor.v1.json'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 
@@ -81,9 +90,13 @@ const SKIP_PATHS = [
   // HeadlessApp writes the deprecated api-port.txt mirror plus shutdown
   // cleanup; the strings are tracked under the allowlist.
   'modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java',
-  // The dev-runner writes nothing into <dataDir>/runtime/ — it observes —
-  // but the path strings live there for cleanup. Permit by file name.
-  'scripts/dev/dev-runner.cjs',
+  // scripts/dev/dev-runner.cjs was skipped here with the justification "the dev-runner writes
+  // nothing into <dataDir>/runtime/ — it observes". Lane F stage B item B8 made it a WRITER
+  // (supervisor.v1.json, the shutdown request file, the terminal-state mirror), so the skip stopped
+  // being a description and became an exemption — and an exemption over a new writer is exactly the
+  // vacuous green this check exists to prevent. Removed rather than re-justified: its artifacts are
+  // on the allowlist above, which is what "checked" means here.
+  //
   // Vite/Node consumers read manifest.json by name; that's not creating new
   // sibling files. The shared platform-paths module is the canonical reader.
   'modules/ui-web/vite.config.js',

@@ -73,6 +73,10 @@ const {
   mergeSessionActivity,
   DEFAULT_THRESHOLDS,
 } = require('./lib/ownership-verdict.cjs');
+// Lane F stage B item B8: the supervisor's DECISION seam, shared with the Tauri half by way of
+// governance/supervision-contract.v1.json. Everything that touches a process, a socket or the clock
+// is the actuator's, and the actuator is this file — see the state machine below `cmdStart`.
+const engineSupervisor = require('./lib/engine-supervisor.cjs');
 const RUN_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const RUN_RETENTION_COUNT = 200;
 // Tempdoc 735 G6: campaign-length lease hold. Passive-expiry default stays 30s (unchanged
@@ -600,11 +604,18 @@ function isPidAlive(pid) {
 // so the preserved copy is 'the engine log as it stood when this run stopped' — it can contain
 // earlier runs' lines too. That is a widening, not a loss (B1's failure mode was a MISSING log,
 // not an over-full one), and it is why the result no longer claims a per-run ownership verdict.
-async function preserveEngineLog(run, runPath) {
+async function preserveEngineLog(run, runPath, { destSubdir = null } = {}) {
   const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   if (!dataDirAbs) return { preserved: false, reason: 'no_data_dir' };
   const srcEngineLog = path.join(dataDirAbs, 'logs', 'engine.log');
-  const destLogsDir = path.join(path.dirname(runPath), 'logs');
+  // Lane F stage B item B8: a supervised run has more than one incarnation, and engine.log is ONE
+  // file keyed to the (cross-run, cross-incarnation) dataDir. Without a per-incarnation destination
+  // the second death would overwrite the first death's evidence — which is the exact failure tempdoc
+  // 730 B1 exists to prevent, arriving one level down. `destSubdir` is how a supervised incarnation
+  // asks for its own copy; the default is unchanged, so every existing caller and its tests hold.
+  const destLogsDir = destSubdir
+    ? path.join(path.dirname(runPath), destSubdir, 'logs')
+    : path.join(path.dirname(runPath), 'logs');
   const destEngineLog = path.join(destLogsDir, 'engine.log');
 
   if (!fs.existsSync(srcEngineLog)) return { preserved: false, reason: 'no_engine_log' };
@@ -639,6 +650,7 @@ function buildStopReport({
   criticalOpsInterrupted = null,
   interruptibleWithLossInterrupted = null,
   gracefulBackendShutdown = null,
+  incarnation = null,
 }) {
   return {
     schemaVersion: 2,
@@ -672,6 +684,10 @@ function buildStopReport({
     // the backend taskkill fallback. Additive/optional like the two fields above it — no
     // existing reader depends on its absence, so no schemaVersion bump.
     ...(gracefulBackendShutdown ? { gracefulBackendShutdown } : {}),
+    // Lane F stage B item B8: WHICH incarnation of a supervised run this report describes. Additive
+    // and optional like the three fields above it — absent for every unsupervised path — so
+    // schemaVersion stays 2 and the existing readers are untouched.
+    ...(incarnation != null ? { incarnation } : {}),
   };
 }
 
@@ -742,7 +758,7 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
 // NO stop-report at all (only onExit() closing the log streams), so a silent death left zero
 // exit-code artifact — the exact gap §THEORIZE B names. Also preserves engine.log (B1, re-homed
 // at item A16), since a self-exit is precisely the "death run" scenario B1 exists for.
-async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, interactive }) {
+async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, interactive, incarnation = null }) {
   const engineLog = await preserveEngineLog(run, runPath);
   const stopReport = buildStopReport({
     runId,
@@ -755,10 +771,226 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
     portsClosed: null,
     errors: [],
     engineLog,
+    incarnation,
   });
   const stopReportPath = path.join(path.dirname(runPath), 'stop-report.json');
   await writeJsonAtomic(stopReportPath, stopReport);
+  // Lane F stage B item B8: the report becomes a per-incarnation record rather than the runner's
+  // last act. `stop-report.json` still names the LAST one, so every existing reader keeps working;
+  // the per-incarnation copy is what makes a run that died three times readable at all.
+  if (incarnation != null) {
+    await writeJsonAtomic(
+      path.join(path.dirname(runPath), 'incarnations', String(incarnation), 'stop-report.json'),
+      stopReport,
+    );
+  }
   return stopReport;
+}
+
+// =============================================================================================
+// Lane F stage B item B8 — the supervisor's ACTUATOR half (design 7.1).
+//
+// The decision is `scripts/dev/lib/engine-supervisor.cjs`'s and is shared with the Tauri shell
+// through the register. What lives here is everything a pure function cannot do honestly: spawn,
+// wait for the process handle to close, sleep a cooldown, write the request file, force kill, and
+// publish the state a reader outside this process can see.
+//
+// The state file is the point of the whole item. Before B8 an Engine that died took the dev-runner
+// with it (`process.exit(code)` in the child's exit handler), so "why is the stack down" had exactly
+// one answer available to anyone who was not watching the terminal: nothing. `supervisor.v1.json` is
+// visible precisely when the Engine is not, which is why design 7.1 puts it beside the port manifest
+// rather than behind an API.
+// =============================================================================================
+
+/** `<dataDir>/runtime/supervisor.v1.json` — the live state, rewritten on every transition. */
+function supervisorStatePath(dataDir) {
+  return path.join(dataDir, 'runtime', 'supervisor.v1.json');
+}
+
+/**
+ * The terminal-state mirror (stage B checklist Q5's answer (c)).
+ *
+ * Q5 asks for the terminal record to survive the moment the Engine dies, and points at
+ * `RuntimeManifestPublisher`'s append-only per-instance history as the precedent. That mirror is
+ * written by Java, keyed by `instanceId`, into `runtime/instances/<instanceId>/` — and the case that
+ * needs the record hardest is the one where NO instance ever published a manifest, so there is no
+ * instanceId to key it by. The supervisor therefore writes a sibling JSONL inside the same
+ * (already sanctioned) `instances` directory: same location convention, same append-only shape,
+ * keyed by time instead of by an identity the failure mode may have prevented from existing.
+ */
+function supervisorHistoryPath(dataDir) {
+  return path.join(dataDir, 'runtime', 'instances', 'supervisor-history.v1.jsonl');
+}
+
+/** `<dataDir>/runtime/shutdown-request.v1.json` — item B2's out-of-band channel, from this side. */
+function shutdownRequestPath(dataDir) {
+  return path.join(dataDir, 'runtime', 'shutdown-request.v1.json');
+}
+
+/**
+ * The supervisor state record. Pure (no fs, no clock beyond what is passed in) so its shape can be
+ * asserted without a live stack — the same reason `buildStopReport` is pure.
+ */
+function buildSupervisorState({
+  state,
+  runId,
+  incarnation,
+  pid = null,
+  apiPort = null,
+  instanceId = null,
+  restartCount = 0,
+  policy,
+  lastExit = null,
+  reason = null,
+  requestedReason = null,
+  readyAt = null,
+  updatedAt,
+}) {
+  return {
+    schemaVersion: 1,
+    kind: 'engine-supervisor-state.v1',
+    supervisor: 'dev-runner',
+    state,
+    runId,
+    incarnation,
+    pid,
+    apiPort,
+    instanceId,
+    restartCount,
+    maxRestartAttempts: policy?.maxRestartAttempts ?? null,
+    // Recorded, not inferred: an `exhausted` reached under a 1.5 s stability window means something
+    // different from one reached under 300 s, and only the file can tell a later reader which it was.
+    policyProfile: policy?.harnessActive ? 'harness' : 'product',
+    ...(policy?.overridden?.length ? { policyOverrides: policy.overridden } : {}),
+    lastExit,
+    reason,
+    requestedReason,
+    readyAt,
+    updatedAt,
+  };
+}
+
+/**
+ * Publish a state transition, and mirror the terminal one.
+ *
+ * Best-effort by construction: a supervisor that cannot write its state file must still supervise.
+ * The failure is reported on stderr rather than swallowed, because a silent write failure here
+ * would make `exhausted` unobservable — the one state the file exists for.
+ */
+async function writeSupervisorState(dataDir, record) {
+  try {
+    await writeJsonAtomic(supervisorStatePath(dataDir), record);
+  } catch (err) {
+    process.stderr.write(`[dev-runner] supervisor state write failed: ${err?.message ?? err}\n`);
+    return;
+  }
+  if (record.state !== 'exhausted') return;
+  try {
+    const historyPath = supervisorHistoryPath(dataDir);
+    await mkdirp(path.dirname(historyPath));
+    await fsp.appendFile(historyPath, `${JSON.stringify(record)}\n`, 'utf8');
+  } catch (err) {
+    process.stderr.write(`[dev-runner] supervisor history append failed: ${err?.message ?? err}\n`);
+  }
+}
+
+/**
+ * The cooldown FLOOR: wait until the dead incarnation has actually let go (design 7.1, stage B §2).
+ *
+ * Not a number, on purpose. Windows keeps file handles until the owning process is gone, and the
+ * Engine holds two that decide whether the next incarnation can boot at all: `<dataDir>/app.lock`
+ * (AppInstanceLock's exclusive channel — a second instance that finds it held exits DATA_DIR_LOCKED,
+ * which the classifier calls NON_TRANSIENT) and `<dataDir>/logs/engine.log`. Restarting before both
+ * are free would turn a recoverable crash into `exhausted` on the very next attempt, for a reason
+ * that has nothing to do with the crash.
+ *
+ * Bounded and honest: after `timeoutMs` it returns `{ released: false }` and the caller restarts
+ * anyway. A supervisor that blocks forever waiting for a handle is worse than one that tries and
+ * records that it did not wait long enough.
+ */
+async function waitForEngineHandleRelease({ pid, dataDir, timeoutMs = 5000, intervalMs = 100 }) {
+  const deadline = Date.now() + timeoutMs;
+  const probes = [path.join(dataDir, 'app.lock'), path.join(dataDir, 'logs', 'engine.log')];
+  const startedAt = Date.now();
+  for (;;) {
+    const pidGone = !pid || !isPidAlive(pid);
+    let filesFree = true;
+    for (const probe of probes) {
+      if (!fs.existsSync(probe)) continue;
+      try {
+        const fd = fs.openSync(probe, 'a');
+        fs.closeSync(fd);
+      } catch {
+        filesFree = false;
+        break;
+      }
+    }
+    if (pidGone && filesFree) {
+      return { released: true, waitedMs: Date.now() - startedAt };
+    }
+    if (Date.now() >= deadline) {
+      return { released: false, waitedMs: Date.now() - startedAt, pidGone, filesFree };
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+/**
+ * Write item B2's request file. The Engine's watcher reads it, runs the ordered shutdown with the
+ * reason, and deletes it; the deadline is what covers a JVM that never reads it at all.
+ */
+async function writeShutdownRequestFile(dataDir, { reason, deadlineEpochMs, issuedBy = 'dev-runner', nonce = null }) {
+  const target = shutdownRequestPath(dataDir);
+  await writeJsonAtomic(target, {
+    schemaVersion: 1,
+    reason,
+    deadlineEpochMs,
+    issuedBy,
+    ...(nonce ? { nonce } : {}),
+  });
+  return target;
+}
+
+/**
+ * The reason of a request file currently on disk, or null.
+ *
+ * The supervisor reads the file it did not necessarily write: item B15's escalation path has the
+ * ENGINE asking for its own restart, and `commit-shutdown` (B6) writes an `upgrade` request. A
+ * supervisor that only knew about its own requests would charge those deaths to the crash budget.
+ * An unparseable or unknown-reason file answers null — never a guess, for the reason the store
+ * register states: guessing a reason from a file caught mid-write could stop the product.
+ */
+/**
+ * The forced half of design 7.1's hang path: the deadline expired, so the request was not enough.
+ *
+ * `/T` because the Engine owns children (llama-server, the extraction pool) whose handles are the
+ * reason the next incarnation's boot can fail; leaving the tree behind would turn a hang into a
+ * DATA_DIR_LOCKED on the restart. Item B12 replaces this blunt subtree kill with kill-by-identity
+ * once the child registry exists.
+ */
+function forceKillEngineTree(pid) {
+  if (!pid) return;
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch (err) {
+    process.stderr.write(`[dev-runner] force kill of ${pid} failed: ${err?.message ?? err}\n`);
+  }
+}
+
+function readShutdownRequestReason(dataDir) {
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(shutdownRequestPath(dataDir), 'utf8'));
+  } catch {
+    return null;
+  }
+  const reason = parsed?.reason;
+  return ['quit', 'restart', 'upgrade', 'hang'].includes(reason) ? reason : null;
 }
 
 // Tempdoc 606 Piece 2 (provenance): capture, at spawn, WHICH code the launched
@@ -1663,9 +1895,21 @@ async function cmdStart(opts) {
     process.stderr.write(`[dev-runner] Using dev AOT cache: ${headAotCache}\n`);
   }
 
+  // Lane F stage B item B7/B8: the conformance harness substitutes its fake engine (and a stand-in
+  // for the Vite dev server) here, which is the only way to drive a real crash, a real wedge and a
+  // real handle-release cooldown through THIS supervisor rather than through a stand-in for it.
+  //
+  // Gated on the harness flag and not on the command variable alone: an inherited
+  // JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND must not be able to replace a developer's Engine with
+  // something else, so the escape hatch needs two keys, not one. `loadPolicy` reads the same flag
+  // for the same reason, and the harness's own self-test asserts that one key is not enough.
+  const harnessActive = process.env[engineSupervisor.HARNESS_FLAG] === '1';
+  const harnessEngineCommand = harnessActive ? process.env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND : null;
+  const harnessFrontendCommand = harnessActive ? process.env.JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND : null;
+
   // Fail fast if the Head dist doesn't exist (e.g. --skip-build without prior installDist).
   // Without this check, spawn() fails silently and the only feedback is a 60s timeout.
-  if (!fs.existsSync(startScript)) {
+  if (!harnessEngineCommand && !fs.existsSync(startScript)) {
     const gradleCmd = process.platform === 'win32' ? './gradlew.bat' : './gradlew';
     const remedy = `node scripts/dev/prepare-worktree.cjs (or: ${gradleCmd} :modules:ui:installDist)`;
     // Tempdoc 844 B2: a fully-understood, recoverable condition with a printed remedy is NOT an
@@ -1695,15 +1939,23 @@ async function cmdStart(opts) {
     `[dev-runner] Launching dist: repoRoot=${devStackProvenance.repoRoot} ` +
     `gitHead=${devStackProvenance.gitHead ?? '?'} headDistStamp=${devStackProvenance.headDistStamp ?? '?'}\n`);
 
-  const spawnBackend = {
-    cwd: repoRoot,
-    command: startScript,
-    args: [],
-    shell: process.platform === 'win32',
-  };
+  const spawnBackend = harnessEngineCommand
+    ? (() => {
+      const parsed = JSON.parse(harnessEngineCommand);
+      return { cwd: repoRoot, command: parsed[0], args: parsed.slice(1), shell: false };
+    })()
+    : {
+      cwd: repoRoot,
+      command: startScript,
+      args: [],
+      shell: process.platform === 'win32',
+    };
+  if (harnessEngineCommand) {
+    process.stderr.write(
+      `[dev-runner] supervisor-conformance harness: engine command replaced by ${spawnBackend.command}\n`);
+  }
 
   let apiPortActual = apiPortRequested;
-  let portEmitted = false;
 
   // Tempdoc 501 §3.1 closure-pass: stdout was previously parsed for
   // JUSTSEARCH_API_PORT=<n> as a fast-path discovery channel. That violates
@@ -1713,7 +1965,10 @@ async function cmdStart(opts) {
   // Port comes exclusively from <dataDir>/runtime/manifest.json read in the
   // wait loop below.
 
-  const backend = spawnLogged(
+  // Lane F stage B item B8: one incarnation of the Engine. A supervised restart calls this again
+  // with the SAME log streams, the same run id and the same lease — 7.6's dev-runner sentence — so
+  // what survives the child is everything except the child.
+  const spawnEngineChild = (apiPortForThisIncarnation) => spawnLogged(
     spawnBackend.command,
     spawnBackend.args,
     {
@@ -1725,7 +1980,7 @@ async function cmdStart(opts) {
         // stage A item A11 deleted the Worker child, that is now the only JVM the pin has to cover;
         // the inference process the Engine still spawns inherits this env.
         JAVA_HOME: resolveJdkHome(),
-        JUSTSEARCH_API_PORT: String(apiPortRequested),
+        JUSTSEARCH_API_PORT: String(apiPortForThisIncarnation),
         JUSTSEARCH_DATA_DIR: dataDir,
         JUSTSEARCH_HOME: dataDir,
         // Tempdoc 842 §2.4: chat model profile ("compact" | "standard"). Ambient operator env
@@ -1784,12 +2039,20 @@ async function cmdStart(opts) {
     },
   );
 
-  const spawnFrontend = () => ({
-    cwd: uiWebDir,
-    command: 'npm',
-    args: ['run', 'dev', '--', '--host', '--port', String(uiPort), '--strictPort'],
-    shell: process.platform === 'win32',
-  });
+  let backend = spawnEngineChild(apiPortRequested);
+
+  const spawnFrontend = () => {
+    if (harnessFrontendCommand) {
+      const parsed = JSON.parse(harnessFrontendCommand);
+      return { cwd: repoRoot, command: parsed[0], args: parsed.slice(1), shell: false };
+    }
+    return {
+      cwd: uiWebDir,
+      command: 'npm',
+      args: ['run', 'dev', '--', '--host', '--port', String(uiPort), '--strictPort'],
+      shell: process.platform === 'win32',
+    };
+  };
 
   const readTimeoutMs = (envKey, fallbackMs) => {
     const raw = process.env[envKey];
@@ -1831,8 +2094,15 @@ async function cmdStart(opts) {
   // Pre-spawn cleanup. api-port.txt is the deprecated mirror (Phase 8) but
   // we still unlink it so a stale --clean=none restart doesn't leave a
   // misleading file around for any legacy consumer.
-  try { fs.unlinkSync(path.join(runtimeDir, 'api-port.txt')); } catch { /* ok if absent */ }
-  try { fs.unlinkSync(manifestPath); } catch { /* ok if absent */ }
+  //
+  // Lane F stage B item B8: this now runs before EVERY incarnation, not only the first. A restarted
+  // Engine that inherited the dead one's manifest would be discovered at the dead one's port with
+  // the dead one's session token, which is the residue tempdoc 805 G.1 named on the Tauri side.
+  const clearStaleDiscoveryFiles = () => {
+    try { fs.unlinkSync(path.join(runtimeDir, 'api-port.txt')); } catch { /* ok if absent */ }
+    try { fs.unlinkSync(manifestPath); } catch { /* ok if absent */ }
+  };
+  clearStaleDiscoveryFiles();
 
   let manifestInstanceId = null;
   const tryReadManifest = () => {
@@ -1848,44 +2118,51 @@ async function cmdStart(opts) {
     return 0;
   };
 
-  // Tempdoc 501 §3.1: manifest is the sole discovery path. The legacy
-  // api-port.txt fallback the wait-loop used to consult was dead code in
-  // the dev-runner context (the worktree always builds the current
-  // HeadlessApp, which writes both files); removing it tightens the
-  // closure ("one mechanism per concern").
-  const waitForPortDeadline = Date.now() + portEmitTimeoutMs;
-  // Exit the moment the ACTUAL bound port is known. The old guard also OR'd in
-  // `apiPortRequested <= 0`, which is permanently true for an ephemeral request (`--api-port 0`,
-  // the default) — so the loop discovered the port (below) but ignored it and spun the FULL
-  // `portEmitTimeoutMs` regardless (15s local / 300s CI). On CI that 300s exceeded the onramp
-  // smoke's 240s startStack budget → deterministic "stack start timed out" (tempdoc 656 §I).
-  while (apiPortActual <= 0 && Date.now() < waitForPortDeadline) {
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, 100));
-    if (!portEmitted && apiPortActual <= 0) {
-      const p = tryReadManifest();
-      if (p > 0) {
-        apiPortActual = p;
-        portEmitted = true;
-      }
+  /**
+   * Wait for ONE incarnation to publish a port and answer.
+   *
+   * Tempdoc 501 §3.1: the manifest is the sole discovery path. The legacy api-port.txt fallback the
+   * wait-loop used to consult was dead code in the dev-runner context, and removing it tightened the
+   * closure ("one mechanism per concern").
+   *
+   * Lane F stage B item B8 changed one thing here, deliberately: the loop no longer short-circuits
+   * when `--api-port` named an explicit port. It used to, which meant an explicit-port start never
+   * read the manifest at all and recorded `portSource: unresolved` with a null instanceId. A
+   * supervisor needs the instanceId on every incarnation to tell one boot from the next, and the
+   * manifest is deleted before each spawn, so waiting for it is now the readiness signal in both
+   * cases. The failure message and the timeouts are unchanged.
+   */
+  const awaitEngineIncarnation = async ({ portTimeoutMs, readyTimeoutMs }) => {
+    let discovered = 0;
+    const waitForPortDeadline = Date.now() + portTimeoutMs;
+    while (discovered <= 0 && Date.now() < waitForPortDeadline) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 100));
+      discovered = tryReadManifest();
     }
-  }
+    if (!Number.isFinite(discovered) || discovered <= 0) {
+      const seconds = Math.max(1, Math.round(portTimeoutMs / 1000));
+      throw new Error(
+        `Backend did not emit JUSTSEARCH_API_PORT=<port> within ${seconds}s (requested=${apiPortRequested}).`,
+      );
+    }
+    const ready = await waitForBackendReady(discovered, readyTimeoutMs);
+    if (!ready) {
+      const seconds = Math.max(1, Math.round(readyTimeoutMs / 1000));
+      throw new Error(
+        `Backend did not become ready at http://127.0.0.1:${discovered}/api/status within ${seconds}s`);
+    }
+    return { apiPort: discovered, instanceId: manifestInstanceId };
+  };
 
-  if (!Number.isFinite(apiPortActual) || apiPortActual <= 0) {
-    const seconds = Math.max(1, Math.round(portEmitTimeoutMs / 1000));
-    throw new Error(
-      `Backend did not emit JUSTSEARCH_API_PORT=<port> within ${seconds}s (requested=${apiPortRequested}).`,
-    );
-  }
+  const firstIncarnation = await awaitEngineIncarnation({
+    portTimeoutMs: portEmitTimeoutMs,
+    readyTimeoutMs: backendReadyTimeoutMs,
+  });
+  apiPortActual = firstIncarnation.apiPort;
 
   const apiBaseUrl = `http://127.0.0.1:${apiPortActual}`;
   const uiUrl = `http://localhost:${uiPort}`;
-
-  const readyHttp = await waitForBackendReady(apiPortActual, backendReadyTimeoutMs);
-  if (!readyHttp) {
-    const seconds = Math.max(1, Math.round(backendReadyTimeoutMs / 1000));
-    throw new Error(`Backend did not become ready at ${apiBaseUrl}/api/status within ${seconds}s`);
-  }
 
   // indexBasePath capture (271 stage 4)
   const expectedIbp = resolveExpectedIndexBasePath(dataDir);
@@ -2188,8 +2465,259 @@ async function cmdStart(opts) {
     } catch (_) { /* best-effort renewal */ }
   }, 10_000);
 
-  backend.on('exit', (code) => {
-    if (reaping) return; // deliberate reap owns teardown + exit (avoids racing stopRun cleanup)
+  // ============================================================================================
+  // Lane F stage B item B8 — the supervisor state machine.
+  //
+  // What this replaces: "child died -> write a stop report -> process.exit(code)". That was not a
+  // policy, it was the absence of one; a crashed Engine took the dev-runner with it and the stack
+  // stayed down until a human noticed. The states are design 7.1's — starting / running / stopping
+  // / restarting / exhausted — and every transition is published to <dataDir>/runtime/supervisor.v1.json.
+  //
+  // The DECISION is not here. `engineSupervisor.decide(observation, policy)` answers what to do, and
+  // the Tauri shell answers the same question with the same table read from the same register. What
+  // is here is the part a pure function cannot do: spawn, wait for the handle, sleep, kill.
+  // ============================================================================================
+  const supervisionPolicy = engineSupervisor.loadPolicy();
+  const { ACTIONS, STATES } = engineSupervisor;
+
+  let supervisorState = STATES.STARTING;
+  let incarnation = 1;
+  let restartCount = 0;
+  let readyAt = null;
+  let stabilityTimer = null;
+  let hangTimer = null;
+  let requestWatchTimer = null;
+  let requestDeadlineTimer = null;
+  let consecutiveHealthMisses = 0;
+  let observedRequestReason = null;
+  let lastExitRecord = null;
+  let supervising = true;
+
+  const publishSupervisorState = async (state, extra = {}) => {
+    supervisorState = state;
+    await writeSupervisorState(dataDir, buildSupervisorState({
+      state,
+      runId,
+      incarnation,
+      pid: backend?.pid ?? null,
+      apiPort: apiPortActual,
+      instanceId: manifestInstanceId,
+      restartCount,
+      policy: supervisionPolicy,
+      lastExit: lastExitRecord,
+      requestedReason: observedRequestReason,
+      readyAt,
+      updatedAt: nowIso(),
+      ...extra,
+    }));
+  };
+
+  const clearSupervisorTimers = () => {
+    for (const timer of [stabilityTimer, hangTimer, requestWatchTimer, requestDeadlineTimer]) {
+      if (!timer) continue;
+      clearTimeout(timer);
+      clearInterval(timer);
+    }
+    stabilityTimer = null;
+    hangTimer = null;
+    requestWatchTimer = null;
+    requestDeadlineTimer = null;
+  };
+
+  /**
+   * Record one incarnation's death.
+   *
+   * Called on EVERY death, not only the last one — that is what item B8 means by "the stop report
+   * becomes a per-incarnation record rather than the runner's last act". Before this, a run that
+   * died three times produced one report, describing the third death, and the first two were
+   * unrecoverable. `stop-report.json` still names the most recent death so every existing reader
+   * keeps working; `incarnations/<n>/stop-report.json` is the per-death record.
+   */
+  const recordIncarnationDeath = async (exitCode) => writeSelfExitStopReport({
+    runId,
+    runPath,
+    run: runJson,
+    backendExitCode: exitCode,
+    interactive: shuttingDown,
+    incarnation,
+  }).catch(() => { });
+
+  /** Terminal: publish the final state and stop being a supervisor. */
+  const finishSupervision = async (state, exitCode, reason) => {
+    supervising = false;
+    clearSupervisorTimers();
+    await publishSupervisorState(state, { reason });
+    onExit();
+    process.exit(exitCode != null && exitCode !== 0 ? exitCode : 0);
+  };
+
+  /**
+   * The stability window (design 7.1: counted from `ready`, not from spawn).
+   *
+   * An Engine that has been ready for the whole window has recovered, so the next crash starts from
+   * a full budget. Counted from `ready` because the Engine's boot carries the encoder load: a window
+   * from spawn would be mostly consumed by booting, and a crash-on-startup loop would read as stable.
+   */
+  const armStabilityWindow = () => {
+    if (stabilityTimer) clearTimeout(stabilityTimer);
+    stabilityTimer = setTimeout(() => {
+      if (!supervising || supervisorState !== STATES.RUNNING) return;
+      const action = engineSupervisor.decide(
+        { event: 'stability-elapsed', restartCount, state: supervisorState },
+        supervisionPolicy,
+      );
+      if (action.action !== ACTIONS.RESET_BUDGET || restartCount === 0) return;
+      process.stderr.write(
+        `[dev-runner] Engine stable for ${supervisionPolicy.stabilityWindowMs}ms — restart budget reset `
+        + `(was ${restartCount}/${supervisionPolicy.maxRestartAttempts}).\n`);
+      restartCount = 0;
+      void publishSupervisorState(STATES.RUNNING);
+    }, supervisionPolicy.stabilityWindowMs);
+    stabilityTimer.unref?.();
+  };
+
+  /**
+   * Ask the Engine to stop, out of band, and arm the deadline that covers it never reading the file.
+   *
+   * Re-entrancy is guarded, and the guard is load-bearing rather than tidy: the liveness probe has a
+   * 1 s timeout and the poll interval can be shorter than that, so several probes are in flight at
+   * once against a hung Engine and each can independently reach the miss threshold. Without the
+   * guard, each would write the request and arm its OWN deadline; only the last would be tracked in
+   * `requestDeadlineTimer`, and the untracked ones would survive the Engine's clean exit and fire a
+   * `taskkill` at an incarnation that had done nothing wrong. Observed as an intermittent "hang-soft
+   * was force-killed" in the conformance harness.
+   */
+  const requestEngineShutdown = async (reason) => {
+    if (supervisorState === STATES.STOPPING && observedRequestReason === reason) return;
+    observedRequestReason = reason;
+    supervisorState = STATES.STOPPING;
+    const deadlineEpochMs = Date.now() + supervisionPolicy.gracefulStopDeadlineMs;
+    await writeShutdownRequestFile(dataDir, { reason, deadlineEpochMs });
+    // Narrated because the file is transient by design — the Engine deletes it on consumption — so
+    // without a line here the graceful arm leaves no trace at all when it works.
+    process.stderr.write(
+      `[dev-runner] wrote a shutdown request: reason=${reason}, deadline in `
+      + `${supervisionPolicy.gracefulStopDeadlineMs}ms, then a forced kill.\n`);
+    await publishSupervisorState(STATES.STOPPING, { reason });
+    if (requestDeadlineTimer) clearTimeout(requestDeadlineTimer);
+    requestDeadlineTimer = setTimeout(() => {
+      if (!supervising || supervisorState !== STATES.STOPPING) return;
+      const action = engineSupervisor.decide(
+        { event: 'request-deadline-elapsed', requestedReason: reason, restartCount, state: supervisorState },
+        supervisionPolicy,
+      );
+      if (action.action !== ACTIONS.FORCE_KILL) return;
+      // The admission the request file makes: it is a request, never a guarantee. A JVM wedged at a
+      // safepoint never reads it, and this is what ends that.
+      process.stderr.write(
+        `[dev-runner] FORCED KILL: the Engine ignored the ${reason} request for `
+        + `${supervisionPolicy.gracefulStopDeadlineMs}ms.\n`);
+      forceKillEngineTree(backend?.pid);
+    }, supervisionPolicy.gracefulStopDeadlineMs);
+    requestDeadlineTimer.unref?.();
+  };
+
+  /**
+   * Liveness polling. `running` only: a booting Engine answers nothing for seconds and one running
+   * its ordered shutdown stops answering by design, so hang detection is suspended in `starting` and
+   * `stopping` (design 7.1). The interval and the threshold are PLACEHOLDERS set with the collector
+   * at stage E — this proves the path fires, never that it fires within a tuned budget.
+   */
+  const armHangDetection = () => {
+    if (hangTimer) clearInterval(hangTimer);
+    hangTimer = setInterval(async () => {
+      if (!supervising || supervisorState !== STATES.RUNNING) return;
+      const alive = await checkHttp200(`http://127.0.0.1:${apiPortActual}/api/health`, 1000);
+      if (alive) {
+        consecutiveHealthMisses = 0;
+        return;
+      }
+      consecutiveHealthMisses += 1;
+      const action = engineSupervisor.decide(
+        {
+          event: 'health-miss',
+          consecutiveMisses: consecutiveHealthMisses,
+          restartCount,
+          state: supervisorState,
+        },
+        supervisionPolicy,
+      );
+      if (action.action !== ACTIONS.REQUEST_SHUTDOWN) return;
+      process.stderr.write(
+        `[dev-runner] Engine missed ${consecutiveHealthMisses} liveness polls while alive — `
+        + 'treating as a hang and requesting shutdown.\n');
+      consecutiveHealthMisses = 0;
+      await requestEngineShutdown('hang');
+    }, supervisionPolicy.hangPollIntervalMs);
+    hangTimer.unref?.();
+  };
+
+  /**
+   * Watch for a request file the supervisor did NOT write.
+   *
+   * Item B15's escalation has the Engine asking for its own restart, and `commit-shutdown` (B6)
+   * writes an `upgrade` request. A supervisor that only knew about its own requests would charge
+   * those deaths to the crash budget — the double-accounting 627 U3 left unresolved, arriving from
+   * the other direction. The poll is fast (50 ms) because the Engine deletes the file the moment it
+   * consumes it, so the window is short by design and missing it would be a silent misclassification.
+   */
+  const armRequestWatch = () => {
+    if (requestWatchTimer) clearInterval(requestWatchTimer);
+    requestWatchTimer = setInterval(() => {
+      if (!supervising) return;
+      const reason = readShutdownRequestReason(dataDir);
+      if (!reason || reason === observedRequestReason) return;
+      observedRequestReason = reason;
+      process.stderr.write(`[dev-runner] observed an out-of-band shutdown request: reason=${reason}\n`);
+      void publishSupervisorState(STATES.STOPPING, { reason });
+    }, 50);
+    requestWatchTimer.unref?.();
+  };
+
+  const enterRunning = async () => {
+    readyAt = nowIso();
+    consecutiveHealthMisses = 0;
+    await publishSupervisorState(STATES.RUNNING);
+    armStabilityWindow();
+    armHangDetection();
+    armRequestWatch();
+  };
+
+  /** Start the next incarnation, keeping the run id, the lease and the four log streams. */
+  const startNextIncarnation = async () => {
+    incarnation += 1;
+    observedRequestReason = null;
+    clearStaleDiscoveryFiles();
+    await publishSupervisorState(STATES.STARTING);
+    // Request the port the dead incarnation actually bound rather than a fresh ephemeral one: the
+    // Vite dev server was started with VITE_JUSTSEARCH_API_PORT baked in, and run.json's readers
+    // resolve through it. Whatever is actually bound is written back below, so a port that could not
+    // be reused produces a corrected record instead of a lie.
+    backend = spawnEngineChild(apiPortActual);
+    attachEngineExitHandler(backend);
+    // The start deadline applies HERE and not to the first boot, and the distinction is real rather
+    // than convenient: `start` is synchronous for its caller, so a first incarnation that never
+    // publishes a port already fails the command with an error a human reads. A RESTART has no such
+    // caller — nobody is waiting on it — so without a deadline the supervisor would sit in
+    // `starting` forever, which is the one state design 7.1 suspends hang detection in.
+    const next = await awaitEngineIncarnation({
+      portTimeoutMs: Math.min(supervisionPolicy.startDeadlineMs, portEmitTimeoutMs),
+      readyTimeoutMs: Math.min(supervisionPolicy.startDeadlineMs, backendReadyTimeoutMs),
+    });
+    apiPortActual = next.apiPort;
+    manifestInstanceId = next.instanceId;
+    runJson.apiPortActual = apiPortActual;
+    runJson.apiBaseUrl = `http://127.0.0.1:${apiPortActual}`;
+    runJson.pids.backendRootPid = backend.pid;
+    runJson.incarnation = incarnation;
+    runJson.resourceClaims.apiPort = apiPortActual;
+    runJson.resourceClaims.runtimeManifestInstanceId = manifestInstanceId;
+    await writeJsonAtomic(runPath, runJson);
+    await enterRunning();
+  };
+
+  const onEngineExit = async (code) => {
+    if (reaping || !supervising) return; // a deliberate reap owns teardown + exit
     // Tempdoc 819 §D: an external `stop` (a DIFFERENT OS process — the in-process `reaping` flag
     // above can't see it) may have just POSTed /api/lifecycle/shutdown and be waiting on this
     // very exit. It drops a marker file right before the POST so this handler can tell "I asked
@@ -2197,26 +2725,120 @@ async function cmdStart(opts) {
     // stopRun's own (authoritative) one for the same run. stopRun deletes the marker once it is
     // done reacting to the exit, so a later, unrelated crash in this same run is never masked.
     if (fs.existsSync(path.join(path.dirname(runPath), 'graceful-shutdown.json'))) {
+      supervising = false;
+      clearSupervisorTimers();
       onExit();
-      if (code != null && code !== 0) process.exit(code);
-      process.exit(0);
+      process.exit(code != null && code !== 0 ? code : 0);
       return;
     }
-    // Tempdoc 730 B2: capture the exit code + preserve engine.log (B1) even though no
-    // stopRun() ran for this exit. Best-effort/fire-and-forget: a signal-driven exit can't
-    // await, so the write races the process.exit() below but is fast (fs-local, ms-scale).
-    writeSelfExitStopReport({
-      runId,
-      runPath,
-      run: runJson,
-      backendExitCode: code,
-      interactive: shuttingDown,
-    }).catch(() => { }).finally(() => {
-      onExit();
-      if (code != null && code !== 0) process.exit(code);
-      process.exit(0);
+    if (requestDeadlineTimer) {
+      clearTimeout(requestDeadlineTimer);
+      requestDeadlineTimer = null;
+    }
+
+    const decision = engineSupervisor.decide(
+      {
+        event: 'exit',
+        exitCode: code,
+        requestedReason: observedRequestReason,
+        restartCount,
+        state: supervisorState,
+      },
+      supervisionPolicy,
+    );
+    // The record carries the class the BUDGET used, not the class the integer alone implies, and the
+    // two differ exactly where it matters: an Engine that exits 0 because the supervisor asked it to
+    // stop for a HANG exits with the code of a clean shutdown, and a state file that called that
+    // REQUESTED would tell a reader the death was free when it was charged. `codeClass` keeps the
+    // raw reading beside it so neither has to be inferred from the other.
+    lastExitRecord = {
+      code,
+      reason: decision.reason ?? engineSupervisor.describeExit(code, supervisionPolicy),
+      class: decision.exitClass ?? engineSupervisor.classifyExit(code, supervisionPolicy),
+      codeReason: engineSupervisor.describeExit(code, supervisionPolicy),
+      codeClass: engineSupervisor.classifyExit(code, supervisionPolicy),
+      counted: decision.counted === true,
+      requestedReason: observedRequestReason,
+      incarnation,
+      at: nowIso(),
+    };
+
+    // Tempdoc 730 B1/B2, re-cut per incarnation: the exit code and this incarnation's engine.log
+    // land BEFORE the next incarnation can append to (or truncate) the shared file.
+    const preserved = await preserveEngineLog(runJson, runPath, {
+      destSubdir: path.join('incarnations', String(incarnation)),
+    }).catch(() => null);
+    await recordIncarnationDeath(code);
+
+    process.stderr.write(
+      `[dev-runner] Engine incarnation ${incarnation} exited ${code} (${lastExitRecord.reason}, `
+      + `${lastExitRecord.class}); decision=${decision.action}`
+      + `${decision.counted ? ` counted ${restartCount + 1}/${supervisionPolicy.maxRestartAttempts}` : ''}`
+      + `${preserved?.preserved ? ` engineLog=${preserved.path}` : ''}\n`);
+
+    if (decision.action === ACTIONS.STOP) {
+      await finishSupervision(STATES.STOPPING, code, decision.reason);
+      return;
+    }
+    if (decision.action === ACTIONS.EXHAUSTED) {
+      // Design 7.1's terminal state. The file is what makes it observable: the Engine is down, so
+      // no engine API can carry this, and the updater (item B13) reads exactly this record.
+      process.stderr.write(
+        `[dev-runner] ENGINE_RESTART_EXHAUSTED — ${decision.reason}. Supervisor state: `
+        + `${toPosix(path.relative(repoRoot, supervisorStatePath(dataDir)))}\n`);
+      await finishSupervision(STATES.EXHAUSTED, code, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
+      return;
+    }
+
+    if (decision.counted) restartCount += 1;
+    await publishSupervisorState(STATES.RESTARTING, { reason: decision.reason });
+
+    // The cooldown FLOOR is the handle closing, and only then the linear step (stage B §2).
+    const release = await waitForEngineHandleRelease({ pid: backend?.pid, dataDir });
+    if (!release.released) {
+      process.stderr.write(
+        `[dev-runner] proceeding with the restart after ${release.waitedMs}ms without a clean handle `
+        + 'release — a boot that finds the data directory still locked will exit non-transient.\n');
+    }
+    if (decision.cooldownMs > 0) {
+      await new Promise((r) => setTimeout(r, decision.cooldownMs));
+    }
+    if (!supervising) return;
+    try {
+      await startNextIncarnation();
+    } catch (err) {
+      if (!supervising) return; // the incarnation died while starting; its own exit owns the outcome
+      // The start deadline elapsed: the incarnation is alive but has published nothing. Hang
+      // detection is suspended in `starting`, so this edge is the only thing that ends the state —
+      // and it ends it the same way a hang does, because the two are the same problem seen at
+      // different times: a process that is up and not serving.
+      const action = engineSupervisor.decide(
+        { event: 'start-deadline-elapsed', restartCount, state: STATES.STARTING },
+        supervisionPolicy,
+      );
+      process.stderr.write(
+        `[dev-runner] incarnation ${incarnation} did not come up: ${err?.message ?? err}\n`);
+      if (action.action === ACTIONS.REQUEST_SHUTDOWN) {
+        await requestEngineShutdown(action.reason);
+        return; // the forced kill and the resulting exit take the death path from here
+      }
+      await finishSupervision(STATES.EXHAUSTED, 1, `restart_failed:${err?.message ?? err}`);
+    }
+  };
+
+  function attachEngineExitHandler(child) {
+    child.on('exit', (code) => {
+      onEngineExit(code).catch((err) => {
+        process.stderr.write(`[dev-runner] supervisor failed: ${err?.stack ?? err}\n`);
+        onExit();
+        process.exit(1);
+      });
     });
-  });
+  }
+
+  attachEngineExitHandler(backend);
+  await enterRunning();
+
   frontend.on('exit', (code) => {
     if (reaping) return; // deliberate reap owns teardown + exit
     onExit();
@@ -2624,6 +3246,18 @@ if (require.main === module) {
       buildStopReport,
       buildHeadJavaOpts,
       writeSelfExitStopReport,
+      // Lane F stage B item B8: the supervisor's actuator helpers. The DECISION is not here —
+      // scripts/dev/lib/engine-supervisor.cjs owns it and the Rust half reads the same register.
+      buildSupervisorState,
+      writeSupervisorState,
+      supervisorStatePath,
+      supervisorHistoryPath,
+      shutdownRequestPath,
+      writeShutdownRequestFile,
+      readShutdownRequestReason,
+      waitForEngineHandleRelease,
+      forceKillEngineTree,
+      engineSupervisor,
       // Tempdoc 819 §D: graceful ordered-shutdown-before-taskkill helpers.
       postLifecycleShutdown,
       maybeGracefulBackendShutdown,

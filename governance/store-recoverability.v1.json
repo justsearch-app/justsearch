@@ -1454,6 +1454,37 @@
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java"
       ],
       "fixtures": []
+    },
+    {
+      "id": "engine-supervisor-state",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "The supervisor resolves the literal \"supervisor.v1.json\" against a <dataDir>/runtime directory it composes from the resolved data dir (scripts/dev/dev-runner.cjs supervisorStatePath). The dataDir prefix is configuration-resolved, not a literal, and the writer is JavaScript, so the register's literal check — which reads double-quoted strings only — could not speak about it either way.",
+      "encryption": "UNSEALED_NO_JVM_CIPHER",
+      "encryptionNote": "There is no JVM anywhere near this file by design: the Engine's supervisor is deliberately not a JVM (design 7.1's `never` clause), so the store cipher is not available to either writer. The content is a state name, a restart count, an exit code with its reason label and the run's own ids — no user content and no secret.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "runtime/supervisor.v1.json",
+        "runtime/instances/supervisor-history.v1.jsonl"
+      ],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "RESET",
+      "format": "JSON supervisor state v1, plus an append-only JSONL mirror of the terminal record",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "DELETE_AND_RECOMPUTE",
+      "reconciliation": "The live file is a claim about a process that may no longer exist, so it is never trusted across a supervisor's own lifetime: a supervisor rewrites it from `starting` on its first transition and every reader treats an absent file as UNSUPERVISED rather than as an error (stage B checklist Q7 (a) — the bare app-launcher shape of design 3.1 has no supervisor and must still boot). A corrupt file is deleted and rewritten by the next transition; nothing is recovered from it, because everything in it is re-derivable from the run that is happening now. The JSONL mirror is the exception and the reason it exists: the terminal `exhausted` record has to survive the moment the Engine and its supervisor are both gone, because the reader that needs it — the updater's dead-Engine path — arrives afterwards.",
+      "status": "READY",
+      "implementationSources": [
+        "scripts/dev/dev-runner.cjs"
+      ],
+      "tests": [
+        "scripts/dev/test-dev-runner-supervisor.mjs"
+      ],
+      "fixtures": [],
+      "note": "Added at lane F stage B item B8. TWO writers are declared by design 7.1 and only one of them exists at this commit: the Tauri shell joins as the second at item B10, which adds modules/shell/src-tauri/src/lib.rs to implementationSources. Listing it early would have been a claim about code that is not there. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one."
     }
   ],
   "nonDurableWriteSites": [
