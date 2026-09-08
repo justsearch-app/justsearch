@@ -8,22 +8,95 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.ShutdownOutcome;
 import io.justsearch.app.util.AppInstanceLock;
+import io.justsearch.telemetry.Telemetry;
+import io.justsearch.ui.api.LocalApiServer;
+import io.justsearch.ui.runtime.RuntimeManifestPublisher;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("HeadlessApp ordered shutdown wiring")
 final class HeadlessAppShutdownWiringTest {
+
+  @Test
+  @DisplayName("terminal writer waits for the complete ordered shutdown binding, then exits 1")
+  void terminalWriterUsesLateBoundOrderedSequence(@TempDir Path tempDir) throws Exception {
+    var binding = new CompletableFuture<EngineShutdownSequence>();
+    var exitCode = new AtomicInteger(-1);
+    OperationLeaseService leases = mock(OperationLeaseService.class);
+    var watcher = mock(io.justsearch.app.engine.ShutdownRequestWatcher.class);
+    RuntimeManifestPublisher manifest = mock(RuntimeManifestPublisher.class);
+    LocalApiServer api = mock(LocalApiServer.class);
+    var health = mock(io.justsearch.app.services.worker.KnowledgeServerHealthMonitor.class);
+    HeadAssembly assembly = mock(HeadAssembly.class);
+    KnowledgeServerBootstrap knowledge = mock(KnowledgeServerBootstrap.class);
+    var tracing = mock(io.justsearch.telemetry.TracingBootstrap.class);
+    Telemetry telemetry = mock(Telemetry.class);
+    AppInstanceLock instanceLock = mock(AppInstanceLock.class);
+    when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
+    Thread faultThread =
+        Thread.ofPlatform()
+            .start(() -> HeadlessApp.terminalWriterFaultAction(binding).accept(1));
+
+    assertTrue(faultThread.isAlive(), "the Root fault thread waits until composition is complete");
+    binding.complete(
+        new EngineShutdownSequence(
+            tempDir,
+            HeadlessApp.orderedShutdownSteps(
+                api,
+                assembly,
+                health,
+                knowledge,
+                manifest,
+                tracing,
+                telemetry,
+                instanceLock,
+                leases,
+                () -> watcher),
+            exitCode::set));
+    faultThread.join(2_000L);
+
+    assertFalse(faultThread.isAlive());
+    assertEquals(1, exitCode.get());
+    var order =
+        inOrder(
+            leases,
+            watcher,
+            manifest,
+            api,
+            health,
+            assembly,
+            knowledge,
+            tracing,
+            telemetry,
+            instanceLock);
+    order.verify(leases).freezeAdmission(Reason.RESTART.wire());
+    order.verify(watcher).close();
+    order.verify(manifest).close();
+    order.verify(api).stop();
+    order.verify(health).close();
+    order.verify(assembly).setStopGenerativeBackendOnClose(false);
+    order.verify(assembly).close();
+    order.verify(knowledge).closeForUpgrade();
+    order.verify(tracing).close();
+    order.verify(telemetry).close();
+    order.verify(instanceLock).close();
+  }
 
   @Test
   @DisplayName("every reason configures the inference close before HeadAssembly closes")

@@ -1294,6 +1294,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Setup Node (for the real Engine supervisor regression)
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       # No model blobs on a public checkout, so the model-dependent cases self-skip via their
       # own assumeTrue guards; the Golden Corpus cases use frozen vectors and need no model.
       - name: Integration tier (Golden Corpus, relevance, isolated-backend E2E)
@@ -1320,6 +1325,7 @@ jobs:
             modules/system-tests/build/test-results/integrationTest/TEST-*.xml
             modules/system-tests/build/reports/tests/integrationTest/**
             modules/system-tests/build/reports/isolated-backend/**
+            tmp/lane-f-takeover/writer-junit-*/**
             build/ci/integration-test-attribution.json
             build/ci/integration-test-attribution.md
           if-no-files-found: warn

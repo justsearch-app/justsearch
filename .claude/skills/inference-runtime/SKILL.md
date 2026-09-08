@@ -206,6 +206,20 @@ Settled empirical facts. Each was an open question that got answered.
 - **Evidence:** tempdoc 903 §2 (tables), Appendix A (probe source), Appendix B (raw rows);
   artifacts under the gitignored `tmp/903-bench/`.
 
+### F-016: JVM exit can race ORT initialization and session teardown
+
+- **Finding (2026-09-08):** ORT 1.24.3 registers its own environment shutdown
+  hook. Entering JVM exit before Engine-owned native resources finish closing
+  permits concurrent native teardown; an NRT failure also deadlocked when its
+  uncaught handler entered exit while the Engine hook joined that same thread.
+- **Ownership:** terminal-writer faults use HeadlessApp's ordered sequence before
+  exit. KnowledgeServer close awaits its existing deferred-model initializer's
+  completion before releasing model fields; a timeout alone is not quiescence.
+- **Verification:** `KnowledgeServerCloseCompletionTest`,
+  `HeadlessAppShutdownWiringTest`, `TerminalWriterFailureTest` and
+  `TerminalWriterSupervisedRecoveryE2ETest`. This narrow ordering repair does
+  not establish general NativeSessionHandle concurrency safety.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.

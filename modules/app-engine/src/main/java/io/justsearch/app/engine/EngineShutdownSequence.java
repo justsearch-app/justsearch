@@ -10,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
 import org.slf4j.Logger;
@@ -90,7 +89,10 @@ public final class EngineShutdownSequence {
   private final List<Step> steps;
   private final IntConsumer exit;
   private final AtomicReference<Result> result = new AtomicReference<>();
-  private final AtomicBoolean exitRequested = new AtomicBoolean();
+  private final Object exitAuthority = new Object();
+  private boolean exitRequested;
+  private boolean fatalExitRequested;
+  private boolean exitSelected;
 
   /**
    * @param dataDir the data directory; the receipt lands under {@code upgrade/}
@@ -163,11 +165,27 @@ public final class EngineShutdownSequence {
    * endpoint requested, and a second {@code exit.accept} would re-enter shutdown.
    */
   public void runAndExit(Reason reason) {
-    if (!exitRequested.compareAndSet(false, true)) {
+    if (!claimExit(false)) {
       return;
     }
     Result shutdown = run(reason);
-    exit.accept(shutdown.clean() ? 0 : 1);
+    exit.accept(selectExitCode(shutdown.clean() ? 0 : 1));
+  }
+
+  /**
+   * Runs the ordered close and exits with the transient fatal code for an admitted process fault.
+   *
+   * <p>The fatal request and final code selection share {@link #exitAuthority} with the cooperative
+   * paths. If a cooperative close is already running, a fatal request that arrives before its code
+   * is selected upgrades that one exit to {@link EngineExit#FATAL_OR_UNCAUGHT}; a request observed
+   * after selection cannot revise an exit already in progress.
+   */
+  public void runAndExitFatal(Reason reason) {
+    if (!claimExit(true)) {
+      return;
+    }
+    run(reason);
+    exit.accept(selectExitCode(EngineExit.FATAL_OR_UNCAUGHT));
   }
 
   /**
@@ -178,10 +196,12 @@ public final class EngineShutdownSequence {
    * shell treats absence as "did not stop cleanly", which is the safe reading.
    */
   public void runAndExitWithReceipt(String preparationId, String shutdownNonce) {
-    if (!exitRequested.compareAndSet(false, true)) {
+    if (!claimExit(false)) {
       return;
     }
     Result shutdown = run(Reason.UPGRADE);
+    int selectedExitCode = selectExitCode(shutdown.clean() ? 0 : 1);
+    boolean cleanReceipt = shutdown.clean() && selectedExitCode == 0;
     try {
       AtomicFileWrites.replace(
           receiptPath,
@@ -191,14 +211,38 @@ public final class EngineShutdownSequence {
                   "preparationId", preparationId,
                   "shutdownNonce", shutdownNonce,
                   "headPid", ProcessHandle.current().pid(),
-                  "clean", shutdown.clean(),
+                  "clean", cleanReceipt,
                   "workerOutcome", shutdown.workerOutcome(),
                   "errors", shutdown.errors(),
                   "completedAt", Instant.now().toString())));
     } catch (Exception e) {
       log.warn("Could not write the shutdown receipt: {}", e.toString());
     }
-    exit.accept(shutdown.clean() ? 0 : 1);
+    exit.accept(selectedExitCode);
+  }
+
+  private boolean claimExit(boolean fatal) {
+    synchronized (exitAuthority) {
+      if (fatal) {
+        fatalExitRequested = true;
+      }
+      if (exitRequested) {
+        return false;
+      }
+      exitRequested = true;
+      return true;
+    }
+  }
+
+  private int selectExitCode(int preferredCode) {
+    synchronized (exitAuthority) {
+      if (exitSelected) {
+        throw new IllegalStateException("exit code was already selected by another owner");
+      }
+      int selectedCode = fatalExitRequested ? EngineExit.FATAL_OR_UNCAUGHT : preferredCode;
+      exitSelected = true;
+      return selectedCode;
+    }
   }
 
   /** The memoised result, if the sequence has run. Test and diagnostic surface. */

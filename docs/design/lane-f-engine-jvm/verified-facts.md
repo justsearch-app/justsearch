@@ -253,3 +253,17 @@ dimensions of `ReadinessEnvelopeView`.
   enum. Several `WORKER_*` members are referenced only from classes stage A deletes, so stage A owes
   a holding action (A17) until the D1 re-cut.
 - `main_gpu_active` / `energy_reduced` have 7 read sites, not 6 (`BgeM3BackfillOps.java:346` added).
+
+**Writer-recovery correction (2026-09-08, candidate above `6f38df7e5`):**
+
+- `RuntimeSession.java:255` owns terminal-writer notification and retirement;
+  `:283` routes the initial and resumed NRT thread's known closed-writer failures.
+  `KnowledgeServer.publishIngestLifecycle` (`:346`) binds before publishing each
+  writable runtime, including boot replay before app-services construction.
+- `HeadlessApp.java:925,1159,1462` binds the fatal action through the complete
+  shutdown sequence. `EngineShutdownSequence.java:183,198,237` arbitrates fatal
+  exit with cooperative shutdown and finalizes the code before the upgrade receipt.
+- `KnowledgeServer.close` (`:2202`) awaits the existing deferred-init future's
+  completion; the former five-second abandonment was not native quiescence.
+  These are source facts. Execution evidence and remaining limitations are in
+  `evidence/B/writer-recovery-investigation.md`.

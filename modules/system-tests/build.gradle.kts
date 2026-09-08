@@ -172,6 +172,12 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   description = "Runs integration tests (Golden Corpus, Relevance)."
   group = "verification"
 
+  // The terminal-writer supervisor regression launches the normal installed Head distribution.
+  // Build that exact artifact before the test; spawning Gradle from inside the test would violate
+  // the repository's single-build ownership rule and could deadlock on Gradle's own locks.
+  dependsOn(":modules:ui:installDist")
+  inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
+
   // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
   // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from
   // that distribution. Lane F stage A item A13 deleted it: the fixture spawns ONE child JVM off

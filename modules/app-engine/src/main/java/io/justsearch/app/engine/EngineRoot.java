@@ -11,6 +11,7 @@ import io.justsearch.indexerworker.server.KnowledgeServer;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,16 +65,32 @@ public final class EngineRoot implements WorkerHost {
   private final Function<GpuSchedulingGauge, KnowledgeServer> serverFactory;
   private final long deadlineMs;
   private final int batchSize;
+  private final IntConsumer terminalWriterFaultAction;
+  private final Object terminalWriterFaultOwnerLock = new Object();
+  private boolean terminalWriterExitAccepted;
 
   private volatile KnowledgeServer server;
   private volatile EngineKnowledgeClient client;
 
   /**
+   * Creates an embedded composition. A caller that can encounter terminal writer faults must own
+   * process recovery explicitly; this form deliberately has no process-exit authority.
+   *
    * @param deadlineMs the base call deadline the {@code RpcDeadlineCategory} multipliers apply to
    *     — the same {@code KnowledgeServerConfig.deadlineMs()} the wire client used
    * @param batchSize the per-batch submission clamp
    */
   public EngineRoot(long deadlineMs, int batchSize) {
+    this(deadlineMs, batchSize, EngineRoot::missingExitAction);
+  }
+
+  /** Process composition whose terminal-writer path is owned by the enclosing Head lifecycle. */
+  public static EngineRoot forProcess(
+      long deadlineMs, int batchSize, IntConsumer terminalWriterFaultAction) {
+    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction);
+  }
+
+  private EngineRoot(long deadlineMs, int batchSize, IntConsumer exitAction) {
     this(
         gauge -> {
           WorkerConfig workerConfig = WorkerConfig.load();
@@ -86,15 +103,27 @@ public final class EngineRoot implements WorkerHost {
               new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")));
         },
         deadlineMs,
-        batchSize);
+        batchSize,
+        exitAction);
   }
 
   /** Test seam: supply the index half rather than building it from the global config. */
   EngineRoot(
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize) {
+    this(serverFactory, deadlineMs, batchSize, EngineRoot::missingExitAction);
+  }
+
+  /** Test seam: supply both the index half and the process exit action. */
+  EngineRoot(
+      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
+      long deadlineMs,
+      int batchSize,
+      IntConsumer terminalWriterFaultAction) {
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
     this.deadlineMs = deadlineMs;
     this.batchSize = batchSize;
+    this.terminalWriterFaultAction =
+        Objects.requireNonNull(terminalWriterFaultAction, "terminalWriterFaultAction");
   }
 
   @Override
@@ -105,8 +134,24 @@ public final class EngineRoot implements WorkerHost {
       return client;
     }
     KnowledgeServer started = serverFactory.apply(gpuScheduling);
-    started.start();
-    this.server = started;
+    synchronized (terminalWriterFaultOwnerLock) {
+      if (terminalWriterExitAccepted) {
+        throw new IOException("EngineRoot cannot restart after accepting a terminal writer fault");
+      }
+      this.server = started;
+    }
+    started.onTerminalWriterFailure(
+        failure -> acceptTerminalWriterFailure(started, failure));
+    try {
+      started.start();
+    } catch (IOException | RuntimeException e) {
+      synchronized (terminalWriterFaultOwnerLock) {
+        if (this.server == started) {
+          this.server = null;
+        }
+      }
+      throw e;
+    }
 
     // THE gauge the indexing loop paces off, read from the field that owns it rather than from
     // IndexingPacing: the pacing field starts as IndexingPacing.unthrottled(), whose gauge is a
@@ -119,6 +164,27 @@ public final class EngineRoot implements WorkerHost {
     return built;
   }
 
+  private void acceptTerminalWriterFailure(KnowledgeServer source, Throwable failure) {
+    synchronized (terminalWriterFaultOwnerLock) {
+      if (terminalWriterExitAccepted || server != source) {
+        return;
+      }
+      terminalWriterExitAccepted = true;
+    }
+    log.error("The active Lucene writer is permanently unusable; terminating the Engine", failure);
+    Thread exitThread =
+        new Thread(
+            () -> terminalWriterFaultAction.accept(EngineExit.FATAL_OR_UNCAUGHT),
+            "engine-terminal-writer-exit");
+    exitThread.setDaemon(false);
+    exitThread.start();
+  }
+
+  private static void missingExitAction(int exitCode) {
+    throw new IllegalStateException(
+        "EngineRoot has no process exit action for terminal writer exit " + exitCode);
+  }
+
   @Override
   public long ownerPid() {
     return ProcessHandle.current().pid();
@@ -126,13 +192,16 @@ public final class EngineRoot implements WorkerHost {
 
   @Override
   public void close() {
+    KnowledgeServer s;
+    synchronized (terminalWriterFaultOwnerLock) {
+      s = server;
+      server = null;
+    }
     EngineKnowledgeClient c = client;
     client = null;
     if (c != null) {
       c.close();
     }
-    KnowledgeServer s = server;
-    server = null;
     if (s != null) {
       try {
         s.close();

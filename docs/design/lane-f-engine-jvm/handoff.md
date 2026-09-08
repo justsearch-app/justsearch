@@ -564,3 +564,39 @@ or owned Gradle run remains active. The registered-process sweep found no owned 
 to reap and retained the ownerless telemetry sink (PID 14468). No development
 stack or new capture campaign was started for publication. Unrelated worktrees
 and the shared main checkout remain untouched.
+
+## Ordered writer-fault repair checkpoint (2026-09-08)
+
+The terminal-writer connection is implemented above `6f38df7e5`. Read the dated
+implementation and verification sections of
+[writer-recovery-investigation.md](evidence/B/writer-recovery-investigation.md)
+before continuing. The production owner is HeadlessApp's complete ordered
+shutdown sequence, dispatched by EngineRoot's dedicated thread. RuntimeSession
+arbitrates one report against retirement; KnowledgeServer binds before publishing
+each writable runtime. NRT failures during intentional close cannot fall back to
+raw JVM exit after the runtime snapshot has been cleared. Deferred native model
+initialization completes before model teardown. Fatal admission and the upgrade
+receipt use the sequence's single exit-code selection.
+
+The deterministic installed-Engine/dev-runner proof passed: one charged fatal
+restart, preserved committed document and accepted document searchable. A separate
+native-enabled arm exercised real GPU session initialization and reranker warm-up
+overlap, followed by graceful stop. It did not execute AI-ranked search, both
+durable queue outcomes or packaged Tauri startup. Earlier deadlock/native-crash
+evidence is preserved rather than relabelled as unrelated. The integration tier
+runs in advisory CI; default `test` excludes that tier and stress tags.
+
+The orchestrator resumed direct implementation ownership after the worker's
+handoff; the independent reviewer remains read-only. The final verification
+inventory belongs in the linked evidence, not in an assumed green filename.
+PRs #708/#717 remain merged. PR 0b still enters this primary branch at the recorded
+main-integration checkpoint.
+
+Next implementation batches are B11-B12, B13-B14, then B15-B17, with fixed briefs
+and at most two worker review rounds. Within B17, explicitly relocate hostile-lock
+survival to a real supervised process,
+preserving intruder-before-boot ordering, lock intensity, corpus, acceptance and
+180-second searchability assertions. Preserve the original red as the cause for
+that move. Prove both durable queue outcomes. Then finish the single-writer
+shutdown re-cut's production proofs and B11-B17; D1 live runtime replacement and
+the rejected shared request-slot protocol remain outside this repair.

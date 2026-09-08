@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +44,19 @@ public final class RunningRuntime implements LuceneRuntime {
 
   public PruneOps pruneOps() {
     return session.pruneOps;
+  }
+
+  /**
+   * Installs the owning Engine's callback for a Lucene writer that has become permanently unusable.
+   * The callback fires at most once for this runtime and never for its intentional drain/close.
+   */
+  public void onTerminalWriterFailure(Consumer<Throwable> listener) {
+    session.onTerminalWriterFailure(listener);
+  }
+
+  /** Prevents this retiring runtime from reporting close-induced writer failures. */
+  public void retireTerminalWriterFailureNotifications() {
+    session.retireTerminalWriterFailureNotifications();
   }
 
   // ==========================================================================
@@ -176,6 +190,7 @@ public final class RunningRuntime implements LuceneRuntime {
   public void drainAndClose(Duration timeout, SwapReason reason) {
     Objects.requireNonNull(timeout, "timeout");
     Objects.requireNonNull(reason, "reason");
+    session.retireTerminalWriterFailureNotifications();
     LuceneRuntimeTypes.TelemetryEvents events = session.telemetryEvents;
     long swapStartNanos = System.nanoTime();
     if (events != null) events.onSwapStart(reason);

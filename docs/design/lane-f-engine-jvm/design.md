@@ -653,6 +653,70 @@ advance the Stage B checkpoint: PR 0b still enters the primary lane at its recor
 main-integration checkpoint, and the writer-recovery and shutdown proofs remain
 open. Publication of the split baseline is not integration into the Engine branch.
 
+**Terminal writer fault ownership (orchestrator, 2026-09-08).** Implement the
+whole-Engine recovery direction through a narrow notification from the active
+Lucene runtime to the composition root. Observe the writer after mutations and
+commits; an ordinary IO failure with a usable writer remains recoverable.
+`RuntimeSession` atomically arbitrates one notification against retirement;
+initial and post-bulk CRTRT threads route only a Lucene `AlreadyClosedException`,
+so intentional retirement consumes its close-induced observation while unrelated
+errors retain the JVM uncaught owner. `EngineRoot` accepts only the current
+`KnowledgeServer` and starts a dedicated fault thread after all mutation or commit
+locks are released.
+
+The fault thread waits for HeadlessApp's complete `EngineShutdownSequence`
+binding, runs the existing ordered close with `RESTART` policy, and selects fatal
+exit code 1 through that sequence's one exit authority. Direct `System.exit`
+before the ordered close is rejected: ORT owns an independent JVM hook, and the
+live failure showed it tearing down the native environment while Engine resources
+were still initializing/closing. Calling `EngineRoot.close()` first is also
+rejected because it bypasses the composition-owned order and races boot
+publication. A concurrent cooperative exit already selected remains final; a
+fatal request admitted by the sequence before selection upgrades the one exit to
+1 and cannot produce a clean upgrade receipt. A main-thread boot failure that
+prevents sequence binding retains the existing fatal-startup fallback. Close now
+waits for the already-published deferred-model initializer to finish before model
+fields are released; a stuck initializer therefore leaves an unsupervised close
+pending, while the existing external supervisor hang/force budget owns death
+after the API has stopped. This avoids importing D1's runtime replacement and
+replay coordination, at the cost of an application-wide outage. No request
+artifact, polling watchdog or generic fault framework is introduced.
+
+The in-process contention fixture cannot prove supervised recovery: retain its
+original red and assertions while establishing a real child-process proof with
+durable-job replay. Test relocation or a stage-proof change requires an explicit
+decision after that proof, not a silent harness restart. This authorizes the
+bounded repair, not a green checkpoint or relaxed survival promise.
+
+**Recovery verification tier (orchestrator, 2026-09-08).** B17 explicitly includes
+`system-tests:integrationTest` for the installed-Engine writer regression. That
+task builds the production distribution and exercises the dev-runner's real child
+binding. Default unit tests cannot prove an actual exit and automatic restart.
+The existing Windows integration CI job runs it and retains diagnostics, but
+remains advisory; this decision does not turn it into a required hosted gate or
+clear the original file-lock stress test. The deterministic segment collision
+proves a terminal writer recovery path; hostile-lock survival and both durable
+queue outcomes remain separate acceptance evidence.
+
+**B17-R1 placement and scope limit (orchestrator, 2026-09-08).** Section 17.8's
+later-mechanism trigger applies to the writer repair: terminal-writer detection
+and bounded whole-Engine escalation are moved from D1 into the named B17-R1 item.
+The demonstrated alternative is an Engine that stays alive with a permanently
+closed writer, so leaving this connection absent cannot meet B's survival proof.
+Only detection, ordered fatal exit and existing supervisor/startup replay move;
+D1 retains live component replacement and general local recovery. B17-R1's proof
+is the focused negative tests, installed-process collision/replay test, native
+initialization overlap arm, full default suite and build/static checks. Finish
+and push that batch without adding hostile-lock fixture relocation or another
+shutdown protocol. Those remain enumerated B17 and shutdown re-cut work.
+
+Remaining implementation runs in fixed batches: B11-B12 (registry/reconciliation),
+B13-B14 (dead-Engine updater and supervision/readiness), then B15-B17 (requested
+restart, residue and stage proof, including the existing shutdown re-cut).
+Each has one implementer and independent review. New findings are separate
+items; after two worker review rounds the orchestrator takes the diff. New raw
+logs remain outside Git; committed evidence carries summaries and hashes.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

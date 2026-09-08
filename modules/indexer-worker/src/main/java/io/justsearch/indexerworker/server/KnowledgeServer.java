@@ -80,6 +80,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,6 +206,8 @@ public final class KnowledgeServer implements Closeable {
   private Thread migrationEnumeratorThread;
   private Thread migrationCutoverThread;
   private volatile boolean running;
+  private volatile Consumer<Throwable> terminalWriterFaultHandler =
+      failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
   private int migrationCutoverMaxFailedJobs = -1;
   /**
    * Tempdoc 819: set when this boot started a corruption-recovery rebuild (the active generation
@@ -328,6 +331,23 @@ public final class KnowledgeServer implements Closeable {
     this.config = config;
     this.dataDir = config.dataDir();
     this.injectedSignalBus = signalBus;
+  }
+
+  /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
+  public void onTerminalWriterFailure(Consumer<Throwable> handler) {
+    terminalWriterFaultHandler = Objects.requireNonNull(handler, "handler");
+  }
+
+  private void bindTerminalWriterFaultSource(RunningRuntime source) {
+    source.onTerminalWriterFailure(failure -> terminalWriterFaultHandler.accept(failure));
+  }
+
+  /** Publishes an ingest runtime only after its terminal-writer owner is installed. */
+  void publishIngestLifecycle(LuceneRuntime runtime) {
+    if (runtime instanceof RunningRuntime runningRuntime) {
+      bindTerminalWriterFaultSource(runningRuntime);
+    }
+    this.ingestLifecycle = runtime;
   }
 
   /**
@@ -708,10 +728,10 @@ public final class KnowledgeServer implements Closeable {
         blueReadOnly = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
         this.searchLifecycle = blueReadOnly;
         this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
-        this.ingestLifecycle =
+        publishIngestLifecycle(
             buildIndexRuntime(buildingIndexPath, fpSupplier)
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                .open();
+                .open());
       } else {
         // Normal operation: single runtime against active generation.
         //
@@ -737,7 +757,7 @@ public final class KnowledgeServer implements Closeable {
           LuceneRuntimeBuilder builder =
               buildIndexRuntime(activeIndexPath, fpSupplier)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
-          this.ingestLifecycle = useDeferredWriter ? builder.openDeferred() : builder.open();
+          publishIngestLifecycle(useDeferredWriter ? builder.openDeferred() : builder.open());
           this.searchLifecycle = this.ingestLifecycle;
 
           // tempdoc 628 Stage B (G3): if the adapter recovered this index to empty on open it dropped
@@ -758,10 +778,10 @@ public final class KnowledgeServer implements Closeable {
             }
             this.ingestLifecycle.close();
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-            this.ingestLifecycle =
+            publishIngestLifecycle(
                 buildIndexRuntime(buildingIndexPath, fpSupplier)
                     .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                    .open();
+                    .open());
             startMigrationEnumeratorBestEffort(rc);
             IndexRecoveryMarker.clear(activeIndexPath);
             // Tempdoc 819: remember that BLUE is an index recovered to EMPTY. The green being built
@@ -814,10 +834,10 @@ public final class KnowledgeServer implements Closeable {
                 // Close the writable runtime on the old generation before opening Green.
                 this.ingestLifecycle.close();
                 this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-                this.ingestLifecycle =
+                publishIngestLifecycle(
                     buildIndexRuntime(buildingIndexPath, fpSupplier)
                         .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                        .open();
+                        .open());
 
                 startMigrationEnumeratorBestEffort(rc);
               }
@@ -874,7 +894,7 @@ public final class KnowledgeServer implements Closeable {
                   IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS,
                   e);
               this.searchLifecycle = blue;
-              this.ingestLifecycle = this.searchLifecycle;
+              publishIngestLifecycle(this.searchLifecycle);
               this.buildingIndexPath = null;
               this.rebuildBrakeExhausted = true;
             } else {
@@ -900,10 +920,10 @@ public final class KnowledgeServer implements Closeable {
                     "Failed to start migration: building_generation missing in state.json");
               }
               this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-              this.ingestLifecycle =
+              publishIngestLifecycle(
                   buildIndexRuntime(buildingIndexPath, fpSupplier)
                       .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                      .open();
+                      .open());
 
               // Kick off background enumeration to populate Green.
               startMigrationEnumeratorBestEffort(rc);
@@ -1140,6 +1160,10 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    LuceneRuntime currentIngest = this.ingestLifecycle;
+    if (currentIngest instanceof RunningRuntime runningRuntime) {
+      bindTerminalWriterFaultSource(runningRuntime);
+    }
     return new DefaultWorkerAppServices(
         infraCtx,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
@@ -1277,7 +1301,7 @@ public final class KnowledgeServer implements Closeable {
       }
     }
     RunningRuntime fresh = opener.get();
-    this.ingestLifecycle = fresh;
+    publishIngestLifecycle(fresh);
     this.searchLifecycle = fresh;
     reconstructAppServicesAfterDeferredUpgrade();
     return (System.nanoTime() - startNanos) / 1_000_000L;
@@ -1300,7 +1324,7 @@ public final class KnowledgeServer implements Closeable {
       //   - write methods stop returning UNAVAILABLE; the indexing loop starts
       if (ingestLifecycle instanceof DeferredRuntime deferred) {
         RunningRuntime upgraded = deferred.upgradeWriter();
-        this.ingestLifecycle = upgraded;
+        publishIngestLifecycle(upgraded);
         if (this.searchLifecycle == deferred) {
           this.searchLifecycle = upgraded;
         }
@@ -2158,6 +2182,10 @@ public final class KnowledgeServer implements Closeable {
 
   @Override
   public void close() throws IOException {
+    LuceneRuntime currentIngest = ingestLifecycle;
+    if (currentIngest instanceof RunningRuntime runningRuntime) {
+      runningRuntime.retireTerminalWriterFailureNotifications();
+    }
     log.info("Shutting down KnowledgeServer...");
     running = false;
 
@@ -2166,12 +2194,15 @@ public final class KnowledgeServer implements Closeable {
       stuckJobReaper.shutdownNow();
     }
 
-    // Wait for deferred model init to complete before closing models
+    // The initializer publishes model/runtime fields that the remaining close steps release. It
+    // must finish before those fields are closed and before the Engine exits: JVM shutdown hooks
+    // may tear down native ORT environment state concurrently with a still-running initializer.
     if (deferredModelInit != null) {
       try {
-        deferredModelInit.get(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        log.warn("Deferred model init did not complete before shutdown: {}", e.getMessage());
+        deferredModelInit.join();
+      } catch (java.util.concurrent.CompletionException
+          | java.util.concurrent.CancellationException e) {
+        log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
       }
     }
 

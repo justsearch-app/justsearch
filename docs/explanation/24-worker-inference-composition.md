@@ -309,6 +309,12 @@ Both release at the same moment: after
 `KnowledgeServer.initDeferredModels()` has wired every model (success
 or failure). Both fall through to a degraded path on 120 s timeout.
 
+Shutdown has a different obligation: `KnowledgeServer.close()` awaits completion
+of the existing deferred-model initializer before it releases the model fields.
+A readiness timeout does not establish that native initialization has stopped.
+The Engine's terminal-writer fault path completes its ordered close before JVM
+exit, because ORT also has an independent environment shutdown hook.
+
 ---
 
 ## Key files

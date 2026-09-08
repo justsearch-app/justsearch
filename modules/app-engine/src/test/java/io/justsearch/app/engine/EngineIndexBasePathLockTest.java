@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -90,8 +91,6 @@ final class EngineIndexBasePathLockTest {
             || causeChainMentions(refused, "already locked"),
         "the refusal must come from the index root lock rather than from an unrelated boot"
             + " failure; chain was: " + causeChain(refused));
-    second.close();
-
     // Republish the first owner's config so nothing downstream reads dataB's, then prove the
     // first owner is untouched — the refusal must cost the incumbent nothing.
     EngineTestHarness.publishConfig(dataA, sharedIndexBase, Map.of());
@@ -105,6 +104,20 @@ final class EngineIndexBasePathLockTest {
     // moves this directory.
     Path lockFile = sharedIndexBase.resolveSibling(sharedIndexBase.getFileName() + ".index.lock");
     assertTrue(Files.exists(lockFile), "the index root lock file must exist at " + lockFile);
+
+    // Do not close the failed second Root before retrying it. KnowledgeServer.start owns cleanup of
+    // its partially constructed runtime, queue, telemetry and locks; after the incumbent releases
+    // the shared directory, the same Root and data directory must open successfully.
+    first.close();
+    first = null;
+    EngineTestHarness.publishConfig(dataB, sharedIndexBase, Map.of());
+    KnowledgeClient recovered =
+        second.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+    try {
+      assertTrue(recovered.isHealthy(), "the failed start must release resources for retry");
+    } finally {
+      second.close();
+    }
   }
 
   private static boolean causeChainMentions(Throwable thrown, String needle) {

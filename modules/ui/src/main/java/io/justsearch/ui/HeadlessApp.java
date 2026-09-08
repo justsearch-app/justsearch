@@ -921,6 +921,8 @@ public class HeadlessApp {
         new io.justsearch.ui.api.UpgradeShutdownBridge();
     io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge =
         new io.justsearch.ui.api.LifecycleShutdownBridge();
+    java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
+        terminalWriterShutdown = new java.util.concurrent.CompletableFuture<>();
 
     try {
       // Phase 0: resolve config (tempdoc 502 §3.3)
@@ -990,7 +992,7 @@ public class HeadlessApp {
       // Start Knowledge Server asynchronously — spawn runs in parallel with API construction.
       java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture =
           java.util.concurrent.CompletableFuture.supplyAsync(
-              () -> tryStartKnowledgeServer(sharedWorkerCapability));
+              () -> tryStartKnowledgeServer(sharedWorkerCapability, terminalWriterShutdown));
 
       // Phase 2: Build API server (degraded mode — no Worker yet)
       ApiPhaseResult apiPhase =
@@ -1153,12 +1155,14 @@ public class HeadlessApp {
                     shutdownSequence.run(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT);
                     latch.countDown();
                   },
-                  "justsearch-headless-shutdown"));
+                   "justsearch-headless-shutdown"));
+      terminalWriterShutdown.complete(shutdownSequence);
 
       latch.await();
       log.info("HeadlessApp stopped.");
 
     } catch (Exception e) {
+      terminalWriterShutdown.completeExceptionally(e);
       log.error("Fatal error in HeadlessApp", e);
       System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
     } finally {
@@ -1393,7 +1397,9 @@ public class HeadlessApp {
   }
 
   private static KnowledgeServerStartResult tryStartKnowledgeServer(
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability) {
+      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
+          terminalWriterShutdown) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
     // no monitor — the "boot brick" of 821 §O.4. The instance is restartable by construction
@@ -1412,8 +1418,10 @@ public class HeadlessApp {
               ksConfig,
               null,
               sharedWorkerCapability,
-              new io.justsearch.app.engine.EngineRoot(
-                  ksConfig.deadlineMs(), ksConfig.batchSize()));
+              io.justsearch.app.engine.EngineRoot.forProcess(
+                  ksConfig.deadlineMs(),
+                  ksConfig.batchSize(),
+                  terminalWriterFaultAction(terminalWriterShutdown)));
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.
@@ -1449,6 +1457,25 @@ public class HeadlessApp {
       log.error("Stack trace:", e);
       return new KnowledgeServerStartResult(bootstrap, startErrorFor(bootstrap, e));
     }
+  }
+
+  static java.util.function.IntConsumer terminalWriterFaultAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
+          terminalWriterShutdown) {
+    return _ -> {
+      try {
+        terminalWriterShutdown
+            .join()
+            .runAndExitFatal(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART);
+      } catch (java.util.concurrent.CompletionException bindingFailure) {
+        // main() owns fatal startup failure and its raw code-1 fallback. The root's fault thread
+        // only waits for the running composition; it must not race a second System.exit against
+        // startup cleanup.
+        log.debug(
+            "Terminal-writer shutdown binding did not complete because boot failed",
+            bindingFailure);
+      }
+    };
   }
 
   /**

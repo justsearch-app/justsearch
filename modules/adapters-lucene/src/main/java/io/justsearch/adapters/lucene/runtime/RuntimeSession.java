@@ -16,12 +16,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.store.AlreadyClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -196,6 +199,13 @@ final class RuntimeSession implements AutoCloseable {
 
   private volatile boolean closed;
 
+  /** Linearizes one terminal-writer notification against this runtime's intentional retirement. */
+  private final Object terminalWriterFailureLock = new Object();
+
+  private Consumer<Throwable> terminalWriterFailureListener;
+  private boolean terminalWriterFailureClaimed;
+  private boolean terminalWriterFailureRetired;
+
   /**
    * Tempdoc 406 Gap G: write-side drain flag. When true, {@link WritePathOps#guardWritable()}
    * rejects new writes with ISE (the gRPC layer maps to UNAVAILABLE so callers retry on the
@@ -217,6 +227,79 @@ final class RuntimeSession implements AutoCloseable {
    * never touches dispatchLock — so no deadlock potential.
    */
   final ReentrantReadWriteLock writeBarrier = new ReentrantReadWriteLock();
+
+  void onTerminalWriterFailure(Consumer<Throwable> listener) {
+    synchronized (terminalWriterFailureLock) {
+      terminalWriterFailureListener = Objects.requireNonNull(listener, "listener");
+    }
+    reportTerminalWriterFailureIfPresent();
+  }
+
+  void retireTerminalWriterFailureNotifications() {
+    synchronized (terminalWriterFailureLock) {
+      terminalWriterFailureRetired = true;
+    }
+  }
+
+  /**
+   * Claims and reports this runtime's terminal writer once.
+   *
+   * <p>An absent listener never consumes the one-shot; installation rechecks a writer that became
+   * terminal before its owner was bound.
+   *
+   * <p>A listener {@link RuntimeException} remains diagnostic so it cannot replace the Lucene
+   * operation failure whose release path discovered the tragedy. {@link Error}s still propagate:
+   * an inability to create the process-fault thread (for example, VM exhaustion) is itself a JVM
+   * failure and must reach the uncaught-exception owner.
+   */
+  boolean reportTerminalWriterFailureIfPresent() {
+    Consumer<Throwable> listener;
+    Throwable cause;
+    synchronized (terminalWriterFailureLock) {
+      if (terminalWriterFailureRetired || terminalWriterFailureClaimed) return true;
+      listener = terminalWriterFailureListener;
+      LifecycleSnapshot snap = snapshot;
+      org.apache.lucene.index.IndexWriter writer = snap != null ? snap.writer() : null;
+      if (writer == null) return false;
+      Throwable tragic = writer.getTragicException();
+      if (tragic == null && writer.isOpen()) {
+        return false;
+      }
+      // NRT starts during construction, before the enclosing owner can bind its listener.
+      // Keep the one-shot available for installation's recheck without falling into raw JVM exit.
+      if (listener == null) return true;
+      terminalWriterFailureClaimed = true;
+      cause =
+          tragic != null
+              ? tragic
+              : new IllegalStateException("Lucene IndexWriter is permanently closed");
+    }
+    try {
+      listener.accept(cause);
+    } catch (RuntimeException listenerFailure) {
+      log.error("Terminal writer failure listener failed", listenerFailure);
+    }
+    return true;
+  }
+
+  void routeTerminalWriterFailuresFrom(Thread thread) {
+    Thread.UncaughtExceptionHandler fallback = thread.getUncaughtExceptionHandler();
+    thread.setUncaughtExceptionHandler(
+        (failedThread, failure) -> {
+          if (!observedTerminalWriterFailure(failure) || !reportTerminalWriterFailureIfPresent()) {
+            fallback.uncaughtException(failedThread, failure);
+          }
+        });
+  }
+
+  private static boolean observedTerminalWriterFailure(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof AlreadyClosedException) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // ==========================================================================
   // Test-only constructor — barebones, does not open Lucene or construct ops
@@ -376,6 +459,9 @@ final class RuntimeSession implements AutoCloseable {
             components.ephemeralPath(),
             components.indexAnalyzer());
     this.crtrt = components.crtrt();
+    if (crtrt != null) {
+      routeTerminalWriterFailuresFrom(crtrt);
+    }
     this.indexPath = components.indexPath();
     this.softDeleteField = components.softDeleteField();
     this.knnVectorsFormat = components.knnVectorsFormat();
@@ -604,6 +690,7 @@ final class RuntimeSession implements AutoCloseable {
 
   @Override
   public void close() {
+    retireTerminalWriterFailureNotifications();
     if (closed) return;
     closed = true;
 
@@ -635,10 +722,13 @@ final class RuntimeSession implements AutoCloseable {
         }
       }
       if (snap.writer() != null) {
+        boolean writerWasTerminal =
+            snap.writer().getTragicException() != null || !snap.writer().isOpen();
         boolean writerClosedCleanly = false;
         try {
           snap.writer().close();
-          writerClosedCleanly = true;
+          writerClosedCleanly =
+              !writerWasTerminal && snap.writer().getTragicException() == null;
         } catch (IOException e) {
           log.warn("writer close error: {}", e.getMessage());
         }

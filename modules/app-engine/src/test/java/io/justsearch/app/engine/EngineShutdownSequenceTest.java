@@ -99,6 +99,42 @@ final class EngineShutdownSequenceTest {
   }
 
   @Test
+  @DisplayName("a fatal request before upgrade exit selection prevents a clean receipt")
+  void fatalRequestBeforeUpgradeSelectionProducesFailureReceipt(@TempDir Path dataDir)
+      throws Exception {
+    var stepEntered = new java.util.concurrent.CountDownLatch(1);
+    var releaseStep = new java.util.concurrent.CountDownLatch(1);
+    var exitCode = new AtomicInteger(-1);
+    var sequence =
+        new EngineShutdownSequence(
+            dataDir,
+            List.of(
+                new Step(
+                    EngineShutdownSequence.INDEX_HALF_STEP,
+                    reason -> {
+                      stepEntered.countDown();
+                      assertTrue(releaseStep.await(2, java.util.concurrent.TimeUnit.SECONDS));
+                      return "GRACEFUL";
+                    })),
+            exitCode::set);
+    Thread upgrade =
+        Thread.ofVirtual()
+            .start(() -> sequence.runAndExitWithReceipt("prep-fatal", "nonce-fatal"));
+    assertTrue(stepEntered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+
+    sequence.runAndExitFatal(Reason.RESTART);
+    releaseStep.countDown();
+    upgrade.join(java.time.Duration.ofSeconds(2));
+
+    assertEquals(EngineExit.FATAL_OR_UNCAUGHT, exitCode.get());
+    var body =
+        JSON.readTree(
+            Files.readString(
+                dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE)));
+    assertFalse(body.get("clean").asBoolean());
+  }
+
+  @Test
   @DisplayName("an omitted index step remains unknown")
   void omittedIndexStepReportsUnknown(@TempDir Path dataDir) {
     var sequence =
@@ -213,6 +249,47 @@ final class EngineShutdownSequenceTest {
         exitCalls.get(),
         "the JVM hook fires DURING the exit the endpoint requested; a second exit call would"
             + " re-enter shutdown");
+  }
+
+  @Test
+  @DisplayName("a fatal request admitted before exit selection upgrades the one exit to code 1")
+  void fatalRequestWinsBeforeExitSelection(@TempDir Path dataDir) throws Exception {
+    var stepEntered = new java.util.concurrent.CountDownLatch(1);
+    var releaseStep = new java.util.concurrent.CountDownLatch(1);
+    var exitCode = new AtomicInteger(-1);
+    var sequence =
+        new EngineShutdownSequence(
+            dataDir,
+            List.of(
+                new Step(
+                    "blocked",
+                    reason -> {
+                      stepEntered.countDown();
+                      assertTrue(releaseStep.await(2, java.util.concurrent.TimeUnit.SECONDS));
+                      return null;
+                    })),
+            exitCode::set);
+    Thread voluntary = Thread.ofVirtual().start(() -> sequence.runAndExit(Reason.QUIT));
+    assertTrue(stepEntered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+
+    sequence.runAndExitFatal(Reason.RESTART);
+    releaseStep.countDown();
+    voluntary.join(java.time.Duration.ofSeconds(2));
+
+    assertEquals(EngineExit.FATAL_OR_UNCAUGHT, exitCode.get());
+    assertEquals(Reason.QUIT, sequence.resultIfRun().reason(), "the ordered close still runs once");
+  }
+
+  @Test
+  @DisplayName("a fatal request cannot revise an exit code already selected")
+  void selectedExitRemainsFinal(@TempDir Path dataDir) {
+    var exitCode = new AtomicInteger(-1);
+    var sequence = new EngineShutdownSequence(dataDir, List.of(ok("only")), exitCode::set);
+
+    sequence.runAndExit(Reason.QUIT);
+    sequence.runAndExitFatal(Reason.RESTART);
+
+    assertEquals(0, exitCode.get());
   }
 
   @Test

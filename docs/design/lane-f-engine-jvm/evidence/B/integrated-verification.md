@@ -129,3 +129,22 @@ no owned process was reaped, no stale staging file was found, and the ownerless
 OTLP sink (PID 14468) was reported and retained by policy. No development stack
 was started for this checkpoint. PRs #708 and #717 were rechecked OPEN/CLEAN and
 remain the owner's separate merge decisions.
+
+## B17-R1 repair verification (2026-09-08)
+
+The later candidate above `6f38df7e5` connects terminal writer detection to the
+complete ordered Engine shutdown and existing supervised fatal restart. Its full
+default suite passed: **9,379 cases, no failures/errors, 25 skipped**, with all
+1,521 XML files from 34 modules preserved before filtered reruns. Build,
+Spotless and PMD passed. The real installed-process collision proof restores both
+a committed document and an accepted document after one charged dev-runner
+restart. A separate native-enabled run confirms model initialization/warm-up and
+ordinary ordered stop without the earlier native crash/hang failure.
+
+Read [the repair record](writer-recovery-investigation.md) for exact commands,
+hashes, negative tests and source attribution. This is B17-R1, explicitly moved
+earlier from D1 under 17.8. It does not clear the original mandatory-lock stress
+red, prove both durable queue outcomes, execute the packaged Tauri application,
+or complete the shutdown ownership re-cut. Those remain named B17 work. The
+earlier PR status in this historical section is superseded by
+[the publication record](../publication.md): #708 and #717 are merged.

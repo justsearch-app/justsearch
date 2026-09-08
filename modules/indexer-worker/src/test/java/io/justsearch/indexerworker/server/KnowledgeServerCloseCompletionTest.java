@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,5 +66,51 @@ final class KnowledgeServerCloseCompletionTest {
         "after close() returns, the latch must be down — close() counts it down as its last"
             + " statement, so a false here means close() did not reach the end. This is the"
             + " direction EngineRoot.close() warns on.");
+  }
+
+  @Test
+  @DisplayName("close does not abandon its published deferred-init future after five seconds")
+  void closeWaitsPastTheFormerDeferredInitializationTimeout(@TempDir Path tempDir)
+      throws Exception {
+    KnowledgeServer server =
+        new KnowledgeServer(WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    server.deferredModelInit = new CompletableFuture<>();
+    var init = server.deferredModelInit;
+
+    var closeFailure = new AtomicReference<Throwable>();
+    Thread closer =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  try {
+                    server.close();
+                  } catch (Throwable failure) {
+                    closeFailure.set(failure);
+                  }
+                });
+    try {
+      assertFalse(
+          server.awaitClosed(5_500),
+          "the old five-second timeout must not let close race a still-publishing initializer");
+    } finally {
+      init.complete(null);
+      closer.join(2_000L);
+    }
+    assertFalse(closer.isAlive());
+    assertTrue(server.awaitClosed(0));
+    assertTrue(closeFailure.get() == null, String.valueOf(closeFailure.get()));
+  }
+
+  @Test
+  @DisplayName("an exceptional deferred initializer still permits complete cleanup")
+  void exceptionalDeferredModelInitializationStillCloses(@TempDir Path tempDir) throws Exception {
+    KnowledgeServer server =
+        new KnowledgeServer(WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    server.deferredModelInit =
+        CompletableFuture.failedFuture(new IllegalStateException("model initialization failed"));
+
+    server.close();
+
+    assertTrue(server.awaitClosed(0));
   }
 }

@@ -11,6 +11,7 @@ import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.runtime.CommitMetadataSource;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -88,6 +89,24 @@ final class CleanShutdownMarkerLifecycleTest {
         CleanShutdownMarker.wasClean(index),
         "so the next open escalates to FULL, which is the whole point of the marker");
     writable.close();
+  }
+
+  @Test
+  void terminalWriterCannotEarnACleanShutdownMarker(@TempDir Path tempDir) throws Exception {
+    Path index = tempDir.resolve("terminal");
+    seedAndCloseCleanly(index);
+
+    RunningRuntime writable = builder(index).open();
+    var writer = writable.session().snapshot.writer();
+    writer.onTragicEvent(new IOException("forced terminal writer"), "test");
+    writer.rollback();
+    assertFalse(writer.isOpen(), "precondition: Lucene permanently closed the writer");
+
+    writable.close();
+
+    assertFalse(
+        CleanShutdownMarker.wasClean(index),
+        "a normally-returning close cannot relabel an already-terminal writer as clean");
   }
 
   private static LuceneRuntimeBuilder builder(Path index) {

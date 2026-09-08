@@ -43,11 +43,11 @@ public final class EngineExit {
   /**
    * A fatal error or an uncaught exception on any thread.
    *
-   * <p><b>Ambiguous, and classified accordingly.</b> Two different sites produce this code: the
-   * default uncaught-exception handler installed before anything else boots ({@code
-   * HeadlessApp.java:901}), which can fire at any moment on any thread long after startup, and the
-   * catch around the whole run ({@code :1129}). The first is a crash; the second is usually a boot
-   * failure. Nothing in the integer distinguishes them, so it is classified {@link
+   * <p><b>Ambiguous, and classified accordingly.</b> The default uncaught-exception handler
+   * installed before anything else boots ({@code HeadlessApp.java:901}), the catch around the whole
+   * run ({@code :1129}), and the active-writer tragedy owner all produce this code. Those paths
+   * cover crashes, terminal runtime faults, and boot failures. Nothing in the integer distinguishes
+   * them, so it is classified {@link
    * ExitClass#TRANSIENT} — the failure that costs more is refusing to restart after a crash.
    *
    * <p>This is where the table grows: a boot failure that genuinely cannot succeed on a retry

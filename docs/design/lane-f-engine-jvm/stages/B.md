@@ -96,6 +96,13 @@ Seven corrections fall out of this pass. Two are moved citations; five change a 
   a segment-write failure with no effective runtime recovery. This is not B14's
   no-client boot case. Do not claim stage-B verification or change the failing
   assertion while the recovery investigation remains open.
+- **Terminal-writer repair (2026-09-08).** The installed Engine now routes an
+  unusable writer through the complete ordered shutdown and fatal exit 1. The
+  dev-runner restarts it once and retained/accepted documents become searchable.
+  See `evidence/B/writer-recovery-investigation.md` for source, negative tests,
+  native-initialization evidence and verification limits. This closes the bounded
+  detection/ordered-exit connection; B17 remains open for hostile-lock survival,
+  both durable queue outcomes and the other supervisor's production proof.
 
 - **B10's production binding was not proved by the conformance adapter.** The adapter owns a
   distinct fake actuator, so its real-child timing cannot prove the shell's child slot, close/spawn
@@ -685,10 +692,20 @@ Every fingerprint the stage's own subject leaves behind, in one commit:
 
 ### B17 — the supervision assertions are in a suite that runs
 
+- [x] **B17-R1: terminal writer escalation (moved from D1, 2026-09-08).** The narrow
+  repair and bounded proof are recorded in design section 0 and
+  `evidence/B/writer-recovery-investigation.md`. Its completion does not close B17:
+  hostile-lock fixture relocation, both durable replay outcomes, the second real
+  supervisor binding and the remaining stage checks stay in this item.
+
 Any test B writes that needs a real kill, a real hang or a real spawn must not silently land
-behind `stress` or `load-sensitive` (I9). Either it is a unit-level test in the default suite,
-or it is `@Tag("stress")`, registered in `scripts/ci/stress-suite-policy.v1.json`, and the
-checkpoint proof names `./gradlew.bat test -PincludeStress=true` explicitly.
+behind `stress` or `load-sensitive` (I9). It must be a unit-level test in the default suite; an
+`@Tag("stress")` test registered in `scripts/ci/stress-suite-policy.v1.json` and run explicitly
+with `./gradlew.bat test -PincludeStress=true`; or an installed-process `integrationTest` invoked
+explicitly. Terminal-writer recovery uses the last tier:
+`./gradlew.bat :modules:system-tests:integrationTest --tests
+io.justsearch.systemtests.supervision.TerminalWriterSupervisedRecoveryE2ETest
+-PskipWebBuild=true --console=plain`.
 
 **Acceptance:** `node scripts/ci/verify-stress-suite-policy.mjs` green; §10's "what a green suite
 covers" paragraph updated for stage B with the exact command behind every claim.
@@ -952,6 +969,9 @@ room, and B is additive, so the list is short.
 - search, ingestion, the dev stack, `jseval run --start-backend` — B changes the dev-runner's
   spawn and exit paths, so this is the row most likely to break silently;
 - the conformance harness, on **both** adapters (§7).
+- the installed-process terminal-writer regression named in B17. A default `test` or full-unit
+  claim does not include `integrationTest`; CI runs that tier in the advisory Windows
+  `integration-tests` job and uploads its owned diagnostic directory.
 
 ---
 

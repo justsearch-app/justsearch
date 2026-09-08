@@ -99,18 +99,24 @@ public final class CommitOps {
 
     // Synchronize only the Lucene interaction: setLiveCommitData must be atomic with commit()
     // to prevent a concurrent caller's metadata from overwriting ours before our commit executes.
-    synchronized (this) {
-      try {
-        LifecycleSnapshot snap = session.snapshot;
-        IndexWriter w = snap != null ? snap.writer() : null;
-        if (w == null) throw new IllegalStateException("IndexWriter not available");
-        w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
-        long start = System.nanoTime();
-        w.commit();
-        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-      } catch (IOException e) {
-        throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
+    try {
+      synchronized (this) {
+        try {
+          LifecycleSnapshot snap = session.snapshot;
+          IndexWriter w = snap != null ? snap.writer() : null;
+          if (w == null) throw new IllegalStateException("IndexWriter not available");
+          w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
+          long start = System.nanoTime();
+          w.commit();
+          return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        } catch (IOException e) {
+          throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
+        }
       }
+    } finally {
+      // Run only after leaving this object's monitor. The listener may initiate whole-Engine
+      // shutdown and must not make the shutdown hook wait behind the failed commit's lock.
+      session.reportTerminalWriterFailureIfPresent();
     }
   }
 
@@ -307,6 +313,7 @@ public final class CommitOps {
             snap.searcherManager(),
             session.nrtReopenTargetMs,
             session.nrtReopenHardMs);
+    session.routeTerminalWriterFailuresFrom(thread);
     thread.start();
     session.crtrt = thread;
     log.info("NRT refresh thread resumed after bulk backfill");
