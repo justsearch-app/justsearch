@@ -835,6 +835,51 @@ before blocking close steps. This avoids a second lifecycle record and the rejec
 accepted-marker/request-slot protocol. Migration callers and their publication-failure
 behavior still require their own B15 proof before the item can close.
 
+**B15 migration consumer cut (orchestrator, 2026-09-08).** The common Engine client
+consumes accepted, restart-required start/rollback results, covering REST and both
+rebuild operations. Cutover requests project the requirement but restart only after
+the monitor durably promotes the generation and preserves its evidence. One callback
+from the process composition schedules the existing ordered RESTART close; embedded
+compositions retain their owner's explicit restart. Per-controller callbacks were
+rejected because they miss non-HTTP operations. This does not promise delivery of an
+in-flight response: durable migration state precedes dispatch, and C2 owns outcome
+recovery. A timing sleep or a new acknowledgement protocol would not belong to B.
+The callback publishes the existing handoff before entering blocking teardown. If
+that publication fails, terminate with fatal code 1 without running potentially
+unbounded JVM shutdown hooks: the host cannot bound an unpublished voluntary close.
+This trades graceful flushing for durable-queue replay and the existing charged
+recovery policy on this exceptional path. Continuing to serve the old generation or
+entering an unbounded close were rejected. No new restart budget or file is added.
+The earlier I2 wording is corrected by A section 10: genuine bound-index settings
+retain HTTP 409; AI install/pack import already report success with restart guidance.
+They are not additional automatic migration restart triggers.
+
+**B15 installed Windows launch identity (orchestrator, 2026-09-08).** The real
+migration fixture exposed the batch wrapper: the dev runner owned cmd.exe while
+the Engine manifest correctly named its JVM child, so exact-PID admission rejected
+a healthy boot. Launch the JVM directly, deriving defaults and main class from the
+installed Gradle script rather than copying a second option authority. Preserve
+quoted option values, pass arguments without shell expansion, and reject an unknown
+script shape. Adopting an arbitrary manifest PID or loosening identity checks was
+rejected. JDK_JAVA_OPTIONS was considered but would leak Engine-only options into
+spawned extraction JVMs; direct arguments keep those options on the owned process.
+Thread dispatch failure is also fatal code 1: a durably promoted generation must not
+remain on the old reader because a restart thread could not be created.
+
+**B15 observed embedding-drain race (orchestrator, 2026-09-08).** In the installed
+migration run, startup root scanning indexed Green at 20:00:30 before embeddings
+became ready at 20:00:32. The drained primary queue triggered final verification at
+20:00:33, while successful embedding backfill completed at 20:00:36. The missing
+fingerprint was unfinished work, not a corrupt completed generation. Reuse the
+existing embedding-pending count before final commit: remain in SWITCHING while
+it is nonzero or unreadable, under the existing cutover deadline, then retain all metadata checks.
+Use the existing throwing count accessor: the best-effort accessor converts an I/O failure
+to zero, which cannot be used as rebuild certification evidence.
+This is B15's promotion prerequisite; no new recovery loop, deadline or D1 live swap
+is introduced. Disabling metadata verification or stamping without embeddings was
+rejected. The earlier disabled-embedding fixture remains a negative observation,
+not evidence of completed migration.
+
 ## 0.1 Forces that shaped the design
 
 One line per force and the section it bent; section 2 holds the rule, section 13 the losses.

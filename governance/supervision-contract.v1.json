@@ -248,13 +248,15 @@
         },
         {
           "mode": "external-adoption",
-          "detection": "NOT BUILT AT STAGE B. The Engine's children (llama-server, the extraction pool) are adopted or killed by identity at Engine start, and that mechanism is items B11 (the child registry in the runtime manifest) and B12 (reconciliation on start).",
-          "recovery": "deferred to B12. What exists today is app-inference's adopt-by-port path, which checks a /health 200 plus a /props shape, holds no process handle and compares no identity or config — the brain row's external-adoption entry above is the live description of it.",
-          "terminalState": "n/a until B12",
+          "detection": "Engine startup reads retained schema-v2 managed-child identities before child-capable work and verifies PID, process start time, executable and declared configuration.",
+          "recovery": "A compatible owned llama-server is revalidated and adopted with its handle; incompatible verified children are terminated. Unknown/reused identities are left alone, and uncertain termination blocks replacement. Extraction children are never adopted.",
+          "terminalState": "Adopted child remains monitored; terminal shutdown kills verified owned children and retains incomplete evidence if cleanup fails.",
           "guards": [
-            "audit-verdict"
+            "io.justsearch.ui.runtime.ManagedChildReconcilerTest",
+            "io.justsearch.app.inference.ManagedLlamaAdoptionTest",
+            "io.justsearch.ui.runtime.MutableManagedChildRegistryTest"
           ],
-          "note": "Sentinel with a dated verdict rather than a guard that resolves to something unrelated: at the commit that added this row (item B7) there is no adoption mechanism on the Engine row to guard. B12's acceptance replaces this entry's detection/recovery and its guard with the four reconciliation tests it names. Leaving the mode off the row entirely was the alternative and is worse: the matrix would then be silent about a fault mode the design explicitly assigns to this process."
+          "note": "B11/B12 implemented and reviewed 2026-09-08; see docs/design/lane-f-engine-jvm/evidence/B/b11-b12-managed-child-registry.md. The separate unowned external-server compatibility path remains described by the brain row."
         }
       ],
       "conformanceCases": [

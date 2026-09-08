@@ -654,3 +654,13 @@ B15 is still open for migration start/rollback/cutover consumers and actual prom
 search after restart, including publication-failure refusal. B17 remains open as above.
 The scope-recut's controller and local-host proof obligations are now covered by this cut;
 no shared request-slot/accepted-marker mechanism was introduced. Root is sole implementer.
+
+B15 completion checkpoint (2026-09-08): migration start/rollback and verified promotion now
+dispatch the existing process-owned ordered restart. Real installed Engine tests pass through
+the integrationTest entry point: start, promotion and rollback each exit 4 without spending
+the crash budget; differing Blue/Green search results prove reader reopen. The installed run
+also exposed and fixed Windows batch-wrapper PID admission and the embedding-backfill drain
+race. Both changes received independent review. Full units 9416/0; the last count-read
+fail-closed correction passed its focused regression, final build and both installed cases.
+See `evidence/B/b15-requested-restart.md` for exact limits and hashes. B15 is complete;
+B17's hostile-lock relocation, PROCESSING-at-death replay and final stage checks remain.

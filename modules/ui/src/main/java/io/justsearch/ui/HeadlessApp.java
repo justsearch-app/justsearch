@@ -1021,6 +1021,15 @@ public class HeadlessApp {
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability =
           new io.justsearch.app.services.lifecycle.WorkerCapability();
 
+      final var restartManifestPublisher = manifestPublisher;
+      Runnable requestedRestartAction = localRestartAction(
+          terminalWriterShutdown,
+          reason -> {
+            restartManifestPublisher.markShutdownPending(reason.wire());
+            return null;
+          },
+          code -> Runtime.getRuntime().halt(code));
+
       // Start Knowledge Server asynchronously — spawn runs in parallel with API construction.
       java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture =
           startChildCapableAsyncAfterOwnershipReconciliation(
@@ -1031,7 +1040,7 @@ public class HeadlessApp {
                       .reconcile(),
               () ->
                   tryStartKnowledgeServer(
-                      sharedWorkerCapability, terminalWriterShutdown, childRegistry));
+                      sharedWorkerCapability, terminalWriterShutdown, childRegistry, requestedRestartAction));
 
       // Phase 2: Build API server (degraded mode — no Worker yet)
       ApiPhaseResult apiPhase =
@@ -1407,7 +1416,8 @@ public class HeadlessApp {
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
           terminalWriterShutdown,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Runnable requestedRestartAction) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
     // no monitor — the "boot brick" of 821 §O.4. The instance is restartable by construction
@@ -1430,7 +1440,8 @@ public class HeadlessApp {
                   ksConfig.deadlineMs(),
                   ksConfig.batchSize(),
                   terminalWriterFaultAction(terminalWriterShutdown),
-                  childRegistry));
+                  childRegistry,
+                  requestedRestartAction));
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.
@@ -1466,6 +1477,57 @@ public class HeadlessApp {
       log.error("Stack trace:", e);
       return new KnowledgeServerStartResult(bootstrap, startErrorFor(bootstrap, e));
     }
+  }
+
+  /**
+   * Schedule the process-owned migration restart. Durable migration acceptance precedes this call;
+   * transport delivery is not guaranteed (C2 owns retry/outcome recovery).
+   */
+  static Runnable localRestartAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt) {
+    return localRestartAction(shutdown, publishPending, fatalHalt, action -> {
+      Thread restartThread = new Thread(action, "engine-migration-restart");
+      restartThread.setDaemon(false);
+      restartThread.start();
+    });
+  }
+
+  static Runnable localRestartAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt,
+      java.util.function.Consumer<Runnable> launch) {
+    var scheduled = new java.util.concurrent.atomic.AtomicBoolean();
+    return () -> {
+      if (!scheduled.compareAndSet(false, true)) return;
+      try {
+        launch.accept(() -> {
+        final io.justsearch.app.engine.EngineShutdownSequence sequence;
+        try {
+          sequence = shutdown.join();
+        } catch (java.util.concurrent.CompletionException bootFailure) {
+          // Startup already owns its fatal cleanup; never introduce a competing exit.
+          log.debug("Migration restart binding failed with Engine startup", bootFailure);
+          return;
+        }
+        try {
+          publishPending.run(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART);
+        } catch (Exception publicationFailure) {
+          // Blocking teardown without a published handoff would have no host deadline. A fatal
+          // process stop preserves the durable queue for the successor and charges crash recovery.
+          log.error("Cannot publish migration shutdown handoff; terminating Engine", publicationFailure);
+          fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+          return;
+        }
+        sequence.runAndExit(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART);
+        });
+      } catch (RuntimeException | Error dispatchFailure) {
+        log.error("Cannot dispatch migration restart; terminating Engine", dispatchFailure);
+        fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+      }
+    };
   }
 
   static java.util.function.IntConsumer terminalWriterFaultAction(

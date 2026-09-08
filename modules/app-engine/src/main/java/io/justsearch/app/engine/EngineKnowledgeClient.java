@@ -88,6 +88,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
    */
   static final int STREAM_THREAD_CAP = 64;
 
+  private final Runnable requestedRestartAction;
   private final ScheduledExecutorService deadlines;
   private final java.util.concurrent.ExecutorService callThreads;
   private final java.util.concurrent.ExecutorService streamThreads;
@@ -107,7 +108,18 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       long deadlineMs,
       int batchSize,
       IpcTelemetry telemetry) {
+    this(services, foregroundLoad, deadlineMs, batchSize, telemetry, () -> {});
+  }
+
+  EngineKnowledgeClient(
+      java.util.function.Supplier<WorkerAppServices> services,
+      ForegroundLoadGate foregroundLoad,
+      long deadlineMs,
+      int batchSize,
+      IpcTelemetry telemetry,
+      Runnable requestedRestartAction) {
     super(deadlineMs, batchSize, telemetry);
+    this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.services = Objects.requireNonNull(services, "services");
     this.foregroundLoad = Objects.requireNonNull(foregroundLoad, "foregroundLoad");
     this.deadlines =
@@ -141,6 +153,20 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               t.setDaemon(true);
               return t;
             });
+  }
+
+  @Override
+  public io.justsearch.app.api.IndexingService.MigrationOutcome startMigration(String reason) {
+    var outcome = super.startMigration(reason);
+    if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
+    return outcome;
+  }
+
+  @Override
+  public io.justsearch.app.api.IndexingService.MigrationOutcome rollbackMigration() {
+    var outcome = super.rollbackMigration();
+    if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
+    return outcome;
   }
 
   /**

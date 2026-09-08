@@ -682,7 +682,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   /** First ordered-shutdown step: record that an incomplete teardown must retain ownership. */
   public synchronized void markShutdownPending(String reason) throws IOException {
     RuntimeManifest previous = current.get();
-    if (previous == null) return;
+    if (previous == null) throw new IOException("No owned runtime manifest for shutdown handoff");
     closeDisposition = CloseDisposition.PENDING;
     commit(
         RuntimeManifestBuilder.builder(previous)

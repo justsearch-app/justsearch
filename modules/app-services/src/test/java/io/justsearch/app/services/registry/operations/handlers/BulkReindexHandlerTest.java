@@ -51,8 +51,8 @@ final class BulkReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public boolean startMigration(String reason) {
-                    return true;
+                  public MigrationOutcome startMigration(String reason) {
+                    return new MigrationOutcome(true, true);
                   }
                 },
             LEASE);
@@ -60,6 +60,7 @@ final class BulkReindexHandlerTest {
     OperationResult result = handler.execute("{\"corpusIds\":[\"a\",\"b\"]}");
     assertTrue(result.success());
     assertTrue(result.message().contains("started"));
+    assertEquals(true, result.structuredData().get("restartRequired"));
   }
 
   @Test
@@ -69,8 +70,8 @@ final class BulkReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public boolean startMigration(String reason) {
-                    return false;
+                  public MigrationOutcome startMigration(String reason) {
+                    return new MigrationOutcome(false, false);
                   }
                 },
             LEASE);
@@ -104,8 +105,8 @@ final class BulkReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public boolean startMigration(String reason) {
-                    return true;
+                  public MigrationOutcome startMigration(String reason) {
+                    return new MigrationOutcome(true, true);
                   }
                 },
             LEASE);

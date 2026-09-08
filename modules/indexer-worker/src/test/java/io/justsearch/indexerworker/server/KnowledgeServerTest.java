@@ -41,6 +41,32 @@ class KnowledgeServerTest {
 
   private static final ObjectMapper JSON = new ObjectMapper();
 
+  @Test
+  void cutoverDefersWhenPendingEmbeddingCountCannotBeRead() throws Exception {
+    var server = createServerWithJobQueue(new StubJobQueue());
+    var runtime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    var controller = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
+    org.mockito.Mockito.when(controller.currentFingerprint()).thenReturn("current-model");
+    setField(server, "ingestLifecycle", runtime);
+    setField(server, "embeddingCompatController", controller);
+    var counts = runtime.indexCountOps();
+    org.mockito.Mockito.when(counts.countByFieldOrThrow(
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS,
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenThrow(new IOException("reader unavailable"))
+        .thenReturn(0);
+    Method method = KnowledgeServer.class.getDeclaredMethod("finalizeEmbeddingRebuildBeforeCutover");
+    method.setAccessible(true);
+
+    assertEquals(false, method.invoke(server), "unreadable is not drained");
+    org.mockito.Mockito.verify(controller, org.mockito.Mockito.never())
+        .checkRebuildCompletion(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt());
+    assertEquals(true, method.invoke(server), "a subsequent successful zero read permits certification");
+    org.mockito.Mockito.verify(controller).checkRebuildCompletion(0L, 0);
+  }
+
   // ==================== Phase 1: Safe Gauge Methods ====================
 
   @Nested

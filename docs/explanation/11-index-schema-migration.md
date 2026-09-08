@@ -443,7 +443,18 @@ set only where the Worker removed a document because its file is VERIFIED absent
 [Storage engine → Document identity](04-storage-engine.md#document-identity). Existing rows migrate
 with NULL, which is the honest value: nothing observed their deletion, so nothing may claim it.
 
-Cutover is performed as a **`state.json` pointer swap + Worker restart** (restart-based cutover), which avoids in-process hot-swapping complexity and is easier to make crash-safe.
+Cutover uses a **`state.json` pointer swap followed by a supervised Engine restart**.
+After verified promotion, the process owner publishes its shutdown handoff and runs
+ordered shutdown. A clean requested restart exits with code 4; the host replaces the
+Engine without spending the crash budget, and the new process opens the promoted
+generation. Accepted migration start and rollback use the same restart path.
+
+The API projects `restartRequired` from the migration response. A cutover request's
+flag describes the need to reopen after promotion; it does not acknowledge that
+promotion or restart has completed. Dispatch can interrupt an in-flight response,
+so durable migration state remains the evidence of acceptance. If shutdown handoff
+publication or thread dispatch fails, the Engine terminates with fatal code 1 for
+charged recovery rather than entering a close the host cannot bound.
 
 ## Embedding readiness gate (`embeddingReadyLatch`)
 
@@ -451,7 +462,7 @@ During blue-green migration, the migration enumerator (which walks the filesyste
 
 Without this gate, the enumerator starts immediately and the `IndexingLoop` processes jobs before the embedding provider is ready — resulting in most documents getting `PENDING` status instead of inline vectors (tempdoc 312: 35% coverage without latch → 99.7% with latch).
 
-The latch has a 120-second timeout; if the embedding provider isn't ready by then, enumeration proceeds without inline embedding (graceful degradation — backfill will handle remaining docs after cutover).
+The latch has a 120-second timeout; if the embedding provider isn't ready by then, enumeration proceeds without inline embedding. When a model fingerprint is resolvable, pending embedding backfill must drain before cutover certification and the final commit. An unreadable pending count defers certification under the existing switching deadline; it never counts as zero pending work. The commit's schema and embedding metadata still have to pass verification before promotion.
 
 ## Inline embedding during migration
 

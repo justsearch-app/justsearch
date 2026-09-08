@@ -374,7 +374,7 @@ optional: 17.3's "branch state after" for B is not reached while any row is open
 | # | inherited state, at this HEAD | item |
 |---|---|---|
 | I1 | **Nothing observes a running Engine's death.** Tauri drains stdout and only notices an exit that happens *before* a port is bound (`lib.rs:900-918`); `watch_manifest` (`lib.rs:989-1035`) polls the manifest and emits `backend-restart` (`:1012`) but never respawns. The dev-runner's child `exit` handler (`dev-runner.cjs:2182-2210`) writes a stop report and then `process.exit(code)`s itself — no retry, no backoff, no budget anywhere in `cmdStart` (`:1485-2221`). | B8, B10 |
-| I2 | **The three restart paths answer, they do not restart.** `WorkerServiceImpl.restart()` (`modules/app-services/.../worker/WorkerServiceImpl.java:57`) unconditionally throws `RestartRequiredException` (`RestartRequiredException.java:31`, `CODE = "restart_required"`), surfaced as HTTP 409 (`InferenceHandlers.java:635,682`; `RestartWorkerHandler.java:61,74`). B's supervisor must serve them through the *requested restart* path so config-apply, AI install and pack import work again. | B8, B10, B15 |
+| I2 | **Historical Stage-A restart refusals; corrected by A section 10.** Config apply was a telemetry dimension; AI install and pack import already succeed with restart guidance. Bound-index settings and `core.restart-worker` still answer `restart_required` until D1. B15's automatic callers are migration start, rollback and completed cutover; it preserves the genuine settings HTTP 409. | B8, B10, B15 |
 | I3 | **`WORKER_RESTART_EXHAUSTED` has no producer** (§0.1), so `BootRecoveryDecision`'s `RESTART_EXHAUSTED` give-up (`BootRecoveryDecision.java:178-180`) is unreachable in practice and `KnowledgeServerHealthMonitor.java:490-500` is dead. | B14 |
 | I4 | **`supervisionActive()` is hard-coded false** (`KnowledgeServerBootstrap.java:460-462`, doc `:450-459`: "Always false since lane F stage A item A11"), so `BootRecoveryDecision`'s `SUPERVISION_ENGAGED` veto (`:194-196`, `Veto` at `:69-102`) never fires and its narration arm is dead **by switch totality** (`KnowledgeServerHealthMonitor.java:530-534`, comment: "Unreachable"). | B14 |
 | I5 | **`check-readiness-reason-codes`'s producer direction cannot tell the difference.** Its predicate (`scripts/ci/check-readiness-reason-codes.mjs:185-194`) matches `LifecycleReasonCode.NAME` or the quoted code string anywhere under `modules/*/src/main`, not inside a `transition(...)`. The register's own note says the effective exemption list is empty and "if a future code appears to need one, that is a design conversation, not a one-line entry" (`governance/readiness-reason-codes.v1.json`, `producerDirectionNote`). B must not satisfy it with a reference. | B14 |
@@ -696,10 +696,11 @@ frontend tests, both real supervisor adapters (11/11 each), readiness gates and 
 
 ### B15 — `restart_required` covers cutover, rollback and start; and who reopens the index
 
-Clean restart exit is committed in `86d369c25`; [the checkpoint record](../evidence/B/b15-requested-restart.md)
-states its limits. Local dispatch and host handoff bounds are reviewed and verified in the next
-checkpoint recorded there (Java full 9405/0, both adapters 17/17); migration consumers and
-promotion/reopen proof remain open.
+**Complete, 2026-09-08.** [The checkpoint record](../evidence/B/b15-requested-restart.md)
+covers clean restart exit, local dispatch, bounded host handoff, migration consumers and actual
+promotion/rollback reader reopen. The installed-process JUnit entry point passes both writer
+and migration cases. The full unit run is 9416/0; the subsequent fail-closed pending-count
+correction has focused regression and installed-process coverage, with its scope recorded there.
 
 Two obligations 17.3 row B hands B through the restart-required settings of 7.4:
 
@@ -709,7 +710,7 @@ Two obligations 17.3 row B hands B through the restart-required settings of 7.4:
   promotion needs the index reopened. Wire change → `--gate wire`.
 - **Who reopens the index after a promotion, until D1's live swap:** the Engine answers
   `restart_required`, and the *supervisor's requested-restart path* performs it. This is the
-  concrete consumer that makes I2's three refusals useful again, and it is the answer 7.6's
+  concrete migration consumer of the requested-restart path, and it is the answer 7.6's
   bounded escalation will later reuse.
 
 **Acceptance:** `node scripts/governance/run.mjs --gate wire` green; a test asserts a cutover
@@ -988,7 +989,7 @@ binary with `cargo build --bin supervisor-conformance --locked` before running
 PROCESSING replay and remaining production shutdown proofs remain acceptance obligations.
 
 
-17.3's "branch state after" for B is: *the three restart paths work through requested restart; a
+17.3's "branch state after" for B is: *migration start, rollback and completed cutover work through requested restart; a
 crash comes back under the budget; children are adopted or killed.* That leaves very little
 room, and B is additive, so the list is short.
 

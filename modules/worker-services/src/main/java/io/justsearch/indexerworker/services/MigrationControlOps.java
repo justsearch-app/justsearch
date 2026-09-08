@@ -89,6 +89,8 @@ final class MigrationControlOps {
           .setAccepted(true)
           .setError("")
           .setMigrationState(s == null || s.migration_state() == null ? "" : s.migration_state())
+          .setRestartRequired(s != null && s.building_generation() != null
+              && !s.building_generation().isBlank())
           .build();
     } catch (Exception e) {
       return MigrationCutoverResponse.newBuilder()

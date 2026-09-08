@@ -1190,6 +1190,9 @@ message MigrationCutoverResponse {
   bool accepted = 1;
   string error = 2;
   string migration_state = 3;
+  // A building generation needs an Engine restart after promotion until live activation exists.
+  // This is a requirement, not an acknowledgement that promotion or restart has completed.
+  bool restart_required = 4;
 }
 
 message MigrationPauseRequest {

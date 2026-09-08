@@ -3,6 +3,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
+import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
 
 const repo = process.cwd();
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
@@ -53,6 +54,12 @@ if (aiEnabled) {
   delete env.JUSTSEARCH_SPLADE_ENABLED;
   delete env.JUSTSEARCH_RERANK_ENABLED;
   delete env.JUSTSEARCH_RERANK_CHUNKS_ENABLED;
+  delete env.AI_OFFLINE;
+}
+if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
+  // A locally resolvable embedding model makes its fingerprint a cutover precondition.
+  // Exercise that model instead of disabling embeddings and bypassing verification.
+  delete env.JUSTSEARCH_AI_EMBED_ENABLED;
   delete env.AI_OFFLINE;
 }
 const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
@@ -159,6 +166,11 @@ try {
       return response.status === 200 ? response : null;
     } catch { return null; }
   });
+  if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
+    await exerciseMigrationRestart({ work, data, indexBase, first, manifest, apiPort,
+      readJson, waitFor, request, post, requireThat, acceptedCount, matchingHit,
+      output: () => output });
+  } else {
   const firstDoc = path.join(work, 'first.txt');
   fs.writeFileSync(firstDoc, 'firstdurablemarker quokka');
   const firstIngest = await waitFor('first ingest acceptance', 90000, async () => {
@@ -251,6 +263,7 @@ try {
   );
   console.log('PASS', JSON.stringify({ first, healthBefore, firstDone, queuedBeforeDeath,
     restarted, healthAfter, hit, durableHit, work }));
+  }
 } catch (error) {
   fixtureFailure = error;
 }

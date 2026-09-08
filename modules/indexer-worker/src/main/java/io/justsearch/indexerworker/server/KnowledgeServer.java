@@ -197,6 +197,8 @@ public final class KnowledgeServer implements Closeable {
   private volatile boolean running;
   private volatile Consumer<Throwable> terminalWriterFaultHandler =
       failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
+  private volatile Runnable migrationRestartAction =
+      () -> log.warn("Promoted generation requires an Engine restart; no process owner is installed");
   private int migrationCutoverMaxFailedJobs = -1;
   /**
    * Tempdoc 819: set when this boot started a corruption-recovery rebuild (the active generation
@@ -333,6 +335,11 @@ public final class KnowledgeServer implements Closeable {
   /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
   public void onTerminalWriterFailure(Consumer<Throwable> handler) {
     terminalWriterFaultHandler = Objects.requireNonNull(handler, "handler");
+  }
+
+  /** Bind before start: a resumed migration may promote during startup. */
+  public void onMigrationRestart(Runnable action) {
+    migrationRestartAction = Objects.requireNonNull(action, "action");
   }
 
   private void bindTerminalWriterFaultSource(RunningRuntime source) {
@@ -2482,6 +2489,7 @@ public final class KnowledgeServer implements Closeable {
                         this::verifyGreenCommitMetadataBestEffort,
                         this::drainSwitchBufferBestEffort,
                         this::flushTelemetryBestEffort,
+                        () -> migrationRestartAction.run(),
                         dataDir,
                         log)),
             "migration-cutover");
@@ -2504,26 +2512,28 @@ public final class KnowledgeServer implements Closeable {
    * immediately before the cutover COMPLETE commit. Flips the ECC to COMPATIBLE iff the green is fully
    * embedded (job queue + pending-embeddings both 0), so the COMPLETE commit's overlay stamps the
    * embedding fingerprint — instead of racing the indexing-loop thread that would otherwise call
-   * {@code checkRebuildCompletion}. Idempotent (no-op unless the ECC is REBUILDING) and best-effort: a
-   * green that is genuinely not fully embedded is not flipped, so {@link #verifyGreenCommitMetadataBestEffort}
-   * correctly blocks its promotion.
+   * {@code checkRebuildCompletion}. Pending work or an unreadable pending count defers the cutover
+   * under its existing switching deadline. Metadata verification still guards promotion after
+   * certification and the final commit.
    */
-  private void finalizeEmbeddingRebuildBeforeCutover() {
+  private boolean finalizeEmbeddingRebuildBeforeCutover() {
     var ecc = embeddingCompatController;
-    if (ecc == null || ingestLifecycle == null) {
-      return;
+    if (ecc == null || ecc.currentFingerprint() == null || ecc.currentFingerprint().isBlank()) {
+      return true; // No resolvable embedding model: a legitimate keyword-only rebuild.
     }
+    if (ingestLifecycle == null) return false;
     try {
       long queueDepth = jobQueue.queueDepth();
       int pendingEmbeddings =
           ingestLifecycle
               .indexCountOps()
-              .countByField(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+              .countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+      if (pendingEmbeddings > 0) return false;
       ecc.checkRebuildCompletion(queueDepth, pendingEmbeddings);
-    } catch (RuntimeException e) {
-      log.warn(
-          "Fix E: finalize embedding rebuild before cutover failed (best-effort): {}",
-          e.getMessage());
+      return true;
+    } catch (IOException | RuntimeException e) {
+      log.warn("Cannot establish embedding completion before cutover: {}", e.getMessage());
+      return false;
     }
   }
 

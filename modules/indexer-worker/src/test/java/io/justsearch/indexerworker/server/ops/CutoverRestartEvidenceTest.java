@@ -3,14 +3,21 @@ package io.justsearch.indexerworker.server.ops;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 
 import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -28,6 +35,37 @@ import org.slf4j.LoggerFactory;
  * <p>Both are now stated at the moment they are true, rather than hoped for from a later step.
  */
 final class CutoverRestartEvidenceTest {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void restartFollowsVerifiedPromotionAndEvidence(boolean verified, @TempDir Path tempDir)
+      throws Exception {
+    var manager = new IndexGenerationManager(tempDir.resolve("index"));
+    String blue = manager.initializeOrLoad().state().active_generation();
+    String green = manager.startMigration("manual").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    Path greenPath = manager.resolveGenerationPathStrict(green);
+    var flushed = new AtomicBoolean();
+    var restarted = new AtomicBoolean();
+    var drainChecks = new java.util.concurrent.atomic.AtomicInteger();
+    var runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+    var context = new KnowledgeServerMigrationOps.CutoverContext(
+        manager, mock(JobQueue.class), () -> true, () -> true, 0, 60_000, -1,
+        () -> runtime, () -> drainChecks.incrementAndGet() > 1, () -> {
+          assertTrue(drainChecks.get() > 1, "unfinished embeddings cannot reach final verification");
+          return verified;
+        }, () -> {}, () -> flushed.set(true),
+        () -> {
+          assertEquals(green, manager.readStateBestEffort().active_generation());
+          assertTrue(flushed.get(), "restart cannot discard unflushed evidence");
+          assertTrue(Files.exists(CleanShutdownMarker.pathFor(greenPath)));
+          restarted.set(true);
+        }, tempDir, LoggerFactory.getLogger(CutoverRestartEvidenceTest.class));
+    KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
+    assertEquals(2, drainChecks.get(), "pending embeddings must be observed again before promotion");
+    assertEquals(verified, restarted.get());
+    assertEquals(verified ? green : blue, manager.readStateBestEffort().active_generation());
+  }
 
   @Test
   void thePromotedGenerationIsMarkedCleanAndTheMetricsAreFlushedBeforeTheRestart(
@@ -84,10 +122,11 @@ final class CutoverRestartEvidenceTest {
         0L,
         0,
         () -> null,
-        () -> {},
+        () -> true,
         () -> true,
         () -> {},
         flush,
+        () -> {},
         dataDir,
         LoggerFactory.getLogger(CutoverRestartEvidenceTest.class));
   }

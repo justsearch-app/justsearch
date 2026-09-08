@@ -66,6 +66,7 @@ public final class EngineRoot implements WorkerHost {
   private final long deadlineMs;
   private final int batchSize;
   private final IntConsumer terminalWriterFaultAction;
+  private final Runnable requestedRestartAction;
   private final Object terminalWriterFaultOwnerLock = new Object();
   private boolean terminalWriterExitAccepted;
 
@@ -99,6 +100,16 @@ public final class EngineRoot implements WorkerHost {
     return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction, childRegistry);
   }
 
+  public static EngineRoot forProcess(
+      long deadlineMs,
+      int batchSize,
+      IntConsumer terminalWriterFaultAction,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Runnable requestedRestartAction) {
+    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction, childRegistry,
+        requestedRestartAction);
+  }
+
   private EngineRoot(long deadlineMs, int batchSize, IntConsumer exitAction) {
     this(deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
@@ -108,6 +119,15 @@ public final class EngineRoot implements WorkerHost {
       int batchSize,
       IntConsumer exitAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(deadlineMs, batchSize, exitAction, childRegistry, EngineRoot::embeddedRestartRequired);
+  }
+
+  private EngineRoot(
+      long deadlineMs,
+      int batchSize,
+      IntConsumer exitAction,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Runnable requestedRestartAction) {
     this(
         gauge -> {
           WorkerConfig workerConfig = WorkerConfig.load();
@@ -122,7 +142,8 @@ public final class EngineRoot implements WorkerHost {
         },
         deadlineMs,
         batchSize,
-        exitAction);
+        exitAction,
+        requestedRestartAction);
   }
 
   /** Test seam: supply the index half rather than building it from the global config. */
@@ -137,6 +158,17 @@ public final class EngineRoot implements WorkerHost {
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction) {
+    this(serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
+        EngineRoot::embeddedRestartRequired);
+  }
+
+  EngineRoot(
+      Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
+      long deadlineMs,
+      int batchSize,
+      IntConsumer terminalWriterFaultAction,
+      Runnable requestedRestartAction) {
+    this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
     this.deadlineMs = deadlineMs;
     this.batchSize = batchSize;
@@ -160,6 +192,7 @@ public final class EngineRoot implements WorkerHost {
     }
     started.onTerminalWriterFailure(
         failure -> acceptTerminalWriterFailure(started, failure));
+    started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.start();
     } catch (IOException | RuntimeException e) {
@@ -176,10 +209,22 @@ public final class EngineRoot implements WorkerHost {
     // fresh orphan, and is only replaced with the real policy partway through start().
     ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     EngineKnowledgeClient built =
-        new EngineKnowledgeClient(started::appServices, gate, deadlineMs, batchSize, telemetry);
+        new EngineKnowledgeClient(started::appServices, gate, deadlineMs, batchSize, telemetry,
+            () -> requestRestart(started));
     this.client = built;
     log.info("Engine composed the index half in-process (no worker process, no channel)");
     return built;
+  }
+
+  private void requestRestart(KnowledgeServer source) {
+    synchronized (terminalWriterFaultOwnerLock) {
+      if (server != source) return;
+      requestedRestartAction.run();
+    }
+  }
+
+  private static void embeddedRestartRequired() {
+    log.warn("Migration requires the embedded Engine owner to restart it");
   }
 
   private void acceptTerminalWriterFailure(KnowledgeServer source, Throwable failure) {

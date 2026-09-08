@@ -222,18 +222,21 @@ public interface IndexingService {
   // Migration controls (Phase H)
   // =========================================================================
 
-  /** Starts a Blue/Green migration (best-effort). Implementations may restart the worker. */
-  default boolean startMigration(String reason) {
+  /** Projection of the migration response; the protocol response remains the result authority. */
+  record MigrationOutcome(boolean accepted, boolean restartRequired) {}
+
+  /** Starts a Blue/Green migration and reports whether an Engine restart is required. */
+  default MigrationOutcome startMigration(String reason) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
   /** Requests cutover (best-effort). Implementations may no-op if migration is not in progress. */
-  default boolean requestCutover(boolean forceSwitching) {
+  default MigrationOutcome requestCutover(boolean forceSwitching) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
-  /** Rolls back to the previous generation (best-effort). Implementations may restart the worker. */
-  default boolean rollbackMigration() {
+  /** Rolls back to the previous generation and reports its Engine restart requirement. */
+  default MigrationOutcome rollbackMigration() {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
@@ -564,17 +567,17 @@ public interface IndexingService {
       }
 
       @Override
-      public boolean startMigration(String reason) {
+      public MigrationOutcome startMigration(String reason) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean requestCutover(boolean forceSwitching) {
+      public MigrationOutcome requestCutover(boolean forceSwitching) {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 
       @Override
-      public boolean rollbackMigration() {
+      public MigrationOutcome rollbackMigration() {
         throw new UnsupportedOperationException("Indexing service unavailable");
       }
 

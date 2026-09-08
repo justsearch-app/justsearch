@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.app.api.IndexingService.MigrationOutcome;
 import io.justsearch.ipc.IndexGcRequest;
 import io.justsearch.ipc.MigrationCutoverRequest;
 import io.justsearch.ipc.MigrationPauseRequest;
@@ -29,7 +30,7 @@ final class MigrationOps {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
     }
 
-    boolean startMigration(String reason) {
+    MigrationOutcome startMigration(String reason) {
         try {
             MigrationStartRequest req =
                     MigrationStartRequest.newBuilder()
@@ -52,17 +53,17 @@ final class MigrationOps {
                         resp.getBuildingGenerationId(),
                         resp.getRestartRequired());
             }
-            return resp.getAccepted();
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired());
         } catch (CircuitBreakerOpenException e) {
             log.debug("startMigration rejected by circuit breaker");
-            return false;
+            return new MigrationOutcome(false, false);
         } catch (Exception e) {
             log.error("startMigration RPC failed", e);
-            return false;
+            return new MigrationOutcome(false, false);
         }
     }
 
-    boolean requestCutover(boolean forceSwitching) {
+    MigrationOutcome requestCutover(boolean forceSwitching) {
         try {
             MigrationCutoverRequest req =
                     MigrationCutoverRequest.newBuilder()
@@ -78,17 +79,17 @@ final class MigrationOps {
             } else {
                 log.info("requestCutover accepted: state={}", resp.getMigrationState());
             }
-            return resp.getAccepted();
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired());
         } catch (CircuitBreakerOpenException e) {
             log.debug("requestCutover rejected by circuit breaker");
-            return false;
+            return new MigrationOutcome(false, false);
         } catch (Exception e) {
             log.error("requestCutover RPC failed", e);
-            return false;
+            return new MigrationOutcome(false, false);
         }
     }
 
-    boolean rollbackMigration() {
+    MigrationOutcome rollbackMigration() {
         try {
             MigrationRollbackRequest req =
                     MigrationRollbackRequest.newBuilder().setRestartWorker(true).build();
@@ -106,13 +107,13 @@ final class MigrationOps {
                         resp.getPreviousGenerationId(),
                         resp.getRestartRequired());
             }
-            return resp.getAccepted();
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired());
         } catch (CircuitBreakerOpenException e) {
             log.debug("rollbackMigration rejected by circuit breaker");
-            return false;
+            return new MigrationOutcome(false, false);
         } catch (Exception e) {
             log.error("rollbackMigration RPC failed", e);
-            return false;
+            return new MigrationOutcome(false, false);
         }
     }
 

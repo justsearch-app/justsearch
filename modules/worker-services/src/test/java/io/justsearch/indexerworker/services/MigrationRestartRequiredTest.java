@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.ipc.MigrationCutoverRequest;
 import io.justsearch.ipc.MigrationRollbackRequest;
 import io.justsearch.ipc.MigrationRollbackResponse;
 import io.justsearch.ipc.MigrationStartRequest;
@@ -87,6 +88,25 @@ final class MigrationRestartRequiredTest {
   }
 
   @Test
+  @DisplayName("cutover reports the reopen requirement only when there is a generation to promote")
+  void cutoverRequirementComesFromTheGenerationState(@TempDir Path tempDir) throws Exception {
+    Path indexBase = tempDir.resolve("index");
+    IndexGenerationManager seed = new IndexGenerationManager(indexBase);
+    seed.initializeOrLoad();
+    MigrationControlOps ops = opsOver(indexBase);
+    var idle = ops.requestCutover(MigrationCutoverRequest.newBuilder().build());
+    assertTrue(idle.getAccepted());
+    assertFalse(idle.getRestartRequired(), "an idle no-op has no promotion to reopen");
+    assertTrue(ops.startMigration(MigrationStartRequest.newBuilder()
+        .setReason("checkpoint_test").setRestartWorker(false).build()).getAccepted());
+    var cutover = ops.requestCutover(MigrationCutoverRequest.newBuilder()
+        .setForceSwitching(true).build());
+    assertTrue(cutover.getAccepted());
+    assertTrue(cutover.getRestartRequired(),
+        "promotion needs reopen even though start did not request a restart");
+  }
+
+  @Test
   @DisplayName("rollback carries the same contract")
   void rollbackReportsRestartRequired(@TempDir Path tempDir) throws Exception {
     Path indexBase = tempDir.resolve("index");
@@ -96,15 +116,13 @@ final class MigrationRestartRequiredTest {
     ops.startMigration(
         MigrationStartRequest.newBuilder().setReason("checkpoint_test").setRestartWorker(false).build());
 
+    seed.promoteBuildingGenerationToActive();
+
     MigrationRollbackResponse response =
         ops.rollbackMigration(MigrationRollbackRequest.newBuilder().setRestartWorker(true).build());
 
-    // Rollback can legitimately refuse (there may be no previous generation to go back to); the
-    // contract under test is only that WHEN it accepts, it states the requirement.
-    if (response.getAccepted()) {
-      assertTrue(
-          response.getRestartRequired(),
-          "an accepted rollback that was asked to restart must report restart_required");
-    }
+    assertTrue(response.getAccepted(), "fixture has a real previous generation to roll back to");
+    assertTrue(response.getRestartRequired(),
+        "an accepted rollback that was asked to restart must report restart_required");
   }
 }

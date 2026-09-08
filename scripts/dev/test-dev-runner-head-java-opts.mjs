@@ -33,6 +33,7 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const { buildHeadJavaOpts } = require(path.join(__dirname, 'dev-runner.cjs')).__test;
+const { splitJvmOptions } = require('./lib/engine-java-launch.cjs');
 
 /**
  * The flags BOTH spawn sites must carry, in the order the dev-runner emits them.
@@ -66,13 +67,9 @@ const PACKAGED_HEAP = '-Xmx2g';
  *
  *  - `-Xmx2g` — tempdoc 730 Increment-4, above.
  *  - `--sun-misc-unsafe-memory-access=warn` / `--enable-native-access=ALL-UNNAMED` — the dev-runner
- *    DOES get both, just not through JAVA_OPTS. It launches the Gradle start script
- *    (`modules/ui/build/install/ui/bin/ui.bat`, dev-runner.cjs:1647), whose DEFAULT_JVM_OPTS are
- *    `application { applicationDefaultJvmArgs }` in modules/ui/build.gradle.kts:1943-1946 — which
- *    is these two flags. lib.rs invokes `java -cp ... io.justsearch.ui.HeadlessApp` directly
- *    (lib.rs:826-828), bypassing the start script, so it must pass them itself. Adding them to
- *    SHARED_FLAGS would assert them on the dev-runner's JAVA_OPTS line, where they would be
- *    duplicates of what the start script already supplies.
+ *    DOES get both from the installed Gradle script's DEFAULT_JVM_OPTS. The dev runner reads
+ *    that launch specification and invokes the JVM directly, so its owned child PID is the
+ *    Engine PID published in the runtime manifest. They are not duplicated in JAVA_OPTS.
  *  - `-Djustsearch.prod=true` — the packaged trust boundary. Setting it in dev would turn the dev
  *    stack into the production surface, which is the opposite of what it is for.
  */
@@ -84,7 +81,7 @@ const PACKAGED_ONLY_FLAGS = [
 ];
 
 function flags(opts) {
-  return buildHeadJavaOpts(opts).split(/\s+/).filter(Boolean);
+  return splitJvmOptions(buildHeadJavaOpts(opts));
 }
 
 function main() {
@@ -104,6 +101,9 @@ function main() {
     'the dev-runner Engine flag set changed; update lib.rs and SHARED_FLAGS together, or explain '
       + 'the divergence in PACKAGED_ONLY_FLAGS the way -Xmx is explained',
   );
+
+  assert.ok(flags({ ...base, logsDir: 'C:/repo with spaces/logs' })
+    .includes('-XX:HeapDumpPath=C:/repo with spaces/logs'));
 
   // 2. The AOT cache does not fork the set.
   const withAot = flags({ ...base, headAotOpts: '-XX:AOTCache=C:/x/head.aot' });

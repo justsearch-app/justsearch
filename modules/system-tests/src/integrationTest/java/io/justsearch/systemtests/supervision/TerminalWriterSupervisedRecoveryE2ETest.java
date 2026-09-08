@@ -10,15 +10,17 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Timeout;
 
 /** Real installed-Engine proof for terminal Lucene writer recovery through the dev supervisor. */
 @Timeout(7 * 60)
 final class TerminalWriterSupervisedRecoveryE2ETest {
 
-  @Test
-  void terminalWriterExitsRestartsAndReplaysAcceptedWork() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"writer", "migration"})
+  void supervisedRecoveryUsesTheCorrectExitAndReopensDurableState(String scenario) throws Exception {
     Path repo = repositoryRoot();
     Path work =
         repo.resolve("tmp/lane-f-takeover/writer-junit-" + UUID.randomUUID()).normalize();
@@ -33,6 +35,7 @@ final class TerminalWriterSupervisedRecoveryE2ETest {
             .redirectErrorStream(true)
             .redirectOutput(outputFile.toFile());
     builder.environment().put("JUSTSEARCH_WRITER_RECOVERY_WORK", work.toString());
+    builder.environment().put("JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario);
     Process process = builder.start();
     int exit;
     boolean interrupted = false;
@@ -64,8 +67,12 @@ final class TerminalWriterSupervisedRecoveryE2ETest {
     String output = Files.readString(outputFile, StandardCharsets.UTF_8);
 
     assertEquals(0, exit, output);
-    assertTrue(output.contains("QUEUE_BEFORE_DEATH"), output);
-    assertTrue(output.contains("fatal_or_uncaught"), output);
+    if ("writer".equals(scenario)) {
+      assertTrue(output.contains("QUEUE_BEFORE_DEATH"), output);
+      assertTrue(output.contains("fatal_or_uncaught"), output);
+    } else {
+      assertTrue(output.contains("MIGRATION_PASS"), output);
+    }
     assertTrue(output.contains("PASS"), output);
     assertTrue(output.contains("\"portsClosed\":true"), output);
   }

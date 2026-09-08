@@ -177,6 +177,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   // the repository's single-build ownership rule and could deadlock on Gradle's own locks.
   dependsOn(":modules:ui:installDist")
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
 
   // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
   // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from

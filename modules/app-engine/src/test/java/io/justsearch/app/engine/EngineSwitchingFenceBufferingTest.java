@@ -97,10 +97,10 @@ final class EngineSwitchingFenceBufferingTest {
     assertFalse(activeBefore.isBlank(), "active_generation_id must be present");
 
     assertTrue(
-        engine.client().startMigration("system_test_switching"), "startMigration must be accepted");
+        engine.client().startMigration("system_test_switching").accepted(), "startMigration must be accepted");
     engine.restart();
 
-    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted");
+    assertTrue(engine.client().requestCutover(true).accepted(), "requestCutover must be accepted");
     assertTrue(awaitMigrationState("SWITCHING", 60_000), "migration_state must reach SWITCHING");
 
     // --- The three buffered operation kinds, all issued behind the fence. ---

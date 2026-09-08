@@ -20,6 +20,7 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // Tempdoc 696: resolve a >= 24 JDK (target Temurin 25) so a stale JDK-8 JAVA_HOME
 // can't break the assemble/head/worker JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
+const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const uiWebDir = path.resolve(repoRoot, 'modules', 'ui-web');
@@ -729,7 +730,7 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     headDistStamp ? `-Djustsearch.head.stamp=${headDistStamp}` : null,
     heapBound ? `-Xmx${heapBound}` : null,
     '-XX:+HeapDumpOnOutOfMemoryError',
-    logsDir ? `-XX:HeapDumpPath=${logsDir}` : null,
+    logsDir ? `-XX:HeapDumpPath=${/\s/.test(logsDir) ? `"${logsDir}"` : logsDir}` : null,
     // Lane F stage B item B1. Without this the JVM lets an OutOfMemoryError reach the default
     // uncaught-exception handler, which exits 1 — the SAME code as a boot failure, so a
     // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
@@ -2003,6 +2004,14 @@ async function cmdStart(opts) {
     `[dev-runner] Launching dist: repoRoot=${devStackProvenance.repoRoot} ` +
     `gitHead=${devStackProvenance.gitHead ?? '?'} headDistStamp=${devStackProvenance.headDistStamp ?? '?'}\n`);
 
+  const engineJavaOpts = buildHeadJavaOpts({
+    existingJavaOpts: process.env.JAVA_OPTS,
+    headAotOpts,
+    headDistStamp: devStackProvenance.headDistStamp,
+    logsDir,
+    headHeap: process.env.JUSTSEARCH_HEAD_HEAP,
+    debugPort: devHotReload.enabled ? devHotReload.debugPort : null,
+  });
   const spawnBackend = harnessEngineCommand
     ? (() => {
       const parsed = JSON.parse(harnessEngineCommand);
@@ -2010,9 +2019,8 @@ async function cmdStart(opts) {
     })()
     : {
       cwd: repoRoot,
-      command: startScript,
-      args: [],
-      shell: process.platform === 'win32',
+      ...engineJavaLaunch({ startScript, javaHome: resolveJdkHome(),
+        javaOpts: engineJavaOpts, uiOpts: process.env.UI_OPTS }),
     };
   if (harnessEngineCommand) {
     process.stderr.write(
@@ -2073,21 +2081,14 @@ async function cmdStart(opts) {
         // S1: Pass dev AOT cache flag when available.
         // Tempdoc 730 B3: bounded -Xmx + HeapDumpOnOutOfMemoryError, dumping into THIS run's own
         // logs dir (JUSTSEARCH_HEAD_HEAP overrides the 2g default for constrained devices).
-        JAVA_OPTS: buildHeadJavaOpts({
-          existingJavaOpts: process.env.JAVA_OPTS,
-          headAotOpts,
-          headDistStamp: devStackProvenance.headDistStamp,
-          logsDir,
-          headHeap: process.env.JUSTSEARCH_HEAD_HEAP,
-          debugPort: devHotReload.enabled ? devHotReload.debugPort : null,
-        }),
+        JAVA_OPTS: engineJavaOpts,
         // NOTE: justsearch.repo.root is NOT set here. In Tauri production, lib.rs sets it to
         // headless_dir where sidecar ONNX models live. In dev mode, OnnxModelDiscovery's sidecar
         // step is a no-op, so reranker/citation-scorer are inactive. To enable them, set
         // JUSTSEARCH_RERANK_MODEL_PATH and JUSTSEARCH_CITATION_SCORER_MODEL_PATH explicitly.
       },
       shell: spawnBackend.shell,
-      windowsHide: spawnBackend.shell,
+      windowsHide: spawnBackend.windowsHide ?? true,
       stdio: ['pipe', 'pipe', 'pipe'],
     },
     backendStdout,
@@ -2983,6 +2984,7 @@ async function cmdStatus(opts) {
 
 async function stopRun(opts) {
   const { run, runPath } = await resolveRunTarget(opts);
+  const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   const disposition = opts.disposition ?? null;
   const actor = opts.actor ?? null;
   const victim = opts.victim ?? null;

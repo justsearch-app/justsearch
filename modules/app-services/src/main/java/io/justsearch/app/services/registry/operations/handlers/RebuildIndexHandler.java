@@ -64,13 +64,14 @@ public final class RebuildIndexHandler implements OperationHandler {
         1800L,
         Map.of("source", "core.rebuild-index"));
     try {
-      boolean started = indexing.startMigration(MigrationSource.USER_REQUESTED_REBUILD.wire());
-      if (!started) {
+      var outcome = indexing.startMigration(MigrationSource.USER_REQUESTED_REBUILD.wire());
+      if (!outcome.accepted()) {
         handle.release(OpLeaseOutcome.FAILURE);
         return OperationResult.failure("Index rebuild could not be started; see worker logs");
       }
       handle.release(OpLeaseOutcome.SUCCESS);
-      return OperationResult.success("Index rebuild (migration) started");
+      return OperationResult.success("Index rebuild (migration) started",
+          Map.of("restartRequired", outcome.restartRequired()));
     } catch (RuntimeException e) {
       handle.release(OpLeaseOutcome.FAILURE);
       log.error("RebuildIndexHandler: startMigration threw", e);

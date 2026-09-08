@@ -62,7 +62,7 @@ public final class KnowledgeServerMigrationOps {
       // Tempdoc 598 review Fix E: deterministically finalize the embedding rebuild (flip the ECC to
       // COMPATIBLE iff the green is fully embedded) BEFORE the COMPLETE commit, so that commit stamps
       // the embedding fingerprint deterministically rather than racing the indexing-loop thread.
-      Runnable finalizeEmbeddingRebuildAction,
+      BooleanSupplier finalizeEmbeddingRebuildAction,
       BooleanSupplier verifyGreenCommitMetadataSupplier,
       Runnable drainSwitchBufferAction,
       // Tempdoc 915 (live validation D4): flush the worker metrics snapshot before the cutover
@@ -71,6 +71,7 @@ public final class KnowledgeServerMigrationOps {
       // snapshot was written - and commit_by_reason therefore never carried migration/cutover in a
       // live run, though both emit sites are production code.
       Runnable flushTelemetryAction,
+      Runnable requestedRestartAction,
       Path dataDir,
       Logger log) {}
 
@@ -222,6 +223,14 @@ public final class KnowledgeServerMigrationOps {
           return;
         }
 
+        if (!context.finalizeEmbeddingRebuildAction().getAsBoolean()) {
+          // Startup root scanning can enqueue before deferred embeddings are ready. A drained
+          // primary queue therefore does not imply that Green's embedding backfill has drained.
+          // Keep the existing SWITCHING deadline and verification; pending work is not failure.
+          Thread.sleep(500);
+          continue;
+        }
+
         try {
           // Tempdoc 598 review Fix E: finalize the embedding rebuild on this (drained) green BEFORE
           // the COMPLETE commit. This deterministically flips the ECC to COMPATIBLE iff the green is
@@ -229,7 +238,6 @@ public final class KnowledgeServerMigrationOps {
           // than racing the indexing-loop thread that would otherwise flip rebuildCompleted. A green
           // that is genuinely not fully embedded is NOT flipped, so its commit lacks the fingerprint
           // and the verification below correctly blocks promotion (no false promote-into-BLOCKED).
-          context.finalizeEmbeddingRebuildAction().run();
           // Phase 5 (folded into Phase 2-3 Step C): commitWithBuildState replaces the
           // setBuildState + commit two-step. Updates ctx.buildState then commits, so
           // the final commit (and any subsequent timer commit) stamps build_state=COMPLETE.
@@ -263,26 +271,9 @@ public final class KnowledgeServerMigrationOps {
           // Best-effort cleanup of stale marker; failure is non-fatal to cutover.
         }
         preserveEvidenceBeforeRestart(context, promoted);
-        // Stage-A checkpoint, blocker 1. This used to read "Restarting worker to open new active
-        // generation..." and then call initiateShutdownAction(). Under the split architecture that
-        // ended the Worker process and the spawner respawned it onto the promoted generation. In
-        // one JVM the action resolved to KnowledgeServer#initiateShutdown, which set `running =
-        // false` and counted down a latch NO production code reads (isRunning() had no main-source
-        // consumer) — so the cutover logged success, the pointer moved on disk, and the Engine went
-        // on serving the OLD generation until someone restarted it by hand. Worse, `running = false`
-        // silently stopped the sentinel thread, taking hot-reload polling and GPU-lifecycle
-        // monitoring with it.
-        //
-        // The promotion is durable either way — it is the state.json swap above, and a restart
-        // re-reads it. What was wrong was claiming the reopen had happened. So: say what is true.
-        // §10 records this as a named red until D1 lands the live generation swap.
-        context
-            .log()
-            .warn(
-                "Migration cutover complete: generation {} is promoted in state.json, but this"
-                    + " Engine is still serving the previous generation. RESTART REQUIRED to open"
-                    + " it. (Stage A has no in-place index reopen; design D1 adds the live swap.)",
-                promoted == null ? "(unknown)" : promoted.active_generation());
+        context.log().info("Migration promoted generation {}; requesting Engine restart",
+            promoted == null ? "(unknown)" : promoted.active_generation());
+        context.requestedRestartAction().run();
         return;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();

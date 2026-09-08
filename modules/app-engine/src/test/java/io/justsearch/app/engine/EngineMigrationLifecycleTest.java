@@ -95,13 +95,13 @@ final class EngineMigrationLifecycleTest {
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
     assertFalse(activeBefore.isBlank(), "active_generation_id must be set before migration");
 
-    assertTrue(engine.client().startMigration("system_test"), "startMigration must be accepted");
+    assertTrue(engine.client().startMigration("system_test").accepted(), "startMigration must be accepted");
 
     // An explicit restart, not a simulation of one: startMigration re-cuts the layout and the
     // Engine has no in-place reopen (see below).
     engine.restart();
 
-    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted");
+    assertTrue(engine.client().requestCutover(true).accepted(), "requestCutover must be accepted");
 
     // The cutover monitor promotes the building generation and writes state.json
     // (KnowledgeServerMigrationOps.java, promoteBuildingGenerationToActive). The FILE is the
@@ -210,7 +210,7 @@ final class EngineMigrationLifecycleTest {
     assertEquals(2L, blueCount, "precondition: the serving generation holds both documents");
 
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
-    assertTrue(engine.client().startMigration("count_divergence"), "startMigration accepted");
+    assertTrue(engine.client().startMigration("count_divergence").accepted(), "startMigration accepted");
 
     // Remove one source file so the generation the enumerator builds differs from the one being
     // served. This is what makes the assertion below non-vacuous: with equal counts it would pass
@@ -218,7 +218,7 @@ final class EngineMigrationLifecycleTest {
     Files.delete(fileB);
     engine.restart();
 
-    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted");
+    assertTrue(engine.client().requestCutover(true).accepted(), "requestCutover must be accepted");
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
         "the cutover must promote the building generation");
@@ -270,9 +270,9 @@ final class EngineMigrationLifecycleTest {
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
     assertFalse(activeBefore.isBlank(), "active_generation_id must be present");
 
-    assertTrue(engine.client().startMigration("system_test_rollback"), "startMigration accepted");
+    assertTrue(engine.client().startMigration("system_test_rollback").accepted(), "startMigration accepted");
     engine.restart();
-    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted");
+    assertTrue(engine.client().requestCutover(true).accepted(), "requestCutover must be accepted");
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
         "the cutover must promote the building generation");
@@ -287,7 +287,7 @@ final class EngineMigrationLifecycleTest {
         afterCutover.getMigration().getPreviousGenerationId(),
         "previous must be the old active generation");
 
-    assertTrue(engine.client().rollbackMigration(), "rollback must be accepted");
+    assertTrue(engine.client().rollbackMigration().accepted(), "rollback must be accepted");
     engine.restart();
 
     StatusResponse afterRollback = awaitActiveGeneration(activeBefore, 60_000);
@@ -336,7 +336,7 @@ final class EngineMigrationLifecycleTest {
     // Captured before the migration starts, so the release assertion at the end of this test has a
     // pointer to compare against.
     String activeBeforePause = engine.status().getMigration().getActiveGenerationId();
-    assertTrue(engine.client().startMigration("pause_resume_test"), "startMigration accepted");
+    assertTrue(engine.client().startMigration("pause_resume_test").accepted(), "startMigration accepted");
     assertTrue(engine.client().pauseMigration("system_test"), "pauseMigration must be accepted");
 
     engine.restart();
@@ -397,7 +397,7 @@ final class EngineMigrationLifecycleTest {
     // to check only one of them on the way out. A resume that clears the flag and restarts the walk
     // but leaves the cutover monitor parked would satisfy every assertion above and still leave the
     // migration unable to ever finish.
-    assertTrue(engine.client().requestCutover(true), "requestCutover must be accepted after resume");
+    assertTrue(engine.client().requestCutover(true).accepted(), "requestCutover must be accepted after resume");
     assertTrue(
         awaitActiveGenerationChanged(engine.indexBase(), activeBeforePause, 180_000),
         "resume must release the cutover monitor too: the promotion has to actually happen, not"

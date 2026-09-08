@@ -427,11 +427,11 @@ public class IndexingController {
         1800L,
         Map.of("source", "REST /api/indexing/migration/start", "reason", reason));
     try {
-      boolean accepted = indexingService().startMigration(reason);
-      if (accepted) {
+      var outcome = indexingService().startMigration(reason);
+      if (outcome.accepted()) {
         // Worker persists MIGRATING before acknowledging, then owns the asynchronous lifetime.
         handle.release(OpLeaseOutcome.SUCCESS);
-        ctx.status(202).json(Map.of("status", "migration start requested"));
+        ctx.status(202).json(Map.of("status", "migration start requested", "restartRequired", outcome.restartRequired()));
       } else {
         handle.release(OpLeaseOutcome.FAILURE);
         ctx.status(409).json(Map.of("status", "migration start rejected by worker"));
@@ -451,9 +451,10 @@ public class IndexingController {
     try {
       String raw = ctx.queryParam("forceSwitching");
       boolean forceSwitching = Boolean.parseBoolean(raw == null ? "false" : raw);
-      boolean accepted = indexingService().requestCutover(forceSwitching);
-      if (accepted) {
-        ctx.status(202).json(Map.of("status", "cutover requested", "forceSwitching", forceSwitching));
+      var outcome = indexingService().requestCutover(forceSwitching);
+      if (outcome.accepted()) {
+        ctx.status(202).json(Map.of("status", "cutover requested", "forceSwitching", forceSwitching,
+            "restartRequired", outcome.restartRequired()));
       } else {
         ctx.status(409).json(Map.of("status", "cutover rejected by worker"));
       }
@@ -468,9 +469,9 @@ public class IndexingController {
 
   public void handleMigrationRollback(Context ctx) {
     try {
-      boolean accepted = indexingService().rollbackMigration();
-      if (accepted) {
-        ctx.status(202).json(Map.of("status", "rollback requested"));
+      var outcome = indexingService().rollbackMigration();
+      if (outcome.accepted()) {
+        ctx.status(202).json(Map.of("status", "rollback requested", "restartRequired", outcome.restartRequired()));
       } else {
         ctx.status(409).json(Map.of("status", "rollback rejected by worker"));
       }

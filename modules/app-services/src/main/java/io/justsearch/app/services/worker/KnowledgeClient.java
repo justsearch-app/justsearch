@@ -980,17 +980,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
-    public boolean startMigration(String reason) {
+    public IndexingService.MigrationOutcome startMigration(String reason) {
         return migrationOps.startMigration(reason);
     }
 
     @Override
-    public boolean requestCutover(boolean forceSwitching) {
+    public IndexingService.MigrationOutcome requestCutover(boolean forceSwitching) {
         return migrationOps.requestCutover(forceSwitching);
     }
 
     @Override
-    public boolean rollbackMigration() {
+    public IndexingService.MigrationOutcome rollbackMigration() {
         return migrationOps.rollbackMigration();
     }
 

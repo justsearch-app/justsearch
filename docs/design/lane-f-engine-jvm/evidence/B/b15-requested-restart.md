@@ -100,3 +100,67 @@ Raw logs are ignored; SHA-256 inventory follows.
 | `tmp/b15-handoff-restored.txt` | `a1a92af146503431126a71460f06643cd46c38fc9c82e3d353874d70a76426c3` |
 | `tmp/b15-local-transport-closure.txt` | `128d1612506b1e123bc0dbc2ef3c6369a9edc50be0e170edd7a16cb6edb4b7f8` |
 | `tmp/b15-local-transport-stores.txt` | `bbd2dca5fc9f39cf55be22fd731465c9eddf464a44558ebbc3f1aacd0e66fc9d` |
+
+## B15 migration completion — 2026-09-08
+
+Accepted start and rollback outcomes reach one Engine-owned asynchronous restart action;
+cutover requests project the requirement, while only verified durable promotion dispatches
+restart. The API/application outcome is a projection of the protobuf response. Thread dispatch
+or handoff publication failure terminates with fatal code 1; there is no silent old-reader
+continuation. Settings that genuinely need restart retain their HTTP 409 response.
+
+The installed fixture proves different readers: Blue contains A+B, Green is built from A,
+promotion serves A without B, and rollback serves B again. Incarnations 1, 2 and 3 each exit 4;
+incarnation 4 serves rolled-back Blue. Crash count remains zero. Run
+`7348d026-3ce4-4bb1-b12e-5df4c98240ca`, distribution stamp `89576c99d6e43cf6`;
+owned stop reports `portsClosed:true`. The same JUnit invocation also re-runs the fatal
+writer recovery case with a charged exit 1. This is installed-distribution/dev-runner proof,
+not signed installer or production Tauri AppHandle proof; that installer obligation stays in E.
+
+Two prerequisites were discovered by the installed run: the Windows batch wrapper exposed
+cmd.exe as the owned PID instead of the JVM, and primary-queue drain raced pending embedding
+backfill. Windows now launches the installed script's Java/main/default options directly,
+without weakening PID identity; POSIX retains its exec/ulimit script. Cutover now waits for a
+trustworthy zero pending count under the existing switching deadline. A failed reader read
+cannot certify zero; commit metadata validation remains in place. The dev-runner's ordinary
+stop also again resolves dataDir from its owned run before terminal child reconciliation.
+Independent Java and host reviews cleared the final changes; the Java reviewer caught the
+swallowing count accessor, and the added regression proves failure defers and a good retry
+certifies. Its first fixture attempt used a sealed-interface mock and failed before exercising
+production code; corrected to the existing concrete RunningRuntime test pattern.
+
+Verification:
+
+- `gradlew.bat test --no-build-cache --rerun-tasks --console=plain`: 8m50s, 9416 tests,
+  zero failures/errors, 25 skipped, 1528 XML files/34 modules. XML was preserved before
+  filtered reruns in `tmp/b15-migration-full-xml`. This run precedes the final throwing-count
+  correction and its new test; it must not be called a post-correction fresh full run.
+- Post-correction `:modules:indexer-worker:test --tests '*KnowledgeServerTest'
+  --tests '*CutoverRestartEvidenceTest'`: passed. `build -x test`: passed, 325 tasks, 28s,
+  including Spotless and PMD. No dependencies changed.
+- `:modules:system-tests:integrationTest --tests
+  io.justsearch.systemtests.supervision.TerminalWriterSupervisedRecoveryE2ETest
+  -PskipWebBuild=true --console=plain`: both writer and migration passed, 1m8s.
+- Rust library 77/77; explicitly rebuilt conformance binary; both adapters 17/17.
+  Dev-runner Node tests, script lint, wire, runtime closure and recoverability gates passed.
+- Hermetic `regen-all --check --except notices`: all seven generated sets match, exactly
+  CI's public-claims invocation. The unfiltered command cannot run the notices projection
+  without separately produced license reports; no dependency/license source changed here.
+  Docs index, skills embedding and canonical links checks passed.
+
+Raw outputs remain ignored. SHA-256 inventory:
+
+| File | SHA-256 |
+| --- | --- |
+| `tmp/b15-migration-full-tests.txt` | `d9c94c28e6f61da8756966efcbb65fcd4bc9cad2ef665276876eef617c456583` |
+| `tmp/b15-migration-full-xml/summary.json` | `4dd721ee6403478866007146a4fce2bd8ef9f23ad5d24a9f2c5183fba6b1d3e0` |
+| `tmp/b15-migration-full-xml/inventory.json` | `cb09b576297cf9e4feb0f36b9ccc30c1f55b4853b240d4543341575bfd3d4c5f` |
+| `tmp/b15-count-read-final.txt` | `7bb8786fad03e364ff89eded7bebdbd98ea136c13c76c7b1c59aa94fb98ab4bb` |
+| `tmp/b15-migration-build-final.txt` | `07a82e563ae4526bc65d60c3b842530ddde1d69d02d61763f7a7d8a3883b2292` |
+| `tmp/b15-installed-junit-final.txt` | `875ef7c8f66195cdce4dc3110ae3a9f0a291189267486270a5cee80097f2900c` |
+| `tmp/b15-rust-final.txt` | `d425b8cd4406021b50d11df7b3807bb19264d4021e117d05d46dc0d4bdcb4fcc` |
+| `tmp/b15-conformance-bin-final.txt` | `a5974ea74ffb3931eff359b5893de39c3183772f3b9a9e958ba0dfc39e5690b1` |
+| `tmp/b15-conformance-dev-final.txt` | `6a804ad96bc69c8899d023f92493c79f67d4c6d873efe6b7dbb78ce5988bb43c` |
+| `tmp/b15-conformance-tauri-final.txt` | `d4917f0c82cc87e4ed56ddaa18a410f9e46f56d0e5c8620ddda28279065f059b` |
+| `tmp/b15-wire-final.txt` | `9227bd322ae1fe365d6f44d9ceec455c5aa586189b85a9dae0e00a3546789382` |
+| `tmp/lane-f-takeover/writer-junit-e21c5f00-e2b1-4f36-92dc-f9968cf9eb67/fixture-output.txt` | `19ce8ced92df0aa1e81979e9b118847ad20a7e063f140ad2b0685d581de41319` |
