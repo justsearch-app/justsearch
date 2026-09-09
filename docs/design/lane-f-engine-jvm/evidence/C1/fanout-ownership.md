@@ -72,3 +72,31 @@ tests (valid run59 cache) and both worker-services PMD source sets; log
 
 None of these local results closes C1: remaining producers, state bounds, guards, full stress,
 final live admission/pacing, and hosted/platform obligations remain.
+
+
+## Additional direct and three-way lifetime proof (2026-09-09)
+
+Root verification over d0d09bc72 adds FanoutRuntimeLifetimeTest's DIRECT chunk path and
+SearchExecutorFanoutLifetimeTest's real runThreeWay path. Each blocks an accepted supplier inside
+its actual analyzer call, synchronously refuses the second submission, and checks exact refusal
+identity, two attempts with no replay, retained caller ownership, and RuntimeSession.close waiting
+through interruption. After release the supplier resumes, caller ownership releases exactly once,
+close restores interruption, and a real post-close searcher acquisition refuses.
+
+Run114 found test setup issues: the separate NRT fixture omitted executor registrations, the
+three-way final oracle called a query builder that requires the caller's open guard instead of
+acquiring a searcher, and PMD found two redundant inherited Analyzer qualifiers. Root wired the
+fixture and used IndexCountOps.docCount for the same intended acquisition oracle; no assertion was
+weakened. Run115 passed focused index, worker, Engine and launcher tests plus affected PMD.
+Mutation116 removes the DIRECT group's runtime lifetime; mutation117 removes runThreeWay's runtime
+lifetime. Both fail because runtime close returns before the blocked accepted body actually exits.
+Both production files were restored in finally. This complements mutation54's hybrid path and
+mutations52/53's admission/pacing ownership; it does not replace final full/stress/live verification.
+
+Raw logs: tmp/c1-batch4-focused-{114,115}.txt and
+c1-batch4-lifetime-mutant-{116,117}.txt. Preserved XML: tmp/c1-batch4-green-115 and matching
+mutant directories. Windows / Temurin25.0.2; retain through lane completion plus30 days.
+
+Restored run128 passed both additional fanout paths plus NRT/generation/launcher tests,
+WholeProgramDeadCodeTest and affected PMD. Log tmp/c1-batch4-restored-128.txt; preserved
+XML tmp/c1-batch4-green-128. These focused results still precede final integrated verification.
