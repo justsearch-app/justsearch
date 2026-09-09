@@ -218,6 +218,7 @@ final class EngineKnowledgeClientExecutorTest {
       assertEquals(1, admission.activeWorkCount());
       try (var replacement = admission.attach(TestEngineContexts.BACKGROUND)) {
         assertEquals(2, admission.activeWorkCount());
+        assertTrue(replacement.context().workId().isPresent());
       }
 
       releaseRunning.countDown();
