@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-09T14:47:34.860288+00:00",
-  "baseHead": "44039df47e88320a79d314cda4b23d49b845604b",
+  "generatedAt": "2026-09-09T14:57:51.214605+00:00",
+  "baseHead": "86e0558f115a974926a5f063019f10d31ddacc52",
   "scope": "Every literal tmp-path citation in C1 evidence Markdown at generation, with brace/glob expansion and recursive hashes for available directory citations. The shared dev-runner path resolves in the main repo. Bare tmp/ denotes a storage root, not a raw artifact. Unresolved strings are retained honestly, never treated as proof.",
   "retention": "Local raw artifacts remain in this lane worktree through lane F acceptance. Hosted artifacts retain their run-specific expiry. Hashes establish identity, not availability; citations name accessible local paths or hosted run artifacts.",
   "citations": [
@@ -21377,7 +21377,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 101,
+      "line": 105,
       "citation": "tmp/c1-review-integrated-252.txt",
       "status": "available",
       "files": [
@@ -21386,7 +21386,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 101,
+      "line": 105,
       "citation": "tmp/c1-review-integrated-results-252/manifest.json",
       "status": "available",
       "files": [
@@ -21395,7 +21395,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 102,
+      "line": 106,
       "citation": "tmp/c1-review-compile-255.txt",
       "status": "available",
       "files": [
@@ -21404,7 +21404,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 102,
+      "line": 106,
       "citation": "tmp/c1-review-compile-restored-256.txt",
       "status": "available",
       "files": [
@@ -25036,6 +25036,166 @@
       "status": "available",
       "files": [
         "tmp/c1-native-waiter-mutation-187/TEST-io.justsearch.ort.NativeSessionHandleGpuWaiterCancellationTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 76,
+      "citation": "tmp/c1-ocr-compile-283.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-compile-283.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 76,
+      "citation": "tmp/c1-ocr-focused-284.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-focused-284.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 77,
+      "citation": "tmp/c1-ocr-adverse-287.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-adverse-287.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 77,
+      "citation": "tmp/c1-ocr-focused-285.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-focused-285.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 77,
+      "citation": "tmp/c1-ocr-ownership-286.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-ownership-286.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 78,
+      "citation": "tmp/c1-ocr-restored-288.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-restored-288.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 78,
+      "citation": "tmp/c1-ocr-restored-289.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-restored-289.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 79,
+      "citation": "tmp/c1-ocr-build-291.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-build-291.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 79,
+      "citation": "tmp/c1-ocr-final-focused-290.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-final-focused-290.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 80,
+      "citation": "tmp/c1-ocr-results-285/",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-results-285/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 80,
+      "citation": "tmp/c1-ocr-results-286/",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.extract.OcrComponentOwnershipTest.xml",
+        "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml",
+        "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest.xml",
+        "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.IndexerWorkerGuardrailsTest.xml",
+        "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.loop.IndexingLoopRestartTest.xml",
+        "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.server.KnowledgeServerCloseCompletionTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 81,
+      "citation": "tmp/c1-ocr-results-287/",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-results-287/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml",
+        "tmp/c1-ocr-results-287/TEST-io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 81,
+      "citation": "tmp/c1-ocr-results-290/",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-results-290/manifest.json",
+        "tmp/c1-ocr-results-290/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml",
+        "tmp/c1-ocr-results-290/TEST-io.justsearch.indexerworker.IndexerWorkerGuardrailsTest.xml",
+        "tmp/c1-ocr-results-290/TEST-io.justsearch.indexerworker.server.KnowledgeServerCloseCompletionTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 81,
+      "citation": "tmp/c1-ocr-results-296/",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-results-296/manifest.json",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.xml",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.OcrComponentOwnershipTest.xml",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest.xml",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.IndexerWorkerGuardrailsTest.xml",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.loop.IndexingLoopRestartTest.xml",
+        "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.server.KnowledgeServerCloseCompletionTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 82,
+      "citation": "tmp/c1-ocr-final-build-297.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-final-build-297.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/ocr-component-close.md",
+      "line": 82,
+      "citation": "tmp/c1-ocr-final-review-296.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-ocr-final-review-296.txt"
       ]
     },
     {
@@ -95134,6 +95294,134 @@
     "tmp/c1-native-waiter-mutation-187/TEST-io.justsearch.ort.NativeSessionHandleGpuWaiterCancellationTest.xml": {
       "bytes": 3017,
       "sha256": "7d95cd81512633bac5078924ebfaf68907c66f0736019f8a150dab580edb1085"
+    },
+    "tmp/c1-ocr-compile-283.txt": {
+      "bytes": 33590,
+      "sha256": "e503571e023479c4000e63386f127768d1d402809630769d73fc3ff7bfe15f55"
+    },
+    "tmp/c1-ocr-focused-284.txt": {
+      "bytes": 52318,
+      "sha256": "509bf422107e0f1ff252f218f949ac6141ef65cdc68562f564080a1bda376f60"
+    },
+    "tmp/c1-ocr-adverse-287.txt": {
+      "bytes": 37090,
+      "sha256": "3976567a6126793e44548f406e6c45eb62257c2b4483a338e760f831dd010d03"
+    },
+    "tmp/c1-ocr-focused-285.txt": {
+      "bytes": 40416,
+      "sha256": "2c7269a2e4b30d00b1408880b50087131185e6ee0431a299c9c09b32af37b9bd"
+    },
+    "tmp/c1-ocr-ownership-286.txt": {
+      "bytes": 47989,
+      "sha256": "1b2755e265d293148e562b81e0378aeea226e1085c9771cbec6832a3bde295c1"
+    },
+    "tmp/c1-ocr-restored-288.txt": {
+      "bytes": 39531,
+      "sha256": "867af48b41aeb70f7dd1c9b9a773a6b2fb775d4f9c7ddedcc119c90756b6b6b5"
+    },
+    "tmp/c1-ocr-restored-289.txt": {
+      "bytes": 8231,
+      "sha256": "a19d3a39b7dcf3f0adbed08388274adfe063507c69797709f2d4483cc8fd0052"
+    },
+    "tmp/c1-ocr-build-291.txt": {
+      "bytes": 73625,
+      "sha256": "042d55ce11b608bfdf21c1eae98f0f6367b1d7e56e1ec6e97fbbb7e8747e2c44"
+    },
+    "tmp/c1-ocr-final-focused-290.txt": {
+      "bytes": 36237,
+      "sha256": "c9335a2b191a14543af9781ba9cee49d854f5e70b95fc0a3fd5915f6ae56a145"
+    },
+    "tmp/c1-ocr-results-285/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml": {
+      "bytes": 6163,
+      "sha256": "975ca261729de65f03ae3915b30182b64a309a91cd1f56cdd81922324c6d9306"
+    },
+    "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.extract.OcrComponentOwnershipTest.xml": {
+      "bytes": 876578,
+      "sha256": "22583c2da42a6c485f2d755e926aa8ce26330617d3e043436aa3a4c370e0ed25"
+    },
+    "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml": {
+      "bytes": 5091,
+      "sha256": "71bfbbcb816ac9bc2165198f19825fae909d1eb2a2c9975f066b4d9132cd8b6e"
+    },
+    "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest.xml": {
+      "bytes": 524488,
+      "sha256": "980fe77b4f5df49a078f8caa1f9c5fe0a4052df82c0efbc93ec926a0039efee8"
+    },
+    "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.IndexerWorkerGuardrailsTest.xml": {
+      "bytes": 1219,
+      "sha256": "611660c2d713a6857a06acdd34209151da0258294511af294b9a6db53721a9ea"
+    },
+    "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.loop.IndexingLoopRestartTest.xml": {
+      "bytes": 913529,
+      "sha256": "38923f89a90aee595b0d97e554f957922d64b1909497339e0fac510e0a87456c"
+    },
+    "tmp/c1-ocr-results-286/TEST-io.justsearch.indexerworker.server.KnowledgeServerCloseCompletionTest.xml": {
+      "bytes": 9979,
+      "sha256": "708b8b2bafc6142c0a41451bedaeb72ec451aec7e8d1dcb76a17e1464acc65a0"
+    },
+    "tmp/c1-ocr-results-287/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml": {
+      "bytes": 1607,
+      "sha256": "4905bb55eb331c3a8ec365debd1d218843934e2cc0e2eb7ef861d9c684f4b6b5"
+    },
+    "tmp/c1-ocr-results-287/TEST-io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest.xml": {
+      "bytes": 525626,
+      "sha256": "6525af7bd60cfbd870749d981e4041a69ea280874e03b50964ee2423120c2942"
+    },
+    "tmp/c1-ocr-results-290/manifest.json": {
+      "bytes": 1456,
+      "sha256": "e3289f7edf9e895d4963d040a0a2b42e2715c6a8d5d18e560f36e3934057636e"
+    },
+    "tmp/c1-ocr-results-290/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml": {
+      "bytes": 5523,
+      "sha256": "a75555e3e6c853ba3cb52c9312c86ba2e2407130985f127e3727da194fbcd068"
+    },
+    "tmp/c1-ocr-results-290/TEST-io.justsearch.indexerworker.IndexerWorkerGuardrailsTest.xml": {
+      "bytes": 1219,
+      "sha256": "0efaa72e84d086610866216cd05ad15e7293f421e0baa1ddc12f5ba6b8f837b9"
+    },
+    "tmp/c1-ocr-results-290/TEST-io.justsearch.indexerworker.server.KnowledgeServerCloseCompletionTest.xml": {
+      "bytes": 10619,
+      "sha256": "cd0a7607eb6a7a9249a8be089b317494bf22d8aa0cec7d43ed9729e1a287cf7c"
+    },
+    "tmp/c1-ocr-results-296/manifest.json": {
+      "bytes": 3392,
+      "sha256": "9c328c5f8f6a2f258739633e005bc6094d7059e593a882c464c915c3e97c431d"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.xml": {
+      "bytes": 1170,
+      "sha256": "f801c28b4052828adbba365a8d069433d8cb7a1f781bb190118f08290e122467"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.OcrComponentOwnershipTest.xml": {
+      "bytes": 877412,
+      "sha256": "1de704f8738aec17b72c919c714f0f5b13f9bc706c4f9ea0ec6159fc38fe8f9a"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.PdfOcrEngineTest.xml": {
+      "bytes": 5002,
+      "sha256": "e4923e5057150fdbc678023057ca6ea7f335f5e8e4b0e0bc51946e9904921ac0"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest.xml": {
+      "bytes": 5641831,
+      "sha256": "7044e2983bdbd57ae8cc6e0cfe4277c578e1bd1cfd175120c6e1ccda28577787"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.IndexerWorkerGuardrailsTest.xml": {
+      "bytes": 1220,
+      "sha256": "6fcdcc9448887c46c5caa211ae2af03a53164b2b7636586f8a1675ed0335f731"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.loop.IndexingLoopRestartTest.xml": {
+      "bytes": 918152,
+      "sha256": "9a960b8f0d2af73384c4335f33016cc0f9662b4b83ca3765637c8a8cd0c167c5"
+    },
+    "tmp/c1-ocr-results-296/TEST-io.justsearch.indexerworker.server.KnowledgeServerCloseCompletionTest.xml": {
+      "bytes": 11233,
+      "sha256": "95e82d1df2847802e12a14f57a8ade8135e816308d52ec6a6bada41b38f93dfb"
+    },
+    "tmp/c1-ocr-final-build-297.txt": {
+      "bytes": 73491,
+      "sha256": "0b15fad49eee20c24a771117e76e9a4e3cbd8681c00e4b1d3f3dea4ff76751ec"
+    },
+    "tmp/c1-ocr-final-review-296.txt": {
+      "bytes": 22928,
+      "sha256": "799b4fd09da2de9ac784bd51657f5330a85801e15567ddfeacb56e05a63503f4"
     },
     "tmp/c1-batch4-producers-87.txt": {
       "bytes": 40560,

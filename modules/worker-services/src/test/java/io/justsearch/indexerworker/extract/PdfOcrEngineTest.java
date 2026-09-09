@@ -31,6 +31,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -41,6 +42,14 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class PdfOcrEngineTest {
   @TempDir Path tempDir;
+  private final List<ExecutorService> openedPools = new java.util.ArrayList<>();
+
+  @AfterEach void closePools() throws Exception {
+    for (ExecutorService pool : openedPools) {
+      pool.shutdownNow();
+      assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS), "fixture must release every page worker");
+    }
+  }
 
   private static final OcrRoutingConfig CONFIG =
       new OcrRoutingConfig(true, List.of("eng"), 30_000, null, null, null, null, null);
@@ -291,7 +300,7 @@ final class PdfOcrEngineTest {
     Path bravoExe = writeFakeTesseract(tempDir.resolve("runtime-bravo"), "RUNTIME BRAVO TEXT");
     AtomicReference<TikaOcrRuntime.RuntimePaths> resolved =
         new AtomicReference<>(runtimePaths(alphaExe));
-    PdfOcrEngine engine = new PdfOcrEngine(testPoolFactory(), CONFIG, resolved::get, 72, 2, null);
+    PdfOcrEngine engine = new PdfOcrEngine(this::openTestPool, CONFIG, resolved::get, 72, 2, null);
 
     String first = engine.ocrImage(image, Integer.MAX_VALUE).text();
     resolved.set(runtimePaths(bravoExe));
@@ -303,12 +312,13 @@ final class PdfOcrEngineTest {
 
   @Test
   @Timeout(30)
-  void pdfPoolIsClosedAndTerminatedBeforeOcrReturns() throws Exception {
+  void pdfPoolIsReusedAcrossDocumentsAndTerminatedByComponentClose() throws Exception {
     Path pdf = blankPdf(1);
     AtomicReference<ExecutorService> opened = new AtomicReference<>();
     IntFunction<ExecutorService> factory =
         size -> {
           ExecutorService pool = Executors.newFixedThreadPool(size);
+          openedPools.add(pool);
           opened.set(pool);
           return pool;
         };
@@ -318,8 +328,11 @@ final class PdfOcrEngineTest {
     PdfOcrEngine.OcrEngineResult result = engine.ocrPdf(pdf, Integer.MAX_VALUE);
 
     assertEquals(1, result.pagesProcessed());
-    assertTrue(opened.get().isShutdown());
-    assertTrue(opened.get().isTerminated(), "pool must terminate before temp/process cleanup");
+    assertFalse(opened.get().isShutdown(), "document cleanup must preserve the component pool");
+    assertEquals(1, engine.ocrPdf(pdf, Integer.MAX_VALUE).pagesProcessed());
+    assertEquals(1, openedPools.size(), "a second document must reuse the same pool");
+    engine.close();
+    assertTrue(opened.get().isTerminated(), "component close owns pool termination");
   }
 
   @Test
@@ -344,6 +357,7 @@ final class PdfOcrEngineTest {
                   throw refusal;
                 }
               };
+          openedPools.add(pool);
           opened.set(pool);
           return pool;
         };
@@ -356,7 +370,9 @@ final class PdfOcrEngineTest {
             () -> engine.ocrPdf(pdf, Integer.MAX_VALUE));
 
     assertSame(refusal, failure);
-    assertTrue(opened.get().isTerminated(), "refusing pool must close before cleanup completes");
+    assertFalse(opened.get().isShutdown(), "document refusal must not retire the component pool");
+    engine.close();
+    assertTrue(opened.get().isTerminated());
   }
 
   @Test
@@ -368,6 +384,7 @@ final class PdfOcrEngineTest {
     AssertionError fatal = new AssertionError("fatal OCR child");
     PdfOcrEngine engine = new PdfOcrEngine(size -> {
       ExecutorService pool = Executors.newFixedThreadPool(size);
+      openedPools.add(pool);
       opened.set(pool);
       return pool;
     }, CONFIG, cmd -> {
@@ -377,6 +394,8 @@ final class PdfOcrEngineTest {
 
     assertSame(fatal, assertThrows(AssertionError.class,
         () -> engine.ocrPdf(pdf, Integer.MAX_VALUE)));
+    assertFalse(opened.get().isShutdown());
+    engine.close();
     assertTrue(opened.get().isTerminated());
     assertNotNull(actualTemp.get(), "the real OCR child must have entered");
     assertFalse(Files.exists(actualTemp.get()), "actual OCR temp directory must be deleted");
@@ -441,12 +460,14 @@ final class PdfOcrEngineTest {
       killRequested.countDown();
       return process;
     });
-    org.mockito.Mockito.when(process.waitFor()).thenAnswer(call -> {
-      allowExit.await();
-      alive.set(false);
-      return 0;
+    org.mockito.Mockito.when(process.waitFor(org.mockito.ArgumentMatchers.anyLong(),
+        org.mockito.ArgumentMatchers.any(TimeUnit.class))).thenAnswer(call -> {
+      if (killRequested.getCount() != 0) return false;
+      boolean exited = allowExit.await(call.getArgument(0), call.getArgument(1));
+      if (exited) alive.set(false);
+      return exited;
     });
-    // Timed wait defaults to false: OCR times out and requests an asynchronous kill.
+    // The first timed wait reports timeout; bounded kill waits observe actual exit.
     PdfOcrEngine engine = engine(CONFIG, 1, cmd -> {
       actualTemp.set(Path.of(cmd.get(1)).getParent());
       return process;
@@ -465,7 +486,7 @@ final class PdfOcrEngineTest {
       assertFalse(caller.isAlive());
       assertNull(failure.get());
       assertFalse(Files.exists(actualTemp.get()));
-      assertFalse(process.isAlive());
+      assertFalse(alive.get());
     } finally {
       allowExit.countDown();
       caller.interrupt();
@@ -475,12 +496,193 @@ final class PdfOcrEngineTest {
 
   // --- helpers -------------------------------------------------------------
 
-  private PdfOcrEngine engine(OcrRoutingConfig config, int poolSize, PdfOcrEngine.ProcessStarter starter) {
-    return new PdfOcrEngine(testPoolFactory(), config, starter, "stub-tesseract", 72, poolSize, null);
+  @Test
+  @Timeout(30)
+  void wedgedStarterReturnsWithinBoundRetainsFilesAndLeavesSparePoolCapacityUsable() throws Exception {
+    Path pdf = blankPdf(1);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var calls = new AtomicInteger();
+    var retained = new AtomicReference<Path>();
+    var failure = new AtomicReference<Throwable>();
+    var restored = new java.util.concurrent.atomic.AtomicBoolean();
+    PdfOcrEngine engine = engine(CONFIG, 2, cmd -> {
+      if (calls.incrementAndGet() == 1) {
+        retained.set(Path.of(cmd.get(1)).getParent());
+        entered.countDown();
+        while (release.getCount() != 0) {
+          try { release.await(); }
+          catch (InterruptedException ignored) { /* Deliberately hostile starter consumes it. */ }
+        }
+      }
+      return succeedStub(cmd, new long[] {0L});
+    });
+    Thread caller = Thread.ofPlatform().start(() -> {
+      try { engine.ocrPdf(pdf, Integer.MAX_VALUE); }
+      catch (Throwable thrown) { failure.set(thrown); }
+      finally { restored.set(Thread.currentThread().isInterrupted()); }
+    });
+    try {
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      long start = System.nanoTime();
+      caller.interrupt();
+      caller.join(6_000);
+      assertFalse(caller.isAlive(), "a wedged starter cannot extend the five-second cleanup wait");
+      assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 6_000);
+      assertNull(failure.get());
+      assertTrue(restored.get());
+      assertTrue(Files.exists(retained.get()), "unfinished actual owner retains its files");
+      assertEquals(1, engine.ocrPdf(pdf, Integer.MAX_VALUE).pagesProcessed(),
+          "later documents can use the spare worker instead of opening another pool");
+      assertEquals(1, openedPools.size());
+      assertThrows(IllegalStateException.class, engine::close);
+      assertTrue(Files.exists(retained.get()));
+      release.countDown();
+      engine.close();
+      assertFalse(Files.exists(retained.get()));
+      assertTrue(openedPools.getFirst().isTerminated());
+    } finally {
+      release.countDown();
+      caller.interrupt();
+      caller.join(2_000);
+      engine.close();
+    }
   }
 
-  private static IntFunction<ExecutorService> testPoolFactory() {
-    return size -> Executors.newFixedThreadPool(size);
+  @Test
+  @Timeout(30)
+  void closeCannotMissCallerStillAcquiringItsTemporaryDirectory() throws Exception {
+    Path pdf = blankPdf(1);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var directory = new AtomicReference<Path>();
+    var failure = new AtomicReference<Throwable>();
+    PdfOcrEngine engine = engine(CONFIG, 1, cmd -> succeedStub(cmd, new long[] {0L}));
+    Thread caller = Thread.ofPlatform().start(() -> {
+      try (var files = org.mockito.Mockito.mockStatic(Files.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        files.when(() -> Files.createTempDirectory("justsearch-ocr-")).thenAnswer(call -> {
+          entered.countDown();
+          assertTrue(release.await(10, TimeUnit.SECONDS));
+          Path created = (Path) call.callRealMethod();
+          directory.set(created);
+          return created;
+        });
+        engine.ocrPdf(pdf, Integer.MAX_VALUE);
+      } catch (Throwable thrown) { failure.set(thrown); }
+    });
+    try {
+      assertTrue(entered.await(3, TimeUnit.SECONDS));
+      assertThrows(IllegalStateException.class, engine::close,
+          "a caller acquiring resources is already an owned document");
+      release.countDown();
+      caller.join(3_000);
+      assertFalse(caller.isAlive());
+      assertTrue(failure.get() instanceof PdfOcrEngine.OcrCapacityException);
+      assertNotNull(directory.get());
+      assertFalse(Files.exists(directory.get()));
+      engine.close();
+    } finally {
+      release.countDown();
+      caller.join(3_000);
+      engine.close();
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void failedChildKillStillCancelsOtherDocumentsAndShutsDownThePool() throws Exception {
+    Path pdf = blankPdf(1);
+    var entered = new CountDownLatch(2);
+    var killedHealthy = new CountDownLatch(1);
+    var stubbornAlive = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var healthyAlive = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var refuseKill = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var calls = new AtomicInteger();
+    var stubborn = org.mockito.Mockito.mock(Process.class);
+    var healthy = org.mockito.Mockito.mock(Process.class);
+    org.mockito.Mockito.when(stubborn.isAlive()).thenAnswer(call -> stubbornAlive.get());
+    org.mockito.Mockito.when(healthy.isAlive()).thenAnswer(call -> healthyAlive.get());
+    org.mockito.Mockito.when(stubborn.destroyForcibly()).thenAnswer(call -> {
+      if (refuseKill.get()) throw new IllegalStateException("fixture refuses kill");
+      stubbornAlive.set(false);
+      return stubborn;
+    });
+    org.mockito.Mockito.when(healthy.destroyForcibly()).thenAnswer(call -> {
+      healthyAlive.set(false);
+      killedHealthy.countDown();
+      return healthy;
+    });
+    for (Process process : List.of(stubborn, healthy)) {
+      org.mockito.Mockito.when(process.waitFor(org.mockito.ArgumentMatchers.anyLong(),
+          org.mockito.ArgumentMatchers.any(TimeUnit.class))).thenAnswer(call -> {
+        entered.countDown();
+        new CountDownLatch(1).await(call.getArgument(0), call.getArgument(1));
+        return false;
+      });
+    }
+    PdfOcrEngine engine = engine(CONFIG, 2, cmd -> calls.incrementAndGet() == 1 ? stubborn : healthy);
+    Runnable invoke = () -> {
+      try { engine.ocrPdf(pdf, Integer.MAX_VALUE); }
+      catch (IllegalStateException expected) { /* The injected kill failure remains visible. */ }
+    };
+    Thread first = Thread.ofPlatform().start(invoke);
+    Thread second = Thread.ofPlatform().start(invoke);
+    try {
+      assertTrue(entered.await(3, TimeUnit.SECONDS));
+      assertThrows(IllegalStateException.class, engine::close);
+      assertTrue(killedHealthy.await(1, TimeUnit.SECONDS), "one failed kill cannot skip another owner");
+      assertTrue(openedPools.getFirst().isShutdown(), "pool shutdown must run despite kill failure");
+      assertTrue(stubbornAlive.get());
+    } finally {
+      refuseKill.set(false);
+      first.interrupt();
+      second.interrupt();
+      first.join(6_000);
+      second.join(6_000);
+      assertFalse(first.isAlive());
+      assertFalse(second.isAlive());
+      engine.close();
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void survivingChildBoundsRetainedDocumentsUntilActualExit() throws Exception {
+    Path pdf = blankPdf(1);
+    var process = org.mockito.Mockito.mock(Process.class);
+    var alive = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var directory = new AtomicReference<Path>();
+    org.mockito.Mockito.when(process.isAlive()).thenAnswer(call -> alive.get());
+    org.mockito.Mockito.when(process.destroyForcibly()).thenReturn(process);
+    // Both timed waits report that the child remains alive, including after destroyForcibly.
+    PdfOcrEngine engine = engine(CONFIG, 1, cmd -> {
+      directory.set(Path.of(cmd.get(1)).getParent());
+      return process;
+    });
+    try {
+      assertEquals(OcrSkipReason.TIMEOUT, engine.ocrPdf(pdf, Integer.MAX_VALUE).failureReason());
+      assertTrue(Files.exists(directory.get()));
+      assertEquals(EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+          assertThrows(PdfOcrEngine.OcrCapacityException.class,
+              () -> engine.ocrPdf(pdf, Integer.MAX_VALUE)).reason());
+      assertEquals(1, openedPools.size());
+      alive.set(false);
+      engine.close();
+      assertFalse(Files.exists(directory.get()));
+    } finally {
+      alive.set(false);
+      engine.close();
+    }
+  }
+
+  private PdfOcrEngine engine(OcrRoutingConfig config, int poolSize, PdfOcrEngine.ProcessStarter starter) {
+    return new PdfOcrEngine(this::openTestPool, config, starter, "stub-tesseract", 72, poolSize, null);
+  }
+
+  private ExecutorService openTestPool(int size) {
+    var pool = Executors.newFixedThreadPool(size);
+    openedPools.add(pool);
+    return pool;
   }
 
   private static TikaOcrRuntime.RuntimePaths runtimePaths(Path executable) {

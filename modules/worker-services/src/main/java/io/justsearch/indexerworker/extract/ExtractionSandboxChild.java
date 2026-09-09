@@ -50,13 +50,14 @@ public final class ExtractionSandboxChild {
     serve(System.in, protocolOut);
   }
 
-  private static void serve(InputStream in, OutputStream protocolOut) throws IOException {
-    ExtractorCache cache = new ExtractorCache();
+  static void serve(InputStream in, OutputStream protocolOut) throws IOException {
+    try (ExtractorCache cache = new ExtractorCache()) {
     byte[] frame;
     while ((frame = SandboxFrames.read(in, SandboxFrames.MAX_FRAME_BYTES)) != null) {
       SandboxExtractionRequest request =
           MAPPER.readValue(new String(frame, StandardCharsets.UTF_8), SandboxExtractionRequest.class);
       SandboxFrames.write(protocolOut, MAPPER.writeValueAsBytes(handle(request, cache)));
+    }
     }
   }
 
@@ -89,18 +90,26 @@ public final class ExtractionSandboxChild {
    * parent classifies a heap-exhausted child as a permanent parse failure from the exit code plus
    * the JVM's own stderr signature, and answering from a poisoned heap is not reliable.
    */
-  private static final class ExtractorCache {
+  static final class ExtractorCache implements AutoCloseable {
     private TikaExtractionPolicy policy;
     private OcrRoutingConfig ocrConfig;
     private PolicyDrivenTikaExtractor extractor;
 
     PolicyDrivenTikaExtractor extractor(TikaExtractionPolicy p, OcrRoutingConfig o) {
       if (extractor == null || !Objects.equals(policy, p) || !Objects.equals(ocrConfig, o)) {
+        close();
         extractor = new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, p, o);
         policy = p;
         ocrConfig = o;
       }
       return extractor;
+    }
+
+    @Override public void close() {
+      if (extractor != null) {
+        extractor.close();
+        extractor = null;
+      }
     }
   }
 

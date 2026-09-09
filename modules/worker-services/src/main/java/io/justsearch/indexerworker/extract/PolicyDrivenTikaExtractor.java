@@ -5,6 +5,7 @@ import io.justsearch.indexerworker.extract.ContentExtractor.BudgetExceededExcept
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.text.TextQualityAnalyzer;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * <p>This is the Worker-side adapter where JustSearch budgets are translated to Tika-native
  * parser configuration, output limits, MIME admission, and artifact provenance.
  */
-public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider {
+public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider, AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(PolicyDrivenTikaExtractor.class);
   private static final String OCR_FALLBACK_DIRECT_TESSERACT = "direct_tesseract";
   private static final String OCR_FALLBACK_RENDERED_PDF = "rendered_pdf";
@@ -87,6 +88,11 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   }
 
   @Override
+  public void close() {
+    ocrEngine.close();
+  }
+
+  @Override
   public ExtractionResult extract(Path file) throws IOException, ExtractionException {
     return extractArtifact(file).result();
   }
@@ -139,12 +145,25 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       ocrEvidence.skip(ocrAttempt.skipReason());
     }
     if (ocrAttempt.shouldAttempt()) {
+      try {
       ExtractionArtifact ocrArtifact =
           summary.mixedPdf()
               ? trySelectivePdfOcr(file, result, summary, ocrEvidence)
               : tryOcr(file, result, summary, ocrEvidence);
       if (ocrArtifact != null) {
         return ocrArtifact;
+      }
+      } catch (java.util.concurrent.RejectedExecutionException refusal) {
+        // OCR is an enhancement of an already extracted document. Keep that baseline while
+        // making this capacity failure visible; the OCR engine itself preserves typed refusal.
+        String reason = refusal instanceof EngineExecutorRejectedException registered
+            ? registered.reason().name()
+            : refusal instanceof PdfOcrEngine.OcrCapacityException capacity
+                ? capacity.reason().name() : "QUEUE_LIMIT";
+        ocrEvidence.skip(OcrSkipReason.UNKNOWN);
+        ocrMetricCatalog.failedTotal.increment(OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, reason));
+        log.warn("OCR capacity refused for {} ({}); preserving structured extraction",
+            file.getFileName(), reason);
       }
     }
     return withVisualEvidence(

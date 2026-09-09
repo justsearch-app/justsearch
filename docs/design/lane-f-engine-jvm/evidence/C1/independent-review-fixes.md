@@ -58,7 +58,11 @@ before the reload-lock correction; final271 has one fanout test timing failure, 
 an explicit parent-cleanup owner and passing focused274. Build273 passes. See
 [runtime-close.md](runtime-close.md) and [fanout-parent-exit.md](fanout-parent-exit.md).
 
-- Bound PDF child/pool termination and use one OCR pool per component, preserving extracted text.
+- OCR component ownership is implemented: one reusable pool, bounded waits and document owners,
+  real structured text preserved on refusal, and retryable enclosing service cleanup. Focused296
+  passes61 cases; see [OCR evidence](ocr-component-close.md). Its review exposed uncontained native
+  descendants when the parser JVM is forcibly recycled. Fix that process boundary immediately
+  before proceeding to the next client item; EOF cleanup alone does not satisfy it.
 - Aggregate every EngineKnowledgeClient registration close; report late worker failures and Error.
 - Discard a sandbox slot if reader submission fails after write; correlate protocol request/response.
 - Re-arm health-monitor ticks on capacity refusal; distinguish owner CLOSED.

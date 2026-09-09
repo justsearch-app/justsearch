@@ -132,6 +132,7 @@ public final class KnowledgeServer implements Closeable {
   private IndexGenerationManager indexGenerationManager;
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
+  private WorkerAppServices pendingAppServices;
   private final Object closeLock = new Object();
   private final ReentrantLock runtimeSwapLock = new ReentrantLock();
   private volatile boolean closeStarted;
@@ -1287,17 +1288,32 @@ public final class KnowledgeServer implements Closeable {
    */
   private void reconstructAppServicesAfterDeferredUpgrade() {
     log.info("Reconstructing appServices after DeferredRuntime.upgradeWriter()");
+    closePendingAppServices();
     WorkerAppServices oldServices = appServices;
     WorkerAppServices newServices = newAppServices();
-    wireAppServicesPostConstruction(newServices);
-    this.appServices = newServices;
-    newServices.startIndexingLoop();
-    if (oldServices != null) {
-      try {
-        oldServices.close();
-      } catch (Exception e) {
-        log.warn("Old appServices close after upgrade failed (best-effort): {}", e.getMessage());
-      }
+    pendingAppServices = newServices;
+    try {
+      wireAppServicesPostConstruction(newServices);
+      if (oldServices != null) oldServices.close();
+      this.appServices = null; // The incumbent has actually closed; callers see unavailability.
+      newServices.startIndexingLoop();
+      this.appServices = newServices;
+      pendingAppServices = null;
+    } catch (Exception | Error failure) {
+      try { closePendingAppServices(); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error fatal) throw fatal;
+      throw new IllegalStateException("Application-service replacement failed; owners retained", failure);
+    }
+  }
+
+  private void closePendingAppServices() {
+    if (pendingAppServices == null) return;
+    try {
+      pendingAppServices.close();
+      pendingAppServices = null;
+    } catch (IOException failure) {
+      throw new IllegalStateException("Unpublished application services still own resources", failure);
     }
   }
 
@@ -2259,6 +2275,25 @@ public final class KnowledgeServer implements Closeable {
             }
           }
 
+          // Both an incumbent and a failed candidate may still own resources. Attempt both
+          // before propagating; a successful close is cleared so retries do not repeat teardown.
+          Throwable serviceCloseFailure = null;
+          try { closePendingAppServices(); }
+          catch (RuntimeException | Error failure) { serviceCloseFailure = failure; }
+          if (appServices != null) {
+            try {
+              appServices.close();
+              appServices = null;
+            } catch (Exception | Error failure) {
+              if (serviceCloseFailure == null) serviceCloseFailure = failure;
+              else if (serviceCloseFailure != failure) serviceCloseFailure.addSuppressed(failure);
+            }
+          }
+          if (serviceCloseFailure instanceof Error fatal) throw fatal;
+          if (serviceCloseFailure != null) {
+            throw new IOException("Application services still own resources", serviceCloseFailure);
+          }
+
           // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
           // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
           // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
@@ -2283,15 +2318,6 @@ public final class KnowledgeServer implements Closeable {
               sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
-            }
-          }
-
-          // Stop indexing loop (via application services registry)
-          if (appServices != null) {
-            try {
-              appServices.close();
-            } catch (Exception e) {
-              log.warn("Error closing application services", e);
             }
           }
 

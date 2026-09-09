@@ -324,7 +324,7 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
       Thread.currentThread().interrupt();
       log.warn("Interrupted while shutting down extraction executor");
     }
-    // Kills any sandbox child processes; an in-process sandbox has nothing to release.
+    // Closes parser children and the in-process extractor's component-owned OCR pool.
     sandbox.close();
   }
 

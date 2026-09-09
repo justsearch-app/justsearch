@@ -44,6 +44,96 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
+  void shutdownAttemptsBothFailedServiceOwnersBeforeReportingIncomplete(@TempDir Path tempDir)
+      throws Exception {
+    KnowledgeServer server = org.mockito.Mockito.spy(new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null));
+    var old = org.mockito.Mockito.mock(WorkerAppServices.class);
+    var candidate = org.mockito.Mockito.mock(DefaultWorkerAppServices.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    var release = new java.util.concurrent.atomic.AtomicBoolean();
+    org.mockito.Mockito.doReturn(candidate).when(server).newAppServices();
+    org.mockito.Mockito.doAnswer(call -> {
+      if (!release.get()) throw new java.io.IOException("incumbent still live");
+      return null;
+    }).when(old).close();
+    org.mockito.Mockito.doAnswer(call -> {
+      if (!release.get()) throw new java.io.IOException("candidate still live");
+      return null;
+    }).when(candidate).close();
+    server.appServices = old;
+    var reconstruct = KnowledgeServer.class.getDeclaredMethod("reconstructAppServicesAfterDeferredUpgrade");
+    reconstruct.setAccessible(true);
+    try {
+      org.junit.jupiter.api.Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> reconstruct.invoke(server));
+      var failure = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close);
+      assertTrue(failure.getCause().getSuppressed().length > 0, "both failures must be retained");
+      org.mockito.Mockito.verify(old, org.mockito.Mockito.times(2)).close();
+      org.mockito.Mockito.verify(candidate, org.mockito.Mockito.times(2)).close();
+      assertFalse(server.awaitClosed(0));
+    } finally {
+      release.set(true);
+      server.close();
+    }
+    assertTrue(server.awaitClosed(0));
+  }
+
+  @Test
+  void replacementRetainsFailedIncumbentAndFailedRollbackUntilRetry(@TempDir Path tempDir)
+      throws Exception {
+    KnowledgeServer server = org.mockito.Mockito.spy(new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null));
+    var old = org.mockito.Mockito.mock(WorkerAppServices.class);
+    var discarded = org.mockito.Mockito.mock(DefaultWorkerAppServices.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    var replacement = org.mockito.Mockito.mock(DefaultWorkerAppServices.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    org.mockito.Mockito.doReturn(discarded, replacement).when(server).newAppServices();
+    org.mockito.Mockito.doThrow(new java.io.IOException("incumbent OCR live"))
+        .doNothing().when(old).close();
+    org.mockito.Mockito.doThrow(new java.io.IOException("rollback OCR live"))
+        .doNothing().when(discarded).close();
+    server.appServices = old;
+    var reconstruct = KnowledgeServer.class.getDeclaredMethod("reconstructAppServicesAfterDeferredUpgrade");
+    reconstruct.setAccessible(true);
+    try {
+      var failed = org.junit.jupiter.api.Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> reconstruct.invoke(server));
+      assertTrue(failed.getCause() instanceof IllegalStateException);
+      org.junit.jupiter.api.Assertions.assertSame(old, server.appServices());
+      org.mockito.Mockito.verify(discarded, org.mockito.Mockito.never()).startIndexingLoop();
+      reconstruct.invoke(server);
+      org.junit.jupiter.api.Assertions.assertSame(replacement, server.appServices());
+      var order = org.mockito.Mockito.inOrder(discarded, old, replacement);
+      order.verify(old).close();
+      order.verify(discarded, org.mockito.Mockito.times(2)).close(); // Rollback, then retained retry.
+      order.verify(old).close();
+      order.verify(replacement).startIndexingLoop();
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  void applicationServiceFailureRetainsServerUntilRetry(@TempDir Path tempDir) throws Exception {
+    KnowledgeServer server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var services = org.mockito.Mockito.mock(WorkerAppServices.class);
+    server.appServices = services;
+    org.mockito.Mockito.doThrow(new java.io.IOException("OCR child still alive"))
+        .doNothing().when(services).close();
+    org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, server::close);
+    assertFalse(server.awaitClosed(0));
+    org.junit.jupiter.api.Assertions.assertSame(services, server.appServices());
+    server.close();
+    assertTrue(server.awaitClosed(0));
+    org.mockito.Mockito.verify(services, org.mockito.Mockito.times(2)).close();
+  }
+
+  @Test
   @DisplayName("false before any close, true after one that completes")
   void awaitClosedDistinguishesTheTwoStates(@TempDir Path tempDir) throws Exception {
     KnowledgeServer server =

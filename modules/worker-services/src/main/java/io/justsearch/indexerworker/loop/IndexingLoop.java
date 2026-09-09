@@ -1115,6 +1115,13 @@ public class IndexingLoop implements Closeable {
       }
     }
 
+    // Retain all later component resources if OCR still owns a task or child. The enclosing
+    // service/server keeps this extractor reachable and can retry close after actual exit.
+    if (contentExtractor != null) {
+      try { contentExtractor.close(); }
+      catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
+    }
+
     // Close NER service — IndexingLoop is the sole closer (KnowledgeServer does not
     // retain a reference). Other borrowed services (embeddingService, spladeEncoder,
     // disambiguationService) are closed by KnowledgeServer after this method returns.
@@ -1124,15 +1131,6 @@ public class IndexingLoop implements Closeable {
         ner.close();
       } catch (Exception e) {
         log.warn("Error closing NER service: {}", e.getMessage());
-      }
-    }
-
-    // Close the timeboxed content extractor (owned by IndexingLoop)
-    if (contentExtractor != null) {
-      try {
-        contentExtractor.close();
-      } catch (Exception e) {
-        log.warn("Error closing content extractor: {}", e.getMessage());
       }
     }
 

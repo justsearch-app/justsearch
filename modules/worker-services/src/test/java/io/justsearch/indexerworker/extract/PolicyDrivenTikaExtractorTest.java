@@ -34,6 +34,31 @@ final class PolicyDrivenTikaExtractorTest {
   @TempDir Path tempDir;
 
   @Test
+  void ocrCapacityRefusalPreservesRealStructuredPdfText() throws Exception {
+    Path pdf = tempDir.resolve("mixed-refused.pdf");
+    writeMixedTextAndImagePdf(pdf);
+    var config = new OcrRoutingConfig(true, List.of("eng"), 20_000, 5, 4096, 40_000_000, null, null);
+    var metrics = new TestMetricRegistry(OcrMetricCatalog.DEFINITIONS);
+    var opens = new java.util.concurrent.atomic.AtomicInteger();
+    try (var runtime = org.mockito.Mockito.mockStatic(TikaOcrRuntime.class);
+        var extractor = new PolicyDrivenTikaExtractor(workers -> {
+          opens.incrementAndGet();
+          throw new io.justsearch.core.execution.EngineExecutorRejectedException(
+              io.justsearch.core.execution.EngineExecutorRejectedException.Reason.INSTANCE_LIMIT,
+              "index.pdf-ocr", 1);
+        }, TikaExtractionPolicy.defaults(), config, new OcrMetricCatalog(metrics))) {
+      runtime.when(() -> TikaOcrRuntime.blockedReason(config)).thenReturn("");
+      ExtractionArtifact result = extractor.extractArtifact(pdf);
+      assertEquals(1, opens.get(), "real mixed-PDF routing must reach the refusing OCR pool");
+      assertTrue(result.result().content().contains("readable digital text"));
+      assertTrue(result.parserId().contains("structured"));
+      assertFalse(result.visualExtractionEvidenceJson().contains("PARSER_FAILED"));
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.FAILED_TOTAL,
+          OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, "INSTANCE_LIMIT")));
+    }
+  }
+
+  @Test
   @Timeout(10)
   void outputLimitProducesValidatedPartialArtifact() throws Exception {
     Path file = tempDir.resolve("long.txt");

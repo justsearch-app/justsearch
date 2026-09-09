@@ -15,8 +15,11 @@ Latest state: [Current C1 verification checkpoint](#current-c1-verification-chec
 The production observer and interrupted-handoff blockers reproduce and pass restored251.
 RuntimeSession close and its enclosing reload/close ownership are implemented and independently
 reviewed: bounded waits retain live resources; reload and close share a lock; failed server close
-retains its index lock and completion latch for retry. Next implementation is OCR child/pool
-termination and one pool per component, then the remaining must-fixes in the supplied order.
+retains its index lock and completion latch for retry. OCR now has one reusable component pool,
+bounded cleanup, retained task/child/temp ownership and structured-text preservation; focused296
+passes61 cases. The final review exposed uncontained Tesseract descendants when the parser JVM
+is forcibly recycled. **Next is parser-process containment**, then the remaining client must-fixes
+in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
 Each subsequent item commit must be build-green and pushed immediately; earlier red WIP
 authorization is historical. Raw evidence hashes and the last full-run summary are now committed
@@ -32,6 +35,9 @@ job passes only after writer recovery's third attempt; earlier failures include 
 deadline hang. Final-guard fatal boot/ingest witnesses are now captured, with exact100 acceptance
 and incarnation2 recovery. The docs headings are corrected; bounded production rename retry remains
 required. These findings are in [hosted-ci.md](evidence/C1/hosted-ci.md).
+Later hosted34363379524 at44039df47 passes every job; inspected system XML has88 cases, zero
+failures,42 skips and no failed retry entries. That checkpoint includes runtime close and the
+publisher regression, before OCR. The reproduced Windows rename defect still requires its fix.
 
 Continue autonomously in `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch
 `worktree-lane-F-A`. A/B are complete at their recorded tiers; C1 is open. C2/D1/D2/E/F remain

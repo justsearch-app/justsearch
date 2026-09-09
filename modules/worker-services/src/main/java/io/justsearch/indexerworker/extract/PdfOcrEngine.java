@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -35,17 +38,17 @@ import org.slf4j.LoggerFactory;
  * The one owned OCR engine: JustSearch renders and OCRs; Tika never spawns tesseract. Each document
  * gets a per-document render loop (serial — PDFBox {@link PDFRenderer} is not thread-safe on a
  * shared {@link PDDocument}) that fans page OCR out to a bounded parallel pool, joins in page order,
- * and owns every child process it spawns.
+ * and owns every child process it spawns. The page pool is shared for the component lifetime;
+ * document cancellation never retires that pool.
  *
  * <p>Two bounds are enforced honestly: a per-invocation timeout and an aggregate per-document
  * elapsed budget that must sit BELOW the outer {@link TimeboxedContentExtractor} 60s timebox so the
  * budget fires first and returns partial page-ordered text (truncated) rather than the whole
- * document being discarded. Every spawned {@link Process} is registered; interrupt/timeout/close
- * forcibly terminates the registered set (the {@code LlamaServerOps} kill discipline applied to
- * tesseract), fixing the interrupt-path orphan leak the previous {@code OcrConfidenceExtractor}
- * left.
+ * document being discarded. Every spawned {@link Process} is retained by its document owner.
+ * Interruption, timeout and close request termination and wait within a deadline. A surviving
+ * child retains its document slot and files for actual-exit cleanup or a later close retry.
  */
-final class PdfOcrEngine {
+final class PdfOcrEngine implements AutoCloseable {
   private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(PdfOcrEngine.class);
   static final int DEFAULT_RENDER_DPI = 300;
   private static final long DEFAULT_BUDGET_MS = 30_000L;
@@ -62,6 +65,11 @@ final class PdfOcrEngine {
   private final int poolSize;
   private final Logger log;
   private final IntFunction<ExecutorService> poolFactory;
+  private final Set<DocumentWork> documents = ConcurrentHashMap.newKeySet();
+  private final Semaphore documentSlots;
+  private volatile boolean closed;
+  private ExecutorService pool;
+  private static final long CLOSE_NANOS = TimeUnit.SECONDS.toNanos(5);
 
   PdfOcrEngine(
       IntFunction<ExecutorService> poolFactory,
@@ -113,6 +121,7 @@ final class PdfOcrEngine {
     this.runtimeSupplier = runtimeSupplier;
     this.renderDpi = renderDpi > 0 ? renderDpi : DEFAULT_RENDER_DPI;
     this.poolSize = Math.max(1, poolSize);
+    this.documentSlots = new Semaphore(this.poolSize);
     this.log = log == null ? DEFAULT_LOG : log;
   }
 
@@ -186,14 +195,12 @@ final class PdfOcrEngine {
   /** OCRs a single pre-existing raster image (no rendering); text carries no page marker. */
   OcrEngineResult ocrImage(Path image, int maxOcrChars) {
     Invocation invocation = resolveInvocation();
-    Set<Process> live = ConcurrentHashMap.newKeySet();
-    Path tempDir = null;
+    DocumentWork work = null;
     long deadlineNanos = System.nanoTime() + budgetMs() * 1_000_000L;
     try {
-      tempDir = Files.createTempDirectory("justsearch-ocr-");
-      Path base = tempDir.resolve("image");
-      PageOcr page = runTesseract(invocation, live, image, base, remainingBudgetMs(deadlineNanos),
-          () -> Thread.currentThread().isInterrupted());
+      work = beginDocument();
+      Path base = work.tempDir.resolve("image");
+      PageOcr page = runTesseract(invocation, work, image, base, remainingBudgetMs(deadlineNanos));
       if (page.failureReason() != null) {
         return OcrEngineResult.failed(page.failureReason());
       }
@@ -208,38 +215,34 @@ final class PdfOcrEngine {
       }
       return new OcrEngineResult(text, page.confidence(), truncated, null, 1);
     } catch (InterruptedException e) {
-      killAll(live);
       Thread.currentThread().interrupt();
       return OcrEngineResult.failed(OcrSkipReason.TIMEOUT);
     } catch (IOException e) {
       log.debug("Single-image OCR failed for {}: {}", image.getFileName(), e.getMessage());
       return OcrEngineResult.failed(OcrSkipReason.UNKNOWN);
     } finally {
-      killAll(live);
-      deleteRecursively(tempDir);
+      if (work != null) work.finishCaller();
     }
   }
 
   private OcrEngineResult renderAndOcr(Path pdf, List<Integer> pageSubset, int maxOcrChars) {
     Invocation invocation = resolveInvocation();
-    Set<Process> live = ConcurrentHashMap.newKeySet();
-    Path tempDir = null;
-    ExecutorService pool = null;
+    DocumentWork work = null;
     long deadlineNanos = System.nanoTime() + budgetMs() * 1_000_000L;
     boolean truncated = false;
     boolean interrupted = false;
     boolean sawTimeout = false;
     int oversizePagesSkipped = 0;
     OcrSkipReason spawnFailure = null;
-    EngineExecutorRejectedException executorRefusal = null;
+    java.util.concurrent.RejectedExecutionException executorRefusal = null;
     List<PageTask> tasks = new ArrayList<>();
     StringBuilder merged = new StringBuilder();
     List<OcrConfidenceExtractor.Summary> confidences = new ArrayList<>();
     int pagesProcessed = 0;
     try {
-      tempDir = Files.createTempDirectory("justsearch-ocr-");
-      pool = Objects.requireNonNull(poolFactory.apply(poolSize), "poolFactory returned null");
-      ExecutorService executionPool = pool;
+      work = beginDocument();
+      ExecutorService executionPool = pagePool();
+      DocumentWork documentWork = work;
       Semaphore inFlight = new Semaphore(poolSize);
       try (PDDocument document = Loader.loadPDF(pdf.toFile())) {
         PDFRenderer renderer = new PDFRenderer(document);
@@ -249,7 +252,7 @@ final class PdfOcrEngine {
           targets = targets.subList(0, maxPages);
           truncated = true;
         }
-        Path renderDir = tempDir;
+        Path renderDir = work.tempDir;
         for (int pageIndex : targets) {
           if (Thread.interrupted()) {
             interrupted = true;
@@ -265,7 +268,11 @@ final class PdfOcrEngine {
             truncated = true;
             continue;
           }
-          inFlight.acquire();
+          if (!inFlight.tryAcquire(Math.max(0, remainingBudgetMs(deadlineNanos)), TimeUnit.MILLISECONDS)) {
+            truncated = true;
+            sawTimeout = true;
+            break;
+          }
           boolean submitted = false;
           try {
             Path png = renderDir.resolve("page-" + pageIndex + ".png");
@@ -276,19 +283,18 @@ final class PdfOcrEngine {
                 "png",
                 png.toFile());
             Path base = renderDir.resolve("page-" + pageIndex);
+            submitted = true; // submit's actual-exit callback also releases on refusal.
             Future<PageOcr> future =
-                pool.submit(
-                    () -> {
-                      try {
-                        return runTesseract(invocation, live, png, base, remainingBudgetMs(deadlineNanos),
-                            executionPool::isShutdown);
-                      } finally {
-                        inFlight.release();
-                        deleteQuietly(png);
-                      }
-                    });
+                documentWork.submit(executionPool, () -> {
+                  try {
+                    return runTesseract(invocation, documentWork, png, base,
+                        remainingBudgetMs(deadlineNanos));
+                  } catch (InterruptedException cancelled) {
+                    Thread.currentThread().interrupt();
+                    throw new CompletionException(cancelled);
+                  }
+                }, inFlight::release);
             tasks.add(new PageTask(pageIndex, future));
-            submitted = true;
           } finally {
             if (!submitted) {
               inFlight.release();
@@ -333,7 +339,7 @@ final class PdfOcrEngine {
       }
     } catch (InterruptedException e) {
       interrupted = true;
-    } catch (EngineExecutorRejectedException e) {
+    } catch (java.util.concurrent.RejectedExecutionException e) {
       executorRefusal = e;
     } catch (IOException | RuntimeException e) {
       EngineFutures.rethrowExecutorRefusal(e);
@@ -341,19 +347,7 @@ final class PdfOcrEngine {
       log.debug("PDF OCR failed for {}: {}", pdf.getFileName(), e.getMessage());
       spawnFailure = OcrSkipReason.UNKNOWN;
     } finally {
-      try {
-        cancelAll(tasks);
-      } finally {
-        try {
-          shutdownAndAwaitTermination(pool, live);
-        } finally {
-          try {
-            killAll(live);
-          } finally {
-            if (live.isEmpty()) deleteRecursively(tempDir);
-          }
-        }
-      }
+      if (work != null) work.finishCaller();
     }
     if (interrupted) {
       cancelAll(tasks);
@@ -388,15 +382,14 @@ final class PdfOcrEngine {
   private static void rethrowFatal(Throwable failure) {
     Throwable cause = failure;
     while (cause instanceof ExecutionException
-        || cause instanceof java.util.concurrent.CompletionException) {
+        || cause instanceof CompletionException) {
       cause = cause.getCause();
     }
     if (cause instanceof Error fatal) throw fatal;
   }
 
   private PageOcr runTesseract(
-      Invocation invocation, Set<Process> live, Path image, Path outputBase, long remainingBudgetMs,
-      java.util.function.BooleanSupplier cancelled)
+      Invocation invocation, DocumentWork work, Path image, Path outputBase, long remainingBudgetMs)
       throws InterruptedException {
     long waitMs = Math.min(remainingBudgetMs, perInvocationTimeoutMs());
     if (waitMs <= 0) {
@@ -416,10 +409,11 @@ final class PdfOcrEngine {
     Process process = null;
     try {
       process = invocation.starter().start(command);
-      live.add(process);
-      // A starter can consume interruption before publishing the process. The owning pool
-      // remains shut down, so late registration must observe that durable lifecycle fact.
-      if (cancelled.getAsBoolean()) throw new InterruptedException("OCR owner cancelled");
+      work.live.add(process);
+      // A starter may consume interruption. Document cancellation remains visible after it returns.
+      if (work.cancelled.get() || closed || Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("OCR owner cancelled");
+      }
       boolean exited = process.waitFor(waitMs, TimeUnit.MILLISECONDS);
       if (!exited) {
         process.destroyForcibly();
@@ -444,8 +438,7 @@ final class PdfOcrEngine {
       return PageOcr.failed(OcrSkipReason.UNKNOWN);
     } finally {
       if (process != null) {
-        terminateAndWait(process);
-        live.remove(process);
+        if (terminateAndWait(process, System.nanoTime() + CLOSE_NANOS)) work.live.remove(process);
       }
     }
   }
@@ -539,53 +532,247 @@ final class PdfOcrEngine {
     return TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime());
   }
 
-  private void killAll(Set<Process> live) {
-    Throwable failure = null;
-    for (Process process : live) {
-      try {
-        terminateAndWait(process);
-        live.remove(process);
-      } catch (RuntimeException | Error cleanup) {
-        if (failure == null) failure = cleanup;
-        else if (failure != cleanup) failure.addSuppressed(cleanup);
-      }
+  private DocumentWork beginDocument() throws IOException {
+    reapDocuments();
+    DocumentWork work;
+    synchronized (this) {
+      if (closed) throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+      if (!documentSlots.tryAcquire()) throw refusal(EngineExecutorRejectedException.Reason.QUEUE_LIMIT);
+      work = new DocumentWork();
+      // Reserve actual caller ownership before any filesystem acquisition. Close may cancel and
+      // time out this caller, but cannot miss it or discard a directory whose creation is pending.
+      documents.add(work);
     }
-    if (failure instanceof RuntimeException runtime) throw runtime;
-    if (failure instanceof Error fatal) throw fatal;
+    try {
+      if (work.cancelled.get()) throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+      work.tempDir = Files.createTempDirectory("justsearch-ocr-");
+      if (closed || work.cancelled.get()) throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+      return work;
+    } catch (IOException | RuntimeException | Error failure) {
+      try { work.finishCaller(); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
-  private static void terminateAndWait(Process process) {
-    if (!process.isAlive()) return;
-    process.destroyForcibly();
+  private synchronized ExecutorService pagePool() {
+    if (closed) throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+    if (pool == null) pool = Objects.requireNonNull(poolFactory.apply(poolSize), "poolFactory returned null");
+    return pool;
+  }
+
+  private OcrCapacityException refusal(EngineExecutorRejectedException.Reason reason) {
+    return new OcrCapacityException(reason);
+  }
+
+  /** Document capacity is local OCR ownership, not an executor's registered retry policy. */
+  static final class OcrCapacityException extends java.util.concurrent.RejectedExecutionException {
+    private final EngineExecutorRejectedException.Reason reason;
+    OcrCapacityException(EngineExecutorRejectedException.Reason reason) {
+      super("OCR document owner unavailable: " + reason);
+      this.reason = reason;
+    }
+    EngineExecutorRejectedException.Reason reason() { return reason; }
+  }
+
+  private void reapDocuments() {
+    for (DocumentWork work : documents) work.reap();
+  }
+
+  @Override
+  public void close() {
+    ExecutorService ownedPool;
+    synchronized (this) {
+      closed = true;
+      ownedPool = pool;
+    }
+    long deadline = System.nanoTime() + CLOSE_NANOS;
     boolean interrupted = Thread.interrupted();
     try {
-      while (process.isAlive()) {
-        try { process.waitFor(); }
-        catch (InterruptedException cancelled) { interrupted = true; }
+      Throwable failure = null;
+      for (DocumentWork work : documents) {
+        try { work.cancel(); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+      }
+      try { if (ownedPool != null) ownedPool.shutdownNow(); }
+      catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+      for (DocumentWork work : documents) {
+        try { work.awaitCleanup(deadline); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+      }
+      if (ownedPool != null && !ownedPool.isTerminated()) {
+        try {
+          ownedPool.awaitTermination(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException cancelled) {
+          interrupted = true;
+        }
+      }
+      reapDocuments();
+      rethrowCleanup(failure);
+      if (!documents.isEmpty() || (ownedPool != null && !ownedPool.isTerminated())) {
+        log.warn("OCR close deadline: {} document owners remain, pool terminated={}",
+            documents.size(), ownedPool == null || ownedPool.isTerminated());
+        throw new IllegalStateException("OCR resources still owned; close may be retried");
       }
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }
   }
 
-  private static void cancelAll(List<PageTask> tasks) {
-    for (PageTask task : tasks) {
-      task.future().cancel(true);
+  private static Throwable combine(Throwable first, Throwable next) {
+    if (first == null) return next;
+    if (first == next) return first;
+    if (next instanceof Error && !(first instanceof Error)) {
+      next.addSuppressed(first);
+      return next;
+    }
+    first.addSuppressed(next);
+    return first;
+  }
+
+  private static void rethrowCleanup(Throwable failure) {
+    if (failure instanceof Error fatal) throw fatal;
+    if (failure instanceof RuntimeException runtime) throw runtime;
+  }
+
+  private static boolean terminateAndWait(Process process, long deadline) {
+    if (!process.isAlive()) return true;
+    process.destroyForcibly();
+    long remaining = deadline - System.nanoTime();
+    if (remaining <= 0) return !process.isAlive();
+    try {
+      return process.waitFor(remaining, TimeUnit.NANOSECONDS) && !process.isAlive();
+    } catch (InterruptedException cancelled) {
+      Thread.currentThread().interrupt();
+      return false;
     }
   }
 
-  /**
-   * Kills registered processes, then waits for actual task exit. A process whose starter
-   * consumed interruption observes the pool shutdown state after registration and kills/waits
-   * itself. The final sweep and temp cleanup therefore run only after tasks and children exit.
-   */
-  private void shutdownAndAwaitTermination(ExecutorService pool, Set<Process> live) {
-    if (pool == null) {
-      return;
+  private static void cancelAll(List<PageTask> tasks) {
+    for (PageTask task : tasks) task.future().cancel(true);
+  }
+
+  /** Retains files/children beyond a bounded return; actual exit alone releases the bounded slot. */
+  private final class DocumentWork {
+    private volatile Path tempDir;
+    private final Set<Process> live = ConcurrentHashMap.newKeySet();
+    private final List<Future<PageOcr>> tasks = new CopyOnWriteArrayList<>();
+    private final AtomicBoolean cancelled = new AtomicBoolean();
+    private final AtomicBoolean disposed = new AtomicBoolean();
+    private boolean disposing;
+    private int owners = 1; // The rendering/image caller also owns the files.
+
+    synchronized Future<PageOcr> submit(ExecutorService executor,
+        Supplier<PageOcr> supplier, Runnable releasePermit) {
+      if (cancelled.get() || closed) {
+        releasePermit.run();
+        throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+      }
+      owners++;
+      var task = EngineFutures.supplyAsync(supplier, executor, () -> {
+        try { releasePermit.run(); }
+        finally { exit(); }
+      });
+      tasks.add(task);
+      return task;
     }
-    pool.shutdownNow();
-    try { killAll(live); }
-    finally { pool.close(); }
+
+    void exit() {
+      synchronized (this) {
+        owners--;
+        notifyAll();
+      }
+      reap();
+    }
+
+    void cancel() {
+      synchronized (this) { cancelled.set(true); }
+      Throwable failure = null;
+      for (Future<PageOcr> task : tasks) {
+        try { task.cancel(true); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+      }
+      // Request every kill before waiting for any child, even if another child refuses termination.
+      for (Process process : live) {
+        try { if (process.isAlive()) process.destroyForcibly(); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+      }
+      rethrowCleanup(failure);
+    }
+
+    void finishCaller() {
+      long deadline = System.nanoTime() + CLOSE_NANOS;
+      boolean interrupted = Thread.interrupted();
+      try {
+        Throwable failure = null;
+        try { cancel(); }
+        catch (RuntimeException | Error cleanup) { failure = cleanup; }
+        try { exit(); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+        try { awaitCleanup(deadline); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+        rethrowCleanup(failure);
+        if (!disposed.get()) log.warn("OCR cleanup deadline: retained document {} with {} child processes",
+            tempDir, live.size());
+      } finally {
+        if (interrupted) Thread.currentThread().interrupt();
+      }
+    }
+
+    void awaitCleanup(long deadline) {
+      synchronized (this) {
+        while (owners > 0) {
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) break;
+          try { TimeUnit.NANOSECONDS.timedWait(this, remaining); }
+          catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+        }
+      }
+      Throwable failure = null;
+      for (Process process : List.copyOf(live)) {
+        try { if (terminateAndWait(process, deadline)) live.remove(process); }
+        catch (RuntimeException | Error cleanup) { failure = combine(failure, cleanup); }
+      }
+      reap();
+      rethrowCleanup(failure);
+      synchronized (this) {
+        while (disposing && !disposed.get()) {
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) break;
+          try { TimeUnit.NANOSECONDS.timedWait(this, remaining); }
+          catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+        }
+      }
+    }
+
+    void reap() {
+      synchronized (this) {
+        if (owners != 0) return;
+        live.removeIf(process -> !process.isAlive());
+        if (!live.isEmpty() || disposing || disposed.get()) return;
+        disposing = true;
+      }
+      try {
+        if (deleteRecursively(tempDir)) {
+          synchronized (this) {
+            documents.remove(this);
+            documentSlots.release();
+            disposed.set(true);
+          }
+        }
+      } finally {
+        synchronized (this) {
+          disposing = false;
+          notifyAll();
+        }
+      }
+    }
   }
 
   private static String readQuietly(Path path) {
@@ -596,24 +783,10 @@ final class PdfOcrEngine {
     }
   }
 
-  private static void deleteQuietly(Path path) {
-    try {
-      Files.deleteIfExists(path);
-    } catch (IOException ignored) {
-      // Best-effort per-page cleanup; the per-document temp directory is swept in finally.
-    }
-  }
-
-  private static void deleteRecursively(Path dir) {
-    if (dir == null) {
-      return;
-    }
-    // Two bounded passes: a cancelled-but-still-running page task (or a killed tesseract child
-    // finishing its last write) can mutate the directory concurrently with the sweep. The lazy
-    // Files.walk stream then throws UncheckedIOException DURING iteration — a RuntimeException
-    // that used to escape this "best-effort" method entirely (observed as a CI-only
-    // NoSuchFileException failure of PdfOcrEngineTest.timeoutWithZeroCompletedPagesReportsTimeout,
-    // run 29097906129) — and a file written after the walk snapshot can survive the first pass.
+  private static boolean deleteRecursively(Path dir) {
+    if (dir == null) return true;
+    // Only quiescent owners enter this sweep. Two passes tolerate external file-system races;
+    // unsuccessful deletion retains the document slot for a later lifecycle retry.
     for (int attempt = 0; attempt < 2 && Files.exists(dir); attempt++) {
       try (var paths = Files.walk(dir)) {
         paths
@@ -631,6 +804,7 @@ final class PdfOcrEngine {
         // then give up; the sweep is best-effort by contract.
       }
     }
+    return Files.notExists(dir);
   }
 
   /** One engine call's resolved spawn recipe: executable plus environment-carrying starter. */
