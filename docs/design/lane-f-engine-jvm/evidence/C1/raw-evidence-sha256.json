@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-09T14:12:32.323419+00:00",
-  "baseHead": "6bf931408f1673af7d4c28ffddf508208b115a98",
+  "generatedAt": "2026-09-09T14:13:17.531311+00:00",
+  "baseHead": "0b45b4a0ffb96266e11a47dc2d9d7f8ea587b7c9",
   "scope": "Every literal tmp-path citation in C1 evidence Markdown at generation, with brace/glob expansion and recursive hashes for available directory citations. The shared dev-runner path resolves in the main repo. Bare tmp/ denotes a storage root, not a raw artifact. Unresolved strings are retained honestly, never treated as proof.",
   "retention": "Local raw artifacts remain in this lane worktree through lane F acceptance. Hosted artifacts retain their run-specific expiry. Hashes establish identity, not availability; citations name accessible local paths or hosted run artifacts.",
   "citations": [
@@ -15867,6 +15867,42 @@
         "tmp/c1-batch4-green-128/app-observability/TEST-io.justsearch.app.observability.surface.SurfaceStateSchemaLoaderTest.xml",
         "tmp/c1-batch4-green-128/dead-code-audit/TEST-io.justsearch.deadcode.WholeProgramDeadCodeTest.xml",
         "tmp/c1-batch4-green-128/worker-services/TEST-io.justsearch.indexerworker.services.execute.SearchExecutorFanoutLifetimeTest.xml"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/fanout-parent-exit.md",
+      "line": 7,
+      "citation": "tmp/c1-runtime-final-integrated-271.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-final-integrated-271.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/fanout-parent-exit.md",
+      "line": 8,
+      "citation": "tmp/c1-runtime-final-integrated-results-271/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-final-integrated-results-271/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/fanout-parent-exit.md",
+      "line": 19,
+      "citation": "tmp/c1-runtime-build-and-ownership-273.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-build-and-ownership-273.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/fanout-parent-exit.md",
+      "line": 19,
+      "citation": "tmp/c1-runtime-ownership-restored-274.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-ownership-restored-274.txt"
       ]
     },
     {
@@ -68464,6 +68500,22 @@
     "tmp/c1-batch4-restored-128.txt": {
       "bytes": 41736,
       "sha256": "a88808c42e6c96aca3ad815e4e1aea66a5c854ae2171a99a36e08f561e302c8c"
+    },
+    "tmp/c1-runtime-final-integrated-271.txt": {
+      "bytes": 101041,
+      "sha256": "5c02a8c788e70beebf9ef835a298755c76a7a1e44daea1661e29a5d33d21ffeb"
+    },
+    "tmp/c1-runtime-final-integrated-results-271/manifest.json": {
+      "bytes": 503415,
+      "sha256": "a10c41a1e345fa6d92ccb3b7a0ab677882cda1920777bb0b9252b0f52b388a16"
+    },
+    "tmp/c1-runtime-build-and-ownership-273.txt": {
+      "bytes": 74784,
+      "sha256": "010ced37d91211e18d72689de57142fbe252c4c2bb79459e34034e66369c6b1d"
+    },
+    "tmp/c1-runtime-ownership-restored-274.txt": {
+      "bytes": 38471,
+      "sha256": "5563918618cb5ab5577557fd828ada02b6d21f2e0692e2bbcadae866b7abe3cd"
     },
     "tmp/c1-batch4-full-results-36/adapters-lucene/TEST-io.justsearch.adapters.lucene.analyzers.AnalyzerDescriptorTest.xml": {
       "bytes": 491,

@@ -40,6 +40,8 @@ final class EngineFanoutOwnershipTest {
     var entered = new CountDownLatch(1);
     var interrupted = new CountDownLatch(1);
     var release = new CountDownLatch(1);
+    var parentCleanupEntered = new CountDownLatch(1);
+    var releaseParentCleanup = new CountDownLatch(1);
     var submissions = new AtomicInteger();
     var laterBodies = new AtomicInteger();
     var refusal = new EngineExecutorRejectedException(
@@ -75,6 +77,16 @@ final class EngineFanoutOwnershipTest {
             submissions.incrementAndGet();
             group.submit(laterBodies::incrementAndGet);
           }
+        } finally {
+          if (interruptCaller) {
+            parentCleanupEntered.countDown();
+            boolean interruptedDuringCleanup = false;
+            while (releaseParentCleanup.getCount() != 0) {
+              try { releaseParentCleanup.await(); }
+              catch (InterruptedException expected) { interruptedDuringCleanup = true; }
+            }
+            if (interruptedDuringCleanup) Thread.currentThread().interrupt();
+          }
         }
         return SearchResponse.getDefaultInstance();
       });
@@ -106,12 +118,23 @@ final class EngineFanoutOwnershipTest {
         assertEquals(1, load.startedTotal(), "a fanout does not wrap the work twice");
         release.countDown();
         assertTrue(childExecutor.awaitTermination(3, TimeUnit.SECONDS));
+        if (interruptCaller) {
+          assertTrue(parentCleanupEntered.await(3, TimeUnit.SECONDS));
+          assertEquals(1, admission.activeWorkCount(), "the parent call still owns admission after child exit");
+          assertEquals(1, load.inFlight(), "the parent call still owns pacing during cleanup");
+        }
+        releaseParentCleanup.countDown();
+        long releaseDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while ((admission.activeWorkCount() != 0 || load.inFlight() != 0)
+            && System.nanoTime() < releaseDeadline) Thread.sleep(1);
+        assertEquals(0, admission.activeWorkCount(), "all actual owners must release admission");
         assertEquals(0, load.inFlight());
         try (var next = admission.attach(TestEngineContexts.BACKGROUND)) {
           assertNotNull(next.context().workId().orElseThrow());
         }
       } finally {
         release.countDown();
+        releaseParentCleanup.countDown();
         caller.interrupt();
         caller.join(3000);
       }
