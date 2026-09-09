@@ -86,6 +86,13 @@ export const LOCAL_MESSAGE_CLASSES = {
     defaultSeverity: 'error',
     locality: 'window',
   },
+  // Admission control paused a request before execution; only the latest wait notice matters.
+  'core.engine.wait': {
+    renderHint: 'EPHEMERAL',
+    supersede: true,
+    defaultSeverity: 'info',
+    locality: 'window',
+  },
   // Tempdoc 941 — a per-event handler inside `consumeShapeStream` threw, so part of the response
   // is missing from the render while the stream itself continues (`api/streams.ts`).
   //

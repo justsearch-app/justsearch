@@ -184,6 +184,41 @@ describe('http module', () => {
 
       expect(callCount).toBe(1); // Should not retry
     });
+
+    it.each([
+      ['UPGRADE_PREPARING', undefined],
+      ['SERVICE_UNAVAILABLE', false],
+    ])('does not retry an unsafe 503 (%s)', async (errorCode, retrySafe) => {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        error: 'Request cannot be replayed',
+        errorCode,
+        ...(retrySafe === undefined ? {} : { retrySafe }),
+      }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+
+      const { request } = await import('./http');
+      await expect(request('http://localhost:3000', '/api/test', { retries: 3 }))
+        .rejects.toMatchObject({ code: errorCode, status: 503 });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry after fetch rejects with a custom caller abort reason', async () => {
+      const controller = new AbortController();
+      const reason = new Error('caller stopped this request');
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        controller.abort(reason);
+        return Promise.reject(reason);
+      });
+
+      const { request } = await import('./http');
+      await expect(request('http://localhost:3000', '/api/test', {
+        signal: controller.signal,
+        retries: 3,
+      })).rejects.toBe(reason);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('generateSessionToken utility (backend)', () => {
