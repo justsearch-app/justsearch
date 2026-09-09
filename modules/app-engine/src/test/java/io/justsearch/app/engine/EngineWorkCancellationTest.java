@@ -92,6 +92,39 @@ final class EngineWorkCancellationTest {
   }
 
   @Test
+  void scanObservationCapacityFailureRemainsTypedAndReleasesWork() throws Exception {
+    var admission = new EngineAdmissionController(1, 1, 1);
+    var load = new ForegroundLoad();
+    var completed = new CompletableFuture<Void>();
+    var failure = new io.justsearch.core.execution.EngineExecutorRejectedException(
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+        "head.scan-progress", 1);
+    var ingest = mock(WorkerIngestService.class);
+    doAnswer(invocation -> {
+      java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progress = invocation.getArgument(1);
+      progress.accept(io.justsearch.ipc.ScanRootProgress.newBuilder().setScanId("capacity").build());
+      return null;
+    }).when(ingest).scanRoot(any(), any(), any());
+    var services = mock(WorkerAppServices.class);
+    when(services.ingestService()).thenReturn(ingest);
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var owner = admission.admit(TestEngineContexts.FOREGROUND, false);
+        var client = new EngineKnowledgeClient(executors, () -> services,
+            new ForegroundLoadGate(load), 5_000, 100, IpcTelemetry.noop(), () -> {}, admission)) {
+      owner.onCompletion(() -> completed.complete(null));
+      assertSame(failure, assertThrows(io.justsearch.core.execution.EngineExecutorRejectedException.class,
+          () -> client.executeScanRoot(io.justsearch.ipc.ScanRootRequest.getDefaultInstance(),
+              null, event -> { throw failure; }, owner.context())));
+      owner.close();
+      completed.get(3, TimeUnit.SECONDS);
+      assertEquals(0, load.inFlight());
+      try (var replacement = admission.attach(TestEngineContexts.FOREGROUND)) {
+        assertTrue(replacement.context().workId().isPresent());
+      }
+    }
+  }
+
+  @Test
   void closingAnIdleStreamClosesFeedAndReleasesWorkWithoutAnotherDelta() throws Exception {
     var admission = new EngineAdmissionController(1, 1, 1);
     var load = new ForegroundLoad();

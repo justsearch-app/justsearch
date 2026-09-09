@@ -944,6 +944,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
     Throwable failed = deliveryFailure.get();
     if (failed != null) {
+      io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(failed);
+      io.justsearch.core.execution.EngineFutures.rethrowCancellation(failed);
       throw WorkerServiceException.internal("scanRoot progress delivery failed: " + failed);
     }
     ScanRootProgress terminal = last.get();

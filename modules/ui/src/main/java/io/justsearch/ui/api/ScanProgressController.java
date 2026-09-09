@@ -24,12 +24,12 @@ import org.slf4j.LoggerFactory;
  *       {@code CLIENT_CANCELLED}, {@code IO_ERROR}, etc. on failure paths).
  * </ul>
  *
- * <p>Closing the SSE connection (EventSource.close() on the client) propagates a gRPC cancel
+ * <p>Closing the SSE connection (EventSource.close() on the client) propagates a cancel
  * to the worker via the registered {@link io.justsearch.app.services.worker.CancelToken} —
  * the worker's scan terminates within the next batch and emits a CLIENT_CANCELLED terminal.
  *
  * <p>Late subscribers (connecting after the scan completes, but within the registry's
- * retention window — default 30s) see the full event sequence replayed. Subscribers past
+ * retention window — default 30s) see the retained event suffix replayed. Subscribers past
  * retention see a single synthetic {@code complete} event with terminalReasonCode
  * {@code UNKNOWN_SCAN_OR_RETENTION_EXPIRED}.
  */
@@ -51,10 +51,10 @@ public final class ScanProgressController {
       ctx.status(400).result("scanId path parameter is required");
       return;
     }
-    sseWriter.initSseHeaders(ctx, "/api/scans/{scanId}/progress");
     boolean clientStillConnected = true;
-    try {
-      for (ScanProgressEvent event : registry.subscribe(scanId)) {
+    try (var subscription = registry.subscribe(scanId)) {
+      sseWriter.initSseHeaders(ctx, "/api/scans/{scanId}/progress");
+      for (ScanProgressEvent event : subscription) {
         if (!clientStillConnected) {
           break;
         }
@@ -75,6 +75,7 @@ public final class ScanProgressController {
         }
       }
     } catch (RuntimeException e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       log.warn("Scan progress stream for scanId={} failed: {}", scanId, e.getMessage());
       sseWriter.writeEvent(ctx, "error", Map.of("message", e.getMessage() == null ? "" : e.getMessage()));
     }
