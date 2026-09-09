@@ -104,7 +104,7 @@ public final class ChaosExtractionSandboxChild {
       SandboxExtractionResponse response;
       try {
         ExtractionArtifact artifact =
-            new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.extract.ExtractionSandboxChild::openOcrPool, policy, ocrConfig).extractArtifact(file);
+            new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, policy, ocrConfig).extractArtifact(file);
         response = SandboxExtractionResponse.fromArtifact(artifact);
       } catch (Exception e) {
         response =

@@ -55,3 +55,10 @@ identify reused results). Keep all raw artifacts through lane completion plus 30
 
 The child factory remains guarded by the separate executable census item. Full/stress, real-model,
 hosted/platform and final stage-wide validation remain required; this is local producer proof.
+
+
+Integrated build140 found one missed redundant ExtractionSandboxChild qualifier in the chaos
+fixture after OCR factory injection. Root removed only that qualifier. Restored build143
+(`./gradlew.bat build -x test`) passed all332 tasks, including configured integration tests and
+PMD source sets. Logs: tmp/c1-batch4-build-{140,143}.txt. This is the integrated compile/quality
+boundary over3f6fdeae5 plus the one-line fixture correction, not the pending full/stress/live proof.
