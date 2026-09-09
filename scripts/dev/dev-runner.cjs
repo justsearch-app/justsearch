@@ -898,6 +898,19 @@ async function writeSupervisorState(dataDir, record) {
   }
 }
 
+function createSupervisorStateWriter(dataDir, write = writeSupervisorState) {
+  // One run owns one transition stream. The handoff watcher and child-exit handler can publish
+  // concurrently; unique temp names alone would still let an older state land after a newer one.
+  let tail = Promise.resolve();
+  return record => {
+    const publication = tail.then(() => write(dataDir, record));
+    // Keep later transitions publishable after a rejected writer. The submitting caller still
+    // receives that rejection; production writeSupervisorState also reports filesystem failures.
+    tail = publication.catch(() => {});
+    return publication;
+  };
+}
+
 /**
  * The cooldown FLOOR: wait until the dead incarnation has actually let go (design 7.1, stage B §2).
  *
@@ -2561,10 +2574,11 @@ async function cmdStart(opts) {
   let observedRequestReason = null;
   let lastExitRecord = null;
   let supervising = true;
+  const publishSupervisorRecord = createSupervisorStateWriter(dataDir);
 
   const publishSupervisorState = async (state, extra = {}) => {
     supervisorState = state;
-    await writeSupervisorState(dataDir, buildSupervisorState({
+    await publishSupervisorRecord(buildSupervisorState({
       state,
       runId,
       incarnation,
@@ -3355,6 +3369,7 @@ if (require.main === module) {
       essentialStatusReady,
       buildSupervisorState,
       writeSupervisorState,
+      createSupervisorStateWriter,
       supervisorStatePath,
       supervisorHistoryPath,
       shutdownRequestPath,

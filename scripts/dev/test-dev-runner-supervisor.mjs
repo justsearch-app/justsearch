@@ -28,6 +28,7 @@ const require = createRequire(import.meta.url);
 const {
   buildSupervisorState,
   writeSupervisorState,
+  createSupervisorStateWriter,
   supervisorStatePath,
   supervisorHistoryPath,
   writeShutdownRequestFile,
@@ -69,6 +70,42 @@ function testStateRecordsWhichPolicyItRanUnder() {
   assert.equal(harness.policyProfile, 'harness');
   assert.deepEqual(harness.policyOverrides, ['stabilityWindowMs']);
   console.log('test-dev-runner-supervisor: the state record names the policy it ran under — PASS');
+}
+
+async function testOverlappingStatePublicationsStayInTransitionOrder() {
+  const root = tempRoot('ordered-state');
+  let releaseFirst;
+  const blocked = new Promise(resolve => { releaseFirst = resolve; });
+  const started = [];
+  const dataDir = path.join(root, 'data');
+  const publish = createSupervisorStateWriter(dataDir, async (directory, record) => {
+    started.push(record.state);
+    if (record.state === 'stopping') await blocked;
+    await writeSupervisorState(directory, record);
+  });
+  const stopping = publish(buildSupervisorState({
+    state: 'stopping', runId: 'r1', incarnation: 1, policy: PRODUCT_POLICY, updatedAt: 'T1',
+  }));
+  const restarting = publish(buildSupervisorState({
+    state: 'restarting', runId: 'r1', incarnation: 1, policy: PRODUCT_POLICY, updatedAt: 'T2',
+  }));
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(started, ['stopping'], 'the later transition cannot enter the shared temp-file writer');
+    releaseFirst();
+    await Promise.all([stopping, restarting]);
+    assert.deepEqual(started, ['stopping', 'restarting']);
+    assert.equal(JSON.parse(fs.readFileSync(supervisorStatePath(dataDir), 'utf8')).state, 'restarting');
+    assert.equal(fs.existsSync(`${supervisorStatePath(dataDir)}.tmp`), false);
+    console.log('test-dev-runner-supervisor: overlapping transitions publish in order — PASS');
+  } finally {
+    releaseFirst();
+    await Promise.allSettled([stopping, restarting]);
+    const resolved = path.resolve(root);
+    assert.equal(path.dirname(resolved), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(resolved).startsWith('justsearch-supervisor-ordered-state-'));
+    fs.rmSync(resolved, { recursive: true, force: true });
+  }
 }
 
 async function testTerminalStateIsMirroredAndNonTerminalIsNot() {
@@ -351,6 +388,7 @@ async function main() {
   assert.equal(essentialStatusReady(null), false);
   console.log('test-dev-runner-supervisor: bounded liveness and essential readiness — PASS');
   testStateRecordsWhichPolicyItRanUnder();
+  await testOverlappingStatePublicationsStayInTransitionOrder();
   await testTerminalStateIsMirroredAndNonTerminalIsNot();
   await testHostRequestWriterAndHandoffAdmission();
   await testHandleReleaseWaitsForALiveProcess();
