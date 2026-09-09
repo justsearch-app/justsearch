@@ -207,6 +207,7 @@ final class RuntimeSession implements AutoCloseable {
   final PruneOps pruneOps; // null in READ_ONLY / DEFERRED / test ctor
 
   private volatile boolean closed;
+  private int taskOwners;
 
   /** Linearizes one terminal-writer notification against this runtime's intentional retirement. */
   private final Object terminalWriterFailureLock = new Object();
@@ -712,12 +713,40 @@ final class RuntimeSession implements AutoCloseable {
   // Close — mirrors LLM.close ordering verbatim
   // ==========================================================================
 
+  /** One generation lease per fanout group, retained before any child can be accepted. */
+  synchronized Runnable retainTaskLifetime() {
+    if (closed) throw new IllegalStateException("Lucene runtime is closing");
+    taskOwners++;
+    var released = new java.util.concurrent.atomic.AtomicBoolean();
+    return () -> {
+      if (!released.compareAndSet(false, true)) return;
+      synchronized (RuntimeSession.this) {
+        taskOwners--;
+        RuntimeSession.this.notifyAll();
+      }
+    };
+  }
+
   @Override
-  public void close() {
+  public synchronized void close() {
     retireTerminalWriterFailureNotifications();
     if (closed) return;
     closed = true;
+    boolean interrupted = Thread.interrupted();
+    try {
+      // Accepted children may not have acquired their searcher yet. Keep the snapshot live until
+      // every actual-exit callback releases its generation owner; cancellation alone is insufficient.
+      while (taskOwners != 0) {
+        try { wait(); }
+        catch (InterruptedException expected) { interrupted = true; }
+      }
+      closeResources();
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
 
+  private void closeResources() {
     // Capture snapshot before nulling — close from the captured copy.
     LifecycleSnapshot snap = snapshot;
     snapshot = null; // atomic — all ops fail-fast on subsequent calls

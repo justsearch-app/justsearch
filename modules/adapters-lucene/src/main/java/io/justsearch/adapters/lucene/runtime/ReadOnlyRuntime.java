@@ -47,6 +47,11 @@ public final class ReadOnlyRuntime implements LuceneRuntime {
   }
 
   @Override
+  public io.justsearch.core.execution.EngineTaskLifetime taskLifetime() {
+    return session::retainTaskLifetime;
+  }
+
+  @Override
   public ReadPathOps readPathOps() {
     return session.readPathOps;
   }

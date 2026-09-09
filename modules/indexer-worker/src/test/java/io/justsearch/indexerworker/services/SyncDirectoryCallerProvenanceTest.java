@@ -123,6 +123,6 @@ final class SyncDirectoryCallerProvenanceTest {
             provenance.transport(),
             EngineContext.Survival.DURABLE,
             EngineContext.Urgency.BACKGROUND),
-        provenance);
+        provenance, io.justsearch.core.execution.EngineTaskLifetime.NONE);
   }
 }

@@ -467,6 +467,8 @@ public final class WorkerSearchService {
           }
           throw e;
         } catch (RuntimeException e) {
+          EngineFutures.rethrowExecutorRefusal(e);
+          EngineFutures.rethrowCancellation(e);
           metrics.recordSearchFailed();
           log.error("Search failed", e);
           throw WorkerServiceException.internal("Search failed: " + e.getMessage());
@@ -868,9 +870,11 @@ public final class WorkerSearchService {
         CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
-            embeddingCompat().allowed(), normalizedCallContext.engineContext().urgency());
+            embeddingCompat().allowed(), normalizedCallContext.engineContext().urgency(),
+            normalizedCallContext.childLifetime());
       } catch (RuntimeException e) {
         EngineFutures.rethrowExecutorRefusal(e);
+        EngineFutures.rethrowCancellation(e);
         log.error("RetrieveContext failed", e);
         throw WorkerServiceException.internal("RetrieveContext failed: " + e.getMessage());
       }

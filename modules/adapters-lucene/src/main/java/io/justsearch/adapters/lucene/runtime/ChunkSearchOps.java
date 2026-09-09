@@ -621,7 +621,7 @@ public final class ChunkSearchOps {
    */
   public SearchResult searchChunksHybrid(
       String queryText, float[] queryVector, Set<String> docIds, int limit,
-      Query additionalFilter, EngineContext.Urgency urgency) {
+      Query additionalFilter, EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank() || docIds == null || docIds.isEmpty()) {
       return new SearchResult(List.of(), 0, 0);
     }
@@ -637,7 +637,7 @@ public final class ChunkSearchOps {
     int docCandidateLimit = Math.min(docIds.size(), effectiveLimit * 2);
     Query docFilter = termInSetFilter(SchemaFields.DOC_ID, docIds);
     SearchResult docResults =
-        hybridSearchOps.searchHybridFiltered(queryText, queryVector, docCandidateLimit, docFilter, urgency);
+        hybridSearchOps.searchHybridFiltered(queryText, queryVector, docCandidateLimit, docFilter, urgency, childLifetime);
 
     Set<String> selectedDocIds =
         docResults.hits().stream()
@@ -679,10 +679,10 @@ public final class ChunkSearchOps {
       int limit,
       boolean chunkVectorsEnabled,
       Query additionalFilter,
-      EngineContext.Urgency urgency) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
 
     if (!chunkVectorsEnabled || queryVector == null || queryVector.length == 0) {
-      return searchChunksHybrid(queryText, queryVector, docIds, limit, additionalFilter, urgency);
+      return searchChunksHybrid(queryText, queryVector, docIds, limit, additionalFilter, urgency, childLifetime);
     }
 
     if (queryText == null || queryText.isBlank() || docIds == null || docIds.isEmpty()) {
@@ -697,18 +697,18 @@ public final class ChunkSearchOps {
     SearchResult bm25Result;
     SearchResult knnResult;
 
-    try (var executor = session.executorRegistrations.openSearchFanout(urgency)) {
+    try (var group = io.justsearch.core.execution.EngineTaskGroup.open(
+        () -> session.executorRegistrations.openSearchFanout(urgency),
+        ((io.justsearch.core.execution.EngineTaskLifetime) session::retainTaskLifetime).and(childLifetime))) {
       var bm25Future =
-          EngineFutures.supplyAsync(
-              () -> searchChunksFiltered(queryText, docIds, candidateLimit, additionalFilter),
-              executor);
+          group.submit(
+              () -> searchChunksFiltered(queryText, docIds, candidateLimit, additionalFilter));
       var knnFuture =
-          EngineFutures.supplyAsync(
-              () -> searchChunkVector(queryVector, docIds, candidateLimit, additionalFilter),
-              executor);
+          group.submit(
+              () -> searchChunkVector(queryVector, docIds, candidateLimit, additionalFilter));
 
-      bm25Result = bm25Future.join();
-      knnResult = knnFuture.join();
+      bm25Result = EngineFutures.await(bm25Future);
+      knnResult = EngineFutures.await(knnFuture);
     }
 
     if (log.isDebugEnabled()) {
@@ -786,7 +786,7 @@ public final class ChunkSearchOps {
    */
   public SearchResult searchDocLevelUnion(
       String queryText, float[] queryVector, Set<String> docIds, int limit,
-      Query additionalFilter, EngineContext.Urgency urgency) {
+      Query additionalFilter, EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank()) {
       return new SearchResult(List.of(), 0, 0);
     }
@@ -810,6 +810,6 @@ public final class ChunkSearchOps {
       cb.add(additionalFilter, BooleanClause.Occur.FILTER);
     }
     Query combined = cb.build();
-    return hybridSearchOps.searchHybridFiltered(queryText, queryVector, limit, combined, urgency);
+    return hybridSearchOps.searchHybridFiltered(queryText, queryVector, limit, combined, urgency, childLifetime);
   }
 }

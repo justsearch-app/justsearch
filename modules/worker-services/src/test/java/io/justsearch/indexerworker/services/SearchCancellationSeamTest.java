@@ -89,7 +89,7 @@ final class SearchCancellationSeamTest extends io.justsearch.adapters.lucene.run
         WorkerServiceException thrown =
             assertThrows(
                 WorkerServiceException.class,
-                () -> service.search(request, new CallContext(null, null, signal, CallContext.none().engineContext(), CallContext.none().provenance())),
+                () -> service.search(request, new CallContext(null, null, signal, CallContext.none().engineContext(), CallContext.none().provenance(), CallContext.none().childLifetime())),
                 "a search cancelled after " + signal.flipAfter + " polls must not return a result");
         assertEquals(
             WorkerServiceException.Status.CANCELLED,
@@ -126,7 +126,7 @@ final class SearchCancellationSeamTest extends io.justsearch.adapters.lucene.run
                   .setLimit(10)
                   .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true).build())
                   .build(),
-              new CallContext(null, null, signal, CallContext.none().engineContext(), CallContext.none().provenance()));
+              new CallContext(null, null, signal, CallContext.none().engineContext(), CallContext.none().provenance(), CallContext.none().childLifetime()));
 
       assertNotNull(response);
       assertEquals(1, response.getTotalHits(), "the search still answers normally");
@@ -164,6 +164,41 @@ final class SearchCancellationSeamTest extends io.justsearch.adapters.lucene.run
     String message = e.getMessage();
     int marker = message.lastIndexOf(": ");
     return marker < 0 ? message : message.substring(marker + 2);
+  }
+
+  @Test
+  void realServiceBoundaryPreservesWrappedCapacityAndInterruptionFromItsOrchestrator() throws Exception {
+    String previous = System.getProperty("justsearch.config");
+    try (var runtime = newLifecycleWithOneDoc("boundary", "boundary needle")) {
+      var service = new WorkerSearchService(runtime);
+      var request = SearchRequest.newBuilder().setQuery("needle").setLimit(10)
+          .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true)).build();
+      var refusal = new io.justsearch.core.execution.EngineExecutorRejectedException(
+          io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+          "service-boundary-test", 3);
+      // Inject at the real orchestrator's capture seam; this traverses the service catch that
+      // a mocked WorkerSearchService cannot exercise. Fanout submission itself has separate proofs.
+      for (RuntimeException failure : new RuntimeException[] {
+          refusal, new java.util.concurrent.CompletionException(refusal)}) {
+        var none = CallContext.none();
+        var context = new CallContext(null, null, () -> { throw failure; },
+            none.engineContext(), none.provenance(), none.childLifetime());
+        org.junit.jupiter.api.Assertions.assertSame(refusal,
+            assertThrows(io.justsearch.core.execution.EngineExecutorRejectedException.class,
+                () -> service.search(request, context)));
+      }
+      var interrupted = new InterruptedException("orchestrator interrupted");
+      var none = CallContext.none();
+      var context = new CallContext(null, null,
+          () -> { throw new java.util.concurrent.CompletionException(interrupted); },
+          none.engineContext(), none.provenance(), none.childLifetime());
+      try {
+        var failure = assertThrows(java.util.concurrent.CompletionException.class,
+            () -> service.search(request, context));
+        org.junit.jupiter.api.Assertions.assertSame(interrupted, failure.getCause());
+        assertTrue(Thread.currentThread().isInterrupted());
+      } finally { Thread.interrupted(); }
+    } finally { restoreProperty("justsearch.config", previous); }
   }
 
   private RunningRuntime newLifecycleWithOneDoc(String docId, String content)

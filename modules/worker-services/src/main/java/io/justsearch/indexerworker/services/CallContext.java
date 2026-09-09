@@ -36,12 +36,14 @@ package io.justsearch.indexerworker.services;
  */
 public record CallContext(String traceId, String requestId, CancelSignal cancel,
     io.justsearch.core.context.EngineContext engineContext,
-    io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance) {
+    io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance,
+    io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
 
   /** Normalises a null cancellation signal to {@link CancelSignal#NEVER}. */
   public CallContext {
     java.util.Objects.requireNonNull(engineContext, "engineContext");
     java.util.Objects.requireNonNull(provenance, "provenance");
+    java.util.Objects.requireNonNull(childLifetime, "childLifetime");
     if (!engineContext.transport().equals(provenance.transport())) {
       throw new IllegalArgumentException("Queue attribution disagrees with Engine transport");
     }
@@ -56,7 +58,8 @@ public record CallContext(String traceId, String requestId, CancelSignal cancel,
           java.util.Optional.empty(), java.util.Optional.empty(), "TRUSTED", "SYSTEM_INTERNAL",
           io.justsearch.core.context.EngineContext.Survival.DURABLE,
           io.justsearch.core.context.EngineContext.Urgency.BACKGROUND),
-      new io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL"));
+      new io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL"),
+      io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
   /**
    * Explicit internal maintenance: no tracing ids, never cancelled, durable background work.

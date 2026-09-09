@@ -42,7 +42,7 @@ final class WorkerIndexingFeedCancellationTest {
         return new IndexingJobChangeFeed.SnapshotAndSubscription(0, List.of(), closed::incrementAndGet);
       });
       var none = CallContext.none();
-      var context = new CallContext(null, null, signal, none.engineContext(), none.provenance());
+      var context = new CallContext(null, null, signal, none.engineContext(), none.provenance(), none.childLifetime());
       var delivered = new AtomicInteger();
       service(feed).subscribeIndexingJobs(SubscribeIndexingJobsRequest.getDefaultInstance(),
           frame -> delivered.incrementAndGet(), context);

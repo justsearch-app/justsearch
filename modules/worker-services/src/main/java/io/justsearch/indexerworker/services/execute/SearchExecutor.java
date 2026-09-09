@@ -76,6 +76,7 @@ public final class SearchExecutor {
   private final ChunkSearchOps chunkSearchOps;
   private final Supplier<ResolvedConfig> resolvedConfigSupplier;
   private final LuceneExecutorRegistrations executorRegistrations;
+  private final io.justsearch.core.execution.EngineTaskLifetime runtimeLifetime;
 
   public SearchExecutor(
       TextQueryOps textQueryOps,
@@ -83,13 +84,15 @@ public final class SearchExecutor {
       HybridSearchOps hybridSearchOps,
       ChunkSearchOps chunkSearchOps,
       Supplier<ResolvedConfig> resolvedConfigSupplier,
-      LuceneExecutorRegistrations executorRegistrations) {
+      LuceneExecutorRegistrations executorRegistrations,
+      io.justsearch.core.execution.EngineTaskLifetime runtimeLifetime) {
     this.textQueryOps = textQueryOps;
     this.readPathOps = readPathOps;
     this.hybridSearchOps = hybridSearchOps;
     this.chunkSearchOps = chunkSearchOps;
     this.resolvedConfigSupplier = resolvedConfigSupplier;
     this.executorRegistrations = Objects.requireNonNull(executorRegistrations, "executorRegistrations");
+    this.runtimeLifetime = Objects.requireNonNull(runtimeLifetime, "runtimeLifetime");
   }
 
   /**
@@ -376,7 +379,7 @@ public final class SearchExecutor {
               spladeExecuted = true;
               yield runThreeWay(
                   tw, queryString, runtimeFilters, boostRuntimeFilters, syntax, debug, retrievalSpan,
-                  ctx.engineContext().urgency());
+                  ctx.engineContext().urgency(), ctx.childLifetime());
             }
             case LegSet.Bm25Dense bd ->
                 debug
@@ -386,14 +389,14 @@ public final class SearchExecutor {
                         bd.retrievalLimit(),
                         runtimeFilters,
                         syntax,
-                        ctx.engineContext().urgency())
+                        ctx.engineContext().urgency(), ctx.childLifetime())
                     : hybridSearchOps.searchHybridFiltered(
                         queryString,
                         toFloatArray(bd.vector().vector()),
                         bd.retrievalLimit(),
                         QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters),
                         syntax,
-                        ctx.engineContext().urgency());
+                        ctx.engineContext().urgency(), ctx.childLifetime());
             case LegSet.DenseOnly d ->
                 // Tempdoc 549 Slice 3c (U2): single dense leg, no fusion.
                 HitProvenanceProjector.attachSingleLeg(
@@ -484,7 +487,7 @@ public final class SearchExecutor {
       LuceneRuntimeTypes.QuerySyntax syntax,
       boolean debug,
       Span retrievalSpan,
-      EngineContext.Urgency urgency) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     ResolvedConfig rc3 = resolvedConfigSupplier.get();
     ResolvedConfig.HybridSearch hs3 = rc3 != null ? rc3.hybridSearch() : null;
     int candidateMax = Math.max(hs3 != null ? hs3.candidateLimitMax() : 100, tw.retrievalLimit());
@@ -495,9 +498,10 @@ public final class SearchExecutor {
 
     Context otelCtx = Context.current().with(retrievalSpan);
     LuceneRuntimeTypes.SearchResult result;
-    try (var executor = executorRegistrations.openSearchFanout(urgency)) {
+    try (var group = io.justsearch.core.execution.EngineTaskGroup.open(
+        () -> executorRegistrations.openSearchFanout(urgency), runtimeLifetime.and(childLifetime))) {
       var bm25F =
-          EngineFutures.supplyAsync(
+          group.submit(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
@@ -510,10 +514,9 @@ public final class SearchExecutor {
                               boostRuntimeFilters,
                               syntax));
                 }
-              },
-              executor);
+              });
       var denseF =
-          EngineFutures.supplyAsync(
+          group.submit(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
@@ -524,21 +527,19 @@ public final class SearchExecutor {
                               vectorCandLimit,
                               QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters)));
                 }
-              },
-              executor);
+              });
       var spladeF =
-          EngineFutures.supplyAsync(
+          group.submit(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
                       "splade",
                       () -> searchSplade(tw.splade().weights(), textCandLimit, runtimeFilters));
                 }
-              },
-              executor);
-      var bm25Result = bm25F.join();
-      var denseResult = denseF.join();
-      var spladeResult = spladeF.join();
+              });
+      var bm25Result = EngineFutures.await(bm25F);
+      var denseResult = EngineFutures.await(denseF);
+      var spladeResult = EngineFutures.await(spladeF);
       double[] weights = {
         hs3 != null ? hs3.ccWeightSparse() : 0.35,
         hs3 != null ? hs3.ccWeightDense() : 0.35,

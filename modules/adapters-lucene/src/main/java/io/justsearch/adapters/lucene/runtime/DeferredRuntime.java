@@ -51,9 +51,9 @@ public final class DeferredRuntime implements LuceneRuntime {
    *
    * <p>Builds a new {@link RuntimeSession} in {@link RuntimeSession.Mode#RUNNING}
    * mode against the same path (using {@link #origin()}), then closes the
-   * deferred session. In-flight searches against the deferred {@code
-   * SearcherManager} survive via Lucene's {@code IndexSearcher} refcount
-   * contract; subsequent search requests must go through the returned
+   * deferred session. Already-acquired searchers survive through Lucene's reader refcount.
+   * Accepted fanout work also holds the old session until actual task exit, including children
+   * that have not acquired a searcher yet; subsequent requests must go through the returned
    * {@code RunningRuntime}.
    *
    * <p>This is one of two "swap with cleanup of the old session" shapes in the
@@ -83,7 +83,7 @@ public final class DeferredRuntime implements LuceneRuntime {
       throw t;
     }
     RunningRuntime upgraded = new RunningRuntime(schema, origin, upgradedSession);
-    // Close the deferred session. In-flight searches survive via Lucene refcount.
+    // Close waits for accepted fanout groups; already-acquired searchers also retain Lucene readers.
     try {
       session.close();
     } catch (RuntimeException e) {
@@ -109,6 +109,11 @@ public final class DeferredRuntime implements LuceneRuntime {
   @Override
   public LuceneExecutorRegistrations executorRegistrations() {
     return session.executorRegistrations;
+  }
+
+  @Override
+  public io.justsearch.core.execution.EngineTaskLifetime taskLifetime() {
+    return session::retainTaskLifetime;
   }
 
   @Override

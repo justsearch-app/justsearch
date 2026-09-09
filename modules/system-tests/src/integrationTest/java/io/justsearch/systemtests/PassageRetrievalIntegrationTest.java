@@ -174,7 +174,7 @@ class PassageRetrievalIntegrationTest {
       } else {
         // HYBRID
         float[] qv = toFloatArray(embeddingBackend.getVector(query.text()));
-        pathAIds = extractDocIds(runtime.hybridSearchOps().searchHybridFiltered(query.text(), qv, 10, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND));
+        pathAIds = extractDocIds(runtime.hybridSearchOps().searchHybridFiltered(query.text(), qv, 10, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
       }
       pathADocIds.put(query.id(), pathAIds);
       pathARecalls.put(query.id(), RelevanceMetrics.recallAtK(pathAIds, relevant, RECALL_K));

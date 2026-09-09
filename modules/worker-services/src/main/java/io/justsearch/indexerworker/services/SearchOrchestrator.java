@@ -88,7 +88,7 @@ public final class SearchOrchestrator {
             lifecycle.hybridSearchOps(),
             lifecycle.chunkSearchOps(),
             lifecycle::resolvedConfig,
-            lifecycle.executorRegistrations());
+            lifecycle.executorRegistrations(), lifecycle.taskLifetime());
     this.responseBuilder =
         new SearchResponseBuilder(
             lifecycle.indexCountOps(),

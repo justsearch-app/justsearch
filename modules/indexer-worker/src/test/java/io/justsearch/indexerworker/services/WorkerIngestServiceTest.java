@@ -507,7 +507,7 @@ final class WorkerIngestServiceTest {
                 "AGENT_LOOP",
                 EngineContext.Survival.DURABLE,
                 EngineContext.Urgency.BACKGROUND),
-            provenance);
+            provenance, io.justsearch.core.execution.EngineTaskLifetime.NONE);
     SyncDirectoryResponse response =
         switchingService.syncDirectory(
             SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(true).build(),

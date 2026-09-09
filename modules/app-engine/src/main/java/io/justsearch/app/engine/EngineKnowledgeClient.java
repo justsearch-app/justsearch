@@ -395,12 +395,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return outcome.compareAndSet(Outcome.RUNNING, Outcome.COMPLETED);
     }
 
+    private io.justsearch.core.execution.EngineTaskLifetime childLifetime;
+
     CallContext context() {
       EngineContext engineContext = work.context();
       return new CallContext(
           traceId,
           requestId,
-          signal, engineContext, enqueueProvenance(engineContext));
+          signal, engineContext, enqueueProvenance(engineContext),
+          Objects.requireNonNull(childLifetime, "unary childLifetime"));
     }
 
     @Override
@@ -567,7 +570,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         Throwable failure = null;
         try {
           if (budget.startWork()) {
-            result = foregroundLoad.call(work, () -> body.apply(budget));
+            result = foregroundLoad.callOwned(work, lifetime -> {
+              budget.childLifetime = lifetime;
+              return body.apply(budget);
+            });
           }
         } catch (Throwable cause) {
           failure = cause;
@@ -913,7 +919,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                       cancel.cancel();
                     }
                   },
-                  new CallContext(traceId, requestId, cancel, work.context(), enqueueProvenance(work.context())));
+                  new CallContext(traceId, requestId, cancel, work.context(), enqueueProvenance(work.context()), () -> work.retain()::close));
         } finally {
           alarm.cancel(false);
           // The walk has ended; let the frames it already handed over reach the consumer before the
@@ -1001,7 +1007,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       registration.set(cancellation);
       if (cancel.isCancelled()) cancellation.close();
       CallContext ctx = new CallContext(traceId, requestId, cancel,
-          work.context(), enqueueProvenance(work.context()));
+          work.context(), enqueueProvenance(work.context()), () -> work.retain()::close);
       // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow
       // must be closed on the way out: leaving it open would leak a delivery thread that polls an
       // empty queue for the life of the process, for a subscription that never started.

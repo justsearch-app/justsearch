@@ -309,7 +309,7 @@ public final class HybridSearchOps {
       int limit,
       boolean debug,
       String logPrefix,
-      EngineContext.Urgency urgency) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     long startTime = System.currentTimeMillis();
 
     // Compute candidate limits from config
@@ -333,15 +333,17 @@ public final class HybridSearchOps {
     SearchResult textResult;
     SearchResult vectorResult;
 
-    try (var executor = session.executorRegistrations.openSearchFanout(urgency)) {
+    try (var group = io.justsearch.core.execution.EngineTaskGroup.open(
+        () -> session.executorRegistrations.openSearchFanout(urgency),
+        ((io.justsearch.core.execution.EngineTaskLifetime) session::retainTaskLifetime).and(childLifetime))) {
       var textFuture =
-          EngineFutures.supplyAsync(
-              () -> textLeg.search(queryText, textCandidateLimit), executor);
+          group.submit(
+              () -> textLeg.search(queryText, textCandidateLimit));
       var vectorFuture =
-          EngineFutures.supplyAsync(
-              () -> vectorLeg.search(queryVector, vectorCandidateLimit), executor);
-      textResult = textFuture.join();
-      vectorResult = vectorFuture.join();
+          group.submit(
+              () -> vectorLeg.search(queryVector, vectorCandidateLimit));
+      textResult = EngineFutures.await(textFuture);
+      vectorResult = EngineFutures.await(vectorFuture);
     }
 
     if (log.isDebugEnabled()) {
@@ -441,7 +443,7 @@ public final class HybridSearchOps {
    * @return search results ordered by fused RRF score
    */
   SearchResult searchHybrid(String queryText, float[] queryVector, int limit, QuerySyntax syntax,
-      EngineContext.Urgency urgency) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
     }
@@ -454,7 +456,7 @@ public final class HybridSearchOps {
     return executeHybrid(
         (t, l) -> textQueryOps.searchText(t, l, null, null, syntax),
         (v, l) -> readPathOps.searchVector(v, l),
-        queryText, queryVector, limit, false, "Hybrid", urgency);
+        queryText, queryVector, limit, false, "Hybrid", urgency, childLifetime);
   }
 
   /**
@@ -467,16 +469,16 @@ public final class HybridSearchOps {
    * @return search results ordered by RRF fusion score
    */
   public SearchResult searchHybridFiltered(
-      String queryText, float[] queryVector, int limit, Query filter, EngineContext.Urgency urgency) {
-    return searchHybridFiltered(queryText, queryVector, limit, filter, QuerySyntax.SIMPLE, urgency);
+      String queryText, float[] queryVector, int limit, Query filter, EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+    return searchHybridFiltered(queryText, queryVector, limit, filter, QuerySyntax.SIMPLE, urgency, childLifetime);
   }
 
   /** Filtered hybrid search parsing the text leg with {@code syntax} (tempdoc 821 §P). */
   public SearchResult searchHybridFiltered(
       String queryText, float[] queryVector, int limit, Query filter, QuerySyntax syntax,
-      EngineContext.Urgency urgency) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (filter == null) {
-      return searchHybrid(queryText, queryVector, limit, syntax, urgency);
+      return searchHybrid(queryText, queryVector, limit, syntax, urgency, childLifetime);
     }
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
@@ -495,7 +497,7 @@ public final class HybridSearchOps {
         limit,
         false,
         "Filtered hybrid",
-        urgency);
+        urgency, childLifetime);
   }
 
   /**
@@ -514,7 +516,7 @@ public final class HybridSearchOps {
       int limit,
       RuntimeSearchFilters filters,
       QuerySyntax syntax,
-      EngineContext.Urgency urgency) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
     }
@@ -532,7 +534,7 @@ public final class HybridSearchOps {
         limit,
         true,
         "Hybrid(debug)",
-        urgency);
+        urgency, childLifetime);
   }
 
 }
