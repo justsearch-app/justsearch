@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -56,25 +57,33 @@ public final class ExtractionSandboxFactory {
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
       TikaExtractionPolicy policy,
       Duration timeout,
       ExtractionMetricCatalog catalog,
       List<String> processCommand) {
-    return create(mode, policy, OcrRoutingConfig.disabled(), timeout, catalog, OcrMetricCatalog.noop(), processCommand);
+    return create(timeboxRegistration, readerRegistration, mode, policy,
+        OcrRoutingConfig.disabled(), timeout, catalog, OcrMetricCatalog.noop(), processCommand);
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
       Duration timeout,
       ExtractionMetricCatalog catalog,
       List<String> processCommand) {
-    return create(mode, policy, ocrConfig, timeout, catalog, OcrMetricCatalog.noop(), processCommand);
+    return create(timeboxRegistration, readerRegistration, mode, policy, ocrConfig, timeout,
+        catalog, OcrMetricCatalog.noop(), processCommand);
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -83,6 +92,8 @@ public final class ExtractionSandboxFactory {
       OcrMetricCatalog ocrMetricCatalog,
       List<String> processCommand) {
     return create(
+        timeboxRegistration,
+        readerRegistration,
         mode,
         policy,
         ocrConfig,
@@ -94,6 +105,8 @@ public final class ExtractionSandboxFactory {
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -102,11 +115,14 @@ public final class ExtractionSandboxFactory {
       OcrMetricCatalog ocrMetricCatalog,
       List<String> processCommand,
       PoolSettings poolSettings) {
-    return create(mode, policy, ocrConfig, timeout, catalog, ocrMetricCatalog, processCommand,
-        poolSettings, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+    return create(timeboxRegistration, readerRegistration, mode, policy, ocrConfig, timeout,
+        catalog, ocrMetricCatalog, processCommand, poolSettings,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -125,12 +141,14 @@ public final class ExtractionSandboxFactory {
 
     if (mode == Mode.IN_PROCESS) {
       return new TimeboxedContentExtractor(
+          timeboxRegistration,
           inProcessSandbox(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog),
           effectiveTimeout,
           catalog);
     }
     ExtractionSandbox pool =
         new PersistentExtractionSandbox(
+            readerRegistration,
             processCommand,
             effectivePolicy,
             effectiveOcrConfig,
@@ -142,15 +160,25 @@ public final class ExtractionSandboxFactory {
     // The sandbox owns the deadline; the timebox is only a backstop for a sandbox that itself
     // wedges. See PROCESS_TIMEBOX_GRACE.
     Duration backstop = effectiveTimeout.plus(PROCESS_TIMEBOX_GRACE);
-    if (mode == Mode.PROCESS) {
-      return new TimeboxedContentExtractor(pool, backstop, catalog);
+    try {
+      if (mode == Mode.PROCESS) {
+        return new TimeboxedContentExtractor(timeboxRegistration, pool, backstop, catalog);
+      }
+      ContentExtractorProvider provider =
+          contributionProvider(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog);
+      return new TimeboxedContentExtractor(
+          timeboxRegistration,
+          new RoutingExtractionSandbox(new InProcessExtractionSandbox(provider), pool, provider),
+          backstop,
+          catalog);
+    } catch (RuntimeException | Error failure) {
+      try {
+        pool.close();
+      } catch (RuntimeException closeFailure) {
+        failure.addSuppressed(closeFailure);
+      }
+      throw failure;
     }
-    ContentExtractorProvider provider =
-        contributionProvider(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog);
-    return new TimeboxedContentExtractor(
-        new RoutingExtractionSandbox(new InProcessExtractionSandbox(provider), pool, provider),
-        backstop,
-        catalog);
   }
 
   /**
@@ -171,22 +199,24 @@ public final class ExtractionSandboxFactory {
    *
    * <p>The pool spawns lazily, which is right for steady state but means a broken child command —
    * a bad operator override, a missing JDK, an unreadable classpath — is invisible until the first
-   * real file, and then surfaces as a per-file failure on every file forever. This turns that into
-   * one bounded check at wiring time, so the Worker can fall back to in-process extraction for the
-   * session instead of failing every document.
+   * real process-routed file. This turns that into one bounded check at wiring time so the Worker
+   * can report the degraded boundary immediately. The verdict is diagnostic: callers must retain
+   * configured routing rather than silently moving untrusted parsing into the Engine JVM.
    *
    * @return empty when the child launched and answered correctly, else the reason it did not
    */
   public static Optional<String> probeChildCommand(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
       Duration timeout) {
-    return probeChildCommand(command, policy, ocrConfig, timeout,
+    return probeChildCommand(readerRegistration, command, policy, ocrConfig, timeout,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   public static Optional<String> probeChildCommand(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -202,7 +232,8 @@ public final class ExtractionSandboxFactory {
       Files.writeString(probeFile, PROBE_MARKER, StandardCharsets.UTF_8);
       // maxRequestsPerChild = 1: this child is for the probe alone and is discarded with the pool.
       try (PersistentExtractionSandbox sandbox =
-          new PersistentExtractionSandbox(command, policy, ocrConfig, timeout, 1, 1, null,
+          new PersistentExtractionSandbox(readerRegistration, command, policy, ocrConfig, timeout,
+              1, 1, null,
               childRegistry)) {
         String content = sandbox.extract(probeFile).result().content();
         if (content == null || !content.contains(PROBE_MARKER)) {
@@ -238,33 +269,40 @@ public final class ExtractionSandboxFactory {
         new PolicyDrivenTikaExtractor(policy, ocrConfig, ocrMetricCatalog));
   }
 
-  public static TimeboxedContentExtractor inProcessStructured(ExtractionMetricCatalog catalog) {
-    return inProcessStructured(catalog, OcrRoutingConfig.disabled());
+  public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      ExtractionMetricCatalog catalog) {
+    return inProcessStructured(timeboxRegistration, catalog, OcrRoutingConfig.disabled());
   }
 
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog, OcrRoutingConfig ocrConfig) {
-    return inProcessStructured(catalog, ocrConfig, OcrMetricCatalog.noop());
+    return inProcessStructured(timeboxRegistration, catalog, ocrConfig, OcrMetricCatalog.noop());
   }
 
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog, OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog) {
-    return inProcessStructured(catalog, ocrConfig, ocrMetricCatalog, TikaExtractionPolicy.defaults());
+    return inProcessStructured(timeboxRegistration, catalog, ocrConfig, ocrMetricCatalog,
+        TikaExtractionPolicy.defaults());
   }
 
   /** As above, with an explicit policy (tempdoc 799 §N.2 — operator worker.limits.*). */
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog,
       OcrRoutingConfig ocrConfig,
       OcrMetricCatalog ocrMetricCatalog,
       TikaExtractionPolicy policy) {
-    return create(
-        Mode.IN_PROCESS,
-        policy,
-        ocrConfig,
+    TikaExtractionPolicy effectivePolicy =
+        policy == null ? TikaExtractionPolicy.defaults() : policy;
+    OcrRoutingConfig effectiveOcrConfig =
+        ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig;
+    return new TimeboxedContentExtractor(
+        timeboxRegistration,
+        inProcessSandbox(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog),
         TimeboxedContentExtractor.DEFAULT_TIMEOUT,
-        catalog,
-        ocrMetricCatalog,
-        List.of());
+        catalog);
   }
 }

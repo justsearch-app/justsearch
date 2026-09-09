@@ -3,6 +3,8 @@ package io.justsearch.indexerworker.extract;
 
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -11,7 +13,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -65,6 +66,7 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
   // Observability counters
   private final AtomicLong timeoutCount = new AtomicLong(0);
   private final ExtractionMetricCatalog catalog;
+  private final EngineExecutorRegistry.Registration executorRegistration;
 
   // Rate-limited logging for timeouts
   private volatile long lastTimeoutLogMs = 0;
@@ -75,14 +77,25 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
    *
    * @param delegate the underlying content extractor provider
    */
-  public TimeboxedContentExtractor(ContentExtractorProvider delegate) {
-    this(delegate, DEFAULT_TIMEOUT, null);
+  public TimeboxedContentExtractor(
+      EngineExecutorRegistry.Registration executorRegistration,
+      ContentExtractorProvider delegate) {
+    this(executorRegistration, delegate, DEFAULT_TIMEOUT, null);
   }
 
   /** Creates a timeboxed extractor around an explicit sandbox implementation. */
   public TimeboxedContentExtractor(
-      ExtractionSandbox sandbox, Duration timeout, ExtractionMetricCatalog catalog) {
-    this(null, Objects.requireNonNull(sandbox, "sandbox"), timeout, catalog, true);
+      EngineExecutorRegistry.Registration executorRegistration,
+      ExtractionSandbox sandbox,
+      Duration timeout,
+      ExtractionMetricCatalog catalog) {
+    this(
+        executorRegistration,
+        null,
+        Objects.requireNonNull(sandbox, "sandbox"),
+        timeout,
+        catalog,
+        true);
   }
 
   /**
@@ -93,8 +106,12 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
    * @param catalog extraction metric catalog (may be null for tests)
    */
   public TimeboxedContentExtractor(
-      ContentExtractorProvider delegate, Duration timeout, ExtractionMetricCatalog catalog) {
+      EngineExecutorRegistry.Registration executorRegistration,
+      ContentExtractorProvider delegate,
+      Duration timeout,
+      ExtractionMetricCatalog catalog) {
     this(
+        executorRegistration,
         Objects.requireNonNull(delegate, "delegate"),
         new InProcessExtractionSandbox(delegate),
         timeout,
@@ -106,11 +123,13 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
    * Internal constructor that allows tests to bypass {@link #MIN_TIMEOUT}.
    */
   TimeboxedContentExtractor(
+      EngineExecutorRegistry.Registration executorRegistration,
       ContentExtractorProvider delegate,
       Duration timeout,
       ExtractionMetricCatalog catalog,
       boolean enforceMinTimeout) {
     this(
+        executorRegistration,
         Objects.requireNonNull(delegate, "delegate"),
         new InProcessExtractionSandbox(delegate),
         timeout,
@@ -119,11 +138,14 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
   }
 
   TimeboxedContentExtractor(
+      EngineExecutorRegistry.Registration executorRegistration,
       ContentExtractorProvider delegate,
       ExtractionSandbox sandbox,
       Duration timeout,
       ExtractionMetricCatalog catalog,
       boolean enforceMinTimeout) {
+    this.executorRegistration =
+        Objects.requireNonNull(executorRegistration, "executorRegistration");
     this.delegate = delegate;
     this.sandbox = Objects.requireNonNull(sandbox, "sandbox");
     if (enforceMinTimeout) {
@@ -136,8 +158,8 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
     this.catalog = catalog;
   }
 
-  private static ExecutorService newExtractionExecutor(long generation) {
-    return Executors.newSingleThreadExecutor(
+  private ExecutorService newExtractionExecutor(long generation) {
+    return executorRegistration.open(
         r -> {
           Thread t = new Thread(r, "ContentExtractor-Timebox-" + generation);
           t.setDaemon(true);
@@ -251,16 +273,26 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
     if (taskReturned.get()) {
       return;
     }
-    ExecutorService replacement = newExtractionExecutor(executorGeneration.incrementAndGet());
+    ExecutorService replacement;
+    try {
+      replacement = newExtractionExecutor(executorGeneration.incrementAndGet());
+    } catch (EngineExecutorRejectedException refused) {
+      // The extraction that discovered the wedge still owns its truthful timeout outcome. Retire
+      // this unusable executor so every later submission receives a typed refusal instead of
+      // queueing forever behind the wedged task.
+      shutdownAndCancelQueued(current);
+      log.warn("Extraction executor replacement refused: {}", refused.getMessage());
+      return;
+    }
     if (executor.compareAndSet(current, replacement)) {
       // shutdownNow() re-interrupts and prevents new work reaching the wedged thread; it does NOT
       // stop the running task (nothing can), so the thread leaks by design until the JVM exits.
-      current.shutdownNow();
+      shutdownAndCancelQueued(current);
       log.warn(
           "Extraction executor thread wedged past the timeout; replaced with generation {}",
           executorGeneration.get());
     } else {
-      replacement.shutdownNow();
+      shutdownAndCancelQueued(replacement);
     }
   }
 
@@ -283,7 +315,7 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
   @Override
   public void close() {
     ExecutorService current = executor.get();
-    current.shutdownNow();
+    shutdownAndCancelQueued(current);
     try {
       if (!current.awaitTermination(5, TimeUnit.SECONDS)) {
         log.warn("Extraction executor did not terminate cleanly");
@@ -294,6 +326,14 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
     }
     // Kills any sandbox child processes; an in-process sandbox has nothing to release.
     sandbox.close();
+  }
+
+  private static void shutdownAndCancelQueued(ExecutorService executor) {
+    for (Runnable queued : executor.shutdownNow()) {
+      if (queued instanceof Future<?> future) {
+        future.cancel(false);
+      }
+    }
   }
 
   /**

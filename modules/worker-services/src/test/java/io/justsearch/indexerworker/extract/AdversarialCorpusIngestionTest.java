@@ -63,7 +63,7 @@ final class AdversarialCorpusIngestionTest {
     queue = new RecordingQueue();
     queue.indexingCoordinator = mock(IndexingCoordinator.class);
     loop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -76,7 +76,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 new PolicyDrivenTikaExtractor(),
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
@@ -236,7 +236,7 @@ final class AdversarialCorpusIngestionTest {
           }
         };
     IndexingLoop mutatingLoop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -249,7 +249,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 mutatingExtractor,
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
@@ -295,7 +295,7 @@ final class AdversarialCorpusIngestionTest {
           }
         };
     IndexingLoop mutatingLoop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -308,7 +308,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 mutatingExtractor,
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
@@ -371,7 +371,7 @@ final class AdversarialCorpusIngestionTest {
             java.util.Set.of());
     PolicyDrivenTikaExtractor tightExtractor = new PolicyDrivenTikaExtractor(tightPolicy);
     IndexingLoop tightLoop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -384,7 +384,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 tightExtractor,
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),

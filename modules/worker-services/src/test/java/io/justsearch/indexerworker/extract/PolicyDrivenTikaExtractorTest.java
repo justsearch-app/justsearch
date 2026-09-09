@@ -339,7 +339,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, catalog)) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, catalog)) {
       artifact = extractor.extractArtifact(image);
     }
 
@@ -402,7 +402,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, catalog)) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, catalog)) {
       artifact = extractor.extractArtifact(image);
     }
 
@@ -451,7 +451,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 
@@ -485,7 +485,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 
@@ -519,7 +519,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 
@@ -572,7 +572,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 

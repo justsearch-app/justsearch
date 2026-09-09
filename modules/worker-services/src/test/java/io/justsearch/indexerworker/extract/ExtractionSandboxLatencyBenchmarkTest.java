@@ -61,7 +61,7 @@ final class ExtractionSandboxLatencyBenchmarkTest {
     double textRoundTripOverheadMs = 0.0d;
 
     try (PersistentExtractionSandbox outOfProcess =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             ExtractionSandboxCommand.defaultCommand(TikaExtractionPolicy.defaults(), ""),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),

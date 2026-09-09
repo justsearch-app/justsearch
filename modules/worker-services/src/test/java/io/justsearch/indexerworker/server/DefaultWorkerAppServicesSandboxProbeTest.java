@@ -1,20 +1,33 @@
 package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.justsearch.indexerworker.extract.ContentExtractor;
 import io.justsearch.indexerworker.extract.ExtractionMetricCatalog;
 import io.justsearch.indexerworker.extract.ExtractionSandboxRestartTags;
 import io.justsearch.indexerworker.extract.OcrMetricCatalog;
 import io.justsearch.indexerworker.extract.PersistentExtractionSandbox;
+import io.justsearch.indexerworker.extract.SandboxExtractionException;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
+import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
+import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
 import io.justsearch.telemetry.catalog.TestMetricRegistry;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Base64;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,10 +39,10 @@ import org.slf4j.LoggerFactory;
  * The startup-probe branch in {@link DefaultWorkerAppServices#buildContentExtractor} (tempdoc 885
  * item 14).
  *
- * <p>Six lines decide whether a Worker with a broken child command extracts every document
- * in-process or fails every document — and they were the one part of the probe with no test: the
- * probe function itself is covered in {@code ExtractionRoutingTest}, but nothing asserted that the
- * wiring acts on its verdict.
+ * <p>The probe function itself is covered in {@code ExtractionRoutingTest}; this test pins what
+ * wiring does with its verdict. A failed probe remains visible, decoder-only families remain
+ * usable, and families that require isolation fail with the durable sandbox reason instead of
+ * silently crossing into the Engine JVM.
  */
 final class DefaultWorkerAppServicesSandboxProbeTest {
 
@@ -40,6 +53,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
 
   private TestMetricRegistry registry;
   private ExtractionMetricCatalog catalog;
+  private io.justsearch.core.execution.TestEngineExecutors engineExecutors;
+  private WorkerExecutorRegistrations executors;
   private ListAppender<ILoggingEvent> logs;
   private ch.qos.logback.classic.Logger wiringLogger;
 
@@ -49,6 +64,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
     System.clearProperty(COMMAND_PROP);
     registry = new TestMetricRegistry(ExtractionMetricCatalog.DEFINITIONS);
     catalog = new ExtractionMetricCatalog(registry);
+    engineExecutors = new io.justsearch.core.execution.TestEngineExecutors();
+    executors = new WorkerExecutorRegistrations(engineExecutors);
     logs = new ListAppender<>();
     logs.start();
     wiringLogger =
@@ -62,6 +79,12 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
     System.clearProperty(COMMAND_PROP);
     if (wiringLogger != null) {
       wiringLogger.detachAppender(logs);
+    }
+    if (executors != null) {
+      executors.close();
+    }
+    if (engineExecutors != null) {
+      engineExecutors.close();
     }
     if (registry != null) {
       registry.close();
@@ -84,17 +107,30 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
 
   @Test
   @Timeout(60)
-  void aFailingProbeWarnsRecordsAndFallsBackToInProcessForTheSession() throws Exception {
+  void aFailingProbeKeepsAllFiveProcessFamiliesConfinedWhileDecodersStillWork() throws Exception {
     // A command that cannot launch at all: ProcessBuilder.start rejects it immediately, so this
     // exercises the branch without waiting out PROBE_TIMEOUT.
-    System.setProperty(MODE_PROP, "process");
+    System.setProperty(MODE_PROP, "auto");
     System.setProperty(COMMAND_PROP, "justsearch-no-such-extraction-child-binary");
 
-    Path file = tempDir.resolve("probe-fallback.txt");
-    Files.writeString(file, "content that must still be extracted", StandardCharsets.UTF_8);
+    List<Path> processFiles =
+        List.of(
+            copyFixture("/fixtures/pdf/pdf-text-layer.pdf", "routed.pdf"),
+            copyFixture("/fixtures/office/office-marker.docx", "routed.docx"),
+            writeZip("routed.zip"),
+            writePng("routed.png"),
+            Files.write(tempDir.resolve("routed.bin"), new byte[] {0, 1, 2, 0, 3, 4}));
+    ContentExtractor detector = new ContentExtractor();
+    assertEquals(
+        List.of("pdf", "office", "archive", "image", "binary"),
+        processFiles.stream()
+            .map(file -> IndexingDocumentOps.classifyFileKind(file, detector.detectMimeType(file)))
+            .toList(),
+        "the adverse fixture must exercise every routed family exactly once");
 
     try (TimeboxedContentExtractor extractor =
         DefaultWorkerAppServices.buildContentExtractor(
+            executors,
             null,
             catalog,
             OcrMetricCatalog.noop(),
@@ -102,12 +138,25 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
       assertTrue(warnedAboutTheProbe(), "a failed probe must be visible in the log");
       assertEquals(1L, probeFailures(), "a failed probe must be recorded as probe_failed");
 
-      // The verdict must have been ACTED on. If the wiring had kept the pool, every extraction
-      // would fail on the unlaunchable command; that it succeeds is what proves the fallback.
+      for (Path processFile : processFiles) {
+        SandboxExtractionException failure =
+            assertThrows(
+                SandboxExtractionException.class,
+                () -> extractor.extract(processFile),
+                processFile.getFileName() + " must not cross the process boundary");
+        assertTrue(
+            failure.getMessage().contains(IngestionReasonCodes.SANDBOX_FAILED),
+            processFile.getFileName() + " must carry the durable retry reason");
+      }
+
       assertEquals(
-          "content that must still be extracted",
-          extractor.extract(file).content().trim(),
-          "the session must fall back to in-process extraction, not fail every document");
+          "plain text survives",
+          extractor.extract(write("plain.txt", "plain text survives")).content().trim());
+      assertEquals(
+          "markdown survives",
+          extractor.extract(write("notes.md", "markdown survives")).content().trim());
+      String csv = extractor.extract(write("rows.csv", "left,right\n1,2\n")).content();
+      assertTrue(csv.contains("left") && csv.contains("right") && csv.contains("1"));
     }
   }
 
@@ -121,6 +170,7 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
 
     try (TimeboxedContentExtractor extractor =
         DefaultWorkerAppServices.buildContentExtractor(
+            executors,
             null,
             catalog,
             OcrMetricCatalog.noop(),
@@ -129,5 +179,39 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
       assertEquals(0L, probeFailures(), "in_process spawns nothing, so nothing can fail a probe");
       assertTrue(logs.list.stream().noneMatch(e -> e.getFormattedMessage().contains("startup probe")));
     }
+  }
+
+  private Path copyFixture(String resource, String name) throws IOException {
+    Path target = tempDir.resolve(name);
+    try (InputStream in = getClass().getResourceAsStream(resource)) {
+      if (in == null) {
+        throw new IOException("Missing fixture: " + resource);
+      }
+      Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+    }
+    return target;
+  }
+
+  private Path write(String name, String content) throws IOException {
+    return Files.writeString(tempDir.resolve(name), content, StandardCharsets.UTF_8);
+  }
+
+  private Path writeZip(String name) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (ZipOutputStream zip = new ZipOutputStream(bytes, StandardCharsets.UTF_8)) {
+      zip.putNextEntry(new ZipEntry("inside.txt"));
+      zip.write("archive marker".getBytes(StandardCharsets.UTF_8));
+      zip.closeEntry();
+    }
+    return Files.write(tempDir.resolve(name), bytes.toByteArray());
+  }
+
+  private Path writePng(String name) throws IOException {
+    byte[] onePixelPng =
+        Base64.getDecoder()
+            .decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+                    + "/x8AAusB9Wl2nGQAAAAASUVORK5CYII=");
+    return Files.write(tempDir.resolve(name), onePixelPng);
   }
 }

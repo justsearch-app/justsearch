@@ -45,7 +45,7 @@ final class PersistentExtractionSandboxTest {
 
   private PersistentExtractionSandbox sandbox(
       List<String> command, Duration timeout, ExtractionMetricCatalog catalog) {
-    return new PersistentExtractionSandbox(
+    return new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
         command, TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), timeout, 1, 500, catalog);
   }
 
@@ -77,7 +77,7 @@ final class PersistentExtractionSandboxTest {
           public void remove(String childId) {}
         };
     try (PersistentExtractionSandbox sandbox =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             javaCommand(ExtractionSandboxChild.class),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),
@@ -86,7 +86,13 @@ final class PersistentExtractionSandboxTest {
             500,
             null,
             failingRegistry)) {
-      assertThrows(java.io.IOException.class, () -> sandbox.extract(file("registration-fails.txt")));
+      SandboxExtractionException failure =
+          assertThrows(
+              SandboxExtractionException.class,
+              () -> sandbox.extract(file("registration-fails.txt")));
+      assertTrue(
+          failure.getCause() instanceof java.io.IOException,
+          "child acquisition must retain the manifest persistence failure as its cause");
     }
 
     ManagedChild child = attempted.get();
@@ -141,7 +147,7 @@ final class PersistentExtractionSandboxTest {
           @Override public void remove(String childId) { owned.removeIf(c -> c.id().equals(childId)); }
         };
     PersistentExtractionSandbox sandbox =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             javaCommand(ExtractionSandboxChild.class), TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(), Duration.ofSeconds(30), 1, 500, null, registry);
     sandbox.extract(file("registered.txt"));
@@ -226,7 +232,7 @@ final class PersistentExtractionSandboxTest {
         assertThrows(
             IllegalArgumentException.class,
             () ->
-                new PersistentExtractionSandbox(
+                new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
                     javaCommand(ScriptedChild.class),
                     oversized,
                     OcrRoutingConfig.disabled(),
@@ -440,7 +446,7 @@ final class PersistentExtractionSandboxTest {
   @Timeout(40)
   void oversizedFrameIsASandboxFailure() throws Exception {
     try (PersistentExtractionSandbox sandbox =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             javaCommand(ScriptedChild.class),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),
@@ -461,7 +467,7 @@ final class PersistentExtractionSandboxTest {
     OcrRoutingConfig ocrConfig =
         new OcrRoutingConfig(true, List.of("deu"), 1_234, 4, 2048, 8_000_000, null, null);
     try (PersistentExtractionSandbox sandbox =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             javaCommand(ScriptedChild.class),
             TikaExtractionPolicy.defaults(),
             ocrConfig,
@@ -477,7 +483,7 @@ final class PersistentExtractionSandboxTest {
   @Timeout(40)
   void childRecyclesAfterItsRequestBudget() throws Exception {
     try (PersistentExtractionSandbox sandbox =
-        new PersistentExtractionSandbox(
+        new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             javaCommand(ScriptedChild.class),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),
@@ -510,7 +516,7 @@ final class PersistentExtractionSandboxTest {
     try (TestMetricRegistry registry = new TestMetricRegistry(ExtractionMetricCatalog.DEFINITIONS)) {
       ExtractionMetricCatalog catalog = new ExtractionMetricCatalog(registry);
       try (TimeboxedContentExtractor extractor =
-          ExtractionSandboxFactory.create(
+          ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
               ExtractionSandboxFactory.Mode.PROCESS,
               TikaExtractionPolicy.defaults(),
               OcrRoutingConfig.disabled(),

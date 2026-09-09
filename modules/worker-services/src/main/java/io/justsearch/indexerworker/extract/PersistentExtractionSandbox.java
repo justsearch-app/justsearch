@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.telemetry.catalog.EmptyTags;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,7 +17,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -89,6 +89,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   private volatile boolean closed;
 
   public PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -96,11 +97,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int poolSize,
       int maxRequestsPerChild,
       ExtractionMetricCatalog catalog) {
-    this(command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   public PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -110,6 +112,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       ExtractionMetricCatalog catalog,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
+        readerRegistration,
         command,
         policy,
         ocrConfig,
@@ -123,6 +126,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   }
 
   PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -132,11 +136,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       ExtractionMetricCatalog catalog,
       int maxResponseBytes,
       int maxStderrBytes) {
-    this(command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
         maxResponseBytes, maxStderrBytes, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -169,7 +174,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       freeSlots.add(allSlots[i]);
     }
     this.readers =
-        Executors.newCachedThreadPool(
+        Objects.requireNonNull(readerRegistration, "readerRegistration").open(
             r -> {
               Thread t = new Thread(r, "extraction-sandbox-reader");
               t.setDaemon(true);
@@ -178,7 +183,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     // Belt to the child's PID-gate braces: a clean JVM exit that skips close() must not leave a
     // child behind either. Removed in close() so a per-test sandbox does not accumulate hooks.
     this.shutdownHook = new Thread(this::killAll, "extraction-sandbox-shutdown");
-    Runtime.getRuntime().addShutdownHook(shutdownHook);
+    try {
+      Runtime.getRuntime().addShutdownHook(shutdownHook);
+    } catch (RuntimeException | Error failure) {
+      shutdownAndCancelQueued(readers);
+      throw failure;
+    }
   }
 
   @Override
@@ -275,7 +285,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   private ExtractionArtifact extractOnSlot(Slot slot, Path file)
       throws IOException, ContentExtractor.ExtractionException {
-    Child child = acquireChild(slot);
+    Child child;
+    try {
+      child = acquireChild(slot);
+    } catch (IOException e) {
+      // Failure to open the child is sandbox infrastructure failure, not failure to read the
+      // source file. Keep source-file IOException unchanged below so JobBatchExtractor can retain
+      // its IO_FAILED distinction, while an unavailable process boundary follows the durable
+      // SANDBOX_FAILED retry path.
+      throw new SandboxExtractionException("Failed to start sandbox child", e);
+    }
     child.requests++;
     // The tail is reported per FILE, so it must not carry the previous request's chatter.
     child.stderr.reset();
@@ -463,7 +482,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   public void close() {
     closed = true;
     boolean stopped = killAll();
-    readers.shutdownNow();
+    shutdownAndCancelQueued(readers);
+    try {
+      readers.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
     if (!stopped) {
       // Keep the JVM callback and exact handles reachable for the final cleanup attempt.
       throw new IllegalStateException("Extraction children survived terminal cleanup");
@@ -472,6 +496,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       Runtime.getRuntime().removeShutdownHook(shutdownHook);
     } catch (IllegalStateException e) {
       // Already shutting down — the hook is running or has run.
+    }
+  }
+
+  private static void shutdownAndCancelQueued(ExecutorService executor) {
+    for (Runnable queued : executor.shutdownNow()) {
+      if (queued instanceof Future<?> future) {
+        future.cancel(false);
+      }
     }
   }
 

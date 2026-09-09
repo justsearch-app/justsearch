@@ -95,7 +95,7 @@ final class ExtractionRoutingTest {
   @Test
   void modeSwitchSelectsTheSandbox() {
     try (TimeboxedContentExtractor inProcess =
-        ExtractionSandboxFactory.create(
+        ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             ExtractionSandboxFactory.Mode.IN_PROCESS,
             TikaExtractionPolicy.defaults(),
             Duration.ofSeconds(5),
@@ -109,7 +109,7 @@ final class ExtractionRoutingTest {
       assertThrows(
           IllegalArgumentException.class,
           () ->
-              ExtractionSandboxFactory.create(
+              ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
                   mode,
                   TikaExtractionPolicy.defaults(),
                   Duration.ofSeconds(5),
@@ -128,7 +128,7 @@ final class ExtractionRoutingTest {
   void startupProbeAnswersForAWorkingChildAndNamesTheFailureForABrokenOne() {
     assertEquals(
         java.util.Optional.empty(),
-        ExtractionSandboxFactory.probeChildCommand(
+        ExtractionSandboxFactory.probeChildCommand(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             PersistentExtractionSandboxTest.javaCommand(ExtractionSandboxChild.class),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),
@@ -136,7 +136,7 @@ final class ExtractionRoutingTest {
         "the shipped child command must pass its own probe");
 
     java.util.Optional<String> broken =
-        ExtractionSandboxFactory.probeChildCommand(
+        ExtractionSandboxFactory.probeChildCommand(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             List.of("this-binary-does-not-exist", "--serve"),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),
