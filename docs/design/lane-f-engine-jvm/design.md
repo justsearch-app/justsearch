@@ -254,8 +254,9 @@ Both drafts (`stages/C1.md`, `stages/C2.md`, base `e692b86ef`) were written whil
 open and are re-verified at each stage start (17.6). Decisions, one per question, so the briefs
 need no re-research. **C1:** the engine context is a sibling of `InvocationProvenance` with one
 tested one-way mapping at the single site where both are in scope, not a projection or a
-replacement (`core` carries no project dependency); the context reaches the indexing port through a
-`withContext` bound view, not 33 signature changes and never a thread-local; VDU's in-Engine PDF
+replacement (`core` carries no project dependency); the context reaches every indexing method as an explicit required parameter
+(the 2026-09-09 implementation decision supersedes the earlier `withContext` bound-view draft),
+never through a thread-local; VDU's in-Engine PDF
 render keeps a dated, reasoned ArchUnit exception at C1 with the move behind the child protocol as an
 in-lane follow-up (17.5); the operator's explicit `in_process` sandbox mode survives and only the
 silent probe fallback is deleted; executor caps by kind and the retained-state caps live in one
@@ -266,14 +267,12 @@ codes as HTTP, with the rejection mapped into the MCP error shape and asserted. 
 acceptance, effect and completion order is stamped from the operations table's own autoincrement
 key, because no journal commit sequence number exists (`CommitOps.commit()` discards Lucene's
 `long`; the NRT watermark is generation-scoped) — 17.3 row C2 and `verified-facts.md` are corrected
-to say so; `jobs.db` becomes `MIXED` (a third `StoreRecoverability` value) with the operations table
-inside it, **and every lane-F change to a durable store's `owner`, `role` or `reconciliation` (the
-`WORKER` owner rename included) is batched into that one register change**, because the installed
-updater refuses a release whose durable-store identities or row count differ (`updater.rs`, the
-"closed set" and "changes ownership or recovery strategy" branches) and the cost is paid per
-boundary, not per field; the same C2 commit relaxes the rule's successor so a later release may add
-a durable store without refusing (the currently installed builds still pay the boundary once — a
-product decision on in-place upgrade, recorded here as such); the operation record sits beside
+to say so; **as re-decided on 2026-09-09**, operations live in their own `operations.db`
+store and `jobs.db` preserves its installed `WORKER`/`DERIVED`/`READ_IN_PLACE` identity.
+The new updater accepts additive incoming rows while preserving every installed store's
+identity, and the release descriptor's installed-baseline projection preserves compatibility
+with older exact-set updaters. This supersedes the draft's jobs.db MIXED conversion and
+in-place upgrade break. The operation record sits beside
 `OperationLeaseService` with the boundary written into both javadocs; `version conflict` lands at
 C2 on the global accepted-settings revision only (7.4's line) and D1 adds the per-component
 versions; ingestion's unit key gains a persisted content-hash column in the same migration;
@@ -314,6 +313,7 @@ it is history, not a second current contract. Evidence records retain the experi
 | 2026-09-08 | Capture child identity from the OS and restore the existing production-disabled boot test counter at index composition; fix hosted platform/tooling gaps without relaxing gates. | §7.2; §7.3; [hosted CI](evidence/B/hosted-ci.md) |
 | 2026-09-09 | Re-ground the C1 and C2 checklists at the stage-B head by a code-verified pass; cite `design.md` by section from now on; the batches in each checklist's §12 are the implementation briefs. | [C1](stages/C1.md); [C2](stages/C2.md) |
 | 2026-09-09 | C1-10: the `ForegroundLoad` producer stays at the port and is re-keyed on the context's urgency; the front stamps urgency and never touches the gauge (rule 6b bars `ui` from the type; the single-wrap guard becomes mechanical). | §8; §17.3 row C1 |
+| 2026-09-09 | C1 batch 3: exact in-process work identity links admission, cancellation and disconnect across context rebases; client/session attribution cannot serve as a lifecycle key. Upgrade control remains reachable after freeze. One Engine accounting owner covers all port call families. | §3.4; §8; stages/C1.md C1-8, C1-10, C1-11 |
 | 2026-09-09 | **Supersedes the 2026-09-08 `MIXED` decision.** The operations table lives in its own `operations.db`; no existing durable store changes owner, class or reconciliation in lane F (the installed updater compares all 44 register rows by count and identity, so stage B's new rows already cost 0.3.0 installs an in-place upgrade and an identity change could not be bridged); the updater's successor rule accepts a superset and `app-release-assets.mjs` gains a baseline mode so the lane-F release is accepted by 0.3.0 installs and later additions are free. The `WORKER` owner labels stay as vocabulary residue, labelled at F. | §7.5; §17.3 row C2; [C2 §0.0 R1](stages/C2.md) |
 | 2026-09-09 | `version conflict` at C2 on the global accepted-settings revision; the outcome query is the durable swap of `OperationHistoryStore`; the ingestion unit key is path plus a persisted content hash; acceptance is process-crash-durable under `synchronous = NORMAL`. | §7.5; §7.6; [C2 §11](stages/C2.md) |
 | 2026-09-09 | Stage E runbook written (`stages/E.md`): runs bounded to fifty-five minutes under the owner's one-hour rule, the two-hour soak measured across three forty-minute runs on separate occasions; the split side of every paired row is measured on `origin/main` at E, not read from the 2026-09-07 baseline (the workflow fixture's recorded split side is reused while its pinned surfaces are unchanged); the floor is simulated by a device-memory cap if no floor machine exists, and the report says so; collector and heap chosen by a short probe protocol, then every row run once; the hang parameters derived from the soak's worst safepoint pause. | §16; §17.7; [E](stages/E.md) |
@@ -532,6 +532,19 @@ timestamp). The context is the unit of admission accounting and the producer of
 transport property that the protocol is already revising (the 2026-07-28 revision moves to
 per-request metadata), so nothing durable in the core (an operation, a grant lifetime, a
 conversation's persisted state) is keyed on it; the API front absorbs that evolution.
+
+**Exact work linkage (C1 batch 3, 2026-09-09):** an optional in-process work id accompanies the
+context and is minted by the Engine admission owner. It is neither caller attribution nor an
+authorization credential, never accepted from HTTP headers, never persisted as C2's client
+operation key, and never exported in request logs. Context rebases preserve it; a distinct child
+work item receives its own handle explicitly. The shared owner resolves the id to a neutral
+lifecycle handle with current context, first-wins cancellation, waiting-client detachment and
+idempotent completion. Equal client/session contexts can therefore be cancelled independently.
+This uses the admission registry already required for shutdown instead of a second equality-keyed
+registry or a thread-local carrier. A separate wrapper/third argument on every migrated port would
+duplicate the context surface; the optional id keeps the explicit parameter contract. A stale or
+unknown attached id is refused, never silently converted into fresh uncancelled work. Direct
+library calls with no attached id acquire a scoped handle at the same Engine boundary.
 
 **Client kind is a declaration, not a verified role.** ADR-0046's boundary is the same-user
 native process: the per-boot token is handed to every legitimate local client through the

@@ -31,6 +31,33 @@ The projection currently contains exactly six read-only operations: runtime mani
 readiness, liveness, health, and status. See [Runtime Contract](runtime-contract.md#generated-node-client)
 for package scope and regeneration commands.
 
+### Engine admission and cancellation
+
+`EngineAdmissionController` is the shared owner for HTTP/MCP admission and upgrade freezing.
+Capacity is bounded per `(clientKind, clientId)` and across the Engine; all declared client kinds
+use identical caps. Aggregate exhaustion takes precedence when both budgets are exhausted.
+`GET /api/debug/effective-config` projects the running owner's immutable `engineAdmission` limits:
+`perContextLimit`, `aggregateLimit`, and `retryAfterSeconds`, plus current `activeWorkCount`
+excluding the inspecting HTTP request. Internal background producers count toward the aggregate.
+A startup aggregate reduction is
+bounded by the packaged maximum; the diagnostic projection reports the applied value.
+`RequestEngineWork` maps capacity refusal to HTTP `429` with `ADMISSION_CONTEXT_LIMIT` or
+`ADMISSION_ENGINE_LIMIT`, with `Retry-After`; upgrade freezing returns `503` with
+`UPGRADE_PREPARING`. Health remains available while admission is full or frozen.
+
+REST refusal includes `retrySafe: true` only when admission refused before dispatch, including
+approval execution before consuming its pending record. A later execution refusal carries
+`retrySafe: false`; `retryable` alone never authorizes replay of a mutation. The webview waits
+abortably and retries replayable requests only with the explicit safe guarantee, showing one
+superseding informational notice. MCP uses JSON-RPC error `-32000` and preserves the request id;
+notifications have no response body.
+
+An admitted work id is process-local and remains occupied until its last asynchronous owner exits.
+Cancellation preserves the first reason through model producers, callback delivery and turn
+finalization. A managed SSE creator disconnect changes durable foreground work to background;
+normal server retirement does not cause that transition. Interactive one-shot work continues
+through a socket disconnect. This connection behavior does not establish restart survival.
+
 ### Lifecycle schema v1 (minimum stable subset)
 
 **Source of truth:** `modules/ui/src/test/java/io/justsearch/ui/api/LifecycleContractTest.java`
@@ -354,11 +381,12 @@ Interaction / memory surfaces (tempdoc 561 P-A/P-B + 565):
 - `tool_call_rejected`
 - `budget_update` (`phase`, `tokensConsumed`, `tokensRemaining`)
 - `done` (`finalResponse`, `iterationsUsed`, `toolCallsExecuted`, `totalTokensUsed`, optional `sources[]`, optional `citations[]`) — note: `toolCallsExecuted` counts tool calls from the primary agent only; sub-agent calls (via handoff) are not included in this count. **Grounding (tempdoc 565 §3.A):** `sources[]` is the one citation authority — each `AgentSource` is a chunk-identified local passage (`parentDocId`, `chunkIndex`, `path`, `title`, `excerpt`, `startLine`, `endLine`, `headingText`); `citations[]` are the per-sentence inline-mark links (`AgentSentenceCite`: `sentenceText`, `sourceIndex`, `similarity`), present only when the answer↔source matcher ran. Both are declared on the `core.agent-run` shape's `done` `EventDescriptor` (so the generated FE type is truthful — §13.8) and emitted by `AgentController`/`ToolIteratingShapeRunner`. Empty/absent ⇒ ungrounded answer.
-- `error` (`error`, `errorCode`, `errorClass`, `retryable`, optional `retryAction`, optional `retryAttempt`)
+- `error` (`error`, `errorCode`, `errorClass`, `retryable`, optional `retryAction`, optional `retryAttempt`, optional `reasonCode`)
 
 Resume contract notes:
 
 - Supported persisted resume states: `WAITING_APPROVAL`, `READY_FOR_LLM`, `AFTER_TOOL_RESULT`.
+- `CANCELLED` is a terminal persisted state, with cancellation reason carried on the error event; it is not a resumable ready state.
 - Unsupported states return typed `UNSUPPORTED_RESUME_STATE` with remediation guidance.
 - For resumed sessions, pending write/destructive actions require fresh approval.
 

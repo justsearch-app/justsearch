@@ -790,3 +790,100 @@ explicitly on start and subsequent calls, and use a worktree-relative dataDir. I
 workerDist requirement is stale; the target worktree's normal runner installs the single Engine.
 No dev stack or Gradle task remains running. C2 can begin after this checkpoint, but admission and
 durable-handle integration still belong to C1 batch 3 and C2 in their documented order.
+
+2026-09-09 batch-3 implementation is now dirty above `986962ec0`; see
+[batch-3 evidence and remaining work](evidence/C1/batch-3.md). Admission, port cancellation/gauge,
+background/approval child lifetimes and frontend retry handling have focused passing proofs.
+The current next seam is complete conversational/agent cancellation: OnlineModeOps still owns an
+asynchronous HTTP stream whose lifetime is not controlled by interrupting the conversation waiter.
+Do not claim shutdown step 2 or batch 3 complete until that producer is bound and the remaining
+wire/live/integrated acceptance is executed. Continue autonomously; this note is not a pause.
+
+2026-09-09 continuation: frontend retry checkpoint is `b0078e603210c2c1c64aa5e1c700a5086f125c6f`;
+other batch-3 work remains dirty. Model producers now retain the admitted handle and cancellation
+closes the actual HTTP stream. Conversation/agent/hierarchical wiring and post-model cancellation
+checks are implemented; focused integration and real managed-SSE ownership proofs are running.
+See the latest progress entry in [batch-3 evidence](evidence/C1/batch-3.md), including retained red
+runs and fixes. Continue with this dirty work, not the earlier checkpoint alone. No stack is active.
+
+
+2026-09-09 batch-3 verification continuation: the model, complete-turn and managed-SSE ownership
+implementation is present above `b0078e603`. Real loopback tests prove durable creator disconnect
+lowers urgency while work continues, normal retirement does not falsely detach it, early/replay
+close releases resources, and MCP freeze preserves JSON-RPC identity. Focused correction tests
+pass; full build/suite is being reconciled. Its long app-engine tail is the existing EngineSoakTest
+(measured thread stack in tmp/c1-batch3-integrated-engine-threads.txt), not a stuck build.
+The live jseval admission driver now rejects malformed/truncated/error SSE and validates real
+holder/probe timing. Aggregate capture needs the startup aggregate reduction to 3 and baseline
+projection; client fairness runs separately at packaged defaults across search/suggest/MCP/health.
+Next: finish integrated verification, install the UI-owned single Engine distribution, run both
+live admissions and the continuous-search indexing proof, reconcile batch-3 evidence and commit.
+Then implement C1 batch 4 (executor registry/bounds and extraction pins), using the pending
+read-only ownership review; C2 grounding is also delegated read-only. No lane item is owner-gated.
+The active session identity is `01a082dc-dfd6-7d60-be2e-a8d088229a67`; use it explicitly for every
+owned tool/helper because the inherited MCP/session-file fallback names the old Claude session.
+
+
+2026-09-09 batch-4 continuation (04:50 UTC): active branch remains worktree-lane-F-A,
+checkpoint `95ac489b2` commits the parent SPLADE preservation prerequisite and dedicated proof
+[evidence/C1/parent-splade-rmw.md](evidence/C1/parent-splade-rmw.md). Its 52 focused tests
+pass, including four real Lucene RMW cases; preservation/share/partial-write mutants fail for
+the intended reasons. Batch-3 continuous-search proof completed: 7048/7048 successful queries
+while 469 documents indexed to all enrichment stages complete. The pre-fix capture exposed the
+SPLADE churn and remains adverse evidence. Repeat against the final batch-4 installed candidate.
+
+Batch 3 and the broader batch-4 migration remain dirty above the checkpoint. The process registry,
+root/telemetry/launcher composition, Head document urgency pools, EngineKnowledgeClient call/stream
+pools, KnowledgeClient walk, SyncOps timer, managed-child HTTP and OpenAI HTTP owners are wired.
+EngineFutures links a queued task's cancellation to its returned stage. Focused composition run
+`tmp/c1-batch4-composition-tests-4.txt` passes 185 tests (Engine 25, services 42, launcher 65, UI 53),
+XML/counts in `tmp/c1-batch4-composition-green-4`. The preceding integration run's four failures are
+preserved in `tmp/c1-batch4-composition-red-3`; its correlation fixture, narrow telemetry layering
+rule and two missing HTTP context fixtures were corrected. EngineKnowledgeClientExecutorTest's
+new physical queue assertion still needs explicit execution (the focused pattern omitted it).
+
+Continue remaining producer injection, urgency-separated inference callbacks/HTTP, parser pins,
+rule mutations, stress/full checks and fresh live admission/pacing before closing C1. Runtime
+activation HTTP wiring and parser confinement are delegated; root owns composition and all builds.
+The current source also adds registered bootstrap/shutdown-watcher execution, not yet tested.
+No dev stack or Gradle build remains active at this note. C2/D/E/F remain required; merge placement
+stays F/PR1. No push/merge occurred in this continuation. This is recovery context, not a pause.
+
+2026-09-09 batch-4 continuation (05:38 UTC): same HEAD95ac489b2 and worktree; no publication.
+Worker registry bundle and parser confinement are implemented. Focused worker run11 passes all
+120 tests, zero failures/errors/skips; XML at tmp/c1-batch4-worker-green-11. Build8/9 uncovered
+minimal Head constructor omissions, telemetry PMD cleanup and two KnowledgeServer qualifiers,
+now corrected. Full build remains pending; run10 also overlapped the next bridge constructor
+migration and retained the old sandbox IOException expectation. Its worker expectation now pins
+SandboxExtractionException with original IOException cause and preserves the real child-reaped
+assertion; corrected worker run11 is the fresh proof.
+
+The stream/metric/readiness/rule/rollup owners, Head/runtime HTTP, watcher self-close handling,
+launcher ConfigStore/default-smoke path rollback are implemented but some recent corrections need
+fresh integrated proof. Review found VDU timer's procedure still raw/untracked and the transition
+log closed before the final inference SHUTDOWN event; root fixed both and added blocked-procedure
+real-registry and Head final-log-drain regressions, not yet run. Four remaining Head timer owners
+(ScanProgressRegistry, RemoteIndexingJobsBridge, KnowledgeServerHealthMonitor, EnergyStatePoller)
+are being migrated; root has wired their production callers and all KnowledgeServerBootstrap
+constructors/tests. Inference executor/actual-work migration is delegated with the decision added
+to C1.md. Lucene/search fanout is under read-only design review. No dev stack is active; Gradle
+worker run11 finished. Continue integrated checks and remaining producers, gates, full/stress,
+final installed live proof, then C2/D/E/F. This is recovery context, not a pause.
+
+2026-09-09 06:10 UTC reorientation and item checkpoints: the user requires pushing every
+batch/item commit, committing WIP at least hourly, and at most three follow-ups per worker before
+root takes the diff. All implementation workers have stopped; root now owns their unfinished
+inference/Lucene integration. No new implementation proceeds until the current dirty tree is split.
+The split and exact outstanding acceptance are recorded in [checkpoints](evidence/C1/checkpoints.md).
+These are explicitly intermediate WIP commits, not individually green stage boundaries. Final
+stage/merge acceptance remains unchanged. The first checkpoint is da6291c80 (C1-5), pushed with
+all prior local checkpoints to the existing branch. Each remaining named item is pushed immediately.
+No branch rewrite, main edit, PR creation or merge occurs during this operation.
+
+New local proof since the previous note: core timeout tests13 passed and a task-cancellation mutant
+failed both intended tests; inference production/test compilation14 passed before the worker's
+last regression additions. All logs are named in checkpoints.md. Latest agent-history retry,
+UnlockDeferredScan follow-up-drain, Head scan-close aggregation, GPL composite shutdown and
+inference/Lucene additions need integrated tests. Reviewer confirmed the prior scan races fixed
+but found running EngineFutures onActualExit cleanup can escape the worker after publication;
+root must settle that failure policy and test it. C1 remains incomplete; C2/D/E/F remain required.

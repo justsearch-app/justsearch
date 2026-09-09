@@ -16,7 +16,7 @@ Their primary responsibility is to convert a chaotic filesystem into a structure
 The `IndexingLoop.java` class is an infinite loop that processes files one by one (or in small batches).
 
 ### The Pipeline
-1.  **Pace:** After each batch (and each extracted file), `IndexingPacing.pace()` yields proportionally while foreground search-family RPCs are in flight, holding indexing at the configured minimum duty instead of pausing it.
+1.  **Pace:** After each batch (and each extracted file), `IndexingPacing.pace()` yields proportionally while Engine knowledge-port work has foreground urgency, holding indexing at the configured minimum duty instead of pausing it.
 2.  **Poll Job:** Takes the next `PENDING` job from `SqliteJobQueue`.
 3.  **Validate:** Checks `Files.exists()` and `Files.isReadable()`.
 4.  **Check Modified:** Compares `Files.getLastModifiedTime()` against the Lucene index. If unchanged, mark `DONE` and skip.

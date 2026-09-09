@@ -72,7 +72,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:ort-common` -> `:modules:configuration`
 - `:modules:reranker` -> `:modules:configuration`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:system-tests` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:ipc-common`
-- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`
+- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`, `:modules:worker-services`
 - `:modules:worker-core` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:worker-services` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:extension-substrate`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`
 
@@ -209,6 +209,7 @@ graph TD
   ui --> ipc-common
   ui --> ort-common
   ui --> telemetry
+  ui --> worker-services
   worker-core --> adapters-lucene
   worker-core --> ai-backend
   worker-core --> configuration
@@ -235,7 +236,7 @@ graph TD
 
 | Module | Direct deps | Notes |
 |--------|-------------|-------|
-| `ui` | 20 | Head REST API + orchestration bridge |
+| `ui` | 21 | Head REST API + orchestration bridge |
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
 | `indexer-worker` | 12 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `worker-services` | 12 |  |
