@@ -1,17 +1,17 @@
 {
-  "run": 299,
-  "testedHead": "bad1a7622ecf91c867a9afaf025df7433888ba2c",
+  "run": 385,
+  "testedHead": "0b4b13ad03dd18eac0df66ab57dc8ec1071c710b",
   "dirtyOverlay": false,
   "result": "PASS",
   "environment": "Windows 11, Temurin 25.0.2",
   "command": "./gradlew.bat build test :modules:system-tests:integrationTest :modules:ui:installDist -PincludeStress=true -PskipErrorProneTests=false",
   "representedReports": {
     "test": {
-      "tests": 9751,
+      "tests": 9782,
       "failures": 0,
       "errors": 0,
       "skipped": 25,
-      "suites": 1601
+      "suites": 1604
     },
     "updateSchemas": {
       "tests": 50,
@@ -43,9 +43,9 @@
     }
   },
   "failures": [],
-  "qualification": "Counts describe represented XML reports; Gradle may reuse unchanged tasks. Read the complete log for executed/up-to-date tasks and skipped environments. This run includes the reload/close lock correction; a full local pass does not prove final live standard-model or current hosted acceptance.",
-  "manifest": "tmp/c1-ocr-integrated-results-299/manifest.json",
-  "manifestSha256": "34f0f3aed75804b3e1498dbaedba0fe26827c21a4b508fde081c862cc1e369c5",
-  "log": "tmp/c1-ocr-integrated-299.txt",
-  "logSha256": "d6fa2843409c9b9146cd54f211c0390f5eea1ab24cb3664dc263bc00b9443a34"
+  "qualification": "Started from clean pushed0b4b13ad0; no source changed during the run. Counts describe represented XML reports; Gradle reused unchanged tasks (16 executed,2 from cache,351 up-to-date). Full stress-enabled local pass includes all five supervised recovery scenarios. Final live standard-model and current hosted acceptance remain separate obligations.",
+  "manifest": "tmp/c1-final-integrated-results-385/manifest.json",
+  "manifestSha256": "261b6279318bb41c0d8845389a995338182b38e6ce649a9c0c06fcab1932be89",
+  "log": "tmp/c1-final-integrated-385.txt",
+  "logSha256": "42e30efdee5ed2b918962e5ab6edc9377b44ab5b06778db6328eee545aecf3b5"
 }

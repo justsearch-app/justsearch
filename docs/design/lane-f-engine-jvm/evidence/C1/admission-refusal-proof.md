@@ -38,3 +38,10 @@ Historical raw capture (unchanged): `tmp/c1-final-standard-aggregate/`.
 Root independently reread the production REST/MCP retrySafe authorities and all three adverse
 outputs. Remaining governance, cancellation/shutdown proof, Windows rename, integrated/live/hosted
 verification and final C1 review are still required.
+
+## Final production review correction
+
+The final review at0b4b13ad0 refuted the earlier statement that MCP retrySafe was
+covered by real transport assertions: its branch omitted that assertion and production
+omitted the field. The strict oracle itself remains correct. See
+[MCP retry safety](mcp-retry-safety.md) for the reproduced defect and correction.

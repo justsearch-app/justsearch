@@ -52,7 +52,8 @@ REST refusal includes `retrySafe: true` only when admission refused before dispa
 approval execution before consuming its pending record. A later execution refusal carries
 `retrySafe: false`; `retryable` alone never authorizes replay of a mutation. The webview waits
 abortably and retries replayable requests only with the explicit safe guarantee, showing one
-superseding informational notice. MCP uses JSON-RPC error `-32000` and preserves the request id;
+superseding informational notice. MCP uses JSON-RPC error `-32000` and preserves the request id. Its `error.data.retrySafe`
+is explicitly `true` for front admission refusal and `false` for a handler-thrown refusal;
 notifications have no response body.
 
 An admitted work id is process-local and remains occupied until its last asynchronous owner exits.

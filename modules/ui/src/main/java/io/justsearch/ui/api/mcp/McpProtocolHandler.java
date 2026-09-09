@@ -103,7 +103,7 @@ public final class McpProtocolHandler {
       if (refused != null) {
         io.justsearch.ui.api.RequestEngineWork.status(ctx, refused);
         if (!isNotification) writeError(ctx, id, -32000, refused.getMessage(),
-            io.justsearch.ui.api.RequestEngineWork.errorCode(refused));
+            io.justsearch.ui.api.RequestEngineWork.errorCode(refused), true);
         return;
       }
 
@@ -152,7 +152,7 @@ public final class McpProtocolHandler {
     } catch (io.justsearch.app.api.EngineAdmissionException refused) {
       io.justsearch.ui.api.RequestEngineWork.status(ctx, refused);
       writeError(ctx, requestId, -32000, refused.getMessage(),
-          io.justsearch.ui.api.RequestEngineWork.errorCode(refused));
+          io.justsearch.ui.api.RequestEngineWork.errorCode(refused), false);
     } catch (Exception e) {
       var executorRefusal = io.justsearch.ui.api.ApiErrorHandler.executorRefusal(e);
       if (executorRefusal != null) {

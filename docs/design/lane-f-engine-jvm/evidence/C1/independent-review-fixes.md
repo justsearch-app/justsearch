@@ -98,6 +98,8 @@ including all five supervised recovery cases. Build273 is retained historical pr
   proof, unchanged25ms polling, both adverse380 controls and build382. See
   [Windows publication](windows-state-rename.md). Both earlier failed hosted writer attempts
   remain preserved even though the advisory job passed on its third attempt.
+- Final review found missing MCP retrySafe on front and handler refusals; the root corrects
+  both paths with explicit booleans and real transport regressions. See [MCP retry safety](mcp-retry-safety.md).
 - Complete independent review of all fixes; run full stress-enabled verification and final live
   standard-model pacing/admission, then obtain and record current hosted green including the
   advisory system tier. A successful overall workflow does not excuse a failed advisory job.

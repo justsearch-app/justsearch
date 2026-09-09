@@ -124,6 +124,44 @@ final class EngineAdmissionTransportTest {
   }
 
   @Test
+  void mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry() throws Exception {
+    try (var fixture = new Fixture(2, 8)) {
+      for (var reason : io.justsearch.app.api.EngineAdmissionException.Reason.values()) {
+        org.mockito.Mockito.doAnswer(invocation -> {
+          fixture.lateAdmissionEntered.incrementAndGet();
+          throw new io.justsearch.app.api.EngineAdmissionException(reason, 2);
+        }).when(fixture.surface).listTools();
+        int enteredBefore = fixture.lateAdmissionEntered.get();
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + fixture.app.port() + "/mcp"))
+            .timeout(Duration.ofSeconds(5))
+            .POST(HttpRequest.BodyPublishers.ofString(
+                "{\"jsonrpc\":\"2.0\",\"id\":\"late-17\",\"method\":\"tools/list\"}"))
+            .build();
+        var response = fixture.client.send(request, HttpResponse.BodyHandlers.ofString());
+        boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+        assertEquals(capacity ? 429 : 503, response.statusCode(), response.body());
+        assertEquals(capacity ? java.util.Optional.of("2") : java.util.Optional.empty(),
+            response.headers().firstValue("Retry-After"));
+        var body = JsonMapper.builder().build().readTree(response.body());
+        assertEquals("late-17", body.path("id").asText());
+        assertEquals(-32000, body.path("error").path("code").asInt());
+        assertEquals(switch (reason) {
+          case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
+          case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+          case FROZEN -> "UPGRADE_PREPARING";
+          case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
+        },
+            body.path("error").path("data").path("errorCode").asText());
+        var retrySafe = body.path("error").path("data").path("retrySafe");
+        assertTrue(retrySafe.isBoolean(), response.body());
+        assertFalse(retrySafe.asBoolean(), response.body());
+        assertEquals(enteredBefore + 1, fixture.lateAdmissionEntered.get());
+      }
+    }
+  }
+
+  @Test
   void aggregateRefusalIsIndependentOfOneOrManyClientsWithFairnessNonBinding() throws Exception {
     for (boolean many : new boolean[] {false, true}) {
       try (var fixture = new Fixture(8, 2)) {
@@ -207,6 +245,8 @@ final class EngineAdmissionTransportTest {
       assertEquals("request-17", mcpBody.path("id").asText(), mcp.body());
       assertEquals(-32000, mcpBody.path("error").path("code").asInt());
       assertEquals("UPGRADE_PREPARING", mcpBody.path("error").path("data").path("errorCode").asText());
+      assertTrue(mcpBody.path("error").path("data").path("retrySafe").isBoolean());
+      assertTrue(mcpBody.path("error").path("data").path("retrySafe").asBoolean());
       var notification = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + fixture.app.port() + "/mcp"))
           .timeout(Duration.ofSeconds(5))
           .POST(HttpRequest.BodyPublishers.ofString("{\"jsonrpc\":\"2.0\",\"method\":\"ping\"}"))
@@ -235,7 +275,10 @@ final class EngineAdmissionTransportTest {
     var body = JsonMapper.builder().build().readTree(response.body());
     if (mcp) {
       assertEquals("request-17", body.get("id").asText());
+      assertEquals(-32000, body.path("error").path("code").asInt());
       assertEquals(code, body.get("error").get("data").get("errorCode").asText());
+      assertEquals(Boolean.TRUE, body.path("error").path("data").path("retrySafe").asBoolean());
+      assertTrue(body.path("error").path("data").path("retrySafe").isBoolean());
     } else {
       assertEquals(code, body.get("errorCode").asText());
       assertEquals("TRANSIENT", body.get("errorClass").asText());
@@ -246,6 +289,7 @@ final class EngineAdmissionTransportTest {
 
   private static final class Fixture implements AutoCloseable {
     final EngineAdmissionController admission;
+    final McpToolSurface surface = mock(McpToolSurface.class);
     final CountDownLatch entered = new CountDownLatch(2);
     final CountDownLatch release = new CountDownLatch(1);
     final AtomicInteger lateAdmissionEntered = new AtomicInteger();
@@ -259,7 +303,7 @@ final class EngineAdmissionTransportTest {
       // Same body-preserving HTTP exception mapping as LocalApiServer's composition.
       app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> ctx.status(failure.getStatus()));
       new ApiSecurityFilters(false, null, new EventBuffer(), events, null, admission, admission).install(app);
-      var protocol = new McpProtocolHandler(mock(McpToolSurface.class), List.of());
+      var protocol = new McpProtocolHandler(surface, List.of());
       app.before(ctx -> {
         if ("true".equals(ctx.queryParam("block")) && RequestEngineWork.get(ctx) != null) {
           entered.countDown();

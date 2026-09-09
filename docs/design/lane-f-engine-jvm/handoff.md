@@ -31,8 +31,8 @@ both timer-contention/manual-refusal regressions failing against the old code330
 rolls back before authority publication; manual capacity reaches HTTP429 with Retry-After.
 See [health capacity](evidence/C1/health-capacity.md). CORS preflight exemption and Retry-After
 visibility pass39 selected cases340/342 and full build343; both adverse341 checks fail as expected.
-See [CORS admission](evidence/C1/cors-admission.md). **Next are the ordered governance and test
-debts**, followed by the Windows rename correction and final C1 proof. The admission oracle now
+See [CORS admission](evidence/C1/cors-admission.md). The ordered governance/test debts and Windows rename correction are complete locally;
+final C1 acceptance remains open. The admission oracle now
 requires captured boolean retrySafe true:63 self-tests347, three adverse346 guards and build348
 pass. The earlier raw aggregate capture fails this stronger rule349; fresh final live proof is
 required. See [refusal proof](evidence/C1/admission-refusal-proof.md). Governance sweep now passes
@@ -43,7 +43,12 @@ test debts now pass24 selected cases374 and full build375, with four adverse373 
 The obsolete B cancellation limitation is removed. See [cancellation sweep](evidence/C1/cancellation-sweep.md).
 Windows rename now passes actual held-reader release/exhaustion, permanent-error and adverse
 deadline/filter tests381, supervisor conformance34/34 and build382. See
-[Windows publication](evidence/C1/windows-state-rename.md). Next is final C1 proof.
+[Windows publication](evidence/C1/windows-state-rename.md). Full385 at clean pushed0b4b13ad0
+passes; final review then found MCP retrySafe omitted from both refusal paths. The root is
+closing that two-call defect with real transport regressions. Hosted34383091150 passes
+Windows-native/system but axe browser installation fails an upstream APT hash mismatch on
+both attempts. Current evidence and exact remaining checks are in
+[final candidate](evidence/C1/final-candidate.md).
 Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
 inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.
 That checkpoint precedes the governance sweep. See [OCR correction](evidence/C1/ocr-component-close.md) and
