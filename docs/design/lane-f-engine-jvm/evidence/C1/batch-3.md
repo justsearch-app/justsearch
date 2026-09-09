@@ -278,3 +278,15 @@ The same report records 87 SPLADE churn drops during parent RMW. This is adverse
 the required bounded correction in batch 4, not an ignored advisory. Repeat admission and pacing
 on the final registry and enrichment candidate. The owned dev stack was stopped successfully,
 ports closed; stop receipt `tmp/dev-runner/runs/d3c22cf7-be20-4f55-a900-c34b03077cff/stop-report.json`.
+
+
+## C1-15 final frontend validation (2026-09-09)
+
+Full UI typecheck141 and unit142 passed on4a57950ae (483files,6474tests). Lint148 caught
+an unused initial false assignment to retrySafe in admissionFetch: every path either assigns the
+parsed retrySafe flag or returns from the catch. Root changed only the declaration to an uninitialized
+boolean, preserving refusal parsing and replay rules. Restored lint154, typecheck155 and allseven
+admissionFetch tests156 passed; UI gates149 passed27/27. The full unit log's localhost connection
+and happy-dom teardown diagnostics are separately under audit; exit0 alone is not a cleanliness claim.
+Logs tmp/c1-batch4-ui-{typecheck-141,unit-142,lint-148,lint-restored-154,typecheck-155}.txt,
+tmp/c1-batch4-admission-ui-156.txt and tmp/c1-batch4-ui-gates-149.txt.

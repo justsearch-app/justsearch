@@ -19,7 +19,7 @@ export async function fetchWithAdmissionWait(
     const response = await send(attemptInput, init);
     if (response.status !== 429 && response.status !== 503) return response;
     let code: unknown;
-    let retrySafe = false;
+    let retrySafe: boolean;
     try {
       const refusal = (await response.clone().json()) as { errorCode?: unknown; retrySafe?: unknown };
       code = refusal.errorCode;
