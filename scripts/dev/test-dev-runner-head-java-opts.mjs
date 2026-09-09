@@ -106,6 +106,16 @@ function main() {
   assert.ok(flags({ ...base, logsDir: 'C:/repo with spaces/logs' })
     .includes('-XX:HeapDumpPath=C:/repo with spaces/logs'));
 
+  // Logging initializes before HeadlessApp can mirror JUSTSEARCH_DATA_DIR to a system property.
+  // The owned launch directory must therefore already be on the JVM command line, with spaces
+  // preserved, just as the packaged launcher passes it before entering Java.
+  assert.ok(flags({ ...base, dataDir: 'C:/repo with spaces/data' })
+    .includes('-Djustsearch.data.dir=C:/repo with spaces/data'));
+  const dataFlags = flags({ ...base, dataDir: 'C:/owned/data',
+    existingJavaOpts: '-Djustsearch.data.dir=C:/stale/data' });
+  assert.equal(dataFlags.filter((flag) => flag.startsWith('-Djustsearch.data.dir=')).at(-1),
+    '-Djustsearch.data.dir=C:/owned/data', 'the owned data directory wins over stale JAVA_OPTS');
+
   // 2. The AOT cache does not fork the set.
   const withAot = flags({ ...base, headAotOpts: '-XX:AOTCache=C:/x/head.aot' });
   assert.deepEqual(

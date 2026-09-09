@@ -700,7 +700,7 @@ function buildStopReport({
 // diagnosed (tempdoc 730 Increment-4 review findings, 2026-07-14), so no default bound is emitted.
 // Pure function (no process/env access beyond the passed-in values) so the generated flags are
 // unit-testable without spawning a JVM.
-function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, headHeap, debugPort }) {
+function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, dataDir, headHeap, debugPort }) {
   const heapBound = headHeap && String(headHeap).trim() ? String(headHeap).trim() : null;
   return [
     existingJavaOpts,
@@ -728,6 +728,9 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     // Tempdoc 606 Piece 2b: the Head echoes this on /api/runtime/manifest so a
     // stale old Head answering on a reused port is detectable (build mismatch).
     headDistStamp ? `-Djustsearch.head.stamp=${headDistStamp}` : null,
+    // Logback initializes before HeadlessApp mirrors the environment. Pass the owned directory
+    // at JVM entry, as the packaged launcher does, so diagnostics cannot land in the cwd default.
+    dataDir ? `-Djustsearch.data.dir=${/\s/.test(dataDir) ? `"${dataDir}"` : dataDir}` : null,
     heapBound ? `-Xmx${heapBound}` : null,
     '-XX:+HeapDumpOnOutOfMemoryError',
     logsDir ? `-XX:HeapDumpPath=${/\s/.test(logsDir) ? `"${logsDir}"` : logsDir}` : null,
@@ -2009,6 +2012,7 @@ async function cmdStart(opts) {
     headAotOpts,
     headDistStamp: devStackProvenance.headDistStamp,
     logsDir,
+    dataDir,
     headHeap: process.env.JUSTSEARCH_HEAD_HEAP,
     debugPort: devHotReload.enabled ? devHotReload.debugPort : null,
   });
