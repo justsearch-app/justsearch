@@ -1,6 +1,7 @@
 package io.justsearch.agent;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -99,32 +100,37 @@ final class BackgroundRunServiceTest {
   void backgroundRunIsProducedAndSurfacedOnReturn(@TempDir Path tmp) {
     var runStore = new AgentRunStore(tmp.resolve("agent-runs"));
     var loop = new FakeLoop(runStore);
-    var background = new BackgroundRunService(loop);
+    var registry = new TestEngineExecutors();
+    var background = new BackgroundRunService(loop, registry);
+    try {
+      Instant before = Instant.now().minusSeconds(3600);
 
-    Instant before = Instant.now().minusSeconds(3600);
-
-    String sid =
-        background.runInBackground(
-            AgentRequest.singleTurn(
-                List.of(Map.of("role", "user", "content", "reindex the new files overnight"))),
-            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
+      String sid =
+          background.runInBackground(
+              AgentRequest.singleTurn(
+                  List.of(Map.of("role", "user", "content", "reindex the new files overnight"))),
+              EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
 
     // The producer ran a real detached run and stamped the durable record.
-    assertNotNull(sid, "the run started and its sessionId was captured");
-    Map<String, Object> meta = runStore.readSnapshot(sid);
-    assertNotNull(meta);
-    assertEquals(Boolean.TRUE, meta.get("background"), "the run is marked background");
-    assertEquals("DONE", meta.get("state"));
+      assertNotNull(sid, "the run started and its sessionId was captured");
+      Map<String, Object> meta = runStore.readSnapshot(sid);
+      assertNotNull(meta);
+      assertEquals(Boolean.TRUE, meta.get("background"), "the run is marked background");
+      assertEquals("DONE", meta.get("state"));
 
     // The render-on-return inbox source: "what completed while you were away".
-    List<AgentLifecycle> presence = loop.presenceSince(before);
-    assertEquals(1, presence.size(), "the background run is in the presence projection");
-    assertEquals(sid, presence.get(0).sessionId());
+      List<AgentLifecycle> presence = loop.presenceSince(before);
+      assertEquals(1, presence.size(), "the background run is in the presence projection");
+      assertEquals(sid, presence.get(0).sessionId());
 
     // A user who looked AFTER the run sees nothing new (the since-filter is exclusive).
-    assertTrue(
-        loop.presenceSince(Instant.now().plusSeconds(3600)).isEmpty(),
-        "no background work after the user's last-seen mark");
+      assertTrue(
+          loop.presenceSince(Instant.now().plusSeconds(3600)).isEmpty(),
+          "no background work after the user's last-seen mark");
+    } finally {
+      background.shutdown();
+      registry.close();
+    }
   }
 
   @Test

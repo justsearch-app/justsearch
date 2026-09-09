@@ -2,15 +2,15 @@
 package io.justsearch.agent;
 
 import io.justsearch.core.context.EngineContext;
-
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.AgentService;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -34,36 +34,56 @@ public final class BackgroundRunService {
   private static final Logger LOG = LoggerFactory.getLogger(BackgroundRunService.class);
 
   private final AgentService agentService;
+  private final EngineExecutorRegistry.Registration schedulerRegistration;
   private final ScheduledExecutorService scheduler;
   private final io.justsearch.app.api.EngineAdmissionService admission;
+  private final AtomicBoolean closed = new AtomicBoolean();
 
-  public BackgroundRunService(AgentService agentService) {
-    this(agentService, defaultScheduler(), null);
+  public BackgroundRunService(AgentService agentService, EngineExecutorRegistry processExecutors) {
+    this(agentService, processExecutors, null);
   }
 
-  public BackgroundRunService(AgentService agentService, io.justsearch.app.api.EngineAdmissionService admission) {
-    this(agentService, defaultScheduler(), admission);
-  }
-
-  BackgroundRunService(AgentService agentService, ScheduledExecutorService scheduler) {
-    this(agentService, scheduler, null);
-  }
-
-  BackgroundRunService(AgentService agentService, ScheduledExecutorService scheduler,
+  public BackgroundRunService(
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors,
       io.justsearch.app.api.EngineAdmissionService admission) {
     this.agentService = Objects.requireNonNull(agentService, "agentService");
-    this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     this.admission = admission;
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    var resources = openScheduler(processExecutors);
+    this.schedulerRegistration = resources.registration();
+    this.scheduler = resources.scheduler();
   }
 
-  private static ScheduledExecutorService defaultScheduler() {
-    ThreadFactory tf =
-        r -> {
-          Thread t = new Thread(r, "background-agent-run");
-          t.setDaemon(true);
-          return t;
-        };
-    return Executors.newSingleThreadScheduledExecutor(tf);
+  private static SchedulerResources openScheduler(EngineExecutorRegistry processExecutors) {
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.background-agent-run",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, "background-agent-run");
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -108,6 +128,14 @@ public final class BackgroundRunService {
 
   /** Stop the scheduler (lifecycle shutdown). */
   public void shutdown() {
-    scheduler.shutdownNow();
+    if (!closed.compareAndSet(false, true)) return;
+    try {
+      scheduler.shutdownNow();
+    } finally {
+      schedulerRegistration.close();
+    }
   }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

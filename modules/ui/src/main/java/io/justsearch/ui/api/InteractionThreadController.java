@@ -6,6 +6,7 @@ import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.conversation.ConversationStore;
 import io.justsearch.agent.api.interaction.InteractionEvent;
 import io.justsearch.agent.api.interaction.InteractionEventKind;
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -49,17 +50,29 @@ public final class InteractionThreadController {
   private final AgentService agentService;
   private final io.justsearch.agent.BackgroundRunService backgroundRunService;
 
-  public InteractionThreadController(ConversationStore conversationStore, AgentService agentService) {
-    this(conversationStore, agentService, null);
+  public InteractionThreadController(
+      ConversationStore conversationStore,
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors) {
+    this(conversationStore, agentService, processExecutors, null);
   }
 
-  public InteractionThreadController(ConversationStore conversationStore, AgentService agentService,
+  public InteractionThreadController(
+      ConversationStore conversationStore,
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors,
       io.justsearch.app.api.EngineAdmissionService admission) {
     this.conversationStore = Objects.requireNonNull(conversationStore, "conversationStore");
     this.agentService = Objects.requireNonNull(agentService, "agentService");
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
-    this.backgroundRunService = new io.justsearch.agent.BackgroundRunService(agentService, admission);
+    this.backgroundRunService =
+        new io.justsearch.agent.BackgroundRunService(agentService, processExecutors, admission);
+  }
+
+  /** Stops the owned background-run scheduler and cancels pending work. */
+  public void shutdown() {
+    backgroundRunService.shutdown();
   }
 
   /** Handles {@code GET /api/thread/{id}}. */

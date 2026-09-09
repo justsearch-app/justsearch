@@ -337,7 +337,8 @@ final class ResourceApiModule implements ApiModule {
                     io.justsearch.agent.api.encryption.StoreCatalog.CONVERSATIONS.recoverability())),
             headAssembly.core().agent() != null
                 ? headAssembly.core().agent()
-                : io.justsearch.agent.api.AgentService.unavailable(), admission);
+                : io.justsearch.agent.api.AgentService.unavailable(),
+            headAssembly.executors(), admission);
     // Tempdoc 778 — the local feedback-capture flag surface, reading/writing the ONE settings
     // authority (nullable on the test-only path where HeadAssembly built none).
     this.feedbackCaptureController =
@@ -538,6 +539,7 @@ final class ResourceApiModule implements ApiModule {
     shutdownQuietly("IndexingJobsStreamController", indexingJobsStreamController::shutdown);
     shutdownQuietly("HealthEventStreamController", healthEventStreamController::shutdown);
     shutdownQuietly("IntentStreamController", intentStreamController::shutdown);
+    shutdownQuietly("InteractionThreadController", interactionThreadController::shutdown);
     shutdownQuietly("ConditionRecoveryIndexController", conditionRecoveryIndexController::shutdown);
     shutdownQuietly("DiagnosticChannelStreamController", diagnosticChannelStreamController::shutdown);
     shutdownQuietly("RuntimeContextController", runtimeContextController::shutdown);
