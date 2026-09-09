@@ -81,11 +81,21 @@ class LayeringEnforcementTest {
               "io.justsearch.indexing..",
               "io.justsearch.reranker..",
               "io.justsearch.ipc..",
-              "io.justsearch.core..",
               "io.justsearch.configuration..",
               "io.justsearch.indexerworker..",
               "io.justsearch.aiworker..")
-          .as("telemetry module must remain a foundation leaf (no deps on higher layers)");
+          .as("telemetry may use neutral execution contracts but no higher layers");
+
+  @ArchTest
+  static final ArchRule telemetryCoreDependencyIsOnlyTheNeutralExecutionContract =
+      noClasses().that().resideInAnyPackage("io.justsearch.telemetry..")
+          .should().dependOnClassesThat(
+              com.tngtech.archunit.core.domain.JavaClass.Predicates
+                  .resideInAPackage("io.justsearch.core..")
+                  .and(com.tngtech.archunit.base.DescribedPredicate.not(
+                      com.tngtech.archunit.core.domain.JavaClass.Predicates
+                          .resideInAPackage("io.justsearch.core.execution.."))))
+          .as("telemetry core dependency is restricted to the neutral execution contract");
 
   // =========================================================================
   // Rule 2: UI module is the top of the stack (only app-launcher consumes it)

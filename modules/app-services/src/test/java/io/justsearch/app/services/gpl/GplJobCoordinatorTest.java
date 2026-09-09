@@ -30,6 +30,8 @@ import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.ipc.RerankResponse;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -46,9 +48,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -77,11 +81,42 @@ class GplJobCoordinatorTest {
 
   private GplTrainingTripleStore tripleStore;
   private GplJobCoordinator coordinator;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     tripleStore = new GplTrainingTripleStore(tempDir);
-    coordinator = new GplJobCoordinator(() -> knowledgeClient, onlineAiService, false, tripleStore);
+    coordinator =
+        new GplJobCoordinator(
+            processExecutors, () -> knowledgeClient, onlineAiService, false, tripleStore);
+    // Keep the existing per-test stream stubs as the fixture seam while production calls the
+    // context-bearing completion API. This adapter preserves all recorded chunks and callbacks.
+    doAnswer(
+            inv -> {
+              CompletableFuture<String> completion = new CompletableFuture<>();
+              StringBuilder generated = new StringBuilder();
+              @SuppressWarnings("unchecked")
+              List<Map<String, Object>> messages = inv.getArgument(0, List.class);
+              int maxTokens = inv.getArgument(1, Integer.class);
+              SamplingParams sampling = inv.getArgument(2, SamplingParams.class);
+              onlineAiService.streamChat(
+                  messages,
+                  maxTokens,
+                  generated::append,
+                  ignored -> completion.complete(generated.toString()),
+                  completion::completeExceptionally,
+                  sampling);
+              return completion;
+            })
+        .when(onlineAiService)
+        .chatCompletion(any(), anyInt(), any(SamplingParams.class), any(EngineContext.class));
+  }
+
+  @AfterEach
+  void tearDown() {
+    coordinator.close();
+    processExecutors.close();
   }
 
   // ========== Status lifecycle ==========
@@ -421,7 +456,7 @@ class GplJobCoordinatorTest {
 
     // Create coordinator with reranker enabled (but RPC will fail)
     GplJobCoordinator coordinatorWithReranker =
-        new GplJobCoordinator(() -> knowledgeClient, onlineAiService, true, tripleStore);
+        new GplJobCoordinator(processExecutors, () -> knowledgeClient, onlineAiService, true, tripleStore);
     coordinatorWithReranker.runAsync();
 
     assertTrue(coordinatorWithReranker.awaitCompletion(10, TimeUnit.SECONDS), "job did not reach terminal state");
@@ -911,7 +946,7 @@ class GplJobCoordinatorTest {
                 .build());
 
     GplJobCoordinator coordWithReranker =
-        new GplJobCoordinator(() -> knowledgeClient, onlineAiService, true, tripleStore);
+        new GplJobCoordinator(processExecutors, () -> knowledgeClient, onlineAiService, true, tripleStore);
 
     ListAllDocumentIdsResponse page =
         ListAllDocumentIdsResponse.newBuilder()
@@ -989,7 +1024,7 @@ class GplJobCoordinatorTest {
                 .build());
 
     GplJobCoordinator coordWithReranker =
-        new GplJobCoordinator(() -> knowledgeClient, onlineAiService, true, tripleStore);
+        new GplJobCoordinator(processExecutors, () -> knowledgeClient, onlineAiService, true, tripleStore);
 
     // 2 docs, 1 query each — produces 2 positive scoreQueryDoc calls minimum
     ListAllDocumentIdsResponse page =
@@ -1159,6 +1194,7 @@ class GplJobCoordinatorTest {
 
     GplJobCoordinator coordWithCallback =
         new GplJobCoordinator(
+            processExecutors,
             () -> knowledgeClient,
             onlineAiService,
             false,

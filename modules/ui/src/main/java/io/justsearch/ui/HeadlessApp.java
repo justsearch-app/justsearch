@@ -50,13 +50,14 @@ public class HeadlessApp {
 
   static <T> java.util.concurrent.CompletableFuture<T>
       startChildCapableAsyncAfterOwnershipReconciliation(
+          java.util.concurrent.Executor executor,
           RuntimeManifestPublisher publisher,
           IoAction reconciliation,
           java.util.function.Supplier<T> bootstrap)
           throws java.io.IOException {
     publisher.publishOwnershipSeed();
     reconciliation.run();
-    return java.util.concurrent.CompletableFuture.supplyAsync(bootstrap);
+    return io.justsearch.core.execution.EngineFutures.supplyAsync(bootstrap, executor);
   }
 
   // Tempdoc 502 §3.3: Typed phase outputs. Each record captures the outputs of one boot phase,
@@ -366,13 +367,14 @@ public class HeadlessApp {
    * the user explicitly set it.)
    */
 
-  private static InfraPhaseResult setupInfra(ConfigPhaseResult configPhase) {
+  private static InfraPhaseResult setupInfra(
+      ConfigPhaseResult configPhase, io.justsearch.core.execution.EngineExecutorRegistry executors) {
     Path dataDir = configPhase.dataDir();
     harmonizeDataDirProperties(dataDir);
     log.info("Using data directory: {}", dataDir);
 
     Telemetry telemetry = new LocalTelemetry(
-        dataDir, 5_000, "justsearch-headless", "phase3", "metrics.ndjson",
+        executors, dataDir, 5_000, "justsearch-headless", "phase3", "metrics.ndjson",
         List.of(
             // Tempdoc 626 §Axis-A — the Head-side file watcher was removed; the `index.watcher.*`
             // metric is emitted only by the Worker (WorkerWatcherMetricCatalog), so the Head no
@@ -444,15 +446,16 @@ public class HeadlessApp {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
       io.justsearch.ui.api.UpgradeShutdownBridge upgradeShutdownBridge,
-      io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge)
+      io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge,
+      io.justsearch.app.engine.EngineRoot engineRoot)
       throws Exception {
     Telemetry telemetry = infraPhase.telemetry();
     ResolvedConfig resolvedConfig = infraPhase.config().resolvedConfig();
 
     HeadAssembly bootstrap =
         new HeadAssembly(
-            telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
-            childRegistry);
+            engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
+            childRegistry, engineRoot.operationLeases(), engineRoot.admission());
     log.info("HeadAssembly started (degraded — Worker connecting in background).");
 
     var headInfra = bootstrap.headInfraRegistry();
@@ -468,8 +471,9 @@ public class HeadlessApp {
 
     Path userHome = Path.of(System.getProperty("user.home", ""));
     LocalApiServer apiServer =
-        LocalApiServer.builder(settingsStore, indexBasePath)
+        LocalApiServer.builder(engineRoot.executors(), settingsStore, indexBasePath)
             .HeadAssembly(bootstrap)
+            .engineAdmission(engineRoot.admission())
             .knowledgeServer(null)
             .configRoot(configRoot)
             .knowledgeServerStartError(null)
@@ -609,7 +613,7 @@ public class HeadlessApp {
    */
   private static KnowledgeServerHealthMonitor startHealthMonitor(
       HeadAssembly bootstrap, LocalApiServer apiServer, KnowledgeServerBootstrap knowledgeServer) {
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(knowledgeServer);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap.executors(), knowledgeServer);
     monitor.onRecoveryConnected(recovered -> connectAndBind(bootstrap, apiServer, recovered, null));
     // Tempdoc 876 §C.8: reconcile the readiness snapshot on the poll the head already runs, so a
     // dimension that settles WITHOUT a capability transition (INDEX_SERVING → DEGRADED /
@@ -924,6 +928,7 @@ public class HeadlessApp {
     log.info("Starting JustSearch HeadlessApp...");
 
     Telemetry telemetry = null;
+    io.justsearch.core.execution.EngineExecutorRegistry processExecutors = null;
     HeadAssembly bootstrap = null;
     LocalApiServer apiServer = null;
     io.justsearch.app.services.settings.UiSettingsStore settingsStore = null; // NOPMD - defensive init
@@ -1007,8 +1012,24 @@ public class HeadlessApp {
       long settingsMs = (tPhase - t0) / 1_000_000;
       tPrev = tPhase;
 
+      final var restartManifestPublisher = manifestPublisher;
+      Runnable requestedRestartAction = localRestartAction(
+          terminalWriterShutdown,
+          reason -> {
+            restartManifestPublisher.markShutdownPending(reason.wire());
+            return null;
+          },
+          code -> Runtime.getRuntime().halt(code));
+
+      // Compose the work owner before either asynchronous Engine startup or API construction.
+      var ksConfig = io.justsearch.app.services.worker.KnowledgeServerConfig.load();
+      var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(
+          ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
+          childRegistry, requestedRestartAction);
+      processExecutors = engineRoot.executors();
+
       // Phase 1: infrastructure (telemetry, policy)
-      InfraPhaseResult infraPhase = setupInfra(configPhase);
+      InfraPhaseResult infraPhase = setupInfra(configPhase, engineRoot.executors());
       telemetry = infraPhase.telemetry();
 
       tPhase = System.nanoTime();
@@ -1021,26 +1042,32 @@ public class HeadlessApp {
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability =
           new io.justsearch.app.services.lifecycle.WorkerCapability();
 
-      final var restartManifestPublisher = manifestPublisher;
-      Runnable requestedRestartAction = localRestartAction(
-          terminalWriterShutdown,
-          reason -> {
-            restartManifestPublisher.markShutdownPending(reason.wire());
-            return null;
-          },
-          code -> Runtime.getRuntime().halt(code));
-
-      // Start Knowledge Server asynchronously — spawn runs in parallel with API construction.
+      // Start Knowledge Server asynchronously — startup runs in parallel with API construction.
+      var bootstrapLimits = engineRoot.executors().limits(
+          io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+      var bootstrapOwner = engineRoot.executors().register(
+          new io.justsearch.core.execution.EngineExecutorSpec(
+              "engine.bootstrap", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+              io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+              1, bootstrapLimits.maxQueue(), 1));
+      var bootstrapExecutor = bootstrapOwner.open(
+          Thread.ofPlatform().daemon().name("engine-bootstrap-", 0).factory());
       java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture =
           startChildCapableAsyncAfterOwnershipReconciliation(
+              bootstrapExecutor,
               manifestPublisher,
-              () ->
-                  new io.justsearch.ui.runtime.ManagedChildReconciler(
-                          childRegistry, declaredLlamaConfigHash)
-                      .reconcile(),
+              () -> {
+                try (var reconciler = new io.justsearch.ui.runtime.ManagedChildReconciler(
+                    engineRoot.executors(), childRegistry, declaredLlamaConfigHash)) {
+                  reconciler.reconcile();
+                }
+              },
               () ->
                   tryStartKnowledgeServer(
-                      sharedWorkerCapability, terminalWriterShutdown, childRegistry, requestedRestartAction));
+                      sharedWorkerCapability, ksConfig, engineRoot));
+      // Graceful retirement from the completing task cannot interrupt its own completion path.
+      // The process registry continues accounting the concrete instance until it actually exits.
+      workerFuture.whenComplete((result, failure) -> bootstrapExecutor.shutdown());
 
       // Phase 2: Build API server (degraded mode — no Worker yet)
       ApiPhaseResult apiPhase =
@@ -1051,7 +1078,7 @@ public class HeadlessApp {
               childRegistry,
               sharedWorkerCapability,
               upgradeShutdownBridge,
-              lifecycleShutdownBridge);
+              lifecycleShutdownBridge, engineRoot);
       bootstrap = apiPhase.bootstrap();
       apiServer = apiPhase.apiServer();
 
@@ -1152,6 +1179,8 @@ public class HeadlessApp {
       final AppInstanceLock appInstanceLockRef = appInstanceLock;
       final io.justsearch.app.api.OperationLeaseService operationLeasesRef =
           bootstrapRef.serviceOut().operationLeaseService();
+      final io.justsearch.app.api.EngineAdmissionService engineAdmissionRef =
+          engineRoot.admission();
       final java.util.concurrent.atomic.AtomicReference<
               io.justsearch.app.engine.ShutdownRequestWatcher>
           shutdownRequestWatcherRef = new java.util.concurrent.atomic.AtomicReference<>();
@@ -1171,6 +1200,8 @@ public class HeadlessApp {
                   telemetryRef,
                   appInstanceLockRef,
                   operationLeasesRef,
+                  engineAdmissionRef,
+                  engineRoot.executors(),
                   shutdownRequestWatcherRef::get),
               System::exit,
               preliminary ->
@@ -1184,6 +1215,7 @@ public class HeadlessApp {
       // Item B3's watcher, started here because this is after the API front is up. It consumes the
       // request written by the owning supervisor. Prepared upgrades dispatch locally.
       startShutdownRequestWatcher(
+          engineRoot.executors(),
           runtimeDir,
           shutdownRequestAcceptance(),
           shutdownRequestDispatcher(shutdownSequence),
@@ -1242,6 +1274,9 @@ public class HeadlessApp {
         }
       } catch (Exception ignored) {
         // best effort
+      }
+      if (processExecutors != null) {
+        processExecutors.close();
       }
       // Tempdoc 501 Phase 1: idempotent manifest cleanup. The shutdown hook above already
       // closed the publisher under SIGTERM/clean-exit; this finally block covers the path
@@ -1302,6 +1337,7 @@ public class HeadlessApp {
 
   /** Builds and starts the production watcher; boot clearing has already completed. */
   static io.justsearch.app.engine.ShutdownRequestWatcher startShutdownRequestWatcher(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Path runtimeDir,
       java.util.function.Function<
               io.justsearch.app.engine.ShutdownRequest,
@@ -1312,7 +1348,7 @@ public class HeadlessApp {
       java.util.function.Consumer<io.justsearch.app.engine.ShutdownRequestWatcher> beforeStart) {
     var watcher =
         new io.justsearch.app.engine.ShutdownRequestWatcher(
-            runtimeDir, accepts, onRequest, pollIntervalMs);
+            executors, runtimeDir, accepts, onRequest, pollIntervalMs);
     beforeStart.accept(watcher);
     watcher.start();
     return watcher;
@@ -1329,6 +1365,7 @@ public class HeadlessApp {
    * Each step is named for the resource it releases, since that name is what appears in the
    * receipt's {@code errors} list and in the log line a support session reads.
    */
+  /** Canonical shutdown binding with the typed Engine admission owner. */
   static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
       orderedShutdownSteps(
           LocalApiServer apiServer,
@@ -1340,6 +1377,8 @@ public class HeadlessApp {
           Telemetry telemetry,
           AppInstanceLock appInstanceLock,
           io.justsearch.app.api.OperationLeaseService operationLeases,
+          io.justsearch.app.api.EngineAdmissionService engineAdmission,
+          io.justsearch.core.execution.EngineExecutorRegistry executors,
           java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
               shutdownRequestWatcher) {
     return List.of(
@@ -1353,6 +1392,12 @@ public class HeadlessApp {
             "operation-admission",
             reason -> {
               operationLeases.freezeAdmission(reason.wire());
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "interactive-work",
+            reason -> {
+              if (engineAdmission != null) engineAdmission.cancelInteractive(reason.wire());
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
@@ -1405,6 +1450,12 @@ public class HeadlessApp {
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "executor-registry",
+            reason -> {
+              executors.close();
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "app-instance-lock",
             reason -> {
               if (appInstanceLock != null) appInstanceLock.close();
@@ -1414,10 +1465,8 @@ public class HeadlessApp {
 
   private static KnowledgeServerStartResult tryStartKnowledgeServer(
       io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
-      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
-          terminalWriterShutdown,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
-      Runnable requestedRestartAction) {
+      io.justsearch.app.services.worker.KnowledgeServerConfig ksConfig,
+      io.justsearch.app.engine.EngineRoot engineRoot) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
     // no monitor — the "boot brick" of 821 §O.4. The instance is restartable by construction
@@ -1429,19 +1478,13 @@ public class HeadlessApp {
       // composition root (design 3.2) and the only module allowed to bind both halves; handing it
       // to the bootstrap as the WorkerHost is what replaces "spawn a process, discover its port,
       // open a channel". This is the single site that decides where the index lives.
-      io.justsearch.app.services.worker.KnowledgeServerConfig ksConfig =
-          io.justsearch.app.services.worker.KnowledgeServerConfig.load();
       bootstrap =
           new KnowledgeServerBootstrap(
+              engineRoot.executors(),
               ksConfig,
               null,
               sharedWorkerCapability,
-              io.justsearch.app.engine.EngineRoot.forProcess(
-                  ksConfig.deadlineMs(),
-                  ksConfig.batchSize(),
-                  terminalWriterFaultAction(terminalWriterShutdown),
-                  childRegistry,
-                  requestedRestartAction));
+              engineRoot);
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.

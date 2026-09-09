@@ -3,6 +3,7 @@ package io.justsearch.app.api;
 
 import io.justsearch.core.context.EngineContext;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,24 +84,53 @@ public interface DocumentService {
    * @return async stage containing a map of docId to resolved document payload
    */
   default CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
-    // Default implementation: sequential fetch (subclasses should override for efficiency)
-    return CompletableFuture.supplyAsync(() -> {
-      Map<String, DocumentRecord> results = new LinkedHashMap<>();
-      for (String docId : docIds) {
-        try {
-          DocumentRecord record = fetch(docId, engineContext).toCompletableFuture().join();
-          results.put(docId, record);
-        } catch (Exception e) {
-          // Include failed docs with empty content, preserving exception details
-          Throwable cause = e.getCause() != null ? e.getCause() : e;
-          String errorType = cause.getClass().getSimpleName();
-          String errorMsg = cause.getMessage() != null ? cause.getMessage() : "unknown";
-          results.put(docId, new DocumentRecord(docId, "",
-              Map.of("error", errorMsg, "errorType", errorType)));
+    if (docIds == null || docIds.isEmpty()) {
+      return CompletableFuture.completedFuture(Map.of());
+    }
+    List<String> requestedIds = new ArrayList<>(docIds);
+
+    // Start every fetch immediately through its own implementation. The allOf continuation only
+    // joins after every stage has completed, so this default composition never blocks a common-pool
+    // worker while waiting for another document.
+    List<CompletableFuture<DocumentRecord>> fetches = new ArrayList<>(requestedIds.size());
+    for (String docId : requestedIds) {
+      try {
+        CompletionStage<DocumentRecord> stage = fetch(docId, engineContext);
+        if (stage == null) {
+          throw new NullPointerException("fetch returned null stage");
         }
+        fetches.add(stage.handle((record, failure) -> {
+          if (failure == null) {
+            return record;
+          }
+          if (failure instanceof Error error) {
+            throw error;
+          }
+          return failedRecord(docId, failure);
+        }).toCompletableFuture());
+      } catch (Exception e) {
+        fetches.add(CompletableFuture.completedFuture(failedRecord(docId, e)));
+      } catch (Error error) {
+        fetches.add(CompletableFuture.failedFuture(error));
       }
-      return results;
-    });
+    }
+
+    CompletableFuture<?>[] all = fetches.toArray(CompletableFuture<?>[]::new);
+    return CompletableFuture.allOf(all)
+        .thenApply(ignored -> {
+          Map<String, DocumentRecord> results = new LinkedHashMap<>();
+          for (int i = 0; i < requestedIds.size(); i++) {
+            results.put(requestedIds.get(i), fetches.get(i).join());
+          }
+          return results;
+        });
+  }
+
+  private static DocumentRecord failedRecord(String docId, Throwable failure) {
+    Throwable cause = failure.getCause() != null ? failure.getCause() : failure;
+    String errorType = cause.getClass().getSimpleName();
+    String errorMsg = cause.getMessage() != null ? cause.getMessage() : "unknown";
+    return new DocumentRecord(docId, "", Map.of("error", errorMsg, "errorType", errorType));
   }
 
   /**

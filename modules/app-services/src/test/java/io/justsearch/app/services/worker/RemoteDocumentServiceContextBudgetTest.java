@@ -50,6 +50,7 @@ final class RemoteDocumentServiceContextBudgetTest {
 
     client =
         new TestKnowledgeClient(
+            new io.justsearch.core.execution.TestEngineExecutors(),
             new FailingRetrieveContextCalls(
                 Map.of(
                     "doc-1", "A".repeat(100_000),
@@ -72,7 +73,7 @@ final class RemoteDocumentServiceContextBudgetTest {
   @Test
   @DisplayName("caps fallback context to 200k chars including header+separator overhead")
   void capsFallbackContextIncludingOverhead() throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
 
     Set<String> docIds = new LinkedHashSet<>();
     docIds.add("doc-1");

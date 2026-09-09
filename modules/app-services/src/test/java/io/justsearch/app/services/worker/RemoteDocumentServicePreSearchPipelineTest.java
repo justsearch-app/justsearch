@@ -63,7 +63,9 @@ final class RemoteDocumentServicePreSearchPipelineTest {
     tempDataDir = Files.createTempDirectory("justsearch-731-i1-presearch-test-");
     System.setProperty("justsearch.data.dir", tempDataDir.toString());
 
-    client = new TestKnowledgeClient(new CapturingSearchCalls());
+    client =
+        new TestKnowledgeClient(
+            new io.justsearch.core.execution.TestEngineExecutors(), new CapturingSearchCalls());
   }
 
   @AfterEach
@@ -83,7 +85,7 @@ final class RemoteDocumentServicePreSearchPipelineTest {
   @Test
   @DisplayName("open retrieval pre-search sends an explicit hybrid pipeline, not a bare request")
   void preSearchSendsExplicitHybridPipeline() throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
 
     RetrieveContextParams params = RetrieveContextParams.of("what is the policy?", 5, 4096);
     service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
@@ -106,7 +108,7 @@ final class RemoteDocumentServicePreSearchPipelineTest {
   @Test
   @DisplayName("open retrieval pre-search preserves search rank order into the discovered doc set")
   void preSearchPreservesRankOrder() throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
 
     RetrieveContextParams params = RetrieveContextParams.of("what is the policy?", 5, 4096);
     service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);

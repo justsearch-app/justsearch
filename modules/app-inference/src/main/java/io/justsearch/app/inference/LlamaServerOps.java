@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -150,22 +149,11 @@ final class LlamaServerOps {
 
   // Crash recovery
   private final AtomicInteger crashCount = new AtomicInteger(0);
-  private final ScheduledExecutorService recoveryScheduler =
-      Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "Server-Recovery");
-            t.setDaemon(true);
-            return t;
-          });
+  private final ScheduledExecutorService recoveryScheduler;
 
   // Health monitoring (separate from recovery so a slow health probe cannot block recovery)
-  private final ScheduledExecutorService healthScheduler =
-      Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "Server-Health");
-            t.setDaemon(true);
-            return t;
-          });
+  private final ScheduledExecutorService healthScheduler;
+  private final java.util.concurrent.ExecutorService exitExecutor;
 
   // Periodic health monitoring
   private final AtomicInteger consecutiveHealthFailures = new AtomicInteger(0);
@@ -222,6 +210,7 @@ final class LlamaServerOps {
    */
   @SuppressWarnings("ParameterNumber") // NOPMD — package-private companion class with many deps
   LlamaServerOps(
+      InferenceExecutorRegistrations executors,
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<InferenceConfig> config,
@@ -232,13 +221,14 @@ final class LlamaServerOps {
       Consumer<String> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events) {
     this(
-        httpClient, objectMapper, config, gpuCapabilitiesService, currentMode, propsObserver,
+        executors, httpClient, objectMapper, config, gpuCapabilitiesService, currentMode, propsObserver,
         goOfflineFromMaxCrashes, goOfflineFromExternalFailure, events,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   @SuppressWarnings("ParameterNumber")
   LlamaServerOps(
+      InferenceExecutorRegistrations executors,
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<InferenceConfig> config,
@@ -250,13 +240,14 @@ final class LlamaServerOps {
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
-        httpClient, objectMapper, config, gpuCapabilitiesService, currentMode, propsObserver,
+        executors, httpClient, objectMapper, config, gpuCapabilitiesService, currentMode, propsObserver,
         goOfflineFromMaxCrashes, goOfflineFromExternalFailure, events, childRegistry,
         LlamaServerOps::terminateManagedHandle);
   }
 
   @SuppressWarnings("ParameterNumber")
   LlamaServerOps(
+      InferenceExecutorRegistrations executors,
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<InferenceConfig> config,
@@ -269,13 +260,14 @@ final class LlamaServerOps {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ManagedHandleTermination managedHandleTermination) {
     this(
-        httpClient, objectMapper, config, gpuCapabilitiesService, currentMode, propsObserver,
+        executors, httpClient, objectMapper, config, gpuCapabilitiesService, currentMode, propsObserver,
         goOfflineFromMaxCrashes, goOfflineFromExternalFailure, events, childRegistry,
         managedHandleTermination, null);
   }
 
   @SuppressWarnings("ParameterNumber")
   LlamaServerOps(
+      InferenceExecutorRegistrations executors,
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<InferenceConfig> config,
@@ -302,6 +294,23 @@ final class LlamaServerOps {
     this.managedHandleTermination =
         Objects.requireNonNull(managedHandleTermination, "managedHandleTermination");
     this.managedCrashHandler = managedCrashHandler == null ? this::handleServerCrash : managedCrashHandler;
+    ScheduledExecutorService openedRecovery = null;
+    ScheduledExecutorService openedHealth = null;
+    java.util.concurrent.ExecutorService openedExit = null;
+    try {
+      openedRecovery =
+          executors.llamaRecovery.openScheduled(daemonFactory("Server-Recovery"));
+      openedHealth = executors.llamaHealth.openScheduled(daemonFactory("Server-Health"));
+      openedExit = executors.llamaExit.open(daemonFactory("Server-Exit"));
+    } catch (RuntimeException | Error failure) {
+      cancelIfOpened(openedExit);
+      cancelIfOpened(openedHealth);
+      cancelIfOpened(openedRecovery);
+      throw failure;
+    }
+    this.recoveryScheduler = openedRecovery;
+    this.healthScheduler = openedHealth;
+    this.exitExecutor = openedExit;
     this.propsOps =
         new ServerPropsOps(
             config, this::isExternalServerActive, propsObserver, this::requestedContextTokens);
@@ -1033,7 +1042,7 @@ final class LlamaServerOps {
   private void monitorAdoptedManagedChild(
       io.justsearch.app.api.runtime.ManagedChild child, ProcessHandle handle) {
     crashMonitor =
-        handle.onExit().thenRun(
+        handle.onExit().thenRunAsync(
             () -> {
               boolean wasCurrent;
               synchronized (this) {
@@ -1045,7 +1054,7 @@ final class LlamaServerOps {
                 LOG.error("adopted managed llama-server PID {} exited", child.pid());
                 managedCrashHandler.run();
               }
-            });
+            }, exitExecutor);
   }
 
   private static boolean terminateManagedHandle(ProcessHandle handle) {
@@ -1272,7 +1281,7 @@ final class LlamaServerOps {
 
     // Monitor for crashes (fire-and-forget monitoring task)
     crashMonitor =
-        CompletableFuture.runAsync(
+        io.justsearch.core.execution.EngineFutures.supplyAsync(
             () -> {
               try {
                 int exitCode = started.waitFor();
@@ -1284,7 +1293,8 @@ final class LlamaServerOps {
               } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); // restore interrupt flag
               }
-            });
+              return null;
+            }, exitExecutor);
   }
 
   IOException rollbackFailedRegistration(Process started, Throwable persistenceFailure) {
@@ -1691,12 +1701,31 @@ final class LlamaServerOps {
     }
     healthScheduler.shutdownNow();
     recoveryScheduler.shutdownNow();
+    cancelQueued(exitExecutor);
     try {
       healthScheduler.awaitTermination(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
       recoveryScheduler.awaitTermination(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+  }
+
+  private static java.util.concurrent.ThreadFactory daemonFactory(String name) {
+    return runnable -> {
+      Thread thread = new Thread(runnable, name);
+      thread.setDaemon(true);
+      return thread;
+    };
+  }
+
+  private static void cancelQueued(java.util.concurrent.ExecutorService executor) {
+    for (Runnable queued : executor.shutdownNow()) {
+      if (queued instanceof java.util.concurrent.Future<?> future) future.cancel(false);
+    }
+  }
+
+  private static void cancelIfOpened(java.util.concurrent.ExecutorService executor) {
+    if (executor != null) cancelQueued(executor);
   }
 
   // ==================== Policy Helpers ====================

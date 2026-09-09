@@ -22,10 +22,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -79,37 +79,24 @@ final class OnlineModeOps {
 
   // Priority queue for Online Mode (Chat > VDU)
   private final ReentrantLock onlineRequestLock = new ReentrantLock();
-  private final ExecutorService vduExecutor =
-      Executors.newSingleThreadExecutor(
-          r -> {
-            Thread t = new Thread(r, "VDU-Background");
-            t.setDaemon(true);
-            return t;
-          });
+  private final ExecutorService foregroundRequests;
+  private final ExecutorService backgroundRequests;
 
   /**
    * Consumer callbacks run here, off the online-request lock, one thread per in-flight stream (see
    * {@link StreamCallbackPump}). A blocked consumer therefore delays only its own stream instead of
    * every inference request in the process.
    */
-  private final ExecutorService callbackExecutor =
-      Executors.newCachedThreadPool(
-          r -> {
-            Thread t = new Thread(r, "VDU-Callbacks");
-            t.setDaemon(true);
-            return t;
-          });
+  private final ExecutorService foregroundCallbacks;
+  private final ExecutorService backgroundCallbacks;
+  private final int callbackQueueCapacity;
+  private final int retryAfterSeconds;
 
   /** Ticks the per-stream {@link StreamIdleWatchdog}s. */
-  private final java.util.concurrent.ScheduledExecutorService streamWatchdogScheduler =
-      Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "VDU-StreamWatchdog");
-            t.setDaemon(true);
-            return t;
-          });
+  private final java.util.concurrent.ScheduledExecutorService streamWatchdogScheduler;
 
   OnlineModeOps(
+      InferenceExecutorRegistrations executors,
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
@@ -117,6 +104,7 @@ final class OnlineModeOps {
       Supplier<String> lastKnownModelId,
       Supplier<String> configModelFileName) {
     this(
+        executors,
         httpClient,
         objectMapper,
         currentMode,
@@ -131,6 +119,7 @@ final class OnlineModeOps {
    * {@link InferenceTelemetryEvents}; tests use the prior constructor (delegates to no-op).
    */
   OnlineModeOps(
+      InferenceExecutorRegistrations executors,
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
@@ -145,6 +134,37 @@ final class OnlineModeOps {
     this.lastKnownModelId = lastKnownModelId;
     this.configModelFileName = configModelFileName;
     this.events = events == null ? InferenceTelemetryEvents.noop() : events;
+    ExecutorService foregroundRequestExecutor = null;
+    ExecutorService backgroundRequestExecutor = null;
+    ExecutorService foregroundCallbackExecutor = null;
+    ExecutorService backgroundCallbackExecutor = null;
+    java.util.concurrent.ScheduledExecutorService watchdogExecutor = null;
+    try {
+      foregroundRequestExecutor =
+          executors.foregroundRequests.open(daemonFactory("Inference-FG"));
+      backgroundRequestExecutor =
+          executors.backgroundRequests.open(daemonFactory("Inference-BG"));
+      foregroundCallbackExecutor =
+          executors.foregroundCallbacks.open(daemonFactory("Inference-Callback-FG"));
+      backgroundCallbackExecutor =
+          executors.backgroundCallbacks.open(daemonFactory("Inference-Callback-BG"));
+      watchdogExecutor =
+          executors.streamWatchdog.openScheduled(daemonFactory("Inference-StreamWatchdog"));
+    } catch (RuntimeException | Error failure) {
+      cancelIfOpened(watchdogExecutor);
+      cancelIfOpened(backgroundCallbackExecutor);
+      cancelIfOpened(foregroundCallbackExecutor);
+      cancelIfOpened(backgroundRequestExecutor);
+      cancelIfOpened(foregroundRequestExecutor);
+      throw failure;
+    }
+    this.foregroundRequests = foregroundRequestExecutor;
+    this.backgroundRequests = backgroundRequestExecutor;
+    this.foregroundCallbacks = foregroundCallbackExecutor;
+    this.backgroundCallbacks = backgroundCallbackExecutor;
+    this.streamWatchdogScheduler = watchdogExecutor;
+    this.callbackQueueCapacity = executors.callbackQueueCapacity;
+    this.retryAfterSeconds = executors.retryAfterSeconds;
   }
 
   /**
@@ -194,7 +214,9 @@ final class OnlineModeOps {
     if (t == null) return RequestOutcome.OK;
     Throwable cur = t;
     while (cur != null) {
-      if (cur instanceof InterruptedException) return RequestOutcome.CANCELLED;
+      if (cur instanceof InterruptedException || cur instanceof java.util.concurrent.CancellationException) {
+        return RequestOutcome.CANCELLED;
+      }
       cur = cur.getCause();
     }
     return RequestOutcome.ERROR;
@@ -209,16 +231,42 @@ final class OnlineModeOps {
 
   CompletableFuture<String> chatCompletion(
       List<Map<String, Object>> messages, int maxTokens, SamplingParams sampling) {
+    return chatCompletionOwned(messages, maxTokens, sampling, null, backgroundRequests);
+  }
+
+  CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    Objects.requireNonNull(work, "work");
+    var owned = work.retain();
+    try {
+      return chatCompletionOwned(
+          messages, maxTokens, sampling, owned, requestExecutor(owned));
+    } catch (RuntimeException | Error failure) {
+      owned.close();
+      throw failure;
+    }
+  }
+
+  private CompletableFuture<String> chatCompletionOwned(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle owned,
+      ExecutorService executor) {
     requireOnline("Chat");
 
-    return CompletableFuture.supplyAsync(
+    return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
+          checkCancelled(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.CHAT);
-          onlineRequestLock.lock();
-          emitRequestStarted(RequestKind.CHAT, enqueueNanos);
           RequestOutcome outcome = RequestOutcome.ERROR;
+          onlineRequestLock.lock();
           try {
+            emitRequestStarted(RequestKind.CHAT, enqueueNanos);
             String result = sendChatRequest(messages, maxTokens, sampling);
             outcome = RequestOutcome.OK;
             return result;
@@ -229,7 +277,9 @@ final class OnlineModeOps {
             onlineRequestLock.unlock();
             emitRequestCompleted(RequestKind.CHAT, enqueueNanos, outcome);
           }
-        });
+        },
+        executor,
+        owned == null ? () -> {} : owned::close);
   }
 
   CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
@@ -244,12 +294,43 @@ final class OnlineModeOps {
    */
   CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
       String prompt, byte[] imageBytes, int maxTokens, SamplingParams sampling, Long seed) {
+    return visionCompletionDetailedOwned(
+        prompt, imageBytes, maxTokens, sampling, seed, null, backgroundRequests);
+  }
+
+  CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    Objects.requireNonNull(work, "work");
+    var owned = work.retain();
+    try {
+      return visionCompletionDetailedOwned(
+          prompt, imageBytes, maxTokens, sampling, seed, owned, requestExecutor(owned));
+    } catch (RuntimeException | Error failure) {
+      owned.close();
+      throw failure;
+    }
+  }
+
+  private CompletableFuture<VisionCompletionResult> visionCompletionDetailedOwned(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle owned,
+      ExecutorService executor) {
     requireOnline("Vision");
 
     String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-    return CompletableFuture.supplyAsync(
+    return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
+          checkCancelled(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.VISION);
           RequestOutcome outcome = RequestOutcome.ERROR;
@@ -282,7 +363,8 @@ final class OnlineModeOps {
             emitRequestCompleted(RequestKind.VISION, enqueueNanos, outcome);
           }
         },
-        vduExecutor);
+        executor,
+        owned == null ? () -> {} : owned::close);
   }
 
   CompletableFuture<String> visionCompletion(
@@ -296,6 +378,12 @@ final class OnlineModeOps {
     return chatCompletion(messages, maxTokens, SamplingParams.DETERMINISTIC);
   }
 
+  CompletableFuture<String> summarize(
+      String content, int maxTokens, io.justsearch.app.api.EngineWorkHandle work) {
+    return chatCompletion(
+        buildSummarizationMessages(content), maxTokens, SamplingParams.DETERMINISTIC, work);
+  }
+
   CompletableFuture<String> askQuestion(String context, String question, int maxTokens) {
     List<Map<String, Object>> messages =
         List.of(
@@ -307,6 +395,45 @@ final class OnlineModeOps {
             Map.of(
                 "role", "user", "content", "Context:\n" + context + "\n\nQuestion: " + question));
     return chatCompletion(messages, maxTokens, SamplingParams.DETERMINISTIC);
+  }
+
+  CompletableFuture<String> askQuestion(
+      String context,
+      String question,
+      int maxTokens,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    List<Map<String, Object>> messages =
+        List.of(
+            Map.of(
+                "role",
+                "system",
+                "content",
+                "You are a helpful assistant. Answer questions based on the provided context."),
+            Map.of(
+                "role", "user", "content", "Context:\n" + context + "\n\nQuestion: " + question));
+    return chatCompletion(messages, maxTokens, SamplingParams.DETERMINISTIC, work);
+  }
+
+  <T> T callOwned(
+      io.justsearch.app.api.EngineWorkHandle work, java.util.function.Supplier<T> operation) {
+    Objects.requireNonNull(work, "work");
+    var owned = work.retain();
+    try {
+      return io.justsearch.core.execution.EngineFutures.supplyAsync(
+              () -> {
+                checkCancelled(owned);
+                return operation.get();
+              },
+              requestExecutor(owned),
+              owned::close)
+          .join();
+    } catch (java.util.concurrent.CompletionException failure) {
+      io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(failure);
+      throw failure;
+    } catch (RuntimeException | Error failure) {
+      owned.close();
+      throw failure;
+    }
   }
 
   // ==================== Streaming ====================
@@ -392,11 +519,17 @@ final class OnlineModeOps {
     }
 
     var unused =
-        CompletableFuture.runAsync(
+        io.justsearch.core.execution.EngineFutures.supplyAsync(
             () -> {
               // The lock covers the llama-server exchange only; consumer callbacks are pumped off
               // it, and the body read carries an idle deadline so it can never park forever.
-              StreamCallbackPump pump = new StreamCallbackPump(callbackExecutor);
+              StreamCallbackPump pump =
+                  new StreamCallbackPump(
+                      foregroundCallbacks,
+                      backgroundCallbacks,
+                      callbackQueueCapacity,
+                      retryAfterSeconds,
+                      null);
               // Tempdoc 835 §5.3: one stateful, frame-straddle-safe think-tag filter for every
               // streaming shape. This path has no reasoning handler, so captured thinking is
               // discarded — exactly what it already does with reasoning_content below.
@@ -406,8 +539,8 @@ final class OnlineModeOps {
               Throwable failure = null;
 
               onlineRequestLock.lock();
-              emitRequestStarted(RequestKind.STREAM, enqueueNanos);
               try {
+                emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());
                 body.put("messages", messages);
@@ -462,10 +595,7 @@ final class OnlineModeOps {
                       consumeStreamBody(
                           response,
                           line -> {
-                            RuntimeException callbackFailure = pump.failure();
-                            if (callbackFailure != null) {
-                              throw callbackFailure;
-                            }
+                            pump.rethrowFailure();
                             if (line.equals("data: [DONE]")) {
                               sawDone[0] = true;
                             } else if (line.startsWith("data: ")) {
@@ -540,8 +670,9 @@ final class OnlineModeOps {
                     lastFinishReason[0]);
                 trackedOnComplete.accept(lastFinishReason[0]);
               }
+              return null;
             },
-            vduExecutor);
+            backgroundRequests);
     unused.isDone(); // mark as observed; fire-and-forget
   }
 
@@ -593,6 +724,25 @@ final class OnlineModeOps {
       return failure;
     }
     return pump.failure();
+  }
+
+  private static Throwable finishOwnedStream(StreamCallbackPump pump, Throwable failure) {
+    boolean interrupted = false;
+    try {
+      for (;;) {
+        try {
+          pump.awaitDrain();
+          return failure == null ? pump.failure() : failure;
+        } catch (InterruptedException cancelled) {
+          // The work cancels its producer, but a terminal callback must follow the callback
+          // already executing. Retain capacity until that callback actually leaves.
+          interrupted = true;
+          if (failure == null) failure = cancelled;
+        }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
   }
 
   /**
@@ -679,6 +829,24 @@ final class OnlineModeOps {
       SamplingParams sampling,
       boolean requireSentinel) {
 
+    streamChatWithTools(messages, tools, maxTokens, onChunk, onToolCallDelta,
+        onReasoningChunk, onUsage, onComplete, onError, sampling, requireSentinel, null);
+  }
+
+  void streamChatWithTools(
+      List<Map<String, Object>> messages,
+      List<Map<String, Object>> tools,
+      int maxTokens,
+      Consumer<String> onChunk,
+      Consumer<JsonNode> onToolCallDelta,
+      Consumer<String> onReasoningChunk,
+      Consumer<AiUsage> onUsage,
+      Consumer<String> onComplete,
+      Consumer<Throwable> onError,
+      SamplingParams sampling,
+      boolean requireSentinel,
+      io.justsearch.app.api.EngineWorkHandle work) {
+
     // Tempdoc 412 follow-up: wrap user callbacks to fire onRequestCompleted exactly once.
     long enqueueNanos = System.nanoTime();
     emitRequestEnqueued(RequestKind.STREAM);
@@ -701,19 +869,30 @@ final class OnlineModeOps {
           onError.accept(t);
         };
 
+    StreamWorkOwner owner = new StreamWorkOwner(work, trackedOnComplete, trackedOnError);
     if (currentMode.get() != Mode.ONLINE) {
-      trackedOnError.accept(
-          new IllegalStateException(
-              "Not in Online Mode, current mode is " + currentMode.get()));
+      try (owner) {
+        owner.fail(new IllegalStateException("Not in Online Mode, current mode is " + currentMode.get()));
+      }
       return;
     }
 
-    var unused =
-        CompletableFuture.runAsync(
+    try {
+      owner.checkCancelled();
+      var unused =
+          io.justsearch.core.execution.EngineFutures.supplyAsync(
             () -> {
+              try {
+                owner.start();
               // The lock covers the llama-server exchange only; consumer callbacks are pumped off
               // it, and the body read carries an idle deadline so it can never park forever.
-              StreamCallbackPump pump = new StreamCallbackPump(callbackExecutor);
+              StreamCallbackPump pump =
+                  new StreamCallbackPump(
+                      foregroundCallbacks,
+                      backgroundCallbacks,
+                      callbackQueueCapacity,
+                      retryAfterSeconds,
+                      owner.work());
               // Tempdoc 835 §5.3: the same stateful filter, here with the reasoning channel
               // wired — inline <think> markup from a leaking build is rerouted to the reasoning
               // sink, so the product behaves identically on both build families.
@@ -726,9 +905,12 @@ final class OnlineModeOps {
               String[] lastFinishReason = {null};
               Throwable failure = null;
 
-              onlineRequestLock.lock();
-              emitRequestStarted(RequestKind.STREAM, enqueueNanos);
+              boolean locked = false;
               try {
+                onlineRequestLock.lockInterruptibly();
+                locked = true;
+                owner.checkCancelled();
+                emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());
                 body.put("messages", messages);
@@ -787,6 +969,8 @@ final class OnlineModeOps {
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
+                owner.body(response.body());
+
                 LOG.debug("LLM Tool Stream Response: status={}", response.statusCode());
 
                 if (response.statusCode() != 200) {
@@ -798,10 +982,7 @@ final class OnlineModeOps {
                       consumeStreamBody(
                           response,
                           line -> {
-                            RuntimeException callbackFailure = pump.failure();
-                            if (callbackFailure != null) {
-                              throw callbackFailure;
-                            }
+                            pump.rethrowFailure();
                             if (line.equals("data: [DONE]")) {
                               sawDone[0] = true;
                             } else if (line.startsWith("data: ")) {
@@ -863,29 +1044,40 @@ final class OnlineModeOps {
               } catch (Exception e) {
                 failure = e;
               } finally {
-                onlineRequestLock.unlock();
+                if (locked) onlineRequestLock.unlock();
+                pump.close();
               }
 
               // Outside the lock: deliver every queued callback, then exactly one terminal event.
-              failure = finishStream(pump, failure);
+              failure = work == null ? finishStream(pump, failure) : finishOwnedStream(pump, failure);
               if (failure != null) {
-                reportStreamFailure("Stream chat with tools", failure, trackedOnError);
+                reportStreamFailure("Stream chat with tools", failure, owner::fail);
               } else if (sawDone[0]) {
-                trackedOnComplete.accept(lastFinishReason[0]);
+                owner.complete(lastFinishReason[0]);
               } else if (requireSentinel) {
                 LOG.warn(
                     "LLM tool stream ended without [DONE] sentinel (finish_reason={})",
                     lastFinishReason[0]);
-                trackedOnError.accept(new StreamTruncatedException(lastFinishReason[0]));
+                owner.fail(new StreamTruncatedException(lastFinishReason[0]));
               } else {
                 LOG.debug(
                     "LLM stream ended without [DONE] (lenient mode, finish_reason={})",
                     lastFinishReason[0]);
-                trackedOnComplete.accept(lastFinishReason[0]);
+                owner.complete(lastFinishReason[0]);
               }
+              } catch (RuntimeException | Error failure) {
+                reportStreamFailure("Stream chat with tools", failure, owner::fail);
+              }
+              return null;
             },
-            vduExecutor);
-    unused.isDone(); // mark as observed; fire-and-forget
+            requestExecutor(owner.work()),
+            owner::close);
+      unused.isDone();
+    } catch (RuntimeException | Error failure) {
+      try (owner) {
+        reportStreamFailure("Stream chat submission", failure, owner::fail);
+      }
+    }
   }
 
   // ==================== Unified Streaming (Tempdoc 499) ====================
@@ -905,9 +1097,10 @@ final class OnlineModeOps {
       Consumer<String> onComplete,
       Consumer<Throwable> onError,
       SamplingParams sampling,
-      boolean requireSentinel) {
+      boolean requireSentinel,
+      io.justsearch.app.api.EngineWorkHandle work) {
     streamChatWithTools(messages, tools, maxTokens, onContent, onToolCallDelta,
-        onReasoning, onUsage, onComplete, onError, sampling, requireSentinel);
+        onReasoning, onUsage, onComplete, onError, sampling, requireSentinel, work);
   }
 
   // Tempdoc 491 §C5 follow-up: streamSummary + streamAnswer forwarders deleted. The shape
@@ -1250,8 +1443,40 @@ final class OnlineModeOps {
   // ==================== Lifecycle ====================
 
   void shutdown() {
-    vduExecutor.shutdownNow();
-    callbackExecutor.shutdownNow();
-    streamWatchdogScheduler.shutdownNow();
+    cancelQueued(foregroundRequests);
+    cancelQueued(backgroundRequests);
+    cancelQueued(foregroundCallbacks);
+    cancelQueued(backgroundCallbacks);
+    cancelQueued(streamWatchdogScheduler);
+  }
+
+  private ExecutorService requestExecutor(io.justsearch.app.api.EngineWorkHandle work) {
+    return work.context().urgency() == io.justsearch.core.context.EngineContext.Urgency.FOREGROUND
+        ? foregroundRequests
+        : backgroundRequests;
+  }
+
+  private static void checkCancelled(io.justsearch.app.api.EngineWorkHandle work) {
+    if (work == null) return;
+    work.cancellationReason()
+        .ifPresent(reason -> { throw new io.justsearch.app.api.EngineWorkCancelledException(reason); });
+  }
+
+  private static java.util.concurrent.ThreadFactory daemonFactory(String name) {
+    return runnable -> {
+      Thread thread = new Thread(runnable, name);
+      thread.setDaemon(true);
+      return thread;
+    };
+  }
+
+  private static void cancelQueued(ExecutorService executor) {
+    for (Runnable queued : executor.shutdownNow()) {
+      if (queued instanceof java.util.concurrent.Future<?> future) future.cancel(false);
+    }
+  }
+
+  private static void cancelIfOpened(ExecutorService executor) {
+    if (executor != null) cancelQueued(executor);
   }
 }

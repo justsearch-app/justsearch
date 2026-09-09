@@ -37,7 +37,7 @@ final class RemoteDocumentServiceExportSeamTest {
                 .build());
 
     var slice =
-        new RemoteDocumentService(() -> client)
+        new RemoteDocumentService(Runnable::run, Runnable::run, () -> client)
             .fetchSlice("doc-1", 0, 200_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
@@ -65,7 +65,7 @@ final class RemoteDocumentServiceExportSeamTest {
                 .build());
 
     var slice =
-        new RemoteDocumentService(() -> client)
+        new RemoteDocumentService(Runnable::run, Runnable::run, () -> client)
             .fetchSlice("legacy", 0, 20_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
@@ -87,7 +87,7 @@ final class RemoteDocumentServiceExportSeamTest {
                 .build());
 
     var page =
-        new RemoteDocumentService(() -> client)
+        new RemoteDocumentService(Runnable::run, Runnable::run, () -> client)
             .listAllDocumentIds(0, 50_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();

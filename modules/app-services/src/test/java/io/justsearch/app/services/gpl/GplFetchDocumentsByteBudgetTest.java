@@ -14,6 +14,8 @@ import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.services.worker.BoundedDocumentFetch;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
 import io.justsearch.ipc.ListAllDocumentIdsResponse;
@@ -21,9 +23,12 @@ import io.justsearch.ipc.grpc.GrpcMessageLimits;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,11 +69,40 @@ final class GplFetchDocumentsByteBudgetTest {
 
   private GplTrainingTripleStore tripleStore;
   private GplJobCoordinator coordinator;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     tripleStore = new GplTrainingTripleStore(tempDir);
-    coordinator = new GplJobCoordinator(() -> knowledgeClient, onlineAiService, false, tripleStore);
+    coordinator =
+        new GplJobCoordinator(
+            processExecutors, () -> knowledgeClient, onlineAiService, false, tripleStore);
+    doAnswer(
+            inv -> {
+              CompletableFuture<String> completion = new CompletableFuture<>();
+              @SuppressWarnings("unchecked")
+              List<Map<String, Object>> messages = inv.getArgument(0, List.class);
+              int maxTokens = inv.getArgument(1, Integer.class);
+              SamplingParams sampling = inv.getArgument(2, SamplingParams.class);
+              StringBuilder generated = new StringBuilder();
+              onlineAiService.streamChat(
+                  messages,
+                  maxTokens,
+                  generated::append,
+                  ignored -> completion.complete(generated.toString()),
+                  completion::completeExceptionally,
+                  sampling);
+              return completion;
+            })
+        .when(onlineAiService)
+        .chatCompletion(any(), anyInt(), any(SamplingParams.class), any(EngineContext.class));
+  }
+
+  @AfterEach
+  void tearDown() {
+    coordinator.close();
+    processExecutors.close();
   }
 
   @Test

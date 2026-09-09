@@ -301,8 +301,8 @@ public final class KnowledgeServer implements Closeable {
    *
    * @param config Worker configuration
    */
-  public KnowledgeServer(WorkerConfig config) {
-    this(config, null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  public KnowledgeServer(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerConfig config) {
+    this(executors, config, null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   /**
@@ -318,18 +318,24 @@ public final class KnowledgeServer implements Closeable {
    * @param config Worker configuration
    * @param signalBus the bus to use, or {@code null} to build one over a private gauge
    */
-  public KnowledgeServer(WorkerConfig config, WorkerSignalBus signalBus) {
-    this(config, signalBus, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  public KnowledgeServer(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerConfig config, WorkerSignalBus signalBus) {
+    this(executors, config, signalBus, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private final WorkerExecutorRegistrations workerExecutors;
+
   public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       WorkerConfig config,
       WorkerSignalBus signalBus,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this.executors = Objects.requireNonNull(executors, "executors");
     this.config = config;
     this.dataDir = config.dataDir();
     this.injectedSignalBus = signalBus;
     this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
+    this.workerExecutors = new WorkerExecutorRegistrations(executors);
   }
 
   /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
@@ -409,7 +415,7 @@ public final class KnowledgeServer implements Closeable {
       // construct the typed catalog after LocalTelemetry exists.
       LocalTelemetry workerTelemetry =
           new LocalTelemetry(
-              dataDir,
+              executors, dataDir,
               config.telemetryFlushMs(),
               "justsearch-worker",
               config.serviceVersion(),
@@ -1169,6 +1175,7 @@ public final class KnowledgeServer implements Closeable {
       bindTerminalWriterFaultSource(runningRuntime);
     }
     return new DefaultWorkerAppServices(
+        workerExecutors,
         infraCtx,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
@@ -2391,6 +2398,8 @@ public final class KnowledgeServer implements Closeable {
         log.warn("Error closing signal bus", e);
       }
     }
+
+    workerExecutors.close();
 
     if (indexRootLock != null) {
       try {

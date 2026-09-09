@@ -56,7 +56,9 @@ final class RemoteDocumentServiceCollectionScopeTest {
     tempDataDir = Files.createTempDirectory("justsearch-821-collection-scope-test-");
     System.setProperty("justsearch.data.dir", tempDataDir.toString());
 
-    client = new TestKnowledgeClient(new CapturingSearchCalls());
+    client =
+        new TestKnowledgeClient(
+            new io.justsearch.core.execution.TestEngineExecutors(), new CapturingSearchCalls());
   }
 
   @AfterEach
@@ -74,7 +76,7 @@ final class RemoteDocumentServiceCollectionScopeTest {
   }
 
   private void retrieve(List<String> collection, Set<String> docIds) throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
     RetrieveContextParams params =
         RetrieveContextParams.of("what did the agent do?", 5, 4096, docIds, List.of(), collection);
     service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);

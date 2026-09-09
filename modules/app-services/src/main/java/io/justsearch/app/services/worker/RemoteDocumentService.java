@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
 
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.ipc.DocumentContent;
@@ -20,6 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,26 +43,41 @@ public final class RemoteDocumentService implements DocumentService {
 
   private final Supplier<KnowledgeClient> clientSupplier;
   private final RagMetricCatalog catalog;
-
-  /**
-   * Creates a new RemoteDocumentService without telemetry (backward compatible).
-   *
-   * @param clientSupplier supplier for the knowledge-port client; resolves at use-time per §31
-   */
-  public RemoteDocumentService(Supplier<KnowledgeClient> clientSupplier) {
-    this(clientSupplier, RagMetricCatalog.noop());
-  }
+  private final Executor foregroundExecutor;
+  private final Executor backgroundExecutor;
 
   /**
    * Creates a new RemoteDocumentService with observability catalog.
    *
+   * @param foregroundExecutor executor for foreground document work
+   * @param backgroundExecutor executor for background document work
    * @param clientSupplier supplier for the knowledge-port client
    * @param catalog RAG metric catalog (use {@link RagMetricCatalog#noop()} when not wired)
    */
   public RemoteDocumentService(
-      Supplier<KnowledgeClient> clientSupplier, RagMetricCatalog catalog) {
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier,
+      RagMetricCatalog catalog) {
+    this.foregroundExecutor = Objects.requireNonNull(foregroundExecutor, "foregroundExecutor");
+    this.backgroundExecutor = Objects.requireNonNull(backgroundExecutor, "backgroundExecutor");
     this.clientSupplier = Objects.requireNonNull(clientSupplier, "clientSupplier");
     this.catalog = Objects.requireNonNull(catalog, "catalog");
+  }
+
+  /** Creates a new RemoteDocumentService without telemetry. */
+  public RemoteDocumentService(
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier) {
+    this(foregroundExecutor, backgroundExecutor, clientSupplier, RagMetricCatalog.noop());
+  }
+
+  private Executor executorFor(EngineContext engineContext) {
+    Objects.requireNonNull(engineContext, "engineContext");
+    return engineContext.urgency() == EngineContext.Urgency.FOREGROUND
+        ? foregroundExecutor
+        : backgroundExecutor;
   }
 
   private void recordRagSuccess() {
@@ -88,7 +105,7 @@ public final class RemoteDocumentService implements DocumentService {
       return CompletableFuture.completedFuture(Map.of());
     }
 
-    return CompletableFuture.supplyAsync(() -> {
+    return EngineFutures.supplyAsync(() -> {
       try {
         log.debug("Fetching {} documents through the knowledge port", docIds.size());
         // Tempdoc 885 item 6 [R6b]: this list is caller-supplied (a search result set, a citation
@@ -124,7 +141,7 @@ public final class RemoteDocumentService implements DocumentService {
         log.error("Failed to fetch documents from the index half", e);
         throw new UnavailableException("Failed to fetch documents via Worker: " + e.getMessage(), e);
       }
-    });
+    }, executorFor(engineContext));
   }
 
   @Override
@@ -136,7 +153,7 @@ public final class RemoteDocumentService implements DocumentService {
     int offset = Math.max(0, offsetChars);
     int max = maxChars <= 0 ? 20_000 : maxChars;
 
-    return CompletableFuture.supplyAsync(
+    return EngineFutures.supplyAsync(
         () -> {
           try {
             var response = clientSupplier.get().fetchDocumentSlice(docId, offset, max, engineContext);
@@ -175,12 +192,12 @@ public final class RemoteDocumentService implements DocumentService {
             log.error("Failed to fetch document slice from the index half", e);
             throw new UnavailableException("Failed to fetch document slice via Worker: " + e.getMessage(), e);
           }
-        });
+        }, executorFor(engineContext));
   }
 
   @Override
   public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
-    return CompletableFuture.supplyAsync(
+    return EngineFutures.supplyAsync(
         () -> {
           try {
             var response = clientSupplier.get().listAllDocumentIds(offset, limit, engineContext);
@@ -191,7 +208,7 @@ public final class RemoteDocumentService implements DocumentService {
             throw new UnavailableException(
                 "Failed to list document IDs via Worker: " + e.getMessage(), e);
           }
-        });
+        }, executorFor(engineContext));
   }
 
   /**
@@ -231,7 +248,7 @@ public final class RemoteDocumentService implements DocumentService {
           "", "EMPTY_REQUEST", false, List.of()));
     }
 
-    return CompletableFuture.supplyAsync(() -> {
+    return EngineFutures.supplyAsync(() -> {
       try {
         log.debug("Retrieving RAG context: question='{}', docIds={}, topK={}, maxTokens={}",
             question, docIds.size(), topK, maxContextTokens);
@@ -284,7 +301,7 @@ public final class RemoteDocumentService implements DocumentService {
         // Fall back to default implementation (concatenate full docs)
         return retrieveContextFallback(docIds, engineContext);
       }
-    });
+    }, executorFor(engineContext));
   }
 
   @Override
@@ -295,7 +312,7 @@ public final class RemoteDocumentService implements DocumentService {
           "", "EMPTY_REQUEST", false, List.of()));
     }
 
-    return CompletableFuture.supplyAsync(() -> {
+    return EngineFutures.supplyAsync(() -> {
       try {
         // When doc_ids are empty, do a pre-search to find relevant documents.
         // This is necessary because entity/path/date filters are indexed on parent
@@ -328,7 +345,7 @@ public final class RemoteDocumentService implements DocumentService {
         recordRagFallback();
         return retrieveContextFallback(params.docIds(), engineContext);
       }
-    });
+    }, executorFor(engineContext));
   }
 
   /**
@@ -551,7 +568,7 @@ public final class RemoteDocumentService implements DocumentService {
   @Override
   public CompletionStage<CitationMatchResult> matchCitationsAgainst(
       String answerText, List<VerificationSource> sources, double threshold, EngineContext engineContext) {
-    return CompletableFuture.supplyAsync(() -> {
+    return EngineFutures.supplyAsync(() -> {
       if (answerText == null || answerText.isBlank() || sources == null || sources.isEmpty()) {
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
       }
@@ -606,7 +623,7 @@ public final class RemoteDocumentService implements DocumentService {
         log.warn("Citation matching failed in the index half", e);
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
       }
-    });
+    }, executorFor(engineContext));
   }
 
   private static String extractFilename(String path) {
