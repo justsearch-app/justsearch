@@ -257,6 +257,25 @@
       ]
     },
     {
+      "id": "engine-executors",
+      "pathIncludes": [
+        "modules/",
+        "governance/retained-state.v1.json"
+      ],
+      "region": "Engine executor ownership and executor-less async calls (lane F C1-5/C1-7)",
+      "docs": [
+        "docs/design/lane-f-engine-jvm/stages/C1.md",
+        "modules/core/src/main/java/io/justsearch/core/execution/EngineExecutorRegistry.java",
+        "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java"
+      ],
+      "recipe": [
+        "Before adding or changing an Executors.new* call, raw pool constructor, factory method reference or executor-less CompletableFuture async call, use the process EngineExecutorRegistry and an existing logical owner where its lifetime and purpose match. Declare any new owner with the required bounded EngineExecutorSpec and retire it through its component.",
+        "Raw executor factories are confined to DefaultEngineExecutorRegistry and the external parser child exception enforced by ExecutorArchitectureTest. No common-pool dispatch, implicit async executor or caller-runs fallback is permitted. A refused submission stays typed and synchronous; capacity is not owner closure.",
+        "Use the foreground or background resource envelope declared in governance/retained-state.v1.json. Preserve actual-exit work ownership and source/task context across executor handoff.",
+        "Verify: ./gradlew.bat :modules:app-launcher:test --tests io.justsearch.app.launcher.ExecutorArchitectureTest; run the affected component ownership and refusal tests. The source census must retain its current explicit and expanded logical-owner floors."
+      ]
+    },
+    {
       "id": "dev-stack-stale-jar",
       "pathIncludes": ["modules/app-services/", "modules/app-agent-api/"],
       "region": "Java on the head-process classpath (dev-stack freshness)",

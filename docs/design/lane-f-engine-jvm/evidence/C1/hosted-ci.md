@@ -116,3 +116,20 @@ Raw evidence: `tmp/c1-hosted-status-292.json`, `tmp/c1-workflow-signal-health-29
 `tmp/c1-hosted-artifacts-293/`, `tmp/c1-hosted-proof-summary-293.json`.
 The integration-test-results artifact10109174357 expires2026-12-08T14:24:20Z. Local extracted
 copies remain accessible through lane-F acceptance; the SHA-256 inventory covers their contents.
+
+## Hosted4136d57e1 — 2026-09-09
+
+[CI34377820922](https://github.com/justsearch-app/justsearch/actions/runs/34377820922) passes all13
+jobs at4136d57e1bb43a45f03f3a7f3abed1c1c609c39e, including Windows-native and the advisory system
+and measured-axe tiers. This checkpoint includes OCR containment, client/sandbox cleanup,
+health capacity, CORS and admission-oracle corrections. It precedes the governance sweep.
+
+System job102556275346 completes in9m20s. Downloaded XML represents88 cases in20 files, zero
+failures/errors,42 skips and no flaky/rerun failure or error entries. The earlier Windows rename
+defect remains mandatory production work despite this checkpoint passing. Final C1 proof must
+follow the remaining corrections.
+
+Evidence: `tmp/c1-hosted-364.json`, `tmp/c1-hosted-artifacts-364.jsonl`,
+`tmp/c1-hosted-system-364/`, `tmp/c1-hosted-summary-364.json`.
+Integration artifact10115115676 expires2026-12-08T16:36:48Z; local extracted copies remain
+accessible through lane acceptance and are included in the committed SHA-256 inventory.

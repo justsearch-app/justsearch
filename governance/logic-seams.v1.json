@@ -154,6 +154,18 @@
       "note": "Tempdoc 790 item 2: the per-document bound on the dropout fallback chain, nested inside TimeboxedContentExtractor's whole-extraction timeout."
     },
     {
+      "id": "extraction-process-routing",
+      "gradlePath": ":modules:worker-services",
+      "targetClass": "io.justsearch.indexerworker.extract.RoutingExtractionSandbox",
+      "targetTests": [
+        "io.justsearch.indexerworker.extract.ExtractionRoutingTest"
+      ],
+      "pure": true,
+      "law": "The routing verdict is total over IndexingDocumentOps.classifyFileKind: pdf, office, archive, image and binary require process isolation; text, markdown and code stay in process. Null and unrecognized kind labels are not process families. The router delegates exactly once to the sandbox selected by that verdict, so a negated condition cannot silently run a wedge-prone parser inside the Engine.",
+      "guard": "test:ExtractionRoutingTest",
+      "note": "Lane F C1-14. The registered pure law is requiresProcessIsolation; extract only projects the existing classifier into that decision. The two sandbox owners and their cleanup remain IO boundaries, not a new taxonomy."
+    },
+    {
       "id": "install-completeness",
       "gradlePath": ":modules:app-services",
       "targetClass": "io.justsearch.app.services.ai.install.InstallCompleteness",

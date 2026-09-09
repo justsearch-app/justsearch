@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { scanPersistenceWriteSites } from '../governance/lib/persistence-write-scan.mjs';
+import { scanPersistenceWriteSites, stripJavaComments } from '../governance/lib/persistence-write-scan.mjs';
 
 const REGISTER = 'governance/store-recoverability.v1.json';
 /**
@@ -286,6 +286,32 @@ export function checkDurableStoreRegister({
 
     failures.push(...checkPathAgreement({ root, row, label, readableSources, readSource }));
     failures.push(...checkEncryptionDisposition({ row, label, authoredCatalogDirs }));
+    if (row.id === 'jobs-db') {
+      if (typeof row.versionAuthority !== 'string' || !row.versionAuthority.trim()
+          || !pathExists(resolve(root, row.versionAuthority))) {
+        failures.push(`${label}: versionAuthority must resolve to the jobs schema source.`);
+      } else {
+        try {
+          const code = stripJavaComments(readSource(resolve(root, row.versionAuthority)),
+            { stripLiterals: true });
+          // This authority uses positive decimal literals. Reject other Java bases rather
+          // than interpreting (for example) octal 017 as decimal 17.
+          const declarations = [...code.matchAll(
+            /^\s*public\s+static\s+final\s+int\s+TARGET_VERSION\s*=\s*([1-9](?:[\d_]*\d)?)\s*;\s*$/gm)];
+          if (declarations.length !== 1) {
+            failures.push(`${label}: versionAuthority must declare exactly one literal TARGET_VERSION.`);
+          } else {
+            const target = Number(declarations[0][1].replaceAll('_', ''));
+            if (!Number.isSafeInteger(target) || target <= 0 || row.currentVersion !== target) {
+              failures.push(`${label}: currentVersion ${row.currentVersion} disagrees with `
+                  + `${row.versionAuthority} TARGET_VERSION ${target}.`);
+            }
+          }
+        } catch (error) {
+          failures.push(`${label}: cannot read versionAuthority ${row.versionAuthority}: ${error.message}.`);
+        }
+      }
+    }
     for (const evidence of [...(row.tests ?? []), ...(row.fixtures ?? [])]) {
       if (!pathExists(resolve(root, evidence))) {
         failures.push(`${label}: evidence does not exist: ${evidence}.`);

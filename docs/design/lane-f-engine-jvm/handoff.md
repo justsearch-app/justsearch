@@ -35,7 +35,14 @@ See [CORS admission](evidence/C1/cors-admission.md). **Next are the ordered gove
 debts**, followed by the Windows rename correction and final C1 proof. The admission oracle now
 requires captured boolean retrySafe true:63 self-tests347, three adverse346 guards and build348
 pass. The earlier raw aggregate capture fails this stronger rule349; fresh final live proof is
-required. See [refusal proof](evidence/C1/admission-refusal-proof.md). See [OCR correction](evidence/C1/ocr-component-close.md) and
+required. See [refusal proof](evidence/C1/admission-refusal-proof.md). Governance sweep now passes
+the complete17-seam efficacy gate366 and reviewed build370: routing registration, executor consult,
+65/80 census, source-backed schema version, two property gaps and retired Worker baseline residue.
+See [governance sweep](evidence/C1/governance-sweep.md). Next are the remaining cancellation,
+shutdown and queued-root test debts, Windows rename and final C1 proof.
+Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
+inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.
+That checkpoint precedes the governance sweep. See [OCR correction](evidence/C1/ocr-component-close.md) and
 [parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
 Each subsequent item commit must be build-green and pushed immediately; earlier red WIP

@@ -87,8 +87,11 @@ including all five supervised recovery cases. Build273 is retained historical pr
   refusals cannot count. Self-test347 passes63 cases; all three adverse346 controls fail; build348
   passes. Old aggregate capture349 fails the stronger rule and needs fresh live proof. See
   [admission refusal proof](admission-refusal-proof.md).
-- Register the routing sandbox logic seam and executor consult region; remove the completed B row;
-  reconcile architecture floors, schema version, double-release and real shutdown admission tests.
+- Routing seam, executor consult region, current65/80 census floors and source-backed schema
+  version pin are implemented. Complete efficacy366 passes17 measured seams; reviewed build370
+  passes. The sweep also closes two existing property-test gaps and retires stale Stage-A Worker
+  mutation baselines. See [governance sweep](governance-sweep.md). Next remove the completed B row
+  and reconcile double-release, real shutdown admission and queued-root correlation tests.
 - Correct the remaining Windows supervisor rename under concurrent readers; hosted34356123502
   still fails this production boundary after publisher serialization. Preserve both failed writer
   attempts even though the advisory system job passes on its third attempt.

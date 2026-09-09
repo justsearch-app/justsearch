@@ -2,8 +2,12 @@ package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import io.justsearch.indexerworker.fixtures.FormatCapabilityFixtureFactory;
 import io.justsearch.indexerworker.fixtures.FormatCapabilityFixtureFactory.FormatId;
@@ -39,7 +43,8 @@ final class ExtractionRoutingTest {
     RoutingExtractionSandbox router =
         new RoutingExtractionSandbox(inProcess, outOfProcess, new ContentExtractor());
 
-    router.extract(copyFixture("/fixtures/pdf/pdf-text-layer.pdf", "doc.pdf"));
+    assertEquals(inProcess.policy(), router.policy());
+    assertEquals("out", router.extract(copyFixture("/fixtures/pdf/pdf-text-layer.pdf", "doc.pdf")).parserId());
     router.extract(copyFixture("/fixtures/office/office-marker.docx", "doc.docx"));
     router.extract(copyFixture("/fixtures/office/office-marker.pptx", "deck.pptx"));
     for (FormatId id : FormatId.values()) {
@@ -64,7 +69,7 @@ final class ExtractionRoutingTest {
         outOfProcess.seen,
         "wedge-prone families must be parsed out of process");
 
-    router.extract(write("notes.txt", "plain text"));
+    assertEquals("in", router.extract(write("notes.txt", "plain text")).parserId());
     router.extract(write("readme.md", "# heading"));
     router.extract(write("App.java", "class App {}"));
     router.extract(write("rows.csv", "a,b\n1,2\n"));
@@ -86,6 +91,33 @@ final class ExtractionRoutingTest {
       assertFalse(RoutingExtractionSandbox.requiresProcessIsolation(kind), kind);
     }
     assertFalse(RoutingExtractionSandbox.requiresProcessIsolation(null));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "false,false,false,false", "true,false,false,false", "false,true,false,false",
+      "true,true,false,false", "true,true,true,false", "true,true,false,true"
+  })
+  void closeAttemptsBothOwnersAndPreservesFailureIdentity(
+      boolean firstThrows, boolean secondThrows, boolean fatal, boolean sharedFailure) {
+    var inProcess = mock(ExtractionSandbox.class);
+    var outOfProcess = mock(ExtractionSandbox.class);
+    var router = new RoutingExtractionSandbox(inProcess, outOfProcess, mock(ContentExtractorProvider.class));
+    Throwable first = fatal ? new AssertionError("first close") : new IllegalStateException("first close");
+    Throwable second = sharedFailure ? first : new IllegalStateException("second close");
+    if (firstThrows) doThrow(first).when(inProcess).close();
+    if (secondThrows) doThrow(second).when(outOfProcess).close();
+    if (firstThrows || secondThrows) {
+      Throwable expected = firstThrows ? first : second;
+      assertSame(expected, assertThrows(expected.getClass(), router::close));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(
+          firstThrows && secondThrows && !sharedFailure ? new Throwable[] {second} : new Throwable[0],
+          expected.getSuppressed());
+    } else {
+      router.close();
+    }
+    verify(inProcess).close();
+    verify(outOfProcess).close();
   }
 
   /**

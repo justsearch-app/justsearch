@@ -55,11 +55,11 @@ class ExecutorArchitectureTest {
       "java.util.concurrent.ScheduledThreadPoolExecutor",
       "java.util.concurrent.ForkJoinPool");
 
-  /** C1's known pre-centralisation expression count; this is a floor, not a registry mirror. */
-  private static final int MIN_EXPLICIT_SPEC_EXPRESSIONS = 58;
+  /** C1's reviewed expression census; this is a floor, not a registry mirror. */
+  private static final int MIN_EXPLICIT_SPEC_EXPRESSIONS = 65;
 
   /** C1-5's non-vacuous logical-registration floor after helper expansion. */
-  private static final int MIN_LOGICAL_REGISTRATIONS = 63;
+  private static final int MIN_LOGICAL_REGISTRATIONS = 80;
   private static final int SHARED_HELPER_DEFINITIONS = 5;
 
   private static final Pattern RAW_SOURCE_FACTORY = Pattern.compile(
