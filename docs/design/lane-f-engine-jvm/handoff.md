@@ -48,7 +48,9 @@ passes; final review then found MCP retrySafe omitted from both refusal paths. T
 closing that two-call defect with real transport regressions. Hosted34383091150 passes
 Windows-native/system but axe browser installation fails an upstream APT hash mismatch on
 both attempts. Current evidence and exact remaining checks are in
-[final candidate](evidence/C1/final-candidate.md).
+[final candidate](evidence/C1/final-candidate.md). Broader400 then exposes the parser fixture's
+one-second cold-start assumption; [the test-only correction](evidence/C1/parser-fixture-startup.md)
+passes28 sandbox cases and retains a failing lost-slot counterfactual. Final stress is still required.
 Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
 inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.
 That checkpoint precedes the governance sweep. See [OCR correction](evidence/C1/ocr-component-close.md) and

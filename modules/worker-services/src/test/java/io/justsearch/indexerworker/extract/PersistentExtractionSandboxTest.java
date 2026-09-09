@@ -528,7 +528,10 @@ final class PersistentExtractionSandboxTest {
         && realChild.waitFor((Long) wait.getArgument(0), wait.getArgument(1)))
         .when(retained).waitFor(org.mockito.ArgumentMatchers.anyLong(),
             org.mockito.ArgumentMatchers.any(TimeUnit.class));
-    try (var sandbox = sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(1))) {
+    // This probes retained ownership, not a one-second cold-JVM startup requirement.
+    // Keep the same deadline allowance as hangingChildIsKilledAtTheDeadlineAndTheNextRequestSucceeds.
+    // SlowStartingChild makes the formerly load-dependent replacement failure deterministic.
+    try (var sandbox = sandbox(javaCommand(SlowStartingChild.class), Duration.ofSeconds(10))) {
       try (var spawns = org.mockito.Mockito.mockConstruction(ProcessBuilder.class,
           (builder, context) -> org.mockito.Mockito.when(builder.start()).thenReturn(retained))) {
         assertThrows(IllegalStateException.class, () -> sandbox.extract(file("hang.txt")));
@@ -760,6 +763,14 @@ final class PersistentExtractionSandboxTest {
     }
     @Override public boolean isAlive() { return alive; }
     @Override public long pid() { return 424243L; }
+  }
+
+  public static final class SlowStartingChild {
+    public static void main(String[] args) throws Exception {
+      // Deterministically include the cold-start delay seen under full-suite Windows load.
+      Thread.sleep(2_000);
+      ScriptedChild.main(args);
+    }
   }
 
   /**

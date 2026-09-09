@@ -46,6 +46,8 @@ keeps the eight MCP transport cases passing but fails the parser surviving-retir
 regression at the successful replacement request. The one-second request budget also
 covered cold JVM startup. Preserve400 and correct that fixture separately; the latest
 completed stress-enabled full run remains385 and does not erase this later failure.
+The [parser fixture correction](parser-fixture-startup.md) reproduces delayed startup and
+preserves the retained-slot assertions, including a failing lost-slot mutation.
 
 ## Remaining acceptance
 
