@@ -25,6 +25,7 @@ import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.AlreadyClosedException;
+import org.apache.lucene.util.ThreadInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -557,7 +558,17 @@ final class RuntimeSession implements AutoCloseable {
 
     // 8. Start commit timer for RUNNING mode only. READ_ONLY/DEFERRED have no writer.
     if (mode == Mode.RUNNING) {
-      commitOps.startCommitTimer();
+      try {
+        commitOps.startCommitTimer();
+      } catch (RuntimeException | Error failure) {
+        // A refused timer occurs after the writer/directory and NRT thread were opened.
+        // No runtime reaches the caller, so this constructor must retire those resources.
+        try { close(); }
+        catch (RuntimeException | Error cleanup) {
+          if (cleanup != failure) failure.addSuppressed(cleanup);
+        }
+        throw failure;
+      }
     }
   }
 
@@ -747,76 +758,88 @@ final class RuntimeSession implements AutoCloseable {
   }
 
   private void closeResources() {
-    // Capture snapshot before nulling — close from the captured copy.
-    LifecycleSnapshot snap = snapshot;
-    snapshot = null; // atomic — all ops fail-fast on subsequent calls
+    boolean interrupted = Thread.interrupted();
+    try {
+      // Capture snapshot before nulling — close from the captured copy.
+      LifecycleSnapshot snap = snapshot;
+      snapshot = null; // atomic — all ops fail-fast on subsequent calls
 
-    if (commitOps != null) {
-      try {
-        commitOps.stopCommitTimer();
-      } catch (RuntimeException e) {
-        log.warn("commit timer stop error: {}", e.getMessage());
-      }
-    }
-    if (crtrt != null) {
-      try {
-        crtrt.close();
-      } catch (Exception e) {
-        log.warn("crtrt close error: {}", e.getMessage());
-      }
-      crtrt = null;
-    }
-    if (snap != null) {
-      if (snap.searcherManager() != null) {
+      if (commitOps != null) {
         try {
-          snap.searcherManager().close();
-        } catch (IOException e) {
-          log.warn("searcherManager close error: {}", e.getMessage());
+          commitOps.stopCommitTimer();
+        } catch (RuntimeException e) {
+          log.warn("commit timer stop error: {}", e.getMessage());
         }
       }
-      if (snap.writer() != null) {
-        boolean writerWasTerminal =
-            snap.writer().getTragicException() != null || !snap.writer().isOpen();
-        boolean writerClosedCleanly = false;
-        try {
-          snap.writer().close();
-          writerClosedCleanly =
-              !writerWasTerminal && snap.writer().getTragicException() == null;
-        } catch (IOException e) {
-          log.warn("writer close error: {}", e.getMessage());
+      // ExecutorService.close restores interruption after its children exit. Defer that flag until
+      // the NRT thread has joined and all Lucene resources are closed, too.
+      interrupted |= Thread.interrupted();
+      if (crtrt != null) {
+        while (true) {
+          try {
+            crtrt.close();
+            break;
+          } catch (ThreadInterruptedException expected) {
+            interrupted = true;
+            Thread.interrupted();
+          }
         }
-        // tempdoc 628 Gap 1: record a clean shutdown only when the writer committed + closed cleanly
-        // and this is a persistent (non-ephemeral) index. An absent marker on the next open means the
-        // previous shutdown was unclean (a crash) → escalate to a FULL integrity scan.
-        if (writerClosedCleanly && !snap.ephemeralPath() && snap.indexPath() != null) {
-          CleanShutdownMarker.write(snap.indexPath());
+        crtrt = null;
+      }
+      if (snap != null) {
+        if (snap.searcherManager() != null) {
+          try {
+            snap.searcherManager().close();
+          } catch (IOException e) {
+            log.warn("searcherManager close error: {}", e.getMessage());
+          }
+        }
+        if (snap.writer() != null) {
+          boolean writerWasTerminal =
+              snap.writer().getTragicException() != null || !snap.writer().isOpen();
+          boolean writerClosedCleanly = false;
+          try {
+            snap.writer().close();
+            writerClosedCleanly =
+                !writerWasTerminal && snap.writer().getTragicException() == null;
+          } catch (IOException e) {
+            log.warn("writer close error: {}", e.getMessage());
+          }
+          // tempdoc 628 Gap 1: record a clean shutdown only when the writer committed + closed cleanly
+          // and this is a persistent (non-ephemeral) index. An absent marker on the next open means the
+          // previous shutdown was unclean (a crash) → escalate to a FULL integrity scan.
+          if (writerClosedCleanly && !snap.ephemeralPath() && snap.indexPath() != null) {
+            CleanShutdownMarker.write(snap.indexPath());
+          }
+        }
+        if (snap.directory() != null) {
+          try {
+            snap.directory().close();
+          } catch (IOException e) {
+            log.warn("directory close error: {}", e.getMessage());
+          }
+        }
+        if (snap.ephemeralPath()
+            && snap.indexPath() != null
+            && Files.exists(snap.indexPath())) {
+          try (var stream = Files.walk(snap.indexPath())) {
+            stream
+                .sorted(java.util.Comparator.reverseOrder())
+                .forEach(
+                    p -> {
+                      try {
+                        Files.deleteIfExists(p);
+                      } catch (IOException ex) {
+                        log.warn("delete error: {}", ex.getMessage());
+                      }
+                    });
+          } catch (IOException ex) {
+            log.debug("walk error during ephemeral cleanup: {}", ex.getMessage());
+          }
         }
       }
-      if (snap.directory() != null) {
-        try {
-          snap.directory().close();
-        } catch (IOException e) {
-          log.warn("directory close error: {}", e.getMessage());
-        }
-      }
-      if (snap.ephemeralPath()
-          && snap.indexPath() != null
-          && Files.exists(snap.indexPath())) {
-        try (var stream = Files.walk(snap.indexPath())) {
-          stream
-              .sorted(java.util.Comparator.reverseOrder())
-              .forEach(
-                  p -> {
-                    try {
-                      Files.deleteIfExists(p);
-                    } catch (IOException ex) {
-                      log.warn("delete error: {}", ex.getMessage());
-                    }
-                  });
-        } catch (IOException ex) {
-          log.debug("walk error during ephemeral cleanup: {}", ex.getMessage());
-        }
-      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
     // ==========================================================================
     // Field-by-field audit (critical-analysis fix item 3): every per-session field is
