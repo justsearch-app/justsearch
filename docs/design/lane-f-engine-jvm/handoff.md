@@ -29,8 +29,10 @@ See [sandbox response ownership](evidence/C1/sandbox-response-ownership.md).
 Health-monitor capacity recovery now passes53 selected cases337 and full build338, with
 both timer-contention/manual-refusal regressions failing against the old code330. Startup
 rolls back before authority publication; manual capacity reaches HTTP429 with Retry-After.
-See [health capacity](evidence/C1/health-capacity.md). **Next is the CORS admission correction**,
-followed by the remaining must-fixes in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md) and
+See [health capacity](evidence/C1/health-capacity.md). CORS preflight exemption and Retry-After
+visibility pass39 selected cases340/342 and full build343; both adverse341 checks fail as expected.
+See [CORS admission](evidence/C1/cors-admission.md). **Next are the ordered governance and test
+debts**, followed by the Windows rename correction and final C1 proof. See [OCR correction](evidence/C1/ocr-component-close.md) and
 [parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
 Each subsequent item commit must be build-green and pushed immediately; earlier red WIP

@@ -170,7 +170,7 @@ final class ApiSecurityFilters {
     app.exception(io.justsearch.app.api.EngineAdmissionException.class,
         (failure, ctx) -> RequestEngineWork.writeRefusal(ctx, failure));
     app.before(ctx -> {
-      if ("/api/health".equals(ctx.path())) return;
+      if ("OPTIONS".equals(ctx.method().name()) || "/api/health".equals(ctx.path())) return;
       if (ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE) != null) return;
       try {
         var work = engineAdmission.admit(RequestEngineContext.get(ctx),
@@ -433,7 +433,7 @@ final class ApiSecurityFilters {
       }
       ctx.header("Access-Control-Allow-Origin", origin);
       ctx.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-      ctx.header("Access-Control-Expose-Headers", "Deprecation, Sunset, Link");
+      ctx.header("Access-Control-Expose-Headers", "Deprecation, Sunset, Link, Retry-After");
       ctx.res().addHeader("Vary", "Origin");
     });
 

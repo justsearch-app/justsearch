@@ -48,6 +48,60 @@ final class EngineAdmissionTransportTest {
   }
 
   @Test
+  void preflightsDoNotAdmitWorkWhenFullOrFrozenAndForeignOriginsStayDenied() throws Exception {
+    try (var fixture = new Fixture(8, 2)) {
+      var first = fixture.send("/api/knowledge/search", "a", true);
+      var second = fixture.send("/api/knowledge/search", "b", true);
+      assertTrue(fixture.entered.await(5, TimeUnit.SECONDS));
+      assertEquals(2, fixture.admission.activeWorkCount());
+      org.mockito.Mockito.clearInvocations(fixture.admission);
+      for (String route : List.of("/api/knowledge/search", "/mcp", "/api/chat/runs")) {
+        assertEquals(200, fixture.preflight(route, "http://tauri.localhost").statusCode());
+        assertEquals(403, fixture.preflight(route, "https://foreign.example").statusCode());
+      }
+      org.mockito.Mockito.verify(fixture.admission, org.mockito.Mockito.never())
+          .admit(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
+      assertEquals(2, fixture.admission.activeWorkCount());
+      fixture.release.countDown();
+      assertEquals(200, first.get(5, TimeUnit.SECONDS).statusCode());
+      assertEquals(200, second.get(5, TimeUnit.SECONDS).statusCode());
+      fixture.admission.freezeAdmission("upgrade");
+      org.mockito.Mockito.clearInvocations(fixture.admission);
+      assertEquals(200, fixture.preflight("/api/knowledge/search", "http://tauri.localhost").statusCode());
+      org.mockito.Mockito.verify(fixture.admission, org.mockito.Mockito.never())
+          .admit(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+  }
+
+  @Test
+  void allowedBrowserCanReadRegisteredRetryDelayOnCapacityRefusal() throws Exception {
+    try (var fixture = new Fixture(8, 2)) {
+      var first = fixture.send("/api/knowledge/search", "a", true);
+      var second = fixture.send("/api/knowledge/search", "b", true);
+      assertTrue(fixture.entered.await(5, TimeUnit.SECONDS));
+      for (String origin : List.of("http://tauri.localhost", "https://foreign.example")) {
+        var request = HttpRequest.newBuilder(URI.create(
+            "http://127.0.0.1:" + fixture.app.port() + "/api/knowledge/search"))
+            .timeout(Duration.ofSeconds(5)).header("Origin", origin)
+            .POST(HttpRequest.BodyPublishers.ofString("{}")).build();
+        var response = fixture.client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertRefusal(response, "ADMISSION_ENGINE_LIMIT", false);
+        if (origin.equals("http://tauri.localhost")) {
+          assertEquals(origin, response.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
+          assertTrue(java.util.Arrays.stream(response.headers().firstValue("Access-Control-Expose-Headers")
+              .orElseThrow().split(",")).map(String::trim).anyMatch("Retry-After"::equals));
+        } else {
+          assertTrue(response.headers().firstValue("Access-Control-Allow-Origin").isEmpty());
+          assertTrue(response.headers().firstValue("Access-Control-Expose-Headers").isEmpty());
+        }
+      }
+      fixture.release.countDown();
+      assertEquals(200, first.get(5, TimeUnit.SECONDS).statusCode());
+      assertEquals(200, second.get(5, TimeUnit.SECONDS).statusCode());
+    }
+  }
+
+  @Test
   void handlerThrownAdmissionRefusalsAreUnsafeAndEnterRouteOnce() throws Exception {
     try (var fixture = new Fixture(2, 8)) {
       for (var reason : List.of(
@@ -200,7 +254,7 @@ final class EngineAdmissionTransportTest {
     final Javalin app;
 
     Fixture(int perContext, int aggregate) {
-      admission = new EngineAdmissionController(perContext, aggregate, 2);
+      admission = org.mockito.Mockito.spy(new EngineAdmissionController(perContext, aggregate, 2));
       app = Javalin.create(config -> config.showJavalinBanner = false);
       // Same body-preserving HTTP exception mapping as LocalApiServer's composition.
       app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> ctx.status(failure.getStatus()));
@@ -230,6 +284,15 @@ final class EngineAdmissionTransportTest {
           });
       app.post("/mcp", protocol::handlePost);
       app.start("127.0.0.1", 0);
+    }
+
+    HttpResponse<String> preflight(String route, String origin) throws Exception {
+      var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + route))
+          .timeout(Duration.ofSeconds(5)).header("Origin", origin)
+          .header("Access-Control-Request-Method", "POST")
+          .header("Access-Control-Request-Headers", "Content-Type")
+          .method("OPTIONS", HttpRequest.BodyPublishers.noBody()).build();
+      return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     java.util.concurrent.CompletableFuture<HttpResponse<String>> send(

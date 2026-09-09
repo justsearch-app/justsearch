@@ -80,7 +80,9 @@ including all five supervised recovery cases. Build273 is retained historical pr
 - Health-monitor capacity is corrected using one retained timer, bounded startup admission and
   explicit manual refusal. Final337 passes53 cases; adverse330 fails both target regressions;
   full build338 passes. See [health capacity](health-capacity.md).
-- Exempt OPTIONS from admission and expose Retry-After, with real transport tests.
+- OPTIONS now bypasses admission and allowed origins can read Retry-After. The real transport
+  and existing trust-boundary suite passes39 cases340/342; both adverse341 regressions fail and
+  full build343 passes. See [CORS admission](cors-admission.md).
 - Register the routing sandbox logic seam and executor consult region; remove the completed B row;
   reconcile architecture floors, aggregate-refusal oracle, schema version, double-release and real
   shutdown admission tests.

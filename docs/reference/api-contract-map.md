@@ -43,7 +43,10 @@ A startup aggregate reduction is
 bounded by the packaged maximum; the diagnostic projection reports the applied value.
 `RequestEngineWork` maps capacity refusal to HTTP `429` with `ADMISSION_CONTEXT_LIMIT` or
 `ADMISSION_ENGINE_LIMIT`, with `Retry-After`; upgrade freezing returns `503` with
-`UPGRADE_PREPARING`. Health remains available while admission is full or frozen.
+`UPGRADE_PREPARING`. Health remains available while admission is full or frozen. CORS
+`OPTIONS` preflights never reserve Engine work, including while full or frozen; the Host and
+Origin checks still apply. Allowed browser origins can read `Retry-After` through
+`Access-Control-Expose-Headers`.
 
 REST refusal includes `retrySafe: true` only when admission refused before dispatch, including
 approval execution before consuming its pending record. A later execution refusal carries
