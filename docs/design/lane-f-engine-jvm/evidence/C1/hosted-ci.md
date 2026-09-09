@@ -1,0 +1,27 @@
+# C1 hosted CI corrections
+
+2026-09-09. Stage C1 is not complete. Retain raw artifacts through lane completion plus30 days.
+
+Run34339800148, PR718 head db368e353: Public claims failed config-surface and npm-audit;
+model-free Build and app-ui failed strict test compilation. Read-only triage and root reread
+are preserved in tmp/c1-hosted-triage/triage-report.md and the three named job logs there.
+SSE and executor comparison corrections are pushed as09c329b46 and9629f240b; strict local
+check181 is running with -PskipErrorProneTests=false. Local defaults skip this test-source
+checker, which explains why the integrated build did not expose those three errors.
+
+## Runtime-client advisory correction
+
+GitHub's primary advisory GHSA-2883-xcg3-v3hh, published2026-09-08T21:24:51Z,
+identifies js-yaml>=4.0.0,<4.3.2 as vulnerable to CPU denial of service through empty merge
+sources. Runtime-client's generator Orval8.27.0 pins4.3.1; npm metadata for latest8.30.0
+still pins4.3.1. A scoped orval -> js-yaml4.3.2 override upgrades only that transitive
+package. No accepted-advisory baseline change. Source:
+https://github.com/advisories/GHSA-2883-xcg3-v3hh
+
+Local install171, deterministic generated-output check172, all7client tests173 and package
+contents check174 PASS. The fresh report175 has zero runtime-client advisories; all targets
+are available and zero high/critical identities remain. Root/UI lower-severity advisories
+remain reported (6/5), outside the gate's existing high/critical threshold. Restored kernel180
+passes npm-audit and config-surface; raw logs tmp/c1-runtime-client-{install-171,regen-172,
+test-173,pack-174}.txt and tmp/c1-advisory-patched-175.txt. Before/after identity reports are
+under tmp/c1-hosted-triage. No regenerated client source changed. Hosted rerun remains required.
