@@ -95,11 +95,10 @@ import org.slf4j.LoggerFactory;
  * {@code KnowledgeClient} keeps answering, and the file submitted after each failure is indexed and
  * becomes searchable, three times over, with a monotonically rising doc count.
  *
- * <p><b>The probe-fallback trap is asserted against explicitly.</b>
- * {@code buildContentExtractor} silently falls back to in-process extraction when the child command
- * fails its startup probe (DefaultWorkerAppServices.java:532-546) — under which every assertion
- * below would pass while testing nothing. {@code probe_failed} is therefore asserted absent from
- * the restart reasons before the first chaos file is submitted.
+ * <p><b>The chaos child must pass its startup probe.</b>
+ * A failed probe now preserves process confinement and fails routed files with SANDBOX_FAILED.
+ * {@code probe_failed} is asserted absent before the first chaos file so this test exercises the
+ * intended running-child timeout, crash and OOM branches rather than a startup failure.
  *
  * <p><b>Why {@code @Tag("stress")}.</b> This test deliberately wedges a parser for a whole
  * {@code TimeboxedContentExtractor.DEFAULT_TIMEOUT} (60&nbsp;s) and then exhausts a child heap, so
@@ -185,11 +184,9 @@ final class EngineExtractionSandboxChaosTest {
     attachExtractorLog();
     assertTrue(engine.client().isHealthy(TestEngineContexts.FOREGROUND), "the index half must be healthy before the chaos");
 
-    // The silent-fallback trap: if the child command had failed its startup probe, extraction would
-    // be in-process and every assertion below would pass while testing nothing.
+    // Establish that subsequent failures exercise the running chaos child, not startup refusal.
     assertFalse(restartReasons().contains("probe_failed"),
-        "the chaos child must have passed its startup probe, or the sandbox silently falls back to "
-            + "in-process extraction and this test asserts nothing; command="
+        "the chaos child must pass its startup probe before runtime failure branches; command="
             + System.getProperty(EnvRegistry.EXTRACTION_SANDBOX_COMMAND.sysProp()));
 
     long baselineTerminal = engine.status().getFailure().getFailedCount();

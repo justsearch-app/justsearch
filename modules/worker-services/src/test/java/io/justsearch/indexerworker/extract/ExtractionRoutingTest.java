@@ -121,8 +121,8 @@ final class ExtractionRoutingTest {
 
   /**
    * The startup probe, both ways. Spawning is lazy, so without it a broken child command is
-   * invisible until the first file and then fails every file; the Worker uses this verdict to fall
-   * back to in-process extraction for the session instead.
+   * invisible until the first routed file. A failed probe is reported at startup; routed families
+   * remain confined and fail with SANDBOX_FAILED while decoder-only formats remain usable.
    */
   @Test
   void startupProbeAnswersForAWorkingChildAndNamesTheFailureForABrokenOne() {
