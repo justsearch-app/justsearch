@@ -20,21 +20,34 @@ export async function exerciseHostileLocks(c) {
       + 'the index half must survive a hostile filesystem while writing this\n');
     return file;
   });
-  const currentPort = () => {
+  const currentBinding = () => {
     const supervisor = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
     const manifest = readJson(path.join(data, 'runtime', 'manifest.json'));
     return supervisor?.state === 'running' && supervisor.runId === first.runId
       && manifest?.pid === supervisor.pid && manifest?.instanceId === supervisor.instanceId
-      ? manifest.head.apiPort : null;
+      ? { port: manifest.head.apiPort, incarnation: supervisor.incarnation } : null;
   };
-  const port = await waitFor('a readable owned binding before submitting the corpus', 10000,
-    currentPort);
-  const ingested = await post(port, '/api/knowledge/ingest', { paths });
-  requireThat(ingested.status === 200 && acceptedCount(ingested) > 0,
+  const submittedBinding = await waitFor('a readable owned binding before submitting the corpus', 10000,
+    currentBinding);
+  const ingested = await post(submittedBinding.port, '/api/knowledge/ingest', { paths });
+  requireThat(ingested.status === 200 && acceptedCount(ingested) === paths.length,
     `documents under lock contention must be accepted: ${JSON.stringify(ingested)}`);
+  let releasedAfterExit = null;
   const result = await waitFor('documents under hostile locks become searchable', 180000, async () => {
+    const supervisor = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
+    if (!releasedAfterExit && supervisor?.runId === first.runId && supervisor.lastExit?.counted
+      && supervisor.lastExit.incarnation >= submittedBinding.incarnation) {
+      // A tragic Lucene write cannot be retried in that writer. After the observed fatal exit,
+      // stop injecting new faults and prove recovery of the already-accepted corpus. Re-attacking
+      // every successor indefinitely tests restart-budget exhaustion instead of transient recovery.
+      fs.writeFileSync(path.join(work, 'intruder-stop'), 'stop');
+      await waitFor('JUnit releases hostile locks after the observed Engine exit', 10000,
+        () => fs.existsSync(path.join(work, 'intruder-stopped')));
+      releasedAfterExit = supervisor.lastExit;
+      console.log('LOCK_FAULT_RELEASED', JSON.stringify(releasedAfterExit));
+    }
     try {
-      const livePort = currentPort();
+      const livePort = currentBinding()?.port;
       if (!livePort) return null;
       const response = await post(livePort, '/api/knowledge/search', {
         query: `${name.replaceAll('-', ' ')} probe`, limit: 10, mode: 'text',
@@ -48,6 +61,6 @@ export async function exerciseHostileLocks(c) {
   requireThat((await request(result.port, '/api/health')).status === 200,
     'the Engine must be healthy after indexing under contention');
   console.log('LOCK_SURVIVAL_PASS', JSON.stringify({ scenario: name,
-    accepted: acceptedCount(ingested), hit: result.hit,
+    accepted: acceptedCount(ingested), submittedBinding, hit: result.hit, releasedAfterExit,
     supervisor: readJson(path.join(data, 'runtime', 'supervisor.v1.json')) }));
 }

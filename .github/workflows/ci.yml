@@ -144,7 +144,9 @@ jobs:
       # need real children and run on the Windows lanes (dev-runner: Windows-native tests; Tauri:
       # Shell crate tests).
       - name: Supervisor conformance self-test (contract + decision table)
-        run: node scripts/supervisor-conformance/run.mjs --self-test
+        run: |
+          node scripts/supervisor-conformance/run.mjs --self-test
+          node --test scripts/supervisor-conformance/*.test.mjs
 
       - name: Verify Codex agent parity
         run: node scripts/ci/check-codex-agent-parity.mjs
