@@ -46,7 +46,6 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:infra-core`
 - `:modules:prompt-support`
 - `:modules:ssot-tools`
-- `:modules:telemetry`
 - `:modules:test-support`
 
 **With dependencies**
@@ -58,7 +57,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:app-api-tck` -> `:modules:ai-backend`
 - `:modules:app-config` -> `:modules:configuration`
 - `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
-- `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
+- `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
 - `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
 - `:modules:app-observability` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-util`, `:modules:configuration`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:prompt-support`
 - `:modules:app-services` -> `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`
@@ -72,6 +71,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:ort-common` -> `:modules:configuration`
 - `:modules:reranker` -> `:modules:configuration`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:system-tests` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:ipc-common`
+- `:modules:telemetry` -> `:modules:core`
 - `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`, `:modules:worker-services`
 - `:modules:worker-core` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:worker-services` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:extension-substrate`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`
@@ -120,6 +120,7 @@ graph TD
   app-engine --> worker-services
   app-inference --> app-api
   app-inference --> configuration
+  app-inference --> core
   app-inference --> core-contracts
   app-inference --> gpu-bridge
   app-inference --> telemetry
@@ -189,6 +190,7 @@ graph TD
   system-tests --> adapters-lucene
   system-tests --> ai-backend
   system-tests --> ipc-common
+  telemetry --> core
   ui --> adapters-lucene
   ui --> ai-backend
   ui --> api-contract-projection-java
