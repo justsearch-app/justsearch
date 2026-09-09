@@ -32,7 +32,10 @@ rolls back before authority publication; manual capacity reaches HTTP429 with Re
 See [health capacity](evidence/C1/health-capacity.md). CORS preflight exemption and Retry-After
 visibility pass39 selected cases340/342 and full build343; both adverse341 checks fail as expected.
 See [CORS admission](evidence/C1/cors-admission.md). **Next are the ordered governance and test
-debts**, followed by the Windows rename correction and final C1 proof. See [OCR correction](evidence/C1/ocr-component-close.md) and
+debts**, followed by the Windows rename correction and final C1 proof. The admission oracle now
+requires captured boolean retrySafe true:63 self-tests347, three adverse346 guards and build348
+pass. The earlier raw aggregate capture fails this stronger rule349; fresh final live proof is
+required. See [refusal proof](evidence/C1/admission-refusal-proof.md). See [OCR correction](evidence/C1/ocr-component-close.md) and
 [parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
 Each subsequent item commit must be build-green and pushed immediately; earlier red WIP

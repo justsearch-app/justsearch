@@ -13,7 +13,7 @@ const ARM_TIMEOUT_MS = 5 * 60 * 1000;
 /**
  * Capture schema: {arm, offered, concurrency, activeBaseline, activeAfter, holderCount,
  * policy:{perContextLimit,aggregateLimit,retryAfterSeconds}, timingPrecondition, timeline,
- * requests:[{id,contextId,operation,status,code?,retryAfter?,durationMs,timeline,terminal?,error?}]}.
+ * requests:[{id,contextId,operation,status,code?,retryAfter?,retrySafe?,durationMs,timeline,terminal?,error?}]}.
  * One row per offered request, including failures. Latency is measured at the caller.
  */
 export function analyzeArm(capture, expectedArm) {
@@ -76,6 +76,7 @@ export function analyzeArm(capture, expectedArm) {
     if (Number.isInteger(request.status) && request.status >= 200 && request.status < 300) {
       counts.admitted++;
     } else if (request.status === 429 && REJECTIONS.has(request.code)
+        && request.retrySafe === true
         && typeof request.retryAfter === 'string' && /^[1-9]\d*$/.test(request.retryAfter)
         && Number.isSafeInteger(Number(request.retryAfter))) {
       if (request.code === 'ADMISSION_CONTEXT_LIMIT') counts.contextRejected++;
@@ -232,6 +233,7 @@ export function analyzeFairness(capture) {
       || refusals.some(request => request.contextId !== holderContext || request.status !== 429
         || request.code !== 'ADMISSION_CONTEXT_LIMIT'
         || request.jsonValidated !== true
+        || request.retrySafe !== true
         || request.retryAfter !== String(capture.policy.retryAfterSeconds)
         || !Number.isFinite(request.timeline?.responseHeadersAt)
         || request.timeline.responseHeadersAt < capture.timeline.probesLaunchedAt)) {
@@ -265,12 +267,12 @@ async function selfTest() {
     requests: [
       { id: 'accepted', contextId: 'client-1', operation: 'search', status: 200, durationMs: 8 },
       { id: 'rejected', contextId: arm === 'context-many' ? 'client-2' : 'client-1', operation: 'chat',
-        status: 429, code: 'ADMISSION_ENGINE_LIMIT', retryAfter: '1', durationMs: 1 },
+        status: 429, code: 'ADMISSION_ENGINE_LIMIT', retryAfter: '1', retrySafe: true, durationMs: 1 },
       { id: 'accepted-chat', contextId: 'client-1', operation: 'chat', status: 200, durationMs: 8,
         streamed: true, activeAtProbe: true,
         terminal: { doneCount: 1, errorCount: 0, eventCount: 3, eof: true } },
       { id: 'rejected-search', contextId: arm === 'context-many' ? 'client-2' : 'client-1', operation: 'search',
-        status: 429, code: 'ADMISSION_ENGINE_LIMIT', retryAfter: '1', durationMs: 1 },
+        status: 429, code: 'ADMISSION_ENGINE_LIMIT', retryAfter: '1', retrySafe: true, durationMs: 1 },
     ],
   });
   const valid = () => [capture('context-many'), capture('context-one')];
@@ -294,6 +296,9 @@ async function selfTest() {
     (c) => { c.requests[1].status = 200; },
     (c) => { c.requests[0] = { ...c.requests[1], id: 'also-rejected' }; },
     (c) => { c.requests[1].code = 'RESOURCE_EXHAUSTED'; },
+    (c) => { c.requests[1].retrySafe = false; },
+    (c) => { delete c.requests[1].retrySafe; },
+    (c) => { c.requests[1].retrySafe = 'true'; },
     (c) => { c.requests[1].retryAfter = undefined; },
     (c) => { c.requests[1].retryAfter = '0'; },
     (c) => { c.requests[1].retryAfter = 'Infinity'; },
@@ -351,7 +356,7 @@ async function selfTest() {
           timeline: { responseHeadersAt: 1, runStartedAt: 2, terminalAt: 10 },
           terminal: { doneCount: 1, errorCount: 0, eventCount: 3, eof: true } },
         { id: `search-${index}`, contextId, operation: 'search', status: 429, durationMs: 2,
-          code: 'ADMISSION_ENGINE_LIMIT', retryAfter: '1',
+          code: 'ADMISSION_ENGINE_LIMIT', retryAfter: '1', retrySafe: true,
           timeline: { responseHeadersAt: 5 } },
       ];
     }),
@@ -376,13 +381,13 @@ async function selfTest() {
         terminal: { doneCount: 1, errorCount: 0, eventCount: 3, eof: true },
       })),
       { id: 'same-search', contextId: 'full-bucket', operation: 'search', role: 'same-bucket-search',
-        status: 429, code: 'ADMISSION_CONTEXT_LIMIT', retryAfter: '1', jsonValidated: true,
+        status: 429, code: 'ADMISSION_CONTEXT_LIMIT', retryAfter: '1', retrySafe: true, jsonValidated: true,
         durationMs: 2, timeline: { responseHeadersAt: 5 } },
       { id: 'same-suggest', contextId: 'full-bucket', operation: 'suggest', role: 'same-bucket-suggest',
-        status: 429, code: 'ADMISSION_CONTEXT_LIMIT', retryAfter: '1', jsonValidated: true,
+        status: 429, code: 'ADMISSION_CONTEXT_LIMIT', retryAfter: '1', retrySafe: true, jsonValidated: true,
         durationMs: 2, timeline: { responseHeadersAt: 5 } },
       { id: 'same-mcp', contextId: 'full-bucket', operation: 'mcp', role: 'same-bucket-mcp',
-        status: 429, code: 'ADMISSION_CONTEXT_LIMIT', retryAfter: '1', jsonValidated: true,
+        status: 429, code: 'ADMISSION_CONTEXT_LIMIT', retryAfter: '1', retrySafe: true, jsonValidated: true,
         mcp: { id: 'fairness-probe', errorCode: 'ADMISSION_CONTEXT_LIMIT', errorNumber: -32000 },
         durationMs: 2, timeline: { responseHeadersAt: 5 } },
       { id: 'health', contextId: 'full-bucket', operation: 'health', role: 'same-bucket-health',
@@ -395,6 +400,9 @@ async function selfTest() {
   });
   assert.equal(analyzeFairness(fairness()).verdict, 'PASS');
   for (const mutation of [
+    (value) => { value.requests[2].retrySafe = false; },
+    (value) => { delete value.requests[3].retrySafe; },
+    (value) => { value.requests[4].retrySafe = 'true'; },
     (value) => { value.requests[2].code = 'ADMISSION_ENGINE_LIMIT'; },
     (value) => { value.requests[6].status = 429; },
     (value) => { value.requests[0].timeline.terminalAt = 4; },
@@ -408,7 +416,40 @@ async function selfTest() {
     mutation(value);
     assert.equal(analyzeFairness(value).verdict, 'FAIL');
   }
-  console.log(`admission oracle self-test: PASS (${checked + 18} cases)`);
+  // Exercise both capture paths through Response body decoding, including the MCP envelope.
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const operation of ['search', 'chat', 'mcp']) {
+      for (const retrySafe of [true, false, undefined, 'true']) {
+        const code = 'ADMISSION_ENGINE_LIMIT';
+        const body = operation === 'mcp'
+          ? { jsonrpc: '2.0', id: 'proof', error: { code: -32000, data: { errorCode: code, retrySafe } } }
+          : { errorCode: code, retrySafe };
+        globalThis.fetch = async () => new Response(JSON.stringify(body), {
+          status: 429, headers: { 'Retry-After': '1' },
+        });
+        const start = process.hrtime.bigint();
+        const row = newRow('decode', 'client', operation, start);
+        const timeoutState = { timedOut: false };
+        if (operation === 'chat') {
+          await startChat('http://127.0.0.1', 'fixture', row, 'fixture', undefined, start, timeoutState);
+        } else {
+          await runJsonRequest('http://127.0.0.1', 'fixture', row, undefined, start, timeoutState, {
+            path: operation === 'mcp' ? '/mcp' : '/api/knowledge/search', method: 'POST', body: {},
+            ...(operation === 'mcp' ? { mcpSession: 'fixture' } : {}),
+          });
+        }
+        assert.equal(row.error, undefined);
+        assert.equal(row.code, code);
+        assert.equal(row.retrySafe, retrySafe);
+        assert.equal(row.jsonValidated, true);
+        checked++;
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  console.log(`admission oracle self-test: PASS (${checked + 21} cases)`);
 }
 
 function elapsedMs(startNs) {
@@ -464,10 +505,12 @@ async function responseJson(response) {
   }
 }
 
-async function responseCode(response) {
-  const parsed = await responseJson(response);
-  const code = parsed?.errorCode ?? parsed?.code;
-  return typeof code === 'string' ? code : undefined;
+function recordJsonResponse(row, parsed) {
+  const code = parsed?.errorCode ?? parsed?.code ?? parsed?.error?.data?.errorCode;
+  row.code = typeof code === 'string' ? code : undefined;
+  // Preserve the wire value: missing, false and the string "true" are not proof.
+  row.retrySafe = parsed?.retrySafe ?? parsed?.error?.data?.retrySafe;
+  row.jsonValidated = true;
 }
 
 function requestFailure(error, timedOut = false) {
@@ -646,7 +689,7 @@ async function startChat(
     row.retryAfter = response.headers.get('retry-after') ?? undefined;
     row.timeline.responseHeadersAt = elapsedMs(armStartNs);
     if (!response.ok) {
-      row.code = await responseCode(response);
+      recordJsonResponse(row, await responseJson(response));
       row.timeline.completedAtMs = elapsedMs(armStartNs);
       row.durationMs = row.timeline.completedAtMs - row.timeline.offeredAtMs;
       return { row, state: null, completion: Promise.resolve() };
@@ -685,8 +728,7 @@ async function runJsonRequest(baseUrl, token, row, signal, armStartNs, timeoutSt
     row.retryAfter = response.headers.get('retry-after') ?? undefined;
     row.timeline.responseHeadersAt = elapsedMs(armStartNs);
     const parsed = await responseJson(response);
-    const code = parsed?.errorCode ?? parsed?.code ?? parsed?.error?.data?.errorCode;
-    row.code = typeof code === 'string' ? code : undefined;
+    recordJsonResponse(row, parsed);
     if (request.mcpSession) {
       row.mcp = {
         id: parsed?.id,
@@ -694,7 +736,6 @@ async function runJsonRequest(baseUrl, token, row, signal, armStartNs, timeoutSt
         errorNumber: parsed?.error?.code,
       };
     }
-    row.jsonValidated = true;
   } catch (error) {
     row.error = requestFailure(error, timeoutState.timedOut);
   } finally {

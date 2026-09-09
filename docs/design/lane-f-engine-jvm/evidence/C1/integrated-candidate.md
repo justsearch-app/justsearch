@@ -186,3 +186,10 @@ zero failures/errors,25existing skips; configured integration36tests,zero failur
 The full app-engine suite executed after the observer/setup corrections. Native stress and other
 unchanged reports retain190's execution timestamps. Public claims also passes hosted34345647291
 at this revision; remaining hosted jobs were in progress at snapshot204. No final acceptance yet.
+
+## 2026-09-09 admission oracle correction
+
+The aggregate/fairness oracle now requires the captured wire field retrySafe to be boolean true.
+Earlier aggregate captures above omit it; re-analysis349 fails rather than inferring safety from
+HTTP429 and its reason. Their original pass is historical and cannot satisfy final C1 acceptance.
+Fresh live captures after the ordered fixes are required. See [refusal proof](admission-refusal-proof.md).
