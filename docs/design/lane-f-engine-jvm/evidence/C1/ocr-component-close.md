@@ -98,3 +98,14 @@ is therefore the **immediate next C1 correction**, before the remaining ordered 
 checkpoint does not claim end-to-end orphan prevention or close the OCR review. The former Windows
 job-object implementation and supported Unix behavior are being investigated before selecting the
 smallest containment mechanism. No owner decision or authorization is pending.
+
+## Integrated checkpoint proof
+
+Full run299 at clean pushed `bad1a7622` passes in8m52s, including all five supervised
+recovery scenarios. The command includes build, test, installed distribution and system
+integration tests with stress enabled and test Error Prone enabled. The represented XML
+contains9,751 unit cases and118 integration cases with zero failures/errors;25 unit and52
+integration cases are skipped. Unchanged Gradle tasks may reuse earlier reports. See
+[last full run](last-full-run-summary.json), `tmp/c1-ocr-integrated-299.txt` and
+`tmp/c1-ocr-integrated-results-299/manifest.json`. This does not close the native-descendant
+containment finding or replace final live and hosted C1 acceptance.
