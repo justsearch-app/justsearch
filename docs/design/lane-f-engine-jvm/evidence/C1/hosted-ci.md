@@ -25,3 +25,18 @@ remain reported (6/5), outside the gate's existing high/critical threshold. Rest
 passes npm-audit and config-surface; raw logs tmp/c1-runtime-client-{install-171,regen-172,
 test-173,pack-174}.txt and tmp/c1-advisory-patched-175.txt. Before/after identity reports are
 under tmp/c1-hosted-triage. No regenerated client source changed. Hosted rerun remains required.
+
+
+## Admission configuration surface reconciliation
+
+The C1 aggregate-cap override added in e71b512a6 is the one extra EnvRegistry declaration:
+measured248pairs versus the stage-A pin247. It is a startup-only reduction, bounded by the
+packaged policy in EngineResourcePolicy; it adds no YAML or ConfigKey entry. This correction
+adds its own declared-growth changeset and advances only that pin to248. Other stage-A
+surface retirement remains. Generated matrix179 and kernel180 pass; raw SARIF is copied to
+tmp/c1-hosted-kernel-restored-180.sarif. No dead-setting or sysaccess allowance grows.
+
+Strict compiler/test181 passes (85tasks,6executed79up-to-date) with test Error Prone enabled.
+SSE4tests and registry tests execute after09c329b46/9629f240b; this closes their WIP local
+proof gap. Hosted rerun remains required. Hosted Docs lint34341109990 passes at56b3d826f;
+canonical sources are unchanged by these subsequent test/dependency/governance corrections.
