@@ -48,3 +48,20 @@ Final installed log: `tmp/c1-hostile-guarded-installed-239.txt`.
 
 This correction does not turn the advisory Windows hosted integration tier into a required
 cross-platform gate. E's installed platform/recovery obligations remain unchanged.
+
+## Final-guard hosted fatal witness — 2026-09-09
+
+Hosted run34356123502 at6bf931408 supplies the previously missing final-guard fatal branch:
+both boot and ingest accepted exactly100 documents, observed counted transient exit1 from the
+submitted incarnation, released the injected fault, and found the indexed data after incarnation2
+became ready. The fixture output retains the exit/incarnation evidence. Extracted summary:
+`tmp/c1-hosted-proof-summary-269.json`; originals are retained under
+`tmp/c1-hosted-artifacts-269/`. The hosted integration-test-results artifact10106694706 expires
+2026-12-08T13:17:16Z and is accessible from
+[the run](https://github.com/justsearch-app/justsearch/actions/runs/34356123502).
+
+This closes the final-guard fatal-branch proof gap for6bf931408 only. That run is not final C1
+acceptance: overall CI fails, and writer recovery passes only after two exit-classification
+failures. One failed attempt also records a supervisor-state EPERM rename; another is forcibly
+killed after its close deadline. The latest runtime-close and remaining ordered fixes still need
+their final configured verification tiers.

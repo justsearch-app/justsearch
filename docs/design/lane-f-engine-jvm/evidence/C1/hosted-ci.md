@@ -63,3 +63,33 @@ registration check; execution evidence comes from the Engine suites, not this so
 The integration ledger failure is under read-only root-directed triage. Integrated190, with
 all stress tests enabled and strict test-source compilation, has also reported a format-matrix
 initialization timeout; that is being investigated before any acceptance claim.
+
+## Hosted6bf931408 follow-up — 2026-09-09
+
+[CI34356123502](https://github.com/justsearch-app/justsearch/actions/runs/34356123502) is FAIL.
+Build, all three unit lanes, Rust, jseval, license and secrets pass. Public claims fails on two
+Markdown heading errors (B17 had a second H1; the pasted independent review had no H1). Both are
+corrected, and local docs validation264/268 passes.
+
+Windows-native supervisor conformance still fails requested-restart-is-not-counted with EPERM
+replacing the state file. The integration job is marked successful because writer recovery
+passes on its third attempt; its first two attempts fail. This is the configured advisory
+failOnPassedAfterRetry=false behavior, not evidence that every attempt was green. The writer
+fixtures include an EPERM state publication failure and an Engine close that exceeded its
+deadline and was classified hang. The latter incarnation log stops immediately after
+"Commit timer stopped"; no thread dump exists to prove its exact blocked frame. The current
+bounded runtime-close correction addresses the following NRT wait boundary, but hosted proof
+on that corrected source is still required. The previous same-process publisher
+serialization remains correct but is insufficient when Windows readers briefly hold the target.
+Bounded production rename retry and its regression remain required; the polling harness is not
+weakened to hide it. Final C1 hosted green has not been established.
+
+Indexing ledger coherence and migration now pass. Final guarded boot/ingest hostile-lock
+recovery has actual fatal-exit witnesses, detailed in [hostile-lock-phase.md](hostile-lock-phase.md).
+Raw status, logs and extracted fixture evidence: `tmp/c1-hosted-status-269.json`,
+`tmp/c1-hosted-failures-263.txt`, `tmp/c1-workflow-signal-health-263.txt`,
+`tmp/c1-hosted-system-green-269.txt`, `tmp/c1-hosted-proof-summary-269.json`,
+`tmp/c1-hosted-artifacts-269.json`, `tmp/c1-hosted-artifacts-269/`,
+`tmp/c1-docs-validate-restored-264.txt`, `tmp/c1-docs-validate-runtime-268.txt`.
+The integration-test-results artifact10106694706 expires2026-12-08T13:17:16Z. The log filename
+system-green reflects the job conclusion only; the summary above preserves its failed attempts.

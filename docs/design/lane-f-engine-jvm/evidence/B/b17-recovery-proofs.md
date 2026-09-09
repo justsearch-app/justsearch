@@ -128,7 +128,7 @@ Final installed runs, all with `portsClosed:true`:
 | `tmp/lane-f-takeover/writer-junit-954e4f2c-7180-4792-a240-e707229b62ea/fixture-output.txt` | `50e57e475283233b0a6abee1f518f8f0585baf1c554e262fd420741b17df47b5` |
 | `tmp/lane-f-takeover/writer-junit-12dd5283-83ce-445d-ad4a-c4f06397ba9c/fixture-output.txt` | `f0b7a77e87148f99eb4b6da60966a4020a52887b375d2b839e58946ca9bd517e` |
 | `tmp/lane-f-takeover/writer-junit-e0dbeceb-a0ec-436b-a353-d7971ffabded/fixture-output.txt` | `809db11af5a3246f4e35a660bcc4425d33f84096c9f7c1a307e2aceda3b9365e` |
-# C1 correction to hostile-lock injection duration (2026-09-09)
+## C1 correction to hostile-lock injection duration (2026-09-09)
 
 The B17 measurements below remain historical proof of their tested revisions. Integrated C1
 run221 exposed repeated fatal reinjection exhausting all successor attempts. Design §16 now

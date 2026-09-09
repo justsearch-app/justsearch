@@ -1,3 +1,5 @@
+# Independent C1 review — 2026-09-09
+
 Independent review of the C1 range 9dededdbe..d4dfbb075 is complete (five read-only lanes, every finding
   re-read at the cited lines at d4dfbb075). Act on this before any further C1 or C2 work. Order matters.
 
