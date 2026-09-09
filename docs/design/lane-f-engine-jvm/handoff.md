@@ -23,8 +23,10 @@ and Engine-crash tests witness live native descendants and prove their exit. Eng
 registration close is now aggregated; adverse310, restored311 and build312 establish cleanup of
 all seven base/transport names despite failures. Late failures are now ERROR logged after cleanup,
 with Error reaching the actual worker uncaught-handler path;14 client/context cases and build317
-pass, with separate logging/rethrow refutations. **Next is sandbox reader refusal and protocol
-correlation**, followed by the remaining must-fixes
+pass, with separate logging/rethrow refutations. Sandbox reader refusal, schema2 correlation and
+retained retiring slots now pass41 selected cases323 and build324, with three adverse guards322.
+See [sandbox response ownership](evidence/C1/sandbox-response-ownership.md).
+**Next is health-monitor capacity recovery**, followed by the remaining must-fixes
 in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md) and
 [parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.

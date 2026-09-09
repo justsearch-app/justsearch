@@ -73,7 +73,10 @@ including all five supervised recovery cases. Build273 is retained historical pr
   [client failure cleanup](client-failures.md). Late failures are also ERROR logged after cleanup,
   with Error rethrown through the actual executor thread. Adverse313/315 separately refute absent
   logging and absent fatal propagation; restored314/316 pass14 cases and build317 passes.
-- Discard a sandbox slot if reader submission fails after write; correlate protocol request/response.
+- Sandbox reader refusal now retires the written-to child; schema2 request IDs prevent stale
+  responses reaching later documents. A surviving retired child keeps its slot until actual
+  termination. Adverse322 refutes all three guards; restored323 passes41 cases and build324
+  passes. See [sandbox response ownership](sandbox-response-ownership.md).
 - Re-arm health-monitor ticks on capacity refusal; distinguish owner CLOSED.
 - Exempt OPTIONS from admission and expose Retry-After, with real transport tests.
 - Register the routing sandbox logic seam and executor consult region; remove the completed B row;

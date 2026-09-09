@@ -206,7 +206,8 @@ final class PersistentExtractionSandboxTest {
     int responseBytes =
         PersistentExtractionSandbox.responseByteCeiling(TikaExtractionPolicy.defaults());
 
-    assertEquals(66_452_608, responseBytes);
+    // Schema2 adds up to96 UTF-16 units for requestId, charged at six JSON bytes each.
+    assertEquals(66_453_184, responseBytes);
     assertTrue(responseBytes <= SandboxFrames.MAX_FRAME_BYTES);
   }
 
@@ -430,6 +431,130 @@ final class PersistentExtractionSandboxTest {
       assertEquals("pollute.txt", sandbox.extract(file("pollute.txt")).result().content());
       assertEquals(0L, sandbox.restartCount());
     }
+  }
+
+  @Test
+  @Timeout(40)
+  void duplicateResponseCannotBecomeTheNextDocumentsText() throws Exception {
+    try (var sandbox = sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(10))) {
+      assertEquals("duplicate.txt", sandbox.extract(file("duplicate.txt")).result().content());
+      long first = sandbox.firstChildPid();
+      var failure = assertThrows(SandboxExtractionException.class,
+          () -> sandbox.extract(file("next.txt")));
+      assertTrue(causeMessages(failure).contains("requestId does not match"));
+      assertFalse(ProcessHandle.of(first).map(ProcessHandle::isAlive).orElse(false));
+      assertEquals(1, sandbox.restartCount());
+      assertEquals("fresh.txt", sandbox.extract(file("fresh.txt")).result().content());
+      assertNotEquals(first, sandbox.firstChildPid());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"missing-id", "legacy-schema"})
+  @Timeout(40)
+  void uncorrelatedWireResponsesAreRejectedAndParserRetired(String mode) throws Exception {
+    try (var sandbox = sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(10))) {
+      var failure = assertThrows(SandboxExtractionException.class,
+          () -> sandbox.extract(file(mode + ".txt")));
+      assertTrue(causeMessages(failure).contains(mode.equals("missing-id")
+          ? "requestId must contain" : "Unsupported sandbox response schema"));
+      assertEquals(1, sandbox.restartCount());
+      assertEquals("fresh.txt", sandbox.extract(file("fresh.txt")).result().content());
+      assertEquals(2, sandbox.spawnCount());
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void saturatedReaderAfterFrameWriteRetiresChildBeforeNextRequest() throws Exception {
+    var owner = new io.justsearch.core.execution.TestEngineExecutors();
+    var registration = owner.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "refused-reader", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, 1, 1));
+    var observed = org.mockito.Mockito.spy(registration);
+    var executor = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ExecutorService>();
+    org.mockito.Mockito.doAnswer(open -> {
+      var pool = registration.open(open.getArgument(0));
+      executor.set(pool);
+      return pool;
+    }).when(observed).open(org.mockito.ArgumentMatchers.any());
+    var entered = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    var queuedDone = new java.util.concurrent.CountDownLatch(1);
+    var firstPid = new java.util.concurrent.atomic.AtomicLong();
+    ManagedChildRegistry children = new ManagedChildRegistry() {
+      @Override public List<ManagedChild> snapshot() { return List.of(); }
+      @Override public void register(ManagedChild child) { firstPid.compareAndSet(0, child.pid()); }
+      @Override public void remove(String id) {}
+    };
+    try (var sandbox = new PersistentExtractionSandbox(observed, javaCommand(ScriptedChild.class),
+        TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), Duration.ofSeconds(10),
+        1, 500, null, children)) {
+      executor.get().execute(() -> {
+        entered.countDown();
+        try { release.await(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+      });
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      executor.get().execute(queuedDone::countDown);
+      var failure = assertThrows(SandboxExtractionException.class,
+          () -> sandbox.extract(file("unread.txt")));
+      assertTrue(failure.getCause() instanceof java.util.concurrent.RejectedExecutionException);
+      assertTrue(firstPid.get() > 0, "rejection must occur after actual parser spawn and frame write");
+      assertFalse(ProcessHandle.of(firstPid.get()).map(ProcessHandle::isAlive).orElse(false));
+      assertEquals(1, sandbox.restartCount());
+      release.countDown();
+      assertTrue(queuedDone.await(2, TimeUnit.SECONDS));
+      assertEquals("next.txt", sandbox.extract(file("next.txt")).result().content());
+      assertNotEquals(firstPid.get(), sandbox.firstChildPid());
+    } finally {
+      release.countDown();
+      owner.close();
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void survivingRetirementRetainsItsSlotUntilKillActuallyCompletes() throws Exception {
+    Process realChild = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();
+    var allowKill = new java.util.concurrent.atomic.AtomicBoolean();
+    Process retained = org.mockito.Mockito.mock(Process.class,
+        org.mockito.AdditionalAnswers.delegatesTo(realChild));
+    org.mockito.Mockito.doAnswer(kill -> {
+      if (allowKill.get()) realChild.destroyForcibly();
+      return retained;
+    }).when(retained).destroyForcibly();
+    org.mockito.Mockito.doAnswer(wait -> allowKill.get()
+        && realChild.waitFor((Long) wait.getArgument(0), wait.getArgument(1)))
+        .when(retained).waitFor(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any(TimeUnit.class));
+    try (var sandbox = sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(1))) {
+      try (var spawns = org.mockito.Mockito.mockConstruction(ProcessBuilder.class,
+          (builder, context) -> org.mockito.Mockito.when(builder.start()).thenReturn(retained))) {
+        assertThrows(IllegalStateException.class, () -> sandbox.extract(file("hang.txt")));
+        assertTrue(realChild.isAlive());
+        assertEquals(realChild.pid(), sandbox.firstChildPid(), "retain exact live child in its slot");
+        assertThrows(IllegalStateException.class, () -> sandbox.extract(file("blocked.txt")));
+        assertEquals(1, spawns.constructed().size(), "retiring slot cannot spawn a replacement");
+        assertEquals(1, sandbox.spawnCount());
+      }
+      allowKill.set(true);
+      assertEquals("recovered.txt", sandbox.extract(file("recovered.txt")).result().content());
+      assertFalse(realChild.isAlive());
+      assertNotEquals(realChild.pid(), sandbox.firstChildPid());
+    } finally {
+      allowKill.set(true);
+      realChild.destroyForcibly();
+      assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
+    }
+  }
+
+  private static String causeMessages(Throwable failure) {
+    StringBuilder messages = new StringBuilder();
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      messages.append(cause.getMessage()).append(' ');
+    }
+    return messages.toString();
   }
 
   @Test
@@ -706,8 +831,17 @@ final class PersistentExtractionSandboxTest {
                 request.policy(),
                 "scripted-child",
                 false);
-        SandboxFrames.write(
-            protocolOut, MAPPER.writeValueAsBytes(SandboxExtractionResponse.fromArtifact(artifact)));
+        String response = MAPPER.writeValueAsString(
+            SandboxExtractionResponse.fromArtifact(request.requestId(), artifact));
+        if (name.contains("missing-id")) {
+          response = response.replace("\"requestId\":\"" + request.requestId() + "\",", "");
+        }
+        if (name.contains("legacy-schema")) {
+          response = response.replace("\"schemaVersion\":2", "\"schemaVersion\":1");
+        }
+        byte[] payload = response.getBytes(StandardCharsets.UTF_8);
+        SandboxFrames.write(protocolOut, payload);
+        if (name.contains("duplicate")) SandboxFrames.write(protocolOut, payload);
       }
     }
 

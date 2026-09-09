@@ -115,7 +115,7 @@ final class WindowsParserContainmentTest {
               new ContentExtractor.ExtractionResult("no native child requested", null, "text/plain"),
               request.policy(), "native-child", false);
           SandboxFrames.write(System.out,
-              mapper.writeValueAsBytes(SandboxExtractionResponse.fromArtifact(next)));
+              mapper.writeValueAsBytes(SandboxExtractionResponse.fromArtifact(request.requestId(), next)));
           continue;
         }
         Process child = new ProcessBuilder("ping.exe", "-t", "127.0.0.1")
@@ -135,7 +135,7 @@ final class WindowsParserContainmentTest {
             new ContentExtractor.ExtractionResult("native child was alive", null, "text/plain"),
             request.policy(), "native-child", false);
         SandboxFrames.write(System.out,
-            mapper.writeValueAsBytes(SandboxExtractionResponse.fromArtifact(artifact)));
+            mapper.writeValueAsBytes(SandboxExtractionResponse.fromArtifact(request.requestId(), artifact)));
       }
     }
   }

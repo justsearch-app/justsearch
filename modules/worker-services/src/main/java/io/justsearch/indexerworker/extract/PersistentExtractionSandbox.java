@@ -226,6 +226,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
               boundedChars,
               Math.multiplyExact(3L, ExtractionArtifact.MAX_SCALAR_METADATA_CHARS));
       boundedChars = Math.addExact(boundedChars, metadataChars);
+      boundedChars = Math.addExact(boundedChars, SandboxExtractionRequest.MAX_REQUEST_ID_CHARS);
       boundedChars =
           Math.addExact(
               boundedChars,
@@ -299,10 +300,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     // The tail is reported per FILE, so it must not carry the previous request's chatter.
     child.stderr.reset();
 
+    String requestId = java.util.UUID.randomUUID().toString();
     byte[] request =
         MAPPER.writeValueAsBytes(
             new SandboxExtractionRequest(
                 SandboxExtractionRequest.CURRENT_SCHEMA_VERSION,
+                requestId,
                 file.toAbsolutePath().toString(),
                 policy,
                 ocrConfig));
@@ -313,8 +316,20 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       throw discardAndClassify(slot, child, REASON_CRASH, e);
     }
 
-    Future<byte[]> pending =
-        readers.submit(() -> SandboxFrames.read(child.stdout, maxResponseBytes));
+    Future<byte[]> pending;
+    try {
+      pending = readers.submit(() -> SandboxFrames.read(child.stdout, maxResponseBytes));
+    } catch (RuntimeException refused) {
+      // A request is already on the pipe. Reusing this slot could give its answer to the next file.
+      throw discardAndClassify(slot, child, REASON_PROTOCOL, refused);
+    } catch (Error fatal) {
+      try {
+        discardChild(slot, child, REASON_PROTOCOL);
+      } catch (RuntimeException | Error cleanup) {
+        if (cleanup != fatal) fatal.addSuppressed(cleanup);
+      }
+      throw fatal;
+    }
     byte[] responseBytes;
     try {
       responseBytes = pending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -354,10 +369,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (!stderrTail.isEmpty() && log.isDebugEnabled()) {
       log.debug("Sandbox child stderr (success path): {}", stderrTail);
     }
-    return decode(responseBytes);
+    try {
+      return decode(responseBytes, requestId);
+    } catch (SandboxExtractionException malformed) {
+      throw discardAndClassify(slot, child, REASON_PROTOCOL, malformed);
+    }
   }
 
-  private ExtractionArtifact decode(byte[] responseBytes)
+  private ExtractionArtifact decode(byte[] responseBytes, String requestId)
       throws ContentExtractor.ExtractionException {
     try {
       SandboxExtractionResponse response =
@@ -365,6 +384,9 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       if (response == null
           || response.schemaVersion() != SandboxExtractionResponse.CURRENT_SCHEMA_VERSION) {
         throw new IllegalArgumentException("Unsupported sandbox response schema");
+      }
+      if (!requestId.equals(response.requestId())) {
+        throw new IllegalArgumentException("Sandbox response requestId does not match request");
       }
       ExtractionArtifact artifact = response.toArtifact();
       if (response.status() == ExtractionStatus.BUDGET_EXCEEDED) {
@@ -390,13 +412,19 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   /** Kills the child, records the restart, and turns its exit into the right typed failure. */
   private ContentExtractor.ExtractionException discardAndClassify(
       Slot slot, Child child, String reason, Exception cause) {
+    child.retirementReason = reason;
     int exitCode = exitCodeAfterKill(child);
     // The OOM signature only reaches the tail once the drain thread has seen EOF on the dead
     // child's stderr; reading it before that classifies a heap exhaustion as an ordinary crash.
     child.stderr.awaitDrain(2000L);
     String tail = child.stderr.tail();
     boolean oom = tail.contains("OutOfMemoryError");
-    finishDiscard(slot, child, oom ? REASON_OOM : reason);
+    try {
+      finishDiscard(slot, child, oom ? REASON_OOM : reason);
+    } catch (RuntimeException | Error cleanup) {
+      if (cause != null && cause != cleanup) cleanup.addSuppressed(cause);
+      throw cleanup;
+    }
     if (oom) {
       // Permanent: the file does not fit in the child heap, so a retry exhausts it again.
       return new ContentExtractor.ExtractionException(
@@ -407,11 +435,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   }
 
   private void discardChild(Slot slot, Child child, String reason) {
+    child.retirementReason = reason;
     exitCodeAfterKill(child);
     finishDiscard(slot, child, reason);
   }
 
   private void finishDiscard(Slot slot, Child child, String reason) {
+    if (child.process.isAlive()) {
+      throw new IllegalStateException("Extraction child " + child.pid
+          + " survived retirement; retaining its slot for cleanup retry");
+    }
     child.close();
     unregister(child);
     if (slot.child == child) {
@@ -438,7 +471,10 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   private Child acquireChild(Slot slot) throws IOException {
     Child current = slot.child;
-    if (current != null && current.requests >= maxRequestsPerChild) {
+    if (current != null && current.retirementReason != null) {
+      discardChild(slot, current, current.retirementReason);
+      current = null;
+    } else if (current != null && current.requests >= maxRequestsPerChild) {
       discardChild(slot, current, REASON_REQUEST_BUDGET);
       current = null;
     } else if (current != null && !current.process.isAlive()) {
@@ -604,6 +640,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     private final StderrTail stderr;
     private final String managedChildId;
     private int requests;
+    private volatile String retirementReason;
 
     Child(Process process, int maxStderrBytes, String managedChildId) {
       this.process = process;

@@ -114,11 +114,11 @@ public final class ChaosExtractionSandboxChild {
       try {
         ExtractionArtifact artifact =
             new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, policy, ocrConfig).extractArtifact(file);
-        response = SandboxExtractionResponse.fromArtifact(artifact);
+        response = SandboxExtractionResponse.fromArtifact(request.requestId(), artifact);
       } catch (Exception e) {
         response =
             SandboxExtractionResponse.failed(
-                io.justsearch.indexerworker.extract.ExtractionStatus.FAILED,
+                request.requestId(), io.justsearch.indexerworker.extract.ExtractionStatus.FAILED,
                 policy,
                 "chaos-child",
                 "Chaos stub parser failed",

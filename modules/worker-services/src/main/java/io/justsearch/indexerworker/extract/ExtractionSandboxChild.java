@@ -73,13 +73,13 @@ public final class ExtractionSandboxChild {
               .extractor(policy, ocrConfig)
               .extractArtifact(Path.of(request.path()))
               .validateContentBoundsOnly(policy.maxExtractedChars());
-      return SandboxExtractionResponse.fromArtifact(artifact);
+      return SandboxExtractionResponse.fromArtifact(request.requestId(), artifact);
     } catch (ContentExtractor.BudgetExceededException e) {
       return SandboxExtractionResponse.failed(
-          ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
+          request.requestId(), ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
     } catch (Exception e) {
       return SandboxExtractionResponse.failed(
-          ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed", "PARSER_FAILED");
+          request.requestId(), ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed", "PARSER_FAILED");
     }
   }
 
