@@ -14,6 +14,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
@@ -256,9 +261,9 @@ class CommitOpsTest extends LuceneExecutorTestBase {
   private static long scheduledInitialDelayMs(CommitOps ops) throws Exception {
     var field = CommitOps.class.getDeclaredField("commitTimerFuture");
     field.setAccessible(true);
-    var future = (java.util.concurrent.ScheduledFuture<?>) field.get(ops);
+    var future = (ScheduledFuture<?>) field.get(ops);
     assertNotNull(future, "the timer must actually have been scheduled");
-    return future.getDelay(java.util.concurrent.TimeUnit.MILLISECONDS);
+    return future.getDelay(TimeUnit.MILLISECONDS);
   }
 
   private CommitOps opsWithIndexConfig(String key, String value) {
@@ -306,6 +311,135 @@ class CommitOpsTest extends LuceneExecutorTestBase {
     } finally {
       zero.stopCommitTimer();
     }
+  }
+
+  @Test
+  void stopCommitTimerWaitsForAnInterruptedCallbackBeforeClearingAndAllowsReuse() throws Exception {
+    try (MMapDirectory dir = new MMapDirectory(tempDir);
+        IndexWriter writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      RuntimeSession session =
+          new RuntimeSession(
+              schemaWith(() -> () -> Map.of(), metadata -> {}), testLuceneExecutors());
+      session.snapshot = new LifecycleSnapshot(dir, writer, null, tempDir, false, null);
+      session.resolvedConfig =
+          new io.justsearch.configuration.resolved.ResolvedConfigBuilder()
+              .put(
+                  "index.commit.timer_interval_ms",
+                  500,
+                  "jvm_arg",
+                  "index.commit.timer_interval_ms",
+                  "1")
+              .build();
+      session.pendingDocs.set(1L);
+      CommitOps ops = new CommitOps(session, LuceneRuntimeTypes.BuildState.COMPLETE);
+      CountDownLatch callbackStarted = new CountDownLatch(1);
+      CountDownLatch releaseCallback = new CountDownLatch(1);
+      CountDownLatch callbackInterrupted = new CountDownLatch(1);
+      ops.setCommitCompletedListener(
+          reason -> {
+            callbackStarted.countDown();
+            boolean interrupted = false;
+            while (true) {
+              try {
+                releaseCallback.await();
+                if (interrupted) Thread.currentThread().interrupt();
+                return;
+              } catch (InterruptedException ignored) {
+                interrupted = true;
+                callbackInterrupted.countDown();
+              }
+            }
+          });
+
+      Thread stopper = null;
+      try {
+        ops.startCommitTimer();
+        assertTrue(callbackStarted.await(5, TimeUnit.SECONDS), "the real timer callback must run");
+        ScheduledFuture<?> future = timerFuture(ops);
+        ScheduledExecutorService executor = timerExecutor(ops);
+
+        AtomicBoolean stopCompleted = new AtomicBoolean();
+        AtomicBoolean stopRestoredInterrupt = new AtomicBoolean();
+        stopper =
+            new Thread(
+                () -> {
+                  try {
+                    ops.stopCommitTimer();
+                  } finally {
+                    stopRestoredInterrupt.set(Thread.currentThread().isInterrupted());
+                    stopCompleted.set(true);
+                  }
+                },
+                "commit-timer-stop-test");
+        stopper.start();
+        awaitShutdown(executor);
+        stopper.interrupt();
+
+        assertTrue(
+            callbackInterrupted.await(1, TimeUnit.SECONDS),
+            "shutdownNow must interrupt the running timer callback");
+        stopper.join(100);
+        assertTrue(stopper.isAlive(), "stop must still wait for the interrupted callback");
+        assertFalse(
+            stopCompleted.get(),
+            "stop must wait for the running callback instead of clearing live executor references");
+        assertSame(future, timerFuture(ops));
+        assertSame(executor, timerExecutor(ops));
+
+        releaseCallback.countDown();
+        stopper.join(TimeUnit.SECONDS.toMillis(5));
+        assertTrue(stopCompleted.get(), "stop must finish after the callback actually exits");
+        assertTrue(executor.isTerminated(), "close must return only after termination");
+        assertTrue(
+            stopRestoredInterrupt.get(),
+            "close must restore an interruption received while waiting");
+        assertNull(timerFuture(ops));
+        assertNull(timerExecutor(ops));
+
+        // The logical registration stays open: a terminated instance is pruned and a new timer can
+        // consume the freed instance slot without rebuilding the Lucene executor registrations.
+        ops.startCommitTimer();
+        ScheduledExecutorService replacement = timerExecutor(ops);
+        assertNotSame(executor, replacement);
+        ops.stopCommitTimer();
+        assertTrue(replacement.isTerminated());
+      } finally {
+        // Keep cleanup inside the writer's resource scope: an assertion must not strand a live
+        // callback while try-with-resources closes the Lucene writer.
+        releaseCallback.countDown();
+        if (stopper != null) {
+          stopper.interrupt();
+          stopper.join(TimeUnit.SECONDS.toMillis(5));
+        }
+        ops.stopCommitTimer();
+        if (stopper != null) {
+          stopper.interrupt();
+          stopper.join(TimeUnit.SECONDS.toMillis(5));
+        }
+      }
+    }
+  }
+
+  private static ScheduledFuture<?> timerFuture(CommitOps ops) throws ReflectiveOperationException {
+    var field = CommitOps.class.getDeclaredField("commitTimerFuture");
+    field.setAccessible(true);
+    return (ScheduledFuture<?>) field.get(ops);
+  }
+
+  private static ScheduledExecutorService timerExecutor(CommitOps ops)
+      throws ReflectiveOperationException {
+    var field = CommitOps.class.getDeclaredField("commitTimer");
+    field.setAccessible(true);
+    return (ScheduledExecutorService) field.get(ops);
+  }
+
+  private static void awaitShutdown(ScheduledExecutorService executor) {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    while (!executor.isShutdown() && System.nanoTime() < deadline) {
+      Thread.onSpinWait();
+    }
+    assertTrue(
+        executor.isShutdown(), "stop must shut down the timer before waiting for termination");
   }
 
   @Test

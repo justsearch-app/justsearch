@@ -389,23 +389,20 @@ public final class CommitOps {
     ScheduledFuture<?> future = this.commitTimerFuture;
     if (future != null) {
       future.cancel(false);
-      this.commitTimerFuture = null;
     }
     ScheduledExecutorService executor = this.commitTimer;
     if (executor != null) {
-      executor.shutdown();
-      try {
-        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-          executor.shutdownNow();
-          if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-            log.warn("Commit timer did not terminate within bounded shutdown window");
-          }
-        }
-      } catch (InterruptedException interrupted) {
-        executor.shutdownNow();
-        Thread.currentThread().interrupt();
+      // ExecutorService.close() waits until the executor is actually terminated. If the caller is
+      // interrupted, it escalates to shutdownNow(), keeps waiting, and restores the interrupt flag
+      // after the running callback exits. Keep both fields published while that wait is in progress
+      // so a still-live executor cannot be mistaken for an available registration slot.
+      executor.close();
+      if (this.commitTimerFuture == future) {
+        this.commitTimerFuture = null;
       }
-      this.commitTimer = null;
+      if (this.commitTimer == executor) {
+        this.commitTimer = null;
+      }
       log.debug("Commit timer stopped");
     }
   }
