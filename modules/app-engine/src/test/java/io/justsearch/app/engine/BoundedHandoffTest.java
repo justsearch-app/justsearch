@@ -307,6 +307,33 @@ final class BoundedHandoffTest {
   // ============================================================
 
   @Test
+  void interruptedDeliveryReportsFailureAndCannotClaimAnUndeliveredTailDrained() throws Exception {
+    var delivery = new AtomicReference<Runnable>();
+    var failure = new AtomicReference<Throwable>();
+    var flow = new BoundedHandoff<Integer>("interrupted", frame -> {}, failure::set,
+        delivery::set, BoundedHandoff.Backpressure.BLOCK);
+    assertTrue(flow.publish(1));
+    var consumer = new Thread(() -> {
+      Thread.currentThread().interrupt();
+      delivery.get().run();
+    });
+    consumer.start();
+    consumer.join(2_000);
+    assertFalse(consumer.isAlive());
+    assertTrue(failure.get() instanceof InterruptedException, "interruption must be a terminal failure");
+    assertFalse(flow.drainAndClose(0), "closed is not evidence that accepted frames were delivered");
+  }
+
+  @Test
+  void explicitlyClosedUndeliveredTailIsNotDrained() {
+    var flow = new BoundedHandoff<Integer>("closed-tail", frame -> {}, failure -> {},
+        task -> {}, BoundedHandoff.Backpressure.BLOCK);
+    assertTrue(flow.publish(1));
+    flow.close();
+    assertFalse(flow.drainAndClose(0));
+  }
+
+  @Test
   @DisplayName("drainAndClose delivers the accepted tail before closing")
   void drainDeliversTheAcceptedTail() {
     int frames = 32;

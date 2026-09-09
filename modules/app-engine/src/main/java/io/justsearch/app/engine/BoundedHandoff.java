@@ -179,7 +179,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
       // queued.
       accepted.decrementAndGet();
       Thread.currentThread().interrupt();
-      close();
+      fail(e);
       return false;
     }
     accepted.decrementAndGet();
@@ -254,10 +254,11 @@ final class BoundedHandoff<T> implements AutoCloseable {
     long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
     boolean drained = false;
     while (true) {
-      if (closed.get() || delivered.get() >= accepted.get()) {
+      if (delivered.get() >= accepted.get()) {
         drained = true;
         break;
       }
+      if (closed.get()) break;
       if (System.nanoTime() - deadlineNs >= 0) {
         break;
       }
@@ -337,7 +338,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
         frame = queue.poll(POLL_TICK_MS, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        close();
+        fail(e);
         return;
       }
       if (frame == null) {
