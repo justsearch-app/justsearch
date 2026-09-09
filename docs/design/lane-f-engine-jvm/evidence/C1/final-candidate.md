@@ -102,3 +102,27 @@ receive hosted verification. Earlier5c system reports independently reconcile88 
 tests, zero failures/errors,42 skips and zero flaky-retry entries, with artifact retention
 through2026-12-08: `tmp/c1-hosted-artifact-list-450.json`,
 `tmp/c1-hosted-system-artifacts-451/`, `tmp/c1-hosted-system-summary-451.json`.
+
+## Current clean candidate8f8 verification
+
+Full455 passes the complete stress-enabled command at8f8c7d775da4f4f69bc21c8399e3c69d0a90cd41
+in5s,2 executed/367 up-to-date; represented reports remain9783 tests,118 integration, zero
+failures/errors. Full Python456 passes3640,16 skips,83 warnings in519.66s. These results and
+item-by-item status are reconciled in [the acceptance table](acceptance-reconciliation.md).
+Raw: `tmp/c1-final-integrated-455.txt`, `tmp/c1-final-integrated-results-455/manifest.json`,
+`tmp/c1-python-suite-restored-456.txt`.
+
+[CI34392044686](https://github.com/justsearch-app/justsearch/actions/runs/34392044686)
+is fully green at8f8, including both advisories. Saved system XML represents88 cases, zero
+failures/errors,42 skips and zero flaky-retry entries. Twenty measured axe artifacts are
+accessible. Windows-native job102602472381 passes in6m43s with105/105 Gradle tasks executed;
+that job has no JUnit artifact upload, so no fabricated per-case hosted count is asserted.
+Raw: `tmp/c1-hosted-final-465.json`, `tmp/c1-hosted-artifact-list-465.json`,
+`tmp/c1-hosted-system-artifacts-466/`, `tmp/c1-hosted-axe-artifacts-466/`,
+`tmp/c1-hosted-artifact-summary-466.json`, `tmp/c1-hosted-windows-native-471.txt`.
+
+[Fresh live proof](final-live.md) passes default fairness459, standard-active primary460
+(all469 files,308/308 search samples) and aggregate comparison467/468. Chat-offline full
+enrichment470 was interrupted at the user-requested pause: NER404/469 at1768s, other
+three stages100%. C1 remains OPEN until full enrichment and final reconciliation.
+The owned stack is stopped; see the pause receipt in [live proof](final-live.md).

@@ -37,3 +37,9 @@ counts remain unchanged. Focused453 passes all96 load, cadence and retriever cas
 This repairs fixture synchronization, not production stopping semantics. A clean committed
 full Python rerun remains required and448 is retained as a failed result.
 Raw: `tmp/c1-python-suite-448.txt`, `tmp/c1-load-budget-restored-453.txt`.
+
+Clean committed full Python456 now passes3640 cases,16 skips,83 warnings in519.66s at8f8c7d775.
+Warnings are recorded numerical/statistical fixture diagnostics, not hidden. No case is removed
+or waived. Raw: `tmp/c1-python-suite-restored-456.txt`. Fresh standard primary460 also passes
+308/308 search-load samples with zero errors; see [live acceptance](final-live.md). This does
+not retrospectively classify or remove the four original423 errors.

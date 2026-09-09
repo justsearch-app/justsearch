@@ -7,7 +7,31 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: [Current C1 verification checkpoint](#current-c1-verification-checkpoint-2026-09-09-root-scan-race).
 
-Current instrument correction: [shared retrieval/load timeout](evidence/C1/load-budget.md); fresh live acceptance remains required.
+## User-requested pause (2026-09-09)
+
+Current implementation candidate8f8c7d775: full455 and Python456 pass, hosted34392044686
+is fully green; fresh fairness459, standard primary460 and aggregate467/468 pass.
+C1 remains OPEN. The user requested stopping before usage exhaustion. Offline enrichment470
+was interrupted at1768s: dense/SPLADE/chunk100%, NER404/469. It is not a full-pipeline pass.
+The owned evaluation and registered stack are stopped, ports closed, data retained; all
+reviewers are complete. No C2 implementation has started and no owner input is pending.
+The session-closeout sweep reaped nothing and reported only the shared ownerless otlp-sink
+daemon (PID14468), which is intentionally retained across sessions.
+See [acceptance reconciliation](evidence/C1/acceptance-reconciliation.md) and
+[final live evidence](evidence/C1/final-live.md) for exact commands, revision and receipts.
+
+Resume with a fresh chat-offline full pipeline under continuous search, then close C1 only
+after reconciling every acceptance item. The completed full455 reuses unchanged Java inputs
+(2 executed/367 up-to-date); do not claim every test ran anew. Preserve earlier failed runs.
+Next re-ground C2 citations and resolve the bounded idempotency-history design before code;
+[entry investigation](evidence/C1/c2-entry-investigation.md) records the source findings and
+open design decisions. C2/D1/D2/E/F remain mandatory; merge placement stays F/PR1 (#718).
+Existing autonomous decision and merge authorization persists when resumed. Push every
+commit, commit WIP at least hourly, and do not exceed three worker follow-ups.
+
+The older checkpoint narrative below is historical; this pause summary and current acceptance
+table supersede its already-completed next-action instructions.
+
 
 ## Current C1 verification checkpoint (2026-09-09 root-scan race)
 
