@@ -418,20 +418,23 @@ final class OnlineModeOps {
       io.justsearch.app.api.EngineWorkHandle work, Supplier<T> operation) {
     Objects.requireNonNull(work, "work");
     var owned = work.retain();
+    java.util.concurrent.Executor executor;
     try {
-      return io.justsearch.core.execution.EngineFutures.supplyAsync(
-              () -> {
-                checkCancelled(owned);
-                return operation.get();
-              },
-              requestExecutor(owned),
-              owned::close)
-          .join();
-    } catch (java.util.concurrent.CompletionException failure) {
-      io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(failure);
-      throw failure;
+      executor = Objects.requireNonNull(requestExecutor(owned), "requestExecutor");
     } catch (RuntimeException | Error failure) {
       owned.close();
+      throw failure;
+    }
+    // supplyAsync owns cleanup after handoff, including synchronous submission refusal.
+    var result = io.justsearch.core.execution.EngineFutures.supplyAsync(
+        () -> {
+          checkCancelled(owned);
+          return operation.get();
+        }, executor, owned::close);
+    try {
+      return io.justsearch.core.execution.EngineFutures.await(result);
+    } catch (java.util.concurrent.CompletionException failure) {
+      io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(failure);
       throw failure;
     }
   }

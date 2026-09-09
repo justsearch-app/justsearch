@@ -362,6 +362,60 @@ class OwnedStreamCancellationTest {
     }
   }
 
+  @Test
+  void interruptedModelWaitRetainsWorkUntilTheOperationActuallyExits() throws Exception {
+    var work = new WorkProbe();
+    var entered = new CountDownLatch(1);
+    var interrupted = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var observed = new CompletableFuture<Throwable>();
+    var flag = new java.util.concurrent.atomic.AtomicBoolean();
+    try (var registry = new io.justsearch.core.execution.TestEngineExecutors();
+        var registrations = new InferenceExecutorRegistrations(registry);
+        var http = HttpClient.newHttpClient()) {
+      var ops = new OnlineModeOps(registrations, http, new ObjectMapper(), () -> Mode.ONLINE,
+          () -> 1, () -> "test-model", () -> "test-model");
+      var caller = new Thread(() -> {
+        try {
+          ops.callOwned(work.handle, () -> {
+            entered.countDown();
+            while (release.getCount() != 0) {
+              try { release.await(); }
+              catch (InterruptedException expected) { interrupted.countDown(); }
+            }
+            return "finished";
+          });
+          observed.complete(new AssertionError("wait returned normally"));
+        } catch (Throwable failure) {
+          flag.set(Thread.currentThread().isInterrupted());
+          observed.complete(failure);
+        }
+      }, "model-call-waiter");
+      try {
+        caller.start();
+        assertTrue(entered.await(3, TimeUnit.SECONDS));
+        work.handle.close();
+        caller.interrupt();
+        Throwable failure = observed.get(3, TimeUnit.SECONDS);
+        assertInstanceOf(InterruptedException.class,
+            assertInstanceOf(java.util.concurrent.CompletionException.class, failure).getCause());
+        assertTrue(flag.get());
+        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertEquals(1, work.references.get(), "the still-running model operation owns admission");
+        assertFalse(work.finished.isDone());
+        release.countDown();
+        work.finished.get(3, TimeUnit.SECONDS);
+        assertEquals(0, work.references.get());
+      } finally {
+        release.countDown();
+        caller.interrupt();
+        caller.join(3000);
+        work.handle.close();
+        ops.shutdown();
+      }
+    }
+  }
+
   /** Records transport-owned references; registry identity/refcount races are tested by app-engine. */
   private static final class WorkProbe {
     final EngineWorkHandle handle = new Reference();
