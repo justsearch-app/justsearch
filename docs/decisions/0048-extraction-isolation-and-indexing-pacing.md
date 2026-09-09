@@ -107,8 +107,10 @@ population.
 
 - **Per-file process spawn** for extraction. Rejected on cost; the persistent pool keeps the
   isolation and amortises the spawn.
-- **`WindowsJobObject` for grandchild lifetime.** Rejected: it would add a dependency to
-  `worker-services` for a property the PID-gate pattern already gives.
+- **`WindowsJobObject` for grandchild lifetime (original decision, superseded 2026-09-09).**
+  Originally rejected as an extra module dependency thought unnecessary beside the PID watchdog.
+  Forced parser recycling disproved that assumption: Java-owned native handles vanish when the
+  parser JVM dies. The watchdog only terminates that JVM.
 - **Keeping the pause and shortening its window.** Rejected: any pause length is a full stop under
   a continuous loop, and the failure mode is starvation rather than slowness.
 - **A streaming health RPC.** Rejected as work that a Head/Worker merge would throw away; the
@@ -206,3 +208,18 @@ branches. The probe is retargeted to that method after this re-examination. Two 
 pin urgency across both survival axes and durable held ownership. EngineForegroundPacingTest's
 real Engine producer witness remains required; a balanced but unfed gauge is still insufficient.
 The older operation-name and gRPC descriptions above record the accepted historical design.
+
+## 2026-09-09 amendment: Windows native-descendant containment
+
+`WindowsParserContainment` now installs a mandatory kill-on-close Job Object inside each Windows
+parser before serving requests. Native processes inherit the job at creation; the sole job handle
+is non-inheritable and remains open until parser death. Windows then terminates the native tree
+even on forced parser recycling. Engine death causes the existing watchdog to halt the parser,
+triggering the same guarantee. Setup failure aborts parsing, and custom parser commands must call
+the production bootstrap. Other platforms retain the watchdog only; the product supports Windows.
+
+The FFM binding lives with the extraction owner in `worker-services`, so no `app-util` dependency
+is introduced. A parent-side descendant snapshot cannot cover late spawns; per-document Java
+process sets still provide orderly cleanup but cannot survive forced JVM death. See
+[Windows Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+for inherited membership and kill-on-close semantics.

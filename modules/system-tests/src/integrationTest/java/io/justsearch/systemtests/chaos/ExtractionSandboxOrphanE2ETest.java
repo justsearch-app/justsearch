@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * extraction child").
  *
  * <p><b>Why this one did NOT convert in-process.</b> The property is the extraction child's
- * parent-PID gate ({@code ExtractionSandboxChild#startParentWatchdog}): when the process that
+ * parent-PID gate ({@code ExtractionSandboxChild#initializeProcessBoundary}): when the process that
  * spawned it disappears, the child must halt itself, because a wedged child is not reading stdin
  * and so the pipe-EOF exit cannot reach it. Testing that needs a <em>killable parent</em>. Composed
  * in-process against {@code EngineRoot}, that parent is the JUnit JVM — killing it destroys the
@@ -60,11 +60,9 @@ import org.slf4j.LoggerFactory;
  * The heartbeat keeper and {@code MmfTestHarness.awaitPort} went with the memory-mapped bus at item
  * A10; the fixture's manifest/health/worker-ready poll replaces them.
  *
- * <p><b>The fallback trap is what the child-PID discovery guards against.</b>
- * {@code DefaultWorkerAppServices.buildContentExtractor} silently reverts to in-process extraction
- * when the child command fails its startup probe (DefaultWorkerAppServices.java:532-546). Under
- * that fallback no descendant process is ever spawned, so {@link #awaitExtractionChild} fails
- * rather than the test passing vacuously.
+ * <p>The child-PID and live-native-PID witnesses prevent vacuous success if the startup probe
+ * fails. Production preserves process isolation on probe failure; it never falls back to parsing
+ * these files in-process.
  */
 @DisplayName("Chaos: killing the Engine mid-parse leaves no orphaned extraction child")
 @Timeout(value = 10, unit = TimeUnit.MINUTES)
@@ -86,11 +84,12 @@ class ExtractionSandboxOrphanE2ETest {
 
   @BeforeAll
   static void setup() throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(isWindows(), "native containment is Windows-only");
     scratchDir = Files.createTempDirectory("extraction-orphan-");
     corpusDir = Files.createDirectories(scratchDir.resolve("corpus"));
     // The wedged file has to exist before the root is added: adding a root walks it immediately.
     Files.writeString(
-        corpusDir.resolve("chaos-hang-orphan.txt"),
+        corpusDir.resolve("chaos-hang-native-descendant.txt"),
         "this parse never returns",
         StandardCharsets.UTF_8);
 
@@ -115,46 +114,59 @@ class ExtractionSandboxOrphanE2ETest {
     assertTrue(addRoot(corpusDir.toAbsolutePath().toString()),
         "the Engine must accept the chaos corpus as an indexing root");
 
-    // Wedge a child mid-parse. This is the state where the pipe-EOF exit cannot help: the child is
-    // not reading stdin, so only the parent-PID gate can reap it.
-    long childPid = awaitExtractionChild(enginePid, before, CHILD_SPAWN_TIMEOUT_MS);
-    // The vacuous-pass guard. Everything below asserts the child DIES; if the PID we picked were
-    // already dead -- a leftover from the startup probe, or a PID the OS had recycled -- the reap
-    // loop would succeed on its first poll and the test would report the parent-PID gate working
-    // without the gate ever running. Measured on the first live run: boot took 3.17 s and the whole
-    // test 5.35 s, which is fast enough that "was it really alive?" is a fair question to make the
-    // test answer rather than the reader.
-    assertTrue(isAlive(childPid),
-        "the extraction child " + childPid + " must be ALIVE when the Engine is killed, or the"
-            + " reap assertion below proves nothing");
-    // System.err, not the logger: this tier captures stderr into the JUnit XML (the fixture's own
-    // phase lines arrive that way) while the test class's SLF4J output does not appear at all.
-    System.err.println(
-        "[ExtractionSandboxOrphanE2ETest] extraction child " + childPid + " is wedged under Engine "
-            + enginePid);
+    Path nativePidFile = corpusDir.resolve("chaos-hang-native-descendant.txt.pid");
+    long nativeDeadline = System.nanoTime() + Duration.ofMillis(CHILD_SPAWN_TIMEOUT_MS).toNanos();
+    while (!Files.exists(nativePidFile) && System.nanoTime() < nativeDeadline) {
+      Thread.sleep(20);
+    }
+    assertTrue(Files.exists(nativePidFile), "the parser must start a real native descendant");
+    ProcessHandle nativeChild = ProcessHandle.of(Long.parseLong(Files.readString(nativePidFile)))
+        .orElseThrow();
+    long childPid = nativeChild.parent().orElseThrow().pid();
+    assertTrue(!before.contains(childPid) && childPid != enginePid,
+        "the native process must come from a newly spawned parser, not the Engine or boot probe");
+    Set<Long> witnessed = descendantPids(enginePid);
+    assertTrue(witnessed.contains(childPid) && witnessed.contains(nativeChild.pid()),
+        "both parser and native child must belong to the live Engine before its kill");
+    assertTrue(isAlive(childPid), "the parser must still be alive before Engine kill");
+    assertTrue(nativeChild.isAlive(), "native descendant must be alive BEFORE Engine kill");
+    System.err.println("[ExtractionSandboxOrphanE2ETest] extraction child " + childPid
+        + " is wedged under Engine " + enginePid);
+    System.err.println("[ExtractionSandboxOrphanE2ETest] native descendant " + nativeChild.pid()
+        + " is live before Engine kill");
+    try {
+      // Kill the Engine outright, so the assertion cannot pass on the graceful shutdown-hook path.
+      assertTrue(backend.kill(), "the Engine must terminate after destroyForcibly()");
+      assertFalse(isAlive(enginePid),
+          "the Engine process must be gone before the orphan window opens");
 
-    // Kill the Engine outright, so the assertion cannot pass on the graceful shutdown-hook path.
-    assertTrue(backend.kill(), "the Engine must terminate after destroyForcibly()");
-    assertFalse(isAlive(enginePid),
-        "the Engine process must be gone before the orphan window opens");
-
-    long deadline = System.currentTimeMillis() + ORPHAN_REAP_TIMEOUT_MS;
-    boolean gone = false;
-    while (System.currentTimeMillis() < deadline) {
-      if (!isAlive(childPid)) {
-        gone = true;
-        break;
+      long deadline = System.currentTimeMillis() + ORPHAN_REAP_TIMEOUT_MS;
+      boolean gone = false;
+      while (System.currentTimeMillis() < deadline) {
+        if (!isAlive(childPid)) {
+          gone = true;
+          break;
+        }
+        Thread.sleep(250);
       }
-      Thread.sleep(250);
+      if (!gone) {
+        ProcessHandle.of(childPid).ifPresent(ProcessHandle::destroyForcibly);
+      }
+      System.err.println(
+          "[ExtractionSandboxOrphanE2ETest] child " + childPid + " reaped after "
+              + (ORPHAN_REAP_TIMEOUT_MS - (deadline - System.currentTimeMillis())) + "ms");
+      assertTrue(gone, "extraction child " + childPid
+          + " must halt itself once the Engine is gone (parent-PID gate)");
+      nativeChild.onExit().get(10, TimeUnit.SECONDS);
+      assertFalse(nativeChild.isAlive(), "native descendant must die with its parser job");
+      System.err.println("[ExtractionSandboxOrphanE2ETest] native descendant " + nativeChild.pid()
+          + " reaped after Engine kill");
+    } finally {
+      if (nativeChild.isAlive()) {
+        nativeChild.destroyForcibly();
+        nativeChild.onExit().get(10, TimeUnit.SECONDS);
+      }
     }
-    if (!gone) {
-      ProcessHandle.of(childPid).ifPresent(ProcessHandle::destroyForcibly);
-    }
-    System.err.println(
-        "[ExtractionSandboxOrphanE2ETest] child " + childPid + " reaped after "
-            + (ORPHAN_REAP_TIMEOUT_MS - (deadline - System.currentTimeMillis())) + "ms");
-    assertTrue(gone, "extraction child " + childPid
-        + " must halt itself once the Engine is gone (parent-PID gate)");
   }
 
   // =========================================================================
@@ -178,7 +190,7 @@ class ExtractionSandboxOrphanE2ETest {
     Path argFile = scratchDir.resolve("chaos-sandbox-child-args.txt");
     // 128m matches the sibling in-process test; this one never OOMs a child, but keeping the two
     // child JVMs identical means a failure here is not explained away by a heap difference.
-    String args = "-Xmx128m\n"
+    String args = "-Xmx128m\n--enable-native-access=ALL-UNNAMED\n"
         + "-Dfile.encoding=UTF-8\n"
         + "-cp\n"
         + "\"" + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n"
@@ -204,32 +216,6 @@ class ExtractionSandboxOrphanE2ETest {
 
   private static boolean isAlive(long pid) {
     return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
-  }
-
-  /**
-   * Waits until the Engine has spawned an extraction child that was not already there, and returns
-   * that child's PID.
-   *
-   * <p>The "not already there" part matters: {@code ExtractionSandboxFactory.probeChildCommand}
-   * spawns and discards its own child during boot, and a PID captured from that one would be dead
-   * before the kill and would make this test pass for the wrong reason.
-   */
-  private static long awaitExtractionChild(long enginePid, Set<Long> before, long timeoutMs)
-      throws InterruptedException {
-    long deadline = System.currentTimeMillis() + timeoutMs;
-    while (System.currentTimeMillis() < deadline) {
-      for (long pid : descendantPids(enginePid)) {
-        if (!before.contains(pid)) {
-          return pid;
-        }
-      }
-      Thread.sleep(250);
-    }
-    throw new AssertionError(
-        "Engine " + enginePid + " never spawned a NEW extraction child within " + timeoutMs
-            + "ms. Either the wedged file never reached the pool, or the child command failed its "
-            + "startup probe and extraction silently fell back to in-process "
-            + "(DefaultWorkerAppServices.java:532-546).");
   }
 
   // =========================================================================

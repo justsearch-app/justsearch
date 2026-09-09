@@ -283,7 +283,7 @@ final class EngineExtractionSandboxChaosTest {
     Path argFile = dataDir.resolve("chaos-sandbox-child-args.txt");
     // 128m: large enough for Tika on the small text fixtures, small enough that the chaos-oom
     // file exhausts the child heap in seconds.
-    String args = "-Xmx128m\n"
+    String args = "-Xmx128m\n--enable-native-access=ALL-UNNAMED\n"
         + "-Dfile.encoding=UTF-8\n"
         + "-cp\n"
         + "\"" + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n"

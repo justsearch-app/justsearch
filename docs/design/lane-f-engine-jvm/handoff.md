@@ -18,17 +18,19 @@ reviewed: bounded waits retain live resources; reload and close share a lock; fa
 retains its index lock and completion latch for retry. OCR now has one reusable component pool,
 bounded cleanup, retained task/child/temp ownership and structured-text preservation; focused296
 passes61 cases. The final review exposed uncontained Tesseract descendants when the parser JVM
-is forcibly recycled. **Next is parser-process containment**, then the remaining client must-fixes
-in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md).
+is forcibly recycled. Windows parser Job containment now corrects that boundary; forced recycling
+and Engine-crash tests witness live native descendants and prove their exit. **Next is aggregate
+Engine client registration close**, then late worker failure reporting and the remaining must-fixes
+in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md) and
+[parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
 Each subsequent item commit must be build-green and pushed immediately; earlier red WIP
 authorization is historical. Raw evidence hashes and the last full-run summary are now committed
-artifacts. Full267 passes before the final reload-lock correction. Full271 includes that correction
-but fails one fanout test that assumes child exit implies parent admission release. The strengthened
-parent/child regression and all runtime ownership tests pass274; complete build273 passes. The
-last-full-run summary honestly remains271 FAIL. See [runtime-close evidence](evidence/C1/runtime-close.md)
-and [fanout parent-exit evidence](evidence/C1/fanout-parent-exit.md). Full stress/current hosted green
-and final live standard-model proof remain required after the ordered fixes.
+artifacts. Full299 at clean pushed `bad1a7622` passes in8m52s with zero represented XML
+failures/errors, including all five supervised recovery cases. Its reports are preserved in
+`tmp/c1-ocr-integrated-results-299/`; the last-full-run summary records the clean tested revision.
+This supersedes271's fanout failure, fixed by the parent/child ownership regression. Full
+stress/current hosted green and final live standard-model proof remain required after the ordered fixes.
 
 Hosted34356123502 at6bf931408 fails Windows supervisor-state rename and docs headings. Its system
 job passes only after writer recovery's third attempt; earlier failures include EPERM and a close

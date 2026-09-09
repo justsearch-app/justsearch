@@ -93,11 +93,10 @@ acquisition/publication and dual-service-shutdown findings, with the regressions
 The final review also identified a distinct production process boundary: PersistentExtractionSandbox
 force-kills a parser JVM on recycling/timeout/close, while native Tesseract descendants are not
 registered or contained by that parent. The parser's retained Java owner cannot survive its own
-process death. EOF/cache-close proof does not cover forced recycling. Parser-process containment
-is therefore the **immediate next C1 correction**, before the remaining ordered client items; this
-checkpoint does not claim end-to-end orphan prevention or close the OCR review. The former Windows
-job-object implementation and supported Unix behavior are being investigated before selecting the
-smallest containment mechanism. No owner decision or authorization is pending.
+process death. EOF/cache-close proof does not cover forced recycling. That process boundary is now implemented with mandatory Windows parser Job Objects and
+non-vacuous forced-recycling/Engine-crash proof; see [parser containment](parser-containment.md).
+This supersedes the earlier investigation note. Final C1 review and current integrated/live/hosted
+acceptance remain required; no owner decision or authorization is pending.
 
 ## Integrated checkpoint proof
 

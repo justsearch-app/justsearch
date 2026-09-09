@@ -27,10 +27,10 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>Protocol channel isolation.</b> The real {@code System.out} is captured before any
  *       parser runs and {@code System.out} is redirected to stderr, so a parser that prints cannot
  *       corrupt a frame. (Shipped before this tempdoc; the serve loop preserves it.)
- *   <li><b>No orphan.</b> With {@code --parent-pid=<pid>} a daemon thread polls the parent handle
- *       and halts the JVM once it is gone — the PID-gate pattern from tempdoc 630. This is the
- *       reason no Windows Job Object dependency had to be added to {@code worker-services}. (The helper
- *       itself was deleted at lane F stage A item A11 with its only caller, the Worker spawner.)
+ *   <li><b>Process lifetime.</b> Windows bootstrap first installs a kill-on-close Job Object
+ *       around this JVM and all its native descendants. The parent-PID watchdog halts this JVM
+ *       when the Engine dies; Windows then kills the entire job, also on forced parser recycling.
+ *       Other platforms retain only the parent watchdog, without native-descendant containment.
  * </ul>
  */
 public final class ExtractionSandboxChild {
@@ -46,7 +46,7 @@ public final class ExtractionSandboxChild {
   public static void main(String[] args) throws Exception {
     PrintStream protocolOut = System.out;
     System.setOut(new PrintStream(System.err, true, StandardCharsets.UTF_8));
-    startParentWatchdog(args);
+    initializeProcessBoundary(args);
     serve(System.in, protocolOut);
   }
 
@@ -140,7 +140,7 @@ public final class ExtractionSandboxChild {
   }
 
   /**
-   * Starts the parent-liveness gate for a child launched with {@code --parent-pid=<pid>}.
+   * Installs Windows descendant containment, then the parent-liveness gate for a child launched with {@code --parent-pid=<pid>}.
    *
    * <p>Public because the chaos harness's stub parser is a real out-of-tree child of this pool and
    * must run <b>this</b> orphan-prevention code, not a copy of it — a copied watchdog would make
@@ -149,7 +149,8 @@ public final class ExtractionSandboxChild {
   // Halting IS the contract here: a parser child whose parent died must not outlive it, and no
   // orderly shutdown is available from a watchdog thread in a doomed process.
   @SuppressWarnings("PMD.DoNotTerminateVM")
-  public static void startParentWatchdog(String[] args) {
+  public static void initializeProcessBoundary(String[] args) {
+    WindowsParserContainment.install();
     long parentPid = parentPid(args);
     if (parentPid <= 0) {
       return;

@@ -42,7 +42,7 @@ import tools.jackson.databind.json.JsonMapper;
  * </ul>
  *
  * <p>Two things are deliberately production code rather than copies: the orphan gate
- * ({@link ExtractionSandboxChild#startParentWatchdog}) and the response records. The frame codec is
+ * ({@link ExtractionSandboxChild#initializeProcessBoundary}) and the response records. The frame codec is
  * re-implemented here on purpose — an independent implementation of the wire format is stronger
  * evidence that the format is real than reusing the same codec on both ends would be.
  *
@@ -67,7 +67,7 @@ public final class ChaosExtractionSandboxChild {
   public static void main(String[] args) throws Exception {
     PrintStream protocolOut = System.out;
     System.setOut(new PrintStream(System.err, true, StandardCharsets.UTF_8));
-    ExtractionSandboxChild.startParentWatchdog(args);
+    ExtractionSandboxChild.initializeProcessBoundary(args);
 
     DataInputStream in = new DataInputStream(System.in);
     List<byte[]> ballast = new ArrayList<>();
@@ -79,6 +79,15 @@ public final class ChaosExtractionSandboxChild {
       String name = file.getFileName().toString();
       System.out.println("chaos child handling " + name);
 
+      if (name.contains("native-descendant")) {
+        Process nativeChild = new ProcessBuilder("ping.exe", "-t", "127.0.0.1")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+        if (!nativeChild.isAlive()) throw new IllegalStateException("native fixture did not start");
+        Path pidTemp = Path.of(request.path() + ".pid.tmp");
+        java.nio.file.Files.writeString(pidTemp, Long.toString(nativeChild.pid()));
+        java.nio.file.Files.move(pidTemp, Path.of(request.path() + ".pid"));
+      }
       if (name.contains("chaos-hang")) {
         String entered = System.getenv("JUSTSEARCH_PROCESSING_TEST_ENTERED");
         if (entered != null && !entered.isBlank()) {

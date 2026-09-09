@@ -241,25 +241,36 @@ See [Agent System Architecture](../explanation/22-agent-system-architecture.md) 
 
 **Notes:** New row, 2026-09-02, opened by the decision review. Lane A owns the measurement and the design; it also owns the neighbouring item on constants sized against the window. The instrument is a `tempdoc:` reference because the budget authority does not exist yet — when it ships, this row's instrument becomes the test that pins it, and lane A closing without one is exactly what the unresolved-instrument rule would surface.
 
-## RISK-010: The extraction sandbox is unreachable
+## RISK-010: Extraction isolation and native-descendant containment
 
 **Category:** reliability | **Status:** Monitoring
 
-**Trade-off:** Content extraction runs in-process behind a timeout, which is fast and simple. The out-of-process sandbox exists in the tree but has no shipped argv, so the default is `in_process` and the isolation is not reachable in production.
+**Trade-off:** The default `auto` mode uses persistent child JVMs for process-routed document
+families and retains in-process decoding for simple text families. The child startup command and
+probe are shipped. On Windows, each parser self-assigns to a kill-on-close Job Object before any
+request, so forced recycling also terminates native descendants. This requires a small FFM binding
+and mandatory native access; setup failure leaves process-routed extraction unavailable.
 
-**Impact:** A wedged native parser (PDFBox/POI) ignores the interrupt, so `future.cancel(true)` does not free the thread. Extraction runs on a single-thread executor, so one wedged file stops **all** extraction until the Worker restarts — a whole-subsystem stall from one malformed document.
+**Impact:** A wedged parser is killed at its deadline. Native OCR children cannot escape parser
+recycling on the supported Windows platform. An operator-supplied parser command must invoke the
+production bootstrap; unsupported platforms have only the parent-PID watchdog, without native-tree
+containment. In-process OCR still depends on its bounded component cleanup and retained owners.
 
-**Reassess when:** A wedged-parser stall is observed in the field, or lane C ships the persistent sandbox child.
+**Reassess when:** Adding a supported OS, changing parser bootstrap/launch ownership, or changing
+Windows native bindings or job inheritance.
 
-**Instrument:** `tempdoc:885#Item 14 — extraction`
+**Instrument:** `test:modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java#killingParserReapsAlreadyLiveNativeDescendant`
 
-**Owner tempdoc:** tempdoc 885 item 14 (decision review, lane C).
+**Owner tempdoc:** lane F, C1-7/C1-11.
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-09-09
 
-**Notes:** New row, 2026-09-02, opened by the decision review. The child entry point and the process sandbox both exist; what is missing is a shipped command, and the per-file JVM start is why nobody enabled it. Lane C's evidence also recorded that a nested Windows job object was blocked on a module-boundary change (`WindowsJobObject` lived in `app-util`, which `worker-services` does not depend on). That obstacle is now different in kind rather than resolved: lane F stage A item A11 **deleted** `WindowsJobObject` outright, because its only caller was `WorkerSpawner` and a containment helper with no child to contain is residue. Anything that wants nested job objects for the sandbox child must restore it from history first.
-
-A second, independent obstacle was measured on 2026-09-02 while running the full suite for tempdoc 884 PR 2, and it is worth recording because it is not the one the row was opened for: **all six `ProcessExtractionSandboxTest` cases fail inside a deep worktree path** with `java.io.IOException: Cannot run program java.exe: CreateProcess error=206, The filename or extension is too long`. The sandbox passes the whole Worker classpath on the child's command line, so every entry inherits the checkout prefix; under `.claude/worktrees/<name>/...` the command line crosses the Windows 32k limit. It is not load-dependent (it reproduces isolated) and is expected to pass in the shorter main checkout, which is why it has not surfaced before. So the sandbox is unreachable for a second reason beyond the missing argv: as currently invoked it cannot start at all on a long path. Any fix that ships an argv must also shorten the child's command line (an argfile or a pathing jar). It was pinned meanwhile as `process-extraction-sandbox-classpath-too-long`; tempdoc 930 retired the expected-state pin mechanism, so this paragraph is now the record.
+**Notes:** The original 2026-09-02 risk concerned an unreachable per-file sandbox. The persistent
+pool resolved that reachability issue. The former `app-util.WindowsJobObject` was deleted with its
+sole Worker-spawner caller at stage A. The native-descendant correction restores the necessary FFM
+mechanism locally as `WindowsParserContainment`, with mandatory bootstrap instead of best-effort
+assignment and no new module dependency. `ExtractionSandboxOrphanE2ETest` additionally witnesses
+both parser and native child alive before forcibly killing an isolated Engine.
 
 ## RISK-011: The reindex mechanism has a single honest detector
 

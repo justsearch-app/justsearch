@@ -55,14 +55,18 @@ generation/timer/NRT waits, retains live resources on timeout, and retries throu
 Engine root without releasing the enclosing index lock early. A registered NRT close task handles
 the real zero-delay Lucene loop; reload and close share bounded serialization. Run267 is full green
 before the reload-lock correction; final271 has one fanout test timing failure, now corrected with
-an explicit parent-cleanup owner and passing focused274. Build273 passes. See
+an explicit parent-cleanup owner and passing focused274. Full299 at cleanbad1a7622 now passes,
+including all five supervised recovery cases. Build273 is retained historical proof. See
 [runtime-close.md](runtime-close.md) and [fanout-parent-exit.md](fanout-parent-exit.md).
 
 - OCR component ownership is implemented: one reusable pool, bounded waits and document owners,
   real structured text preserved on refusal, and retryable enclosing service cleanup. Focused296
   passes61 cases; see [OCR evidence](ocr-component-close.md). Its review exposed uncontained native
-  descendants when the parser JVM is forcibly recycled. Fix that process boundary immediately
-  before proceeding to the next client item; EOF cleanup alone does not satisfy it.
+  descendants when the parser JVM is forcibly recycled. Mandatory Windows parser Job containment
+  now closes that boundary locally: all three recycling/close regressions fail without bootstrap,
+  and restored tests plus the isolated Engine-crash native witness pass. See
+  [parser containment](parser-containment.md). Continue with the next client item; final C1 review
+  and integrated/live/hosted proof remain required.
 - Aggregate every EngineKnowledgeClient registration close; report late worker failures and Error.
 - Discard a sandbox slot if reader submission fails after write; correlate protocol request/response.
 - Re-arm health-monitor ticks on capacity refusal; distinguish owner CLOSED.
