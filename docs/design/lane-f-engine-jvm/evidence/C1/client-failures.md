@@ -26,5 +26,32 @@ Logs: `tmp/c1-client-close-adverse-308.txt`, `tmp/c1-client-close-restored-309.t
 `tmp/c1-client-close-results-310/`, `tmp/c1-client-close-results-311/`. Run309's XML was replaced
 before preservation; its log is retained and no successful proof relies on it.
 
-Root reviewed this bounded correction. Late worker failure reporting is the next separate item;
-final C1 review and integrated/live/hosted acceptance remain required.
+Root reviewed this bounded correction. Final C1 review and integrated/live/hosted acceptance remain required.
+
+## Late worker failure after caller completion
+
+`withBudget` now logs a worker failure at ERROR if the caller's completion CAS has already won.
+It reports only after worker/admission cleanup, and rethrows Error through OwnedCallTask to the
+executor's uncaught-error path. Caller deadline/cancellation results remain the settled outcome.
+The same final Error propagation also applies when the worker wins completion; it cannot quietly
+poison an executor thread just because the caller also receives the Error.
+
+The two new cases hold a real registered call executor's mocked search body beyond the caller
+deadline, verify the caller receives DEADLINE_EXCEEDED while admission remains held, then release
+an ordinary exception or Error. They capture the exact failure's log event at ERROR, require
+admission zero before reporting, and observe the Error through a handler installed only on that
+executor's own thread factory. The ordinary case also performs a subsequent healthy request.
+
+Adverse313 on the previous production code fails both cases at the missing error-log wait.
+Restored314 passes14 client/context cases and PMD. Adverse315 removes only the final Error
+rethrow: the ordinary case passes and the Error case fails specifically at the uncaught-handler
+wait, after successful ERROR logging. Restored316 reuses the unchanged passing314 source/test
+outputs from Gradle cache; all14 cases are green. Full build317 passes in22s. Base7cd9ef55d plus
+this item. Root inspected the caller CAS, actual-work cleanup and OwnedCallTask propagation.
+
+Logs: `tmp/c1-client-late-adverse-313.txt`, `tmp/c1-client-late-restored-314.txt`,
+`tmp/c1-client-error-adverse-315.txt`, `tmp/c1-client-late-final-316.txt`,
+`tmp/c1-client-late-build-317.txt`. Preserved reports: `tmp/c1-client-late-results-313/`,
+`tmp/c1-client-late-results-314/`, `tmp/c1-client-late-results-315/`,
+`tmp/c1-client-late-results-316/`. Next is sandbox reader refusal and protocol correlation,
+followed by the remaining ordered independent-review items.

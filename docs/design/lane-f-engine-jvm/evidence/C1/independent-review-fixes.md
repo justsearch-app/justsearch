@@ -70,7 +70,9 @@ including all five supervised recovery cases. Build273 is retained historical pr
 - EngineKnowledgeClient registration close is aggregated and locally proved: both injected
   RuntimeException and Error cases retain all failures, retire all seven base/transport names and
   allow replacement registration. Adverse310 fails; restored311 and build312 pass. See
-  [client failure cleanup](client-failures.md). Next: report late worker failures and rethrow Error.
+  [client failure cleanup](client-failures.md). Late failures are also ERROR logged after cleanup,
+  with Error rethrown through the actual executor thread. Adverse313/315 separately refute absent
+  logging and absent fatal propagation; restored314/316 pass14 cases and build317 passes.
 - Discard a sandbox slot if reader submission fails after write; correlate protocol request/response.
 - Re-arm health-monitor ticks on capacity refusal; distinguish owner CLOSED.
 - Exempt OPTIONS from admission and expose Retry-After, with real transport tests.

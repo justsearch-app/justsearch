@@ -21,7 +21,10 @@ passes61 cases. The final review exposed uncontained Tesseract descendants when 
 is forcibly recycled. Windows parser Job containment now corrects that boundary; forced recycling
 and Engine-crash tests witness live native descendants and prove their exit. Engine client
 registration close is now aggregated; adverse310, restored311 and build312 establish cleanup of
-all seven base/transport names despite failures. **Next is late worker failure reporting** and the remaining must-fixes
+all seven base/transport names despite failures. Late failures are now ERROR logged after cleanup,
+with Error reaching the actual worker uncaught-handler path;14 client/context cases and build317
+pass, with separate logging/rethrow refutations. **Next is sandbox reader refusal and protocol
+correlation**, followed by the remaining must-fixes
 in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md) and
 [parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.

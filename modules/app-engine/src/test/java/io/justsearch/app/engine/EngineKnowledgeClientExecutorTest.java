@@ -91,6 +91,98 @@ final class EngineKnowledgeClientExecutorTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void failureAfterCallerDeadlineIsLoggedAndFatalErrorEscapesWorker(boolean fatal) throws Exception {
+    Throwable lateFailure = fatal ? new AssertionError("late worker fatal failure")
+        : new IllegalStateException("late worker ordinary failure");
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var uncaught = new java.util.concurrent.CompletableFuture<Throwable>();
+    var logged = new java.util.concurrent.CompletableFuture<ch.qos.logback.classic.spi.ILoggingEvent>();
+    var logger = (ch.qos.logback.classic.Logger)
+        org.slf4j.LoggerFactory.getLogger(EngineKnowledgeClient.class);
+    var appender = new ch.qos.logback.core.AppenderBase<ch.qos.logback.classic.spi.ILoggingEvent>() {
+      @Override protected void append(ch.qos.logback.classic.spi.ILoggingEvent event) {
+        if (event.getThrowableProxy() instanceof ch.qos.logback.classic.spi.ThrowableProxy proxy
+            && proxy.getThrowable() == lateFailure) logged.complete(event);
+      }
+    };
+    appender.start();
+    logger.addAppender(appender);
+    var search = mock(WorkerSearchService.class);
+    when(search.search(any(), any())).thenAnswer(invocation -> {
+      var request = (io.justsearch.ipc.SearchRequest) invocation.getArgument(0);
+      if (!request.getQuery().equals("late")) return SearchResponse.getDefaultInstance();
+      entered.countDown();
+      boolean waiting = true;
+      while (waiting) {
+        try {
+          release.await();
+          waiting = false;
+        } catch (InterruptedException ignored) {
+          // Model/native work may finish after its caller has already received the deadline.
+        }
+      }
+      throw lateFailure;
+    });
+    var services = mock(WorkerAppServices.class);
+    when(services.searchService()).thenReturn(search);
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = org.mockito.Mockito.spy(registry(1, 1, 1, 4))) {
+      org.mockito.Mockito.doAnswer(invocation -> {
+        var registration = (io.justsearch.core.execution.EngineExecutorRegistry.Registration)
+            invocation.callRealMethod();
+        if (!registration.spec().name().equals("engine-knowledge-call-foreground")) {
+          return registration;
+        }
+        var observed = org.mockito.Mockito.spy(registration);
+        org.mockito.Mockito.doAnswer(open -> {
+          java.util.concurrent.ThreadFactory factory = open.getArgument(0);
+          return registration.open(task -> {
+            Thread thread = factory.newThread(task);
+            thread.setUncaughtExceptionHandler((owner, failure) -> uncaught.complete(failure));
+            return thread;
+          });
+        }).when(observed).open(any(java.util.concurrent.ThreadFactory.class));
+        org.mockito.Mockito.doAnswer(close -> {
+          registration.close();
+          return null;
+        }).when(observed).close();
+        return observed;
+      }).when(registry).register(any());
+      try (var client = new EngineKnowledgeClient(registry, () -> services,
+          new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100, IpcTelemetry.noop(),
+          () -> {}, admission)) {
+        var caller = new java.util.concurrent.FutureTask<>(
+            () -> client.search("late", 10, TestEngineContexts.FOREGROUND));
+        Thread.ofVirtual().start(caller);
+        assertTrue(entered.await(2, TimeUnit.SECONDS), "worker must enter before caller deadline");
+        var timedOut = assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> caller.get(3, TimeUnit.SECONDS));
+        assertTrue(timedOut.getCause() instanceof io.justsearch.app.api.knowledge.KnowledgeClientException);
+        assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+            ((io.justsearch.app.api.knowledge.KnowledgeClientException) timedOut.getCause()).status());
+        assertEquals(1, admission.activeWorkCount(), "late body still owns admission after caller exit");
+        release.countDown();
+        var event = logged.get(3, TimeUnit.SECONDS);
+        assertEquals(ch.qos.logback.classic.Level.ERROR, event.getLevel());
+        assertTrue(event.getFormattedMessage().contains("after caller completion"));
+        assertEquals(0, admission.activeWorkCount(), "report only after actual-work cleanup");
+        if (fatal) {
+          org.junit.jupiter.api.Assertions.assertSame(lateFailure, uncaught.get(2, TimeUnit.SECONDS));
+        } else {
+          client.search("healthy", 10, TestEngineContexts.FOREGROUND);
+          assertTrue(!uncaught.isDone(), "ordinary late failures are reported without fatal propagation");
+        }
+      }
+    } finally {
+      release.countDown();
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
   @Test
   void blockedForegroundCallDoesNotConsumeBackgroundExecutor() throws Exception {
     var foregroundEntered = new CountDownLatch(1);

@@ -589,7 +589,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         if (budget.complete()) {
           if (failure == null) pending.complete(result);
           else pending.completeExceptionally(failure);
+        } else if (failure != null) {
+          log.error("Engine {} worker failed after caller completion", operation, failure);
         }
+        if (failure instanceof Error error) throw error;
       });
       ExecutorService executor = callThreads(work.context());
       budget.submitted(task);
