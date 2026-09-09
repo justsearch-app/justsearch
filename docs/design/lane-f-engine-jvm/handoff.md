@@ -7,6 +7,8 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: [Current C1 verification checkpoint](#current-c1-verification-checkpoint-2026-09-09-root-scan-race).
 
+Current instrument correction: [shared retrieval/load timeout](evidence/C1/load-budget.md); fresh live acceptance remains required.
+
 ## Current C1 verification checkpoint (2026-09-09 root-scan race)
 
 **Latest steering: the owner's independent review is mandatory and ordered.** Read
@@ -57,10 +59,11 @@ verify the current hosted run, then complete fresh stress and live acceptance be
 Full418 now passes at clean5c2f0ef3b, including all five recovery cases. Hosted34387563666
 passes12/13 jobs including axe; Public claims finds a newly published smol-toml advisory,
 [corrected in the frontend development lockfile](evidence/C1/dependency-advisory.md).
+Hosted34390502944 is fully green at7ff787cf3; it precedes the load-client correction.
 Primary423 proves the initial scan and all469 files, but has four unclassified load failures.
 Slow receipts confirm HTTP200 responses beyond its30s client timeout, within the existing
 60s CPU rerank allowance; the mismatch is proven, but the four exact error types were not logged.
-The normal jseval retriever already allows90s. Align that instrument next, retain failures,
+The load/probe clients now share the normal jseval retriever's existing90s allowance. Retain failures,
 and obtain fresh live/hosted proof. See final-candidate.md for exact artifacts and remaining arms.
 Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
 inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.

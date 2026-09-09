@@ -89,3 +89,16 @@ Raw: `tmp/c1-standard-activation-422.json`, `tmp/c1-final-standard-primary-423.t
 `scripts/jseval/tmp/eval-results/lane-f-c1-standard-primary-423/20260909T182429_golden_synth-multihop-prose-v2/summary.json`.
 The owned stack stopped with portsClosed:true and clean:none. Default fairness, offline full
 pacing and reduced aggregate captures remain unperformed on the final candidate. C1 stays OPEN.
+
+The [load-client correction](load-budget.md) shares ordinary retrieval's existing90s budget,
+reports it in both summary populations, and logs future failure types. Primary423 remains
+an unsuccessful zero-error acceptance attempt; fresh live proof is required.
+
+Hosted [CI34390502944](https://github.com/justsearch-app/justsearch/actions/runs/34390502944)
+is fully green at7ff787cf378f0b26c124a56f8b8e17536cd57526, including Public claims,
+measured axe, Windows-native and system integration. Raw metadata:
+`tmp/c1-hosted-final-452.json`. This predates the load-client correction; its push must also
+receive hosted verification. Earlier5c system reports independently reconcile88 represented
+tests, zero failures/errors,42 skips and zero flaky-retry entries, with artifact retention
+through2026-12-08: `tmp/c1-hosted-artifact-list-450.json`,
+`tmp/c1-hosted-system-artifacts-451/`, `tmp/c1-hosted-system-summary-451.json`.
