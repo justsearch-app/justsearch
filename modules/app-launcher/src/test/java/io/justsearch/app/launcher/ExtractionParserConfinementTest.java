@@ -117,7 +117,7 @@ class ExtractionParserConfinementTest {
                         + "DefaultWorkerAppServices.java"));
     int ingestBranch = source.indexOf("if (ingestRunning != null)");
     int extractorConstruction =
-        source.indexOf("buildContentExtractor(ctx, extractionCatalog, ocrCatalog, childRegistry)");
+        source.indexOf("buildContentExtractor(", ingestBranch);
     int deferredBranch = source.indexOf("this.indexingLoop = null", ingestBranch);
 
     assertTrue(ingestBranch >= 0 && extractorConstruction > ingestBranch);
