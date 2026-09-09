@@ -76,7 +76,7 @@ final class SchemaMismatchStatusContractTest {
     // The operator escape, used here for what it is: this test deliberately opens an index whose
     // fingerprint does not match, to assert the STATUS surface reports it. Without the escape the
     // parity guard would (correctly) refuse the open and the status contract could never be
-    // exercised. Nothing in production sets this (tempdoc 915 Â§C).
+    // exercised. Nothing in production sets this (tempdoc 915 §C).
     System.setProperty("justsearch.index.parity.allow_mismatch", "true");
 
     // Initialize ConfigStore so that RerankerConfig.fromEnv() (called during LocalApiServer construction) resolves.
@@ -89,13 +89,13 @@ final class SchemaMismatchStatusContractTest {
     // Start a real index half via KnowledgeServerBootstrap (required for /api/status schema
     // fields). Lane F stage A item A9: it runs INSIDE this JVM now. Before A9 this spawned the
     // indexer-worker distribution and waited for it to publish a gRPC port; A9 deleted that
-    // server, so the spawn path cannot come up at all. The property under test â€” a schema
-    // mismatch surfaces on /api/status as reindexRequired â€” is unchanged and is now exercised
+    // server, so the spawn path cannot come up at all. The property under test — a schema
+    // mismatch surfaces on /api/status as reindexRequired — is unchanged and is now exercised
     // without a second process, which also removes this test's dependency on the
     // indexer-worker installDist and its Windows file-lock teardown dance.
     KnowledgeServerConfig config = KnowledgeServerConfig.load();
     // Item A16: one process, one log. This was <dataDir>/logs/worker.log, which nothing has
-    // written since A11 deleted the Worker child â€” a failure tail read from it was empty.
+    // written since A11 deleted the Worker child — a failure tail read from it was empty.
     engineLogPath = config.dataDir().resolve("logs").resolve("engine.log");
 
     bootstrap =
@@ -106,8 +106,8 @@ final class SchemaMismatchStatusContractTest {
             new io.justsearch.app.engine.EngineRoot(config.deadlineMs(), config.batchSize()));
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
-      // timeout must not read as a schema-contract failure. (This test never runs in CI â€” see the
-      // @DisabledIfEnvironmentVariable above â€” so the budget below covers local load only.)
+      // timeout must not read as a schema-contract failure. (This test never runs in CI — see the
+      // @DisabledIfEnvironmentVariable above — so the budget below covers local load only.)
       bootstrap.startWithRetry();
     } catch (Exception e) {
       String tail = readTailBestEffort(engineLogPath, 12_000);

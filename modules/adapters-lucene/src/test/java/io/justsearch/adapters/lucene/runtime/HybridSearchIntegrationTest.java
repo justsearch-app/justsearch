@@ -148,7 +148,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     System.setProperty("justsearch.config", cfg.toString());
     System.setProperty("index.hybrid.fusion_strategy", "rrf");
     // Tempdoc 636 shipped leg-arbitration + recall-complete default-ON (commits 65821feeb/3b534ba73).
-    // This test isolates the candidate-multiplier â†’ cross-signal-RRF mechanism it is named for, so the
+    // This test isolates the candidate-multiplier → cross-signal-RRF mechanism it is named for, so the
     // always-on levers (which re-weight fusion and splice each leg's pool) must be disabled here.
     System.setProperty("index.hybrid.leg_arbitration_enabled", "false");
     System.setProperty("index.hybrid.leg_recall_complete_enabled", "false");
@@ -401,7 +401,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
   }
 
   /**
-   * Tempdoc 821 Â§P: the HYBRID entry points must forward the caller's syntax to their text leg.
+   * Tempdoc 821 §P: the HYBRID entry points must forward the caller's syntax to their text leg.
    *
    * <p>This is the headline production path and the one the gRPC-level tests cannot reach (with no
    * embedding service every request degrades to {@code Bm25Only}), so hardcoding SIMPLE at
@@ -409,7 +409,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
    *
    * <p>The discriminator is per-hit PROVENANCE, not hit count: the dense leg returns all three docs
    * either way, so only "which docs did the BM25 leg contribute" separates a LUCENE parse (required
-   * clauses â†’ doc-a alone) from a SIMPLE one (escaped â†’ token OR â†’ all three).
+   * clauses → doc-a alone) from a SIMPLE one (escaped → token OR → all three).
    */
   @Test
   void hybridEntryPointsForwardQuerySyntaxToTheTextLeg() throws Exception {
@@ -434,7 +434,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     float[] queryVector = new float[] {1.0f, 0.0f, 0.0f, 0.0f};
     org.apache.lucene.search.Query passThrough = new org.apache.lucene.search.MatchAllDocsQuery();
 
-    // searchHybridFiltered â†’ searchTextWithFilter (the Bm25Dense leg's non-debug path)
+    // searchHybridFiltered → searchTextWithFilter (the Bm25Dense leg's non-debug path)
     assertEquals(
         1,
         bm25ContributedDocIds(
@@ -456,9 +456,9 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
                     passThrough,
                     LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND))
             .size(),
-        "SIMPLE escapes them into a token OR â€” all three docs come from the text leg");
+        "SIMPLE escapes them into a token OR — all three docs come from the text leg");
 
-    // searchHybridWithDebug â†’ searchText (the Bm25Dense leg's debug path, a separate lambda)
+    // searchHybridWithDebug → searchText (the Bm25Dense leg's debug path, a separate lambda)
     assertEquals(
         1,
         bm25ContributedDocIds(

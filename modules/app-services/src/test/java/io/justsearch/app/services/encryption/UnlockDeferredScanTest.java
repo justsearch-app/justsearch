@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Tempdoc 834 Â§5.2 â€” the unlock seam's two load-bearing properties, tested rather than asserted in a
+ * Tempdoc 834 §5.2 — the unlock seam's two load-bearing properties, tested rather than asserted in a
  * comment: the scan must not run under the key monitor, and it must not be able to break unlock.
  */
 final class UnlockDeferredScanTest {
@@ -29,7 +29,7 @@ final class UnlockDeferredScanTest {
   }
 
   @Test
-  @DisplayName("unlock() returns while the scan is still running â€” the key monitor is not held")
+  @DisplayName("unlock() returns while the scan is still running — the key monitor is not held")
   void scanDoesNotBlockTheKeyMonitor() throws Exception {
     DataKeyManager keys = configured();
     var scanStarted = new CountDownLatch(1);
@@ -49,7 +49,7 @@ final class UnlockDeferredScanTest {
 
       keys.unlock("passphrase".toCharArray());
 
-      // If the listener ran the scan inline, `fire` â€” and therefore the synchronized unlock() â€” would
+      // If the listener ran the scan inline, `fire` — and therefore the synchronized unlock() — would
       // still be blocked on releaseScan, and this call could not have returned at all.
       assertTrue(scanStarted.await(5, TimeUnit.SECONDS), "the scan must actually have been scheduled");
       assertEquals(
@@ -82,7 +82,7 @@ final class UnlockDeferredScanTest {
       assertEquals(1, runs.get());
 
       // DataKeyManager.fire swallows listener throws, so a fault here would be INVISIBLE rather than
-      // loud â€” and a dead executor would silently stop reconciling every later unlock.
+      // loud — and a dead executor would silently stop reconciling every later unlock.
       keys.lock();
       keys.unlock("passphrase".toCharArray());
       assertTrue(seam.awaitQuiescence(Duration.ofSeconds(5)));
