@@ -254,7 +254,11 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
 
       // Must NOT throw the boot NPE, and the agent-tool handlers must register.
+      var gpuGauge = new io.justsearch.core.scheduling.GpuSchedulingGauge();
+      gpuGauge.setMainGpuActive(true);
+      org.mockito.Mockito.when(ks.gpuScheduling()).thenReturn(gpuGauge);
       bootstrap.connectKnowledgeServer(ks);
+      assertFalse(gpuGauge.isMainGpuActive(), "connect seeds the current offline inference mode");
       assertTrue(
           bootstrap.agentToolsRegistration().get(),
           "agent-tool handlers must register on worker connect");
@@ -309,6 +313,8 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
       org.mockito.Mockito.when(ks.client()).thenReturn(client);
 
+      org.mockito.Mockito.when(ks.gpuScheduling())
+          .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
       bootstrap.connectKnowledgeServer(ks);
 
       // Same coordinator instance both API entry points read (HeadInfraRegistry / ServicePhase

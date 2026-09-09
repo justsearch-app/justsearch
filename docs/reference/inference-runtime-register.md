@@ -223,6 +223,19 @@ Settled empirical facts. Each was an open question that got answered.
   and post-acquire interruption with a mocked native session boundary. Real-model pacing and
   overall native close/quiescence remain separate proof obligations.
 
+### F-018: async index connection must seed the GPU scheduling signal
+
+- **Finding (2026-09-09):** inference setup runs before the index bootstrap connects. Capturing
+  that initial null bootstrap disabled GPU-status publication throughout a normal Engine boot,
+  allowing ORT GPU work alongside an online standard chat model without the intended yield signal.
+- **Correction:** one mode listener resolves the existing live bootstrap supplier; connect and
+  reconnect seed current manager mode. Publication reads current mode under the gauge lock, so
+  delayed callbacks cannot replay stale mode values. Existing teardown removes the same listener.
+- **Operating shape:** GPU-configured bulk enrichment pauses while chat owns the GPU; primary
+  indexing continues and query encoding uses CPU. Throughput proof must distinguish these arms.
+- **Evidence:** lane-F C1 `gpu-scheduling-connect.md` records clean standard-run207, the disabled
+  broadcast log, unit215 and the connect-seed adverse mutation217. Restored live proof remains open.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.

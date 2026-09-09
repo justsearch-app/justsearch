@@ -22,8 +22,8 @@ public final class InferenceWiring {
 
   /**
    * Wires the GPU-claimed signal from {@link InferenceLifecycleManager} to the index half. Returns
-   * the registered listener (so the caller can remove it on shutdown), or null when there is no
-   * KnowledgeServerBootstrap.
+   * the registered listener so the caller can remove it on shutdown. The supplier follows async
+   * index startup and reconnects; an absent index service must not disable future publication.
    *
    * <p>Lane F item A5: the authority is the in-process {@code GpuSchedulingGauge}
    * ({@code KnowledgeServerBootstrap.gpuScheduling()}), which is where the merged Engine reads
@@ -32,26 +32,30 @@ public final class InferenceWiring {
    * broadcast, and there is one writer and one reader in one address space.
    */
   public static io.justsearch.app.api.ModeChangeListener wireGpuStatusBroadcast(
-      InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
-    if (knowledgeServer == null) {
-      log.debug("No KnowledgeServerBootstrap; GPU status broadcast disabled");
-      return null;
-    }
-    var gauge = knowledgeServer.gpuScheduling();
+      InferenceLifecycleManager manager,
+      java.util.function.Supplier<KnowledgeServerBootstrap> knowledgeServer) {
     io.justsearch.app.api.ModeChangeListener listener =
         (from, to) -> {
-          boolean gpuActive = (to == io.justsearch.app.api.Mode.ONLINE);
-          gauge.setMainGpuActive(gpuActive);
-          log.info(
-              "GPU status broadcast: {} (mode: {} -> {})",
-              gpuActive ? "ACTIVE" : "FREE", from, to);
+          refreshGpuStatus(manager, knowledgeServer.get());
         };
     manager.addModeChangeListener(listener);
-    boolean initialGpuActive = manager.isOnline();
-    gauge.setMainGpuActive(initialGpuActive);
-    log.debug("Initial GPU status set: {}", initialGpuActive ? "ACTIVE" : "FREE");
-    log.info("GPU status broadcast wired to the GPU-scheduling gauge");
+    refreshGpuStatus(manager, knowledgeServer.get());
+    log.info("GPU status broadcast wired to the current index service");
     return listener;
+  }
+
+  /** Seeds a newly connected index service, including when inference became online before it. */
+  public static void refreshGpuStatus(
+      InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
+    if (manager == null || knowledgeServer == null) return;
+    var gauge = knowledgeServer.gpuScheduling();
+    // Read the current authority under the same lock as publication. A delayed mode callback or
+    // connect-time seed must not overwrite a newer mode with the event's historical value.
+    synchronized (gauge) {
+      boolean gpuActive = manager.isOnline();
+      gauge.setMainGpuActive(gpuActive);
+      log.debug("GPU status broadcast: {}", gpuActive ? "ACTIVE" : "FREE");
+    }
   }
 
   /**

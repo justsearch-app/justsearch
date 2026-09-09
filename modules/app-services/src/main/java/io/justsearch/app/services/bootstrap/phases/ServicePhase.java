@@ -186,7 +186,8 @@ public final class ServicePhase {
     EnterprisePolicyService enterprisePolicy = new EnterprisePolicyServiceImpl();
     if (in.inferenceManager() != null) {
       onlineAiService = new OnlineAiServiceImpl(in.engineAdmission(), in.inferenceManager());
-      gpuListener = InferenceWiring.wireGpuStatusBroadcast(in.inferenceManager(), in.knowledgeServer());
+      gpuListener = InferenceWiring.wireGpuStatusBroadcast(
+          in.inferenceManager(), in.knowledgeServerBootstrapSupplier());
       // Tempdoc 672 follow-up: composed once here and threaded down as a single BooleanSupplier —
       // VduBatchProcessor doesn't need to know about KnowledgeServerBootstrap/EnergyState itself,
       // only "should I stop now". Deliberately does NOT include inferenceManager.isOnline() — see

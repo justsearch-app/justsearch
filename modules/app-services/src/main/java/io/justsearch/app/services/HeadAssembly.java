@@ -1355,6 +1355,8 @@ public final class HeadAssembly implements AutoCloseable {
     KnowledgeClient client = ks.client();
     this.knowledgeClient = client;
     this.knowledgeServerBootstrap = ks;
+    io.justsearch.app.services.bootstrap.phases.InferenceWiring.refreshGpuStatus(
+        this.inferenceManager, ks);
     this.searchPort = client;
     IndexingService newIndexing = client;
     DocumentService newDocuments =
