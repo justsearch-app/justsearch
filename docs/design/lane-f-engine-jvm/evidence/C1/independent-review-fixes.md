@@ -77,7 +77,9 @@ including all five supervised recovery cases. Build273 is retained historical pr
   responses reaching later documents. A surviving retired child keeps its slot until actual
   termination. Adverse322 refutes all three guards; restored323 passes41 cases and build324
   passes. See [sandbox response ownership](sandbox-response-ownership.md).
-- Re-arm health-monitor ticks on capacity refusal; distinguish owner CLOSED.
+- Health-monitor capacity is corrected using one retained timer, bounded startup admission and
+  explicit manual refusal. Final337 passes53 cases; adverse330 fails both target regressions;
+  full build338 passes. See [health capacity](health-capacity.md).
 - Exempt OPTIONS from admission and expose Retry-After, with real transport tests.
 - Register the routing sandbox logic seam and executor consult region; remove the completed B row;
   reconcile architecture floors, aggregate-refusal oracle, schema version, double-release and real

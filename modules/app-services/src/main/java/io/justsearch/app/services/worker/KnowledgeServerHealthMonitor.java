@@ -78,6 +78,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   /** Floor for the variable tick interval (tempdoc 885 item 6) — a supplier cannot make it spin. */
   static final long MIN_TICK_INTERVAL_MS = 1_000;
+  private static final long START_ADMISSION_BUDGET_MS = 5_000;
 
   /**
    * Tempdoc 885 item 6: variable inter-tick delay, installed by the composition root. Null (the
@@ -127,6 +128,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * Worker JVM after the coordinator had already closed the bootstrap — an orphan nothing owns.
    */
   private volatile boolean closed;
+  private final AtomicBoolean startClaimed = new AtomicBoolean();
+  private long nextTickAtNanos;
 
   public KnowledgeServerHealthMonitor(
       EngineExecutorRegistry processExecutors, KnowledgeServerBootstrap bootstrap) {
@@ -199,42 +202,58 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   public void start() {
-    log.info("Knowledge Server health monitor started (poll interval: {}ms)", pollIntervalMs);
-    scheduleNextTick(pollIntervalMs);
+    if (closed || !startClaimed.compareAndSet(false, true)) return;
+    boolean installed = false;
+    nextTickAtNanos = System.nanoTime();
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(START_ADMISSION_BUDGET_MS);
+    io.justsearch.core.execution.EngineExecutorRejectedException lastRefusal = null;
+    try {
+      while (!closed) {
+        if (lastRefusal != null && System.nanoTime() - deadline >= 0) throw lastRefusal;
+        try {
+          @SuppressWarnings("unused")
+          var ignored = executor.scheduleWithFixedDelay(this::tickIfDue, pollIntervalMs,
+              Math.min(MIN_TICK_INTERVAL_MS, pollIntervalMs), TimeUnit.MILLISECONDS);
+          installed = true;
+          log.info("Knowledge Server health monitor started (poll interval: {}ms)", pollIntervalMs);
+          return;
+        } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+          if (refusal.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+            log.debug("Health monitor start refused after owner close");
+            throw refusal;
+          }
+          long waitNanos = TimeUnit.SECONDS.toNanos(refusal.retryAfterSeconds());
+          if (deadline - System.nanoTime() <= waitNanos) throw refusal;
+          lastRefusal = refusal;
+          log.warn("Health monitor start retained for capacity retry (reason={})", refusal.reason());
+          try {
+            TimeUnit.NANOSECONDS.sleep(waitNanos);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted waiting to start health monitor", interrupted);
+          }
+        }
+      }
+    } finally {
+      if (!installed) startClaimed.set(false);
+    }
   }
 
   /**
-   * Tempdoc 885 item 6: install a variable inter-tick delay. The monitor re-arms itself after every
-   * tick with {@code supplier.getAsLong()} clamped to {@code [MIN_TICK_INTERVAL_MS, pollIntervalMs]}
-   * — so the health sampler it now hosts can observe at 2 s while indexing is in flight and fall
-   * back to the configured 10 s when idle, without a second executor.
-   *
-   * <p>Resume detection deliberately keeps using the CONFIGURED {@code pollIntervalMs} as its
-   * reference (not the actual delay): shrinking the reference alongside the delay would shrink the
-   * gap threshold to 6 s and turn a long GC pause into a false "the machine resumed" reconnect.
-   * With the reference pinned, a faster tick can only make resume detection more conservative.
+   * Chooses the actual sampling delay on one retained periodic timer. The heartbeat checks a
+   * monotonic due time, so changing sampling cadence does not need another timer reservation.
+   * Resume detection still compares wall-clock gaps against the configured poll interval.
    */
   public void tickIntervalSupplier(LongSupplier supplier) {
     this.tickIntervalSupplier = supplier;
   }
 
-  private void scheduleNextTick(long delayMs) {
-    if (closed) {
-      return;
-    }
-    try {
-      @SuppressWarnings("unused")
-      var ignored = executor.schedule(this::tickAndReschedule, delayMs, TimeUnit.MILLISECONDS);
-    } catch (java.util.concurrent.RejectedExecutionException e) {
-      log.debug("Health monitor tick not rescheduled (monitor closing): {}", e.getMessage());
-    }
-  }
-
-  private void tickAndReschedule() {
+  private void tickIfDue() {
+    if (closed || System.nanoTime() - nextTickAtNanos < 0) return;
     try {
       tick();
     } finally {
-      scheduleNextTick(nextTickDelayMs());
+      nextTickAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(nextTickDelayMs());
     }
   }
 
@@ -636,12 +655,19 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
           yield Verdict.ACCEPTED;
         }
       };
-    } catch (java.util.concurrent.RejectedExecutionException e) {
-      // The monitor is closed (shutdown in progress). Nothing will recover, but an HTTP request must
-      // not become a 500 because the process is on its way out — the caller falls back to its own
-      // unavailable answer.
-      log.debug("Worker recovery request rejected — the monitor is shut down");
-      return Verdict.NOT_APPLICABLE;
+    } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+      if (refusal.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+        log.debug("Worker recovery request rejected after owner close");
+        return Verdict.NOT_APPLICABLE;
+      }
+      log.warn("Worker recovery request refused by executor capacity (reason={})", refusal.reason());
+      var failure = new io.justsearch.app.api.EngineAdmissionException(
+          io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.retryAfterSeconds());
+      failure.initCause(refusal);
+      throw failure;
+    } catch (java.util.concurrent.RejectedExecutionException refusal) {
+      if (closed || executor.isShutdown()) return Verdict.NOT_APPLICABLE;
+      throw refusal;
     } finally {
       // Every path that did NOT hand the slot to a runnable must release it, or one refused request
       // would wedge the arm for the life of the process.

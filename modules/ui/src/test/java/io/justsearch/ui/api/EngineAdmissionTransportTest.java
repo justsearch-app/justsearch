@@ -91,6 +91,52 @@ final class EngineAdmissionTransportTest {
   }
 
   @Test
+  void manualRecoveryCapacityReachesInstalledHttpExceptionMapping() throws Exception {
+    try (var fixture = new Fixture(2, 8);
+        var registry = org.mockito.Mockito.spy(new io.justsearch.app.engine.DefaultEngineExecutorRegistry())) {
+      var scheduler = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledExecutorService>();
+      org.mockito.Mockito.doAnswer(invocation -> {
+        var owner = (io.justsearch.core.execution.EngineExecutorRegistry.Registration) invocation.callRealMethod();
+        var observed = org.mockito.Mockito.spy(owner);
+        org.mockito.Mockito.doAnswer(open -> {
+          var executor = owner.openScheduled(open.getArgument(0));
+          scheduler.set(executor);
+          return executor;
+        }).when(observed).openScheduled(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doAnswer(close -> { owner.close(); return null; }).when(observed).close();
+        return observed;
+      }).when(registry).register(org.mockito.ArgumentMatchers.any());
+      var bootstrap = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      org.mockito.Mockito.when(bootstrap.workerCapability())
+          .thenReturn(new io.justsearch.app.services.lifecycle.WorkerCapability());
+      try (var monitor = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
+          registry, bootstrap, 60_000)) {
+        monitor.start();
+        int capacity = registry.limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND).maxQueue();
+        for (int i = 1; i < capacity; i++) {
+          var _ = scheduler.get().schedule(() -> {}, 1, TimeUnit.DAYS);
+        }
+        assertEquals(capacity, registry.snapshot().timerRegistrations());
+        var handlers = new InferenceHandlers(mock(io.justsearch.app.api.OnlineAiService.class),
+            null, mock(io.justsearch.gpu.GpuCapabilitiesService.class),
+            mock(io.justsearch.app.api.EnterprisePolicyService.class),
+            mock(io.justsearch.app.services.settings.UiSettingsStore.class), null, null, null);
+        handlers.setWorkerRecovery(monitor);
+        fixture.app.post("/api/worker/restart", handlers::handleRestartWorker);
+        var request = HttpRequest.newBuilder(URI.create(
+            "http://127.0.0.1:" + fixture.app.port() + "/api/worker/restart"))
+            .timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.ofString("{}")).build();
+        var response = fixture.client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(429, response.statusCode(), response.body());
+        assertEquals(String.valueOf(registry.retryAfterSeconds()), response.headers().firstValue("Retry-After").orElseThrow());
+        var body = JsonMapper.builder().build().readTree(response.body());
+        assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode").asText());
+        assertFalse(body.get("retrySafe").asBoolean(), "handler entered before refusal");
+      }
+    }
+  }
+
+  @Test
   void upgradeFreezeKeepsItsDistinctStatusAndControlRoutesCanReleaseIt() throws Exception {
     try (var fixture = new Fixture(2, 8)) {
       var frozen = fixture.admission.freezeAdmission("upgrade");

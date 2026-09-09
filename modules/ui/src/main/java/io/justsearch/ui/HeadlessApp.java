@@ -632,9 +632,18 @@ public class HeadlessApp {
         monitor.tickIntervalSupplier(apiServer::statusSamplingPeriodMs);
       }
     }
-    apiServer.bindWorkerRecovery(monitor);
-    monitor.start();
-    return monitor;
+    try {
+      monitor.start();
+      apiServer.bindWorkerRecovery(monitor);
+      return monitor;
+    } catch (RuntimeException | Error failure) {
+      try {
+        monitor.close();
+      } catch (RuntimeException | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
   }
 
   private static ConfigPhaseResult resolveConfig() throws Exception {
