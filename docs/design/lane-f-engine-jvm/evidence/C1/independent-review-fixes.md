@@ -67,7 +67,10 @@ including all five supervised recovery cases. Build273 is retained historical pr
   and restored tests plus the isolated Engine-crash native witness pass. See
   [parser containment](parser-containment.md). Continue with the next client item; final C1 review
   and integrated/live/hosted proof remain required.
-- Aggregate every EngineKnowledgeClient registration close; report late worker failures and Error.
+- EngineKnowledgeClient registration close is aggregated and locally proved: both injected
+  RuntimeException and Error cases retain all failures, retire all seven base/transport names and
+  allow replacement registration. Adverse310 fails; restored311 and build312 pass. See
+  [client failure cleanup](client-failures.md). Next: report late worker failures and rethrow Error.
 - Discard a sandbox slot if reader submission fails after write; correlate protocol request/response.
 - Re-arm health-monitor ticks on capacity refusal; distinguish owner CLOSED.
 - Exempt OPTIONS from admission and expose Retry-After, with real transport tests.

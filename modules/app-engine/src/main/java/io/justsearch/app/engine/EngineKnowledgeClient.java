@@ -1103,11 +1103,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected void closeTransport() {
-    foregroundStreamRegistration.close();
-    backgroundStreamRegistration.close();
-    foregroundCallRegistration.close();
-    backgroundCallRegistration.close();
-    deadlineRegistration.close();
+    Throwable failure = null;
+    for (var registration : java.util.List.of(foregroundStreamRegistration,
+        backgroundStreamRegistration, foregroundCallRegistration, backgroundCallRegistration,
+        deadlineRegistration)) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (failure == null) failure = cleanupFailure;
+        else if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+      }
+    }
+    if (failure instanceof Error error) throw error;
+    if (failure instanceof RuntimeException runtime) throw runtime;
     log.debug("Engine knowledge client call scheduler stopped");
   }
 }

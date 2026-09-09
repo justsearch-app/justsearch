@@ -19,8 +19,9 @@ retains its index lock and completion latch for retry. OCR now has one reusable 
 bounded cleanup, retained task/child/temp ownership and structured-text preservation; focused296
 passes61 cases. The final review exposed uncontained Tesseract descendants when the parser JVM
 is forcibly recycled. Windows parser Job containment now corrects that boundary; forced recycling
-and Engine-crash tests witness live native descendants and prove their exit. **Next is aggregate
-Engine client registration close**, then late worker failure reporting and the remaining must-fixes
+and Engine-crash tests witness live native descendants and prove their exit. Engine client
+registration close is now aggregated; adverse310, restored311 and build312 establish cleanup of
+all seven base/transport names despite failures. **Next is late worker failure reporting** and the remaining must-fixes
 in the supplied order. See [OCR correction](evidence/C1/ocr-component-close.md) and
 [parser containment](evidence/C1/parser-containment.md).
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.

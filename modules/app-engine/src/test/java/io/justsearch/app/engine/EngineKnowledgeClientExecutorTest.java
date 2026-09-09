@@ -51,6 +51,46 @@ final class EngineKnowledgeClientExecutorTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void throwingTransportCloseStillRetiresEveryRegistrationAndPreservesFailures(boolean fatal) {
+    var services = mock(WorkerAppServices.class);
+    Throwable firstFailure = fatal ? new AssertionError("foreground stream close failed")
+        : new IllegalStateException("foreground stream close failed");
+    var secondFailure = new IllegalStateException("foreground call close failed");
+    var attempted = new java.util.ArrayList<String>();
+    try (var registry = org.mockito.Mockito.spy(registry(1, 1, 1, 4))) {
+      org.mockito.Mockito.doAnswer(invocation -> {
+        var registration = (io.justsearch.core.execution.EngineExecutorRegistry.Registration)
+            invocation.callRealMethod();
+        var observed = org.mockito.Mockito.spy(registration);
+        org.mockito.Mockito.doAnswer(close -> {
+          String name = registration.spec().name();
+          attempted.add(name);
+          registration.close();
+          if (name.equals("engine-knowledge-stream-foreground")) throw firstFailure;
+          if (name.equals("engine-knowledge-call-foreground")) throw secondFailure;
+          return null;
+        }).when(observed).close();
+        return observed;
+      }).when(registry).register(any());
+      var client = newClient(registry, services, new EngineAdmissionController(8, 8, 1));
+      var failure = assertThrows(firstFailure.getClass(), client::close);
+      assertTrue(registry.snapshot().registrations().isEmpty(),
+          "all base and transport owners must retire despite multiple close failures");
+      assertEquals(7, attempted.size());
+      org.junit.jupiter.api.Assertions.assertSame(firstFailure, failure);
+      org.junit.jupiter.api.Assertions.assertArrayEquals(new Throwable[] {secondFailure},
+          failure.getSuppressed());
+      // Base close is one-shot: cleanup must complete on the first attempt, not rely on retry.
+      client.close();
+      assertEquals(7, attempted.size());
+      org.mockito.Mockito.reset(registry);
+      newClient(registry, services, new EngineAdmissionController(8, 8, 1)).close();
+      assertTrue(registry.snapshot().registrations().isEmpty());
+    }
+  }
+
   @Test
   void blockedForegroundCallDoesNotConsumeBackgroundExecutor() throws Exception {
     var foregroundEntered = new CountDownLatch(1);
