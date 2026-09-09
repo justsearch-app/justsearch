@@ -11,6 +11,7 @@ probes:
   - adr-0048-chaos-witness
   - adr-0048-foreground-gauge-is-worker-local
   - adr-0048-foreground-urgency-is-explicit
+  - adr-0048-observer-front-exclusion
   - adr-0048-durable-foreground-held-once
   - adr-0048-foreground-gauge-has-a-live-producer
   - adr-0048-retry-exhausted-terminal

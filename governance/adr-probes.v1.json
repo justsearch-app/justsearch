@@ -607,7 +607,7 @@
       "kind": "test",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
       "test": "io.justsearch.app.engine.ForegroundLoadGateTest#normalExceptionCancellationAndErrorAlwaysBalanceInteractiveWork",
-      "note": "Re-examined against ForegroundLoadGate and its current tests after C1 replaced the operation-name predicate with explicit EngineContext urgency and work ownership. The former method was replaced; the normal/error/cancel/Error assertions remain, and separate probes pin both survival axes and durable held lifetime. The actual Engine producer probe remains unchanged."
+      "note": "RETARGETED, not weakened, by lane F stage A item A9 (2026-09-07). The premise is unchanged and is now MORE true: ADR-0048 predicted that the interceptor was the throwaway adapter and that the gauge would survive the Head/Worker merge, and A9 is where the adapter was thrown away. The named file moved with the producer — ForegroundLoadInterceptorTest went with the interceptor; ForegroundLoadGateTest pins the same balance property (ok / exception / cancellation / Error, plus never-negative under concurrency) on ForegroundLoadGate, which is now the gauge's only producer. Per this register's own amendment rule the probe was not edited to make a violation pass: the violation is that the pin's SUBJECT was deleted by a decision this ADR anticipated. 2026-09-09 amendment: Re-examined against ForegroundLoadGate and its current tests after C1 replaced the operation-name predicate with explicit EngineContext urgency and work ownership. The former method was replaced; the normal/error/cancel/Error assertions remain, and separate probes pin both survival axes and durable held lifetime. The actual Engine producer probe remains unchanged."
     },
     {
       "id": "adr-0048-foreground-urgency-is-explicit",
@@ -657,6 +657,14 @@
       ],
       "expect": 1,
       "note": "expect 1 is the population: one enum declaration. The pattern pins the three policy-bearing leading arguments, including the literal default, while allowing orthogonal declaration metadata after them; a default flip still fails the probe."
+    },
+    {
+      "id": "adr-0048-observer-front-exclusion",
+      "adr": "0048",
+      "premise": "Status, health and diagnostics observers enter through the real API filters with BACKGROUND urgency and do not start foreground work; a real search through the same client still increments the gauge.",
+      "kind": "test",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineObserverPacingTest.java",
+      "test": "io.justsearch.ui.api.EngineObserverPacingTest#observerRequestsThroughRealFiltersNeverStartForegroundWork"
     }
   ]
 }

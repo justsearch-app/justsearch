@@ -30,12 +30,25 @@ public final class RequestEngineContext {
           .orElseGet(() -> mcp ? session.orElse("mcp-anonymous") : "local-webview");
       EngineContext resolved = EngineProvenance.context(kind, clientId, session,
           optional(request, "X-JustSearch-Grant-Reference"), transport,
-          EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+          EngineContext.Survival.INTERACTIVE, urgency(request));
       request.attribute(ATTRIBUTE, resolved);
       return resolved;
     } catch (IllegalArgumentException e) {
       throw new BadRequestResponse("Invalid Engine context: " + e.getMessage());
     }
+  }
+
+  private static EngineContext.Urgency urgency(Context request) {
+    if (request.method() != io.javalin.http.HandlerType.GET
+        && request.method() != io.javalin.http.HandlerType.HEAD) {
+      return EngineContext.Urgency.FOREGROUND;
+    }
+    String path = request.path();
+    boolean observer = path.equals("/api/knowledge/status") || path.equals("/api/status")
+        || path.equals("/api/health") || path.startsWith("/api/health/")
+        || path.equals("/api/debug/state") || path.equals("/api/diagnostics")
+        || path.startsWith("/api/diagnostics/");
+    return observer ? EngineContext.Urgency.BACKGROUND : EngineContext.Urgency.FOREGROUND;
   }
 
   /** Direct resume/fork/undo enters the same agent trust boundary as the shape runner. */
