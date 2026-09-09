@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-09T14:14:48.397899+00:00",
-  "baseHead": "3ee27a2271df0fa559fd709b3b7d36b901fe7d82",
+  "generatedAt": "2026-09-09T14:23:45.925992+00:00",
+  "baseHead": "4c2d0869cc220a775b43cb3dd1aaa69025ae3321",
   "scope": "Every literal tmp-path citation in C1 evidence Markdown at generation, with brace/glob expansion and recursive hashes for available directory citations. The shared dev-runner path resolves in the main repo. Bare tmp/ denotes a storage root, not a raw artifact. Unresolved strings are retained honestly, never treated as proof.",
   "retention": "Local raw artifacts remain in this lane worktree through lane F acceptance. Hosted artifacts retain their run-specific expiry. Hashes establish identity, not availability; citations name accessible local paths or hosted run artifacts.",
   "citations": [
@@ -20712,7 +20712,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 30,
+      "line": 40,
       "citation": "tmp/c1-observer-before-250.txt",
       "status": "available",
       "files": [
@@ -20721,7 +20721,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 30,
+      "line": 40,
       "citation": "tmp/c1-review-blockers-before-249.txt",
       "status": "available",
       "files": [
@@ -20730,7 +20730,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 31,
+      "line": 41,
       "citation": "tmp/c1-observer-adr-coverage-254.txt",
       "status": "available",
       "files": [
@@ -20739,7 +20739,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 31,
+      "line": 41,
       "citation": "tmp/c1-review-blockers-restored-251.txt",
       "status": "available",
       "files": [
@@ -20748,7 +20748,61 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 86,
+      "line": 42,
+      "citation": "tmp/c1-publisher-interrupt-before-277.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-publisher-interrupt-before-277.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
+      "line": 43,
+      "citation": "tmp/c1-publisher-interrupt-results-277/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-publisher-interrupt-results-277/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
+      "line": 44,
+      "citation": "tmp/c1-publisher-final-280.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-publisher-final-280.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
+      "line": 44,
+      "citation": "tmp/c1-publisher-interrupt-restored-278.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-publisher-interrupt-restored-278.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
+      "line": 45,
+      "citation": "tmp/c1-publisher-final-build-281.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-publisher-final-build-281.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
+      "line": 46,
+      "citation": "tmp/c1-publisher-build-279.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-publisher-build-279.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
+      "line": 101,
       "citation": "tmp/c1-review-integrated-252.txt",
       "status": "available",
       "files": [
@@ -20757,7 +20811,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 86,
+      "line": 101,
       "citation": "tmp/c1-review-integrated-results-252/manifest.json",
       "status": "available",
       "files": [
@@ -20766,7 +20820,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 87,
+      "line": 102,
       "citation": "tmp/c1-review-compile-255.txt",
       "status": "available",
       "files": [
@@ -20775,7 +20829,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 87,
+      "line": 102,
       "citation": "tmp/c1-review-compile-restored-256.txt",
       "status": "available",
       "files": [
@@ -80609,6 +80663,30 @@
     "tmp/c1-review-blockers-restored-251.txt": {
       "bytes": 40941,
       "sha256": "4853ceffe83c30804b555ac3373131fd21afbb5177ad781163705c352bc388a7"
+    },
+    "tmp/c1-publisher-interrupt-before-277.txt": {
+      "bytes": 39252,
+      "sha256": "60be161620b6b39f26861f43993adb7f46a1e255308ea8ea0696b4d5528fb76e"
+    },
+    "tmp/c1-publisher-interrupt-results-277/manifest.json": {
+      "bytes": 491390,
+      "sha256": "04d38c57190a80ed55d0d66502583afd8f31a793dd23c220396e07bcdf241037"
+    },
+    "tmp/c1-publisher-final-280.txt": {
+      "bytes": 55068,
+      "sha256": "fa10f2b735fe9694963bcfd29242e258fb92bac5c410b37a8e5461a2913cffb3"
+    },
+    "tmp/c1-publisher-interrupt-restored-278.txt": {
+      "bytes": 37837,
+      "sha256": "fb4e21908707d33f1bcf0a82efebb186944ed46124284b55b5fcd34ea6ca7584"
+    },
+    "tmp/c1-publisher-final-build-281.txt": {
+      "bytes": 72921,
+      "sha256": "f006b929f3deb738f009080d7edd14c9fa4a21bfbc162176a767e0726b0a7582"
+    },
+    "tmp/c1-publisher-build-279.txt": {
+      "bytes": 74063,
+      "sha256": "3e14ee23580c699ee22fb82c02a4d4fea8099e52ee24d491d4a52fadd883e858"
     },
     "tmp/c1-review-integrated-252.txt": {
       "bytes": 81354,

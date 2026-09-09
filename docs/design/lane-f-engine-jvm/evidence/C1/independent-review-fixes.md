@@ -7,7 +7,7 @@ health-monitor retries, CORS, and the named governance/test debts. C2 cannot sta
 fixes and the record-keeping are complete and reviewed. Only root edits this worktree; reviewers
 are read-only. Later commits must be build-green individually and pushed immediately.
 
-## Blockers implemented, final review pending
+## Blockers implemented and independently reviewed
 
 1. **Observer urgency at the production front.** RequestEngineContext stamps GET/HEAD status,
    health and diagnostic observers BACKGROUND. Caller attribution and survival are preserved;
@@ -26,9 +26,24 @@ are read-only. Later commits must be build-green individually and pushed immedia
    Adverse249 fails the interrupted-delivery and explicitly-closed-undelivered tests. Restored251
    passes the complete BoundedHandoff suite. ScanRootWork's existing failure path now receives the
    interrupted delivery instead of returning its last partial frame as an unqualified success.
+   The independent final review found no remaining production defect and requested the missing
+   interrupted-publisher regression. That regression now fills a BLOCK queue, observes the producer
+   actually waiting, interrupts it, and asserts false return, restored interruption, one terminal
+   InterruptedException, refused later publication, and an undelivered tail that cannot drain or
+   deliver later. Mutation277 restores publish's old close() and fails at the missing terminal
+   InterruptedException assertion. Restored278 passes all13 handoff tests and PMD; final280 passes
+   the producer test after making its wait-state observation immune to sampling races. Build281
+   passes. The reviewed front fixture exercises GET with real installed filters/handlers; HEAD is
+   inspected routing proof. These tests do not inject delivery interruption through a complete
+   production scan port.
 
 Logs: `tmp/c1-review-blockers-before-249.txt`, `tmp/c1-observer-before-250.txt`,
 `tmp/c1-review-blockers-restored-251.txt`, `tmp/c1-observer-adr-coverage-254.txt`.
+Publisher proof: `tmp/c1-publisher-interrupt-before-277.txt`,
+`tmp/c1-publisher-interrupt-results-277/manifest.json`,
+`tmp/c1-publisher-interrupt-restored-278.txt`, `tmp/c1-publisher-final-280.txt`,
+`tmp/c1-publisher-final-build-281.txt`. Build279 also passed before the wait-state sampling correction:
+`tmp/c1-publisher-build-279.txt`.
 Run249 initially also encountered an inaccessible test constructor;250 corrected the fixture to
 share the actual public client's admission owner and then demonstrated the production failure.
 Neither compile failure is claimed as adverse behavioral proof.

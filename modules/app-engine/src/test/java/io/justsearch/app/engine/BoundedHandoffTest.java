@@ -307,6 +307,57 @@ final class BoundedHandoffTest {
   // ============================================================
 
   @Test
+  void interruptedBlockedPublisherReportsFailureOnceAndCannotDrainAcceptedTail() throws Exception {
+    var delivery = new AtomicReference<Runnable>();
+    var failure = new AtomicReference<Throwable>();
+    var reports = new AtomicInteger();
+    var delivered = new AtomicInteger();
+    var accepted = new AtomicReference<Boolean>();
+    var interrupted = new AtomicReference<Boolean>();
+    var flow = new BoundedHandoff<Integer>("interrupted-publisher",
+        frame -> delivered.incrementAndGet(), cause -> {
+          failure.set(cause);
+          reports.incrementAndGet();
+        }, delivery::set, BoundedHandoff.Backpressure.BLOCK, 1, 30_000);
+    assertTrue(flow.publish(1), "the accepted tail fills the queue without a running consumer");
+    var producer = new Thread(() -> {
+      accepted.set(flow.publish(2));
+      interrupted.set(Thread.currentThread().isInterrupted());
+    });
+    producer.start();
+    try {
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+      boolean blocked = false;
+      while (System.nanoTime() < deadline) {
+        if (producer.getState() == Thread.State.TIMED_WAITING) {
+          blocked = true;
+          break;
+        }
+        Thread.sleep(1);
+      }
+      assertTrue(blocked,
+          "the producer must actually block offering into the full queue");
+      producer.interrupt();
+      producer.join(2_000);
+      assertFalse(producer.isAlive(), "interruption must promptly release the blocked publisher");
+      assertEquals(Boolean.FALSE, accepted.get());
+      assertEquals(Boolean.TRUE, interrupted.get(), "the caller's interrupt flag must be restored");
+      assertTrue(failure.get() instanceof InterruptedException);
+      assertEquals(1, reports.get());
+      assertFalse(flow.publish(3));
+      assertFalse(flow.drainAndClose(0), "an accepted undelivered tail is never a successful drain");
+      delivery.get().run();
+      flow.close();
+      assertEquals(0, delivered.get(), "a failed flow cannot deliver its discarded tail later");
+      assertEquals(1, reports.get(), "later publish, delivery and close cannot repeat the error");
+    } finally {
+      flow.close();
+      producer.interrupt();
+      producer.join(2_000);
+    }
+  }
+
+  @Test
   void interruptedDeliveryReportsFailureAndCannotClaimAnUndeliveredTailDrained() throws Exception {
     var delivery = new AtomicReference<Runnable>();
     var failure = new AtomicReference<Throwable>();
