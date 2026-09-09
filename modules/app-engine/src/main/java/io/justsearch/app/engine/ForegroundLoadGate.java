@@ -32,6 +32,13 @@ public final class ForegroundLoadGate {
   public ForegroundLoadGate(ForegroundLoad load) { this.load = Objects.requireNonNull(load, "load"); }
 
   public <T> T call(EngineWorkHandle work, Supplier<T> body) {
+    Objects.requireNonNull(body, "body");
+    return callOwned(work, ignored -> body.get());
+  }
+
+  /** Children retain this call's existing pacing increment, never start a second increment. */
+  public <T> T callOwned(EngineWorkHandle work,
+      java.util.function.Function<io.justsearch.core.execution.EngineTaskLifetime, T> body) {
     Objects.requireNonNull(work, "work");
     Objects.requireNonNull(body, "body");
     UUID id = work.context().workId().orElseThrow();
@@ -39,20 +46,54 @@ public final class ForegroundLoadGate {
     if (!current.add(id)) throw new IllegalStateException("Foreground work was wrapped twice");
     try {
       EngineContext context = work.context();
-      if (context.urgency() == EngineContext.Urgency.BACKGROUND) return body.get();
+      if (context.urgency() == EngineContext.Urgency.BACKGROUND) {
+        return body.apply(() -> work.retain()::close);
+      }
       if (context.survival() == EngineContext.Survival.DURABLE) {
         hold(work, id);
-        return body.get();
+        return body.apply(() -> work.retain()::close);
       }
       load.started();
+      var lifetime = new InteractiveLifetime(work);
       try {
-        return body.get();
+        return body.apply(lifetime);
       } finally {
-        load.finished();
+        lifetime.release();
       }
     } finally {
       current.remove(id);
       if (current.isEmpty()) nested.remove();
+    }
+  }
+
+  private final class InteractiveLifetime implements io.justsearch.core.execution.EngineTaskLifetime {
+    private final EngineWorkHandle work;
+    private final java.util.concurrent.atomic.AtomicInteger references =
+        new java.util.concurrent.atomic.AtomicInteger(1);
+
+    private InteractiveLifetime(EngineWorkHandle work) { this.work = work; }
+
+    @Override public Runnable retain() {
+      var child = work.retain();
+      // Do not resurrect a completed pacing increment if a captured factory is used too late.
+      int current;
+      do {
+        current = references.get();
+        if (current == 0) {
+          child.close();
+          throw new IllegalStateException("Foreground call has completed");
+        }
+      } while (!references.compareAndSet(current, current + 1));
+      var released = new AtomicBoolean();
+      return () -> {
+        if (!released.compareAndSet(false, true)) return;
+        try { child.close(); }
+        finally { release(); }
+      };
+    }
+
+    private void release() {
+      if (references.decrementAndGet() == 0) load.finished();
     }
   }
 

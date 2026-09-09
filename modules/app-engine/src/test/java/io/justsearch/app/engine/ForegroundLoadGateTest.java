@@ -17,6 +17,26 @@ import org.junit.jupiter.api.Test;
 
 /** Urgency is explicit; balance on errors and concurrent use still pins ADR-0048's pacing feed. */
 final class ForegroundLoadGateTest {
+  @Test
+  void capturedChildFactoryCannotResurrectACompletedInteractiveCall() {
+    var admission = new EngineAdmissionController(1, 1, 1);
+    var load = new ForegroundLoad();
+    var gate = new ForegroundLoadGate(load);
+    var captured = new java.util.concurrent.atomic.AtomicReference<
+        io.justsearch.core.execution.EngineTaskLifetime>();
+    try (var work = admission.admit(context(EngineContext.Survival.INTERACTIVE,
+        EngineContext.Urgency.FOREGROUND), false)) {
+      gate.callOwned(work, lifetime -> { captured.set(lifetime); return null; });
+      assertEquals(0, load.inFlight());
+      assertThrows(IllegalStateException.class, () -> captured.get().retain());
+      assertEquals(0, load.inFlight());
+      assertEquals(1, load.startedTotal());
+    }
+    try (var next = admission.attach(TestEngineContexts.BACKGROUND)) {
+      assertTrue(next.context().workId().isPresent(), "failed retain did not leak admission");
+    }
+  }
+
   private static EngineContext context(EngineContext.Survival survival, EngineContext.Urgency urgency) {
     return new EngineContext(EngineContext.ClientKind.INTERNAL, "gate-test", Optional.empty(),
         Optional.empty(), "UNTRUSTED", "HTTP", survival, urgency);
