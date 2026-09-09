@@ -138,10 +138,12 @@ public class LocalApiServer {
   private volatile GpuCapabilities cachedGpuSnapshot;
   private volatile long gpuSnapshotTimestamp;
   private final RerankerService lambdaMartReranker;
+  private final io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
   private final HeadApiMetricCatalog apiCatalog;
 
   /** Creates a new builder. Required: settingsStore, indexBasePath. The bootstrap and per-service
-   * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.). */
+   * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.).
+   * A Knowledge Server also requires the Head search owner or explicit perSourceSearch. */
   public static Builder builder(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
@@ -150,6 +152,8 @@ public class LocalApiServer {
   }
 
   private LocalApiServer(Builder b) {
+    this.perSourceSearch = b.perSourceSearch != null ? b.perSourceSearch
+        : b.HeadAssembly == null ? null : b.HeadAssembly.perSourceSearch();
     this.scanProgressRegistry = new io.justsearch.app.services.worker.ScanProgressRegistry(b.executors);
     this.telemetry = b.telemetry;
     this.lambdaMartReranker = b.lambdaMartReranker;
@@ -919,6 +923,7 @@ public class LocalApiServer {
     if (ks != null && this.knowledgeSearchController == null) {
       KnowledgeSearchController ctrl = new KnowledgeSearchController(
           ks,
+          this.perSourceSearch,
           this.telemetry,
           this.HeadAssemblyRef != null ? this.HeadAssemblyRef.inference().onlineAi() : OnlineAiService.unavailable(),
           this.lambdaMartReranker,
@@ -1074,7 +1079,7 @@ public class LocalApiServer {
     return port > 0 ? port : null;
   }
 
-  /** Builder for {@link LocalApiServer}. Required: settingsStore, indexBasePath. */
+  /** Builder for {@link LocalApiServer}; a Knowledge Server requires an explicit search owner. */
   public static final class Builder {
     final io.justsearch.core.execution.EngineExecutorRegistry executors;
     final io.justsearch.app.services.settings.UiSettingsStore settingsStore;
@@ -1114,6 +1119,13 @@ public class LocalApiServer {
     Runnable lifecycleShutdownAction = () -> {};
     io.justsearch.app.api.OperationLeaseService operationLeaseService;
     io.justsearch.app.api.EngineAdmissionService engineAdmission;
+    io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
+
+    /** Explicit dependency for fixtures without a HeadAssembly; the supplying owner closes it. */
+    public Builder perSourceSearch(io.justsearch.app.services.worker.SearchPerSourceExecutor value) {
+      this.perSourceSearch = java.util.Objects.requireNonNull(value);
+      return this;
+    }
     Path upgradeDataDir;
     Supplier<String> upgradeRunningVersion =
         () -> EnvRegistry.APP_VERSION.get().orElse("");
@@ -1274,6 +1286,11 @@ public class LocalApiServer {
     }
 
     public LocalApiServer build() {
+      if (knowledgeServer != null && perSourceSearch == null
+          && (HeadAssembly == null || HeadAssembly.perSourceSearch() == null)) {
+        throw new IllegalStateException("Knowledge Server requires the Head per-source search owner"
+            + " or an explicitly supplied perSourceSearch owner");
+      }
       return new LocalApiServer(this);
     }
   }

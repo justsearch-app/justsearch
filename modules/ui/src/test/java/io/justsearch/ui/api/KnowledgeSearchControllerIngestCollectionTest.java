@@ -56,7 +56,7 @@ final class KnowledgeSearchControllerIngestCollectionTest {
             0L,
             0);
     KnowledgeSearchController controller =
-        new KnowledgeSearchController(new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config));
+        new KnowledgeSearchController(new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config), org.mockito.Mockito.mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
     app =
         Javalin.create(
                 cfg -> {

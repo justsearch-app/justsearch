@@ -31,6 +31,7 @@ import io.justsearch.app.services.observability.HeadApiTags.ApiRequestTags;
 import io.justsearch.app.services.observability.HttpMethod;
 import io.justsearch.app.services.observability.HttpStatusClass;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
+import io.justsearch.app.services.worker.SearchPerSourceExecutor;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.app.services.indexing.ExcludeGlobs;
 import java.io.IOException;
@@ -249,29 +250,29 @@ public class KnowledgeSearchController {
     return s;
   }
 
-  public KnowledgeSearchController(KnowledgeServerBootstrap knowledgeServer) {
-    this(knowledgeServer, null);
+  public KnowledgeSearchController(KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch) {
+    this(knowledgeServer, perSourceSearch, null);
   }
 
-  public KnowledgeSearchController(KnowledgeServerBootstrap knowledgeServer, Telemetry telemetry) {
-    this(knowledgeServer, telemetry, OnlineAiService.unavailable());
-  }
-
-  public KnowledgeSearchController(
-      KnowledgeServerBootstrap knowledgeServer, Telemetry telemetry, OnlineAiService onlineAi) {
-    this(knowledgeServer, telemetry, onlineAi, null);
+  public KnowledgeSearchController(KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch, Telemetry telemetry) {
+    this(knowledgeServer, perSourceSearch, telemetry, OnlineAiService.unavailable());
   }
 
   public KnowledgeSearchController(
-      KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch, Telemetry telemetry, OnlineAiService onlineAi) {
+    this(knowledgeServer, perSourceSearch, telemetry, onlineAi, null);
+  }
+
+  public KnowledgeSearchController(
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       Telemetry telemetry,
       OnlineAiService onlineAi,
       RerankerService lambdaMartReranker) {
-    this(knowledgeServer, telemetry, onlineAi, lambdaMartReranker, null);
+    this(knowledgeServer, perSourceSearch, telemetry, onlineAi, lambdaMartReranker, null);
   }
 
   public KnowledgeSearchController(
-      KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       Telemetry telemetry,
       OnlineAiService onlineAi,
       RerankerService lambdaMartReranker,
@@ -279,7 +280,7 @@ public class KnowledgeSearchController {
     this.knowledgeServer = knowledgeServer;
     this.telemetry = telemetry;
     this.apiCatalog = apiCatalog;
-    this.adapter = new KnowledgeHttpApiAdapter(knowledgeServer, onlineAi, lambdaMartReranker);
+    this.adapter = new KnowledgeHttpApiAdapter(knowledgeServer, perSourceSearch, onlineAi, lambdaMartReranker);
   }
 
   /**

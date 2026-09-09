@@ -78,7 +78,7 @@ final class AgentToolFactoryScanWiringTest {
   }
 
   private static KnowledgeHttpApiAdapter agentAdapter() {
-    return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class));
+    return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class), mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
   }
 
   @Test
@@ -120,6 +120,7 @@ final class AgentToolFactoryScanWiringTest {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       boolean registered =
           AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
               new HandlerRegistry(),
               mock(KnowledgeServerBootstrap.class),
               mock(KnowledgeClient.class),
@@ -164,6 +165,7 @@ final class AgentToolFactoryScanWiringTest {
     HandlerRegistry eager = new HandlerRegistry();
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -176,6 +178,7 @@ final class AgentToolFactoryScanWiringTest {
     HandlerRegistry lateBound = new HandlerRegistry();
     assertTrue(
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             lateBound,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -225,6 +228,7 @@ final class AgentToolFactoryScanWiringTest {
     // Step 1: the eager path, exactly as SubstratePhase.run calls it at construction time.
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -243,6 +247,7 @@ final class AgentToolFactoryScanWiringTest {
     // permanently suppresses REMEMBER").
     boolean lateBoundRan =
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             registry,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -280,6 +285,7 @@ final class AgentToolFactoryScanWiringTest {
 
     AgentToolFactory.Output reused =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -295,6 +301,7 @@ final class AgentToolFactoryScanWiringTest {
 
     AgentToolFactory.Output fresh =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -318,6 +325,7 @@ final class AgentToolFactoryScanWiringTest {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.Output out =
           AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
               dataDir,
               mock(KnowledgeServerBootstrap.class),
               client,
@@ -341,6 +349,7 @@ final class AgentToolFactoryScanWiringTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
     AgentToolFactory.Output out =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -379,6 +388,7 @@ final class AgentToolFactoryScanWiringTest {
   void eagerGuardNullsTheWorkerBackedToolsButNotTheJournal(@TempDir Path dataDir) {
     AgentToolFactory.Output out =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             null,
@@ -428,6 +438,7 @@ final class AgentToolFactoryScanWiringTest {
 
     AgentToolFactory.Output reused =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -443,6 +454,7 @@ final class AgentToolFactoryScanWiringTest {
 
     AgentToolFactory.Output fresh =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,

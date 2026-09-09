@@ -504,6 +504,7 @@ final class CoreApiAssembly {
     KnowledgeSearchController knowledgeSearchController = b.knowledgeServer != null
         ? new KnowledgeSearchController(
             b.knowledgeServer,
+            b.perSourceSearch != null ? b.perSourceSearch : b.HeadAssembly.perSourceSearch(),
             telemetry,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(),
             b.lambdaMartReranker,

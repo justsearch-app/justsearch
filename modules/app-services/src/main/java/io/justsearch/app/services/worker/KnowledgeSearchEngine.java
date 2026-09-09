@@ -530,6 +530,7 @@ final class KnowledgeSearchEngine {
   }
 
   private final KnowledgeServerBootstrap knowledgeServer;
+  private final SearchPerSourceExecutor perSourceSearch;
   private final RerankerConfig rerankConfig;
   private final OnlineAiService onlineAiService;
   private final RerankerService lambdaMartReranker;
@@ -537,20 +538,21 @@ final class KnowledgeSearchEngine {
   private final FilterNormalizationService normService;
   private final WorkerStatusCache statusCache;
 
-  KnowledgeSearchEngine(KnowledgeServerBootstrap knowledgeServer) {
-    this(knowledgeServer, OnlineAiService.unavailable(), null);
+  KnowledgeSearchEngine(KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch) {
+    this(knowledgeServer, perSourceSearch, OnlineAiService.unavailable(), null);
   }
 
   KnowledgeSearchEngine(
-      KnowledgeServerBootstrap knowledgeServer, OnlineAiService onlineAiService) {
-    this(knowledgeServer, onlineAiService, null);
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch, OnlineAiService onlineAiService) {
+    this(knowledgeServer, perSourceSearch, onlineAiService, null);
   }
 
   KnowledgeSearchEngine(
-      KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService,
       RerankerService lambdaMartReranker) {
     this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
+    this.perSourceSearch = Objects.requireNonNull(perSourceSearch, "perSourceSearch");
     this.onlineAiService = Objects.requireNonNull(onlineAiService, "onlineAiService");
     this.lambdaMartReranker = lambdaMartReranker; // nullable
     this.rerankConfig = RerankerConfig.fromEnv();
@@ -813,7 +815,7 @@ final class KnowledgeSearchEngine {
     SearchResponse resp;
     boolean perSourceRetrieval = false;
     if (structuredAnalysis.detectedSources().size() >= 2) {
-      resp = SearchPerSourceExecutor.execute(
+      resp = perSourceSearch.execute(
           client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext);
       perSourceRetrieval = true;
     } else {

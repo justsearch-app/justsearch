@@ -194,6 +194,7 @@ final class LifecycleContractTest {
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .inferenceCapability(inferenceCap)
             .build();
     try {
@@ -246,6 +247,7 @@ final class LifecycleContractTest {
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
       HttpResponse<String> resp =
@@ -288,6 +290,7 @@ final class LifecycleContractTest {
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
       HttpResponse<String> resp =
@@ -345,6 +348,7 @@ final class LifecycleContractTest {
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .inferenceCapability(inferenceCap)
             .build();
     try {
@@ -397,6 +401,7 @@ final class LifecycleContractTest {
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(onlineAi)
             .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .inferenceCapability(inferenceCap)
             .build();
     try {
@@ -444,6 +449,7 @@ final class LifecycleContractTest {
 
     LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
         .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
         .build();
     try {
       HttpResponse<String> resp =
@@ -495,6 +501,7 @@ final class LifecycleContractTest {
     LocalApiServer server =
         LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
+            .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
       HttpResponse<String> resp =

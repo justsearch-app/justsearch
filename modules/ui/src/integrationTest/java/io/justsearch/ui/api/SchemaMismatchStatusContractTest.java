@@ -122,6 +122,7 @@ final class SchemaMismatchStatusContractTest {
     Files.createDirectories(indexBase);
     server = LocalApiServer.builder(executors, settingsStore, indexBase)
         .knowledgeServer(bootstrap)
+        .perSourceSearch(org.mockito.Mockito.mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
         .build();
   }
 

@@ -92,6 +92,10 @@ public final class HeadAssembly implements AutoCloseable {
 
 
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+  private final io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
+  public io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch() {
+    return perSourceSearch; // Absent only in the search-port-only fixture.
+  }
   private final KnowledgeHttpApiAdapter agentSearchAdapter;
   // Tempdoc 913 D5: the ONE file-operation journal for the process. Held for the same reason
   // agentSearchAdapter is — connectKnowledgeServer hands it to AgentToolHandlers.registerLateBound
@@ -325,11 +329,17 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     Objects.requireNonNull(telemetry, "telemetry");
     Objects.requireNonNull(engineAdmission, "engineAdmission");
+    List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
+    try {
+    this.perSourceSearch = new io.justsearch.app.services.worker.SearchPerSourceExecutor(executors, engineAdmission);
+    acquiredOwners.add(perSourceSearch);
     this.executors = Objects.requireNonNull(executors, "executors");
     this.foregroundDocumentOwner = documentExecutorOwner(executors,
         io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND, "foreground");
+    acquiredOwners.add(foregroundDocumentOwner);
     this.backgroundDocumentOwner = documentExecutorOwner(executors,
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, "background");
+    acquiredOwners.add(backgroundDocumentOwner);
     this.foregroundDocuments = foregroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
@@ -441,6 +451,7 @@ public final class HeadAssembly implements AutoCloseable {
                         new io.justsearch.app.services.bootstrap.phases.ServicePhase.Input(
                             executors,
                             engineAdmission,
+                            this.perSourceSearch,
                             knowledgeServerForService,
                             this.knowledgeClient,
                             indexingServiceFinal,
@@ -867,6 +878,7 @@ public final class HeadAssembly implements AutoCloseable {
                                 .toList());
               }
               return io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.registerLateBound(
+                  this.perSourceSearch,
                   this.substrateOut.operationHandlers(),
                   this.knowledgeServerBootstrap,
                   this.knowledgeClient,
@@ -895,6 +907,10 @@ public final class HeadAssembly implements AutoCloseable {
         sealedTrace.totalDurationMs().orElse(0L));
     io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.logAiServicesConfiguration(
         onlineAiService, inferenceManager, knowledgeClient, orchestrationOut.agentService());
+    } catch (RuntimeException | Error failure) {
+      closeFailedOwners(acquiredOwners, failure);
+      throw failure;
+    }
   }
 
   /** F5 Phase 4: delegates to OrchestrationAssembly.build. */
@@ -944,11 +960,16 @@ public final class HeadAssembly implements AutoCloseable {
   private HeadAssembly(io.justsearch.core.execution.EngineExecutorRegistry executors,
       SearchPort searchPort, Telemetry telemetry) {
     Objects.requireNonNull(searchPort, "searchPort");
+    List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
+    try {
+    this.perSourceSearch = null;
     this.executors = Objects.requireNonNull(executors, "executors");
     this.foregroundDocumentOwner = documentExecutorOwner(executors,
         io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND, "foreground");
+    acquiredOwners.add(foregroundDocumentOwner);
     this.backgroundDocumentOwner = documentExecutorOwner(executors,
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, "background");
+    acquiredOwners.add(backgroundDocumentOwner);
     this.foregroundDocuments = foregroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
@@ -1032,6 +1053,10 @@ public final class HeadAssembly implements AutoCloseable {
     // surfaces "skipped: no worker" if any caller queries it.
     this.agentToolsRegistration =
         io.justsearch.app.services.bootstrap.Memoized.of(() -> Boolean.FALSE);
+    } catch (RuntimeException | Error failure) {
+      closeFailedOwners(acquiredOwners, failure);
+      throw failure;
+    }
   }
 
   /** §5/F1 snapshot accessor — projects the live inference manager into a status record. */
@@ -1499,7 +1524,20 @@ public final class HeadAssembly implements AutoCloseable {
           if (asyncTransitionLog != null) asyncTransitionLog.close();
         }
       } finally {
-        try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
+        try {
+          if (perSourceSearch != null) perSourceSearch.close();
+        } finally {
+          try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
+        }
+      }
+    }
+  }
+
+  private static void closeFailedOwners(List<AutoCloseable> owners, Throwable failure) {
+    for (int i = owners.size() - 1; i >= 0; i--) {
+      try { owners.get(i).close(); }
+      catch (Exception | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
       }
     }
   }

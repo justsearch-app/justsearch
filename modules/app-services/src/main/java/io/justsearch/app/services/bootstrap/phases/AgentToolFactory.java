@@ -68,6 +68,7 @@ public final class AgentToolFactory {
    * is a dependency it never had.
    */
   public static Output build(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       Path dataDir,
       KnowledgeServerBootstrap knowledgeServer,
       KnowledgeClient knowledgeClient,
@@ -79,6 +80,7 @@ public final class AgentToolFactory {
       return new Output(null, fileOperationLog(dataDir), null, null, null, null, null);
     }
     return assemble(
+        perSourceSearch,
         dataDir,
         knowledgeServer,
         knowledgeClient,
@@ -128,6 +130,7 @@ public final class AgentToolFactory {
    *     null and its handler is not registered, exactly as the other null-tolerant fields behave.
    */
   static Output assemble(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       Path dataDir,
       KnowledgeServerBootstrap knowledgeServer,
       KnowledgeClient knowledgeClient,
@@ -142,7 +145,7 @@ public final class AgentToolFactory {
     KnowledgeHttpApiAdapter agentSearchAdapter =
         existingAdapter != null
             ? existingAdapter
-            : new KnowledgeHttpApiAdapter(knowledgeServer, onlineAiService, lambdaMartReranker);
+            : new KnowledgeHttpApiAdapter(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker);
     bindScanObservability(agentSearchAdapter, scanProgressRegistry, scanRollupLedger);
     FileOperationLog fileOperationLog =
         existingFileOperationLog != null ? existingFileOperationLog : fileOperationLog(dataDir);

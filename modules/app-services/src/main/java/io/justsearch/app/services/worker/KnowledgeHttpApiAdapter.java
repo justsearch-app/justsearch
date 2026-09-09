@@ -52,21 +52,21 @@ public final class KnowledgeHttpApiAdapter {
    */
   private volatile io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger;
 
-  public KnowledgeHttpApiAdapter(KnowledgeServerBootstrap knowledgeServer) {
-    this(knowledgeServer, OnlineAiService.unavailable(), null);
+  public KnowledgeHttpApiAdapter(KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch) {
+    this(knowledgeServer, perSourceSearch, OnlineAiService.unavailable(), null);
   }
 
   public KnowledgeHttpApiAdapter(
-      KnowledgeServerBootstrap knowledgeServer, OnlineAiService onlineAiService) {
-    this(knowledgeServer, onlineAiService, null);
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch, OnlineAiService onlineAiService) {
+    this(knowledgeServer, perSourceSearch, onlineAiService, null);
   }
 
   public KnowledgeHttpApiAdapter(
-      KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService,
       RerankerService lambdaMartReranker) {
     this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
-    this.searchEngine = new KnowledgeSearchEngine(knowledgeServer, onlineAiService, lambdaMartReranker);
+    this.searchEngine = new KnowledgeSearchEngine(knowledgeServer, perSourceSearch, onlineAiService, lambdaMartReranker);
   }
 
   // ========== Search + status (delegated to KnowledgeSearchEngine) ==========

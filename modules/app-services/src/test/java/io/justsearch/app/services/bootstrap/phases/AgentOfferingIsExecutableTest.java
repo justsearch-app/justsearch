@@ -88,6 +88,7 @@ final class AgentOfferingIsExecutableTest {
 
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -99,6 +100,7 @@ final class AgentOfferingIsExecutableTest {
 
     boolean lateBoundRan =
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             operationHandlers,
             mock(KnowledgeServerBootstrap.class),
             client,

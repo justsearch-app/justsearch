@@ -15,6 +15,19 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class KnowledgeSearchControllerExecutorRefusalTest {
+  private io.justsearch.configuration.resolved.ConfigStore previousConfigStore;
+
+  @org.junit.jupiter.api.BeforeEach
+  void configure() {
+    previousConfigStore = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    io.justsearch.configuration.resolved.TestResolvedConfigHelper.storeWithDefaults();
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void restore() {
+    io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
+  }
+
   @Test
   @SuppressWarnings("unchecked")
   void suggestPreservesTypedRefusalThroughItsControllerCatch() {
@@ -25,7 +38,7 @@ class KnowledgeSearchControllerExecutorRefusalTest {
     var bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.isReady()).thenReturn(true);
     when(bootstrap.client()).thenReturn(client);
-    var controller = new KnowledgeSearchController(bootstrap);
+    var controller = new KnowledgeSearchController(bootstrap, mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
     var ctx = mock(Context.class);
     when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
     when(ctx.path()).thenReturn("/api/knowledge/suggest");

@@ -145,6 +145,7 @@ public final class AgentToolHandlers {
    *     prerequisite (worker capability, knowledge server, or data dir) was missing.
    */
   public static boolean registerLateBound(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       HandlerRegistry operationHandlers,
       KnowledgeServerBootstrap knowledgeServer,
       KnowledgeClient knowledgeClient,
@@ -187,6 +188,7 @@ public final class AgentToolHandlers {
     // copies. Registration is this method's job; composition is the factory's.
     AgentToolFactory.Output tools =
         AgentToolFactory.assemble(
+            perSourceSearch,
             dataDir,
             knowledgeServer,
             knowledgeClient,

@@ -76,6 +76,7 @@ public final class ServicePhase {
   public record Input(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       KnowledgeServerBootstrap knowledgeServer,
       KnowledgeClient knowledgeClient,
       IndexingService indexingService,
@@ -251,6 +252,7 @@ public final class ServicePhase {
 
     AgentToolFactory.Output agentTools =
         AgentToolFactory.build(
+            in.perSourceSearch(),
             in.dataDir(),
             in.knowledgeServer(),
             in.knowledgeClient(),
