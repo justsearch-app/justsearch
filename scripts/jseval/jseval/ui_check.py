@@ -457,6 +457,69 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.get_by_text("JustSearch could not restart", exact=True).wait_for()
         await page.get_by_text("Install update", exact=True).wait_for()
 
+    async def setup_engine_admission_wait(page):
+        """Exercise the real admission-wait emitter and its mounted toast projection."""
+        await page.evaluate(
+            """() => {
+              const events = [];
+              window.__justsearchAdmissionWaitEvents = events;
+              window.__justsearchAdmissionWaitListener = (event) => {
+                const detail = event.detail || {};
+                events.push({
+                  classId: detail.classId,
+                  message: detail.message,
+                  severity: detail.severity,
+                  supersede: detail.supersede,
+                });
+              };
+              document.addEventListener(
+                'jf-advisory-ephemeral', window.__justsearchAdmissionWaitListener
+              );
+            }"""
+        )
+        # SES blocks import expressions evaluated as page JavaScript. A module script is the
+        # trusted served-module boundary used by the app itself; expose only this named helper for
+        # the next page evaluation, which merely invokes it and observes the real event channel.
+        await page.add_script_tag(
+            type="module",
+            content="""
+              import { reportAdmissionWait } from '/src/shell-v0/state/admissionWaitNotice.ts';
+              globalThis.__justsearchReportAdmissionWait = reportAdmissionWait;
+            """,
+        )
+        emitted = await page.evaluate(
+            """() => {
+              if (typeof globalThis.__justsearchReportAdmissionWait !== 'function') {
+                throw new Error('served admission-wait module did not expose its helper');
+              }
+              globalThis.__justsearchReportAdmissionWait(false, 250);
+              globalThis.__justsearchReportAdmissionWait(true, 500);
+              return globalThis.__justsearchAdmissionWaitEvents;
+            }"""
+        )
+        if len(emitted) != 2:
+            raise AssertionError(f"expected two admission-wait emissions, got {emitted!r}")
+        if any(event.get("classId") != "core.engine.wait" for event in emitted):
+            raise AssertionError(f"admission-wait emissions used the wrong class: {emitted!r}")
+        if any(event.get("severity") != "info" for event in emitted):
+            raise AssertionError(f"admission-wait emissions were not informational: {emitted!r}")
+        if any(event.get("supersede") is not True for event in emitted):
+            raise AssertionError(f"admission-wait emissions did not supersede: {emitted!r}")
+
+        toast = page.locator(S.CSS_TOAST)
+        await toast.first.wait_for(state="visible", timeout=10_000)
+        await asyncio.sleep(0.2)
+        if await toast.count() != 1:
+            raise AssertionError("same-class admission waits must leave one visible toast")
+        toast_text = await toast.first.inner_text()
+        if "preparing an update" not in toast_text:
+            raise AssertionError(f"latest admission-wait notice was not rendered: {toast_text!r}")
+        notice = toast.first.locator("jf-system-notice")
+        if await notice.get_attribute("tone") != "neutral":
+            raise AssertionError("informational admission wait must use the canonical neutral tone")
+        if await notice.get_attribute("live") != "status":
+            raise AssertionError("admission-wait toast must use polite status announcement")
+
     # === Shared-browser chain (sequential, depends_on linkage) ===
 
     async def setup_search_results(page):
@@ -2018,6 +2081,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     return [
         Step("engine-recovery", setup=setup_engine_recovery, isolated=True),
+        Step("engine-admission-wait", setup=setup_engine_admission_wait, isolated=True),
         Step("health-completion", setup=setup_health_completion, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
