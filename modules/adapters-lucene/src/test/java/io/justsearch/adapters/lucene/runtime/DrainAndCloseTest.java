@@ -28,7 +28,7 @@ import org.junit.jupiter.api.io.TempDir;
  * IllegalStateException); (3) close runs even if the queue does not drain in time
  * (best-effort).
  */
-class DrainAndCloseTest {
+class DrainAndCloseTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -41,7 +41,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Index 5 docs without committing (so they're pending).
@@ -67,7 +67,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       reopened.commitOps().maybeRefreshBlocking();
@@ -87,7 +87,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       // Set the drain flag manually (drainAndClose does this then awaits queue → 0).
@@ -126,7 +126,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     long commitsBefore = runtime.session().commitCount.get();
     // No pending writes. drainAndClose should be a fast no-op + close (no commit, item 6).
@@ -161,7 +161,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Start a writer that holds the readLock for ~200ms by simulating slow validation
@@ -209,7 +209,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       reopened.commitOps().maybeRefreshBlocking();
@@ -236,7 +236,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Acquire the readLock manually from another thread and hold it longer than the drain timeout.

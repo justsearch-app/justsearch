@@ -153,7 +153,7 @@ final class EngineDurableSseWorkTest {
       runs =
           new RunStreamController(
             processExecutors,
-              new RunChannelRegistry(), new ChatController(new io.justsearch.core.execution.TestEngineExecutors(), engine, new SseWriter(null), null));
+              new RunChannelRegistry(), new ChatController(new TestEngineExecutors(), engine, new SseWriter(null), null));
       app =
           Javalin.create(
               config -> {

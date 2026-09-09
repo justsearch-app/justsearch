@@ -49,7 +49,7 @@ import org.junit.jupiter.api.io.TempDir;
  * {@code -PincludeStress=true}.
  */
 @Tag("stress")
-class LifecycleStressTest {
+class LifecycleStressTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -69,7 +69,7 @@ class LifecycleStressTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     for (int i = 0; i < 100; i++) {
       seed.indexingCoordinator()
@@ -91,7 +91,7 @@ class LifecycleStressTest {
             new JsonSchemaCommitMetadataValidator());
 
     AtomicReference<RunningRuntime> holder =
-        new AtomicReference<>(schema.atPath(indexPath).open());
+        new AtomicReference<>(schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open());
 
     // Track weak refs to prove no RuntimeSession leak.
     List<WeakReference<RunningRuntime>> swappedOut = new CopyOnWriteArrayList<>();
@@ -237,7 +237,7 @@ class LifecycleStressTest {
                   swappedOut.add(new WeakReference<>(old));
                   old.drainAndClose(Duration.ofSeconds(5));
                   // Old writer is now closed; safe to acquire write.lock for the new instance.
-                  RunningRuntime fresh = schema.atPath(indexPath).open();
+                  RunningRuntime fresh = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
                   holder.set(fresh);
                   // Tiny pause so readers/writers get a live window each cycle.
                   Thread.sleep(20);

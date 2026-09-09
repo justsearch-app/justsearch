@@ -45,15 +45,21 @@ class HeadAssemblyTest {
   @TempDir private Path tempDir;
   private String previousCapabilitiesProp;
   private String previousProdProp;
+  private String previousHomeProp;
+  private String previousDataDirProp;
   private ConfigStore previousStore;
 
   @BeforeEach
   void captureOverrides() {
     previousCapabilitiesProp = System.getProperty("app.api.fake_capabilities");
     previousProdProp = System.getProperty("justsearch.prod");
+    previousHomeProp = System.getProperty("justsearch.home");
+    previousDataDirProp = System.getProperty("justsearch.data.dir");
     previousStore = ConfigStore.globalOrNull();
     System.clearProperty("app.api.fake_capabilities");
     System.clearProperty("justsearch.prod");
+    System.setProperty("justsearch.home", tempDir.toString());
+    System.setProperty("justsearch.data.dir", tempDir.toString());
     TestResolvedConfigHelper.storeFromEnvironment();
   }
 
@@ -70,6 +76,10 @@ class HeadAssemblyTest {
       System.setProperty("justsearch.prod", previousProdProp);
     }
     TestResolvedConfigHelper.restoreGlobal(previousStore);
+    if (previousHomeProp == null) System.clearProperty("justsearch.home");
+    else System.setProperty("justsearch.home", previousHomeProp);
+    if (previousDataDirProp == null) System.clearProperty("justsearch.data.dir");
+    else System.setProperty("justsearch.data.dir", previousDataDirProp);
   }
 
   @Test
@@ -106,6 +116,39 @@ class HeadAssemblyTest {
       assertThrows(IllegalStateException.class, head::close);
       assertEquals(List.of("SHUTDOWN"), reasons,
           "the log must stay open through the manager's final transition and drain on failure too");
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void failedUnlockScanCloseStillAttemptsEveryScanAndOrchestrationOwner() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var head = HeadAssembly.bootForSearchPortOnly(executors,
+            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry())) {
+      var order = new java.util.ArrayList<String>();
+      var first = org.mockito.Mockito.mock(io.justsearch.app.services.encryption.UnlockDeferredScan.class);
+      var second = org.mockito.Mockito.mock(io.justsearch.app.services.encryption.UnlockDeferredScan.class);
+      var scanFailure = new IllegalStateException("scan close failed");
+      org.mockito.Mockito.doAnswer(invocation -> { order.add("first-scan"); throw scanFailure; })
+          .when(first).close();
+      org.mockito.Mockito.doAnswer(invocation -> { order.add("second-scan"); return null; })
+          .when(second).close();
+      var scansField = HeadAssembly.class.getDeclaredField("unlockScans");
+      scansField.setAccessible(true);
+      var scans = (List<io.justsearch.app.services.encryption.UnlockDeferredScan>) scansField.get(head);
+      scans.add(first);
+      scans.add(second);
+      var handlesField = HeadAssembly.class.getDeclaredField("orchestration");
+      handlesField.setAccessible(true);
+      handlesField.set(head, new io.justsearch.app.services.bootstrap.OrchestrationHandles(
+          null, null, null, null, null, null,
+          () -> { order.add("inference"); throw new IllegalStateException("manager close failed"); },
+          null, null, null, null, null, null, null));
+      var failure = assertThrows(IllegalStateException.class, head::close);
+      org.junit.jupiter.api.Assertions.assertSame(scanFailure, failure);
+      assertEquals(List.of("first-scan", "second-scan", "inference"), order);
+      assertEquals(1, failure.getSuppressed().length);
+      assertEquals("manager close failed", failure.getSuppressed()[0].getSuppressed()[0].getMessage());
     }
   }
 

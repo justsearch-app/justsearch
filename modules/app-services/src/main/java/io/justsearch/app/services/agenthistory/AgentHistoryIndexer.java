@@ -84,6 +84,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   private final ExecutorService executor;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration executorOwner;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration retryOwner;
+  private final java.util.concurrent.ScheduledFuture<?> retryTask;
   private final java.util.concurrent.atomic.AtomicBoolean reconciliationNeeded = new java.util.concurrent.atomic.AtomicBoolean();
   private final java.util.concurrent.atomic.AtomicBoolean reconciliationQueued = new java.util.concurrent.atomic.AtomicBoolean();
   private volatile Runnable reconciliation;
@@ -128,7 +129,8 @@ public final class AgentHistoryIndexer implements AutoCloseable {
           "head.agent-history-retry", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
           io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
       var retryTimer = acquiredRetry.openScheduled(Thread.ofPlatform().daemon().name("agent-history-retry").factory());
-      retryTimer.scheduleWithFixedDelay(this::retryReconciliation, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
+      this.retryTask = retryTimer.scheduleWithFixedDelay(this::retryReconciliation,
+          executors.retryAfterSeconds(), executors.retryAfterSeconds(), java.util.concurrent.TimeUnit.SECONDS);
       this.retryOwner = acquiredRetry;
     } catch (RuntimeException | Error failure) {
       if (acquiredRetry != null) {
@@ -142,6 +144,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   @Override
   public void close() {
     closed = true;
+    retryTask.cancel(false);
     try { retryOwner.close(); }
     finally { closeWorker(); }
   }
@@ -214,13 +217,12 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   }
 
   private void retryReconciliation() {
-    Runnable scan = reconciliation;
-    if (closed || scan == null || !reconciliationNeeded.get()
+    if (closed || reconciliation == null || !reconciliationNeeded.get()
         || !reconciliationQueued.compareAndSet(false, true)) return;
     try {
       executor.execute(() -> {
         reconciliationNeeded.set(false);
-        try { scan.run(); }
+        try { reconciliation.run(); }
         catch (RuntimeException failure) {
           reconciliationNeeded.set(true);
           LOG.warn("Agent-history reconciliation will retry", failure);

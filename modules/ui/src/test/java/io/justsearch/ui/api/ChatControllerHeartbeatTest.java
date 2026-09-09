@@ -81,7 +81,7 @@ final class ChatControllerHeartbeatTest {
 
     scheduler = Executors.newSingleThreadScheduledExecutor();
     ChatController controller =
-        new ChatController(new io.justsearch.core.execution.TestEngineExecutors(),
+        new ChatController(
             engine,
             writer,
             null,
@@ -135,7 +135,7 @@ final class ChatControllerHeartbeatTest {
             });
     scheduler = Executors.newSingleThreadScheduledExecutor();
     ChatController controller =
-        new ChatController(new io.justsearch.core.execution.TestEngineExecutors(),
+        new ChatController(
             mock(ConversationEngine.class),
             writer,
             null,

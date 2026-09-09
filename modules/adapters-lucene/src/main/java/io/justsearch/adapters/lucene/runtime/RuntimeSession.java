@@ -335,9 +335,14 @@ final class RuntimeSession implements AutoCloseable {
    * <p>Production code MUST use {@link #RuntimeSession(LuceneRuntimeBuilder, Mode)}.
    */
   RuntimeSession(IndexSchema schema) {
+    this(schema, null);
+  }
+
+  /** Test-only ops session with an explicit owner for tests that exercise scheduled work. */
+  RuntimeSession(IndexSchema schema, LuceneExecutorRegistrations executorRegistrations) {
     // Schema-derived
     this.schema = schema;
-    this.executorRegistrations = null;
+    this.executorRegistrations = executorRegistrations;
     this.fieldMapper = schema.fieldMapper();
     this.metadataSourceSupplier = schema.metadataSourceSupplier();
     this.metadataValidator = schema.metadataValidator();

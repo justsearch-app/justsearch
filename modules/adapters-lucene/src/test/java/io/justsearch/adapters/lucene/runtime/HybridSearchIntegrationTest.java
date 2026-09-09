@@ -49,7 +49,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     RuntimeSearchFilters filters =
         LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder().includeChunks(true).build();
     SearchResult result = runtime.hybridSearchOps().searchHybridFiltered(
-        "justsearc", queryVector, 10, QueryFilterBuilder.buildFilterQueryOnly(filters));
+        "justsearc", queryVector, 10, QueryFilterBuilder.buildFilterQueryOnly(filters), EngineContext.Urgency.FOREGROUND);
 
     assertNotNull(result);
     assertTrue(

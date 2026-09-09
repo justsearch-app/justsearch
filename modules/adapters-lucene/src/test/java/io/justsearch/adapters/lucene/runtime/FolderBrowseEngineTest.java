@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("FolderBrowseEngine")
-class FolderBrowseEngineTest {
+class FolderBrowseEngineTest extends LuceneExecutorTestBase {
 
   // ========== Path Parsing Unit Tests ==========
 
@@ -180,7 +180,7 @@ class FolderBrowseEngineTest {
     @BeforeEach
     void setUp() throws Exception {
       indexDir = Files.createTempDirectory("browse-test-index-");
-      runtime = IndexSchema.fromCatalog(createTestCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR).atPath(indexDir).open();
+      runtime = IndexSchema.fromCatalog(createTestCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR).atPath(indexDir).withExecutorRegistrations(testLuceneExecutors()).open();
     }
 
     @AfterEach

@@ -182,11 +182,17 @@ final class ManagedChildReconcilerTest {
   }
 
   @Test
-  void closeReleasesOwnedRegistrationWithoutClosingProcessRegistry() {
+  void closeReleasesOwnedRegistrationWithoutClosingProcessRegistry() throws Exception {
     var processExecutors = spy(new TestEngineExecutors());
+    java.util.concurrent.ExecutorService httpExecutor;
     try (var reconciler = new ManagedChildReconciler(processExecutors, activeRegistry(), null)) {
-      // Construction owns one HTTP registration even when no child needs probing.
+      var httpField = ManagedChildReconciler.class.getDeclaredField("http");
+      httpField.setAccessible(true);
+      var http = (java.net.http.HttpClient) httpField.get(reconciler);
+      httpExecutor = (java.util.concurrent.ExecutorService) http.executor().orElseThrow();
+      assertTrue(!httpExecutor.isShutdown());
     }
+    assertTrue(httpExecutor.isShutdown(), "close must retire the owned HTTP executor");
     verify(processExecutors, never()).close();
     processExecutors.close();
   }

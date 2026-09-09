@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
  * ({@code open()} either succeeds or throws — no intermediate FAILED state to retry from, since
  * the state machine was deleted in tempdoc 406 Phase 4b).
  */
-class OpsAbsorbedLogicTest {
+class OpsAbsorbedLogicTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -81,7 +81,7 @@ class OpsAbsorbedLogicTest {
   void guardWritable_normalPath_passesGuard() throws Exception {
     Path dir = tempDir.resolve("guardWritable-normal");
     Files.createDirectories(dir);
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).open();
+    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       // updateDocument on a non-existent doc returns false — but no ISE.
       // This proves guardWritable() passed.
@@ -105,7 +105,7 @@ class OpsAbsorbedLogicTest {
   void commitAndTrack_updatesCountersAndFiresTelemetry() throws Exception {
     Path dir = tempDir.resolve("commitAndTrack");
     Files.createDirectories(dir);
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).open();
+    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       // Index a doc to simulate pending work
       runtime.indexingCoordinator().indexSingle(
@@ -156,7 +156,7 @@ class OpsAbsorbedLogicTest {
   void getOrComputeCorpusProfile_cachesBetweenCalls() throws Exception {
     Path dir = tempDir.resolve("corpusProfile");
     Files.createDirectories(dir);
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).open();
+    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       // Index a few docs so the profile has something to compute
       for (int i = 0; i < 3; i++) {
@@ -219,7 +219,7 @@ class OpsAbsorbedLogicTest {
                     FieldCatalogDef.forTesting(4),
                     new SsotCommitMetadataSource(),
                     new JsonSchemaCommitMetadataValidator())
-                .atPath(fakeIndexPath)
+                .atPath(fakeIndexPath).withExecutorRegistrations(testLuceneExecutors())
                 .open();
 
     assertThrows(Exception.class, opener::get,

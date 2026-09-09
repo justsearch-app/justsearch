@@ -3,8 +3,6 @@ package io.justsearch.adapters.lucene.runtime;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import io.justsearch.core.execution.TestEngineExecutors;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
@@ -13,21 +11,7 @@ import tools.jackson.databind.ObjectMapper;
  * Shared base for runtime integration tests. Provides config/lifecycle helpers and the
  * SystemPropertyExtension that saves/restores common system properties.
  */
-abstract class RuntimeTestBase {
-
-  private final TestEngineExecutors testExecutors = new TestEngineExecutors();
-  private final LuceneExecutorRegistrations luceneExecutors =
-      new LuceneExecutorRegistrations(testExecutors);
-
-  @AfterEach
-  void closeTestExecutors() {
-    luceneExecutors.close();
-    testExecutors.close();
-  }
-
-  LuceneRuntimeBuilder withTestExecutors(LuceneRuntimeBuilder builder) {
-    return builder.withExecutorRegistrations(luceneExecutors);
-  }
+abstract class RuntimeTestBase extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -83,7 +67,7 @@ abstract class RuntimeTestBase {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral();
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors());
       return withTestExecutors(builder).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -155,7 +139,7 @@ abstract class RuntimeTestBase {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral();
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors());
       return withTestExecutors(builder).open();
     } catch (Exception e) {
       throw new RuntimeException(e);

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import tools.jackson.databind.ObjectMapper;
 
-class BatchUpdateIntegrationTest {
+class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
 
   @Test
   void updateDocumentsBatchUpdatesAllDocs() throws Exception {
@@ -692,7 +692,7 @@ class BatchUpdateIntegrationTest {
           """;
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -723,7 +723,7 @@ class BatchUpdateIntegrationTest {
           """;
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -755,7 +755,7 @@ class BatchUpdateIntegrationTest {
           """;
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

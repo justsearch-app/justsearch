@@ -8,6 +8,7 @@ plugins {
 extra["coverage.enforce"] = "true"
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:configuration"))  // Exposes configuration types in public API
   api(project(":modules:indexing"))  // Exposes IndexDocument, FieldDefinition in public API
   api(project(":modules:core"))  // Exposes core DTOs in public API

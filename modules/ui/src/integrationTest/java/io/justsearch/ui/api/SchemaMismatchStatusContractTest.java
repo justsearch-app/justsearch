@@ -58,6 +58,7 @@ final class SchemaMismatchStatusContractTest {
   private ConfigStore prevConfigStore;
   private KnowledgeServerBootstrap bootstrap;
   private LocalApiServer server;
+  private final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
   private Path engineLogPath;
 
   @BeforeEach
@@ -99,7 +100,7 @@ final class SchemaMismatchStatusContractTest {
     engineLogPath = config.dataDir().resolve("logs").resolve("engine.log");
 
     bootstrap =
-        new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(),
+        new KnowledgeServerBootstrap(executors,
             config,
             null,
             new io.justsearch.app.services.lifecycle.WorkerCapability(),
@@ -119,7 +120,7 @@ final class SchemaMismatchStatusContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tmp.resolve("settings.json"));
     Path indexBase = tmp.resolve("index");
     Files.createDirectories(indexBase);
-    server = LocalApiServer.builder(settingsStore, indexBase)
+    server = LocalApiServer.builder(executors, settingsStore, indexBase)
         .knowledgeServer(bootstrap)
         .build();
   }
@@ -144,6 +145,8 @@ final class SchemaMismatchStatusContractTest {
         bootstrap = null;
       }
     }
+
+    executors.close();
 
     // Windows: the index half holds file locks on jobs.db (and, before item A11, the Worker
     // subprocess held one on worker.log) that the OS releases lazily (100-2000ms after close).
@@ -271,7 +274,7 @@ final class SchemaMismatchStatusContractTest {
     }
   }
 
-  private static void seedLegacyIndexWithBogusSchemaFingerprint(Path dataDir) throws Exception {
+  private void seedLegacyIndexWithBogusSchemaFingerprint(Path dataDir) throws Exception {
     // Worker default when index.collections is absent: collectionName=default.
     //
     // Important (Windows): avoid creating a "legacy" index directly under indexBasePath because
@@ -310,12 +313,14 @@ final class SchemaMismatchStatusContractTest {
     @SuppressWarnings("unchecked")
     Supplier<io.justsearch.indexing.runtime.CommitMetadataSource> typedSupplier =
         (Supplier<io.justsearch.indexing.runtime.CommitMetadataSource>) (Supplier<?>) metadataSupplier;
+    try (var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors)) {
     RunningRuntime runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 catalog,
                 typedSupplier,
                 new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator())
             .atPath(genPath)
+            .withExecutorRegistrations(luceneExecutors)
             .open();
 
     try {
@@ -336,6 +341,7 @@ final class SchemaMismatchStatusContractTest {
       runtime.commitOps().commitAndTrack();
     } finally {
       runtime.close();
+    }
     }
   }
 

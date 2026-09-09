@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class ParityGuardTest {
+class ParityGuardTest extends LuceneExecutorTestBase {
   static class GoodMeta implements CommitMetadataSource {
     @Override public Map<String, Object> build() { return new SsotCommitMetadataSource().build(); }
   }
@@ -29,14 +29,14 @@ class ParityGuardTest {
     CommitMetadataValidator validator = new JsonSchemaCommitMetadataValidator();
 
     var goodMeta = new GoodMeta();
-    var r1 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), goodMeta, validator).atPath(dir).open();
+    var r1 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), goodMeta, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     r1.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(SchemaFields.DOC_ID, "parity-3", SchemaFields.DOC_UID, "parity-3#0")));
     r1.commitOps().commitAndTrack();
     r1.close();
 
-    var r2 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), goodMeta, validator).atPath(dir).open();
+    var r2 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), goodMeta, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     // Should not throw
     r2.indexingCoordinator().indexSingle(
         new IndexDocument(
@@ -58,7 +58,7 @@ class ParityGuardTest {
       return m;
     };
 
-    var r1 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), good, validator).atPath(dir).open();
+    var r1 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), good, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     r1.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(SchemaFields.DOC_ID, "parity-5", SchemaFields.DOC_UID, "parity-5#0")));
@@ -71,7 +71,7 @@ class ParityGuardTest {
             () ->
                 IndexSchema.fromCatalog(
                         FieldCatalogDef.forTesting(768), badBoosts, validator)
-                    .atPath(dir)
+                    .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
                     .open());
     assertTrue(e.getMessage().contains("read-only"));
     assertTrue(
@@ -89,7 +89,7 @@ class ParityGuardTest {
     CommitMetadataValidator validator = new JsonSchemaCommitMetadataValidator();
 
     // Write a committed index stamped with the real (good) metadata.
-    var r1 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new GoodMeta(), validator).atPath(dir).open();
+    var r1 = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new GoodMeta(), validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     r1.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(SchemaFields.DOC_ID, "parity-6", SchemaFields.DOC_UID, "parity-6#0")));
@@ -173,7 +173,7 @@ class ParityGuardTest {
     var r =
         IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), meta, new JsonSchemaCommitMetadataValidator())
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     r.indexingCoordinator()
         .indexSingle(
@@ -210,7 +210,7 @@ class ParityGuardTest {
     var r =
         IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), meta, new JsonSchemaCommitMetadataValidator())
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     r.indexingCoordinator()
         .indexSingle(

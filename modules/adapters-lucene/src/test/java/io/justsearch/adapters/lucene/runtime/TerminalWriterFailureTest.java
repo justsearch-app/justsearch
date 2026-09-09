@@ -19,12 +19,12 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.AlreadyClosedException;
 import org.junit.jupiter.api.Test;
 
-final class TerminalWriterFailureTest {
+final class TerminalWriterFailureTest extends LuceneExecutorTestBase {
 
   @Test
   void tragicWriterReportsOnceAfterMutationReleasesItsBarrier() throws Exception {
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       AtomicInteger reports = new AtomicInteger();
       AtomicBoolean writeBarrierReleased = new AtomicBoolean();
@@ -55,7 +55,7 @@ final class TerminalWriterFailureTest {
   @Test
   void nestedMutationDefersFaultUntilTheOutermostBarrierIsReleased() throws Exception {
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       AtomicInteger reports = new AtomicInteger();
       runtime.onTerminalWriterFailure(ignored -> reports.incrementAndGet());
@@ -84,7 +84,7 @@ final class TerminalWriterFailureTest {
   @Test
   void usableWriterAndIntentionalDrainDoNotReport() throws Exception {
     try (RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open()) {
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open()) {
       AtomicInteger reports = new AtomicInteger();
       runtime.onTerminalWriterFailure(ignored -> reports.incrementAndGet());
 
@@ -113,7 +113,7 @@ final class TerminalWriterFailureTest {
     Thread.setDefaultUncaughtExceptionHandler(
         (ignoredThread, ignoredFailure) -> fallbacks.incrementAndGet());
     try (RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open()) {
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open()) {
       runtime.session().snapshot.writer().close();
       Thread nrt = runtime.session().crtrt;
       nrt.getUncaughtExceptionHandler()
@@ -133,7 +133,7 @@ final class TerminalWriterFailureTest {
   @Test
   void listenerErrorPropagatesToTheJvmOwner() throws Exception {
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       runtime.onTerminalWriterFailure(
           ignored -> {
@@ -157,7 +157,7 @@ final class TerminalWriterFailureTest {
   @Test
   void nrtThreadRoutesOnlyTerminalWriterFailureToTheRuntimeOwner() throws Exception {
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       AtomicInteger reports = new AtomicInteger();
       AtomicInteger fallbacks = new AtomicInteger();
@@ -199,7 +199,7 @@ final class TerminalWriterFailureTest {
         (ignoredThread, ignoredFailure) -> fallbacks.incrementAndGet());
     try {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       AtomicInteger reports = new AtomicInteger();
       runtime.onTerminalWriterFailure(ignored -> reports.incrementAndGet());
       Thread nrt = runtime.session().crtrt;
@@ -223,7 +223,7 @@ final class TerminalWriterFailureTest {
     Thread.setDefaultUncaughtExceptionHandler(
         (ignoredThread, ignoredFailure) -> fallbacks.incrementAndGet());
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       AtomicInteger reports = new AtomicInteger();
       runtime.onTerminalWriterFailure(ignored -> reports.incrementAndGet());
@@ -250,7 +250,7 @@ final class TerminalWriterFailureTest {
   @Test
   void resumedProductionNrtThreadRoutesTerminalWriterFailure() throws Exception {
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       AtomicInteger reports = new AtomicInteger();
       runtime.onTerminalWriterFailure(ignored -> reports.incrementAndGet());
@@ -277,7 +277,7 @@ final class TerminalWriterFailureTest {
   @Test
   void failedCommitReportsAfterItsMonitorAndPreservesTheCommitFailure() throws Exception {
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       CountDownLatch commitMonitorAcquired = new CountDownLatch(1);
       AtomicBoolean listenerObservedReleasedMonitor = new AtomicBoolean();

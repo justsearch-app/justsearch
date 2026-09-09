@@ -324,6 +324,7 @@ public final class KnowledgeServer implements Closeable {
 
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final WorkerExecutorRegistrations workerExecutors;
+  private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
 
   public KnowledgeServer(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
@@ -335,7 +336,12 @@ public final class KnowledgeServer implements Closeable {
     this.dataDir = config.dataDir();
     this.injectedSignalBus = signalBus;
     this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
-    this.workerExecutors = new WorkerExecutorRegistrations(executors);
+    this.luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+    try { this.workerExecutors = new WorkerExecutorRegistrations(executors); }
+    catch (RuntimeException | Error failure) {
+      try { luceneExecutors.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
@@ -1873,7 +1879,7 @@ public final class KnowledgeServer implements Closeable {
             metadataSupplier,
             new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
             null);
-    LuceneRuntimeBuilder builder = schema.atPath(indexPath);
+    LuceneRuntimeBuilder builder = schema.atPath(indexPath).withExecutorRegistrations(luceneExecutors);
     // Tempdoc 406 observability: wire WorkerLuceneTelemetryAdapter so commit /
     // backpressure / drain / swap / lock-contention events flow into
     // metrics-worker.ndjson under the index.runtime.* namespace.
@@ -1924,7 +1930,8 @@ public final class KnowledgeServer implements Closeable {
     if ("bge-m3".equalsIgnoreCase(sparseModel)) {
       catalog = catalog.withVectorDimension(1024);
     }
-    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath);
+    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath)
+        .withExecutorRegistrations(luceneExecutors);
     if (telemetry != null) {
       builder.withTelemetry(
           new io.justsearch.indexerworker.services.WorkerLuceneTelemetryAdapter(
@@ -2399,7 +2406,8 @@ public final class KnowledgeServer implements Closeable {
       }
     }
 
-    workerExecutors.close();
+    try { workerExecutors.close(); }
+    finally { luceneExecutors.close(); }
 
     if (indexRootLock != null) {
       try {

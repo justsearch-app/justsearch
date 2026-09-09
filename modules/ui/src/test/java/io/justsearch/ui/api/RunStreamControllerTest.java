@@ -321,7 +321,7 @@ final class RunStreamControllerTest {
       controller =
           new RunStreamController(
               processExecutors,
-              registry, new ChatController(new io.justsearch.core.execution.TestEngineExecutors(), engine, new SseWriter(null), null, store));
+              registry, new ChatController(new TestEngineExecutors(), engine, new SseWriter(null), null, store));
     }
 
     private RunChannel onlyRun() {

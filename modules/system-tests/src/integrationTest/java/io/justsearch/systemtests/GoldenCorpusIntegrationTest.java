@@ -338,7 +338,7 @@ class GoldenCorpusIntegrationTest {
     double vectorRecall = RelevanceMetrics.recallAtK(vectorDocs, relevant, 3);
 
     // HYBRID mode
-    var hybridResult = runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, 10, null);
+    var hybridResult = runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, 10, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
     List<String> hybridDocs = hybridResult.hits().stream()
         .map(LuceneRuntimeTypes.SearchHit::docId)
         .toList();
@@ -559,7 +559,7 @@ class GoldenCorpusIntegrationTest {
         }
         case "HYBRID" -> {
           float[] vector = getEmbedding(query.text());
-          result = runtime.hybridSearchOps().searchHybridFiltered(query.text(), vector, 10, null);
+          result = runtime.hybridSearchOps().searchHybridFiltered(query.text(), vector, 10, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
         }
         default -> {
           log.warn("Unknown query mode: {}", query.mode());

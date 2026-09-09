@@ -22,7 +22,7 @@ import org.apache.lucene.store.Directory;
 import org.junit.jupiter.api.Test;
 import io.justsearch.indexing.api.IndexDocument;
 
-class ComponentsInjectionTest {
+class ComponentsInjectionTest extends LuceneExecutorTestBase {
 
   private static ResolvedConfig resolveForTest() {
     ResolvedConfigBuilder builder = ResolvedConfig.builder();
@@ -89,7 +89,7 @@ class ComponentsInjectionTest {
 
     RunningRuntime runtime =
         schema
-            .ephemeral()
+            .ephemeral().withExecutorRegistrations(testLuceneExecutors())
             .withPrebuiltComponentsForTests(components)
             .open();
 

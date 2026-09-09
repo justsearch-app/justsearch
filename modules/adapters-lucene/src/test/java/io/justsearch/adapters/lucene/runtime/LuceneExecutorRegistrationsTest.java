@@ -33,6 +33,11 @@ class LuceneExecutorRegistrationsTest {
 
     try (ExecutorService foreground = bundle.openSearchFanout(EngineContext.Urgency.FOREGROUND);
         ExecutorService background = bundle.openSearchFanout(EngineContext.Urgency.BACKGROUND)) {
+      org.junit.jupiter.api.Assertions.assertNotSame(foreground, background);
+      assertFalse(foreground.isShutdown());
+      assertFalse(background.isShutdown());
+      assertEquals(List.of("head.lucene.search-fanout-foreground", "head.lucene.search-fanout-background"),
+          registry.openedNames);
       assertEquals(EngineExecutorSpec.Mode.VIRTUAL, registry.opened.get(0));
       assertEquals(EngineExecutorSpec.Mode.VIRTUAL, registry.opened.get(1));
     }
@@ -44,6 +49,7 @@ class LuceneExecutorRegistrationsTest {
   private static final class RecordingRegistry implements EngineExecutorRegistry {
     final List<EngineExecutorSpec> specs = new ArrayList<>();
     final List<EngineExecutorSpec.Mode> opened = new ArrayList<>();
+    final List<String> openedNames = new ArrayList<>();
     int registrationCloseCount;
     boolean closed;
 
@@ -53,14 +59,17 @@ class LuceneExecutorRegistrationsTest {
         @Override public EngineExecutorSpec spec() { return spec; }
         @Override public ExecutorService open(ThreadFactory factory) {
           opened.add(spec.mode());
+          openedNames.add(spec.name());
           return Executors.newFixedThreadPool(spec.threadCount(), factory);
         }
         @Override public ScheduledExecutorService openScheduled(ThreadFactory factory) {
           opened.add(spec.mode());
-          return java.util.concurrent.Executors.newSingleThreadScheduledExecutor(factory);
+          openedNames.add(spec.name());
+          return Executors.newSingleThreadScheduledExecutor(factory);
         }
         @Override public ExecutorService openVirtual() {
           opened.add(spec.mode());
+          openedNames.add(spec.name());
           return Executors.newVirtualThreadPerTaskExecutor();
         }
         @Override public void close() { registrationCloseCount++; }
@@ -68,6 +77,7 @@ class LuceneExecutorRegistrationsTest {
     }
 
     @Override public Limits limits(EngineExecutorSpec.Kind kind) { return new Limits(4, 64); }
+    @Override public int retryAfterSeconds() { return 1; }
     @Override public int maxConcurrentWork() { return 7; }
     @Override public io.justsearch.core.execution.EngineExecutorSnapshot snapshot() {
       throw new UnsupportedOperationException();

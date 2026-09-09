@@ -22,7 +22,7 @@ import org.apache.lucene.store.MMapDirectory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class CommitOpsTest {
+class CommitOpsTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -232,7 +232,7 @@ class CommitOpsTest {
     var meta = new SsotCommitMetadataSource();
     var val = new JsonSchemaCommitMetadataValidator();
     Path dir = Files.createTempDirectory("lucene-lag");
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), meta, val).atPath(dir).open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), meta, val).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     r.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(SchemaFields.DOC_ID, "lag-1", SchemaFields.DOC_UID, "lag-1#0")));
@@ -261,9 +261,10 @@ class CommitOpsTest {
     return future.getDelay(java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
-  private static CommitOps opsWithIndexConfig(String key, String value) {
+  private CommitOps opsWithIndexConfig(String key, String value) {
     RuntimeSession session =
-        new RuntimeSession(schemaWith(() -> () -> new HashMap<>(Map.of("k", "v")), m -> {}));
+        new RuntimeSession(schemaWith(() -> () -> new HashMap<>(Map.of("k", "v")), m -> {}),
+            testLuceneExecutors());
     var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
     if (key != null) {
       builder.put(key, 500, "jvm_arg", key, value);
@@ -312,7 +313,7 @@ class CommitOpsTest {
     var meta = new SsotCommitMetadataSource();
     var val = new JsonSchemaCommitMetadataValidator();
     Path dir = Files.createTempDirectory("lucene-lag-0");
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), meta, val).atPath(dir).open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), meta, val).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     assertTrue(r.commitOps().refreshLagMs() == 0L);
     r.close();
   }

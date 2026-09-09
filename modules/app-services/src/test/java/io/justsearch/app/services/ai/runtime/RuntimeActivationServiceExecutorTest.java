@@ -89,12 +89,10 @@ final class RuntimeActivationServiceExecutorTest {
 
   private static final class CapturingRegistry implements EngineExecutorRegistry {
     private final CapturingRegistration registration;
-    private final boolean failOpen;
     private EngineExecutorSpec spec;
     private boolean closed;
 
     private CapturingRegistry(boolean failOpen) {
-      this.failOpen = failOpen;
       this.registration = new CapturingRegistration(failOpen);
     }
 

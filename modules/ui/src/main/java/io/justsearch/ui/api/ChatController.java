@@ -96,7 +96,7 @@ public final class ChatController {
       ConversationStore conversationStore,
       Supplier<OnlineAiService> onlineAi,
       Supplier<AgentService> agentService) {
-    this(executors, engine, sseWriter, telemetry, conversationStore, onlineAi, agentService,
+    this(engine, sseWriter, telemetry, conversationStore, onlineAi, agentService,
         // A lambda, not a method reference: the reference would bind (and null-check) the writer at
         // construction, and this controller has constructors that legitimately pass nothing useful.
         new SseHeartbeat(
@@ -107,7 +107,6 @@ public final class ChatController {
 
   /** Test seam: an {@link SseHeartbeat} whose scheduler and cadence a test can drive. */
   ChatController(
-      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,

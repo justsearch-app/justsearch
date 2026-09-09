@@ -12,7 +12,7 @@ import java.util.Set;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.junit.jupiter.api.Test;
 
-class PathUpdateIntegrationTest {
+class PathUpdateIntegrationTest extends LuceneExecutorTestBase {
 
   @Test
   void updateDocumentPathsRenamesParentAndChunks() throws Exception {
@@ -585,7 +585,7 @@ class PathUpdateIntegrationTest {
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
 
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -614,7 +614,7 @@ class PathUpdateIntegrationTest {
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
 
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

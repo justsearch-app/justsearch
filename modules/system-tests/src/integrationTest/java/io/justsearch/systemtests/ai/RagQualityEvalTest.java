@@ -403,7 +403,7 @@ class RagQualityEvalTest {
     try {
       float[] queryVector = getQueryVector(queryText);
       LuceneRuntimeTypes.SearchResult hybridResult =
-          runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, topK, null);
+          runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, topK, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
 
       List<String> hybridDocIds =
           hybridResult.hits().stream()

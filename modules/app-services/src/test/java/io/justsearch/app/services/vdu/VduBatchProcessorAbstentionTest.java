@@ -46,7 +46,7 @@ class VduBatchProcessorAbstentionTest {
         new GateVerdict(
             true, GateVerdict.Band.REJECT, VduAbstentionGate.STAGE_INPUT_LEGIBILITY,
             null, null, null, null, 5.0, 0.01, null, null);
-    when(vduProcessor.process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+    when(vduProcessor.process(any(Path.class), any(io.justsearch.core.context.EngineContext.class)))
         .thenReturn(new VduProcessor.VduResult("", null, 2, rejectedVerdict));
 
     KnowledgeClient client = mock(KnowledgeClient.class);
@@ -95,7 +95,7 @@ class VduBatchProcessorAbstentionTest {
     when(vduProcessor.hasVisionCapability()).thenReturn(true);
     GateVerdict agreementRejectedVerdict =
         VduAbstentionGate.agreementVerdict(0.1).withProbedPage(2);
-    when(vduProcessor.process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+    when(vduProcessor.process(any(Path.class), any(io.justsearch.core.context.EngineContext.class)))
         .thenReturn(new VduProcessor.VduResult("suspect text", null, 3, agreementRejectedVerdict));
 
     KnowledgeClient client = mock(KnowledgeClient.class);
@@ -139,7 +139,7 @@ class VduBatchProcessorAbstentionTest {
   void passedVerdictWithTextSendsSuccessText() throws Exception {
     VduProcessor vduProcessor = mock(VduProcessor.class);
     when(vduProcessor.hasVisionCapability()).thenReturn(true);
-    when(vduProcessor.process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+    when(vduProcessor.process(any(Path.class), any(io.justsearch.core.context.EngineContext.class)))
         .thenReturn(
             new VduProcessor.VduResult(
                 "genuinely extracted text", "{\"summary\":\"ok\"}", 1, GateVerdict.passed()));

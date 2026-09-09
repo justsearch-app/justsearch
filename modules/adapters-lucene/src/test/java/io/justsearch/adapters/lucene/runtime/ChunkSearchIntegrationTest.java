@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
  * (HttpAiQualityTest) rather than unit tests.
  */
 @DisplayName("RAG Document Retrieval")
-class ChunkSearchIntegrationTest {
+class ChunkSearchIntegrationTest extends LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private Path tempDir;
@@ -66,7 +66,7 @@ class ChunkSearchIntegrationTest {
     System.setProperty("justsearch.config", cfg.toString());
 
     // Use chunk-aware testing catalog with 4-dim vectors
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach
@@ -630,7 +630,7 @@ class ChunkSearchIntegrationTest {
 
     // Unscoped (empty docIds): both parents match, and the chunk doc is excluded despite its
     // CONTENT field containing "fox". null additionalFilter is accepted.
-    var unscoped = runtime.chunkSearchOps().searchFullDocs("fox", Set.of(), 10, null, EngineContext.Urgency.FOREGROUND);
+    var unscoped = runtime.chunkSearchOps().searchFullDocs("fox", Set.of(), 10, null);
     assertNotNull(unscoped);
     assertEquals(2, unscoped.hits().size(), "Unscoped search returns both parent docs");
     Set<String> unscopedIds =
@@ -644,7 +644,7 @@ class ChunkSearchIntegrationTest {
     assertEquals("doc-p2", scoped.hits().get(0).docId());
 
     // Blank query is empty regardless of scope.
-    var blank = runtime.chunkSearchOps().searchFullDocs("   ", Set.of(), 10, null, EngineContext.Urgency.FOREGROUND);
+    var blank = runtime.chunkSearchOps().searchFullDocs("   ", Set.of(), 10, null);
     assertTrue(blank.hits().isEmpty(), "Blank query yields no full-doc hits");
 
     // Regression: searchFullDocsForDocs keeps its return-empty-on-empty-scope contract, which
@@ -1187,7 +1187,7 @@ class ChunkSearchIntegrationTest {
     Map<String, String> chunkIds = mintReverseOrderedChunkIds();
 
     RunningRuntime probe =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       String parentContent = TIE_CHUNK_TEXT + " " + TIE_CHUNK_TEXT;
       for (String parentDocId : List.of("tie-a", "tie-b")) {
@@ -1283,7 +1283,7 @@ class ChunkSearchIntegrationTest {
             + "would produce the expected order for the wrong reason");
 
     RunningRuntime probe =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       // Commit tie-b's chunk FIRST so the internal-docId order is b, a.
       for (String parentDocId : List.of("tie-b", "tie-a")) {
@@ -1379,7 +1379,7 @@ class ChunkSearchIntegrationTest {
     List<String> chunkIds = mintDiscriminatingChunkIds(commitOrder.size());
 
     RunningRuntime probe =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       Map<String, Object> parent = new LinkedHashMap<>();
       parent.put(SchemaFields.DOC_ID, parentDocId);

@@ -32,7 +32,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>Reading the answer and invalidating it are now separate acts, and only the writer does the
  * second.
  */
-final class CleanShutdownMarkerLifecycleTest {
+final class CleanShutdownMarkerLifecycleTest extends LuceneExecutorTestBase {
 
   private static final CommitMetadataSource META = () -> new SsotCommitMetadataSource().build();
 
@@ -109,13 +109,13 @@ final class CleanShutdownMarkerLifecycleTest {
         "a normally-returning close cannot relabel an already-terminal writer as clean");
   }
 
-  private static LuceneRuntimeBuilder builder(Path index) {
+  private LuceneRuntimeBuilder builder(Path index) {
     return IndexSchema.fromCatalog(
             FieldCatalogDef.forTesting(768), () -> META, new JsonSchemaCommitMetadataValidator())
-        .atPath(index);
+        .atPath(index).withExecutorRegistrations(testLuceneExecutors());
   }
 
-  private static void seedAndCloseCleanly(Path index) throws Exception {
+  private void seedAndCloseCleanly(Path index) throws Exception {
     Files.createDirectories(index);
     try (RunningRuntime r = builder(index).open()) {
       r.indexingCoordinator()

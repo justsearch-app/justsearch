@@ -9,8 +9,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 519 §7 / Step 6: typed record holding {@link AutoCloseable} handles for the bootstrap's
- * background-behavior starts. Each non-null handle is closed in reverse construction order
- * (LIFO) by {@link #close()}; close failures are aggregated after every handle is attempted.
+ * background-behavior starts. GPL production stops first, before its inference/Worker dependencies;
+ * other non-null handles close in reverse construction order. Failures aggregate after every attempt.
  *
  * <p>Items whose stop semantics aren't a plain {@code close()} (e.g., a thread's interrupt+join,
  * or a listener-removal coupled to another shutdown) are wrapped at construction site into a
@@ -42,7 +42,7 @@ public record OrchestrationHandles(
   private static final Logger log = LoggerFactory.getLogger(OrchestrationHandles.class);
 
   /**
-   * Closes all non-null handles in reverse construction order. Close failures are aggregated so a single bad handle
+   * Stops GPL first, then closes remaining handles in reverse construction order. Failures aggregate so a single bad handle
    * does not block the remaining teardown or let ordered shutdown claim a clean receipt.
    */
   @Override

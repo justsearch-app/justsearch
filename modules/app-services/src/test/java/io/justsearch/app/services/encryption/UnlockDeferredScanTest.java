@@ -29,6 +29,52 @@ final class UnlockDeferredScanTest {
   }
 
   @Test
+  void closeDrainsTheCoalescedFollowupAndWaitsForItsActualExit() throws Exception {
+    var firstStarted = new CountDownLatch(1);
+    var secondStarted = new CountDownLatch(1);
+    var releaseFirst = new CountDownLatch(1);
+    var releaseSecond = new CountDownLatch(1);
+    var closeStarted = new CountDownLatch(1);
+    var closeFinished = new CountDownLatch(1);
+    var runs = new AtomicInteger();
+    var closeFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var seam = new UnlockDeferredScan(executors, "coalesced-close-test", () -> {
+          int run = runs.incrementAndGet();
+          (run == 1 ? firstStarted : secondStarted).countDown();
+          try { (run == 1 ? releaseFirst : releaseSecond).await(); }
+          catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        })) {
+      Thread closer = new Thread(() -> {
+        closeStarted.countDown();
+        try { seam.close(); }
+        catch (Throwable failure) { closeFailure.set(failure); }
+        finally { closeFinished.countDown(); }
+      }, "unlock-scan-close-test");
+      try {
+        seam.schedule();
+        assertTrue(firstStarted.await(3, TimeUnit.SECONDS));
+        seam.schedule();
+        seam.schedule();
+        closer.start();
+        assertTrue(closeStarted.await(3, TimeUnit.SECONDS));
+        releaseFirst.countDown();
+        assertTrue(secondStarted.await(3, TimeUnit.SECONDS));
+        org.junit.jupiter.api.Assertions.assertFalse(seam.awaitQuiescence(Duration.ofMillis(20)));
+        assertEquals(1, closeFinished.getCount(), "the second pass still owns the worker");
+        releaseSecond.countDown();
+        assertTrue(closeFinished.await(3, TimeUnit.SECONDS));
+        assertEquals(2, runs.get());
+        org.junit.jupiter.api.Assertions.assertNull(closeFailure.get());
+      } finally {
+        releaseFirst.countDown();
+        releaseSecond.countDown();
+        closer.join(5_000);
+      }
+    }
+  }
+
+  @Test
   @DisplayName("unlock() returns while the scan is still running — the key monitor is not held")
   void scanDoesNotBlockTheKeyMonitor() throws Exception {
     DataKeyManager keys = configured();

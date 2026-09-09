@@ -37,7 +37,7 @@ import tools.jackson.databind.ObjectMapper;
  * doc sit in two buckets and understate the repair backlog).
  */
 @DisplayName("enrichment stage completeness counts")
-class StageCompletenessCountsTest {
+class StageCompletenessCountsTest extends LuceneExecutorTestBase {
 
   private static final String SEP = File.separator;
   private static final String ROOT = SEP + "lib" + SEP + "stage";
@@ -345,7 +345,7 @@ class StageCompletenessCountsTest {
     return new IndexDocument(fields);
   }
 
-  private static RunningRuntime openRuntime(Path indexDir) {
+  private RunningRuntime openRuntime(Path indexDir) {
     try {
       String json =
           """
@@ -372,7 +372,7 @@ class StageCompletenessCountsTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .atPath(indexDir)
+          .atPath(indexDir).withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

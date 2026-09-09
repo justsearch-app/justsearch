@@ -22,10 +22,10 @@ public final class LuceneExecutorRegistrations implements AutoCloseable {
     EngineExecutorRegistry.Registration foreground = null;
     EngineExecutorRegistry.Registration background = null;
     try {
-      EngineExecutorRegistry.Limits background = registry.limits(EngineExecutorSpec.Kind.BACKGROUND);
+      EngineExecutorRegistry.Limits backgroundLimits = registry.limits(EngineExecutorSpec.Kind.BACKGROUND);
       commit = registry.register(new EngineExecutorSpec(
           "head.lucene.commit-timer", EngineExecutorSpec.Kind.BACKGROUND,
-          EngineExecutorSpec.Mode.SCHEDULED, 1, background.maxQueue(), 3));
+          EngineExecutorSpec.Mode.SCHEDULED, 1, backgroundLimits.maxQueue(), 3));
       int maxInstances = registry.maxConcurrentWork();
       foreground = registry.register(EngineExecutorSpec.virtual(
           "head.lucene.search-fanout-foreground", EngineExecutorSpec.Kind.FOREGROUND,
