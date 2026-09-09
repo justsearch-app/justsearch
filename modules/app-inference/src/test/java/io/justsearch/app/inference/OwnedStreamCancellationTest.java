@@ -122,14 +122,18 @@ class OwnedStreamCancellationTest {
     try (var owner = new StreamWorkOwner(work.handle, ignored -> {}, ignored -> {})) {
       assertEquals("user_stop", assertThrows(EngineWorkCancelledException.class, owner::start).reasonCode());
     }
-    var executor = Executors.newSingleThreadExecutor();
-    executor.shutdown();
-    var pump = new StreamCallbackPump(executor, work.handle);
-    pump.dispatch(() -> {});
-    assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, pump.failure());
-    assertEquals(1, work.references.get());
     work.handle.close();
     assertEquals(0, work.references.get());
+    // A fresh owner reaches submission. The cancelled owner above must never submit a callback.
+    var refusedWork = new WorkProbe();
+    var executor = Executors.newSingleThreadExecutor();
+    executor.shutdown();
+    var pump = new StreamCallbackPump(executor, refusedWork.handle);
+    pump.dispatch(() -> {});
+    assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, pump.failure());
+    assertEquals(1, refusedWork.references.get());
+    refusedWork.handle.close();
+    assertEquals(0, refusedWork.references.get());
   }
 
   @Test

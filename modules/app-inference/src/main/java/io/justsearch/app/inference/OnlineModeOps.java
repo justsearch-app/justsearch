@@ -415,7 +415,7 @@ final class OnlineModeOps {
   }
 
   <T> T callOwned(
-      io.justsearch.app.api.EngineWorkHandle work, java.util.function.Supplier<T> operation) {
+      io.justsearch.app.api.EngineWorkHandle work, Supplier<T> operation) {
     Objects.requireNonNull(work, "work");
     var owned = work.retain();
     try {
@@ -1451,6 +1451,9 @@ final class OnlineModeOps {
   }
 
   private ExecutorService requestExecutor(io.justsearch.app.api.EngineWorkHandle work) {
+    // Package-private legacy helpers are used by protocol tests. Public model calls enter through
+    // OnlineAiServiceImpl, which requires explicit admitted work and never selects this branch.
+    if (work == null) return backgroundRequests;
     return work.context().urgency() == io.justsearch.core.context.EngineContext.Urgency.FOREGROUND
         ? foregroundRequests
         : backgroundRequests;

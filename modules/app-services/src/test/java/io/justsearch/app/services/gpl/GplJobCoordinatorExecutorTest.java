@@ -53,7 +53,7 @@ final class GplJobCoordinatorExecutorTest {
   }
 
   @Test
-  void synchronousSubmissionRefusalLeavesTerminalFailure(@TempDir Path tempDir) {
+  void synchronousSubmissionRefusalLeavesTerminalFailure(@TempDir Path tempDir) throws InterruptedException {
     CapturingRegistry processExecutors = new CapturingRegistry(true);
     GplJobCoordinator coordinator =
         new GplJobCoordinator(
@@ -66,11 +66,13 @@ final class GplJobCoordinatorExecutorTest {
       assertThrows(RejectedExecutionException.class, coordinator::runAsync);
       assertEquals(GplJobStatus.Status.FAILED, coordinator.getStatus().status());
       assertTrue(coordinator.awaitCompletion(1, TimeUnit.SECONDS));
-      assertTrue(processExecutors.registrations.getFirst().closed);
+      assertFalse(processExecutors.registrations.getFirst().closed,
+          "a refused run releases its work but the retryable coordinator still owns its registration");
     } finally {
       coordinator.close();
       processExecutors.close();
     }
+    assertTrue(processExecutors.registrations.getFirst().closed);
   }
 
   private static final class CapturingRegistry implements EngineExecutorRegistry {

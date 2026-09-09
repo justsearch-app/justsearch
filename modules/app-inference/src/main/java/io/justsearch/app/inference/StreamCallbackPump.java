@@ -57,7 +57,14 @@ final class StreamCallbackPump implements AutoCloseable {
   void dispatch(Runnable callback) {
     Objects.requireNonNull(callback, "callback");
     synchronized (this) {
-      if (failure.get() != null || stopping || cancelled()) return;
+      if (failure.get() != null || stopping) return;
+      if (cancelled()) {
+        failure.compareAndSet(null, new CancellationException("Model callback work cancelled"));
+        stopping = true;
+        queue.clear();
+        if (!active) finish();
+        return;
+      }
       if (queue.size() >= capacity) {
         failure.compareAndSet(
             null,
@@ -122,6 +129,9 @@ final class StreamCallbackPump implements AutoCloseable {
   }
 
   private void callbackFinished(FutureTask<Void> task) {
+    if (Thread.currentThread().isInterrupted()) {
+      failure.compareAndSet(null, new CancellationException("Model callback dispatcher interrupted"));
+    }
     try {
       task.get();
     } catch (CancellationException cancelled) {
