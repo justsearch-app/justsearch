@@ -1,11 +1,17 @@
 package io.justsearch.app.launcher;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
  * ArchUnit tests enforcing module layering rules.
@@ -90,10 +96,10 @@ class LayeringEnforcementTest {
   static final ArchRule telemetryCoreDependencyIsOnlyTheNeutralExecutionContract =
       noClasses().that().resideInAnyPackage("io.justsearch.telemetry..")
           .should().dependOnClassesThat(
-              com.tngtech.archunit.core.domain.JavaClass.Predicates
+              JavaClass.Predicates
                   .resideInAPackage("io.justsearch.core..")
-                  .and(com.tngtech.archunit.base.DescribedPredicate.not(
-                      com.tngtech.archunit.core.domain.JavaClass.Predicates
+                  .and(DescribedPredicate.not(
+                      JavaClass.Predicates
                           .resideInAPackage("io.justsearch.core.execution.."))))
           .as("telemetry core dependency is restricted to the neutral execution contract");
 
@@ -256,10 +262,6 @@ class LayeringEnforcementTest {
                   + " io.justsearch.indexerworker.{server,services,loop}..");
 
   // =========================================================================
-  // Rule 7: UI must use GPL contracts from app-api, not concrete implementations
-  // =========================================================================
-
-  // =========================================================================
   // Rule 8: No direct java.util.logging usage — use SLF4J
   // =========================================================================
 
@@ -285,4 +287,64 @@ class LayeringEnforcementTest {
           .resideInAnyPackage("io.justsearch.app.services.gpl..")
           .as("ui must access GPL types through app-api contracts (GplStatusProvider,"
               + " RerankerService, GplEvalData), not concrete implementations");
+
+  // =========================================================================
+  // Rule 9: asynchronous work must name its executor
+  // =========================================================================
+
+  private static final String COMPLETABLE_FUTURE = "java.util.concurrent.CompletableFuture";
+  private static final String EXECUTOR = "java.util.concurrent.Executor";
+
+  private static final ArchCondition<JavaClass> asyncCallsNameExecutor =
+      new ArchCondition<>("use an executor for asynchronous CompletableFuture work") {
+        @Override
+        public void check(JavaClass item, ConditionEvents events) {
+          for (var call : item.getCodeUnitAccessesFromSelf()) {
+            String owner = call.getTargetOwner().getFullName();
+            String name = call.getName();
+            if ((COMPLETABLE_FUTURE.equals(owner) || "java.util.concurrent.CompletionStage".equals(owner))
+                && name.endsWith("Async")
+                && call.getTarget().getRawParameterTypes().stream()
+                    .noneMatch(parameter -> EXECUTOR.equals(parameter.getFullName()))) {
+              events.add(
+                  SimpleConditionEvent.violated(
+                      item,
+                      item.getSimpleName()
+                          + " calls CompletableFuture#"
+                          + name
+                          + " without an Executor at "
+                          + call.getSourceCodeLocation()
+                          + " — asynchronous work must use a registered executor (C1-6)"));
+            }
+            if ("java.util.concurrent.ForkJoinPool".equals(owner)
+                && "commonPool".equals(name)) {
+              events.add(
+                  SimpleConditionEvent.violated(
+                      item,
+                      item.getSimpleName()
+                          + " calls ForkJoinPool.commonPool() at "
+                          + call.getSourceCodeLocation()
+                          + " — use a registered executor (C1-6)"));
+            }
+            if ("parallelStream".equals(name)
+                || ("parallel".equals(name) && owner.startsWith("java.util.stream."))) {
+              events.add(
+                  SimpleConditionEvent.violated(
+                      item,
+                      item.getSimpleName()
+                          + " calls "
+                          + name
+                          + "() at "
+                          + call.getSourceCodeLocation()
+                          + " — parallel stream work bypasses executor admission (C1-6)"));
+            }
+          }
+        }
+      };
+
+  @ArchTest
+  static final ArchRule asynchronousCallsMustUseRegisteredExecutors =
+      classes().should(asyncCallsNameExecutor).as(
+          "CompletableFuture *Async calls must pass an Executor; commonPool and parallel streams"
+              + " are prohibited (C1-6)");
 }
