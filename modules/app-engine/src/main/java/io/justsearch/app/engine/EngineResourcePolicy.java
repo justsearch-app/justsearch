@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.core.context.RetainedStateBudget;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.JsonNode;
@@ -21,10 +23,32 @@ record EngineResourcePolicy(Map<String, Integer> execution, RetainedStateBudget 
   static EngineResourcePolicy load() {
     try (InputStream input = EngineResourcePolicy.class.getResourceAsStream("/engine/retained-state.v1.json")) {
       if (input == null) throw new IllegalStateException("Engine resource policy is missing");
-      return parse(new ObjectMapper().readTree(input));
+      return applyAggregateLimitOverride(parse(new ObjectMapper().readTree(input)));
     } catch (IOException e) {
       throw new IllegalStateException("Cannot read Engine resource policy", e);
     }
+  }
+
+  private static EngineResourcePolicy applyAggregateLimitOverride(EngineResourcePolicy policy) {
+    Optional<String> configured = EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT.get();
+    if (configured.isEmpty()) return policy;
+
+    final int override;
+    try {
+      override = Integer.parseInt(configured.get().trim());
+    } catch (NumberFormatException e) {
+      throw new IllegalStateException(
+          "Invalid Engine admission aggregate limit: " + configured.get(), e);
+    }
+    int packagedLimit = policy.execution().get("aggregateLimit");
+    if (override < 1 || override > packagedLimit) {
+      throw new IllegalStateException(
+          "Engine admission aggregate limit must be between 1 and packaged aggregateLimit ("
+              + packagedLimit + "): " + override);
+    }
+    Map<String, Integer> execution = new LinkedHashMap<>(policy.execution());
+    execution.put("aggregateLimit", override);
+    return new EngineResourcePolicy(Map.copyOf(execution), policy.retained());
   }
 
   static EngineResourcePolicy parse(JsonNode root) {

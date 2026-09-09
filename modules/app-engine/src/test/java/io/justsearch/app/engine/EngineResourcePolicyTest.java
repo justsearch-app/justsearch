@@ -7,14 +7,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.justsearch.configuration.EnvRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceAccessMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 import tools.jackson.databind.ObjectMapper;
 
+@ResourceLock(value = Resources.SYSTEM_PROPERTIES, mode = ResourceAccessMode.READ_WRITE)
 final class EngineResourcePolicyTest {
   @Test
   void everyRetainedKindNamesItsActualFutureProducer() {
@@ -63,10 +68,57 @@ final class EngineResourcePolicyTest {
     assertTrue(Files.readString(root.resolve("scripts/dev/test-dev-runner-head-java-opts.mjs")).contains(flag));
   }
 
+  @Test
+  void aggregateOverrideUsesCanonicalEntryAndPreservesOtherPolicy() {
+    assertEquals(
+        "justsearch.engine.admission.aggregate_limit",
+        EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT.sysProp());
+    assertEquals(
+        "JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT",
+        EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT.envVar());
+
+    withAggregateOverride("7", () -> {
+      var policy = EngineResourcePolicy.load();
+      assertEquals(7, policy.execution().get("aggregateLimit"));
+      assertEquals(16, policy.execution().get("perContextLimit"));
+      assertEquals(1, policy.execution().get("retryAfterSeconds"));
+      assertEquals(256, policy.execution().get("timerRegistrations"));
+      assertEquals(5, policy.retained().snapshot().size());
+    });
+  }
+
+  @Test
+  void absentAggregateOverrideUsesPackagedDefault() {
+    withAggregateOverride(null, () ->
+        assertEquals(64, EngineResourcePolicy.load().execution().get("aggregateLimit")));
+  }
+
+  @Test
+  void aggregateOverrideRejectsMalformedAndOutOfRangeValues() {
+    for (String invalid : new String[] {"not-a-number", "0", "-1", "65"}) {
+      withAggregateOverride(
+          invalid,
+          () -> assertThrows(IllegalStateException.class, EngineResourcePolicy::load));
+    }
+  }
+
   private static Path repoRoot() {
     for (Path path = Path.of("").toAbsolutePath(); path != null; path = path.getParent()) {
       if (Files.isRegularFile(path.resolve("governance/retained-state.v1.json"))) return path;
     }
     throw new IllegalStateException("Repository root not found");
+  }
+
+  private static void withAggregateOverride(String value, Runnable assertion) {
+    String key = EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT.sysProp();
+    String original = System.getProperty(key);
+    try {
+      if (value == null) System.clearProperty(key);
+      else System.setProperty(key, value);
+      assertion.run();
+    } finally {
+      if (original == null) System.clearProperty(key);
+      else System.setProperty(key, original);
+    }
   }
 }

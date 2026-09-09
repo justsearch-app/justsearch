@@ -1402,7 +1402,13 @@ public enum EnvRegistry {
      * only load-bearing for CPU, where the reduction happens on those threads.
      */
     ORT_INTRA_OP_THREADS("justsearch.onnxruntime.intra_op_threads",
-        "JUSTSEARCH_ORT_INTRA_OP_THREADS", LifecycleStage.PERMANENT);
+        "JUSTSEARCH_ORT_INTRA_OP_THREADS", LifecycleStage.PERMANENT),
+
+    /** Optional startup cap for the Engine admission aggregate; absent uses the packaged policy. */
+    ENGINE_ADMISSION_AGGREGATE_LIMIT(
+        "justsearch.engine.admission.aggregate_limit",
+        "JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT",
+        LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

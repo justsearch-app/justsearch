@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-08.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-09.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -167,6 +167,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.EMBED_LATE_CHUNKING_CONTEXT_LENGTH | permanent | - | JUSTSEARCH_EMBED_LATE_CHUNKING_CONTEXT_LENGTH | justsearch.embed.late_chunking_context_length | EMBED_LATE_CHUNKING_CONTEXT_LENGTH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_LATE_CHUNKING_ENABLED | permanent | - | JUSTSEARCH_EMBED_LATE_CHUNKING_ENABLED | justsearch.embed.late_chunking_enabled | EMBED_LATE_CHUNKING_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_ONNX_MODEL_PATH | permanent | - | JUSTSEARCH_EMBED_ONNX_MODEL_PATH | justsearch.embed.onnx.model_path | EMBED_ONNX_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT | permanent | - | JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT | justsearch.engine.admission.aggregate_limit | ENGINE_ADMISSION_AGGREGATE_LIMIT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_COMMAND | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND | justsearch.extraction.sandbox.command | EXTRACTION_SANDBOX_COMMAND | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_HEAP | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_HEAP | justsearch.extraction.sandbox.heap | EXTRACTION_SANDBOX_HEAP | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_MAX_REQUESTS | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_MAX_REQUESTS | justsearch.extraction.sandbox.max_requests | EXTRACTION_SANDBOX_MAX_REQUESTS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
