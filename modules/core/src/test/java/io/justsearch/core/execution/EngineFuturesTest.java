@@ -171,6 +171,48 @@ class EngineFuturesTest {
     }
   }
 
+  @Test
+  void interruptedWaitCancelsSupplierButRetainsOwnershipUntilActualExit() throws Exception {
+    var entered = new CountDownLatch(1);
+    var interrupted = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var exited = new CountDownLatch(1);
+    var releases = new AtomicInteger();
+    var observed = new java.util.concurrent.CompletableFuture<Throwable>();
+    var flag = new java.util.concurrent.atomic.AtomicBoolean();
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      var result = EngineFutures.supplyAsync(() -> {
+        entered.countDown();
+        while (release.getCount() != 0) {
+          try { release.await(); }
+          catch (InterruptedException expected) { interrupted.countDown(); }
+        }
+        return 42;
+      }, executor, () -> { releases.incrementAndGet(); exited.countDown(); });
+      var waiter = new Thread(() -> {
+        try { EngineFutures.await(result); observed.complete(new AssertionError("wait returned normally")); }
+        catch (Throwable failure) { flag.set(Thread.currentThread().isInterrupted()); observed.complete(failure); }
+      }, "interruptible-engine-wait");
+      try {
+        assertTrue(entered.await(3, TimeUnit.SECONDS));
+        waiter.start();
+        waiter.interrupt();
+        Throwable failure = observed.get(3, TimeUnit.SECONDS);
+        assertInstanceOf(InterruptedException.class, assertInstanceOf(CompletionException.class, failure).getCause());
+        assertTrue(flag.get(), "the caller retains its interruption signal");
+        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertEquals(0, releases.get(), "a cancellation request is not actual task exit");
+        release.countDown();
+        assertTrue(exited.await(3, TimeUnit.SECONDS));
+        assertEquals(1, releases.get());
+      } finally {
+        release.countDown();
+        waiter.interrupt();
+        waiter.join(3000);
+      }
+    }
+  }
+
   private static void await(CountDownLatch latch) {
     try { latch.await(); }
     catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }

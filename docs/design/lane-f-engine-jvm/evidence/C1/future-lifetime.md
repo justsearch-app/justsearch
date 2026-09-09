@@ -25,3 +25,19 @@ assert one cleanup attempt, no uncaught worker failure, and no replacement platf
 
 These are focused local proofs of this correction, not integrated, stress, hosted or final C1
 acceptance. Retain raw artifacts through lane completion plus 30 days.
+
+## Interruptible waits (C1-5, 2026-09-09)
+
+`EngineFutures.await` uses interruptible `get`, requests task cancellation, preserves the
+waiter's interrupt flag and exposes the original interruption as the completion cause.
+Cancellation still releases the task's owner only at actual exit. A supplier that ignores
+interruption proves that prompt caller return does not prematurely release ownership.
+
+Tested above `e021b8828` on Windows/Temurin 25: run44 passed eight EngineFutures tests
+(plus three core architecture tests). Replacing the entire await body with `join()` compiled
+and failed both the core and inference interruption regressions with their expected three-second
+prompt-return TimeoutException (run45). Restoration passed the same source/test inputs from
+Gradle's valid run44 cache (run46). Raw logs are `tmp/c1-batch4-interrupt-tests-44.txt`,
+`tmp/c1-batch4-interrupt-mutant-45.txt`, and `tmp/c1-batch4-interrupt-restored-46.txt`;
+preserved XML is under `tmp/c1-batch4-interrupt-green-44` and
+`tmp/c1-batch4-interrupt-mutant-45`. This is focused local proof, not C1 closure.
