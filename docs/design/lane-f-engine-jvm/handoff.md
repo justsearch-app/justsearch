@@ -5,7 +5,41 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Publication and recovery checkpoint](#publication-and-recovery-checkpoint-2026-09-08).
+Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-0758-utc).
+
+## Current C1 batch 4 checkpoint (2026-09-09 07:58 UTC)
+
+Worktree `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
+A/B are complete at their recorded proof tier. C1 is in progress; C2/D/E/F remain required.
+Lane decisions and autonomous merges remain authorized. Merge placement remains F/PR1.
+The original dirty tree was split into ten per-item WIP commits and pushed. Subsequent integration
+corrections are also checkpointed per item, with every commit pushed immediately. Continue this
+cadence and commit WIP at least hourly; cap worker follow-ups at three, then take the diff at root.
+
+Latest implementation: `b017a13f3` (C1-7 search admission/runtime ownership), following `0dca9a597`
+(C1-10 child pacing) and `caaa9ebd9` (C1-5 actual-exit task groups). Earlier fixes include explicit
+shared Lucene fixtures, BackgroundRunService timer ownership, standalone admission composition,
+inference cancellation ownership, history overflow retry and shutdown-drain corrections. See
+[evidence/C1/fanout-ownership.md](evidence/C1/fanout-ownership.md),
+[fixture-and-background.md](evidence/C1/fixture-and-background.md), and
+[integration-corrections.md](evidence/C1/integration-corrections.md) for tested sources and limits.
+Build58 passed; the latest service-boundary correction passed focused tests and PMD in run61.
+Full worker-services passed 1,277 tests (two existing skips) before that final correction. Focused
+fanout proofs and mutations cover admission, pacing, actual virtual instance capacity and runtime
+closure. This is not a full/stress/live/hosted C1 pass.
+
+Next implement the remaining KnowledgeServer reaper/deferred-model registered owners,
+SearchPerSourceExecutor lifetime/urgency ownership, OCR executor policy/child placement, retained
+ScanProgress bounds and CommitOps actual-exit shutdown safety. Finish the executable producer
+census, generation-cap proof and remaining architecture/gate mutations. Then run the final full
+suite with stress and repeat installed standard-model aggregate admission/fairness and continuous
+search/indexing proof; batch-3 live evidence predates the bounded executors. Update canonical docs
+and derived outputs at the governed boundary. No outstanding item is owner-gated.
+
+The active session identity is `01a082dc-dfd6-7d60-be2e-a8d088229a67`; supply it for owned tools.
+No dev stack is running. This note is a recovery checkpoint during continuing work, not a pause.
+Older notes below are historical when they disagree with this current state.
+
 
 Two handoffs live in this file. The first (2026-09-07) is from the design orchestrator to the
 first implementation orchestrator and is kept as written. The second, **"Implementation
