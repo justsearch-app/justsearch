@@ -15,13 +15,27 @@ public final class EngineFutures {
 
   /** Capacity refusal is never a successful optional-computation fallback. */
   public static void rethrowExecutorRefusal(Throwable failure) {
+    if (completionCause(failure) instanceof EngineExecutorRejectedException refusal) throw refusal;
+  }
+
+  /** Optional search work may fall back on ordinary failures, never on caller abandonment. */
+  public static void rethrowCancellation(Throwable failure) {
+    Throwable cause = completionCause(failure);
+    if (cause instanceof CancellationException cancelled) throw cancelled;
+    if (cause instanceof InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new java.util.concurrent.CompletionException(interrupted);
+    }
+  }
+
+  private static Throwable completionCause(Throwable failure) {
     var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
     while (failure != null && seen.add(failure)) {
-      if (failure instanceof EngineExecutorRejectedException refusal) throw refusal;
       if (!(failure instanceof java.util.concurrent.CompletionException)
-          && !(failure instanceof ExecutionException)) return;
+          && !(failure instanceof ExecutionException)) return failure;
       failure = failure.getCause();
     }
+    return failure;
   }
 
   /**

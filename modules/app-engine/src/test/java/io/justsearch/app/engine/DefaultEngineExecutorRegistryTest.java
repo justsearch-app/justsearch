@@ -369,6 +369,33 @@ class DefaultEngineExecutorRegistryTest {
   }
 
   @Test
+  void cancelledFanoutGroupRetainsVirtualInstanceCapacityUntilActualExit() throws Exception {
+    try (var registry = registry(1, 1, 1, 1, 3, 3)) {
+      var registration = registry.register(EngineExecutorSpec.virtual("owned-fanout", Kind.FOREGROUND, 1));
+      var executor = registration.openVirtual();
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var ownerReleased = new CountDownLatch(1);
+      try (var group = io.justsearch.core.execution.EngineTaskGroup.open(
+          () -> executor, () -> ownerReleased::countDown)) {
+        group.submit(() -> { awaitUninterruptibly(entered, release); return null; });
+        assertTrue(entered.await(1, TimeUnit.SECONDS));
+        group.close();
+        assertEquals(1L, ownerReleased.getCount());
+        assertEquals(1, registry.snapshot().registrations().getFirst().liveInstances());
+        assertEquals(Reason.INSTANCE_LIMIT, assertThrows(EngineExecutorRejectedException.class,
+            registration::openVirtual).reason());
+        release.countDown();
+        assertTrue(ownerReleased.await(1, TimeUnit.SECONDS));
+        assertTrue(executor.awaitTermination(1, TimeUnit.SECONDS));
+        try (var replacement = registration.openVirtual()) {
+          assertTrue(replacement.submit(() -> Thread.currentThread().isVirtual()).get());
+        }
+      } finally { release.countDown(); }
+    }
+  }
+
+  @Test
   void bothClosePathsCancelQueuedFuturesAndRetainActuallyRunningInstances() throws Exception {
     for (boolean wholeRegistry : new boolean[] { false, true }) {
       var registry = registry(1, 2, 1, 2, 4, 4, Duration.ofMillis(20));

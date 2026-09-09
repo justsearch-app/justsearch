@@ -120,6 +120,20 @@ class EngineFuturesTest {
   }
 
   @Test
+  void optionalFallbackCannotTurnCancellationOrInterruptionIntoMoreWork() {
+    var cancelled = new java.util.concurrent.CancellationException("caller left");
+    assertSame(cancelled, assertThrows(java.util.concurrent.CancellationException.class,
+        () -> EngineFutures.rethrowCancellation(new CompletionException(cancelled))));
+    var interrupted = new InterruptedException("caller interrupted");
+    try {
+      assertSame(interrupted, assertThrows(CompletionException.class,
+          () -> EngineFutures.rethrowCancellation(new CompletionException(interrupted))).getCause());
+      assertTrue(Thread.currentThread().isInterrupted());
+    } finally { Thread.interrupted(); }
+    assertDoesNotThrow(() -> EngineFutures.rethrowCancellation(new IllegalStateException("optional failure")));
+  }
+
+  @Test
   void runningSuccessCleanupFailureDoesNotKillExecutorWorker() throws Exception {
     assertRunningCleanupFailureIsContained(false);
   }
