@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.applauncher;
 
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.configuration.Faults;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -261,17 +262,8 @@ final class LauncherEnvironment implements AutoCloseable {
 
   private void restoreProperties() {
     if (installedConfigStore != null) ConfigStore.restoreGlobal(installedConfigStore, previousConfigStore);
-    if (previousDataDirProperty == null) System.clearProperty(EnvRegistry.DATA_DIR.sysProp());
-    else System.setProperty(EnvRegistry.DATA_DIR.sysProp(), previousDataDirProperty);
-    if (previousConfigProperty == null) {
-      System.clearProperty("justsearch.config");
-    } else {
-      System.setProperty("justsearch.config", previousConfigProperty);
-    }
-    if (previousEgressProperty == null) {
-      System.clearProperty("egress.block_all");
-    } else {
-      System.setProperty("egress.block_all", previousEgressProperty);
-    }
+    SystemAccess.setSysProp(EnvRegistry.DATA_DIR.sysProp(), previousDataDirProperty);
+    SystemAccess.setSysProp(EnvRegistry.CONFIG_PATH.sysProp(), previousConfigProperty);
+    SystemAccess.setSysProp("egress.block_all", previousEgressProperty);
   }
 }

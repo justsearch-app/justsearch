@@ -101,7 +101,6 @@ io.justsearch.applauncher.Launcher#emitSmokeSummary
 io.justsearch.applauncher.Launcher#setIfBlank
 io.justsearch.applauncher.LauncherBootstrap#setIfBlank
 io.justsearch.applauncher.LauncherEnvironment#<init>
-io.justsearch.applauncher.LauncherEnvironment#close
 io.justsearch.applauncher.SmokeDriver#execute
 io.justsearch.benchmarks.EngineVectorIndexBench#main
 io.justsearch.benchmarks.FilteredKnnBench#main
