@@ -603,11 +603,27 @@
     {
       "id": "adr-0048-foreground-gauge-is-worker-local",
       "adr": "0048",
-      "premise": "NARROWED by the ADR's 2026-09-07 amendment. ForegroundLoad is a worker-services type, so the TYPE survives a Head/Worker merge -- but its producer does not, and a re-homed producer is a new integration rather than a move. This test pins the gauge's BALANCE across ok/error/cancel closes: every increment has a decrement. That is a real property and it is not the one that broke, because an always-balanced counter that is never incremented is perfectly balanced. The 'is it fed at all' half is adr-0048-foreground-gauge-has-a-live-producer.",
+      "premise": "The gauge balance claim remains true under the 2026-09-09 amendment: interactive foreground work increments during execution and balances normal return, exception, cancellation and Error on actual completion. This unit property is separate from urgency selection, durable ownership, and the live Engine producer witness.",
       "kind": "test",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
-      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#eachForegroundOperationIncrementsAndDecrements",
-      "note": "RETARGETED, not weakened, by lane F stage A item A9 (2026-09-07). The premise is unchanged and is now MORE true: ADR-0048 predicted that the interceptor was the throwaway adapter and that the gauge would survive the Head/Worker merge, and A9 is where the adapter was thrown away. The named file moved with the producer — ForegroundLoadInterceptorTest went with the interceptor; ForegroundLoadGateTest pins the same balance property (ok / exception / cancellation / Error, plus never-negative under concurrency) on ForegroundLoadGate, which is now the gauge's only producer. Per this register's own amendment rule the probe was not edited to make a violation pass: the violation is that the pin's SUBJECT was deleted by a decision this ADR anticipated."
+      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#normalExceptionCancellationAndErrorAlwaysBalanceInteractiveWork",
+      "note": "Re-examined against ForegroundLoadGate and its current tests after C1 replaced the operation-name predicate with explicit EngineContext urgency and work ownership. The former method was replaced; the normal/error/cancel/Error assertions remain, and separate probes pin both survival axes and durable held lifetime. The actual Engine producer probe remains unchanged."
+    },
+    {
+      "id": "adr-0048-foreground-urgency-is-explicit",
+      "premise": "ForegroundLoad is selected by explicit EngineContext urgency, independently of interactive/durable survival, for both call and run forms. Background work does not increment or update foreground time.",
+      "adr": "0048",
+      "kind": "test",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
+      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#urgencyAloneCountsAcrossBothSurvivalAxesAndBothForms"
+    },
+    {
+      "id": "adr-0048-durable-foreground-held-once",
+      "premise": "One foreground durable work identity holds one pacing increment across retained owners and repeated calls, then balances on client detachment or final owner completion.",
+      "adr": "0048",
+      "kind": "test",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
+      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#durableWorkHoldsExactlyOnceUntilDetachOrLastOwnerCompletes"
     },
     {
       "id": "adr-0048-foreground-gauge-has-a-live-producer",

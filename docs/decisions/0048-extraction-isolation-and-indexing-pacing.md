@@ -10,10 +10,12 @@ probes:
   - adr-0048-no-eval-breath-hold-hatch
   - adr-0048-chaos-witness
   - adr-0048-foreground-gauge-is-worker-local
+  - adr-0048-foreground-urgency-is-explicit
+  - adr-0048-durable-foreground-held-once
   - adr-0048-foreground-gauge-has-a-live-producer
   - adr-0048-retry-exhausted-terminal
   - adr-0048-nrt-mode-defaults-continuous
-last_reviewed: 2026-09-07
+last_reviewed: 2026-09-09
 ---
 
 # ADR-0048: Extraction isolation and indexing pacing
@@ -184,3 +186,22 @@ consistency. The decision here was right; the confidence that it was self-execut
 No numbers change. The duty cycle, its 20% default, the extraction pool, the health sampler, the
 retry ladder and the cadence decision are untouched — the fix restored the producer, it did not
 re-decide anything.
+
+
+## Amendment 2026-09-09: explicit urgency and work lifetime replace operation-name selection
+
+Re-examination after the foreground-balance premise probe failed found a retired test method,
+not evidence that balance was optional. The Engine producer now takes an EngineWorkHandle;
+ForegroundLoadGate.callOwned selects on EngineContext.urgency rather than an RPC/operation label.
+Interactive foreground work balances on actual completion, including its retained child work.
+Durable foreground work holds one increment for the work identity across calls and releases it
+when the client detaches or the last owner completes. Survival and urgency are independent axes;
+background work never starts a foreground increment. The duty share and indexing pacing consumer
+are unchanged.
+
+The current source and tests support the narrower balance premise: ForegroundLoadGateTest's
+normalExceptionCancellationAndErrorAlwaysBalanceInteractiveWork preserves all four terminal
+branches. The probe is retargeted to that method after this re-examination. Two separate probes
+pin urgency across both survival axes and durable held ownership. EngineForegroundPacingTest's
+real Engine producer witness remains required; a balanced but unfed gauge is still insufficient.
+The older operation-name and gRPC descriptions above record the accepted historical design.

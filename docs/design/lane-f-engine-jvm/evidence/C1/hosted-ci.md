@@ -40,3 +40,26 @@ Strict compiler/test181 passes (85tasks,6executed79up-to-date) with test Error P
 SSE4tests and registry tests execute after09c329b46/9629f240b; this closes their WIP local
 proof gap. Hosted rerun remains required. Hosted Docs lint34341109990 passes at56b3d826f;
 canonical sources are unchanged by these subsequent test/dependency/governance corrections.
+
+
+## Hosted1c7fcfff9 follow-up (2026-09-09)
+
+CI34342537664 passes model-free build, app-ui, search-worker, platform-contracts, Windows-native,
+license, Rust shell, secrets and jseval; Public claims fails at the ADR-coverage probe, and the
+system integration tier fails IndexingLedgerCoherenceTest's new terminal-event assertion on
+all retries. Logs tmp/c1-hosted-1c7-failures-192.txt and status snapshot191 (taken before the last
+integration result). These are still required failures, not final C1 hosted success.
+
+Local ADR reproduction193 fails because its foreground balance probe still names
+ForegroundLoadGateTest.eachForegroundOperationIncrementsAndDecrements, which C1 replaced.
+Re-examination of ForegroundLoadGate and current tests confirms the retained normal/exception/
+cancellation/Error balance, explicit urgency independent of survival, and one held durable work
+increment. ADR0048 now has a dated amendment, reviewed date and decision-log update; the balance
+probe names the preserving test and two separate probes pin urgency and durable lifetime. The
+real Engine producer witness remains. Restored194 PASS,53 findings,zero failures; before/after
+SARIF: tmp/c1-adr-coverage-193.sarif and tmp/c1-adr-coverage-restored-194.sarif. This is a probe
+registration check; execution evidence comes from the Engine suites, not this source census.
+
+The integration ledger failure is under read-only root-directed triage. Integrated190, with
+all stress tests enabled and strict test-source compilation, has also reported a format-matrix
+initialization timeout; that is being investigated before any acceptance claim.
