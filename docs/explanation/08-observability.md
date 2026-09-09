@@ -966,6 +966,16 @@ The OTel span tree is **additive** — it coexists with the `EventTraceSequencer
 
 ## Real-Time Insights
 
+### SSE replay handoff
+
+`SseStreamChannel.subscribeAndReplay` captures retained history and registers its listener
+atomically, then delivers the replay outside the channel write lock. While replay is being
+written, the listener buffers at most `FrameHistoryRingBuffer.capacity()` incoming live frames.
+If that queue fills, the channel removes only the slow listener and clears its queued frames;
+the replay call fails when its blocked callback returns. Publishers continue, and a failed handoff
+cannot claim a successful replay with missing frames. A successful handoff preserves replay/live
+ordering. The limit counts frames; payload sizes follow each stream's existing contract.
+
 ### The Ring Buffer (`EventBuffer`)
 We maintain a circular buffer of the last 50 significant events in memory.
 *   **Endpoint:** `/api/debug/events`

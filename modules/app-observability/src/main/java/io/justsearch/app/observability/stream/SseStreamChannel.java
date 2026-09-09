@@ -12,8 +12,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
@@ -244,13 +244,22 @@ public final class SseStreamChannel {
     } finally {
       subscribeLock.writeLock().unlock();
     }
+    boolean handedOff = false;
     try {
       handoff.handOff(replay);
-    } catch (RuntimeException e) {
+      handedOff = true;
+    } catch (RuntimeException | Error e) {
       listeners.remove(handoff);
       throw e;
+    } finally {
+      if (!handedOff) {
+        handoff.clear();
+      }
     }
-    return Optional.of(() -> listeners.remove(handoff));
+    return Optional.of(() -> {
+      listeners.remove(handoff);
+      handoff.clear();
+    });
   }
 
   /**
@@ -261,11 +270,13 @@ public final class SseStreamChannel {
   private final class HandoffListener implements Consumer<SseEnvelope> {
 
     private final Consumer<SseEnvelope> delegate;
-    private final Queue<SseEnvelope> buffered = new ConcurrentLinkedQueue<>();
+    private final Queue<SseEnvelope> buffered;
     private volatile boolean passThrough;
+    private volatile boolean overflowed;
 
     HandoffListener(Consumer<SseEnvelope> delegate) {
       this.delegate = delegate;
+      this.buffered = new ArrayBlockingQueue<>(history.capacity());
     }
 
     @Override
@@ -275,18 +286,27 @@ public final class SseStreamChannel {
       if (passThrough) {
         delegate.accept(envelope);
       } else {
-        buffered.add(envelope);
+        synchronized (buffered) {
+          if (overflowed || !buffered.offer(envelope)) {
+            overflowed = true;
+            buffered.clear();
+            throw new IllegalStateException(
+                "SSE replay handoff buffer overflowed for " + streamId);
+          }
+        }
       }
     }
 
     void handOff(List<SseEnvelope> replay) {
       for (SseEnvelope frame : replay) {
+        requireHealthy();
         delegate.accept(frame);
       }
       while (true) {
         List<SseEnvelope> batch = new ArrayList<>();
         subscribeLock.writeLock().lock();
         try {
+          requireHealthy();
           if (buffered.isEmpty()) {
             passThrough = true;
             return;
@@ -299,9 +319,21 @@ public final class SseStreamChannel {
           subscribeLock.writeLock().unlock();
         }
         for (SseEnvelope frame : batch) {
+          requireHealthy();
           delegate.accept(frame);
         }
       }
+    }
+
+    private void requireHealthy() {
+      if (overflowed) {
+        throw new IllegalStateException(
+            "SSE replay handoff could not keep up for " + streamId);
+      }
+    }
+
+    void clear() {
+      buffered.clear();
     }
   }
 
