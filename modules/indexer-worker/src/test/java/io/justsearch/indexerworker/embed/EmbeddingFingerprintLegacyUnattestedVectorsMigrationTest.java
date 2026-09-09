@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * {@code EmbeddingFingerprintProductionWiringDurabilityTest} per that class's own template role
  * named in tempdoc 730's DERISK section.
  */
-class EmbeddingFingerprintLegacyUnattestedVectorsMigrationTest {
+class EmbeddingFingerprintLegacyUnattestedVectorsMigrationTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String FP = "unattested-migration-embed-fp-sha256";
   private static final String SPLADE_FP = "unattested-migration-splade-fp-sha256";
@@ -329,11 +329,11 @@ class EmbeddingFingerprintLegacyUnattestedVectorsMigrationTest {
     return v;
   }
 
-  private static io.justsearch.adapters.lucene.runtime.RunningRuntime openRuntime(
+  private io.justsearch.adapters.lucene.runtime.RunningRuntime openRuntime(
       Path dir, Supplier<CommitMetadataSource> commitMetadata) {
     return io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
             FieldCatalogDef.forTesting(768), commitMetadata, PERMISSIVE)
-        .atPath(dir)
+        .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
         .open();
   }
 

@@ -28,7 +28,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>splitSentences tests are in {@link WorkerSearchServiceSplitSentencesTest} (no index needed).
  */
 @DisplayName("WorkerSearchService MatchCitations")
-class WorkerSearchServiceMatchCitationsTest {
+class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -39,7 +39,7 @@ class WorkerSearchServiceMatchCitationsTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

@@ -7,6 +7,7 @@ plugins {
 }
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:adapters-lucene")))
   testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:app-api"))
   api(project(":modules:worker-core"))

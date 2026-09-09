@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class WorkerSearchServiceMatchSpansTest {
+class WorkerSearchServiceMatchSpansTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   void searchIncludesPreciseMatchSpansForContentPreview() throws Exception {
@@ -57,7 +57,7 @@ class WorkerSearchServiceMatchSpansTest {
                     "icu",
                     false)));
 
-    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var runtime = lifecycle;
 
     String q = "needle";
@@ -143,7 +143,7 @@ class WorkerSearchServiceMatchSpansTest {
                     "icu",
                     false)));
 
-    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var runtime = lifecycle;
 
     String preview = "hello one hello world two world";
@@ -232,7 +232,7 @@ class WorkerSearchServiceMatchSpansTest {
                     "icu",
                     false)));
 
-    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var runtime = lifecycle;
 
     String preview = "foo x bar y foo";

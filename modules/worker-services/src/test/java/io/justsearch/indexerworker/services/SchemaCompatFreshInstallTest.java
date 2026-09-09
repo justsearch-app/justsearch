@@ -33,7 +33,7 @@ import org.junit.jupiter.api.io.TempDir;
  * install is told on first launch to rebuild an index containing nothing — so both call the same
  * predicate ({@code ParityDiagnostics.isIndexWithoutRecordedFingerprint}).
  */
-final class SchemaCompatFreshInstallTest {
+final class SchemaCompatFreshInstallTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime runtime;
@@ -47,7 +47,7 @@ final class SchemaCompatFreshInstallTest {
 
   @Test
   void aFreshEmptyIndexIsCompatibleRatherThanBlockedLegacy() throws Exception {
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
 
     StatusResponse status = buildStatus();
     assertEquals(
@@ -62,7 +62,7 @@ final class SchemaCompatFreshInstallTest {
 
   @Test
   void anIndexHoldingDocumentsWithNoRecordedShapeIsBlockedLegacy() throws Exception {
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     runtime
         .indexingCoordinator()
         .indexSingle(
@@ -102,7 +102,7 @@ final class SchemaCompatFreshInstallTest {
                 FieldCatalogDef.forChunkTesting(0),
                 () -> frozen,
                 new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator())
-            .atPath(tempDir)
+            .atPath(tempDir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     runtime.commitOps().commitAndTrack();
     runtime.commitOps().maybeRefreshBlocking();

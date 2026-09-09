@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-final class WorkerSearchServiceReasonCodeContractTest {
+final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final Set<String> EMBEDDING_COMPAT_REASON_CODES =
       Set.of(
@@ -500,11 +500,11 @@ final class WorkerSearchServiceReasonCodeContractTest {
     return response;
   }
 
-  private static RunningRuntime newLifecycleEmpty() throws Exception {
+  private RunningRuntime newLifecycleEmpty() throws Exception {
     return newLifecycleWithCatalog(FieldCatalogDef.forChunkTesting(4));
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content) throws Exception {
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content) throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     RunningRuntime lifecycle = newLifecycleWithCatalog(catalog);
     var runtime = lifecycle;
@@ -520,7 +520,7 @@ final class WorkerSearchServiceReasonCodeContractTest {
     return lifecycle;
   }
 
-  private static RunningRuntime newLifecycleWithChunk(String parentDocId, String parentContent, String chunkContent)
+  private RunningRuntime newLifecycleWithChunk(String parentDocId, String parentContent, String chunkContent)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     RunningRuntime lifecycle = newLifecycleWithCatalog(catalog);
@@ -561,7 +561,7 @@ final class WorkerSearchServiceReasonCodeContractTest {
    * Indexes N (parent, chunk) pairs into one corpus. Each entry is {@code {parentId, parentContent,
    * chunkContent}}. Used by the 774 Stage 1 chunk-side recall-complete gap-case test.
    */
-  private static RunningRuntime newLifecycleWithChunkedParents(List<String[]> docs) throws Exception {
+  private RunningRuntime newLifecycleWithChunkedParents(List<String[]> docs) throws Exception {
     RunningRuntime lifecycle = newLifecycleWithCatalog(FieldCatalogDef.forChunkTesting(4));
     int idx = 0;
     for (String[] d : docs) {
@@ -598,7 +598,7 @@ final class WorkerSearchServiceReasonCodeContractTest {
     return lifecycle;
   }
 
-  private static RunningRuntime newLifecycleWithCatalog(FieldCatalogDef catalog) throws Exception {
+  private RunningRuntime newLifecycleWithCatalog(FieldCatalogDef catalog) throws Exception {
     Path base = Files.createTempDirectory("justsearch-reason-code-contract-test-");
     String yaml =
         "app:\n  data_dir: " + base.toString().replace("\\", "\\\\") + "\n"
@@ -608,7 +608,7 @@ final class WorkerSearchServiceReasonCodeContractTest {
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
 
-    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle.commitOps().maybeRefreshBlocking();
     return lifecycle;
   }

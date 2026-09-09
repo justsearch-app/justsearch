@@ -34,14 +34,14 @@ import org.slf4j.LoggerFactory;
 
 /** Real Lucene RMW proof for parent SPLADE preservation (the unit fake cannot observe postings). */
 @DisplayName("CombinedEnrichmentBackfillOps — parent SPLADE RMW")
-class CombinedEnrichmentRmwIntegrationTest {
+class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir java.nio.file.Path tempDir;
   private RunningRuntime runtime;
 
   @BeforeEach
   void setUp() throws Exception {
-    runtime = IndexSchema.fromCatalog(testCatalog()).atPath(tempDir).open();
+    runtime = IndexSchema.fromCatalog(testCatalog()).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

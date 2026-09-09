@@ -50,6 +50,9 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PassageRetrievalIntegrationTest {
+  private final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
+  private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+
 
   private static final int VECTOR_DIM = 768;
   // Tempdoc 916 Part 1 (open item 4): these were three hand-copied literals of the production
@@ -99,7 +102,7 @@ class PassageRetrievalIntegrationTest {
             "/corpus/passage-retrieval-frozen-vectors.json", false);
 
     // Create runtime with chunk-aware catalog
-    runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(VECTOR_DIM)).ephemeral().open();
+    runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(VECTOR_DIM)).ephemeral().withExecutorRegistrations(luceneExecutors).open();
 
     // Index all documents
     Set<String> allParentIds = new HashSet<>();
@@ -216,13 +219,18 @@ class PassageRetrievalIntegrationTest {
 
   @AfterAll
   void teardown() throws Exception {
-    if (runtime != null) {
-      runtime.close();
-    }
-    if (prevConfig != null) {
-      System.setProperty("justsearch.config", prevConfig);
-    } else {
-      System.clearProperty("justsearch.config");
+    try {
+      if (runtime != null) {
+        runtime.close();
+      }
+      if (prevConfig != null) {
+        System.setProperty("justsearch.config", prevConfig);
+      } else {
+        System.clearProperty("justsearch.config");
+      }
+
+    } finally {
+      try { luceneExecutors.close(); } finally { executors.close(); }
     }
   }
 

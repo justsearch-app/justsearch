@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("WorkerIngestService document identity")
-final class WorkerIngestServiceDocumentIdentityTest {
+final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -365,7 +365,7 @@ final class WorkerIngestServiceDocumentIdentityTest {
     runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema
             .fromCatalog(FieldCatalogDef.forChunkTesting(0))
-            .atPath(tempDir.resolve("lucene"))
+            .atPath(tempDir.resolve("lucene")).withExecutorRegistrations(testLuceneExecutors())
             .open();
   }
 

@@ -42,7 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
  * by hand is exactly the mistake — the defect was never in the comparison, it was in which index the
  * comparison was pointed at.
  */
-final class MidMigrationCompatSurfaceTest {
+final class MidMigrationCompatSurfaceTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String OLD_SHAPE = "b".repeat(64);
 
@@ -104,7 +104,7 @@ final class MidMigrationCompatSurfaceTest {
     assertFalse(status.getCompatibility().getReindexRequired());
   }
 
-  private static RunningRuntime open(Path path, String fingerprintOverride, int docs)
+  private RunningRuntime open(Path path, String fingerprintOverride, int docs)
       throws Exception {
     Map<String, Object> meta = new HashMap<>(new SsotCommitMetadataSource().build());
     if (fingerprintOverride != null) {
@@ -116,7 +116,7 @@ final class MidMigrationCompatSurfaceTest {
                 FieldCatalogDef.forChunkTesting(0),
                 () -> frozen,
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(path)
+            .atPath(path).withExecutorRegistrations(testLuceneExecutors())
             .open();
     for (int i = 0; i < docs; i++) {
       r.indexingCoordinator()

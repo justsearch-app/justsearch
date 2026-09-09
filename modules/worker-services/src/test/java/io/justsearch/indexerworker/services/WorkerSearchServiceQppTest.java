@@ -29,7 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
  * HYBRID modes. They are always 0.0 for VECTOR mode and for empty queries.
  */
 @DisplayName("WorkerSearchService QPP signals")
-class WorkerSearchServiceQppTest {
+class WorkerSearchServiceQppTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -38,7 +38,7 @@ class WorkerSearchServiceQppTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     service = new WorkerSearchService(lifecycle);
   }
 

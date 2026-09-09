@@ -54,7 +54,7 @@ import org.junit.jupiter.api.Test;
  * {@code chunk_merge_applied}, {@code chunk_merge_reason}.
  */
 @DisplayName("SearchExecutor LegSet matrix (tempdoc 517 §A.12 E2 Tier-3a)")
-final class SearchExecutorLegSetMatrixTest {
+final class SearchExecutorLegSetMatrixTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   @DisplayName("EmptyQueryDecision: blank query + sparse-only pipeline → 0 hits + SKIPPED_EMPTY_QUERY")
@@ -191,7 +191,7 @@ final class SearchExecutorLegSetMatrixTest {
     return response;
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-legset-matrix-test-");
@@ -204,7 +204,7 @@ final class SearchExecutorLegSetMatrixTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

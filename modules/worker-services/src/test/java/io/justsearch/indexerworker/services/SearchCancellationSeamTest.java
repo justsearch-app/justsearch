@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
  * a seam is deleted the list shortens and a stage name shifts, which no per-stage test would show.
  */
 @DisplayName("search cancellation seams (lane F review B3)")
-final class SearchCancellationSeamTest {
+final class SearchCancellationSeamTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   /**
    * The seams a sparse search passes through, in order. Adding a phase to the pipeline should add
@@ -166,7 +166,7 @@ final class SearchCancellationSeamTest {
     return marker < 0 ? message : message.substring(marker + 2);
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-cancel-seam-test-");
@@ -179,7 +179,7 @@ final class SearchCancellationSeamTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("Office fixtures: searchable end-to-end (extract → index → search)")
-final class OfficeMarkerSearchabilityTest {
+final class OfficeMarkerSearchabilityTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -75,7 +75,7 @@ final class OfficeMarkerSearchabilityTest {
       var lifecycle =
           io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                   FieldCatalogDef.forTesting(0))
-              .ephemeral()
+              .ephemeral().withExecutorRegistrations(testLuceneExecutors())
               .open();
       try {
         var runtime = lifecycle;

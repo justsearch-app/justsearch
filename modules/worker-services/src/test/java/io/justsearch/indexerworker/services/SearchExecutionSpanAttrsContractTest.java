@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Test;
  * allowlisted by prefix rather than by exact match.
  */
 @DisplayName("SearchExecutor OTel span attribute contract (tempdoc 525 move A)")
-final class SearchExecutionSpanAttrsContractTest {
+final class SearchExecutionSpanAttrsContractTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   // ============================================================
   // Contract — closed allowlist per span name.
@@ -306,7 +306,7 @@ final class SearchExecutionSpanAttrsContractTest {
     }
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-span-contract-test-");
@@ -319,7 +319,7 @@ final class SearchExecutionSpanAttrsContractTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

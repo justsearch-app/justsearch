@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-final class WorkerSearchServiceDegradationSignalingTest {
+final class WorkerSearchServiceDegradationSignalingTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   void vectorModeReturnsEmptyWithVectorBlockedAndReasonWhenEmbeddingQueriesDisallowed() throws Exception {
@@ -102,7 +102,7 @@ final class WorkerSearchServiceDegradationSignalingTest {
     return response;
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String content) throws Exception {
+  private RunningRuntime newLifecycleWithOneDoc(String content) throws Exception {
     Path base = Files.createTempDirectory("justsearch-grpc-search-degradation-test-");
     String yaml =
         "app:\n  data_dir: " + base.toString().replace("\\", "\\\\") + "\n"
@@ -144,7 +144,7 @@ final class WorkerSearchServiceDegradationSignalingTest {
                     "icu",
                     false)));
 
-    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var runtime = lifecycle;
     runtime.indexingCoordinator().indexSingle(
         new IndexDocument(

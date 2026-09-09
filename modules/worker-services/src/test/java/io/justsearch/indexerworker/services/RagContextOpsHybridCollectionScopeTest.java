@@ -40,7 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
  * BM25-only test can see. This class makes it visible and regression-guarded.
  */
 @DisplayName("RAG collection scope under hybrid retrieval (821 §3-C2)")
-final class RagContextOpsHybridCollectionScopeTest {
+final class RagContextOpsHybridCollectionScopeTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String IN_SCOPE = "d:/agent/session-7.md";
   private static final String OUT_OF_SCOPE = "d:/docs/handbook.md";
@@ -92,7 +92,7 @@ final class RagContextOpsHybridCollectionScopeTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     service = new WorkerSearchService(lifecycle, new StubEmbeddingProvider());
 
     indexDocWithChunk(IN_SCOPE, "agent-history", "Rollback checklist AGENTMARKER from the run.");

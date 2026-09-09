@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("WorkerSearchService fetch/suggest endpoints")
-class WorkerSearchServiceFetchEndpointsTest {
+class WorkerSearchServiceFetchEndpointsTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -41,7 +41,7 @@ class WorkerSearchServiceFetchEndpointsTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(catalogWithExtractionProvenance()).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(catalogWithExtractionProvenance()).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     service = new WorkerSearchService(lifecycle);
   }
 

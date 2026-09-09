@@ -141,6 +141,7 @@ dependencies {
   // Tempdoc 847 S5 — the RAG faithfulness metric scores the answer's SENTENCES, so it uses the
   // production splitter (`AnswerSegmentation`) rather than a copy that drifts from it.
   add("integrationTestImplementation", project(":modules:worker-services"))
+  add("integrationTestImplementation", testFixtures(project(":modules:core")))
   add("integrationTestImplementation", testFixtures(project(":modules:ort-common"))) // §14.28 U1 helper
   add("integrationTestImplementation", project(":modules:app-agent"))
   add("integrationTestImplementation", project(":modules:app-agent-api"))

@@ -34,7 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
  * /api/status}) — a synthetic boot-time pass must not look like the user's first real search.
  */
 @DisplayName("WorkerSearchService search-path warm-up (tempdoc 687 R3d)")
-class WorkerSearchServiceWarmUpTest {
+class WorkerSearchServiceWarmUpTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -43,7 +43,7 @@ class WorkerSearchServiceWarmUpTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     service = new WorkerSearchService(lifecycle);
   }
 

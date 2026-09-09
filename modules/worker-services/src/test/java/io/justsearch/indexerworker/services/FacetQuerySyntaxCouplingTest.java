@@ -52,7 +52,7 @@ import org.junit.jupiter.api.Test;
  * to a SIMPLE-only parse while the request asked for LUCENE.
  */
 @DisplayName("Facet/matchCount parse is coupled to the retrieval leg's parse (tempdoc 821 §L.3 + §P)")
-final class FacetQuerySyntaxCouplingTest {
+final class FacetQuerySyntaxCouplingTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   /**
    * SIMPLE escapes the operators (tokens {@code shared}, {@code alpha}, default-OR) → 3 docs.
@@ -345,7 +345,7 @@ final class FacetQuerySyntaxCouplingTest {
         "search() answered instead of signalling the malformed query");
   }
 
-  private static RunningRuntime newLifecycleWithPdfDocs(Map<String, String> docs) throws Exception {
+  private RunningRuntime newLifecycleWithPdfDocs(Map<String, String> docs) throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-facet-syntax-test-");
     String yaml =
@@ -357,7 +357,7 @@ final class FacetQuerySyntaxCouplingTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     for (var entry : docs.entrySet()) {
       Map<String, Object> fields = new LinkedHashMap<>();
       fields.put(SchemaFields.DOC_ID, entry.getKey());

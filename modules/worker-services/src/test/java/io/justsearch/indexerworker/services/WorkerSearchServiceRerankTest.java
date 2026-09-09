@@ -37,7 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
  * every case here drives {@link WorkerSearchService} directly, as it always did.)
  */
 @DisplayName("WorkerSearchService Rerank RPC")
-class WorkerSearchServiceRerankTest {
+class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -47,7 +47,7 @@ class WorkerSearchServiceRerankTest {
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
     lifecycle =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     service = new WorkerSearchService(lifecycle);
   }
 

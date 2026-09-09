@@ -48,7 +48,7 @@ import org.junit.jupiter.api.io.TempDir;
  * the Worker coerces the status to FAILED with a "no_text_detected" enrichment.
  */
 @DisplayName("WorkerIngestService VDU Hardening (P0.4)")
-final class WorkerIngestServiceVduHardeningTest {
+final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @TempDir Path tempDir;
@@ -62,10 +62,10 @@ final class WorkerIngestServiceVduHardeningTest {
     jobQueue.open();
 
     // Use chunk-aware testing catalog with explicit vdu_retry_count support for markVduProcessing tests.
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0)).atPath(tempDir).open();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
 
     // Create service with the real lifecycle
-    IndexingLoop stubLoop = new StubIndexingLoop();
+    IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
     Path indexBasePath = tempDir.resolve("indexBase");
     Files.createDirectories(indexBasePath);
@@ -751,7 +751,7 @@ final class WorkerIngestServiceVduHardeningTest {
     Files.createDirectories(genDir);
     writeSwitchingState(indexBasePath);
     return new WorkerIngestService(
-        queue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+        queue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
         indexBasePath, genDir, lifecycle, lifecycle, null, 0L);
   }
 
@@ -792,26 +792,12 @@ final class WorkerIngestServiceVduHardeningTest {
 
   // ========== Stub Classes ==========
 
-  private static final class StubIndexingLoop extends IndexingLoop {
-    StubIndexingLoop() {
-      super(null, null, null, null, null, null, null, null);
-    }
-
-    @Override
-    public long getLastCommitTime() {
-      return System.currentTimeMillis();
-    }
-
-    @Override
-    public String getCurrentState() {
-      return "IDLE";
-    }
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void close() {}
+  // This service test borrows loop status only; do not construct an unused extractor owner.
+  private static IndexingLoop stubIndexingLoop() {
+    IndexingLoop loop = org.mockito.Mockito.mock(IndexingLoop.class);
+    org.mockito.Mockito.when(loop.getLastCommitTime()).thenAnswer(ignored -> System.currentTimeMillis());
+    org.mockito.Mockito.when(loop.getCurrentState()).thenReturn("IDLE");
+    return loop;
   }
 
   private static final class StubWorkerSignalBus implements WorkerSignalBus {

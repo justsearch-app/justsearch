@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
  * ephemeral Lucene runtime via {@code IndexSchema.fromCatalog(...).ephemeral().open()}.
  */
 @DisplayName("FacetCompute regression matrix (tempdoc 517 §Risks)")
-final class FacetRegressionMatrixTest {
+final class FacetRegressionMatrixTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   // (a) LUCENE-syntax sparse with facets — sparse-only request, LUCENE query syntax.
   //     Path: FacetCompute.FromRetrievalQuery (honours runtimeSyntax).
@@ -307,7 +307,7 @@ final class FacetRegressionMatrixTest {
     return response;
   }
 
-  private static RunningRuntime newLifecycleWithDocs(Map<String, String> docs) throws Exception {
+  private RunningRuntime newLifecycleWithDocs(Map<String, String> docs) throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-facet-matrix-test-");
     String yaml =
@@ -319,7 +319,7 @@ final class FacetRegressionMatrixTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     for (var entry : docs.entrySet()) {
       lifecycle
           .indexingCoordinator()

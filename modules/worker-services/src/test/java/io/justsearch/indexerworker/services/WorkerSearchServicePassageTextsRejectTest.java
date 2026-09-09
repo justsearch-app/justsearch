@@ -28,7 +28,7 @@ import org.junit.jupiter.params.provider.CsvSource;
  * to sources, which is the F-049 mis-targeting class re-entering through the back door.
  */
 @DisplayName("WorkerSearchService — passage_texts length contract")
-class WorkerSearchServicePassageTextsRejectTest {
+class WorkerSearchServicePassageTextsRejectTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -36,7 +36,7 @@ class WorkerSearchServicePassageTextsRejectTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

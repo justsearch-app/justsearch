@@ -18,7 +18,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-final class KnowledgeServerTerminalWriterBindingTest {
+final class KnowledgeServerTerminalWriterBindingTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @BeforeAll
   static void ensureGlobalConfig() {
@@ -35,7 +35,7 @@ final class KnowledgeServerTerminalWriterBindingTest {
     Thread.setDefaultUncaughtExceptionHandler(
         (ignoredThread, ignoredFailure) -> fallbacks.incrementAndGet());
     RunningRuntime runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     KnowledgeServer server =
         new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
     AtomicInteger reports = new AtomicInteger();

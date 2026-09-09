@@ -54,7 +54,7 @@ final class WorkerIngestServiceTest {
     jobQueue.open();
 
     // Use stub implementations for dependencies not needed in these tests
-    IndexingLoop stubLoop = new StubIndexingLoop();
+    IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
     Path stubIndexBasePath = tempDir.resolve("indexBase");
     Path stubIndexPath = stubIndexBasePath.resolve("indices").resolve("g-test");
@@ -271,7 +271,7 @@ final class WorkerIngestServiceTest {
     Path stubIndexPath = stubIndexBasePath.resolve("indices").resolve("g-test");
     Files.createDirectories(stubIndexPath);
     WorkerIngestService svc = new WorkerIngestService(
-        jobQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+        jobQueue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
         stubIndexBasePath, stubIndexPath, null, null, null, 0L);
 
     for (boolean force : new boolean[] {false, true}) {
@@ -336,7 +336,7 @@ final class WorkerIngestServiceTest {
     }
 
     // Create service with the SWITCHING indexBasePath
-    IndexingLoop stubLoop = new StubIndexingLoop();
+    IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
     WorkerIngestService switchingService = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), indexBasePath, genDir,
@@ -393,7 +393,7 @@ final class WorkerIngestServiceTest {
     JobQueue nonSqliteQueue = new NoopJobQueue();
     WorkerIngestService switchingService =
         new WorkerIngestService(
-            nonSqliteQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+            nonSqliteQueue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
             indexBasePath, genDir, null, null, null, 0L);
 
     BatchRequest request =
@@ -436,7 +436,7 @@ final class WorkerIngestServiceTest {
     JobQueue nonSqliteQueue = new NoopJobQueue();
     WorkerIngestService switchingService =
         new WorkerIngestService(
-            nonSqliteQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+            nonSqliteQueue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
             indexBasePath, genDir, null, null, null, 0L);
 
     SyncDirectoryRequest request =
@@ -487,7 +487,7 @@ final class WorkerIngestServiceTest {
 
     WorkerIngestService switchingService =
         new WorkerIngestService(
-            sqliteQueue, new StubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
+            sqliteQueue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
             indexBasePath, genDir, null, null, null, 0L);
 
     String rootPath = tempDir.toAbsolutePath().toString();
@@ -792,26 +792,12 @@ final class WorkerIngestServiceTest {
   }
 
   /** Stub IndexingLoop for testing - returns sensible defaults. */
-  private static final class StubIndexingLoop extends IndexingLoop {
-    StubIndexingLoop() {
-      super(null, null, null, null, null, null, null, null);
-    }
-
-    @Override
-    public long getLastCommitTime() {
-      return System.currentTimeMillis();
-    }
-
-    @Override
-    public String getCurrentState() {
-      return "IDLE";
-    }
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void close() {}
+  // This service test borrows loop status only; do not construct an unused extractor owner.
+  private static IndexingLoop stubIndexingLoop() {
+    IndexingLoop loop = org.mockito.Mockito.mock(IndexingLoop.class);
+    org.mockito.Mockito.when(loop.getLastCommitTime()).thenAnswer(ignored -> System.currentTimeMillis());
+    org.mockito.Mockito.when(loop.getCurrentState()).thenReturn("IDLE");
+    return loop;
   }
 
   /** Minimal non-SQLite queue for SWITCHING fallback-path tests. */

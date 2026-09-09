@@ -20,7 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class WorkerSearchServiceExcerptRegionsTest {
+class WorkerSearchServiceExcerptRegionsTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final FieldCatalogDef CATALOG =
       new FieldCatalogDef(
@@ -56,7 +56,7 @@ class WorkerSearchServiceExcerptRegionsTest {
 
   @BeforeEach
   void setUp() {
-    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().open();
+    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     service = new WorkerSearchService(lifecycle);
   }
 

@@ -38,7 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 @DisplayName("WorkerIngestService chunk regeneration (Tier 2)")
-final class WorkerIngestServiceChunkRegenerationTest {
+final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private SqliteJobQueue jobQueue;
@@ -50,9 +50,9 @@ final class WorkerIngestServiceChunkRegenerationTest {
     jobQueue = new SqliteJobQueue(dbPath);
     jobQueue.open();
 
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
 
-    IndexingLoop stubLoop = new StubIndexingLoop();
+    IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
     Path indexBasePath = tempDir.resolve("indexBase");
     Files.createDirectories(indexBasePath);
@@ -220,26 +220,12 @@ final class WorkerIngestServiceChunkRegenerationTest {
     return sb.toString();
   }
 
-  private static final class StubIndexingLoop extends IndexingLoop {
-    StubIndexingLoop() {
-      super(null, null, null, null, null, null, null, null);
-    }
-
-    @Override
-    public long getLastCommitTime() {
-      return System.currentTimeMillis();
-    }
-
-    @Override
-    public String getCurrentState() {
-      return "IDLE";
-    }
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void close() {}
+  // This service test borrows loop status only; do not construct an unused extractor owner.
+  private static IndexingLoop stubIndexingLoop() {
+    IndexingLoop loop = org.mockito.Mockito.mock(IndexingLoop.class);
+    org.mockito.Mockito.when(loop.getLastCommitTime()).thenAnswer(ignored -> System.currentTimeMillis());
+    org.mockito.Mockito.when(loop.getCurrentState()).thenReturn("IDLE");
+    return loop;
   }
 
   private static final class StubWorkerSignalBus implements WorkerSignalBus {

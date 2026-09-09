@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class WorkerSearchServiceSearchPayloadTest {
+class WorkerSearchServiceSearchPayloadTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   void searchDoesNotReturnStoredContentFieldInHitFields() throws Exception {
@@ -79,7 +79,7 @@ class WorkerSearchServiceSearchPayloadTest {
                       "icu",
                       false)));
 
-      var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+      var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       var runtime = lifecycle;
       runtime.indexingCoordinator().indexSingle(
           new IndexDocument(

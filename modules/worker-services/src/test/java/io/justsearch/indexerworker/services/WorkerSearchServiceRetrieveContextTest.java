@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>Verifies chunk vs fallback behavior, diversification, and metadata fields.
  */
 @DisplayName("WorkerSearchService RetrieveContext (P1.4)")
-class WorkerSearchServiceRetrieveContextTest {
+class WorkerSearchServiceRetrieveContextTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
@@ -38,7 +38,7 @@ class WorkerSearchServiceRetrieveContextTest {
     System.clearProperty("justsearch.config");
 
     // Use chunk-aware testing catalog with explicit index path
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
 
     service = new WorkerSearchService(lifecycle);
   }

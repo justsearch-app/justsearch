@@ -35,7 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
  * barrier would be writer contention on a writer someone else was promised.
  */
 @DisplayName("WorkerIngestService.settleIndex")
-final class WorkerIngestServiceSettleIndexTest {
+final class WorkerIngestServiceSettleIndexTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -47,7 +47,7 @@ final class WorkerIngestServiceSettleIndexTest {
     indexBasePath = tempDir.resolve("index-base");
     runtime =
         IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))
-            .atPath(tempDir.resolve("index"))
+            .atPath(tempDir.resolve("index")).withExecutorRegistrations(testLuceneExecutors())
             .open();
   }
 

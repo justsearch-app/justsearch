@@ -1,5 +1,6 @@
 plugins {
   `java-library`
+  `java-test-fixtures`
   id("jvm-test-suite")
   id("conventions.jvm-base")
   id("conventions.mutation")  // PIT scoped to registered seams (governance/logic-seams.v1.json) — tempdoc 555
@@ -8,6 +9,9 @@ plugins {
 extra["coverage.enforce"] = "true"
 
 dependencies {
+  testFixturesImplementation(testFixtures(project(":modules:core")))
+  testFixturesImplementation(platform(libs.junit.bom))
+  testFixturesImplementation(libs.junit.jupiter.api)
   testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:configuration"))  // Exposes configuration types in public API
   api(project(":modules:indexing"))  // Exposes IndexDocument, FieldDefinition in public API

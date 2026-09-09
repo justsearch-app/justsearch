@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * the re-marked docs COMPLETED, as the backfill would). ECC, counts, the SQLite job queue, and the
  * Lucene commit/overlay persistence are all real.
  */
-class InPlaceEmbeddingRebuildRecoveryTest {
+class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String FP = "in-place-recovery-fp-sha256";
   private static final CommitMetadataValidator PERMISSIVE = metadata -> {};
@@ -317,11 +317,11 @@ class InPlaceEmbeddingRebuildRecoveryTest {
     return v;
   }
 
-  private static io.justsearch.adapters.lucene.runtime.RunningRuntime openRuntime(
+  private io.justsearch.adapters.lucene.runtime.RunningRuntime openRuntime(
       Path dir, Supplier<CommitMetadataSource> commitMetadata) {
     return io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
             FieldCatalogDef.forTesting(768), commitMetadata, PERMISSIVE)
-        .atPath(dir)
+        .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
         .open();
   }
 

@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class WorkerSearchServiceMatchReasonsTest {
+class WorkerSearchServiceMatchReasonsTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   void searchPopulatesMatchedFieldsBasedOnPreviewPresence() throws Exception {
@@ -76,7 +76,7 @@ class WorkerSearchServiceMatchReasonsTest {
                       "icu",
                       false)));
 
-      var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+      var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       var runtime = lifecycle;
 
       String q = "needle";

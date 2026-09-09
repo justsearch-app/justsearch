@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  * vectorBlocked, hybridFallback, spladeSkipReason) when components are unavailable.
  */
 @DisplayName("SearchOrchestrator composable path (256-E6)")
-final class SearchOrchestratorComposablePathTest {
+final class SearchOrchestratorComposablePathTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Nested
   @DisplayName("Pipeline-based degradation signaling")
@@ -263,7 +263,7 @@ final class SearchOrchestratorComposablePathTest {
     return response;
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     RunningRuntime lifecycle = newLifecycleWithCatalog(catalog);
@@ -280,7 +280,7 @@ final class SearchOrchestratorComposablePathTest {
     return lifecycle;
   }
 
-  private static RunningRuntime newLifecycleWithCatalog(FieldCatalogDef catalog)
+  private RunningRuntime newLifecycleWithCatalog(FieldCatalogDef catalog)
       throws Exception {
     Path base = Files.createTempDirectory("justsearch-composable-path-test-");
     String yaml =
@@ -293,7 +293,7 @@ final class SearchOrchestratorComposablePathTest {
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
 
-    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    var lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle.commitOps().maybeRefreshBlocking();
     return lifecycle;
   }

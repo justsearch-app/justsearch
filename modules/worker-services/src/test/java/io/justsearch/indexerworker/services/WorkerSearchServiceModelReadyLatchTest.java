@@ -26,6 +26,8 @@ class WorkerSearchServiceModelReadyLatchTest {
 
   private WorkerSearchService buildService() {
     RunningRuntime mockLifecycle = Mockito.mock(RunningRuntime.class);
+    Mockito.when(mockLifecycle.executorRegistrations()).thenReturn(
+        Mockito.mock(io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations.class));
     return new WorkerSearchService(mockLifecycle, NoOpEmbeddingProvider.INSTANCE);
   }
 

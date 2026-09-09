@@ -11,13 +11,12 @@ import java.util.concurrent.ThreadFactory;
 
 /** The bounded executor registrations owned by one Lucene runtime. */
 public final class LuceneExecutorRegistrations implements AutoCloseable {
-  private final EngineExecutorRegistry registry;
   private final EngineExecutorRegistry.Registration commitTimer;
   private final EngineExecutorRegistry.Registration foregroundSearchFanout;
   private final EngineExecutorRegistry.Registration backgroundSearchFanout;
 
   public LuceneExecutorRegistrations(EngineExecutorRegistry registry) {
-    this.registry = Objects.requireNonNull(registry, "registry");
+    Objects.requireNonNull(registry, "registry");
     EngineExecutorRegistry.Registration commit = null;
     EngineExecutorRegistry.Registration foreground = null;
     EngineExecutorRegistry.Registration background = null;
@@ -61,9 +60,6 @@ public final class LuceneExecutorRegistrations implements AutoCloseable {
       case BACKGROUND -> backgroundSearchFanout.openVirtual();
     };
   }
-
-  /** Package-visible metadata hook for runtime tests; the process registry remains externally owned. */
-  EngineExecutorRegistry registry() { return registry; }
 
   @Override
   public void close() {

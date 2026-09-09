@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
  * {@code TracingWorkflowSpanAttributeProcessorTest}.
  */
 @DisplayName("SearchExecutor OTel span topology (tempdoc 517 invariant #12)")
-final class SearchExecutorOtelTopologyTest {
+final class SearchExecutorOtelTopologyTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   @DisplayName("Sparse-only query emits search/retrieval span under the request context")
@@ -323,7 +323,7 @@ final class SearchExecutorOtelTopologyTest {
     }
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-otel-topology-test-");
@@ -336,7 +336,7 @@ final class SearchExecutorOtelTopologyTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

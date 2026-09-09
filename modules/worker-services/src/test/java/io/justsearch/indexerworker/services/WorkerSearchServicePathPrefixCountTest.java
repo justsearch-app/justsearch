@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
  * exact.)
  */
 @DisplayName("WorkerSearchService — pathPrefix scopes the counts, not just the rows")
-final class WorkerSearchServicePathPrefixCountTest {
+final class WorkerSearchServicePathPrefixCountTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private String prevConfig;
@@ -58,7 +58,7 @@ final class WorkerSearchServicePathPrefixCountTest {
     Path cfg = Files.createTempFile("justsearch-pathprefix-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

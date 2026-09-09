@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("WorkerIngestService syncDirectory phase behavior")
-final class WorkerIngestServiceSyncDirectoryPhaseTest {
+final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private SqliteJobQueue jobQueue;
@@ -36,7 +36,7 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest {
     jobQueue = new SqliteJobQueue(dbPath);
     jobQueue.open();
 
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forTesting(0)).atPath(tempDir).open();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach
@@ -139,30 +139,16 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest {
     Files.createDirectories(indexBasePath);
     Files.createDirectories(indexPath);
     return new WorkerIngestService(
-        jobQueue, new StubIndexingLoop(), bus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
+        jobQueue, stubIndexingLoop(), bus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
         lifecycle, lifecycle, null, 0L);
   }
 
-  private static final class StubIndexingLoop extends IndexingLoop {
-    StubIndexingLoop() {
-      super(null, null, null, null, null, null, null, null);
-    }
-
-    @Override
-    public long getLastCommitTime() {
-      return System.currentTimeMillis();
-    }
-
-    @Override
-    public String getCurrentState() {
-      return "IDLE";
-    }
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void close() {}
+  // This service test borrows loop status only; do not construct an unused extractor owner.
+  private static IndexingLoop stubIndexingLoop() {
+    IndexingLoop loop = org.mockito.Mockito.mock(IndexingLoop.class);
+    org.mockito.Mockito.when(loop.getLastCommitTime()).thenAnswer(ignored -> System.currentTimeMillis());
+    org.mockito.Mockito.when(loop.getCurrentState()).thenReturn("IDLE");
+    return loop;
   }
 
   private static final class StubWorkerSignalBus implements WorkerSignalBus {
