@@ -337,6 +337,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
         frame = queue.poll(POLL_TICK_MS, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        close();
         return;
       }
       if (frame == null) {

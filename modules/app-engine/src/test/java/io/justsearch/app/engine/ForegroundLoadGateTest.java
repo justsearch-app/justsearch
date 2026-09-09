@@ -2,235 +2,167 @@
 package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
-import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * The gate must feed {@link ForegroundLoad} so that the pacing policy sees the same gauge move it
- * saw when a gRPC interceptor fed it.
- *
- * <p><b>Item A4 wrote this as a drift pin</b> between two live producers: the gate and
- * {@code ForegroundLoadInterceptor}, whose operation sets could not be allowed to diverge while
- * both existed. <b>Item A9 deleted the interceptor</b>, so those two comparisons are gone —
- * there is nothing left to drift from, and a test comparing the gate against a deleted class is
- * not a weaker test, it is an uncompilable one.
- *
- * <p>What survives is the larger half and the reason this file is named by
- * {@code adr-0048-foreground-gauge-is-worker-local}: the gauge's <b>balance</b> across a normal
- * return, a thrown exception, a cancellation and an {@link Error}, the two deliberate exclusions,
- * and the invariant that the live gauge never goes negative under concurrent use. That is the
- * property the indexing duty cycle depends on, and ADR-0048 predicted exactly this transition —
- * "{@code ForegroundLoad} is a worker-services type so it survives a Head/Worker merge; the gRPC
- * interceptor that feeds it is the throwaway adapter". A9 threw the adapter away; the probe was
- * retargeted onto this file rather than retired, because the premise it pins is now MORE true,
- * not less.
- */
+/** Urgency is explicit; balance on errors and concurrent use still pins ADR-0048's pacing feed. */
 final class ForegroundLoadGateTest {
-
-  private static final String NOT_FOREGROUND_INDEX_STATUS = "indexStatus";
-  private static final String NOT_FOREGROUND_LIST_ALL = "listAllDocumentIds";
-
-  @Test
-  @DisplayName("the gate covers exactly ten operation labels, and the two exclusions are excluded")
-  void theOperationSetIsTheNineTheUserWaitsOn() {
-    // The population, not a ratchet: adding a tenth foreground operation is a decision about what
-    // a user waits on, and it should have to be made here rather than arrive by accident.
-    assertEquals(10, ForegroundLoadGate.foregroundOperations().size());
-    assertFalse(ForegroundLoadGate.isForeground(NOT_FOREGROUND_INDEX_STATUS));
-    assertFalse(ForegroundLoadGate.isForeground(NOT_FOREGROUND_LIST_ALL));
+  private static EngineContext context(EngineContext.Survival survival, EngineContext.Urgency urgency) {
+    return new EngineContext(EngineContext.ClientKind.INTERNAL, "gate-test", Optional.empty(),
+        Optional.empty(), "UNTRUSTED", "HTTP", survival, urgency);
   }
 
   @Test
-  @DisplayName("each of the ten operation labels increments during the call and decrements after it")
-  void eachForegroundOperationIncrementsAndDecrements() {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
-
-    int expectedTotal = 0;
-    for (String operation : ForegroundLoadGate.foregroundOperations()) {
-      String result = gate.call(operation, () -> "in-flight=" + load.inFlight());
-      assertEquals("in-flight=1", result, operation + " must be counted while it executes");
-      assertEquals(0, load.inFlight(), operation + " must not leak an in-flight count");
-      expectedTotal++;
-      assertEquals(expectedTotal, load.startedTotal());
+  void urgencyAloneCountsAcrossBothSurvivalAxesAndBothForms() {
+    var admission = new EngineAdmissionController(10, 10, 1);
+    for (var survival : EngineContext.Survival.values()) {
+      for (var urgency : EngineContext.Urgency.values()) {
+        var load = new ForegroundLoad();
+        var gate = new ForegroundLoadGate(load);
+        int expected = urgency == EngineContext.Urgency.FOREGROUND ? 1 : 0;
+        try (var work = admission.admit(context(survival, urgency), false)) {
+          assertEquals(expected, gate.call(work, load::inFlight));
+          gate.run(work, () -> assertEquals(expected, load.inFlight()));
+          assertEquals(survival == EngineContext.Survival.DURABLE ? expected : 0, load.inFlight());
+        }
+        assertEquals(0, load.inFlight());
+        assertEquals(expected * (survival == EngineContext.Survival.DURABLE ? 1 : 2), load.startedTotal());
+        if (expected == 0) assertEquals(0, load.lastForegroundAtMs());
+      }
     }
-    assertEquals(10, expectedTotal);
   }
 
   @Test
-  @DisplayName("the Runnable form counts the same ten operation labels")
-  void runnableFormCountsTheSameOperations() {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
+  void normalExceptionCancellationAndErrorAlwaysBalanceInteractiveWork() {
+    var admission = new EngineAdmissionController(10, 10, 1);
+    var load = new ForegroundLoad();
+    var gate = new ForegroundLoadGate(load);
+    try (var work = admission.admit(context(EngineContext.Survival.INTERACTIVE,
+        EngineContext.Urgency.FOREGROUND), false)) {
+      assertEquals("ok", gate.call(work, () -> "ok"));
+      assertThrows(IllegalStateException.class, () -> gate.call(work, () -> {
+        throw new IllegalStateException("failure");
+      }));
+      assertEquals(0, load.inFlight());
+      assertThrows(IllegalStateException.class, () -> gate.run(work, () -> {
+        throw new IllegalStateException("failure");
+      }));
+      assertEquals(0, load.inFlight());
+      assertThrows(CancellationException.class, () -> gate.call(work, () -> {
+        throw new CancellationException("cancelled");
+      }));
+      assertEquals(0, load.inFlight());
+      assertThrows(StackOverflowError.class, () -> gate.call(work, () -> {
+        throw new StackOverflowError("deep");
+      }));
+      assertEquals(0, load.inFlight());
+      assertEquals(5, load.startedTotal());
+    }
+  }
 
-    for (String operation : ForegroundLoadGate.foregroundOperations()) {
-      AtomicInteger observed = new AtomicInteger(-1);
-      gate.run(operation, () -> observed.set(load.inFlight()));
-      assertEquals(1, observed.get(), operation + " must be counted while it executes");
+  @Test
+  void durableWorkHoldsExactlyOnceUntilDetachOrLastOwnerCompletes() {
+    var admission = new EngineAdmissionController(10, 10, 1);
+    var load = new ForegroundLoad();
+    var gate = new ForegroundLoadGate(load);
+    for (boolean detach : new boolean[] {false, true}) {
+      var front = admission.admit(context(EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.FOREGROUND), false);
+      var worker = front.retain();
+      gate.run(worker, () -> assertEquals(1, load.inFlight()));
+      gate.run(worker, () -> assertEquals(1, load.inFlight()));
+      front.close();
+      assertEquals(1, load.inFlight(), "the asynchronous owner still holds work");
+      if (detach) {
+        worker.waitingClientGone();
+        worker.waitingClientGone();
+        assertEquals(0, load.inFlight());
+        assertEquals(EngineContext.Urgency.BACKGROUND, worker.context().urgency());
+        gate.run(worker, () -> assertEquals(0, load.inFlight()));
+      }
+      worker.close();
+      worker.close();
       assertEquals(0, load.inFlight());
     }
-    assertEquals(10, load.startedTotal());
+    assertEquals(2, load.startedTotal());
   }
 
   @Test
-  @DisplayName("a thrown exception still decrements, for every operation and both forms")
-  void exceptionStillDecrements() {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
-
-    for (String operation : ForegroundLoadGate.foregroundOperations()) {
-      assertThrows(
-          IllegalStateException.class,
-          () ->
-              gate.call(
-                  operation,
-                  () -> {
-                    throw new IllegalStateException("boom in " + operation);
-                  }));
-      assertEquals(0, load.inFlight(), operation + " must not leak on a thrown exception");
-
-      assertThrows(
-          IllegalStateException.class,
-          () ->
-              gate.run(
-                  operation,
-                  () -> {
-                    throw new IllegalStateException("boom in " + operation);
-                  }));
+  void nestedWrapFailsWithoutUnbalancingOrPoisoningTheNextCall() {
+    var admission = new EngineAdmissionController(10, 10, 1);
+    var load = new ForegroundLoad();
+    var gate = new ForegroundLoadGate(load);
+    try (var work = admission.admit(context(EngineContext.Survival.INTERACTIVE,
+        EngineContext.Urgency.FOREGROUND), false)) {
+      assertThrows(IllegalStateException.class, () -> gate.run(work, () -> gate.run(work, () -> {})));
       assertEquals(0, load.inFlight());
+      assertEquals(1, load.startedTotal());
+      gate.run(work, () -> assertEquals(1, load.inFlight()));
+      assertEquals(0, load.inFlight());
+      assertEquals(2, load.startedTotal());
     }
-    assertEquals(20, load.startedTotal(), "ten labels x two forms");
   }
 
   @Test
-  @DisplayName("a cancellation still decrements, for every operation")
-  void cancellationStillDecrements() {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
-
-    for (String operation : ForegroundLoadGate.foregroundOperations()) {
-      assertThrows(
-          CancellationException.class,
-          () ->
-              gate.call(
-                  operation,
-                  () -> {
-                    throw new CancellationException("cancelled " + operation);
-                  }));
-      assertEquals(0, load.inFlight(), operation + " must not leak on cancellation");
-    }
-    assertEquals(10, load.startedTotal());
-  }
-
-  @Test
-  @DisplayName("an Error still decrements (the finally covers Throwable, not just Exception)")
-  void errorStillDecrements() {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
-
-    assertThrows(
-        StackOverflowError.class,
-        () ->
-            gate.call(
-                "search",
-                () -> {
-                  throw new StackOverflowError("deep");
-                }));
-    assertEquals(0, load.inFlight());
-  }
-
-  @Test
-  @DisplayName("IndexStatus and ListAllDocumentIds do not touch the gauge at all")
-  void excludedOperationsDoNotTouchTheGauge() {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
-
-    for (String excluded : Set.of(NOT_FOREGROUND_INDEX_STATUS, NOT_FOREGROUND_LIST_ALL)) {
-      int seenDuringCall = gate.call(excluded, load::inFlight);
-      assertEquals(0, seenDuringCall, excluded + " must not be counted");
-      gate.run(excluded, () -> assertEquals(0, load.inFlight()));
-    }
-    assertEquals(0, load.inFlight());
-    assertEquals(0L, load.startedTotal(), "an excluded operation must not move startedTotal");
-    assertEquals(0L, load.lastForegroundAtMs(), "an excluded operation must not touch the cooldown");
-  }
-
-  @Test
-  @DisplayName("the live gauge is never negative and settles at zero under concurrent use")
-  void concurrentUseNeverGoesNegative() throws InterruptedException {
-    ForegroundLoad load = new ForegroundLoad();
-    ForegroundLoadGate gate = new ForegroundLoadGate(load);
-
+  void concurrentUseNeverGoesNegativeAndCountsEveryExecutingCall() throws InterruptedException {
+    var admission = new EngineAdmissionController(10, 10, 1);
+    var load = new ForegroundLoad();
+    var gate = new ForegroundLoadGate(load);
     int threads = 8;
     int callsPerThread = 200;
-    String[] operations = ForegroundLoadGate.foregroundOperations().toArray(new String[0]);
-    AtomicInteger negativeReadings = new AtomicInteger();
-    AtomicInteger zeroWhileInFlight = new AtomicInteger();
-    CountDownLatch start = new CountDownLatch(1);
-    CountDownLatch done = new CountDownLatch(threads);
-
-    ExecutorService pool = Executors.newFixedThreadPool(threads);
-    try {
+    var negativeReadings = new AtomicInteger();
+    var zeroWhileInFlight = new AtomicInteger();
+    var failures = new AtomicInteger();
+    var start = new CountDownLatch(1);
+    var done = new CountDownLatch(threads);
+    var pool = Executors.newFixedThreadPool(threads);
+    try (var work = admission.admit(context(EngineContext.Survival.INTERACTIVE,
+        EngineContext.Urgency.FOREGROUND), false)) {
       for (int t = 0; t < threads; t++) {
         final int offset = t;
-        pool.execute(
-            () -> {
+        pool.execute(() -> {
+          try {
+            start.await();
+            for (int i = 0; i < callsPerThread; i++) {
+              boolean fail = (offset + i) % 3 == 0;
               try {
-                start.await();
-                for (int i = 0; i < callsPerThread; i++) {
-                  String operation = operations[(offset + i) % operations.length];
-                  boolean fail = (offset + i) % 3 == 0;
-                  try {
-                    gate.run(
-                        operation,
-                        () -> {
-                          int seen = load.inFlight();
-                          if (seen < 0) {
-                            negativeReadings.incrementAndGet();
-                          }
-                          if (seen == 0) {
-                            zeroWhileInFlight.incrementAndGet();
-                          }
-                          if (fail) {
-                            throw new CancellationException("cancelled");
-                          }
-                        });
-                  } catch (CancellationException expected) {
-                    // the failing third of the calls: the gauge must still balance
-                  }
-                  if (load.inFlight() < 0) {
-                    negativeReadings.incrementAndGet();
-                  }
-                }
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              } finally {
-                done.countDown();
+                gate.run(work, () -> {
+                  int seen = load.inFlight();
+                  if (seen < 0) negativeReadings.incrementAndGet();
+                  if (seen == 0) zeroWhileInFlight.incrementAndGet();
+                  if (fail) throw new CancellationException("cancelled");
+                });
+              } catch (CancellationException expected) {
+                // Deliberately failing work must balance exactly like successful work.
               }
-            });
+              if (load.inFlight() < 0) negativeReadings.incrementAndGet();
+            }
+          } catch (Throwable failure) {
+            failures.incrementAndGet();
+          } finally {
+            done.countDown();
+          }
+        });
       }
       start.countDown();
       assertTrue(done.await(30, TimeUnit.SECONDS), "workers must finish");
     } finally {
       pool.shutdownNow();
     }
-
-    assertEquals(0, negativeReadings.get(), "the gauge must never read negative");
-    assertEquals(
-        0, zeroWhileInFlight.get(), "a call must always see itself counted while it executes");
-    assertEquals(0, load.inFlight(), "every increment must be balanced by exactly one decrement");
+    assertEquals(0, failures.get());
+    assertEquals(0, negativeReadings.get());
+    assertEquals(0, zeroWhileInFlight.get());
+    assertEquals(0, load.inFlight());
     assertEquals((long) threads * callsPerThread, load.startedTotal());
   }
 }

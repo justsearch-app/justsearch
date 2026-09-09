@@ -38,10 +38,10 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <ol>
  *   <li><b>Status/health polling never throttles indexing</b> — the wrong-gate arm. Tempdoc 885
- *       item 3 removed "an observer counts as a user": {@code indexStatus} and the health check are
- *       deliberately NOT in {@code ForegroundLoadGate.foregroundOperations()}. If either ever leaks
- *       back into the foreground set, a Head that merely polls its own status would stall its own
- *       indexing, which is the pre-885 defect wearing a different hat.
+ *       item 3 removed "an observer counts as a user": {@code indexStatus} and the health check
+ *       deliberately carry {@link io.justsearch.core.context.EngineContext.Urgency#BACKGROUND}.
+ *       If either ever leaks into foreground pacing, a Head that merely polls its own status would
+ *       stall its own indexing, which is the pre-885 defect wearing a different hat.
  *   <li><b>Real foreground search load throttles indexing without stopping it</b> — the duty cycle.
  *       The 885 baseline arm (c) indexed 699 of 5184 documents in 22 minutes under the old
  *       breath-hold pause; the property that replaced it is that the loop yields <em>and keeps
@@ -60,7 +60,7 @@ import org.junit.jupiter.api.io.TempDir;
  * the same claim is made against {@link IndexingPacing#pacedIntervalsTotal()} and
  * {@link IndexingPacing#yieldedMsTotal()}, monotonic counters that only advance when the loop
  * actually yielded to foreground load, and against {@link ForegroundLoad#startedTotal()}, which is
- * the only assertion that can distinguish "the poll RPCs are outside the foreground set" from "the
+ * the only assertion that can distinguish "the poll RPCs carry background urgency" from "the
  * gauge is not wired at all" (reference case {@code wrong-gate}: the gate was dead from A6 to A9
  * and no test could see it). {@code worker_state} is still read and still asserted on — it moves
  * (IndexingLoop.java:740-744 sets {@code PAUSED} for the duration of the yield) and it is the field
@@ -125,7 +125,7 @@ final class EngineForegroundPacingTest {
     root =
         new EngineRoot(
             g -> {
-              built[0] = new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g));
+              built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];
             },
             30_000L,
@@ -147,22 +147,21 @@ final class EngineForegroundPacingTest {
         submitInChunks(client, pollBatch) > 0, "the poll-phase corpus should have been accepted");
 
     // Both poll calls are hammered at 100 ms with no search traffic at all: getHealthCheck() is
-    // HealthService.Check and getStatus() is IngestService.IndexStatus — the exact call whose
-    // observer-counts-as-a-user behaviour tempdoc 885 item 3 removed. If either entered the
-    // foreground set, this loop alone would pin the gauge and the duty cycle would engage with
-    // nobody waiting on a search.
+    // HealthService.Check and getStatus() is IngestService.IndexStatus. The explicit BACKGROUND
+    // context is the contract that keeps these observations outside pacing; if either leaked into
+    // foreground pacing, this loop alone would pin the gauge with nobody waiting on a search.
     long pollDeadline = System.currentTimeMillis() + 30_000;
     long pollMinimumUntil = System.currentTimeMillis() + 5_000;
     int pollSamples = 0;
     long docsAfterPolling = 0;
     while (System.currentTimeMillis() < pollDeadline) {
-      String state = client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState();
+      String state = client.getHealthCheck(TestEngineContexts.BACKGROUND).getWorkerState();
       assertNotEquals(
           "PAUSED",
           state,
           "status/health polling must never throttle indexing — a PAUSED sample here means an"
-              + " ingest or health operation leaked into ForegroundLoadGate's foreground set");
-      docsAfterPolling = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount();
+              + " ingest or health operation carried foreground urgency");
+      docsAfterPolling = client.getStatus(TestEngineContexts.BACKGROUND).getCore().getDocCount();
       pollSamples++;
       if (docsAfterPolling > 0 && System.currentTimeMillis() >= pollMinimumUntil) {
         break;
@@ -175,8 +174,8 @@ final class EngineForegroundPacingTest {
     assertEquals(
         foregroundBeforePolling,
         foregroundLoad.startedTotal(),
-        "no status or health call may enter the foreground set — " + pollSamples
-            + " poll samples moved ForegroundLoad.startedTotal, which only a foreground-labelled"
+        "no status or health call may carry foreground urgency — " + pollSamples
+            + " poll samples moved ForegroundLoad.startedTotal, which only a foreground-urgent"
             + " operation may do");
     assertTrue(
         docsAfterPolling > 0,
@@ -186,8 +185,8 @@ final class EngineForegroundPacingTest {
     // ---- Phase 2: real foreground search load drives the gauge and the duty cycle. --------------
     assertTrue(
         submitInChunks(client, loadBatch) > 0, "the load-phase corpus should have been accepted");
-    long docsBeforeLoad = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount();
-    long queueDepthAtLoadStart = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getQueueDepth();
+    long docsBeforeLoad = client.getStatus(TestEngineContexts.BACKGROUND).getCore().getDocCount();
+    long queueDepthAtLoadStart = client.getStatus(TestEngineContexts.BACKGROUND).getCore().getQueueDepth();
     assertTrue(
         queueDepthAtLoadStart > 0,
         "the load phase must start with work queued, otherwise it cannot tell a throttled loop from"
@@ -218,10 +217,10 @@ final class EngineForegroundPacingTest {
       long loadMinimumUntil = System.currentTimeMillis() + 12_000;
       docsUnderLoad = docsBeforeLoad;
       while (System.currentTimeMillis() < loadDeadline) {
-        if ("PAUSED".equals(client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState())) {
+        if ("PAUSED".equals(client.getHealthCheck(TestEngineContexts.BACKGROUND).getWorkerState())) {
           observedPaused.set(true); // sampled inside a duty-cycle yield window
         }
-        docsUnderLoad = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount();
+        docsUnderLoad = client.getStatus(TestEngineContexts.BACKGROUND).getCore().getDocCount();
         // Exit as soon as every property this phase asserts has been observed, and not before —
         // otherwise the assertions below would be graded on a 12 s window rather than on the full
         // deadline, which is how "X happened" degrades into "X happened fast enough".
@@ -293,10 +292,10 @@ final class EngineForegroundPacingTest {
   private static String awaitWorkerState(KnowledgeClient client, long timeoutMs)
       throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
-    String state = client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState();
+    String state = client.getHealthCheck(TestEngineContexts.BACKGROUND).getWorkerState();
     while (System.currentTimeMillis() < deadline && "PAUSED".equals(state)) {
       Thread.sleep(100);
-      state = client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState();
+      state = client.getHealthCheck(TestEngineContexts.BACKGROUND).getWorkerState();
     }
     return state;
   }
@@ -305,7 +304,7 @@ final class EngineForegroundPacingTest {
     int accepted = 0;
     for (int from = 0; from < corpus.size(); from += SUBMIT_CHUNK) {
       int to = Math.min(from + SUBMIT_CHUNK, corpus.size());
-      accepted += client.submitBatch(corpus.subList(from, to), TestEngineContexts.FOREGROUND).getAcceptedCount();
+      accepted += client.submitBatch(corpus.subList(from, to), TestEngineContexts.BACKGROUND).getAcceptedCount();
     }
     return accepted;
   }
