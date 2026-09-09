@@ -50,7 +50,9 @@ class DiagnosticsServiceImplFeTelemetryTest {
   void embedsFeTelemetryEntryVerbatim() throws Exception {
     String feTelemetry = "{\n  \"wireDrift\" : {\n    \"total\" : 2\n  }\n}";
 
-    Path zip = service().exportDiagnostics(feTelemetry);
+    Path zip =
+        service().exportDiagnostics(
+            feTelemetry, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(Files.isRegularFile(zip), "export zip should exist");
     try (ZipFile zf = new ZipFile(zip.toFile())) {
@@ -63,8 +65,10 @@ class DiagnosticsServiceImplFeTelemetryTest {
 
   @Test
   void omitsEntryWhenNoFeTelemetrySupplied() throws Exception {
-    Path viaNull = service().exportDiagnostics(null);
-    Path viaNoArg = service().exportDiagnostics();
+    Path viaNull =
+        service().exportDiagnostics(null, io.justsearch.app.services.TestEngineContexts.internal());
+    Path viaNoArg =
+        service().exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
 
     try (ZipFile zf = new ZipFile(viaNull.toFile())) {
       assertNull(zf.getEntry("frontend/fe-telemetry.json"), "null telemetry must add no entry");

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap.phases;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.gpl.GplEvalSnapshot;
 import io.justsearch.app.services.gpl.GplJobCoordinator;
@@ -22,6 +24,9 @@ import org.slf4j.LoggerFactory;
  * (about 150 LOC of orchestration that doesn't belong in the bootstrap's body).
  */
 public final class GplOrchestration {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "gpl-orchestration", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
 
   private static final Logger log = LoggerFactory.getLogger(GplOrchestration.class);
 
@@ -67,7 +72,7 @@ public final class GplOrchestration {
         if (client == null) {
           continue;
         }
-        io.justsearch.ipc.StatusResponse status = client.getStatus();
+        io.justsearch.ipc.StatusResponse status = client.getStatus(ENGINE_CONTEXT);
         String state = status.getCore().getState();
         long docCount = status.getCore().getDocCount();
         long uptimeMs = status.getCore().getUptimeMs();
@@ -126,7 +131,7 @@ public final class GplOrchestration {
                               .build())
                       .build())
               .build();
-      io.justsearch.ipc.SearchResponse resp = client.search(req);
+      io.justsearch.ipc.SearchResponse resp = client.search(req, ENGINE_CONTEXT);
       io.justsearch.ipc.FacetCounts counts = resp.getFacetsMap().get("mime");
       return counts != null ? new HashMap<>(counts.getCountsMap()) : Map.of();
     } catch (Exception e) {
@@ -139,7 +144,7 @@ public final class GplOrchestration {
   public static void captureSnapshot(
       KnowledgeClient client, GplJobCoordinator coordinator, Path snapshotFile) {
     try {
-      io.justsearch.ipc.StatusResponse status = client.getStatus();
+      io.justsearch.ipc.StatusResponse status = client.getStatus(ENGINE_CONTEXT);
       Map<String, Long> mimeCounts = fetchMimeFacets(client);
       long triples = coordinator.getStatus().tripleCount();
       GplEvalSnapshot.capture(status, mimeCounts, triples).save(snapshotFile);

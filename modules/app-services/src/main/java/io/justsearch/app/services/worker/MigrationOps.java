@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.IndexingService.MigrationOutcome;
 import io.justsearch.ipc.IndexGcRequest;
 import io.justsearch.ipc.MigrationCutoverRequest;
@@ -30,7 +32,7 @@ final class MigrationOps {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
     }
 
-    MigrationOutcome startMigration(String reason) {
+    MigrationOutcome startMigration(String reason, EngineContext engineContext) {
         try {
             MigrationStartRequest req =
                     MigrationStartRequest.newBuilder()
@@ -41,7 +43,7 @@ final class MigrationOps {
                     rpc.execute(
                             "startMigration",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.startMigration(req));
+                            stub -> stub.startMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("startMigration rejected: {}", resp.getError());
             } else {
@@ -63,7 +65,7 @@ final class MigrationOps {
         }
     }
 
-    MigrationOutcome requestCutover(boolean forceSwitching) {
+    MigrationOutcome requestCutover(boolean forceSwitching, EngineContext engineContext) {
         try {
             MigrationCutoverRequest req =
                     MigrationCutoverRequest.newBuilder()
@@ -73,7 +75,7 @@ final class MigrationOps {
                     rpc.execute(
                             "requestCutover",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.requestCutover(req));
+                            stub -> stub.requestCutover(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("requestCutover rejected: {}", resp.getError());
             } else {
@@ -89,7 +91,7 @@ final class MigrationOps {
         }
     }
 
-    MigrationOutcome rollbackMigration() {
+    MigrationOutcome rollbackMigration(EngineContext engineContext) {
         try {
             MigrationRollbackRequest req =
                     MigrationRollbackRequest.newBuilder().setRestartWorker(true).build();
@@ -97,7 +99,7 @@ final class MigrationOps {
                     rpc.execute(
                             "rollbackMigration",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.rollbackMigration(req));
+                            stub -> stub.rollbackMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("rollbackMigration rejected: {}", resp.getError());
             } else {
@@ -117,7 +119,7 @@ final class MigrationOps {
         }
     }
 
-    boolean pauseMigration(String reason) {
+    boolean pauseMigration(String reason, EngineContext engineContext) {
         try {
             MigrationPauseRequest req =
                     MigrationPauseRequest.newBuilder()
@@ -127,7 +129,7 @@ final class MigrationOps {
                     rpc.execute(
                             "pauseMigration",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.pauseMigration(req));
+                            stub -> stub.pauseMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("pauseMigration rejected: {}", resp.getError());
             } else {
@@ -143,14 +145,14 @@ final class MigrationOps {
         }
     }
 
-    boolean resumeMigration() {
+    boolean resumeMigration(EngineContext engineContext) {
         try {
             MigrationResumeRequest req = MigrationResumeRequest.newBuilder().build();
             var resp =
                     rpc.execute(
                             "resumeMigration",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.resumeMigration(req));
+                            stub -> stub.resumeMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("resumeMigration rejected: {}", resp.getError());
             } else {
@@ -173,7 +175,7 @@ final class MigrationOps {
      * body both surface these counts.
      */
     io.justsearch.app.api.IndexingService.IndexGcOutcome runIndexGc(
-            int keepLatest, boolean pruneMarkedOnly) {
+            int keepLatest, boolean pruneMarkedOnly, EngineContext engineContext) {
         try {
             IndexGcRequest req =
                     IndexGcRequest.newBuilder()
@@ -184,7 +186,7 @@ final class MigrationOps {
                     rpc.execute(
                             "runIndexGc",
                             KnowledgeClient.RpcDeadlineCategory.INDEX_GC,
-                            stub -> stub.runIndexGc(req));
+                            stub -> stub.runIndexGc(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("runIndexGc rejected: {}", resp.getError());
                 return new io.justsearch.app.api.IndexingService.IndexGcOutcome(
@@ -216,7 +218,7 @@ final class MigrationOps {
      * generation prune, and both are far past the standard RPC budget.
      */
     io.justsearch.app.api.IndexingService.SettleIndexOutcome settleIndex(
-            boolean expungeDeletesOnly, int maxSegments) {
+            boolean expungeDeletesOnly, int maxSegments, EngineContext engineContext) {
         try {
             SettleIndexRequest req =
                     SettleIndexRequest.newBuilder()
@@ -227,7 +229,7 @@ final class MigrationOps {
                     rpc.execute(
                             "settleIndex",
                             KnowledgeClient.RpcDeadlineCategory.INDEX_GC,
-                            stub -> stub.settleIndex(req));
+                            stub -> stub.settleIndex(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("settleIndex rejected: {}", resp.getError());
                 return io.justsearch.app.api.IndexingService.SettleIndexOutcome.refused(

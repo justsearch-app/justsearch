@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.BackendIntentRouter;
 import io.justsearch.agent.api.registry.Intent;
 import io.justsearch.agent.api.registry.IntentDispatchResult;
@@ -200,11 +202,11 @@ public final class BackendIntentRouterImpl implements BackendIntentRouter {
   }
 
   @Override
-  public IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance) {
+  public IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance, EngineContext engineContext) {
     Objects.requireNonNull(intent, "intent");
     Objects.requireNonNull(provenance, "provenance");
     return switch (intent.address()) {
-      case ShellAddress.Invocation inv -> dispatchInvocation(inv, provenance);
+      case ShellAddress.Invocation inv -> dispatchInvocation(inv, provenance, engineContext);
       // Navigation and Query (548 S4-A) are both forwarded verbatim to the FE intent
       // stream; the FE IntentRouter resolves Query to a search-surface activation.
       case ShellAddress.Navigation ignored -> forwardToFrontend(intent, provenance);
@@ -214,7 +216,7 @@ public final class BackendIntentRouterImpl implements BackendIntentRouter {
   }
 
   private IntentDispatchResult dispatchInvocation(
-      ShellAddress.Invocation invocation, InvocationProvenance provenance) {
+      ShellAddress.Invocation invocation, InvocationProvenance provenance, EngineContext engineContext) {
     OperationRef ref = invocation.target();
     Operation op =
         operationCatalog
@@ -230,7 +232,7 @@ public final class BackendIntentRouterImpl implements BackendIntentRouter {
     // ConfirmationRequiredException for the caller to surface elicitation UX.
     OperationResult result =
         operationDispatcher.dispatch(
-            op, invocation.argsJson(), provenance, invocation.confirmationToken());
+            op, invocation.argsJson(), provenance, invocation.confirmationToken(), engineContext);
     return new IntentDispatchResult.Dispatched(result);
   }
 

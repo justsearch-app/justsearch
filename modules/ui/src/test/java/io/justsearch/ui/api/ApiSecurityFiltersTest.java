@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -177,12 +178,13 @@ class ApiSecurityFiltersTest {
     DocumentService documentService =
         new DocumentService() {
           @Override
-          public CompletableFuture<DocumentRecord> fetch(String docId) {
+          public CompletableFuture<DocumentRecord> fetch(String docId, EngineContext engineContext) {
             return CompletableFuture.completedFuture(null);
           }
 
           @Override
-          public CompletableFuture<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
+          public CompletableFuture<DocumentIdPage> listAllDocumentIds(
+              int offset, int limit, EngineContext engineContext) {
             return CompletableFuture.completedFuture(
                 new DocumentIdPage(
                     List.of("C:/root/a.txt", "C:/root/nested/b.txt"), 2, 1));

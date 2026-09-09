@@ -102,10 +102,10 @@ final class RichDocumentInProcessTest {
             5_000);
     KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
     assertNotNull(client, "the root must hand back a client");
-    assertTrue(client.isHealthy(), "Worker should be healthy");
+    assertTrue(client.isHealthy(TestEngineContexts.FOREGROUND), "Worker should be healthy");
 
     // 3. Submit PDF
-    BatchResponse batchResponse = client.submitBatch(List.of(pdfFile));
+    BatchResponse batchResponse = client.submitBatch(List.of(pdfFile), TestEngineContexts.FOREGROUND);
     assertEquals(1, batchResponse.getAcceptedCount(), "Should accept PDF file");
 
     // 4. Wait for indexing completion (queue drain + doc-count convergence)
@@ -140,12 +140,12 @@ final class RichDocumentInProcessTest {
 
   private static void waitForIndexing(KnowledgeClient client, long minDocCount)
       throws InterruptedException {
-    StatusResponse status = client.getStatus();
+    StatusResponse status = client.getStatus(TestEngineContexts.FOREGROUND);
     int maxWaitSeconds = 30;
     int stablePolls = 0;
     for (int i = 0; i < maxWaitSeconds && stablePolls < 2; i++) {
       Thread.sleep(1000);
-      status = client.getStatus();
+      status = client.getStatus(TestEngineContexts.FOREGROUND);
       if (status.getCore().getQueueDepth() == 0 && status.getCore().getDocCount() >= minDocCount) {
         stablePolls++;
       } else {
@@ -165,7 +165,7 @@ final class RichDocumentInProcessTest {
       KnowledgeClient client, String query, int limit, int maxAttempts) throws InterruptedException {
     SearchResponse latest = null;
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-      latest = client.search(query, limit, PipelineConfigs.TEXT);
+      latest = client.search(query, limit, PipelineConfigs.TEXT, TestEngineContexts.FOREGROUND);
       if (latest.getResultsCount() > 0) {
         return latest;
       }

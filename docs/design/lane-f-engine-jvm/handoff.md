@@ -747,3 +747,46 @@ survive asynchronous enqueue to a terminal ledger row, including recovery; a led
 constructor change cannot establish an agent-originated ingest. The root is tracing that queue
 ownership seam before implementing V14. C2 remains separate operations.db, with jobs identity
 unchanged. E observes three forty-minute runs to honor the original one-hour per-run ceiling.
+
+C1 batch 2 in progress (2026-09-09 continuation, based on `dd11e372d`): required contexts now
+propagate through ports, documents, agents/tools, conversation runners, request controllers,
+MCP and pending approvals. `stages/C1.md §0.1` records the ingress/trust decisions and scope.
+Jobs schema V14 persists admission originator/transport; maintenance preserves prior values,
+atomic claims snapshot them for terminal writes, and versioned SWITCHING UPSERTs preserve collection
+and attribution while reading legacy paths. The projection remains owned by the action ledger.
+Focused persistence, real bridge propagation and originator tests pass; the migrated app-agent
+suite passes 669/669 and app-agent-api 228/228. Store-recoverability and engine-port gates pass.
+Raw logs are `tmp/c1-batch2-*`; initial XML copies are under `tmp/c1-batch2-xml` (retain through
+lane F completion plus 30 days). These are working-tree results, not a committed/hosted proof.
+UI and app-services fixture migrations plus new approval/run provenance regressions are delegated;
+the root owns queue changes and all builds. Batch 2 remains incomplete until integrated build,
+full suite, review and evidence reconciliation pass. Admission, gauge changes and bounded
+executors remain batches 3/4; C2 begins only after batch 2 is reviewed and green.
+
+Independent batch-2 review found and corrected a same-path re-admission attribution race: claimed
+work now carries immutable provenance through extraction, stale outcomes and writing. A supplied
+legacy-null snapshot stays unknown instead of borrowing a later caller. The regression passes and
+fails with the previous current-row lookup restored (`tmp/c1-batch2-claim-mutation-red.txt`, XML
+under `tmp/c1-batch2-xml/claim-mutation-red.xml`). The restored implementation and a real Engine
+MCP submission reaching an agent/MCP SQLite outcome passed in `tmp/c1-batch2-claim-tests-2.txt`.
+Explicit directory-sync attribution (normal and SWITCHING) and request-span export provenance
+are now implemented and verified, including the final typed maintenance-coalescing correction.
+
+C1 batch 2 complete (2026-09-09, checkpoint containing this note). Required context migration,
+V14 durable provenance, real claim snapshots, versioned replay, maintenance coalescing and
+request logging all pass independent review and integrated verification. Full-build-6 passes
+including every Java source set and PMD; full-suite-3 reconciles 9503 tests with zero failures/errors
+and 25 skipped. Final XML/counts and adverse mutation proof are linked from evidence/C1/batch-2.md.
+The final owned live run a0dacbc2-580c-4d19-9e09-e9ae8fbca937 exercised hybrid dense/cross-encoder
+search and real compact-model summarization with citation scoring; it was stopped after proof.
+The compact output hit its token caps and is plumbing evidence only, not quality acceptance.
+
+Continue with C1 batch 3 from its section 12 brief. Read-only preparation is recorded in section
+0.1: one shared admission owner must be composed before asynchronous Engine startup; neutral
+cancellation handles must cross the front/Engine boundary; the urgency gauge must cover all
+unary/streaming work. The upgrade control routes must remain reachable after prepare freezes
+admission. The current MCP process inherited an old Claude identity: supply this Codex sessionId
+explicitly on start and subsequent calls, and use a worktree-relative dataDir. Its preflight's
+workerDist requirement is stale; the target worktree's normal runner installs the single Engine.
+No dev stack or Gradle task remains running. C2 can begin after this checkpoint, but admission and
+durable-handle integration still belong to C1 batch 3 and C2 in their documented order.

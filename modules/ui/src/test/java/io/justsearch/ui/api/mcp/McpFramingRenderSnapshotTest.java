@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -77,7 +78,7 @@ final class McpFramingRenderSnapshotTest {
       long indexedDocs) {
     McpSearchResponseContent content =
         surface().buildSearchContent(
-            resp, Map.of("query", query), framing, indexedDocs, CARRIAGE_OFF);
+            resp, Map.of("query", query), framing, indexedDocs, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     return McpToolSurface.renderSearchText(resp, content, false);
   }
 
@@ -187,7 +188,7 @@ final class McpFramingRenderSnapshotTest {
                 Map.of("query", "what happened to the Q3 hedging memo"),
                 F1,
                 -1L,
-                CARRIAGE_OFF);
+                CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     // The fact is computed either way — the density decision is the renderer's.
     assertTrue(content.hits().get(0).continuation().contains("Vince Kaminski"));
 
@@ -211,14 +212,14 @@ final class McpFramingRenderSnapshotTest {
     KnowledgeSearchResponse resp = hopOneResponse();
     McpSearchResponseContent content =
         surface()
-            .buildSearchContent(resp, Map.of("query", "hedging memo"), F1, -1L, CARRIAGE_OFF);
+            .buildSearchContent(resp, Map.of("query", "hedging memo"), F1, -1L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     Map<String, Object> structured = McpEvidenceProjection.searchEvidence(resp, content, false);
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> results = (List<Map<String, Object>>) structured.get("results");
     assertTrue(((String) results.get(0).get("continuation")).contains("Vince Kaminski"));
 
     McpSearchResponseContent offContent =
-        surface().buildSearchContent(resp, Map.of("query", "hedging memo"), OFF, -1L, CARRIAGE_OFF);
+        surface().buildSearchContent(resp, Map.of("query", "hedging memo"), OFF, -1L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     Map<String, Object> offStructured =
         McpEvidenceProjection.searchEvidence(resp, offContent, false);
     @SuppressWarnings("unchecked")
@@ -250,12 +251,12 @@ final class McpFramingRenderSnapshotTest {
     // Tier equivalence (735 G3): the header must reach structuredContent too, or a client that
     // delivers the structured tier would silently sit outside the probe arm.
     McpSearchResponseContent onContent =
-        surface().buildSearchContent(resp, Map.of("query", "hedging memo"), F2, -1L, CARRIAGE_OFF);
+        surface().buildSearchContent(resp, Map.of("query", "hedging memo"), F2, -1L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     assertTrue(
         ((String) McpEvidenceProjection.searchEvidence(resp, onContent, false).get("evidenceHeader"))
             .startsWith("Retrieval evidence"));
     McpSearchResponseContent offContent =
-        surface().buildSearchContent(resp, Map.of("query", "hedging memo"), OFF, -1L, CARRIAGE_OFF);
+        surface().buildSearchContent(resp, Map.of("query", "hedging memo"), OFF, -1L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     assertFalse(
         McpEvidenceProjection.searchEvidence(resp, offContent, false)
             .containsKey("evidenceHeader"));
@@ -266,9 +267,9 @@ final class McpFramingRenderSnapshotTest {
   void f2AnswerBeforeAfter() {
     ContextResult result = answerResult();
     McpAnswerResponseContent offContent =
-        surface().buildAnswerContent(result, "who escalated the hedge", OFF);
+        surface().buildAnswerContent(result, "who escalated the hedge", OFF, TestRequestContexts.mcp("s1"));
     McpAnswerResponseContent onContent =
-        surface().buildAnswerContent(result, "who escalated the hedge", F2);
+        surface().buildAnswerContent(result, "who escalated the hedge", F2, TestRequestContexts.mcp("s1"));
     String before = McpToolSurface.renderAnswerText(result, offContent, false, "q");
     String after = McpToolSurface.renderAnswerText(result, onContent, false, "q");
 
@@ -313,14 +314,14 @@ final class McpFramingRenderSnapshotTest {
     // Tier equivalence (735 G3): the absence note reaches structuredContent too.
     McpSearchResponseContent onContent =
         surface().buildSearchContent(
-            resp, Map.of("query", "quarterly hedging policy"), F3, 10_432L, CARRIAGE_OFF);
+            resp, Map.of("query", "quarterly hedging policy"), F3, 10_432L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     assertTrue(
         ((String) McpEvidenceProjection.searchEvidence(resp, onContent, false).get("absenceNote"))
             .contains("Absence of results is not evidence of absence"));
     McpSearchResponseContent offContent =
         surface()
             .buildSearchContent(
-                resp, Map.of("query", "quarterly hedging policy"), OFF, 10_432L, CARRIAGE_OFF);
+                resp, Map.of("query", "quarterly hedging policy"), OFF, 10_432L, CARRIAGE_OFF, TestRequestContexts.mcp("s1"));
     assertFalse(
         McpEvidenceProjection.searchEvidence(resp, offContent, false).containsKey("absenceNote"));
   }

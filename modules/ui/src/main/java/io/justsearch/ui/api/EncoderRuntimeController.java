@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.app.api.inference.EncoderRuntimeResponse;
 import io.justsearch.app.api.inference.EncoderRuntimeView;
@@ -53,18 +55,19 @@ public final class EncoderRuntimeController {
 
   /** Handler for {@code GET /api/inference/encoders}. */
   public void handle(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     ctx.contentType("application/json");
-    ctx.json(buildResponse());
+    ctx.json(buildResponse(engineContext));
   }
 
   /** Package-private for tests. Returns the typed response body (Jackson serialises). */
-  EncoderRuntimeResponse buildResponse() {
+  EncoderRuntimeResponse buildResponse(EngineContext engineContext) {
     KnowledgeClient current = this.client;
     if (current == null) {
       return new EncoderRuntimeResponse(Map.of(), "worker-unreachable");
     }
 
-    Map<String, Object> policies = current.getSessionPolicies();
+    Map<String, Object> policies = current.getSessionPolicies(engineContext);
     Object configStatusNode = policies.get("configStatus");
     if ("worker-unreachable".equals(configStatusNode)) {
       return new EncoderRuntimeResponse(Map.of(), "worker-unreachable");
@@ -79,7 +82,7 @@ public final class EncoderRuntimeController {
     // /api/ai/runtime/status's observed-EP fields project the SAME derivation instead of
     // re-implementing it. This controller keeps only its own reachability reporting.
     Map<EncoderRole, EncoderRuntimeView> derived =
-        EncoderRuntimeExplainer.explainAll(policies, current.getEncoderOrtCudaViews());
+        EncoderRuntimeExplainer.explainAll(policies, current.getEncoderOrtCudaViews(engineContext));
     Map<String, EncoderRuntimeView> encoders = new LinkedHashMap<>();
     for (Map.Entry<EncoderRole, EncoderRuntimeView> entry : derived.entrySet()) {
       encoders.put(entry.getKey().consumerName(), entry.getValue());

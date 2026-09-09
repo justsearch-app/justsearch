@@ -164,10 +164,10 @@ final class EngineFormatCapabilityMatrixTest {
         "Every matrix row needs its own path hash for ledger reconciliation");
 
     harness = EngineTestHarness.start(tempDir.resolve("data"));
-    assertTrue(harness.client().isHealthy(), "the engine must be healthy before indexing");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before indexing");
     assertEquals(
         FormatId.values().length,
-        harness.client().submitBatch(fixtures).getAcceptedCount(),
+        harness.client().submitBatch(fixtures, TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the engine should admit every generated fixture");
     assertTrue(
         harness.awaitIndexed(FormatId.values().length, INDEX_TIMEOUT_MS),
@@ -234,7 +234,7 @@ final class EngineFormatCapabilityMatrixTest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (true) {
       List<Map<String, Object>> matrixEvents =
-          harness.client().recentIngestionEvents(LEDGER_LIMIT).stream()
+          harness.client().recentIngestionEvents(LEDGER_LIMIT, TestEngineContexts.FOREGROUND).stream()
               .filter(event -> MATRIX_PATH_HASHES.contains(event.get("pathHash")))
               .toList();
       if (matrixEvents.size() >= expectedRows || System.currentTimeMillis() >= deadline) {
@@ -252,7 +252,7 @@ final class EngineFormatCapabilityMatrixTest {
   private static SearchResult awaitRowHit(FormatId id, String marker, String normalizedPath)
       throws InterruptedException {
     long deadline = System.currentTimeMillis() + SEARCH_TIMEOUT_MS;
-    SearchResponse search = harness.client().search(marker, SEARCH_LIMIT);
+    SearchResponse search = harness.client().search(marker, SEARCH_LIMIT, TestEngineContexts.FOREGROUND);
     while (true) {
       for (SearchResult result : search.getResultsList()) {
         if (normalizedPath.equals(result.getId())) {
@@ -263,7 +263,7 @@ final class EngineFormatCapabilityMatrixTest {
         break;
       }
       Thread.sleep(250);
-      search = harness.client().search(marker, SEARCH_LIMIT);
+      search = harness.client().search(marker, SEARCH_LIMIT, TestEngineContexts.FOREGROUND);
     }
     return fail(
         id
@@ -281,7 +281,7 @@ final class EngineFormatCapabilityMatrixTest {
 
     for (int page = 0; page < 100; page++) {
       FetchDocumentSliceResponse response =
-          harness.client().fetchDocumentSlice(docId, offset, SLICE_CHARS);
+          harness.client().fetchDocumentSlice(docId, offset, SLICE_CHARS, TestEngineContexts.FOREGROUND);
       assertTrue(response.getFound(), "Stored document should exist: " + docId);
       assertEquals(docId, response.getDocId(), "Slice should retain the requested document id");
 

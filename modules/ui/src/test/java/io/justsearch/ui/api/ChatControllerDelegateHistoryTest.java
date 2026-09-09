@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -184,7 +185,7 @@ final class ChatControllerDelegateHistoryTest {
     body.put("messages", List.of(Map.of("role", "user", "content", question)));
     body.put("conversationId", conversationId);
     body.put("maxIterations", 1);
-    engine.run(AgentRunShape.ID, body, Audience.USER, ev -> {});
+    engine.run(AgentRunShape.ID, body, Audience.USER, ev -> {}, TestRequestContexts.browser());
   }
 
   private static JsonNode loadHistory(
@@ -214,7 +215,7 @@ final class ChatControllerDelegateHistoryTest {
   private static AgentService stubAgent(Consumer<Consumer<AgentEvent>> script) {
     return new AgentService() {
       @Override
-      public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+      public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
         script.accept(eventConsumer);
       }
 

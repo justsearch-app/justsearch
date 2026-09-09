@@ -91,7 +91,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     log.append(advisoryFor(consumedId));
     assertTrue(store.consume(consumedId).isPresent(), "precondition: pending was consumed");
 
@@ -134,7 +136,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     String liveId =
         store.create(
             "core.reindex-library",
@@ -144,7 +148,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     log.append(advisoryFor(consumedId));
     log.append(advisoryFor(liveId));
     assertTrue(store.consume(consumedId).isPresent(), "precondition: pending was consumed");
@@ -207,7 +213,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     log.append(advisoryFor(expiredId));
     now.set(createdAt.plus(ttl).plusSeconds(1));
 

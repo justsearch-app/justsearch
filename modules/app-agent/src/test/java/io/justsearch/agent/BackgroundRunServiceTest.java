@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,14 +37,19 @@ final class BackgroundRunServiceTest {
     }
 
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
-      runAgent(request, eventConsumer, false);
+    public void runAgent(
+        AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
+      runAgent(request, eventConsumer, false, engineContext);
     }
 
     // Mirrors AgentLoopService: a background run is stamped on its durable record (P-D2), so the
     // presence projection can surface it; an interactive run is not.
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background) {
+    public void runAgent(
+        AgentRequest request,
+        Consumer<AgentEvent> eventConsumer,
+        boolean background,
+        EngineContext engineContext) {
       String sid = UUID.randomUUID().toString();
       runStore.startRun(sid, request, request.messages(), 1000);
       if (background) {
@@ -99,7 +106,8 @@ final class BackgroundRunServiceTest {
     String sid =
         background.runInBackground(
             AgentRequest.singleTurn(
-                List.of(Map.of("role", "user", "content", "reindex the new files overnight"))));
+                List.of(Map.of("role", "user", "content", "reindex the new files overnight"))),
+            EngineContextTestFixtures.AGENT_LOOP_BACKGROUND);
 
     // The producer ran a real detached run and stamped the durable record.
     assertNotNull(sid, "the run started and its sessionId was captured");
@@ -128,7 +136,7 @@ final class BackgroundRunServiceTest {
     // Drive runAgent directly (an interactive run) — NOT through BackgroundRunService, so unmarked.
     loop.runAgent(
         AgentRequest.singleTurn(List.of(Map.of("role", "user", "content", "find invoices"))),
-        ev -> {});
+        ev -> {}, EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(
         loop.presenceSince(Instant.now().minusSeconds(3600)).isEmpty(),

@@ -171,7 +171,7 @@ final class AgentController {
                   // Tempdoc 577 §2.14 Root I (#13) — the initiating run observer EVICTS on
                   // disconnect (it throws, so the run drops it), the precondition the
                   // zero-observer park needs.
-                  sseEvent -> sseWriter.writeOrEvict(ctx, sseEvent.name(), sseEvent.payload())));
+                  sseEvent -> sseWriter.writeOrEvict(ctx, sseEvent.name(), sseEvent.payload()), RequestEngineContext.agent(ctx)));
     } catch (UnknownShapeException unknown) {
       LOG.warn("Rejecting agent run for unknown shapeId: {}", unknown.getMessage());
       Map<String, Object> errPayload = new LinkedHashMap<>();
@@ -612,7 +612,7 @@ final class AgentController {
     sseWriter.initSseHeaders(ctx, "/api/chat/sessions/resume-last");
     try {
       withHeartbeat(
-          ctx, () -> agentService().resumeLastSession(event -> sseWriter.writeAgentEvent(ctx, event)));
+          ctx, () -> agentService().resumeLastSession(event -> sseWriter.writeAgentEvent(ctx, event), RequestEngineContext.agent(ctx)));
     } catch (Exception e) {
       LOG.error("Failed to resume last agent session", e);
       Map<String, Object> resumeErr = new LinkedHashMap<>();
@@ -645,7 +645,7 @@ final class AgentController {
     try {
       withHeartbeat(
           ctx,
-          () -> agentService().resumeSession(sessionId, event -> sseWriter.writeAgentEvent(ctx, event)));
+          () -> agentService().resumeSession(sessionId, event -> sseWriter.writeAgentEvent(ctx, event), RequestEngineContext.agent(ctx)));
     } catch (Exception e) {
       LOG.error("Failed to resume agent session {}", sessionId, e);
       Map<String, Object> resumeErr = new LinkedHashMap<>();
@@ -690,7 +690,7 @@ final class AgentController {
           ctx,
           () ->
               agentService()
-                  .forkSession(sessionId, forkMessage, event -> sseWriter.writeAgentEvent(ctx, event)));
+                  .forkSession(sessionId, forkMessage, event -> sseWriter.writeAgentEvent(ctx, event), RequestEngineContext.agent(ctx)));
     } catch (Exception e) {
       LOG.error("Failed to fork agent session {}", sessionId, e);
       Map<String, Object> forkErr = new LinkedHashMap<>();

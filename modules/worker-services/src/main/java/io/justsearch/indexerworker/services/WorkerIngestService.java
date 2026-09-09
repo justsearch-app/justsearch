@@ -537,7 +537,7 @@ public final class WorkerIngestService {
         if (switchBufferOps.isSwitching()) {
           if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
             return switchBufferOps.bufferSubmitBatchDuringSwitching(
-                sbq, validPaths, filePaths.size(), rejected);
+                sbq, validPaths, filePaths.size(), rejected, request.getTargetCollection(), ctx.provenance());
           }
           throw IngestSwitchBufferOps.switchingUnavailable();
         }
@@ -550,7 +550,7 @@ public final class WorkerIngestService {
         // entry to unknown size (NULL) — it never rejects the enqueue.
         int accepted =
             jobQueue.enqueueEntries(
-                validPaths.stream().map(JobQueue.EnqueueEntry::stat).toList(), collection);
+                validPaths.stream().map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance())).toList(), collection);
 
         // Mark paths for force reindex if requested (bypasses "unchanged" check).
         // The key must be the one JobBatchExtractor looks the forced set up by — the envelope's —
@@ -1124,6 +1124,20 @@ public final class WorkerIngestService {
    * <p><b>Throttling:</b> Checks user activity every 100 files, sleeps 1ms every 100 files.
    */
   public SyncDirectoryResponse syncDirectory(SyncDirectoryRequest request, CallContext ctx) {
+    JobQueue.EnqueueProvenance provenance =
+        ctx.engineContext().clientKind() == io.justsearch.core.context.EngineContext.ClientKind.INTERNAL
+            && "SYSTEM_INTERNAL".equals(ctx.provenance().transport()) ? null : ctx.provenance();
+    return syncDirectoryCommon(request, ctx, provenance);
+  }
+
+  /** Replays a durable sync with its persisted descriptive attribution. */
+  public SyncDirectoryResponse syncDirectoryForReplay(
+      SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
+    return syncDirectoryCommon(request, CallContext.none(), provenance);
+  }
+
+  private SyncDirectoryResponse syncDirectoryCommon(
+      SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance) {
     try (var ignored = openRequestMdc(ctx)) {
       String rootPath = request.getRootPath();
       boolean force = request.getForce();
@@ -1140,7 +1154,9 @@ public final class WorkerIngestService {
         // During cutover, accept and durably buffer sync requests so OVERFLOW/burst events don't get lost.
         return switchBufferOps.bufferDuringSwitchingOrThrow(
             "syncDirectory",
-            sbq -> switchBufferOps.bufferSyncDirectoryDuringSwitching(sbq, rootPath, force));
+            sbq ->
+                switchBufferOps.bufferSyncDirectoryDuringSwitching(
+                    sbq, rootPath, force, provenance));
       }
 
       SyncDirectoryResponse unavailable =
@@ -1150,7 +1166,7 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      return syncOps.execute(rootPath, force);
+      return syncOps.execute(rootPath, force, provenance);
     }
   }
 
@@ -1799,7 +1815,7 @@ public final class WorkerIngestService {
           };
       WorkerScanOps.ScanRequest scanRequest =
           new WorkerScanOps.ScanRequest(
-              root, request.getCollection(), mode, request.getExcludeGlobsList(), scanId);
+              root, request.getCollection(), mode, request.getExcludeGlobsList(), scanId, ctx.provenance());
       // Tempdoc 418 B-H.3 — Worker owns backpressure + cancellation. The call's cancellation
       // signal lets WorkerScanOps stop walking when the caller drops the stream (e.g.,
       // RootLifecycleOps removes the watched root mid-scan).

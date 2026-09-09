@@ -156,13 +156,13 @@ final class EngineForegroundPacingTest {
     int pollSamples = 0;
     long docsAfterPolling = 0;
     while (System.currentTimeMillis() < pollDeadline) {
-      String state = client.getHealthCheck().getWorkerState();
+      String state = client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState();
       assertNotEquals(
           "PAUSED",
           state,
           "status/health polling must never throttle indexing — a PAUSED sample here means an"
               + " ingest or health operation leaked into ForegroundLoadGate's foreground set");
-      docsAfterPolling = client.getStatus().getCore().getDocCount();
+      docsAfterPolling = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount();
       pollSamples++;
       if (docsAfterPolling > 0 && System.currentTimeMillis() >= pollMinimumUntil) {
         break;
@@ -186,8 +186,8 @@ final class EngineForegroundPacingTest {
     // ---- Phase 2: real foreground search load drives the gauge and the duty cycle. --------------
     assertTrue(
         submitInChunks(client, loadBatch) > 0, "the load-phase corpus should have been accepted");
-    long docsBeforeLoad = client.getStatus().getCore().getDocCount();
-    long queueDepthAtLoadStart = client.getStatus().getCore().getQueueDepth();
+    long docsBeforeLoad = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount();
+    long queueDepthAtLoadStart = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getQueueDepth();
     assertTrue(
         queueDepthAtLoadStart > 0,
         "the load phase must start with work queued, otherwise it cannot tell a throttled loop from"
@@ -204,7 +204,7 @@ final class EngineForegroundPacingTest {
             () -> {
               while (loadRunning.get()) {
                 try {
-                  client.search("chaos throttling probe", 5);
+                  client.search("chaos throttling probe", 5, TestEngineContexts.FOREGROUND);
                   queriesIssued.incrementAndGet();
                 } catch (RuntimeException underLoad) {
                   // A search failing under load is not what this test measures; the queries that
@@ -218,10 +218,10 @@ final class EngineForegroundPacingTest {
       long loadMinimumUntil = System.currentTimeMillis() + 12_000;
       docsUnderLoad = docsBeforeLoad;
       while (System.currentTimeMillis() < loadDeadline) {
-        if ("PAUSED".equals(client.getHealthCheck().getWorkerState())) {
+        if ("PAUSED".equals(client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState())) {
           observedPaused.set(true); // sampled inside a duty-cycle yield window
         }
-        docsUnderLoad = client.getStatus().getCore().getDocCount();
+        docsUnderLoad = client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount();
         // Exit as soon as every property this phase asserts has been observed, and not before —
         // otherwise the assertions below would be graded on a 12 s window rather than on the full
         // deadline, which is how "X happened" degrades into "X happened fast enough".
@@ -293,10 +293,10 @@ final class EngineForegroundPacingTest {
   private static String awaitWorkerState(KnowledgeClient client, long timeoutMs)
       throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
-    String state = client.getHealthCheck().getWorkerState();
+    String state = client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState();
     while (System.currentTimeMillis() < deadline && "PAUSED".equals(state)) {
       Thread.sleep(100);
-      state = client.getHealthCheck().getWorkerState();
+      state = client.getHealthCheck(TestEngineContexts.FOREGROUND).getWorkerState();
     }
     return state;
   }
@@ -305,7 +305,7 @@ final class EngineForegroundPacingTest {
     int accepted = 0;
     for (int from = 0; from < corpus.size(); from += SUBMIT_CHUNK) {
       int to = Math.min(from + SUBMIT_CHUNK, corpus.size());
-      accepted += client.submitBatch(corpus.subList(from, to)).getAcceptedCount();
+      accepted += client.submitBatch(corpus.subList(from, to), TestEngineContexts.FOREGROUND).getAcceptedCount();
     }
     return accepted;
   }

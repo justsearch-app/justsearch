@@ -5,10 +5,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.app.engine.EngineRoot;
+import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.gpu.VramDetector;
 import io.justsearch.indexing.chunking.ChunkSplitter;
@@ -97,6 +99,11 @@ class SummarizationPipelineE2ETest {
   private static final Logger log = LoggerFactory.getLogger(SummarizationPipelineE2ETest.class);
   private static final int LLAMA_SERVER_PORT = 8080;
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final EngineContext TEST_ENGINE_CONTEXT =
+      EngineProvenance.internal(
+          "summarization-system-test",
+          EngineContext.Survival.INTERACTIVE,
+          EngineContext.Urgency.FOREGROUND);
 
   // Test document content (long enough to require chunking)
   private static final String TEST_DOCUMENT = """
@@ -562,7 +569,7 @@ class SummarizationPipelineE2ETest {
     // channel: there is no second process to spawn, no signal file to read a port out of, and no
     // channel to open. startEngine() either hands back a working client or throws.
     startEngine(env.getTempDir());
-    assertTrue(client.isHealthy(), "Engine should be healthy");
+    assertTrue(client.isHealthy(TEST_ENGINE_CONTEXT), "Engine should be healthy");
 
     // 3. Create test document file
     Path testDoc = testDataDir.resolve("quarterly-report.md");
@@ -572,7 +579,7 @@ class SummarizationPipelineE2ETest {
     log.info("Created test document: {} (docId: {})", filePath, docId);
 
     // 4. Submit for indexing
-    int accepted = client.submitBatch(List.of(testDoc)).getAcceptedCount();
+    int accepted = client.submitBatch(List.of(testDoc), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(1, accepted, "Should accept 1 file");
 
     // 5. Wait for indexing
@@ -667,7 +674,7 @@ class SummarizationPipelineE2ETest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        StatusResponse status = client.getStatus();
+        StatusResponse status = client.getStatus(TEST_ENGINE_CONTEXT);
         if (status.getCore().getQueueDepth() == 0
             && status.getCore().getDocCount() >= expectedDocCount) {
           return true;
@@ -724,7 +731,7 @@ class SummarizationPipelineE2ETest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        SearchResponse response = client.search(query, 10);
+        SearchResponse response = client.search(query, 10, TEST_ENGINE_CONTEXT);
         if (response.getTotalHits() > 0) {
           log.debug("Search '{}' returned {} hits", query, response.getTotalHits());
           return true;

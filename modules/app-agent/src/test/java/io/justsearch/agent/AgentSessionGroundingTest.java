@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,7 +28,7 @@ import org.junit.jupiter.api.Test;
 final class AgentSessionGroundingTest {
 
   private static AgentSession session() {
-    return new AgentSession(List.of(Map.of("role", "user", "content", "q")), 8000);
+    return new AgentSession(List.of(Map.of("role", "user", "content", "q")), 8000, EngineContextTestFixtures.AGENT_LOOP);
   }
 
   private static ToolCallRequest searchCall(String id) {

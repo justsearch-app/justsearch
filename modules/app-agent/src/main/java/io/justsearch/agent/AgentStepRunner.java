@@ -995,11 +995,11 @@ final class AgentStepRunner {
           // the LLM's original, unscoped arguments.
           ToolCallRequest scopedCall = toolDispatcher.scopeToolCall(op, call, session);
           if (wfRunner != null && wfRunner.handles(op.id())) {
-            toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink);
+            toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink, session.engineContext());
           } else {
             // Tempdoc 561 P-A1: thread the agent sessionId so the dispatched call stamps it as the
             // ledger correlationId (the History join key).
-            toolResult = toolDispatcher.executeOperationWithPolicy(op, scopedCall, sessionId);
+            toolResult = toolDispatcher.executeOperationWithPolicy(op, scopedCall, sessionId, session.engineContext());
           }
           // Tempdoc 415: tool_failure_total counts post-policy-retry failures of executed calls.
           if (!toolResult.success()) {
@@ -1235,7 +1235,7 @@ final class AgentStepRunner {
     AgentCitationResolver.Resolved resolved =
         citationResolver == null
             ? AgentCitationResolver.Resolved.none()
-            : citationResolver.resolve(response, sources);
+            : citationResolver.resolve(response, sources, session.engineContext());
     return new AgentEvent.AgentDone(
         response,
         session.iterationsUsed(),

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.services.worker.CancelToken;
 import io.justsearch.app.services.worker.HealthServiceCalls;
 import io.justsearch.app.services.worker.IngestServiceCalls;
@@ -156,15 +158,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   @Override
-  public io.justsearch.app.api.IndexingService.MigrationOutcome startMigration(String reason) {
-    var outcome = super.startMigration(reason);
+  public io.justsearch.app.api.IndexingService.MigrationOutcome startMigration(String reason, EngineContext engineContext) {
+    var outcome = super.startMigration(reason, engineContext);
     if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
     return outcome;
   }
 
   @Override
-  public io.justsearch.app.api.IndexingService.MigrationOutcome rollbackMigration() {
-    var outcome = super.rollbackMigration();
+  public io.justsearch.app.api.IndexingService.MigrationOutcome rollbackMigration(EngineContext engineContext) {
+    var outcome = super.rollbackMigration(engineContext);
     if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
     return outcome;
   }
@@ -229,7 +231,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return outcome.compareAndSet(Outcome.RUNNING, Outcome.COMPLETED);
     }
 
-    CallContext context() {
+    CallContext context(EngineContext engineContext) {
       return new CallContext(
           currentTraceId(),
           currentRequestId(),
@@ -246,7 +248,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                 handler.run();
               }
             }
-          });
+          }, engineContext, enqueueProvenance(engineContext));
     }
 
     @Override
@@ -338,7 +340,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected <T> T executeSearchRpc(
-      String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc) {
+      String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc,
+      EngineContext engineContext) {
     // The gate wraps the WORKER's work, not the caller's wait (review B3): when a call times out
     // the caller is released immediately, and the gauge must not drop until the worker actually
     // unwinds — otherwise a timed-out search would read as "no foreground load" while it is still
@@ -350,28 +353,30 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         budget ->
             foregroundLoad.call(
                 operation,
-                () -> rpc.apply(new WorkerSearchCalls(services.get().searchService(), budget.context()))));
+                () -> rpc.apply(new WorkerSearchCalls(services.get().searchService(), budget.context(engineContext)))));
   }
 
   @Override
   protected <T> T executeIngestRpc(
-      String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc) {
+      String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc,
+      EngineContext engineContext) {
     return withBudget(
         operation,
         deadline(category),
-        budget -> rpc.apply(new WorkerIngestCalls(services.get().ingestService(), budget.context())));
+        budget -> rpc.apply(new WorkerIngestCalls(services.get().ingestService(), budget.context(engineContext))));
   }
 
   @Override
   protected <T> T executeHealthRpc(
-      String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc) {
+      String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc,
+      EngineContext engineContext) {
     // Review B3: the health call was the one that passed no context at all. WorkerHealthService
     // does not read one today, but a call that cannot be cancelled is a call the budget cannot
     // bound, and the health poll is exactly the call a wedged index half hangs.
     return withBudget(
         operation,
         callDeadlineMs,
-        budget -> rpc.apply(new WorkerHealthCalls(services.get().healthService(), budget.context())));
+        budget -> rpc.apply(new WorkerHealthCalls(services.get().healthService(), budget.context(engineContext))));
   }
 
   /**
@@ -418,7 +423,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected ScanRootProgress executeScanRoot(
-      ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer) {
+      ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer,
+      EngineContext engineContext) {
     // Item A8: the same bounded hand-off item A7 built, between the WALKER thread and the SSE
     // fan-out. `WorkerScanOps` emits one progress frame per 100 files straight into the sink, so
     // without it a `ScanProgressRegistry` write (and every SSE writer behind it) runs inside
@@ -473,7 +479,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                   cancel.cancel();
                 }
               },
-              new CallContext(currentTraceId(), currentRequestId(), cancel));
+              new CallContext(currentTraceId(), currentRequestId(), cancel, engineContext, enqueueProvenance(engineContext)));
     } finally {
       alarm.cancel(false);
       // The walk has ended; let the frames it already handed over reach the consumer before the
@@ -508,7 +514,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   public IndexingJobsStream subscribeIndexingJobs(
-      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted) {
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
     // Item A7: a bounded hand-off between the change feed's dispatch thread and the SSE fan-out.
     // Without it the fan-out would run ON the SQLite update-hook thread, so a slow HTTP client
     // would pace the indexing loop — the backpressure the Netty send buffer used to absorb.
@@ -531,7 +537,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                     BoundedHandoff.Backpressure.FAIL_FAST));
     FlowCancelSignal cancel = new FlowCancelSignal();
     flow.onClose(cancel::cancel);
-    CallContext ctx = new CallContext(null, null, cancel);
+    CallContext ctx = new CallContext(null, null, cancel, engineContext, enqueueProvenance(engineContext));
     // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow
     // must be closed on the way out: leaving it open would leak a delivery thread that polls an
     // empty queue for the life of the process, for a subscription that never started.
@@ -569,6 +575,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       flow.close();
       cancel.cancel();
     };
+  }
+
+  private static io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance enqueueProvenance(
+      EngineContext context) {
+    return new io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance(
+        io.justsearch.app.services.intent.EngineProvenance.originator(context), context.transport());
   }
 
   @Override

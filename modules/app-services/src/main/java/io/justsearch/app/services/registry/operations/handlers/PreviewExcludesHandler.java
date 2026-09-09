@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ExcludesService;
@@ -16,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * every watched root and counts, per pattern, how many already-indexed files
  * would be deleted by the configured exclude globs. Read-only; no deletion.
  *
- * <p>Delegates to {@link ExcludesService#applyExcludes(boolean) applyExcludes(true)}
+ * <p>Delegates to {@link ExcludesService#applyExcludes(boolean, EngineContext) applyExcludes(true)}
  * via a lazy supplier (the service is late-bound by LocalApiServer after
  * IndexingController is constructed). The full result shape is forwarded as
  * {@code structuredData}, mirroring the pre-existing
@@ -34,7 +36,7 @@ public final class PreviewExcludesHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
-    return ExcludesHandlerSupport.run(excludesSupplier, true, log, "PreviewExcludesHandler");
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return ExcludesHandlerSupport.run(excludesSupplier, true, log, "PreviewExcludesHandler", engineContext);
   }
 }

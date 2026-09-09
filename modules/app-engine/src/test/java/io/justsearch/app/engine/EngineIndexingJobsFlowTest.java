@@ -88,7 +88,7 @@ final class EngineIndexingJobsFlowTest {
               }
             },
             error::set,
-            () -> {});
+            () -> {}, TestEngineContexts.FOREGROUND);
 
     try {
       assertTrue(
@@ -98,7 +98,7 @@ final class EngineIndexingJobsFlowTest {
       // A submitted job is a row mutation, which is what the SQLite update hook turns into a delta.
       Path doc = tempDir.resolve("jobs-flow-probe.txt");
       Files.writeString(doc, "indexing jobs flow probe");
-      client.submitBatch(List.of(doc));
+      client.submitBatch(List.of(doc), TestEngineContexts.FOREGROUND);
 
       assertTrue(
           delta.await(60, TimeUnit.SECONDS),
@@ -131,11 +131,11 @@ final class EngineIndexingJobsFlowTest {
               }
             },
             controlError::set,
-            () -> {});
+            () -> {}, TestEngineContexts.FOREGROUND);
     try {
       Path afterClose = tempDir.resolve("after-close.txt");
       Files.writeString(afterClose, "observed by the control, not by the closed flow");
-      client.submitBatch(List.of(afterClose));
+      client.submitBatch(List.of(afterClose), TestEngineContexts.FOREGROUND);
 
       assertTrue(
           controlDelta.await(60, TimeUnit.SECONDS),

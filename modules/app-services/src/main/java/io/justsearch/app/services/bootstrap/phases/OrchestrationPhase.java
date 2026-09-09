@@ -59,7 +59,7 @@ public final class OrchestrationPhase {
       Function<String, String> operationMessageResolver,
       FileOperationLog fileOperationLog,
       AgentRunStore agentRunStore,
-      Supplier<List<String>> agentRootPaths,
+      Function<io.justsearch.core.context.EngineContext, List<String>> agentRootPaths,
       Runnable startLambdaMartTrainingAsync,
       io.justsearch.app.api.ExcludesService excludes,
       io.justsearch.app.api.SettingsService settings,

@@ -56,23 +56,23 @@ final class ForceReindexScanModeTest {
             // syncDirectory branch and never scans at all, so this is what makes the two arms
             // differ ONLY in `force` — otherwise the unforced case would prove nothing.
             () -> ExcludeMatcher.fromPatterns(java.util.List.of("*.tmp"), true),
-            (rootPath, collection, mode, globs, progress) -> {
+            (rootPath, collection, mode, globs, progress, engineContext) -> {
               scannedMode.set(mode);
               return null;
             },
             new RootLifecycleOps.WorkerWatchFn() {
               @Override
-              public void watch(String rootPath, String collection) {}
+              public void watch(String rootPath, String collection, io.justsearch.core.context.EngineContext engineContext) {}
 
               @Override
-              public void unwatch(String rootPath) {}
+              public void unwatch(String rootPath, io.justsearch.core.context.EngineContext engineContext) {}
             },
-            p -> null,
-            s -> null,
+            (p, engineContext) -> null,
+            (s, engineContext) -> null,
             mock(SyncOps.class),
             walkExecutor);
 
-    ops.reindexWatchedRoots(force);
+    ops.reindexWatchedRoots(force, io.justsearch.app.services.TestEngineContexts.durableInternal());
     walkExecutor.shutdown();
     assertEquals(
         true,

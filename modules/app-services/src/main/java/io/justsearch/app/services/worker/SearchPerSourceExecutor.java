@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.SearchResult;
@@ -53,7 +55,7 @@ final class SearchPerSourceExecutor {
    * robust to source tokens). Falls back to unfiltered retrieval if all per-source calls fail.
    */
   static SearchResponse execute(
-      KnowledgeClient client, SearchRequest baseReq, List<String> sources, int totalLimit) {
+      KnowledgeClient client, SearchRequest baseReq, List<String> sources, int totalLimit, EngineContext engineContext) {
 
     int perSourceLimit = Math.max(1, (int) Math.ceil((double) totalLimit / sources.size()));
 
@@ -68,7 +70,7 @@ final class SearchPerSourceExecutor {
                 .addMetaSource(source.toLowerCase(Locale.ROOT))
                 .build())
             .build();
-        return client.search(perSourceReq);
+        return client.search(perSourceReq, engineContext);
       }, PER_SOURCE_EXECUTOR));
     }
 
@@ -85,11 +87,11 @@ final class SearchPerSourceExecutor {
     if (responses.isEmpty()) {
       // All per-source calls failed — fall back to unfiltered
       log.debug("385: All per-source calls failed, falling back to unfiltered retrieval");
-      return client.search(baseReq);
+      return client.search(baseReq, engineContext);
     }
 
     // Round-robin interleave hits from each source
-    return mergeSearchResponses(responses, totalLimit, baseReq, client::search);
+    return mergeSearchResponses(responses, totalLimit, baseReq, request -> client.search(request, engineContext));
   }
 
   /**

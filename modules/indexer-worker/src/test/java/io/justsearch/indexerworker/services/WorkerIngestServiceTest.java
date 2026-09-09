@@ -19,6 +19,7 @@ import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -33,6 +34,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -489,10 +491,27 @@ final class WorkerIngestServiceTest {
             indexBasePath, genDir, null, null, null, 0L);
 
     String rootPath = tempDir.toAbsolutePath().toString();
+    JobQueue.EnqueueProvenance provenance =
+        new JobQueue.EnqueueProvenance("agent", "AGENT_LOOP");
+    CallContext caller =
+        new CallContext(
+            null,
+            null,
+            CallContext.CancelSignal.NEVER,
+            new EngineContext(
+                EngineContext.ClientKind.INTERNAL,
+                "agent-test",
+                Optional.of("session-test"),
+                Optional.empty(),
+                "UNTRUSTED",
+                "AGENT_LOOP",
+                EngineContext.Survival.DURABLE,
+                EngineContext.Urgency.BACKGROUND),
+            provenance);
     SyncDirectoryResponse response =
         switchingService.syncDirectory(
             SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(true).build(),
-            CallContext.none());
+            caller);
 
     assertFalse(response.getSkipped());
     assertEquals(0, response.getFilesAdded());
@@ -514,6 +533,27 @@ final class WorkerIngestServiceTest {
     Map<String, Object> payload = JSON.readValue(op.payload(), Map.class);
     assertEquals(expectedRoot, payload.get("root_path"));
     assertEquals(true, payload.get("force"));
+    assertEquals(1, payload.get("version"));
+    assertEquals("agent", payload.get("originator"));
+    assertEquals("AGENT_LOOP", payload.get("transport"));
+
+    switchingService.syncDirectory(
+        SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(false).build(), CallContext.none());
+    var coalesced = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(
+        sqliteQueue.listSwitchBufferOps().getFirst().payload());
+    assertEquals(provenance, coalesced.provenance(), "maintenance must preserve the buffered agent");
+    assertFalse(coalesced.force(), "coalescing preserves the incoming work parameters");
+
+    String maintenanceRoot = Files.createDirectories(tempDir.resolve("maintenance-only")).toString();
+    switchingService.syncDirectory(
+        SyncDirectoryRequest.newBuilder().setRootPath(maintenanceRoot).setForce(true).build(), CallContext.none());
+    var maintenancePayload = sqliteQueue.listSwitchBufferOps().stream()
+        .map(entry -> JSON.readTree(entry.payload()))
+        .filter(node -> node.path("root_path").asText().contains("maintenance-only"))
+        .findFirst().orElseThrow();
+    assertEquals(1, maintenancePayload.path("version").asInt());
+    assertTrue(maintenancePayload.has("originator") && maintenancePayload.get("originator").isNull());
+    assertTrue(maintenancePayload.has("transport") && maintenancePayload.get("transport").isNull());
   }
 
   // ========== File Walking Behavior Tests ==========

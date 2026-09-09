@@ -26,20 +26,20 @@ final class IndexGcHandlerTest {
   /** Minimal IndexingService base — subclasses override what each test needs. */
   private static class FakeIndexingService implements IndexingService {
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return List.of();
     }
 
     @Override
-    public void addWatchedPath(Path path) {}
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
   }
 
   @Test
@@ -51,7 +51,7 @@ final class IndexGcHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, io.justsearch.core.context.EngineContext engineContext) {
                     capturedKeep.set(keepLatest);
                     capturedPmo.set(pruneMarkedOnly);
                     return new IndexGcOutcome(true, 7, 5, "");
@@ -59,7 +59,7 @@ final class IndexGcHandlerTest {
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(0, capturedKeep.get(), "default keepLatest=0");
     assertEquals(Boolean.TRUE, capturedPmo.get(), "default pruneMarkedOnly=true");
@@ -79,7 +79,7 @@ final class IndexGcHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, io.justsearch.core.context.EngineContext engineContext) {
                     capturedKeep.set(keepLatest);
                     capturedPmo.set(pruneMarkedOnly);
                     return new IndexGcOutcome(true, 0, 0, "");
@@ -87,7 +87,7 @@ final class IndexGcHandlerTest {
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{\"keepLatest\":3,\"pruneMarkedOnly\":false}");
+    OperationResult result = handler.execute("{\"keepLatest\":3,\"pruneMarkedOnly\":false}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(3, capturedKeep.get());
     assertEquals(Boolean.FALSE, capturedPmo.get());
@@ -100,12 +100,12 @@ final class IndexGcHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, io.justsearch.core.context.EngineContext engineContext) {
                     throw new AssertionError("should not be called");
                   }
                 },
             LEASE);
-    OperationResult result = handler.execute("{\"keepLatest\":-1}");
+    OperationResult result = handler.execute("{\"keepLatest\":-1}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().toLowerCase().contains("non-negative"));
   }
@@ -117,13 +117,13 @@ final class IndexGcHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, io.justsearch.core.context.EngineContext engineContext) {
                     return new IndexGcOutcome(false, 0, 0, "Concurrent GC in flight");
                   }
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Concurrent GC in flight"));
   }
@@ -131,7 +131,7 @@ final class IndexGcHandlerTest {
   @Test
   void executeReturnsFailureWhenServiceNull() {
     IndexGcHandler handler = new IndexGcHandler(() -> null, LEASE);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Indexing service unavailable"));
   }
@@ -141,7 +141,7 @@ final class IndexGcHandlerTest {
     // IndexingService::unavailable returns an instance whose default runIndexGc
     // throws UnsupportedOperationException.
     IndexGcHandler handler = new IndexGcHandler(IndexingService::unavailable, LEASE);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Index GC failed"));
   }
@@ -153,13 +153,13 @@ final class IndexGcHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, io.justsearch.core.context.EngineContext engineContext) {
                     throw new RuntimeException("boom");
                   }
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("boom"));
   }
@@ -171,12 +171,12 @@ final class IndexGcHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
+                  public IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, io.justsearch.core.context.EngineContext engineContext) {
                     throw new AssertionError("should not be called");
                   }
                 },
             LEASE);
-    OperationResult result = handler.execute("not-json");
+    OperationResult result = handler.execute("not-json", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().toLowerCase().contains("invalid arguments json"));
   }

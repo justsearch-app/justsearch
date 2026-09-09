@@ -84,7 +84,7 @@ final class ReadinessTriggerCompositionTest {
 
     KnowledgeServerBootstrap knowledgeServer = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(knowledgeServer.client()).thenReturn(client);
 
     StatusLifecycleHandler handler = newHandler(indexBase, worker, inference);

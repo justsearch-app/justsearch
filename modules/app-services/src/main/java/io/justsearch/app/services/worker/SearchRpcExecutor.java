@@ -13,5 +13,5 @@ public interface SearchRpcExecutor {
     <T> T execute(
             String operation,
             KnowledgeClient.RpcDeadlineCategory category,
-            Function<SearchServiceCalls, T> rpc);
+            Function<SearchServiceCalls, T> rpc, io.justsearch.core.context.EngineContext engineContext);
 }

@@ -215,8 +215,7 @@ final class ResourceApiModule implements ApiModule {
             headAssembly.substrate().operations().executor(),
             List.of(
                 headAssembly.substrate().operations().operations(),
-                headAssembly.substrate().operations().agentTools()),
-            java.time.Clock.systemUTC());
+                headAssembly.substrate().operations().agentTools()));
     // Slice 494: per-class advisory SSE controllers.
     this.operationCompletedAdvisoryStreamController =
         new AdvisoryStreamController(

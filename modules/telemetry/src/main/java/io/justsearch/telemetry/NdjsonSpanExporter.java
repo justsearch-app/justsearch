@@ -44,6 +44,10 @@ final class NdjsonSpanExporter implements SpanExporter {
       "http.route",
       "http.target",
       "http.status_code",
+      // Coarse request attribution projected from the cached EngineContext by LocalApiServer.
+      // Client, session and grant identifiers are intentionally not exported.
+      "engine.originator",
+      "engine.transport",
       // Agent OTel spans (gen_ai semantic conventions)
       "gen_ai.operation.name",
       "gen_ai.agent.id",

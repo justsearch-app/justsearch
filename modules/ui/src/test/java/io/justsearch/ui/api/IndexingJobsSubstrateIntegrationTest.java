@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -241,38 +242,38 @@ final class IndexingJobsSubstrateIntegrationTest {
     IndexingService stub =
         new IndexingService() {
           @Override
-          public Map<String, Object> resolvePathHash(String pathHash) {
+          public Map<String, Object> resolvePathHash(String pathHash, EngineContext engineContext) {
             captured.put("resolve", pathHash);
             return Map.of("found", true, "path", "/abs/p.txt", "lastSeenAtMs", 42L);
           }
 
           @Override
-          public Map<String, Object> cancelIndexingJob(String pathHash) {
+          public Map<String, Object> cancelIndexingJob(String pathHash, EngineContext engineContext) {
             captured.put("cancel", pathHash);
             return Map.of("cancelled", true, "previousState", "PROCESSING");
           }
 
           @Override
-          public Map<String, Object> retryIndexingJob(String pathHash) {
+          public Map<String, Object> retryIndexingJob(String pathHash, EngineContext engineContext) {
             captured.put("retry", pathHash);
             return Map.of("retried", true, "previousState", "FAILED");
           }
 
           @Override
-          public List<java.nio.file.Path> getWatchedPaths() {
+          public List<java.nio.file.Path> getWatchedPaths(EngineContext engineContext) {
             return List.of();
           }
 
           @Override
-          public void addWatchedPath(java.nio.file.Path path) {}
+          public void addWatchedPath(java.nio.file.Path path, EngineContext engineContext) {}
 
           @Override
-          public int removeWatchedPath(java.nio.file.Path path) {
+          public int removeWatchedPath(java.nio.file.Path path, EngineContext engineContext) {
             return 0;
           }
 
           @Override
-          public void flush() {}
+          public void flush(EngineContext engineContext) {}
         };
 
     HandlerRegistry handlers = new HandlerRegistry();
@@ -288,7 +289,7 @@ final class IndexingJobsSubstrateIntegrationTest {
     // resolve
     var resolveOp = catalog.findById(CoreOperationCatalog.RESOLVE_PATH_HASH).orElseThrow();
     OperationResult resolveResult =
-        dispatcher.dispatch(resolveOp, "{\"pathHash\":\"hash-1\"}");
+        dispatcher.dispatch(resolveOp, "{\"pathHash\":\"hash-1\"}", TestRequestContexts.browser());
     assertTrue(resolveResult.success(), () -> "resolve: " + resolveResult.message());
     assertEquals("hash-1", captured.get("resolve"));
     assertEquals("/abs/p.txt", resolveResult.structuredData().get("path"));
@@ -296,14 +297,14 @@ final class IndexingJobsSubstrateIntegrationTest {
     // cancel
     var cancelOp = catalog.findById(CoreOperationCatalog.CANCEL_INDEXING_JOB).orElseThrow();
     OperationResult cancelResult =
-        dispatcher.dispatch(cancelOp, "{\"pathHash\":\"hash-2\"}");
+        dispatcher.dispatch(cancelOp, "{\"pathHash\":\"hash-2\"}", TestRequestContexts.browser());
     assertTrue(cancelResult.success(), () -> "cancel: " + cancelResult.message());
     assertEquals("hash-2", captured.get("cancel"));
 
     // retry
     var retryOp = catalog.findById(CoreOperationCatalog.RETRY_INDEXING_JOB).orElseThrow();
     OperationResult retryResult =
-        dispatcher.dispatch(retryOp, "{\"pathHash\":\"hash-3\"}");
+        dispatcher.dispatch(retryOp, "{\"pathHash\":\"hash-3\"}", TestRequestContexts.browser());
     assertTrue(retryResult.success(), () -> "retry: " + retryResult.message());
     assertEquals("hash-3", captured.get("retry"));
   }

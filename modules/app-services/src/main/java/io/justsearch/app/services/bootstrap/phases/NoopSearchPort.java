@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap.phases;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.core.dto.Query;
 import io.justsearch.core.dto.Result;
 import io.justsearch.core.search.SearchPort;
@@ -15,7 +17,7 @@ import java.util.Map;
 public final class NoopSearchPort implements SearchPort {
 
   @Override
-  public Result search(Query intent) {
+  public Result search(Query intent, EngineContext engineContext) {
     return new Result(List.of(), Map.of(), null, Map.of());
   }
 }

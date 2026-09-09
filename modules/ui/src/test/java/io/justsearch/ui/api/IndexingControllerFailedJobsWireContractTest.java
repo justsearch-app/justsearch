@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -104,38 +105,38 @@ class IndexingControllerFailedJobsWireContractTest {
   private static IndexingService stubService() {
     return new IndexingService() {
       @Override
-      public List<FailedJobInfo> listFailedJobs(int limit) {
+      public List<FailedJobInfo> listFailedJobs(int limit, EngineContext engineContext) {
         return ROWS;
       }
 
       @Override
-      public List<FailedJobInfo> listFailedJobsByPathPrefix(Path pathPrefix, int limit) {
+      public List<FailedJobInfo> listFailedJobsByPathPrefix(Path pathPrefix, int limit, EngineContext engineContext) {
         return ROOT.equals(pathPrefix) ? ROWS : List.of();
       }
 
       @Override
-      public List<WatchedRoot> getWatchedRoots() {
+      public List<WatchedRoot> getWatchedRoots(EngineContext engineContext) {
         return List.of(new WatchedRoot("default", ROOT, null, null, true, false, 0, 0L));
       }
 
       // The stub serves reads only; the mutating half of IndexingService is unreachable here.
       @Override
-      public List<Path> getWatchedPaths() {
+      public List<Path> getWatchedPaths(EngineContext engineContext) {
         return List.of(ROOT);
       }
 
       @Override
-      public void addWatchedPath(Path path) {
+      public void addWatchedPath(Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
 
       @Override
-      public int removeWatchedPath(Path path) {
+      public int removeWatchedPath(Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
 
       @Override
-      public void flush() {
+      public void flush(EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
     };

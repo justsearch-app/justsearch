@@ -72,8 +72,8 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("runs VDU phase before embedding phase when both have pending work")
         void runsVduBeforeEmbeddings() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(10);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(10);
             inferenceManager.withMode(Mode.OFFLINE);
 
             coordinator.startOfflineProcessing();
@@ -88,8 +88,8 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("skips VDU phase when no pending VDU files")
         void skipsVduWhenNoPending() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(0);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(10);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(0);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(10);
 
             coordinator.startOfflineProcessing();
 
@@ -101,9 +101,9 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("clears VDU capability blocker when no VDU work is pending")
         void clearsVduCapabilityWhenNoPending() {
-            when(knowledgeClient.recoverVduProcessing()).thenReturn(0);
-            when(knowledgeClient.countPendingVdu()).thenReturn(0);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(0);
+            when(knowledgeClient.recoverVduProcessing(any())).thenReturn(0);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(0);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(0);
             capabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
 
             coordinator.startOfflineProcessing();
@@ -116,8 +116,8 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("skips embedding phase when no pending embeddings")
         void skipsEmbeddingsWhenNoPending() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(0);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(0);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(0);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(0);
 
             coordinator.startOfflineProcessing();
 
@@ -128,13 +128,13 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("re-queries embedding count after VDU phase")
         void requeriesEmbeddingsAfterVdu() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
             // First query 0 (before VDU), second 5 (VDU generated re-embeddings).
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(0, 5);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(0, 5);
 
             coordinator.startOfflineProcessing();
 
-            verify(knowledgeClient, times(2)).countPendingEmbeddings();
+            verify(knowledgeClient, times(2)).countPendingEmbeddings(any());
             assertEquals(1, inferenceManager.getIndexingSwitchCount(), "parks to indexing for newly pending embeddings");
         }
     }
@@ -147,19 +147,19 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("calls recoverVduProcessing at start")
         void callsRecoveryAtStart() {
-            when(knowledgeClient.recoverVduProcessing()).thenReturn(3);
+            when(knowledgeClient.recoverVduProcessing(any())).thenReturn(3);
 
             coordinator.startOfflineProcessing();
 
-            verify(knowledgeClient, times(1)).recoverVduProcessing();
+            verify(knowledgeClient, times(1)).recoverVduProcessing(any());
         }
 
         // INTENT: zero recovered does not abort the run.
         @Test
         @DisplayName("continues processing even if recovery finds no stuck documents")
         void continuesWithZeroRecovered() {
-            when(knowledgeClient.recoverVduProcessing()).thenReturn(0);
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.recoverVduProcessing(any())).thenReturn(0);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
 
             coordinator.startOfflineProcessing();
 
@@ -179,7 +179,7 @@ class OfflineCoordinatorTest {
             CountDownLatch processingStarted = new CountDownLatch(1);
             CountDownLatch canFinish = new CountDownLatch(1);
 
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
             when(vduBatchProcessor.processPendingFiles())
                 .thenAnswer(
                     inv -> {
@@ -213,7 +213,7 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("allows sequential processing")
         void allowsSequentialProcessing() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
 
             coordinator.startOfflineProcessing();
             coordinator.startOfflineProcessing();
@@ -228,7 +228,7 @@ class OfflineCoordinatorTest {
             CountDownLatch processingStarted = new CountDownLatch(1);
             CountDownLatch canFinish = new CountDownLatch(1);
 
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
             when(vduBatchProcessor.processPendingFiles())
                 .thenAnswer(
                     inv -> {
@@ -267,7 +267,7 @@ class OfflineCoordinatorTest {
         @DisplayName("requests engine up for VDU when not already online")
         void requestsEngineUpForVdu() {
             inferenceManager.withMode(Mode.OFFLINE);
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
 
             coordinator.startOfflineProcessing();
 
@@ -279,7 +279,7 @@ class OfflineCoordinatorTest {
         @DisplayName("skips engine-up request when already in Online mode")
         void skipsEngineUpWhenAlreadyOnline() {
             inferenceManager.withMode(Mode.ONLINE);
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
 
             coordinator.startOfflineProcessing();
 
@@ -292,8 +292,8 @@ class OfflineCoordinatorTest {
         void skipsVduWhenEngineUpFails() {
             inferenceManager.withMode(Mode.OFFLINE);
             inferenceManager.withFailOnlineTransition(true);
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(10);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(10);
 
             coordinator.startOfflineProcessing();
 
@@ -310,7 +310,7 @@ class OfflineCoordinatorTest {
         @DisplayName("handles park-to-indexing failure gracefully")
         void handlesIndexingParkFailure() {
             inferenceManager.withFailIndexingTransition(true);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(10);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(10);
 
             assertDoesNotThrow(() -> coordinator.startOfflineProcessing());
         }
@@ -323,8 +323,8 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("hasPendingWork returns true when VDU pending")
         void hasPendingWorkWithVdu() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(5);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(0);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(5);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(0);
 
             assertTrue(coordinator.hasPendingWork());
         }
@@ -332,8 +332,8 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("hasPendingWork returns true when embeddings pending")
         void hasPendingWorkWithEmbeddings() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(0);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(10);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(0);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(10);
 
             assertTrue(coordinator.hasPendingWork());
         }
@@ -341,8 +341,8 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("hasPendingWork returns false when nothing pending")
         void hasPendingWorkWithNothing() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(0);
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(0);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(0);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(0);
 
             assertFalse(coordinator.hasPendingWork());
         }
@@ -350,14 +350,14 @@ class OfflineCoordinatorTest {
         @Test
         @DisplayName("getPendingVduCount delegates to client")
         void getPendingVduCountDelegates() {
-            when(knowledgeClient.countPendingVdu()).thenReturn(42);
+            when(knowledgeClient.countPendingVdu(any())).thenReturn(42);
             assertEquals(42, coordinator.getPendingVduCount());
         }
 
         @Test
         @DisplayName("getPendingEmbeddingCount delegates to client")
         void getPendingEmbeddingCountDelegates() {
-            when(knowledgeClient.countPendingEmbeddings()).thenReturn(99);
+            when(knowledgeClient.countPendingEmbeddings(any())).thenReturn(99);
             assertEquals(99, coordinator.getPendingEmbeddingCount());
         }
     }

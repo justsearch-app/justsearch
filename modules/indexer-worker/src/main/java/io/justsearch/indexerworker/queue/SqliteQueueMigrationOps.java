@@ -279,6 +279,19 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V12 to V13: Ensured deleted_at column on document_identity (tempdoc 931 §C.6)");
       }
+      case 14 -> {
+        addColumnIfMissing(conn, "originator", SqliteSchema.MIGRATE_V13_TO_V14_JOBS_ORIGINATOR);
+        addColumnIfMissing(conn, "transport", SqliteSchema.MIGRATE_V13_TO_V14_JOBS_TRANSPORT);
+        try (Statement stmt = conn.createStatement()) {
+          if (!columnExists(conn, "ingestion_ledger", "originator")) {
+            stmt.execute(SqliteSchema.MIGRATE_V13_TO_V14_LEDGER_ORIGINATOR);
+          }
+          if (!columnExists(conn, "ingestion_ledger", "transport")) {
+            stmt.execute(SqliteSchema.MIGRATE_V13_TO_V14_LEDGER_TRANSPORT);
+          }
+        }
+        log.info("V13 to V14: Ensured durable ingestion attribution");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

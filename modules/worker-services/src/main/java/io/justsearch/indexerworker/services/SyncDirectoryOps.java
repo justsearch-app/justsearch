@@ -104,7 +104,8 @@ final class SyncDirectoryOps {
    * no {@link WorkerServiceException}. The phase helpers below return the terminal response, or
    * {@code null} for "no terminal state, continue".
    */
-  SyncDirectoryResponse execute(String rootPath, boolean force) {
+  SyncDirectoryResponse execute(
+      String rootPath, boolean force, JobQueue.EnqueueProvenance provenance) {
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
       return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
@@ -137,7 +138,8 @@ final class SyncDirectoryOps {
       }
 
       // STEP 3: Walk disk and find missing files
-      SyncWalkPhaseResult walk = walkAndEnqueueMissingFiles(root, force, indexedPaths);
+      SyncWalkPhaseResult walk =
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance);
       filesAdded = walk.filesAdded();
 
       SyncDirectoryResponse walkTerminal =
@@ -248,7 +250,8 @@ final class SyncDirectoryOps {
 
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
-      Path root, boolean force, Set<String> indexedPaths) throws IOException {
+      Path root, boolean force, Set<String> indexedPaths,
+      JobQueue.EnqueueProvenance provenance) throws IOException {
     // 391/E-J-N12: collect the full list first, sort by absolute path, then
     // enqueue in deterministic batches. Filesystem-order enumeration varies
     // across runs of the same unchanged corpus (NTFS MFT state, OS cache),
@@ -290,7 +293,7 @@ final class SyncDirectoryOps {
             if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
             if (IngestionSkipPolicy.shouldSkip(file)) return FileVisitResult.CONTINUE;
             if (isCloudPlaceholder(file)) {
-              recordCloudPlaceholderObservation(file);
+              recordCloudPlaceholderObservation(file, provenance);
               return FileVisitResult.CONTINUE;
             }
 
@@ -322,7 +325,7 @@ final class SyncDirectoryOps {
             if (force
                 || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
               // 813 Slice B: the walk already holds the size — no extra stat.
-              collected.add(new JobQueue.EnqueueEntry(file, attrs.size()));
+              collected.add(new JobQueue.EnqueueEntry(file, attrs.size(), provenance));
             }
             return FileVisitResult.CONTINUE;
           }
@@ -448,11 +451,16 @@ final class SyncDirectoryOps {
     }
   }
 
-  /** Delegates to the shared {@link CloudPlaceholderRecorder}; retained for direct test access. */
-  void recordCloudPlaceholderObservation(Path file) {
+  /** Delegates the observation and its admission attribution to the shared recorder. */
+  void recordCloudPlaceholderObservation(
+      Path file, JobQueue.EnqueueProvenance provenance) {
     if (cloudPlaceholderRecorder == null) {
       return;
     }
-    cloudPlaceholderRecorder.record(file);
+    if (provenance == null) {
+      cloudPlaceholderRecorder.record(file);
+    } else {
+      cloudPlaceholderRecorder.record(file, null, provenance);
+    }
   }
 }

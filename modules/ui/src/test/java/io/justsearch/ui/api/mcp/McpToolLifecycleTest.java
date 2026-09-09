@@ -93,6 +93,7 @@ class McpToolLifecycleTest {
     var surface = new McpToolSurface(List.of(fakeTool("fake_tool")), List.of());
     var handler = new McpProtocolHandler(surface, List.of());
     Context context = mock(Context.class);
+    when(context.path()).thenReturn("/mcp");
     when(context.body())
         .thenReturn("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
     ArgumentCaptor<String> resultCaptor = ArgumentCaptor.forClass(String.class);

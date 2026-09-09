@@ -34,15 +34,20 @@ import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.agent.api.registry.SourceTier;
+import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.agent.api.registry.Workflow;
 import io.justsearch.agent.api.registry.WorkflowCatalog;
 import io.justsearch.agent.api.registry.WorkflowNode;
 import io.justsearch.agent.api.registry.WorkflowRef;
+import io.justsearch.core.context.EngineContext;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -84,12 +89,21 @@ class WorkflowShapeRunnerTest {
   }
 
   private static WorkflowShapeRunner runner(Workflow wf, OperationResult dispatchResult) {
+    return runner(wf, dispatchResult, ignored -> {});
+  }
+
+  private static WorkflowShapeRunner runner(
+      Workflow wf, OperationResult dispatchResult, Consumer<EngineContext> contextSink) {
     OperationCatalog agentTools =
         OperationCatalog.of("vendor.x", List.of(op("vendor.x.add", RiskTier.LOW)));
     OperationCatalog coreOps = OperationCatalog.of("core", List.of());
     BackendIntentRouter router =
-        (intent, provenance) -> new IntentDispatchResult.Dispatched(dispatchResult);
-    GatedOperationExecutor gated = new GatedOperationExecutor(() -> router, () -> null);
+        (intent, provenance, engineContext) -> {
+          contextSink.accept(engineContext);
+          return new IntentDispatchResult.Dispatched(dispatchResult);
+        };
+    GatedOperationExecutor gated =
+        new GatedOperationExecutor(() -> router, () -> null, TransportTag.WORKFLOW);
     ConversationEngine engine =
         new ConversationEngine(ConversationShapeCatalog.of("core", List.of()), List.of());
     return new WorkflowShapeRunner(
@@ -112,8 +126,19 @@ class WorkflowShapeRunnerTest {
             "core.t-tool",
             List.of(new WorkflowNode.ToolStep("act", new OperationRef("vendor.x.add"), "{}")));
     List<SseEvent> events = new CopyOnWriteArrayList<>();
+    AtomicReference<EngineContext> routedContext = new AtomicReference<>();
+    EngineContext incomingContext =
+        io.justsearch.app.services.intent.EngineProvenance.context(
+            EngineContext.ClientKind.INTERNAL,
+            "workflow-parent-agent",
+            Optional.of("agent-session"),
+            Optional.of("grant-workflow"),
+            TransportTag.AGENT_LOOP,
+            EngineContext.Survival.DURABLE,
+            EngineContext.Urgency.BACKGROUND);
 
-    runner(wf, OperationResult.success("42")).run(Map.of("workflowId", "core.t-tool"), Audience.USER, events::add);
+    runner(wf, OperationResult.success("42"), routedContext::set)
+        .run(Map.of("workflowId", "core.t-tool"), Audience.USER, events::add, incomingContext);
 
     List<String> order = names(events);
     assertTrue(order.contains("session_started"), order.toString());
@@ -126,13 +151,24 @@ class WorkflowShapeRunnerTest {
         events.stream().filter(e -> e.name().equals("tool_exec_completed")).findFirst().orElseThrow();
     assertEquals(Boolean.TRUE, completed.payload().get("success"));
     assertEquals("42", completed.payload().get("output"));
+
+    EngineContext childContext = routedContext.get();
+    assertEquals(TransportTag.WORKFLOW.name(), childContext.transport());
+    assertEquals(SourceTier.UNTRUSTED.name(), childContext.sourceTier());
+    assertEquals(incomingContext.clientKind(), childContext.clientKind());
+    assertEquals(incomingContext.clientId(), childContext.clientId());
+    assertEquals(incomingContext.grantReference(), childContext.grantReference());
+    assertEquals(incomingContext.survival(), childContext.survival());
+    assertEquals(incomingContext.urgency(), childContext.urgency());
+    assertTrue(childContext.sessionId().isPresent());
+    assertFalse(childContext.sessionId().equals(incomingContext.sessionId()));
   }
 
   @Test
   void unknownWorkflowEmitsError() {
     Workflow wf = workflow("core.t-x", List.of());
     List<SseEvent> events = new CopyOnWriteArrayList<>();
-    runner(wf, OperationResult.success("x")).run(Map.of("workflowId", "core.nope"), Audience.USER, events::add);
+    runner(wf, OperationResult.success("x")).run(Map.of("workflowId", "core.nope"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui());
     assertEquals(List.of("error"), names(events));
   }
 
@@ -144,7 +180,7 @@ class WorkflowShapeRunnerTest {
             List.of(new WorkflowNode.ToolStep("act", new OperationRef("vendor.x.ghost"), "{}")));
     List<SseEvent> events = new CopyOnWriteArrayList<>();
     runner(wf, OperationResult.success("x"))
-        .run(Map.of("workflowId", "core.t-dangling"), Audience.USER, events::add);
+        .run(Map.of("workflowId", "core.t-dangling"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui());
     assertEquals(List.of("error"), names(events));
     assertTrue(
         events.get(0).payload().get("error").toString().contains("dangling"),
@@ -189,12 +225,13 @@ class WorkflowShapeRunnerTest {
             () -> OperationCatalog.of("vendor.x", List.of()),
             () -> OperationCatalog.of("core", List.of()),
             new GatedOperationExecutor(
-                () -> (intent, provenance) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
-                () -> null),
+                () -> (intent, provenance, engineContext) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
+                () -> null,
+                TransportTag.WORKFLOW),
             new WorkflowGateRegistry());
     List<SseEvent> events = new CopyOnWriteArrayList<>();
 
-    r.run(Map.of(), Audience.USER, events::add);
+    r.run(Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui());
 
     List<String> order = names(events);
     assertFalse(order.contains("error"), "must not fail: " + events);
@@ -230,7 +267,7 @@ class WorkflowShapeRunnerTest {
     List<SseEvent> events = Collections.synchronizedList(new java.util.ArrayList<>());
 
     Thread runThread =
-        new Thread(() -> r.run(Map.of("workflowId", "core.t-gate"), Audience.USER, events::add));
+        new Thread(() -> r.run(Map.of("workflowId", "core.t-gate"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui()));
     runThread.start();
 
     String callId = awaitPendingCallId(events);
@@ -254,7 +291,7 @@ class WorkflowShapeRunnerTest {
     List<SseEvent> events = Collections.synchronizedList(new java.util.ArrayList<>());
 
     Thread runThread =
-        new Thread(() -> r.run(Map.of("workflowId", "core.t-gate-no"), Audience.USER, events::add));
+        new Thread(() -> r.run(Map.of("workflowId", "core.t-gate-no"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui()));
     runThread.start();
 
     String callId = awaitPendingCallId(events);
@@ -308,11 +345,12 @@ class WorkflowShapeRunnerTest {
             () -> OperationCatalog.of("vendor.x", List.of()),
             () -> OperationCatalog.of("core", List.of()),
             new GatedOperationExecutor(
-                () -> (intent, provenance) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
-                () -> null),
+                () -> (intent, provenance, engineContext) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
+                () -> null,
+                TransportTag.WORKFLOW),
             new WorkflowGateRegistry());
 
-    r.run(Map.of("workflowId", "core.t-llm"), Audience.USER, new CopyOnWriteArrayList<>()::add);
+    r.run(Map.of("workflowId", "core.t-llm"), Audience.USER, new CopyOnWriteArrayList<>()::add, io.justsearch.app.services.TestEngineContexts.ui());
 
     assertEquals("hello-seed", recorder.lastBody.get("prompt"), "LlmStep must pass the prompt field");
   }
@@ -354,12 +392,13 @@ class WorkflowShapeRunnerTest {
             () -> OperationCatalog.of("vendor.x", List.of()),
             () -> OperationCatalog.of("core", List.of()),
             new GatedOperationExecutor(
-                () -> (intent, provenance) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
-                () -> null),
+                () -> (intent, provenance, engineContext) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
+                () -> null,
+                TransportTag.WORKFLOW),
             new WorkflowGateRegistry());
     List<SseEvent> events = new CopyOnWriteArrayList<>();
 
-    r.run(Map.of("workflowId", "core.t-llm2"), Audience.USER, events::add);
+    r.run(Map.of("workflowId", "core.t-llm2"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui());
 
     List<String> order = names(events);
     int started = order.indexOf("node_started");
@@ -392,7 +431,9 @@ class WorkflowShapeRunnerTest {
     }
 
     @Override
-    public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink) {
+    public void run(
+        Map<String, Object> body, Audience audience, Consumer<SseEvent> sink,
+        EngineContext engineContext) {
       this.lastBody = body;
       sink.accept(new SseEvent("chunk", Map.of("text", "ok")));
       sink.accept(new SseEvent("done", Map.of("finalResponse", "ok")));

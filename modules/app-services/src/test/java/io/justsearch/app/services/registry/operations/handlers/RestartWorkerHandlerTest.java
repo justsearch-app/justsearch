@@ -49,7 +49,7 @@ final class RestartWorkerHandlerTest {
                   }
                 });
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success(), "it did not restart, so it is not a success");
     assertEquals(
@@ -73,7 +73,7 @@ final class RestartWorkerHandlerTest {
     // Default constructor uses WorkerService.unavailable() → available()
     // returns false → handler returns failure.
     RestartWorkerHandler handler = new RestartWorkerHandler();
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Worker service unavailable"));
   }
@@ -99,7 +99,7 @@ final class RestartWorkerHandlerTest {
                     return 9001;
                   }
                 });
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertTrue(result.message().contains("9001"));
     assertEquals(9001, result.structuredData().get("port"));
@@ -126,7 +126,7 @@ final class RestartWorkerHandlerTest {
                     throw new java.io.IOException("port already in use");
                   }
                 });
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("port already in use"));
   }
@@ -135,8 +135,8 @@ final class RestartWorkerHandlerTest {
   void executeIgnoresArguments() {
     // Restart-worker takes no arguments per CoreOperationCatalog.intf
     RestartWorkerHandler handler = new RestartWorkerHandler();
-    OperationResult one = handler.execute("{}");
-    OperationResult two = handler.execute("{\"foo\":\"bar\"}");
+    OperationResult one = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
+    OperationResult two = handler.execute("{\"foo\":\"bar\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertEquals(one.success(), two.success());
   }
 
@@ -144,7 +144,7 @@ final class RestartWorkerHandlerTest {
   void executeHasNoExecutionId() {
     // Restart is not undoable.
     RestartWorkerHandler handler = new RestartWorkerHandler();
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.executionId().isEmpty());
   }
 }

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.ipc.PruneRequest;
 import io.justsearch.ipc.PruneResponse;
 import io.justsearch.ipc.SyncDirectoryRequest;
@@ -83,28 +85,28 @@ final class SyncOps {
 
     // ========== RPC helpers ==========
 
-    private PruneResponse executePruneMissing(String pathPrefix) {
+    private PruneResponse executePruneMissing(String pathPrefix, EngineContext engineContext) {
         PruneRequest request = PruneRequest.newBuilder().setPathPrefix(pathPrefix).build();
         return rpc.execute(
                 "pruneMissing",
                 KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.pruneMissing(request));
+                stub -> stub.pruneMissing(request), engineContext);
     }
 
-    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force) {
+    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force, EngineContext engineContext) {
         SyncDirectoryRequest request =
                 SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
         return rpc.execute(
                 "syncDirectory",
                 KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.syncDirectory(request));
+                stub -> stub.syncDirectory(request), engineContext);
     }
 
     // ========== Public operations ==========
 
-    boolean pruneMissing(String pathPrefix) {
+    boolean pruneMissing(String pathPrefix, EngineContext engineContext) {
         try {
-            PruneResponse response = executePruneMissing(pathPrefix);
+            PruneResponse response = executePruneMissing(pathPrefix, engineContext);
 
             if (response.getAborted()) {
                 log.info("Prune aborted for {} (user activity)", pathPrefix);
@@ -129,9 +131,9 @@ final class SyncOps {
         }
     }
 
-    SyncDirectoryResponse syncDirectory(String rootPath, boolean force) {
+    SyncDirectoryResponse syncDirectory(String rootPath, boolean force, EngineContext engineContext) {
         try {
-            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force);
+            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext);
 
             // Tempdoc 626 §Axis-C/§Recency — update the per-root verification state from this reconcile.
             if (response.getError().isEmpty()) {
@@ -183,6 +185,8 @@ final class SyncOps {
     }
 
     void startPeriodicSync() {
+        EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.internal(
+            "periodic-root-sync", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
         if (syncScheduler != null) {
             log.debug("Periodic sync already started");
             return;
@@ -219,7 +223,7 @@ final class SyncOps {
                                         root);
 
                                 // force=false: Worker will skip if user is actively searching
-                                syncDirectory(root.toString(), /* force= */ false);
+                                syncDirectory(root.toString(), /* force= */ false, engineContext);
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);

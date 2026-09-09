@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -391,7 +392,7 @@ final class AgentSseContractTest {
 
   private static final class ContractAgentService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       ToolCallRequest call = new ToolCallRequest("call_1", "search_index", "{\"query\":\"contract\"}");
       eventConsumer.accept(new AgentEvent.SessionStarted("session_contract"));
       eventConsumer.accept(new AgentEvent.AgentProgress("llm_call", "Calling LLM", 1, 3));
@@ -481,7 +482,7 @@ final class AgentSseContractTest {
 
   private static final class ContractAgentErrorService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.SessionStarted("session_error"));
       eventConsumer.accept(
           new AgentEvent.AgentError(
@@ -520,7 +521,7 @@ final class AgentSseContractTest {
 
   private static final class PersistedSessionAgentService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.AgentDone("unused", 0, 0, 0));
     }
 
@@ -554,7 +555,7 @@ final class AgentSseContractTest {
     }
 
     @Override
-    public void resumeLastSession(Consumer<AgentEvent> eventConsumer) {
+    public void resumeLastSession(Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.SessionStarted("session_resumed"));
       eventConsumer.accept(new AgentEvent.AgentDone("resumed response", 2, 1, 120));
     }
@@ -592,7 +593,7 @@ final class AgentSseContractTest {
     }
 
     @Override
-    public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer) {
+    public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       if (!"session_persisted".equals(sessionId)) {
         eventConsumer.accept(
             new AgentEvent.AgentError(
@@ -729,7 +730,7 @@ final class AgentSseContractTest {
 
   private static final class ContractHandoffAgentService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.SessionStarted("session_handoff"));
       eventConsumer.accept(new AgentEvent.HandoffProposed("planner", "executor", "time to execute"));
       eventConsumer.accept(new AgentEvent.HandoffExecuted("planner", "executor"));
@@ -766,7 +767,7 @@ final class AgentSseContractTest {
     volatile AgentRequest captured;
 
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       captured = request;
       eventConsumer.accept(new AgentEvent.AgentDone("done", 1, 0, 0));
     }

@@ -27,9 +27,9 @@ final class MigrationOutcomeProjectionTest {
         .setAccepted(accepted).setRestartRequired(restartRequired).build());
     try (var client = new TestKnowledgeClient(null, calls, null)) {
       var expected = new MigrationOutcome(accepted, restartRequired);
-      assertEquals(expected, client.startMigration("manual"));
-      assertEquals(expected, client.requestCutover(true));
-      assertEquals(expected, client.rollbackMigration());
+      assertEquals(expected, client.startMigration("manual", io.justsearch.app.services.TestEngineContexts.durableInternal()));
+      assertEquals(expected, client.requestCutover(true, io.justsearch.app.services.TestEngineContexts.durableInternal()));
+      assertEquals(expected, client.rollbackMigration(io.justsearch.app.services.TestEngineContexts.durableInternal()));
     }
   }
 }

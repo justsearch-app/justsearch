@@ -68,7 +68,7 @@ final class EngineIndexBasePathLockTest {
     Path doc = tempDir.resolve("lock-probe.txt");
     Files.writeString(doc, "quokka index base path lock probe");
     assertTrue(
-        first.client().submitBatch(List.of(doc)).getAcceptedCount() > 0,
+        first.client().submitBatch(List.of(doc), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
         "the first owner must accept work");
     assertTrue(
         first.awaitSearchable("quokka", 120_000),
@@ -94,9 +94,9 @@ final class EngineIndexBasePathLockTest {
     // Republish the first owner's config so nothing downstream reads dataB's, then prove the
     // first owner is untouched — the refusal must cost the incumbent nothing.
     EngineTestHarness.publishConfig(dataA, sharedIndexBase, Map.of());
-    assertTrue(first.client().isHealthy(), "the first owner must remain healthy");
+    assertTrue(first.client().isHealthy(TestEngineContexts.FOREGROUND), "the first owner must remain healthy");
     assertTrue(
-        first.client().search("quokka", 10).getResultsCount() > 0,
+        first.client().search("quokka", 10, TestEngineContexts.FOREGROUND).getResultsCount() > 0,
         "the first owner must still serve its index after the second was refused");
 
     // The lock is a sibling of the index base path, not a file inside it (IndexRootLock.java:44)
@@ -114,7 +114,7 @@ final class EngineIndexBasePathLockTest {
     KnowledgeClient recovered =
         second.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
     try {
-      assertTrue(recovered.isHealthy(), "the failed start must release resources for retry");
+      assertTrue(recovered.isHealthy(TestEngineContexts.FOREGROUND), "the failed start must release resources for retry");
     } finally {
       second.close();
     }

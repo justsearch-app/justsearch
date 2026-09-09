@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import java.util.LinkedHashMap;
@@ -70,12 +72,13 @@ public final class SessionPoliciesController {
 
   /** Handler for {@code GET /api/debug/session-policies}. */
   public void handle(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     ctx.contentType("application/json");
-    ctx.json(buildResponse());
+    ctx.json(buildResponse(engineContext));
   }
 
   /** Package-private for tests. Returns the typed response body (Jackson serialises). */
-  Map<String, Object> buildResponse() {
+  Map<String, Object> buildResponse(EngineContext engineContext) {
     KnowledgeClient current = this.client;
     if (current == null) {
       Map<String, Object> response = new LinkedHashMap<>();
@@ -84,6 +87,6 @@ public final class SessionPoliciesController {
       response.put("models", new TreeMap<>());
       return response;
     }
-    return current.getSessionPolicies();
+    return current.getSessionPolicies(engineContext);
   }
 }

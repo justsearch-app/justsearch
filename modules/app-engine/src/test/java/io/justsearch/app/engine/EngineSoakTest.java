@@ -140,13 +140,13 @@ final class EngineSoakTest {
       // A mix, as the retired soak intended but never achieved (its "mix of search types" was one
       // isHealthy() call): a real query against a real corpus, and every tenth iteration a status
       // read, so the ingest side of the port is exercised too.
-      SearchResponse response = engine.client().search("engine soak probe", 10);
+      SearchResponse response = engine.client().search("engine soak probe", 10, TestEngineContexts.FOREGROUND);
       if (response.getResultsCount() > 0) {
         succeeded++;
       }
       if (i % 10 == 0) {
         assertTrue(
-            engine.client().getStatus().getCore().getIsHealthy(),
+            engine.client().getStatus(TestEngineContexts.FOREGROUND).getCore().getIsHealthy(),
             "the engine must stay healthy through the search soak (iteration " + i + ")");
       }
     }
@@ -192,7 +192,7 @@ final class EngineSoakTest {
       engine.restart();
 
       assertTrue(
-          engine.client().isHealthy(),
+          engine.client().isHealthy(TestEngineContexts.FOREGROUND),
           "the engine must be healthy after open/close cycle " + (cycle + 1));
       // Durability across the cycle: the reopened generation reads the same on-disk state a
       // respawned process used to read. A cycle that came back healthy but empty would be a
@@ -204,7 +204,7 @@ final class EngineSoakTest {
       Path extra = tempDir.resolve("cycle-" + cycle + ".txt");
       Files.writeString(extra, "engine soak probe cycle marker " + cycle + "\n");
       assertTrue(
-          engine.client().submitBatch(List.of(extra)).getAcceptedCount() > 0,
+          engine.client().submitBatch(List.of(extra), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
           "the reopened engine must accept work in cycle " + (cycle + 1));
     }
 
@@ -248,9 +248,9 @@ final class EngineSoakTest {
       try {
         // The retired test polled isHealthy() only. Health plus a real search plus a status read
         // is the load an actual Head applies, and it covers both sides of the port.
-        boolean healthy = engine.client().isHealthy();
-        boolean found = engine.client().search("engine soak probe", 5).getResultsCount() > 0;
-        boolean statusOk = engine.client().getStatus().getCore().getIsHealthy();
+        boolean healthy = engine.client().isHealthy(TestEngineContexts.FOREGROUND);
+        boolean found = engine.client().search("engine soak probe", 5, TestEngineContexts.FOREGROUND).getResultsCount() > 0;
+        boolean statusOk = engine.client().getStatus(TestEngineContexts.FOREGROUND).getCore().getIsHealthy();
         if (healthy && found && statusOk) {
           successCount++;
         } else {
@@ -275,9 +275,9 @@ final class EngineSoakTest {
             + String.format(Locale.ROOT, "%.1f%%", successRate * 100) + " ("
             + successCount + " succeeded, " + failCount + " failed)");
     assertTrue(
-        engine.client().isHealthy(), "the engine must still be healthy after the sustained load");
+        engine.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must still be healthy after the sustained load");
     assertTrue(
-        engine.client().search("engine soak probe", 5).getResultsCount() > 0,
+        engine.client().search("engine soak probe", 5, TestEngineContexts.FOREGROUND).getResultsCount() > 0,
         "the index must still serve its corpus after the sustained load");
   }
 
@@ -304,7 +304,7 @@ final class EngineSoakTest {
       paths.add(file);
     }
     assertTrue(
-        engine.client().submitBatch(paths).getAcceptedCount() > 0,
+        engine.client().submitBatch(paths, TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
         "the soak corpus must be accepted for indexing");
     assertTrue(
         engine.awaitSearchable("engine soak probe", 180_000),

@@ -39,16 +39,16 @@ final class RootLifecycleOpsIdempotencyTest {
         watchedRoots,
         state,
         () -> null, // excludeMatcherSupplier — not used by addWatchedRoot
-        (rootPath, collection, mode, globs, progress) -> null, // scanRootFn — not used (walk never runs)
+        (rootPath, collection, mode, globs, progress, engineContext) -> null, // scanRootFn — not used (walk never runs)
         new RootLifecycleOps.WorkerWatchFn() {
           @Override
-          public void watch(String rootPath, String collection) {}
+          public void watch(String rootPath, String collection, io.justsearch.core.context.EngineContext engineContext) {}
 
           @Override
-          public void unwatch(String rootPath) {}
+          public void unwatch(String rootPath, io.justsearch.core.context.EngineContext engineContext) {}
         },
-        p -> null, // deleteByPathFn
-        s -> null, // deleteByIdFn
+        (p, engineContext) -> null, // deleteByPathFn
+        (s, engineContext) -> null, // deleteByIdFn
         mock(SyncOps.class),
         walkExecutor);
   }
@@ -67,7 +67,7 @@ final class RootLifecycleOpsIdempotencyTest {
     RootLifecycleOps ops = newOps(watchedRoots, state, walkExecutor);
 
     // First add registers the root and queues exactly one walk.
-    ops.addWatchedRoot("default", root);
+    ops.addWatchedRoot("default", root, io.justsearch.app.services.TestEngineContexts.internal());
     verify(walkExecutor, times(1)).execute(any());
 
     // Simulate the walk finishing with admitted files: timestamp set, walk-completed.
@@ -76,7 +76,7 @@ final class RootLifecycleOpsIdempotencyTest {
     assertTrue(state.isWalkCompleted(normalized));
 
     // Re-add the SAME root (the duplicate-submit) — must be a no-op.
-    ops.addWatchedRoot("default", root);
+    ops.addWatchedRoot("default", root, io.justsearch.app.services.TestEngineContexts.internal());
 
     // No second walk was queued, and the indexed state was NOT reset to NEVER_INDEXED.
     verify(walkExecutor, times(1)).execute(any());
@@ -98,8 +98,8 @@ final class RootLifecycleOpsIdempotencyTest {
     ExecutorService walkExecutor = mock(ExecutorService.class);
     RootLifecycleOps ops = newOps(watchedRoots, state, walkExecutor);
 
-    ops.addWatchedRoot("default", a);
-    ops.addWatchedRoot("default", b);
+    ops.addWatchedRoot("default", a, io.justsearch.app.services.TestEngineContexts.internal());
+    ops.addWatchedRoot("default", b, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Two distinct roots → two walks queued; both registered.
     verify(walkExecutor, times(2)).execute(any());

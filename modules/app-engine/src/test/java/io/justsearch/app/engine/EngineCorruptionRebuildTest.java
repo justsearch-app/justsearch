@@ -88,7 +88,7 @@ final class EngineCorruptionRebuildTest {
     engine = EngineTestHarness.start(dataDir, dataDir.resolve("index"), RECOVERY_POSTURE);
     Path indexBase = engine.indexBase();
     assertTrue(
-        engine.client().submitBatch(List.of(file)).getAcceptedCount() > 0,
+        engine.client().submitBatch(List.of(file), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
         "the file must be accepted for indexing");
     assertTrue(engine.awaitIndexed(1, 120_000), "indexing must complete");
     assertTrue(engine.awaitSearchable(marker, 60_000), "the marker is searchable before corruption");

@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -76,7 +78,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("answer: unavailable knowledge server states the condition + status-tool pointer")
   void answerUnavailableMessage() {
     Map<String, Object> result =
-        surfaceWithNoBackend().callTool("justsearch_answer", Map.of("query", "q"), "s1");
+        surfaceWithNoBackend().callTool("justsearch_answer", Map.of("query", "q"), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -91,7 +93,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("search: unavailable knowledge server states the condition + status-tool pointer")
   void searchUnavailableMessage() {
     Map<String, Object> result =
-        surfaceWithNoBackend().callTool("justsearch_search", Map.of("query", "q"), "s1");
+        surfaceWithNoBackend().callTool("justsearch_search", Map.of("query", "q"), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -106,7 +108,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("status: unavailable knowledge server states the condition + status-tool pointer")
   void statusUnavailableMessage() {
     Map<String, Object> result =
-        surfaceWithNoBackend().callTool("justsearch_status", Map.of(), "s1");
+        surfaceWithNoBackend().callTool("justsearch_status", Map.of(), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -125,7 +127,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("answer: generic failure states tool name, exception class/message, status pointer")
   void answerGenericFailureMessage() {
     DocumentService documents = mock(DocumentService.class);
-    when(documents.retrieveContext(any())).thenThrow(new IllegalStateException("boom"));
+    when(documents.retrieveContext(any(), any(EngineContext.class))).thenThrow(new IllegalStateException("boom"));
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
@@ -137,7 +139,7 @@ final class McpErrorLegibilityTest {
             () -> facade,
             FIXED_CLOCK);
 
-    Map<String, Object> result = surface.callTool("justsearch_answer", Map.of("query", "q"), "s1");
+    Map<String, Object> result = surface.callTool("justsearch_answer", Map.of("query", "q"), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -150,7 +152,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("search: generic failure states tool name, exception class/message, status pointer")
   void searchGenericFailureMessage() {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenThrow(new IllegalStateException("boom"));
+    when(adapter.search(any(), any(EngineContext.class))).thenThrow(new IllegalStateException("boom"));
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -161,7 +163,7 @@ final class McpErrorLegibilityTest {
             () -> null,
             FIXED_CLOCK);
 
-    Map<String, Object> result = surface.callTool("justsearch_search", Map.of("query", "q"), "s1");
+    Map<String, Object> result = surface.callTool("justsearch_search", Map.of("query", "q"), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -174,7 +176,7 @@ final class McpErrorLegibilityTest {
   @DisplayName("status: generic failure states tool name, exception class/message, status pointer")
   void statusGenericFailureMessage() {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.status()).thenThrow(new IllegalStateException("boom"));
+    when(adapter.status(any(EngineContext.class))).thenThrow(new IllegalStateException("boom"));
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -185,7 +187,7 @@ final class McpErrorLegibilityTest {
             () -> null,
             FIXED_CLOCK);
 
-    Map<String, Object> result = surface.callTool("justsearch_status", Map.of(), "s1");
+    Map<String, Object> result = surface.callTool("justsearch_status", Map.of(), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -200,7 +202,7 @@ final class McpErrorLegibilityTest {
           + " pointer")
   void operationDispatchGenericFailureMessage() {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
-    when(dispatcher.dispatch(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
+    when(dispatcher.dispatch(any(), any(), any(), any())).thenThrow(new IllegalStateException("boom"));
     McpToolSurface surface =
         new McpToolSurface(
             List.of(new AgentToolsOperationCatalog()),
@@ -210,7 +212,7 @@ final class McpErrorLegibilityTest {
             FIXED_CLOCK);
 
     Map<String, Object> result =
-        surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/tmp/notes")), "s1");
+        surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/tmp/notes")), "s1", TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"));
     String text = textOf(result);
@@ -247,14 +249,14 @@ final class McpErrorLegibilityTest {
   @DisplayName("search: typed failures retain the API policy in both serialized delivery tiers")
   void classifiedSearchFailure(Exception failure, ApiErrorCode expectedCode) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenThrow(failure);
+    when(adapter.search(any(), any(EngineContext.class))).thenThrow(failure);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface = new McpToolSurface(
         List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),
         () -> ctrl, () -> null, FIXED_CLOCK);
 
-    var result = surface.callTool("justsearch_search", Map.of("query", "q"), "s1");
+    var result = surface.callTool("justsearch_search", Map.of("query", "q"), "s1", TestRequestContexts.mcp("s1"));
     assertFailureFacts(result, expectedCode);
     assertFalse(textOf(result).contains("may be transient"));
   }
@@ -267,7 +269,7 @@ final class McpErrorLegibilityTest {
         new java.util.concurrent.CompletionException(
             new java.util.concurrent.ExecutionException(failure)))) {
       DocumentService documents = mock(DocumentService.class);
-      when(documents.retrieveContext(any()))
+      when(documents.retrieveContext(any(), any(EngineContext.class)))
           .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(asyncFailure));
       HeadAssembly facade = mock(HeadAssembly.class);
       when(facade.workers()).thenReturn(new WorkerServices(null, documents, null, null, null));
@@ -275,7 +277,7 @@ final class McpErrorLegibilityTest {
           List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),
           () -> null, () -> facade, FIXED_CLOCK);
 
-      var result = surface.callTool("justsearch_answer", Map.of("query", "q"), "s1");
+      var result = surface.callTool("justsearch_answer", Map.of("query", "q"), "s1", TestRequestContexts.mcp("s1"));
       assertFailureFacts(result, expectedCode);
       assertTrue(textOf(result).startsWith("Answer failed: " + failure.getClass().getSimpleName() + ":"));
       assertFalse(textOf(result).contains("ExecutionException"));
@@ -286,14 +288,14 @@ final class McpErrorLegibilityTest {
   @Test
   void exceptionDetailsAreSanitizedInBothTiers() {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.status()).thenThrow(new IllegalStateException("Cannot read C:\\private\\notes.txt"));
+    when(adapter.status(any(EngineContext.class))).thenThrow(new IllegalStateException("Cannot read C:\\private\\notes.txt"));
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface = new McpToolSurface(
         List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),
         () -> ctrl, () -> null, FIXED_CLOCK);
 
-    var result = surface.callTool("justsearch_status", Map.of(), "s1");
+    var result = surface.callTool("justsearch_status", Map.of(), "s1", TestRequestContexts.mcp("s1"));
     String wire = JsonMapper.builder().build().writeValueAsString(result);
     assertFalse(wire.contains("private"), wire);
     assertTrue(wire.contains("[path]"), wire);
@@ -303,14 +305,14 @@ final class McpErrorLegibilityTest {
   @Test
   void boundaryValidationHasKnownNonRetryableFacts() {
     var result = surfaceWithNoBackend().callTool(
-        "justsearch_search", Map.of("query", 42), "s1");
+        "justsearch_search", Map.of("query", 42), "s1", TestRequestContexts.mcp("s1"));
     assertTrue(textOf(result).contains("Invalid arguments"));
     assertFailureFacts(result, ApiErrorCode.INVALID_REQUEST);
   }
 
   @Test
   void unavailableBackendHasExistingTransientClassification() {
-    var result = surfaceWithNoBackend().callTool("justsearch_status", Map.of(), "s1");
+    var result = surfaceWithNoBackend().callTool("justsearch_status", Map.of(), "s1", TestRequestContexts.mcp("s1"));
     assertFailureFacts(result, ApiErrorCode.SERVICE_UNAVAILABLE);
   }
 
@@ -337,7 +339,7 @@ final class McpErrorLegibilityTest {
 
   @Test
   void unknownToolRemainsUnclassified() {
-    var result = surfaceWithNoBackend().callTool("unrecognized", Map.of(), "s1");
+    var result = surfaceWithNoBackend().callTool("unrecognized", Map.of(), "s1", TestRequestContexts.mcp("s1"));
     var structured = structuredOf(result);
     assertEquals(1, structured.size());
     assertEquals(structured.get("error"), textOf(result));
@@ -346,10 +348,10 @@ final class McpErrorLegibilityTest {
 
   private static Map<String, Object> operationFailure(OperationResult failure) {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
-    when(dispatcher.dispatch(any(), any(), any())).thenReturn(failure);
+    when(dispatcher.dispatch(any(), any(), any(), any())).thenReturn(failure);
     McpToolSurface surface = new McpToolSurface(
         List.of(new AgentToolsOperationCatalog()), dispatcher, () -> null, () -> null, FIXED_CLOCK);
-    return surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/tmp/notes")), "s1");
+    return surface.callTool("justsearch_ingest", Map.of("paths", List.of("C:/tmp/notes")), "s1", TestRequestContexts.mcp("s1"));
   }
 
   @SuppressWarnings("unchecked")

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
@@ -57,6 +59,8 @@ import org.slf4j.LoggerFactory;
  * structural here, not a convention.
  */
 public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "engine-health-monitor", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServerHealthMonitor.class);
 
   static final long DEFAULT_POLL_INTERVAL_MS = 10_000;
@@ -645,7 +649,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // (an in-process client has no connection to lose) and its only reason to exist was a stale
     // post-wake socket.
     try {
-      client.reindexPersistedRoots();
+      client.reindexPersistedRoots(ENGINE_CONTEXT);
     } catch (RuntimeException e) {
       log.warn("Post-resume watcher re-register + reconcile failed: {}", e.getMessage());
     }

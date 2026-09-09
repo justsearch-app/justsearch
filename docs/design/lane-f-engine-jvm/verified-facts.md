@@ -401,3 +401,27 @@ index-half invariant and do not restore the split-JVM instruction.
   operations.db. Existing store identities and recoverability classes do not change.
 - The original session imposed a one-hour maximum per run. E's drift observation is three
   forty-minute observations (120 minutes total), explicitly not a continuous two-hour soak.
+
+## C1 batch-2 corrections (2026-09-09, working tree above dd11e372d)
+
+- Required EngineContext parameters now reach search/indexing ports, document helpers,
+  agent sessions/tools, conversation runners, HTTP/MCP ingress and stored pending approvals.
+  The engine-port catalogue includes typed callers and composition carriers. Explicit contexts
+  replace the abandoned bound-view proposal; no ThreadLocal carries provenance.
+- jobs.db V14 adds nullable originator/transport on both jobs and ingestion_ledger. The Engine
+  bridge uses the existing ActionLedgerProjection authority; WORKFLOW is agent-originated.
+  Atomic queue claims retain provenance through extraction, stale resolution and terminal writes.
+  Later same-path admission cannot overwrite a claim's attribution, including legacy-null claims.
+- A real EngineRoot MCP ingest reaches an agent/MCP SQLite outcome in the focused test run
+  tmp/c1-batch2-claim-tests-2.txt. The concurrent re-admission regression fails with the old SQL
+  lookup restored (expected agent, observed user), proving it detects the reviewed defect.
+  The mutation was reverted. Raw evidence is retained under tmp/c1-batch2-xml.
+- Explicit syncDirectory admission/replay provenance and request-span projection/export are
+  implemented and verified. Typed SYNC_ROOT coalescing retains prior attribution on maintenance
+  under the existing queue lock; malformed prior work is retained and refused, never acknowledged
+  as replaced. A shared versioned codec governs writer, coalescing and replay.
+- Batch 2 is complete locally: full-build-6 and full-suite-3 pass; 9503 tests, zero failures/errors,
+  25 skipped. Final service count is 2534 (3 skipped), UI 1071 (1 skipped). Tests migrated all
+  integration/system source sets too. Final XML is tmp/c1-batch2-xml/full-suite-green; the final
+  evidence map and live compact-model plumbing proof are in evidence/C1/batch-2.md. This does not
+  establish standard-model quality or C1 admission/executor behavior, which later batches own.

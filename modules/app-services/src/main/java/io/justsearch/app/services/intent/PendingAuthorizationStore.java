@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.GateBehavior;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.SourceTier;
@@ -64,8 +66,8 @@ public final class PendingAuthorizationStore {
       SourceTier sourceTier,
       RiskTier riskTier,
       GateBehavior gateBehavior,
-      String rationale) {
-    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, null);
+      String rationale, EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance) {
+    return create(operationId, argsJson, sourceTier, riskTier, gateBehavior, rationale, null, engineContext, provenance);
   }
 
   /**
@@ -81,7 +83,7 @@ public final class PendingAuthorizationStore {
       RiskTier riskTier,
       GateBehavior gateBehavior,
       String rationale,
-      String requestedBy) {
+      String requestedBy, EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance) {
     return create(
         operationId,
         argsJson,
@@ -90,7 +92,7 @@ public final class PendingAuthorizationStore {
         gateBehavior,
         rationale,
         requestedBy,
-        TransportTag.SYSTEM_INTERNAL);
+        TransportTag.valueOf(engineContext.transport()), engineContext, provenance);
   }
 
   /**
@@ -108,7 +110,7 @@ public final class PendingAuthorizationStore {
       GateBehavior gateBehavior,
       String rationale,
       String requestedBy,
-      TransportTag transport) {
+      TransportTag transport, EngineContext engineContext, io.justsearch.agent.api.registry.InvocationProvenance provenance) {
     Instant now = clock.instant();
     // Evict expired entries here — expiry is otherwise only checked lazily on peek/consume of
     // a specific id, so a pending that is gated-then-abandoned (never approved) would never be
@@ -136,7 +138,7 @@ public final class PendingAuthorizationStore {
             now,
             now.plus(ttl),
             requestedBy,
-            transport));
+            transport, engineContext, provenance));
     return id;
   }
 

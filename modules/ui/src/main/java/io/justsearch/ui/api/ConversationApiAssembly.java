@@ -72,12 +72,12 @@ final class ConversationApiAssembly {
     final io.justsearch.agent.api.registry.WorkflowToolRunner wfToolRunner =
         new io.justsearch.app.services.conversation.WorkflowToolRunnerImpl(
             io.justsearch.app.services.conversation.CoreWorkflowCatalog.catalog(),
-            (body, aud, sink) -> {
+            (body, aud, sink, engineContext) -> {
               io.justsearch.app.services.conversation.WorkflowShapeRunner r = wfShapeRunnerHolder[0];
               if (r == null) {
                 throw new IllegalStateException("WorkflowShapeRunner not yet wired");
               }
-              r.run(body, aud, sink);
+              r.run(body, aud, sink, engineContext);
             });
     Supplier<io.justsearch.agent.api.AgentService> rawAgentSupplier =
         b.agentService != null

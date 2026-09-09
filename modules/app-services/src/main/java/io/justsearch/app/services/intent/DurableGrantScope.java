@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.Operation;
 
 /**
@@ -37,5 +39,5 @@ public interface DurableGrantScope {
    *     {@code false} whenever containment cannot be PROVEN — which costs a confirmation, never a
    *     silent action.
    */
-  boolean coversArguments(Operation op, String argumentsJson);
+  boolean coversArguments(Operation op, String argumentsJson, EngineContext engineContext);
 }

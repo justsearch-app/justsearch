@@ -85,7 +85,6 @@ public final class AuthorizationController {
   private final io.justsearch.agent.api.registry.OperationDispatcher dispatcher;
 
   private final List<io.justsearch.agent.api.registry.OperationCatalog> catalogs;
-  private final java.time.Clock clock;
 
   public AuthorizationController(ConsentCapsuleAuthority capsuleService) {
     this(capsuleService, null, null);
@@ -102,7 +101,7 @@ public final class AuthorizationController {
       ConsentCapsuleAuthority capsuleService,
       io.justsearch.app.services.intent.PendingAuthorizationStore pendingStore,
       io.justsearch.app.services.intent.DurableGrantStore durableGrantStore) {
-    this(capsuleService, pendingStore, durableGrantStore, null, List.of(), java.time.Clock.systemUTC());
+    this(capsuleService, pendingStore, durableGrantStore, null, List.of());
   }
 
   /** Canonical constructor (tempdoc 655): also wires server-side {@code execute: true} completion. */
@@ -111,14 +110,12 @@ public final class AuthorizationController {
       io.justsearch.app.services.intent.PendingAuthorizationStore pendingStore,
       io.justsearch.app.services.intent.DurableGrantStore durableGrantStore,
       io.justsearch.agent.api.registry.OperationDispatcher dispatcher,
-      List<io.justsearch.agent.api.registry.OperationCatalog> catalogs,
-      java.time.Clock clock) {
+      List<io.justsearch.agent.api.registry.OperationCatalog> catalogs) {
     this.capsuleService = Objects.requireNonNull(capsuleService, "capsuleService");
     this.pendingStore = pendingStore;
     this.durableGrantStore = durableGrantStore;
     this.dispatcher = dispatcher;
     this.catalogs = catalogs == null ? List.of() : List.copyOf(catalogs);
-    this.clock = clock == null ? java.time.Clock.systemUTC() : clock;
   }
 
   /**
@@ -280,10 +277,10 @@ public final class AuthorizationController {
       // upgrade. Matches the FE's own invokeWithConsent, which re-invokes with the SAME
       // request shape it originally used, capsule added.
       io.justsearch.agent.api.registry.InvocationProvenance provenance =
-          io.justsearch.agent.api.registry.InvocationProvenance.mcp(
-              clock.instant(), java.util.Optional.empty());
+          pending.provenance();
       io.justsearch.agent.api.registry.OperationResult result =
-          dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule));
+          dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
+              pending.engineContext());
       payload.put("executed", true);
       payload.put("executeSuccess", result.success());
       payload.put("executeMessage", result.message());

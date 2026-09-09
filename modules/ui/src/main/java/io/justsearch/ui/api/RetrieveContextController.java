@@ -186,7 +186,7 @@ public class RetrieveContextController {
 
     try {
       ContextResult result = documentService()
-          .retrieveContext(params)
+          .retrieveContext(params, RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(RETRIEVE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
@@ -294,7 +294,7 @@ public class RetrieveContextController {
 
     try {
       var result = documentService()
-          .matchCitationsAgainst(answerText, sources, threshold)
+          .matchCitationsAgainst(answerText, sources, threshold, RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(CITATIONS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 

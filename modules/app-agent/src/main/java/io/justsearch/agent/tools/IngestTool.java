@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -34,7 +36,7 @@ public final class IngestTool implements OperationHandler {
   private final IngestCallback ingestCallback;
   private final ScanRootCallback scanRootCallback;
   private final AgentToolPaths.RootsView rootsView;
-  private final Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier;
+  private final java.util.function.Function<EngineContext, List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier;
 
   /**
    * Constructs the agent ingest tool. Tempdoc 418 Phase B made the {@link ScanRootCallback}
@@ -45,8 +47,8 @@ public final class IngestTool implements OperationHandler {
   public IngestTool(
       IngestCallback ingestCallback,
       ScanRootCallback scanRootCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier) {
-    this(ingestCallback, scanRootCallback, rootsSupplier, List::of);
+      java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier) {
+    this(ingestCallback, scanRootCallback, rootsSupplier, engineContext -> List.of());
   }
 
   /**
@@ -57,8 +59,8 @@ public final class IngestTool implements OperationHandler {
   public IngestTool(
       IngestCallback ingestCallback,
       ScanRootCallback scanRootCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier,
-      Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
+      java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier,
+      java.util.function.Function<EngineContext, List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
     this(
         ingestCallback,
         scanRootCallback,
@@ -71,7 +73,7 @@ public final class IngestTool implements OperationHandler {
       IngestCallback ingestCallback,
       ScanRootCallback scanRootCallback,
       AgentToolPaths.RootsView rootsView,
-      Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
+      java.util.function.Function<EngineContext, List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
     this.ingestCallback = ingestCallback;
     this.scanRootCallback = scanRootCallback;
     this.rootsView = rootsView == null ? AgentToolPaths.RootsView.of(null) : rootsView;
@@ -79,7 +81,7 @@ public final class IngestTool implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     if (argumentsJson == null || argumentsJson.isBlank()) {
       return OperationResult.failure("No arguments provided");
     }
@@ -107,7 +109,7 @@ public final class IngestTool implements OperationHandler {
       } catch (IllegalArgumentException e) {
         return OperationResult.failure(e.getMessage());
       }
-      List<IngestCollectionPolicy.RootBinding> rootBindings = rootBindings();
+      List<IngestCollectionPolicy.RootBinding> rootBindings = rootBindings(engineContext);
 
       // Tempdoc 418 Phase B — directories dispatch to Worker-side ScanRoot RPC; only single
       // files keep the local submitBatch path. Worker-side WorkerIngestionAuthority applies
@@ -123,7 +125,7 @@ public final class IngestTool implements OperationHandler {
       List<String> directoryErrors = new ArrayList<>();
 
       for (JsonNode pathNode : pathsNode) {
-        Path input = resolvePath(pathNode.asText());
+        Path input = resolvePath(pathNode.asText(), engineContext);
         if (input == null || !Files.exists(input)) {
           skippedCount++;
           continue;
@@ -137,7 +139,7 @@ public final class IngestTool implements OperationHandler {
               io.justsearch.agent.AgentTimeouts.call(
                   "core_ingest_files",
                   io.justsearch.agent.AgentTimeouts.toolScanMs(),
-                  () -> scanRootCallback.scanRoot(input.toString(), collection, List.of()));
+                  () -> scanRootCallback.scanRoot(input.toString(), collection, List.of(), engineContext));
           directoryAccepted += scanResp.accepted();
           if (scanResp.error() != null && !scanResp.error().isEmpty()) {
             directoryErrors.add(input + ":" + scanResp.error());
@@ -159,7 +161,7 @@ public final class IngestTool implements OperationHandler {
       List<String> singleErrors = new ArrayList<>();
       for (Map.Entry<String, List<Path>> group : singleFilesByCollection.entrySet()) {
         String collection = group.getKey().isEmpty() ? null : group.getKey();
-        KnowledgeIngestResponse fileResp = ingestCallback.ingest(group.getValue(), collection);
+        KnowledgeIngestResponse fileResp = ingestCallback.ingest(group.getValue(), collection, engineContext);
         singleAccepted += fileResp.accepted();
         if (fileResp.error() != null && !fileResp.error().isEmpty()) {
           singleErrors.add(fileResp.error());
@@ -204,20 +206,20 @@ public final class IngestTool implements OperationHandler {
    * correctly, and reported as "1 paths skipped". So the name match is probed like any other
    * candidate and falls through when it misses.
    */
-  private Path resolvePath(String raw) {
+  private Path resolvePath(String raw, EngineContext engineContext) {
     try {
       Path p = Path.of(raw);
       if (p.isAbsolute()) {
         return p.normalize();
       }
-      String resolved = rootsView.resolveRelative(raw);
+      String resolved = rootsView.resolveRelative(raw, engineContext);
       if (resolved != null) {
         Path named = Path.of(resolved).normalize();
         if (Files.exists(named)) {
           return named;
         }
       }
-      for (BrowseTool.RootInfo root : rootsView.roots()) {
+      for (BrowseTool.RootInfo root : rootsView.roots(engineContext)) {
         Path candidate = Path.of(root.path()).resolve(p).normalize();
         if (Files.exists(candidate)) {
           return candidate;
@@ -254,9 +256,9 @@ public final class IngestTool implements OperationHandler {
    * Best-effort watched-root lookup for collection inheritance (tempdoc 811 C-2a). A failure here
    * means every path resolves out-of-root, which is a real tag rather than the pre-811 {@code null}.
    */
-  private List<IngestCollectionPolicy.RootBinding> rootBindings() {
+  private List<IngestCollectionPolicy.RootBinding> rootBindings(EngineContext engineContext) {
     try {
-      List<IngestCollectionPolicy.RootBinding> bindings = rootBindingsSupplier.get();
+      List<IngestCollectionPolicy.RootBinding> bindings = rootBindingsSupplier.apply(engineContext);
       return bindings == null ? List.of() : bindings;
     } catch (RuntimeException e) {
       LOG.debug("watched-root lookup for ingest tagging failed", e);
@@ -270,7 +272,7 @@ public final class IngestTool implements OperationHandler {
    */
   @FunctionalInterface
   public interface IngestCallback {
-    KnowledgeIngestResponse ingest(List<Path> files, String collection);
+    KnowledgeIngestResponse ingest(List<Path> files, String collection, EngineContext engineContext);
   }
 
   /**
@@ -281,6 +283,6 @@ public final class IngestTool implements OperationHandler {
    */
   @FunctionalInterface
   public interface ScanRootCallback {
-    KnowledgeIngestResponse scanRoot(String rootPath, String collection, List<String> excludeGlobs);
+    KnowledgeIngestResponse scanRoot(String rootPath, String collection, List<String> excludeGlobs, EngineContext engineContext);
   }
 }

@@ -103,11 +103,11 @@ final class EngineDocumentFetchAndContextTest {
     Files.writeString(testFile2, CONTENT_2);
 
     harness = EngineTestHarness.start(tempDir.resolve("data"));
-    assertTrue(harness.client().isHealthy(), "the engine must be healthy before indexing");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before indexing");
 
     assertEquals(
         2,
-        harness.client().submitBatch(List.of(testFile1, testFile2)).getAcceptedCount(),
+        harness.client().submitBatch(List.of(testFile1, testFile2), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "should accept 2 files for indexing");
 
     assertTrue(harness.awaitIndexed(2, 120_000), "documents should be indexed");
@@ -135,7 +135,7 @@ final class EngineDocumentFetchAndContextTest {
   }
 
   private static String discoverDocIdBySearch(String searchTerm) {
-    SearchResponse response = harness.client().search(searchTerm, 1);
+    SearchResponse response = harness.client().search(searchTerm, 1, TestEngineContexts.FOREGROUND);
     return response.getResultsCount() > 0 ? response.getResults(0).getId() : null;
   }
 
@@ -147,7 +147,7 @@ final class EngineDocumentFetchAndContextTest {
   @Order(1)
   @DisplayName("Search finds indexed document by content")
   void searchFindsIndexedDocumentByContent() {
-    SearchResponse response = harness.client().search("fox", 10);
+    SearchResponse response = harness.client().search("fox", 10, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "search response should not be null");
     assertTrue(response.getResultsCount() > 0, "should find at least 1 document");
@@ -160,7 +160,7 @@ final class EngineDocumentFetchAndContextTest {
   @Order(2)
   @DisplayName("Search finds database config by keyword")
   void searchFindsDatabaseConfigByKeyword() {
-    SearchResponse response = harness.client().search("password", 10);
+    SearchResponse response = harness.client().search("password", 10, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "search response should not be null");
     assertTrue(response.getResultsCount() > 0, "should find at least 1 document");
@@ -177,7 +177,7 @@ final class EngineDocumentFetchAndContextTest {
   @Order(3)
   @DisplayName("FetchDocuments returns actual file content")
   void fetchDocumentsReturnsActualContent() {
-    FetchDocumentsResponse response = harness.client().fetchDocuments(List.of(docId1));
+    FetchDocumentsResponse response = harness.client().fetchDocuments(List.of(docId1), TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "FetchDocuments response should not be null");
     assertEquals(1, response.getDocumentsCount(), "should return 1 document");
@@ -196,7 +196,7 @@ final class EngineDocumentFetchAndContextTest {
   @Order(4)
   @DisplayName("FetchDocuments returns multiple documents")
   void fetchDocumentsReturnsMultipleDocuments() {
-    FetchDocumentsResponse response = harness.client().fetchDocuments(List.of(docId1, docId2));
+    FetchDocumentsResponse response = harness.client().fetchDocuments(List.of(docId1, docId2), TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "FetchDocuments response should not be null");
     assertEquals(2, response.getDocumentsCount(), "should return 2 documents");
@@ -213,7 +213,7 @@ final class EngineDocumentFetchAndContextTest {
   @DisplayName("FetchDocuments handles mix of found and not found")
   void fetchDocumentsHandlesMixedResults() {
     FetchDocumentsResponse response =
-        harness.client().fetchDocuments(List.of(docId1, "nonexistent-doc-id", docId2));
+        harness.client().fetchDocuments(List.of(docId1, "nonexistent-doc-id", docId2), TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "FetchDocuments response should not be null");
     assertEquals(3, response.getDocumentsCount(), "should return 3 document entries");
@@ -242,7 +242,7 @@ final class EngineDocumentFetchAndContextTest {
   @Order(6)
   @DisplayName("FetchDocumentSlice returns paged content with correct offsets")
   void fetchDocumentSliceReturnsPagedContent() {
-    FetchDocumentSliceResponse page1 = harness.client().fetchDocumentSlice(docId1, 0, 16);
+    FetchDocumentSliceResponse page1 = harness.client().fetchDocumentSlice(docId1, 0, 16, TestEngineContexts.FOREGROUND);
     assertNotNull(page1, "slice response should not be null");
     assertEquals(docId1, page1.getDocId(), "doc ID should match");
     assertTrue(page1.getFound(), "document should be found");
@@ -254,7 +254,7 @@ final class EngineDocumentFetchAndContextTest {
     assertTrue(page1.getTruncated(), "a 16-char page of a multi-line document must be truncated");
 
     FetchDocumentSliceResponse page2 =
-        harness.client().fetchDocumentSlice(docId1, page1.getNextOffsetChars(), 16);
+        harness.client().fetchDocumentSlice(docId1, page1.getNextOffsetChars(), 16, TestEngineContexts.FOREGROUND);
     assertTrue(page2.getFound(), "second page should be found");
     assertEquals(
         page1.getNextOffsetChars() + page2.getContent().length(),
@@ -273,7 +273,7 @@ final class EngineDocumentFetchAndContextTest {
   @DisplayName("FetchDocumentSlice returns not-found for unknown doc IDs")
   void fetchDocumentSliceReturnsNotFoundForUnknownId() {
     FetchDocumentSliceResponse response =
-        harness.client().fetchDocumentSlice("nonexistent-doc-id", 0, 50);
+        harness.client().fetchDocumentSlice("nonexistent-doc-id", 0, 50, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "slice response should not be null");
     assertFalse(response.getFound(), "unknown doc should not be found");
@@ -292,7 +292,7 @@ final class EngineDocumentFetchAndContextTest {
     RetrieveContextResponse response =
         harness
             .client()
-            .retrieveContext("What animal jumps over the lazy dog?", Set.of(docId1, docId2), 5);
+            .retrieveContext("What animal jumps over the lazy dog?", Set.of(docId1, docId2), 5, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "RetrieveContext response should not be null");
     String context = response.getContext();
@@ -309,7 +309,7 @@ final class EngineDocumentFetchAndContextTest {
   @DisplayName("RetrieveContext finds database password from config")
   void retrieveContextFindsDatabasePassword() {
     RetrieveContextResponse response =
-        harness.client().retrieveContext("What is the database password?", Set.of(docId1, docId2), 5);
+        harness.client().retrieveContext("What is the database password?", Set.of(docId1, docId2), 5, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "RetrieveContext response should not be null");
     String context = response.getContext();
@@ -326,7 +326,7 @@ final class EngineDocumentFetchAndContextTest {
   void retrieveContextRespectsDocIdFilter() {
     // Only the fox document, which has no password in it.
     RetrieveContextResponse response =
-        harness.client().retrieveContext("What is the password?", Set.of(docId1), 5);
+        harness.client().retrieveContext("What is the password?", Set.of(docId1), 5, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "RetrieveContext response should not be null");
     assertFalse(
@@ -339,7 +339,7 @@ final class EngineDocumentFetchAndContextTest {
   @DisplayName("RetrieveContext handles an irrelevant question")
   void retrieveContextHandlesIrrelevantQuestion() {
     RetrieveContextResponse response =
-        harness.client().retrieveContext("What is the capital of France?", Set.of(docId1, docId2), 5);
+        harness.client().retrieveContext("What is the capital of France?", Set.of(docId1, docId2), 5, TestEngineContexts.FOREGROUND);
 
     // The retired test named itself "returns empty" but asserted only non-null, on the stated
     // grounds that a BM25 retriever may still return low-relevance content. That judgement is

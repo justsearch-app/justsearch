@@ -389,6 +389,7 @@ final class RunStreamControllerTest {
     private static Context requestContext(
         String body, AtomicInteger status, AtomicReference<Object> json) {
       Context ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/api/chat/runs/test/observe");
       when(ctx.body()).thenReturn(body);
       when(ctx.contentType(anyString())).thenReturn(ctx);
       when(ctx.attributeOrCompute(anyString(), any())).thenReturn(new Object());

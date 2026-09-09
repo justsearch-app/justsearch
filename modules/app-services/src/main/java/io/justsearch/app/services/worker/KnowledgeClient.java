@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
+
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.ipc.CircuitBreakerOpenException;
 import io.justsearch.ipc.BatchRequest;
 import io.justsearch.ipc.BatchResponse;
@@ -239,18 +241,18 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         // SCAN_MODE_INITIAL, so a force-reindex arrived at the Worker indistinguishable from an
         // ordinary rewalk. The caller decides the mode now; this lambda only carries it.
         RootLifecycleOps.ScanRootFn scanRootFn =
-            (rootPath, collection, mode, excludeGlobs, progressConsumer) ->
-                scanRoot(rootPath, collection, mode, excludeGlobs, progressConsumer);
+            (rootPath, collection, mode, excludeGlobs, progressConsumer, engineContext) ->
+                scanRoot(rootPath, collection, mode, excludeGlobs, progressConsumer, engineContext);
         RootLifecycleOps.WorkerWatchFn workerWatchFn =
             new RootLifecycleOps.WorkerWatchFn() {
                 @Override
-                public void watch(String rootPath, String collection) {
-                    watchRoot(rootPath, collection);
+                public void watch(String rootPath, String collection, EngineContext engineContext) {
+                    watchRoot(rootPath, collection, engineContext);
                 }
 
                 @Override
-                public void unwatch(String rootPath) {
-                    unwatchRoot(rootPath);
+                public void unwatch(String rootPath, EngineContext engineContext) {
+                    unwatchRoot(rootPath, engineContext);
                 }
             };
         // Tempdoc 418 B-H.3 — Worker now owns backpressure (queue-depth aware throttle inside
@@ -264,19 +266,19 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         watchedRootsState.loadPersistedRoots();
     }
 
-    public void reindexPersistedRoots() {
-        rootLifecycleOps.reindexPersistedRoots();
+    public void reindexPersistedRoots(EngineContext engineContext) {
+        rootLifecycleOps.reindexPersistedRoots(engineContext);
     }
 
 
-    private DeleteByPathResponse executeDeleteByPath(Path normalizedPath) {
+    private DeleteByPathResponse executeDeleteByPath(Path normalizedPath, EngineContext engineContext) {
         DeleteByPathRequest request = DeleteByPathRequest.newBuilder()
             .setPath(normalizedPath.toString())
             .build();
         return executeIngestRpc(
             "deleteByPath",
             RpcDeadlineCategory.STANDARD,
-            stub -> stub.deleteByPath(request));
+            stub -> stub.deleteByPath(request), engineContext);
     }
 
     // ========== The transport seam (lane F stage A item A6) ==========
@@ -295,13 +297,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     protected abstract <T> T executeSearchRpc(
             String operation,
             RpcDeadlineCategory category,
-            java.util.function.Function<SearchServiceCalls, T> rpc);
+            java.util.function.Function<SearchServiceCalls, T> rpc, EngineContext engineContext);
 
     /** Runs one unary {@code IngestService} call. See {@link #executeSearchRpc}. */
     protected abstract <T> T executeIngestRpc(
             String operation,
             RpcDeadlineCategory category,
-            java.util.function.Function<IngestServiceCalls, T> rpc);
+            java.util.function.Function<IngestServiceCalls, T> rpc, EngineContext engineContext);
 
     /**
      * Runs the {@code HealthService} call with an explicit deadline in milliseconds.
@@ -312,7 +314,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     protected abstract <T> T executeHealthRpc(
             String operation,
             long callDeadlineMs,
-            java.util.function.Function<HealthServiceCalls, T> rpc);
+            java.util.function.Function<HealthServiceCalls, T> rpc, EngineContext engineContext);
 
     /**
      * Runs the server-streaming {@code ScanRoot} call, forwarding every progress event to
@@ -328,7 +330,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     protected abstract io.justsearch.ipc.ScanRootProgress executeScanRoot(
             io.justsearch.ipc.ScanRootRequest request,
             CancelToken cancelToken,
-            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer);
+            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer, EngineContext engineContext);
 
     /**
      * Opens the long-lived {@code SubscribeIndexingJobs} stream and delivers every frame to
@@ -346,7 +348,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     public abstract IndexingJobsStream subscribeIndexingJobs(
             java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> onFrame,
             java.util.function.Consumer<Throwable> onError,
-            Runnable onCompleted);
+            Runnable onCompleted, EngineContext engineContext);
 
     /** Releases whatever the transport holds. Called from {@link #close()}. */
     protected abstract void closeTransport();
@@ -380,50 +382,50 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     private <T> T executeHealthRpc(
             String operation,
             RpcDeadlineCategory category,
-            java.util.function.Function<HealthServiceCalls, T> rpc) {
-        return executeHealthRpc(operation, deadline(category), rpc);
+            java.util.function.Function<HealthServiceCalls, T> rpc, EngineContext engineContext) {
+        return executeHealthRpc(operation, deadline(category), rpc, engineContext);
     }
 
     // ========== Search Service (delegates to SearchRpcOps) ==========
 
-    public SearchResponse search(String query, int limit) {
-        return searchRpcOps.search(query, limit);
+    public SearchResponse search(String query, int limit, EngineContext engineContext) {
+        return searchRpcOps.search(query, limit, engineContext);
     }
 
-    public SearchResponse search(String query, int limit, io.justsearch.ipc.PipelineConfig pipeline) {
-        return searchRpcOps.search(query, limit, pipeline);
+    public SearchResponse search(String query, int limit, io.justsearch.ipc.PipelineConfig pipeline, EngineContext engineContext) {
+        return searchRpcOps.search(query, limit, pipeline, engineContext);
     }
 
-    public SearchResponse search(SearchRequest request) {
-        return searchRpcOps.search(request);
+    public SearchResponse search(SearchRequest request, EngineContext engineContext) {
+        return searchRpcOps.search(request, engineContext);
     }
 
-    public SearchResponse searchVector(List<Float> queryVector, int limit) {
-        return searchRpcOps.searchVector(queryVector, limit);
+    public SearchResponse searchVector(List<Float> queryVector, int limit, EngineContext engineContext) {
+        return searchRpcOps.searchVector(queryVector, limit, engineContext);
     }
 
-    public SuggestResponse suggest(String query, int limit) {
-        return searchRpcOps.suggest(query, limit);
+    public SuggestResponse suggest(String query, int limit, EngineContext engineContext) {
+        return searchRpcOps.suggest(query, limit, engineContext);
     }
 
-    public FetchDocumentsResponse fetchDocuments(List<String> docIds) {
-        return searchRpcOps.fetchDocuments(docIds);
+    public FetchDocumentsResponse fetchDocuments(List<String> docIds, EngineContext engineContext) {
+        return searchRpcOps.fetchDocuments(docIds, engineContext);
     }
 
-    public FetchDocumentSliceResponse fetchDocumentSlice(String docId, int offsetChars, int maxChars) {
-        return searchRpcOps.fetchDocumentSlice(docId, offsetChars, maxChars);
+    public FetchDocumentSliceResponse fetchDocumentSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
+        return searchRpcOps.fetchDocumentSlice(docId, offsetChars, maxChars, engineContext);
     }
 
-    public RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK) {
-        return searchRpcOps.retrieveContext(question, docIds, topK);
+    public RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(question, docIds, topK, engineContext);
     }
 
-    public RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK, int maxContextTokens) {
-        return searchRpcOps.retrieveContext(question, docIds, topK, maxContextTokens);
+    public RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(question, docIds, topK, maxContextTokens, engineContext);
     }
 
-    public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params) {
-        return searchRpcOps.retrieveContext(params);
+    public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(params, engineContext);
     }
 
     public MatchCitationsResponse matchCitations(
@@ -431,9 +433,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         List<String> chunkDocIds,
         List<Integer> chunkIndices,
         List<String> passageTexts,
-        double threshold) {
+        double threshold, EngineContext engineContext) {
         return searchRpcOps.matchCitations(
-            answerText, chunkDocIds, chunkIndices, passageTexts, threshold);
+            answerText, chunkDocIds, chunkIndices, passageTexts, threshold, engineContext);
     }
 
     /**
@@ -444,17 +446,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param deadlineMs budget for inference (0 = server default)
      * @return rerank response with sorted indices and scores
      */
-    public RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs) {
-        return searchRpcOps.rerank(query, documentTexts, deadlineMs);
+    public RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs, EngineContext engineContext) {
+        return searchRpcOps.rerank(query, documentTexts, deadlineMs, engineContext);
     }
 
-    public ListFoldersResponse listFolders(String parentPath, int maxFolders) {
-        return searchRpcOps.listFolders(parentPath, maxFolders);
+    public ListFoldersResponse listFolders(String parentPath, int maxFolders, EngineContext engineContext) {
+        return searchRpcOps.listFolders(parentPath, maxFolders, engineContext);
     }
 
     public ListFolderFilesResponse listFolderFiles(
-        String folderPath, int limit, List<String> projection) {
-        return searchRpcOps.listFolderFiles(folderPath, limit, projection);
+        String folderPath, int limit, List<String> projection, EngineContext engineContext) {
+        return searchRpcOps.listFolderFiles(folderPath, limit, projection, engineContext);
     }
 
     /**
@@ -467,14 +469,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param limit max IDs to return (0 → default 1000 on the Worker)
      * @return response with doc IDs, total count, and timing
      */
-    public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(int offset, int limit) {
-        return searchRpcOps.listAllDocumentIds(offset, limit);
+    public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
+        return searchRpcOps.listAllDocumentIds(offset, limit, engineContext);
     }
 
     /** Continues document-ID pagination against the immutable snapshot from the first page. */
     public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(
-            int offset, int limit, String snapshotToken) {
-        return searchRpcOps.listAllDocumentIds(offset, limit, snapshotToken);
+            int offset, int limit, String snapshotToken, EngineContext engineContext) {
+        return searchRpcOps.listAllDocumentIds(offset, limit, snapshotToken, engineContext);
     }
 
     // ========== Ingest Service ==========
@@ -485,8 +487,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param paths list of file paths to index
      * @return batch response with accepted count
      */
-    public BatchResponse submitBatch(List<Path> paths) {
-        return submitBatch(paths, false);
+    public BatchResponse submitBatch(List<Path> paths, EngineContext engineContext) {
+        return submitBatch(paths, false, engineContext);
     }
 
     /**
@@ -496,8 +498,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param force if true, bypass "file unchanged" check and force re-extraction
      * @return batch response with accepted count
      */
-    public BatchResponse submitBatch(List<Path> paths, boolean force) {
-        return submitBatch(paths, force, null);
+    public BatchResponse submitBatch(List<Path> paths, boolean force, EngineContext engineContext) {
+        return submitBatch(paths, force, null, engineContext);
     }
 
     /**
@@ -508,7 +510,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param collection optional collection tag for the indexed documents (null for default)
      * @return batch response with accepted count
      */
-    public BatchResponse submitBatch(List<Path> paths, boolean force, String collection) {
+    public BatchResponse submitBatch(List<Path> paths, boolean force, String collection, EngineContext engineContext) {
         BatchRequest.Builder builder = BatchRequest.newBuilder();
         for (Path path : paths) {
             builder.addFilePaths(path.toAbsolutePath().toString());
@@ -521,7 +523,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return executeIngestRpc(
             "submitBatch",
             RpcDeadlineCategory.STANDARD,
-            stub -> stub.submitBatch(request));
+            stub -> stub.submitBatch(request), engineContext);
     }
 
     /**
@@ -531,14 +533,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param docId the document ID (will be normalized)
      * @return response indicating success/failure
      */
-    public DeleteByIdResponse deleteById(String docId) {
+    public DeleteByIdResponse deleteById(String docId, EngineContext engineContext) {
         DeleteByIdRequest request = DeleteByIdRequest.newBuilder()
                 .setDocId(docId)
                 .build();
         return executeIngestRpc(
             "deleteById",
             RpcDeadlineCategory.STANDARD,
-            stub -> stub.deleteById(request));
+            stub -> stub.deleteById(request), engineContext);
     }
 
     /**
@@ -549,7 +551,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * @param pathMappings map of old absolute path to new absolute path
      * @return number of parent documents successfully updated
      */
-    public int updateDocumentPaths(Map<Path, Path> pathMappings) {
+    public int updateDocumentPaths(Map<Path, Path> pathMappings, EngineContext engineContext) {
         UpdatePathsRequest.Builder reqBuilder = UpdatePathsRequest.newBuilder();
         for (var entry : pathMappings.entrySet()) {
             String oldPath = normalizePath(entry.getKey().toAbsolutePath().toString());
@@ -563,7 +565,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         UpdatePathsResponse resp = executeIngestRpc(
             "updateDocumentPaths",
             RpcDeadlineCategory.STANDARD,
-            stub -> stub.updateDocumentPaths(reqBuilder.build()));
+            stub -> stub.updateDocumentPaths(reqBuilder.build()), engineContext);
         if (!resp.getFailedPathsList().isEmpty()) {
             log.warn("updateDocumentPaths: {} failed paths: {}",
                 resp.getFailedPathsList().size(), resp.getFailedPathsList());
@@ -588,13 +590,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *
      * @return status response with queue depth and health
      */
-    public StatusResponse getStatus() {
+    public StatusResponse getStatus(EngineContext engineContext) {
         try (var sample = telemetry.startStatusPoll()) { // NOPMD - telemetry timing
             StatusRequest request = StatusRequest.newBuilder().build();
             StatusResponse response = executeIngestRpc(
                 "getStatus",
                 RpcDeadlineCategory.STANDARD,
-                stub -> stub.indexStatus(request));
+                stub -> stub.indexStatus(request), engineContext);
             telemetry.recordStatusResponseSize(response.getSerializedSize());
             return response;
         }
@@ -608,8 +610,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * (e.g. fingerprints, schema hashes, model SHAs). Returns an empty map when the Worker
      * is unavailable or no commit has been made yet.
      */
-    public Map<String, String> getCommitMetadata() {
-        StatusResponse status = getStatus();
+    public Map<String, String> getCommitMetadata(EngineContext engineContext) {
+        StatusResponse status = getStatus(engineContext);
         return status.getCommitUserDataMap();
     }
 
@@ -619,11 +621,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * <p>This avoids leaking proto DTOs into the UI module while keeping the response
      * backwards-compatible via the record's Jackson serialization.
      */
-    public io.justsearch.app.api.status.WorkerOperationalView getWorkerOperationalView() {
-        StatusResponse status = getStatus();
+    public io.justsearch.app.api.status.WorkerOperationalView getWorkerOperationalView(EngineContext engineContext) {
+        StatusResponse status = getStatus(engineContext);
         io.justsearch.app.api.status.WorkerOperationalView view;
         try {
-            view = WorkerStatusMapper.toUiStatusMap(status, getHealthCheck());
+            view = WorkerStatusMapper.toUiStatusMap(status, getHealthCheck(engineContext));
         } catch (Exception e) {
             log.debug("Failed to fetch worker health readiness details for UI status", e);
             view = WorkerStatusMapper.toUiStatusMap(status);
@@ -635,7 +637,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     /**
      * Returns the last-known WorkerOperationalView without making a port call.
      *
-     * <p>Updated as a side-effect of {@link #getWorkerOperationalView()}. Returns null if the
+     * <p>Updated as a side-effect of {@link #getWorkerOperationalView(EngineContext)}. Returns null if the
      * operational view has never been fetched (e.g., before the first status poll).
      */
     public io.justsearch.app.api.status.WorkerOperationalView cachedOperationalView() {
@@ -657,12 +659,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *
      * <p>Returns a typed record to avoid leaking proto DTOs across module boundaries.
      */
-    public io.justsearch.app.api.status.WorkerDebugView getDebugWorkerState() {
-        StatusResponse status = getStatus();
+    public io.justsearch.app.api.status.WorkerDebugView getDebugWorkerState(EngineContext engineContext) {
+        StatusResponse status = getStatus(engineContext);
         io.justsearch.app.api.status.HealthNodeView healthNode;
         Map<String, String> effectiveConfig;
         try {
-            var health = getHealthCheck();
+            var health = getHealthCheck(engineContext);
             healthNode = WorkerStatusMapper.buildHealthNode(health);
             // tempdoc 623 U7: surface the worker effective_config (carrying ort.version) into the
             // debug-only WorkerDebugView — retained un-hashed in the eval manifest, no status-contract change.
@@ -685,13 +687,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *
      * @return true if serving
      */
-    public boolean isHealthy() {
+    public boolean isHealthy(EngineContext engineContext) {
         try {
             HealthCheckRequest request = HealthCheckRequest.newBuilder().build();
             HealthCheckResponse response = executeHealthRpc(
                 "isHealthy",
                 RpcDeadlineCategory.STANDARD,
-                stub -> stub.check(request));
+                stub -> stub.check(request), engineContext);
             return response.getServing();
         } catch (CircuitBreakerOpenException e) {
             log.debug("Health check rejected by circuit breaker");
@@ -705,14 +707,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     /**
      * Returns the full health check response (including worker_state) for diagnostics.
      *
-     * <p>Prefer this over {@link #isHealthy()} when you need details like {@code worker_state} or {@code pid}.
+     * <p>Prefer this over {@link #isHealthy(EngineContext)} when you need details like {@code worker_state} or {@code pid}.
      *
-     * <p>Same call handling as {@link #isHealthy()}: the shared health path is a direct call to the
+     * <p>Same call handling as {@link #isHealthy(EngineContext)}: the shared health path is a direct call to the
      * index half under a deadline. (It used to re-read the signal bus and rebuild the channel when
      * the reported port changed; there is no bus and no port.)
      */
-    public HealthCheckResponse getHealthCheck() {
-        return getHealthCheck(deadline(RpcDeadlineCategory.STANDARD));
+    public HealthCheckResponse getHealthCheck(EngineContext engineContext) {
+        return getHealthCheck(deadline(RpcDeadlineCategory.STANDARD), engineContext);
     }
 
     /**
@@ -726,11 +728,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *
      * @param callDeadlineMs the deadline for this one call, in milliseconds
      */
-    public HealthCheckResponse getHealthCheck(long callDeadlineMs) {
+    public HealthCheckResponse getHealthCheck(long callDeadlineMs, EngineContext engineContext) {
         HealthCheckResponse response = executeHealthRpc(
             "getHealthCheck",
             callDeadlineMs,
-            stub -> stub.check(HealthCheckRequest.newBuilder().build()));
+            stub -> stub.check(HealthCheckRequest.newBuilder().build()), engineContext);
         // Update last-known-good ONNX model cache from Worker's startup-time discovery (D-4).
         // executeHealthRpc never returns null — it throws on failure, so cache is only updated
         // on success. On failure, last-known-good is preserved.
@@ -748,7 +750,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     /**
      * Returns the last-known-good ONNX model discovery status from the Worker.
      *
-     * <p>Updated on each successful {@link #getHealthCheck()} call. Returns an empty list until the
+     * <p>Updated on each successful {@link #getHealthCheck(EngineContext)} call. Returns an empty list until the
      * first successful health check response containing ONNX model data.
      */
     public List<OnnxModelStatus> getLastKnownOnnxModels() {
@@ -760,12 +762,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *
      * @return version string or null if unavailable
      */
-    public String getVersion() {
+    public String getVersion(EngineContext engineContext) {
         try {
                 HealthCheckResponse response = executeHealthRpc(
                 "getVersion",
                 RpcDeadlineCategory.STANDARD,
-                stub -> stub.check(HealthCheckRequest.newBuilder().build()));
+                stub -> stub.check(HealthCheckRequest.newBuilder().build()), engineContext);
             return response.getVersion();
         } catch (CircuitBreakerOpenException e) {
             log.debug("getVersion rejected by circuit breaker");
@@ -779,7 +781,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     // ========== SearchPort Implementation ==========
 
     @Override
-    public Result search(Query intent) {
+    public Result search(Query intent, EngineContext engineContext) {
         // Map Core Query to IPC SearchRequest
         String queryText = extractQueryText(intent);
         int limit = intent.limit();
@@ -796,7 +798,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         if (cursorToken != null && !cursorToken.isBlank()) {
             req.setCursor(cursorToken);
         }
-        SearchResponse response = searchRpcOps.search(req.build());
+        SearchResponse response = searchRpcOps.search(req.build(), engineContext);
 
         // Map IPC SearchResponse to Core Result
         return toCoreResult(response);
@@ -876,33 +878,33 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     // ========== IndexingService Implementation (delegates to RootLifecycleOps) ==========
 
     @Override
-    public List<Path> getWatchedPaths() {
-        return rootLifecycleOps.getWatchedPaths();
+    public List<Path> getWatchedPaths(EngineContext engineContext) {
+        return rootLifecycleOps.getWatchedPaths(engineContext);
     }
 
     @Override
-    public List<IndexingService.WatchedRoot> getWatchedRoots() {
-        return rootLifecycleOps.getWatchedRoots();
+    public List<IndexingService.WatchedRoot> getWatchedRoots(EngineContext engineContext) {
+        return rootLifecycleOps.getWatchedRoots(engineContext);
     }
 
     @Override
-    public void addWatchedPath(Path path) {
-        rootLifecycleOps.addWatchedPath(path);
+    public void addWatchedPath(Path path, EngineContext engineContext) {
+        rootLifecycleOps.addWatchedPath(path, engineContext);
     }
 
     @Override
-    public void addWatchedRoot(String collection, Path path) {
-        rootLifecycleOps.addWatchedRoot(collection, path);
+    public void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
+        rootLifecycleOps.addWatchedRoot(collection, path, engineContext);
     }
 
     @Override
-    public int deleteDocsByPathPrefix(Path pathPrefix) {
-        return rootLifecycleOps.deleteDocsByPathPrefix(pathPrefix);
+    public int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocsByPathPrefix(pathPrefix, engineContext);
     }
 
     @Override
-    public boolean deleteDocById(String docId) {
-        return rootLifecycleOps.deleteDocById(docId);
+    public boolean deleteDocById(String docId, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocById(docId, engineContext);
     }
 
     /**
@@ -910,7 +912,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * belongs to the caller via {@code IngestCollectionPolicy.isDeletable}; this is the transport.
      */
     @Override
-    public int deleteDocsByCollection(String collection) {
+    public int deleteDocsByCollection(String collection, EngineContext engineContext) {
         if (collection == null || collection.isBlank()) {
             return -1;
         }
@@ -922,7 +924,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             executeIngestRpc(
                 "deleteByCollection",
                 RpcDeadlineCategory.STANDARD,
-                stub -> stub.deleteByCollection(request));
+                stub -> stub.deleteByCollection(request), engineContext);
         if (response == null) {
             return -1;
         }
@@ -933,22 +935,22 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
-    public int removeWatchedPath(Path path) {
-        return rootLifecycleOps.removeWatchedPath(path);
+    public int removeWatchedPath(Path path, EngineContext engineContext) {
+        return rootLifecycleOps.removeWatchedPath(path, engineContext);
     }
 
     @Override
-    public void flush() {
-        rootLifecycleOps.flush();
+    public void flush(EngineContext engineContext) {
+        rootLifecycleOps.flush(engineContext);
     }
 
     @Override
-    public void reindexWatchedRoots(boolean force) {
-        rootLifecycleOps.reindexWatchedRoots(force);
+    public void reindexWatchedRoots(boolean force, EngineContext engineContext) {
+        rootLifecycleOps.reindexWatchedRoots(force, engineContext);
     }
 
     @Override
-    public boolean reconcileRoot(String pathHash, boolean force) {
+    public boolean reconcileRoot(String pathHash, boolean force, EngineContext engineContext) {
         // Tempdoc 626 §Recency (Move C) — resolve the privacy-safe pathHash to the real root Head-side
         // (raw paths never cross the wire — ADR-0028), then run a per-root force reconcile. A force=true
         // syncDirectory re-prunes orphans + re-walks the root, re-converging it AND (via SyncOps' §Recency
@@ -957,12 +959,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         if (pathHash == null || pathHash.isBlank()) {
             return false;
         }
-        for (IndexingService.WatchedRoot root : rootLifecycleOps.getWatchedRoots()) {
+        for (IndexingService.WatchedRoot root : rootLifecycleOps.getWatchedRoots(engineContext)) {
             if (root.path() == null) {
                 continue;
             }
             if (sha256Hex(root.path().toString()).equalsIgnoreCase(pathHash)) {
-                syncDirectory(root.path().toString(), force);
+                syncDirectory(root.path().toString(), force, engineContext);
                 return true;
             }
         }
@@ -980,39 +982,39 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
-    public IndexingService.MigrationOutcome startMigration(String reason) {
-        return migrationOps.startMigration(reason);
+    public IndexingService.MigrationOutcome startMigration(String reason, EngineContext engineContext) {
+        return migrationOps.startMigration(reason, engineContext);
     }
 
     @Override
-    public IndexingService.MigrationOutcome requestCutover(boolean forceSwitching) {
-        return migrationOps.requestCutover(forceSwitching);
+    public IndexingService.MigrationOutcome requestCutover(boolean forceSwitching, EngineContext engineContext) {
+        return migrationOps.requestCutover(forceSwitching, engineContext);
     }
 
     @Override
-    public IndexingService.MigrationOutcome rollbackMigration() {
-        return migrationOps.rollbackMigration();
+    public IndexingService.MigrationOutcome rollbackMigration(EngineContext engineContext) {
+        return migrationOps.rollbackMigration(engineContext);
     }
 
     @Override
-    public boolean pauseMigration(String reason) {
-        return migrationOps.pauseMigration(reason);
+    public boolean pauseMigration(String reason, EngineContext engineContext) {
+        return migrationOps.pauseMigration(reason, engineContext);
     }
 
     @Override
-    public boolean resumeMigration() {
-        return migrationOps.resumeMigration();
+    public boolean resumeMigration(EngineContext engineContext) {
+        return migrationOps.resumeMigration(engineContext);
     }
 
     @Override
-    public IndexingService.IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly) {
-        return migrationOps.runIndexGc(keepLatest, pruneMarkedOnly);
+    public IndexingService.IndexGcOutcome runIndexGc(int keepLatest, boolean pruneMarkedOnly, EngineContext engineContext) {
+        return migrationOps.runIndexGc(keepLatest, pruneMarkedOnly, engineContext);
     }
 
     @Override
     public IndexingService.SettleIndexOutcome settleIndex(
-            boolean expungeDeletesOnly, int maxSegments) {
-        return migrationOps.settleIndex(expungeDeletesOnly, maxSegments);
+            boolean expungeDeletesOnly, int maxSegments, EngineContext engineContext) {
+        return migrationOps.settleIndex(expungeDeletesOnly, maxSegments, engineContext);
     }
 
     /**
@@ -1036,7 +1038,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 response.getBlockersList());
     }
 
-    public io.justsearch.app.api.WorkerQuiescenceSnapshot prepareUpgrade(String preparationId) {
+    public io.justsearch.app.api.WorkerQuiescenceSnapshot prepareUpgrade(String preparationId, EngineContext engineContext) {
         var request =
                 io.justsearch.ipc.UpgradeQuiescenceRequest.newBuilder()
                         .setPreparationId(preparationId)
@@ -1045,10 +1047,10 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "prepareUpgrade",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.prepareUpgrade(request)));
+                        stub -> stub.prepareUpgrade(request), engineContext));
     }
 
-    public io.justsearch.app.api.WorkerQuiescenceSnapshot upgradeStatus(String preparationId) {
+    public io.justsearch.app.api.WorkerQuiescenceSnapshot upgradeStatus(String preparationId, EngineContext engineContext) {
         var request =
                 io.justsearch.ipc.UpgradeQuiescenceRequest.newBuilder()
                         .setPreparationId(preparationId)
@@ -1057,10 +1059,10 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "upgradeStatus",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.upgradeStatus(request)));
+                        stub -> stub.upgradeStatus(request), engineContext));
     }
 
-    public io.justsearch.app.api.WorkerQuiescenceSnapshot cancelUpgrade(String preparationId) {
+    public io.justsearch.app.api.WorkerQuiescenceSnapshot cancelUpgrade(String preparationId, EngineContext engineContext) {
         var request =
                 io.justsearch.ipc.UpgradeQuiescenceRequest.newBuilder()
                         .setPreparationId(preparationId)
@@ -1069,16 +1071,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "cancelUpgrade",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.cancelUpgrade(request)));
+                        stub -> stub.cancelUpgrade(request), engineContext));
     }
 
     @Override
-    public List<IndexingService.FailedJobInfo> listFailedJobs(int limit) {
+    public List<IndexingService.FailedJobInfo> listFailedJobs(int limit, EngineContext engineContext) {
         ListFailedJobsRequest req = ListFailedJobsRequest.newBuilder()
                 .setLimit(limit).build();
         ListFailedJobsResponse resp = executeIngestRpc(
                 "listFailedJobs", RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFailedJobs(req));
+                stub -> stub.listFailedJobs(req), engineContext);
         return resp.getJobsList().stream()
                 .map(j -> new IndexingService.FailedJobInfo(
                         j.getPath(), j.getErrorMessage(), j.getAttempts(),
@@ -1090,7 +1092,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     @Override
     public List<IndexingService.FailedJobInfo> listFailedJobsByPathPrefix(
-            Path pathPrefix, int limit) {
+            Path pathPrefix, int limit, EngineContext engineContext) {
         if (pathPrefix == null) {
             return List.of();
         }
@@ -1101,7 +1103,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                         .build();
         ListFailedJobsResponse resp = executeIngestRpc(
                 "listFailedJobsByPathPrefix", RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFailedJobsByPathPrefix(req));
+                stub -> stub.listFailedJobsByPathPrefix(req), engineContext);
         return resp.getJobsList().stream()
                 .map(j -> new IndexingService.FailedJobInfo(
                         j.getPath(), j.getErrorMessage(), j.getAttempts(),
@@ -1112,7 +1114,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
-    public IndexingService.JobCounts countJobsByPathPrefix(Path pathPrefix) {
+    public IndexingService.JobCounts countJobsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
         if (pathPrefix == null) {
             return IndexingService.JobCounts.zero();
         }
@@ -1122,7 +1124,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                         .build();
         io.justsearch.ipc.CountJobsByPathPrefixResponse resp = executeIngestRpc(
                 "countJobsByPathPrefix", RpcDeadlineCategory.STANDARD,
-                stub -> stub.countJobsByPathPrefix(req));
+                stub -> stub.countJobsByPathPrefix(req), engineContext);
         io.justsearch.ipc.IndexingJobCounts c = resp.getCounts();
         long inFlight = c.getPendingCount() + c.getProcessingCount();
         io.justsearch.ipc.RootCoverageCounts cov = resp.getCoverage();
@@ -1141,25 +1143,25 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
-    public int clearFailedJobs() {
+    public int clearFailedJobs(EngineContext engineContext) {
         ClearFailedJobsRequest req = ClearFailedJobsRequest.newBuilder().build();
         ClearFailedJobsResponse resp = executeIngestRpc(
                 "clearFailedJobs", RpcDeadlineCategory.STANDARD,
-                stub -> stub.clearFailedJobs(req));
+                stub -> stub.clearFailedJobs(req), engineContext);
         return resp.getDeletedCount();
     }
 
     @Override
-    public void clearAllRoots() {
-        rootLifecycleOps.clearAllRoots();
+    public void clearAllRoots(EngineContext engineContext) {
+        rootLifecycleOps.clearAllRoots(engineContext);
     }
 
     @Override
-    public boolean resetIndex() {
+    public boolean resetIndex(EngineContext engineContext) {
         ResetIndexRequest req = ResetIndexRequest.newBuilder().build();
         ResetIndexResponse resp = executeIngestRpc(
                 "resetIndex", RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.resetIndex(req));
+                stub -> stub.resetIndex(req), engineContext);
         return resp.getSuccess();
     }
 
@@ -1173,14 +1175,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *     "admin_triggered" if blank
      */
     @Override
-    public long reloadRuntime(String reason) {
+    public long reloadRuntime(String reason, EngineContext engineContext) {
         io.justsearch.ipc.ReloadRuntimeRequest req =
                 io.justsearch.ipc.ReloadRuntimeRequest.newBuilder()
                         .setReason(reason == null ? "" : reason)
                         .build();
         io.justsearch.ipc.ReloadRuntimeResponse resp = executeIngestRpc(
                 "reloadRuntime", RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.reloadRuntime(req));
+                stub -> stub.reloadRuntime(req), engineContext);
         return resp.getSwapDurationMs();
     }
 
@@ -1195,7 +1197,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * on {@code io.justsearch.ipc} proto types (UiApiGuardrailsTest). Returned shape mirrors
      * today's REST response: {@code {configStatus, runtime, models}}.
      */
-    public Map<String, Object> getSessionPolicies() {
+    public Map<String, Object> getSessionPolicies(EngineContext engineContext) {
         io.justsearch.ipc.SessionPoliciesRequest req =
                 io.justsearch.ipc.SessionPoliciesRequest.newBuilder().build();
         io.justsearch.ipc.SessionPoliciesResponse ipcResp;
@@ -1203,7 +1205,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         try {
             ipcResp = executeIngestRpc(
                     "getSessionPolicies", RpcDeadlineCategory.STANDARD,
-                    stub -> stub.getSessionPolicies(req));
+                    stub -> stub.getSessionPolicies(req), engineContext);
         } catch (RuntimeException e) {
             // Phase 2.1a debug spike (tempdoc 400 LR1-c). Pre-Phase-2.1 this
             // catch was silent, masking the root cause of worker-unreachable
@@ -1246,17 +1248,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * Tempdoc 422: returns per-encoder {@link io.justsearch.app.api.status.OrtCudaView} typed
      * keyed by {@link io.justsearch.ort.EncoderRole}. Source of truth for the
      * {@code /api/inference/encoders} explainer's runtime accelerator state. Mirrors
-     * {@link #getSessionPolicies()}'s shape: typed Head-side return, no proto types leaked
+     * {@link #getSessionPolicies(EngineContext)}'s shape: typed Head-side return, no proto types leaked
      * across modules.
      *
      * <p>On RPC failure, returns an empty map and logs (consistent with
      * {@code getSessionPolicies()} returning {@code "worker-unreachable"}).
      */
     public Map<io.justsearch.ort.EncoderRole, io.justsearch.app.api.status.OrtCudaView>
-            getEncoderOrtCudaViews() {
+            getEncoderOrtCudaViews(EngineContext engineContext) {
         StatusResponse status;
         try {
-            status = getStatus();
+            status = getStatus(engineContext);
         } catch (RuntimeException e) {
             log.warn(
                     "getEncoderOrtCudaViews status RPC failed: {}: {}",
@@ -1288,14 +1290,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * Backs {@code GET /api/diagnostics/ingestion/recent} (tempdoc 410 §12).
      */
     @Override
-    public List<Map<String, Object>> recentIngestionEvents(int limit) {
+    public List<Map<String, Object>> recentIngestionEvents(int limit, EngineContext engineContext) {
         io.justsearch.ipc.RecentIngestionEventsRequest req =
                 io.justsearch.ipc.RecentIngestionEventsRequest.newBuilder().setLimit(limit).build();
         io.justsearch.ipc.RecentIngestionEventsResponse resp =
                 executeIngestRpc(
                         "recentIngestionEvents",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.recentIngestionEvents(req));
+                        stub -> stub.recentIngestionEvents(req), engineContext);
         List<Map<String, Object>> events = new java.util.ArrayList<>(resp.getEventsCount());
         for (io.justsearch.ipc.IngestionEvent event : resp.getEventsList()) {
             Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -1323,7 +1325,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * Backs {@code GET /api/diagnostics/ingestion/summary} (tempdoc 410 §12).
      */
     @Override
-    public List<Map<String, Object>> ingestionOutcomeSummary(long sinceMs) {
+    public List<Map<String, Object>> ingestionOutcomeSummary(long sinceMs, EngineContext engineContext) {
         io.justsearch.ipc.IngestionOutcomeSummaryRequest req =
                 io.justsearch.ipc.IngestionOutcomeSummaryRequest.newBuilder()
                         .setSinceMs(sinceMs)
@@ -1332,7 +1334,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "ingestionOutcomeSummary",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.ingestionOutcomeSummary(req));
+                        stub -> stub.ingestionOutcomeSummary(req), engineContext);
         List<Map<String, Object>> rollups = new java.util.ArrayList<>(resp.getRollupsCount());
         for (io.justsearch.ipc.IngestionOutcomeRollup rollup : resp.getRollupsList()) {
             Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -1354,7 +1356,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * {@code LibraryResolveHashOnlyCallerPin}).
      */
     @Override
-    public Map<String, Object> resolvePathHash(String pathHash) {
+    public Map<String, Object> resolvePathHash(String pathHash, EngineContext engineContext) {
         Objects.requireNonNull(pathHash, "pathHash");
         io.justsearch.ipc.LookupPathByHashRequest req =
                 io.justsearch.ipc.LookupPathByHashRequest.newBuilder()
@@ -1364,7 +1366,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "lookupPathByHash",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.lookupPathByHash(req));
+                        stub -> stub.lookupPathByHash(req), engineContext);
         Map<String, Object> row = new java.util.LinkedHashMap<>();
         row.put("found", resp.getFound());
         if (resp.getFound()) {
@@ -1381,7 +1383,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * {@code PathResolutionStore} and marks the row terminal.
      */
     @Override
-    public Map<String, Object> cancelIndexingJob(String pathHash) {
+    public Map<String, Object> cancelIndexingJob(String pathHash, EngineContext engineContext) {
         Objects.requireNonNull(pathHash, "pathHash");
         io.justsearch.ipc.CancelIndexingJobRequest req =
                 io.justsearch.ipc.CancelIndexingJobRequest.newBuilder()
@@ -1391,7 +1393,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "cancelIndexingJob",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.cancelIndexingJob(req));
+                        stub -> stub.cancelIndexingJob(req), engineContext);
         Map<String, Object> row = new java.util.LinkedHashMap<>();
         row.put("cancelled", resp.getCancelled());
         row.put("previousState", resp.getPreviousState());
@@ -1403,7 +1405,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * {@code RetryIndexingJob} RPC; the worker resolves the hash and re-enqueues the row.
      */
     @Override
-    public Map<String, Object> retryIndexingJob(String pathHash) {
+    public Map<String, Object> retryIndexingJob(String pathHash, EngineContext engineContext) {
         Objects.requireNonNull(pathHash, "pathHash");
         io.justsearch.ipc.RetryIndexingJobRequest req =
                 io.justsearch.ipc.RetryIndexingJobRequest.newBuilder()
@@ -1413,7 +1415,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 executeIngestRpc(
                         "retryIndexingJob",
                         RpcDeadlineCategory.STANDARD,
-                        stub -> stub.retryIndexingJob(req));
+                        stub -> stub.retryIndexingJob(req), engineContext);
         Map<String, Object> row = new java.util.LinkedHashMap<>();
         row.put("retried", resp.getRetried());
         row.put("previousState", resp.getPreviousState());
@@ -1448,8 +1450,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             String collection,
             io.justsearch.ipc.ScanMode mode,
             List<String> excludeGlobs,
-            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer) {
-        return scanRoot(rootPath, collection, mode, excludeGlobs, null, progressConsumer);
+            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer, EngineContext engineContext) {
+        return scanRoot(rootPath, collection, mode, excludeGlobs, null, progressConsumer, engineContext);
     }
 
     /**
@@ -1469,7 +1471,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             io.justsearch.ipc.ScanMode mode,
             List<String> excludeGlobs,
             CancelToken cancelToken,
-            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer) {
+            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer, EngineContext engineContext) {
         Objects.requireNonNull(rootPath, "rootPath");
         Objects.requireNonNull(progressConsumer, "progressConsumer");
         io.justsearch.ipc.ScanRootRequest.Builder builder =
@@ -1487,7 +1489,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             }
         }
         io.justsearch.ipc.ScanRootRequest request = builder.build();
-        return executeScanRoot(request, cancelToken, progressConsumer);
+        return executeScanRoot(request, cancelToken, progressConsumer, engineContext);
     }
 
     /**
@@ -1518,7 +1520,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * registry is bookkeeping-only; Phase B's watcher migration upgrades it to real change-event
      * delivery via the Methvin watcher.
      */
-    public io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection) {
+    public io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection, EngineContext engineContext) {
         Objects.requireNonNull(rootPath, "rootPath");
         io.justsearch.ipc.WatchRootRequest.Builder builder =
                 io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(rootPath);
@@ -1527,20 +1529,20 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         }
         io.justsearch.ipc.WatchRootRequest request = builder.build();
         return executeIngestRpc(
-                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request));
+                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request), engineContext);
     }
 
     /** Tempdoc 418 Phase B — removes a Worker watcher subscription. Idempotent. */
-    public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(String rootPath) {
+    public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(String rootPath, EngineContext engineContext) {
         Objects.requireNonNull(rootPath, "rootPath");
         io.justsearch.ipc.UnwatchRootRequest request =
                 io.justsearch.ipc.UnwatchRootRequest.newBuilder().setRootPath(rootPath).build();
         return executeIngestRpc(
-                "unwatchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.unwatchRoot(request));
+                "unwatchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.unwatchRoot(request), engineContext);
     }
 
-    public SyncDirectoryResponse syncDirectory(String rootPath, boolean force) {
-        return syncOps.syncDirectory(rootPath, force);
+    public SyncDirectoryResponse syncDirectory(String rootPath, boolean force, EngineContext engineContext) {
+        return syncOps.syncDirectory(rootPath, force, engineContext);
     }
 
     public void startPeriodicSync() {
@@ -1552,18 +1554,18 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
-    public void reindex() {
-        reindexWatchedRoots();
+    public void reindex(EngineContext engineContext) {
+        reindexWatchedRoots(false, engineContext);
     }
 
     // ========== Pending Status Counts (Phase 2) ==========
 
-    public int countPendingEmbeddings() {
-        return vduOps.countPendingEmbeddings();
+    public int countPendingEmbeddings(EngineContext engineContext) {
+        return vduOps.countPendingEmbeddings(engineContext);
     }
 
-    public int countPendingVdu() {
-        return vduOps.countPendingVdu();
+    public int countPendingVdu(EngineContext engineContext) {
+        return vduOps.countPendingVdu(engineContext);
     }
 
     // ========== VDU Result Update (Phase 3) ==========
@@ -1573,24 +1575,24 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             String extractedContent,
             io.justsearch.ipc.VduUpdateOutcome outcome,
             String enrichment,
-            int pageCount) {
-        return vduOps.updateVduResult(docId, extractedContent, outcome, enrichment, pageCount);
+            int pageCount, EngineContext engineContext) {
+        return vduOps.updateVduResult(docId, extractedContent, outcome, enrichment, pageCount, engineContext);
     }
 
-    public List<String> queryPendingVduDocIds() {
-        return vduOps.queryPendingVduDocIds();
+    public List<String> queryPendingVduDocIds(EngineContext engineContext) {
+        return vduOps.queryPendingVduDocIds(engineContext);
     }
 
-    public List<String> queryPendingVduDocIds(int limit) {
-        return vduOps.queryPendingVduDocIds(limit);
+    public List<String> queryPendingVduDocIds(int limit, EngineContext engineContext) {
+        return vduOps.queryPendingVduDocIds(limit, engineContext);
     }
 
-    public int markVduProcessing(String docId, int maxRetries) {
-        return vduOps.markVduProcessing(docId, maxRetries);
+    public int markVduProcessing(String docId, int maxRetries, EngineContext engineContext) {
+        return vduOps.markVduProcessing(docId, maxRetries, engineContext);
     }
 
-    public int recoverVduProcessing() {
-        return vduOps.recoverVduProcessing();
+    public int recoverVduProcessing(EngineContext engineContext) {
+        return vduOps.recoverVduProcessing(engineContext);
     }
 
     /**

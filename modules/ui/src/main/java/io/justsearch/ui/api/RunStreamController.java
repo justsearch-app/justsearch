@@ -133,6 +133,7 @@ public final class RunStreamController {
 
   /** Package-private so the run mechanics are testable without a live Jetty async context. */
   void streamNewRun(SseClient client) {
+    var engineContext = RequestEngineContext.get(client.ctx());
     Map<String, Object> body = readBody(client.ctx());
     ConversationShapeRef shapeId = shapeIdOf(body).orElseThrow();
     RunId runId = RunId.mint();
@@ -175,7 +176,7 @@ public final class RunStreamController {
           shapeId,
           body,
           ChatController.readAudience(client.ctx()),
-          event -> run.publish(new RunFrame(event.name(), event.payload())));
+          event -> run.publish(new RunFrame(event.name(), event.payload())), engineContext);
     } finally {
       // The run is terminal whichever way the body left: refuse further publishes, close the
       // attached connections, and keep the ring readable for the linger so a tab reloading as the

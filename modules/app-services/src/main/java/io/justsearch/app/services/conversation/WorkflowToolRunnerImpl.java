@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
@@ -30,7 +32,7 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
   /** The single behavior this bridge needs from {@code WorkflowShapeRunner} — its {@code run}. */
   @FunctionalInterface
   public interface WorkflowExecutor {
-    void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink);
+    void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext);
   }
 
   private final WorkflowCatalog workflowCatalog;
@@ -50,7 +52,7 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
   }
 
   @Override
-  public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink) {
+  public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink, EngineContext engineContext) {
     WorkflowRef workflowRef = WorkflowOperationProjection.workflowRefFor(ref).orElse(null);
     if (workflowRef == null || workflowCatalog.findById(workflowRef).isEmpty()) {
       return OperationResult.failure("Not a projected workflow tool: " + ref.value());
@@ -91,7 +93,7 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
       // model's argumentsJson is intentionally not threaded through (an empty-object schema is
       // projected) — see WorkflowOperationProjection.
       executor.run(
-          Map.of("workflowId", workflowRef.value()), Audience.AGENT, sseSink);
+          Map.of("workflowId", workflowRef.value()), Audience.AGENT, sseSink, engineContext);
     } catch (RuntimeException e) {
       // Host owns truth (§4.5): a runner failure becomes a result the model can recover from, never
       // an exception that tears down the agent loop.

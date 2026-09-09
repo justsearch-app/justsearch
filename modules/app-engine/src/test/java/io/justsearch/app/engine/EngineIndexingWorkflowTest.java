@@ -95,7 +95,7 @@ final class EngineIndexingWorkflowTest {
     corpus = tempDir.resolve("corpus");
     Files.createDirectories(corpus);
     harness = EngineTestHarness.start(tempDir.resolve("data"));
-    assertTrue(harness.client().isHealthy(), "the engine must be healthy before the workflow runs");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before the workflow runs");
   }
 
   @AfterAll
@@ -164,7 +164,7 @@ final class EngineIndexingWorkflowTest {
     List<String> stillPresent = List.of();
     while (System.currentTimeMillis() < deadline) {
       stillPresent =
-          harness.client().fetchDocuments(docIds).getDocumentsList().stream()
+          harness.client().fetchDocuments(docIds, TestEngineContexts.FOREGROUND).getDocumentsList().stream()
               .filter(DocumentContent::getFound)
               .map(DocumentContent::getDocId)
               .toList();
@@ -194,7 +194,7 @@ final class EngineIndexingWorkflowTest {
 
     // 2. Index it (the CREATE event).
     long initialCount = docCount();
-    BatchResponse submitted = harness.client().submitBatch(List.of(testFile));
+    BatchResponse submitted = harness.client().submitBatch(List.of(testFile), TestEngineContexts.FOREGROUND);
     assertEquals(1, submitted.getAcceptedCount(), "the lifecycle file must be accepted");
     awaitIndexing(initialCount + 1);
 
@@ -208,7 +208,7 @@ final class EngineIndexingWorkflowTest {
     // without force, so the freshness check's ability to notice a rewritten file is part of what
     // step 6 proves. Forcing would make step 6 pass even if freshness detection were broken.
     long countBeforeModify = docCount();
-    harness.client().submitBatch(List.of(testFile));
+    harness.client().submitBatch(List.of(testFile), TestEngineContexts.FOREGROUND);
 
     // 6. Verify the UPDATED content is searchable.
     assertSearchableByMarker(marker2);
@@ -225,7 +225,7 @@ final class EngineIndexingWorkflowTest {
     Files.delete(testFile);
 
     // 9. Sync to detect and prune the orphan.
-    SyncDirectoryResponse sync = harness.client().syncDirectory(corpus.toString(), true);
+    SyncDirectoryResponse sync = harness.client().syncDirectory(corpus.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         sync.getFilesDeleted() >= 1,
         "sync should prune at least 1 orphan, got " + sync.getFilesDeleted());
@@ -253,7 +253,7 @@ final class EngineIndexingWorkflowTest {
     }
 
     long initialCount = docCount();
-    BatchResponse response = harness.client().submitBatch(files);
+    BatchResponse response = harness.client().submitBatch(files, TestEngineContexts.FOREGROUND);
     assertEquals(fileCount, response.getAcceptedCount(), "all files should be accepted");
 
     awaitIndexing(initialCount + fileCount);
@@ -287,7 +287,7 @@ final class EngineIndexingWorkflowTest {
     long initialCount = docCount();
 
     Path nestedRoot = corpus.resolve("nested");
-    SyncDirectoryResponse sync = harness.client().syncDirectory(nestedRoot.toString(), true);
+    SyncDirectoryResponse sync = harness.client().syncDirectory(nestedRoot.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         sync.getFilesAdded() >= 4,
         "sync should find at least 4 files, got " + sync.getFilesAdded());
@@ -314,7 +314,7 @@ final class EngineIndexingWorkflowTest {
     long initialCount = docCount();
     assertEquals(
         1,
-        harness.client().submitBatch(List.of(testImage)).getAcceptedCount(),
+        harness.client().submitBatch(List.of(testImage), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the image must be accepted");
     awaitIndexing(initialCount + 1);
 
@@ -322,10 +322,10 @@ final class EngineIndexingWorkflowTest {
     // detection. The key assertion is that the worker didn't crash and the image was indexed."
     // That judgement is carried over verbatim — the pending list is read but not asserted on here;
     // EngineVduRecoveryTest is where the PENDING transition is pinned precisely.
-    List<String> pendingVdu = harness.client().queryPendingVduDocIds(100);
+    List<String> pendingVdu = harness.client().queryPendingVduDocIds(100, TestEngineContexts.FOREGROUND);
     assertNotNull(pendingVdu, "the pending-VDU query must return a list, not null");
     assertTrue(
-        harness.client().isHealthy(), "the engine should remain healthy after indexing an image");
+        harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine should remain healthy after indexing an image");
   }
 
   // =========================================================================
@@ -354,7 +354,7 @@ final class EngineIndexingWorkflowTest {
     long initialCount = docCount();
     assertEquals(
         1,
-        harness.client().submitBatch(List.of(largeFile)).getAcceptedCount(),
+        harness.client().submitBatch(List.of(largeFile), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the large file must be accepted");
 
     // The retired test allowed 60s here against its 30s default; kept at 60s.
@@ -383,7 +383,7 @@ final class EngineIndexingWorkflowTest {
     // The property is "does not blow up". Whether a binary is admitted or refused is a policy the
     // retired test explicitly declined to pin (it logged the accepted count and moved on), so the
     // count is not asserted here either — only that the call returns rather than throwing.
-    BatchResponse response = harness.client().submitBatch(List.of(binaryFile));
+    BatchResponse response = harness.client().submitBatch(List.of(binaryFile), TestEngineContexts.FOREGROUND);
     assertNotNull(response, "submitting an unsupported file must return a response");
 
     // Let the loop actually attempt the file before checking health: the queue must drain, which
@@ -392,7 +392,7 @@ final class EngineIndexingWorkflowTest {
         harness.awaitIndexed(docCount(), 60_000),
         "the queue must drain after an unsupported file rather than wedging");
     assertTrue(
-        harness.client().isHealthy(),
+        harness.client().isHealthy(TestEngineContexts.FOREGROUND),
         "the engine should remain healthy after an unsupported binary file");
   }
 
@@ -419,7 +419,7 @@ final class EngineIndexingWorkflowTest {
     long initialCount = docCount();
     assertEquals(
         fileCount,
-        harness.client().submitBatch(files).getAcceptedCount(),
+        harness.client().submitBatch(files, TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "all mass-delete files must be accepted");
     awaitIndexing(initialCount + fileCount);
 
@@ -429,7 +429,7 @@ final class EngineIndexingWorkflowTest {
       Files.deleteIfExists(file);
     }
 
-    SyncDirectoryResponse sync = harness.client().syncDirectory(massDeleteDir.toString(), true);
+    SyncDirectoryResponse sync = harness.client().syncDirectory(massDeleteDir.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         sync.getFilesDeleted() >= fileCount,
         "should prune at least " + fileCount + " orphans, got " + sync.getFilesDeleted());
@@ -448,7 +448,7 @@ final class EngineIndexingWorkflowTest {
   @Order(8)
   @DisplayName("Concurrent indexing and searching is stable")
   void concurrentOperationsStable() throws Exception {
-    assertTrue(harness.client().isHealthy(), "the engine must be healthy entering the concurrency test");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy entering the concurrency test");
 
     createSubDir("concurrent");
     List<Path> initialPaths = new ArrayList<>();
@@ -461,7 +461,7 @@ final class EngineIndexingWorkflowTest {
     long baseCount = docCount();
     assertEquals(
         3,
-        harness.client().submitBatch(initialPaths).getAcceptedCount(),
+        harness.client().submitBatch(initialPaths, TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the initial concurrent files must be accepted");
     awaitIndexing(baseCount + 3);
 
@@ -479,7 +479,7 @@ final class EngineIndexingWorkflowTest {
                       createTestFile(
                           "concurrent/new-" + i + ".txt",
                           "New concurrent content " + i + " " + RUN_ID);
-                  harness.client().submitBatch(List.of(file));
+                  harness.client().submitBatch(List.of(file), TestEngineContexts.FOREGROUND);
                   Thread.sleep(200);
                 }
               } catch (InterruptedException interrupted) {
@@ -496,7 +496,7 @@ final class EngineIndexingWorkflowTest {
             () -> {
               try {
                 for (int i = 0; i < 10; i++) {
-                  harness.client().search("concurrent", 10);
+                  harness.client().search("concurrent", 10, TestEngineContexts.FOREGROUND);
                   Thread.sleep(100);
                 }
               } catch (InterruptedException interrupted) {
@@ -518,7 +518,7 @@ final class EngineIndexingWorkflowTest {
     assertTrue(failures.isEmpty(), "concurrent index+search must not raise: " + failures);
 
     // And the index must still be usable afterwards, which is the actual stability claim.
-    assertTrue(harness.client().isHealthy(), "the engine must remain healthy after concurrent use");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must remain healthy after concurrent use");
     assertTrue(
         harness.awaitSearchable("concurrent", 60_000),
         "search must still serve results after concurrent index+search");

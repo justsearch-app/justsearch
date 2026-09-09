@@ -63,7 +63,9 @@ public record PendingAuthorization(
     Instant createdAt,
     Instant expiresAt,
     String requestedBy,
-    TransportTag transport) {
+    TransportTag transport,
+    io.justsearch.core.context.EngineContext engineContext,
+    io.justsearch.agent.api.registry.InvocationProvenance provenance) {
 
   public PendingAuthorization {
     Objects.requireNonNull(id, "id");
@@ -75,6 +77,14 @@ public record PendingAuthorization(
     Objects.requireNonNull(createdAt, "createdAt");
     Objects.requireNonNull(expiresAt, "expiresAt");
     Objects.requireNonNull(transport, "transport");
+    Objects.requireNonNull(engineContext, "engineContext");
+    Objects.requireNonNull(provenance, "provenance");
+    if (EngineProvenance.sourceTier(engineContext) != sourceTier
+        || !transport.name().equals(engineContext.transport())
+        || !EngineProvenance.invocation(engineContext, provenance.executor(),
+            provenance.occurredAt(), provenance.signedIntentToken()).equals(provenance)) {
+      throw new IllegalArgumentException("Pending authorization attribution disagrees");
+    }
     rationale = rationale == null ? "" : rationale;
     requestedBy = requestedBy == null || requestedBy.isBlank() ? null : requestedBy;
   }

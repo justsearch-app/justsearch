@@ -21,7 +21,7 @@ final class RemoteDocumentServiceExportSeamTest {
   @DisplayName("maps persisted extraction provenance from the Worker response")
   void mapsExtractionProvenance() {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.fetchDocumentSlice("doc-1", 0, 200_000))
+    when(client.fetchDocumentSlice(org.mockito.ArgumentMatchers.eq("doc-1"), org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(200_000), org.mockito.ArgumentMatchers.any()))
         .thenReturn(
             FetchDocumentSliceResponse.newBuilder()
                 .setDocId("doc-1")
@@ -38,7 +38,7 @@ final class RemoteDocumentServiceExportSeamTest {
 
     var slice =
         new RemoteDocumentService(() -> client)
-            .fetchSlice("doc-1", 0, 200_000)
+            .fetchSlice("doc-1", 0, 200_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
 
@@ -54,7 +54,7 @@ final class RemoteDocumentServiceExportSeamTest {
   @DisplayName("preserves unknown truncation when a legacy Worker omits the optional field")
   void preservesUnknownContentTruncation() {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.fetchDocumentSlice("legacy", 0, 20_000))
+    when(client.fetchDocumentSlice(org.mockito.ArgumentMatchers.eq("legacy"), org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(20_000), org.mockito.ArgumentMatchers.any()))
         .thenReturn(
             FetchDocumentSliceResponse.newBuilder()
                 .setDocId("legacy")
@@ -66,7 +66,7 @@ final class RemoteDocumentServiceExportSeamTest {
 
     var slice =
         new RemoteDocumentService(() -> client)
-            .fetchSlice("legacy", 0, 20_000)
+            .fetchSlice("legacy", 0, 20_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
 
@@ -78,7 +78,7 @@ final class RemoteDocumentServiceExportSeamTest {
   @DisplayName("maps the existing Worker parent-ID RPC without folder browsing")
   void mapsDocumentIdPage() {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.listAllDocumentIds(0, 50_000))
+    when(client.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50_000), org.mockito.ArgumentMatchers.any()))
         .thenReturn(
             ListAllDocumentIdsResponse.newBuilder()
                 .addAllDocIds(List.of("C:/root/a.txt", "C:/root/nested/b.txt"))
@@ -88,7 +88,7 @@ final class RemoteDocumentServiceExportSeamTest {
 
     var page =
         new RemoteDocumentService(() -> client)
-            .listAllDocumentIds(0, 50_000)
+            .listAllDocumentIds(0, 50_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
 

@@ -434,7 +434,7 @@ public final class KnowledgeServerMigrationOps {
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
 
-    ArrayList<Path> toEnqueue = new ArrayList<>();
+    ArrayList<io.justsearch.indexerworker.queue.SwitchBufferUpsert> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
 
@@ -448,7 +448,7 @@ public final class KnowledgeServerMigrationOps {
         case "UPSERT" -> {
           if (!payload.isBlank()) {
             try {
-              toEnqueue.add(Path.of(payload));
+              toEnqueue.add(io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(payload));
             } catch (Exception e) {
               allApplied = false;
               context
@@ -711,15 +711,14 @@ public final class KnowledgeServerMigrationOps {
           }
         }
         case "SYNC_ROOT" -> {
-          if (context.ingestLifecycle() != null && !payload.isBlank()) {
+          if (context.ingestLifecycle() == null || payload.isBlank()) {
+            allApplied = false;
+          } else {
             try {
-              var node = context.json().readTree(payload);
-              String rootPath = node.path("root_path").asText();
-              boolean force = node.path("force").asBoolean(false);
-              if (rootPath == null || rootPath.isBlank()) {
-                context.log().warn("Buffered SYNC_ROOT missing root_path: key={}", op.key());
-                break;
-              }
+              var buffered = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(payload);
+              String rootPath = buffered.rootPath();
+              boolean force = buffered.force();
+              JobQueue.EnqueueProvenance provenance = buffered.provenance();
 
               WorkerIngestService tmp =
                   new WorkerIngestService(
@@ -738,7 +737,7 @@ public final class KnowledgeServerMigrationOps {
 
               SyncDirectoryResponse r;
               try {
-                r = tmp.syncDirectory(req, CallContext.none());
+                r = tmp.syncDirectoryForReplay(req, provenance);
               } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
@@ -805,11 +804,13 @@ public final class KnowledgeServerMigrationOps {
     }
 
     if (!toEnqueue.isEmpty()) {
-      // 813 Slice B: replayed buffer ops carry only a path — stat for the size (unknown on failure).
-      int enqueued =
-          context
-              .jobQueue()
-              .enqueueEntries(toEnqueue.stream().map(JobQueue.EnqueueEntry::stat).toList());
+      int enqueued = 0;
+      for (var upsert : toEnqueue) {
+        int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
+        enqueued += accepted;
+        // A refused enqueue must leave the durable buffer available for the next replay.
+        if (accepted != 1) allApplied = false;
+      }
       context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
     }
 

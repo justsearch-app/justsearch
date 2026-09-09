@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.AgentRunStore;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.tools.FileOperationLog;
@@ -586,10 +588,10 @@ public final class HeadAssembly implements AutoCloseable {
         io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.loadRegistryMessages();
     this.operationMessageResolver = key -> registryMessages.getProperty(key, key);
 
-    Supplier<List<String>> agentRootPaths =
+    java.util.function.Function<EngineContext, List<String>> agentRootPaths =
         this.knowledgeClient != null
-            ? () ->
-                this.services.worker().indexing().getWatchedRoots().stream()
+            ? engineContext ->
+                this.services.worker().indexing().getWatchedRoots(engineContext).stream()
                     .map(r -> r.path().toAbsolutePath().normalize().toString())
                     .toList()
             : null;
@@ -693,7 +695,7 @@ public final class HeadAssembly implements AutoCloseable {
     final IndexingService indexingForOrchestration = indexingService;
     final DocumentService documentForOrchestration = documentService;
     final FileOperationLog fileOperationLogFinal = this.fileOperationLog;
-    final Supplier<List<String>> agentRootPathsFinal = agentRootPaths;
+    final java.util.function.Function<EngineContext, List<String>> agentRootPathsFinal = agentRootPaths;
     var orchestrationOut =
         tracedPhase(
                 "orchestration",
@@ -836,8 +838,8 @@ public final class HeadAssembly implements AutoCloseable {
                 operationOut
                     .durableGrantScope()
                     .bindIndexedRoots(
-                        () ->
-                            indexing.getWatchedRoots().stream()
+                        engineContext ->
+                            indexing.getWatchedRoots(engineContext).stream()
                                 .filter(r -> r != null && r.path() != null)
                                 .map(r -> r.path().toAbsolutePath().normalize())
                                 .toList());

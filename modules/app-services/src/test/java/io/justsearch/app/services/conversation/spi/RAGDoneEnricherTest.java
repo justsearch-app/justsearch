@@ -124,6 +124,11 @@ final class RAGDoneEnricherTest {
 
   private static ConversationContext stubCtxWithAttrs(Map<String, Object> attrs) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> a = new HashMap<>(attrs);
 
       @Override

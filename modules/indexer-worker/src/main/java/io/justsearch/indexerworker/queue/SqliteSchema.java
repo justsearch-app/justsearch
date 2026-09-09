@@ -21,7 +21,8 @@ package io.justsearch.indexerworker.queue;
  *   <li>V10: Added nullable first_failed_at column to jobs (tempdoc 885 item 21)</li>
  *   <li>V11: Added durable, path-free document_identity table (tempdoc 915 Phase 2)</li>
  *   <li>V12: Added document_identity_import bookkeeping table (tempdoc 931 §C.2)</li>
- *   <li>V13: Added nullable deleted_at column to document_identity (tempdoc 931 §C.6)</li>
+   *   <li>V13: Added nullable deleted_at column to document_identity (tempdoc 931 §C.6)</li>
+ *   <li>V14: Added nullable admission originator/transport to jobs and ingestion_ledger (lane F C1)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -34,7 +35,17 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 13;
+  public static final int TARGET_VERSION = 14;
+
+  /** V14 persists admission attribution across queue recovery and terminal outcome writes. */
+  public static final String MIGRATE_V13_TO_V14_JOBS_ORIGINATOR =
+      "ALTER TABLE jobs ADD COLUMN originator TEXT";
+  public static final String MIGRATE_V13_TO_V14_JOBS_TRANSPORT =
+      "ALTER TABLE jobs ADD COLUMN transport TEXT";
+  public static final String MIGRATE_V13_TO_V14_LEDGER_ORIGINATOR =
+      "ALTER TABLE ingestion_ledger ADD COLUMN originator TEXT";
+  public static final String MIGRATE_V13_TO_V14_LEDGER_TRANSPORT =
+      "ALTER TABLE ingestion_ledger ADD COLUMN transport TEXT";
 
   // ==================== Table: jobs ====================
 
@@ -60,7 +71,9 @@ public final class SqliteSchema {
         last_updated INTEGER NOT NULL,
         error_message TEXT,
         retry_after INTEGER,
-        first_failed_at INTEGER
+        first_failed_at INTEGER,
+        originator TEXT,
+        transport TEXT
       )
       """;
 
@@ -122,7 +135,9 @@ public final class SqliteSchema {
         source_kind TEXT,
         artifact_status TEXT,
         policy_id TEXT,
-        parser_id TEXT
+        parser_id TEXT,
+        originator TEXT,
+        transport TEXT
       )
       """;
 

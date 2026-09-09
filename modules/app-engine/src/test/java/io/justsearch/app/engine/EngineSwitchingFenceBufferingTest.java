@@ -86,7 +86,7 @@ final class EngineSwitchingFenceBufferingTest {
     engine = EngineTestHarness.start(dataDir);
 
     assertTrue(
-        engine.client().submitBatch(List.of(blueFile)).getAcceptedCount() > 0,
+        engine.client().submitBatch(List.of(blueFile), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
         "the blue file must be accepted");
     assertTrue(engine.awaitSearchable(blueMarker, 120_000), "the blue doc must be searchable");
 
@@ -97,10 +97,10 @@ final class EngineSwitchingFenceBufferingTest {
     assertFalse(activeBefore.isBlank(), "active_generation_id must be present");
 
     assertTrue(
-        engine.client().startMigration("system_test_switching").accepted(), "startMigration must be accepted");
+        engine.client().startMigration("system_test_switching", TestEngineContexts.FOREGROUND).accepted(), "startMigration must be accepted");
     engine.restart();
 
-    assertTrue(engine.client().requestCutover(true).accepted(), "requestCutover must be accepted");
+    assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
     assertTrue(awaitMigrationState("SWITCHING", 60_000), "migration_state must reach SWITCHING");
 
     // --- The three buffered operation kinds, all issued behind the fence. ---
@@ -111,12 +111,12 @@ final class EngineSwitchingFenceBufferingTest {
     Files.writeString(greenFile, "hello " + greenMarker);
     assertEquals(
         1,
-        engine.client().submitBatch(List.of(greenFile)).getAcceptedCount(),
+        engine.client().submitBatch(List.of(greenFile), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "an upsert during SWITCHING must be accepted (buffered), not refused");
 
     // DELETE.
     assertTrue(
-        engine.client().deleteById(blueDocId).getSuccess(),
+        engine.client().deleteById(blueDocId, TestEngineContexts.FOREGROUND).getSuccess(),
         "a delete during SWITCHING must be accepted (buffered), not refused");
 
     // SYNC_ROOT — a separate root so it does not re-enqueue or undo the delete above.
@@ -124,7 +124,7 @@ final class EngineSwitchingFenceBufferingTest {
     Files.createDirectories(syncRoot);
     String syncMarker = "SM" + UUID.randomUUID().toString().replace("-", "");
     Files.writeString(syncRoot.resolve("sync.txt"), "hello " + syncMarker);
-    SyncDirectoryResponse syncResp = engine.client().syncDirectory(syncRoot.toString(), true);
+    SyncDirectoryResponse syncResp = engine.client().syncDirectory(syncRoot.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         syncResp.getDeferredToSwitchBuffer()
             || syncResp.getError().toUpperCase(Locale.ROOT).contains("DEFERRED"),

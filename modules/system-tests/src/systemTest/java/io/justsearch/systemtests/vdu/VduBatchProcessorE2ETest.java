@@ -6,10 +6,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.app.engine.EngineRoot;
 import io.justsearch.app.services.vdu.ImagePreparer;
+import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.StatusResponse;
@@ -98,6 +100,12 @@ class VduBatchProcessorE2ETest {
   private static final Logger log = LoggerFactory.getLogger(VduBatchProcessorE2ETest.class);
   private static final int LLAMA_SERVER_PORT = 8080;
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final EngineContext TEST_ENGINE_CONTEXT =
+      EngineProvenance.internal(
+          "vdu-system-test", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+  private static final EngineContext VDU_ENGINE_CONTEXT =
+      EngineProvenance.internal(
+          "vdu-batch-processor", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
 
   // Expected text content from test images (used for output quality verification)
   private static final String EXPECTED_TEXT_KEYWORD = "TEST";  // Must appear in extracted text
@@ -144,7 +152,7 @@ class VduBatchProcessorE2ETest {
     // channel: there is no second process to spawn, no signal file to read a port out of, and no
     // channel to open. startEngine() either hands back a working client or throws.
     startEngine(dataDir);
-    assertTrue(client.isHealthy(), "Engine should be healthy");
+    assertTrue(client.isHealthy(TEST_ENGINE_CONTEXT), "Engine should be healthy");
 
     // Create testable VDU processor
     vduProcessor = new TestableVduBatchProcessor(llamaClient, client);
@@ -172,7 +180,7 @@ class VduBatchProcessorE2ETest {
     String docId = normalizeDocId(testImage);
     log.info("Created test image: {} (docId: {})", filePath, docId);
 
-    int accepted = client.submitBatch(List.of(testImage)).getAcceptedCount();
+    int accepted = client.submitBatch(List.of(testImage), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(1, accepted, "Should accept 1 file");
 
     // 2. Wait for indexing
@@ -228,7 +236,7 @@ class VduBatchProcessorE2ETest {
     String docId = normalizeDocId(pdf);
     log.info("Copied scanned PDF fixture: {} (docId: {})", filePath, docId);
 
-    int accepted = client.submitBatch(List.of(pdf)).getAcceptedCount();
+    int accepted = client.submitBatch(List.of(pdf), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(1, accepted, "Should accept 1 file");
 
     // 2. Wait for indexing
@@ -266,7 +274,7 @@ class VduBatchProcessorE2ETest {
     String docId2 = normalizeDocId(img2);
 
     // 2. Submit all for indexing (use actual paths)
-    int accepted = client.submitBatch(List.of(img1, img2)).getAcceptedCount();
+    int accepted = client.submitBatch(List.of(img1, img2), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(2, accepted);
 
     // 3. Wait for indexing
@@ -322,7 +330,7 @@ class VduBatchProcessorE2ETest {
     String docId = normalizeDocId(invalidImage);
 
     // 2. Submit for indexing
-    client.submitBatch(List.of(invalidImage));
+    client.submitBatch(List.of(invalidImage), TEST_ENGINE_CONTEXT);
     assertTrue(awaitIndexed(1, 30_000, 200));
 
     // 3. Verify pending (poll to handle searcher refresh)
@@ -395,7 +403,7 @@ class VduBatchProcessorE2ETest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        StatusResponse status = client.getStatus();
+        StatusResponse status = client.getStatus(TEST_ENGINE_CONTEXT);
         if (status.getCore().getQueueDepth() == 0
             && status.getCore().getDocCount() >= expectedDocCount) {
           return true;
@@ -466,7 +474,7 @@ class VduBatchProcessorE2ETest {
   private boolean awaitPending(String docId, long timeoutMs) throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
-      List<String> pending = client.queryPendingVduDocIds(100);
+      List<String> pending = client.queryPendingVduDocIds(100, TEST_ENGINE_CONTEXT);
       if (pending.contains(docId)) {
         return true;
       }
@@ -493,7 +501,7 @@ class VduBatchProcessorE2ETest {
   private boolean awaitNotPending(String docId, long timeoutMs) throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
-      List<String> pending = client.queryPendingVduDocIds(100);
+      List<String> pending = client.queryPendingVduDocIds(100, TEST_ENGINE_CONTEXT);
       if (!pending.contains(docId)) {
         return true;
       }
@@ -510,7 +518,7 @@ class VduBatchProcessorE2ETest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        SearchResponse response = client.search(query, 10);
+        SearchResponse response = client.search(query, 10, TEST_ENGINE_CONTEXT);
         if (response.getTotalHits() > 0) {
           log.debug("Search '{}' returned {} hits", query, response.getTotalHits());
           return true;
@@ -654,7 +662,7 @@ class VduBatchProcessorE2ETest {
      * @return ProcessingResult containing counts and captured outputs
      */
     ProcessingResult processPendingFilesWithResults() {
-      List<String> pending = knowledgeClient.queryPendingVduDocIds(100);
+      List<String> pending = knowledgeClient.queryPendingVduDocIds(100, VDU_ENGINE_CONTEXT);
       log.info("Processing {} pending VDU files", pending.size());
 
       int processed = 0;
@@ -668,7 +676,7 @@ class VduBatchProcessorE2ETest {
       for (String docId : pending) {
         try {
           // Mark as PROCESSING (with retry protection)
-          int retryCount = knowledgeClient.markVduProcessing(docId, MAX_RETRIES);
+          int retryCount = knowledgeClient.markVduProcessing(docId, MAX_RETRIES, VDU_ENGINE_CONTEXT);
           if (retryCount < 0) {
             log.warn("Skipping {} - max retries exceeded", docId);
             lastFailureReason = "Max retries exceeded";
@@ -701,7 +709,8 @@ class VduBatchProcessorE2ETest {
               result.extractedText(),
               VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT,
               result.enrichment(),
-              result.pageCount());
+              result.pageCount(),
+              VDU_ENGINE_CONTEXT);
 
           if (updated) {
             processed++;
@@ -758,7 +767,8 @@ class VduBatchProcessorE2ETest {
           null,
           VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED,
           "{\"error\": \"" + safeReason + "\"}",
-          0);
+          0,
+          VDU_ENGINE_CONTEXT);
     }
 
     record VduResult(String extractedText, String enrichment, int pageCount) {}

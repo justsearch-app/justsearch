@@ -26,7 +26,7 @@ class SessionPoliciesControllerTest {
   @DisplayName("null client → configStatus='worker-unreachable', empty maps")
   void nullClientReturnsWorkerUnreachable() {
     SessionPoliciesController controller = new SessionPoliciesController(null);
-    Map<String, Object> response = controller.buildResponse();
+    Map<String, Object> response = controller.buildResponse(TestRequestContexts.browser());
 
     assertEquals("worker-unreachable", response.get("configStatus"));
     assertTrue(response.get("runtime") instanceof Map);
@@ -47,10 +47,10 @@ class SessionPoliciesControllerTest {
     Map<String, Object> models = new TreeMap<>();
     models.put("EMBEDDING", new LinkedHashMap<>());
     mockResponse.put("models", models);
-    when(client.getSessionPolicies()).thenReturn(mockResponse);
+    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(mockResponse);
 
     SessionPoliciesController controller = new SessionPoliciesController(client);
-    Map<String, Object> response = controller.buildResponse();
+    Map<String, Object> response = controller.buildResponse(TestRequestContexts.browser());
 
     assertEquals("ok", response.get("configStatus"));
     assertEquals(runtime, response.get("runtime"));
@@ -67,18 +67,18 @@ class SessionPoliciesControllerTest {
     // PolicySnapshot response.
     SessionPoliciesController controller = new SessionPoliciesController(null);
     assertEquals(
-        "worker-unreachable", controller.buildResponse().get("configStatus"));
+        "worker-unreachable", controller.buildResponse(TestRequestContexts.browser()).get("configStatus"));
 
     KnowledgeClient client = mock(KnowledgeClient.class);
     Map<String, Object> ready = new LinkedHashMap<>();
     ready.put("configStatus", "ok");
     ready.put("runtime", new LinkedHashMap<>());
     ready.put("models", new TreeMap<>());
-    when(client.getSessionPolicies()).thenReturn(ready);
+    when(client.getSessionPolicies(TestRequestContexts.browser())).thenReturn(ready);
 
     controller.setClient(client);
 
-    Map<String, Object> response = controller.buildResponse();
+    Map<String, Object> response = controller.buildResponse(TestRequestContexts.browser());
     assertEquals("ok", response.get("configStatus"));
   }
 
@@ -93,6 +93,6 @@ class SessionPoliciesControllerTest {
     SessionPoliciesController controller = new SessionPoliciesController(client);
     controller.setClient(null);
     assertEquals(
-        "worker-unreachable", controller.buildResponse().get("configStatus"));
+        "worker-unreachable", controller.buildResponse(TestRequestContexts.browser()).get("configStatus"));
   }
 }

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.gpl;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
@@ -52,6 +54,9 @@ import org.slf4j.LoggerFactory;
  * receive a default score of {@code 1.0f}.
  */
 public final class GplJobCoordinator implements GplStatusProvider {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "gpl-job-coordinator", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
 
   private static final Logger log = LoggerFactory.getLogger(GplJobCoordinator.class);
 
@@ -293,10 +298,10 @@ public final class GplJobCoordinator implements GplStatusProvider {
       while (!aiTimedOut) {
         ListAllDocumentIdsResponse page =
             offset == 0
-                ? knowledgeClientSupplier.get().listAllDocumentIds(0, BATCH_SIZE)
+                ? knowledgeClientSupplier.get().listAllDocumentIds(0, BATCH_SIZE, ENGINE_CONTEXT)
                 : knowledgeClientSupplier
                     .get()
-                    .listAllDocumentIds(offset, BATCH_SIZE, snapshotToken);
+                    .listAllDocumentIds(offset, BATCH_SIZE, snapshotToken, ENGINE_CONTEXT);
         List<String> docIds = page.getDocIdsList();
 
         if (localTotal == 0L) {
@@ -320,7 +325,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
         // paged under a byte budget rather than handed over whole.
         FetchDocumentsResponse fetchResp =
             io.justsearch.app.services.worker.BoundedDocumentFetch.fetchAll(
-                ids -> knowledgeClientSupplier.get().fetchDocuments(ids), docIds);
+                ids -> knowledgeClientSupplier.get().fetchDocuments(ids, ENGINE_CONTEXT), docIds);
 
         for (DocumentContent doc : fetchResp.getDocumentsList()) {
           if (!doc.getFound() || doc.getContent().isBlank()) {
@@ -460,7 +465,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
               // deprecated debug flag, which the worker still honors as a transitional alias).
               .setIncludeDetail(true)
               .build();
-      searchResp = knowledgeClientSupplier.get().search(req);
+      searchResp = knowledgeClientSupplier.get().search(req, ENGINE_CONTEXT);
     } catch (Exception e) {
       if (isTransientWorkerUnavailable(e)) {
         throw new IllegalStateException(
@@ -684,7 +689,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
    */
   private String fetchSingleDocContent(String docId) {
     try {
-      FetchDocumentsResponse resp = knowledgeClientSupplier.get().fetchDocuments(List.of(docId));
+      FetchDocumentsResponse resp = knowledgeClientSupplier.get().fetchDocuments(List.of(docId), ENGINE_CONTEXT);
       for (DocumentContent doc : resp.getDocumentsList()) {
         if (doc.getFound() && !doc.getContent().isBlank()) {
           return doc.getContent();
@@ -735,7 +740,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
     }
     try {
       RerankResponse result =
-          knowledgeClientSupplier.get().rerank(query, List.of(docContent), RERANK_DEADLINE_MS);
+          knowledgeClientSupplier.get().rerank(query, List.of(docContent), RERANK_DEADLINE_MS, ENGINE_CONTEXT);
       if (!result.getSkipped() && result.getScoresCount() > 0) {
         return result.getScores(0);
       }

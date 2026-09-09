@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.agent.api.AgentErrorCode;
@@ -242,7 +244,7 @@ class AgentLoopServiceTest {
   @Test
   @DisplayName("PR 0b: the ceiling finalize carries the override but stays unconstrained")
   void samplingOverride_appliedToTheStepCeilingFinalize() {
-    var session = new AgentSession(new ArrayList<>(userMessage("q")), 8000);
+    var session = new AgentSession(new ArrayList<>(userMessage("q")), 8000, EngineContextTestFixtures.AGENT_LOOP);
     session.recordHandoff("primary", "organizer", "delegating the ingest");
     assertTrue(
         AgentTurnPolicy.shouldForceToolCall(session),
@@ -532,7 +534,7 @@ class AgentLoopServiceTest {
     // failure. The ONLY thing that would keep the real disposition intact if a future change un-caught
     // updateCheckpoint — letting a throwing terminal checkpoint fall into that catch — is
     // markTerminated's first-wins guard. Pin it so the F1 ordering stays protective by construction.
-    var session = new AgentSession(List.of(), 1000);
+    var session = new AgentSession(List.of(), 1000, EngineContextTestFixtures.AGENT_LOOP);
     session.markTerminated(TerminalDisposition.MAX_ITERATIONS, null, null);
     // Simulate the catch-path re-mark a throwing terminal checkpoint would trigger.
     session.markTerminated(
@@ -749,7 +751,7 @@ class AgentLoopServiceTest {
           }
         }
       };
-      service.runAgent(new AgentRequest(userMessage("cancel me"), List.of(), 5), sink);
+      service.runAgent(new AgentRequest(userMessage("cancel me"), List.of(), 5), sink, EngineContextTestFixtures.AGENT_LOOP);
 
       assertEquals(
           1L,
@@ -793,7 +795,7 @@ class AgentLoopServiceTest {
     };
 
     var loopThread = new Thread(() -> service.runAgent(
-        new AgentRequest(userMessage("do the dangerous thing"), List.of(), 3), sink));
+        new AgentRequest(userMessage("do the dangerous thing"), List.of(), 3), sink, EngineContextTestFixtures.AGENT_LOOP));
     loopThread.setDaemon(true);
     loopThread.start();
 
@@ -847,7 +849,7 @@ class AgentLoopServiceTest {
     // background=true. On a daemon thread so a regression (blocking on a non-existent approver) bounds
     // to the assert timeout instead of hanging the suite for the full approval timeout.
     var loopThread = new Thread(() -> service.runAgent(
-        new AgentRequest(userMessage("do the dangerous thing"), List.of(), 3), sink, true));
+        new AgentRequest(userMessage("do the dangerous thing"), List.of(), 3), sink, true, EngineContextTestFixtures.AGENT_LOOP_BACKGROUND));
     loopThread.setDaemon(true);
     loopThread.start();
 
@@ -884,7 +886,7 @@ class AgentLoopServiceTest {
     };
 
     var loopThread = new Thread(() -> service.runAgent(
-        new AgentRequest(userMessage("do the thing"), List.of(), 3), primary));
+        new AgentRequest(userMessage("do the thing"), List.of(), 3), primary, EngineContextTestFixtures.AGENT_LOOP));
     loopThread.setDaemon(true);
     loopThread.start();
     assertTrue(pendingSeen.await(5, java.util.concurrent.TimeUnit.SECONDS), "run is live + parked");
@@ -999,7 +1001,7 @@ class AgentLoopServiceTest {
       };
       var loopThread = new Thread(() -> service.runAgent(
           new AgentRequest(userMessage("watch me"), List.of(), 3, List.of(), null, null, null, "watch"),
-          deadSocket));
+          deadSocket, EngineContextTestFixtures.AGENT_LOOP));
       loopThread.setDaemon(true);
       loopThread.start();
 
@@ -1071,7 +1073,7 @@ class AgentLoopServiceTest {
     };
 
     var loopThread = new Thread(() -> service.runAgent(
-        new AgentRequest(userMessage("do the dangerous thing"), List.of(), 3), sink));
+        new AgentRequest(userMessage("do the dangerous thing"), List.of(), 3), sink, EngineContextTestFixtures.AGENT_LOOP));
     loopThread.setDaemon(true);
     loopThread.start();
 
@@ -1124,7 +1126,7 @@ class AgentLoopServiceTest {
       if (event instanceof AgentEvent.AgentDone) done.set(true);
     };
 
-    service.runAgent(new AgentRequest(userMessage("hi"), List.of(), 3), sink);
+    service.runAgent(new AgentRequest(userMessage("hi"), List.of(), 3), sink, EngineContextTestFixtures.AGENT_LOOP);
 
     assertEquals("Focus only on Q3 results.", acknowledged.get(),
         "the injected directive is acknowledged at the step boundary");
@@ -1146,7 +1148,7 @@ class AgentLoopServiceTest {
 
   @Test
   void agentSession_drainInterject_isExactlyOnce() {
-    var session = new AgentSession(List.of(), 8000);
+    var session = new AgentSession(List.of(), 8000, EngineContextTestFixtures.AGENT_LOOP);
     assertNull(session.drainInterject(), "no directive queued initially");
     session.setInterject("steer me");
     assertEquals("steer me", session.drainInterject(), "drain returns the queued directive");
@@ -1181,7 +1183,7 @@ class AgentLoopServiceTest {
       }
     };
 
-    service.runAgent(new AgentRequest(userMessage("hi"), List.of(), 3), sink);
+    service.runAgent(new AgentRequest(userMessage("hi"), List.of(), 3), sink, EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(injected.get(), "the directive was injected after iteration 0's boundary drain");
     assertEquals("too late to change the answer", acked.get(),
@@ -1206,7 +1208,7 @@ class AgentLoopServiceTest {
       var request = new AgentRequest(
           List.of(Map.of("role", "user", "content", "go")),
           List.of(), 3, profiles, "primary");
-      service.runAgent(request, e -> {});
+      service.runAgent(request, e -> {}, EngineContextTestFixtures.AGENT_LOOP);
 
       // Cardinality invariant: handoff_to_* tool names must not appear on tool_call_total.
       assertEquals(
@@ -1305,7 +1307,7 @@ class AgentLoopServiceTest {
     messages.add(Map.of("role", "user", "content", "hi"));
     var request = new AgentRequest(messages, List.of(), 1);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.runAgent(request, events::add);
+    service.runAgent(request, events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     List<Map<String, Object>> firstCall = ai.recordedMessages.get(0);
     assertEquals("system", firstCall.get(0).get("role"));
@@ -1328,7 +1330,7 @@ class AgentLoopServiceTest {
             stubExecutor(searchTool),
             stubEmitter(),
             null,
-            () -> List.of("D:\\Documents", "D:\\Projects"));
+            context -> List.of("D:\\Documents", "D:\\Projects"));
 
     run(service, userMessage("hi"), 1);
 
@@ -1356,7 +1358,7 @@ class AgentLoopServiceTest {
             stubExecutor(searchTool),
             stubEmitter(),
             null,
-            List::of);
+            context -> List.of());
 
     run(service, userMessage("hi"), 1);
 
@@ -1374,7 +1376,12 @@ class AgentLoopServiceTest {
     var searchTool = new StubTool("search", RiskTier.LOW, "r");
     var service =
         new AgentLoopService(
-            ai, stubCatalog(searchTool), stubExecutor(searchTool), stubEmitter(), null, List::of);
+            ai,
+            stubCatalog(searchTool),
+            stubExecutor(searchTool),
+            stubEmitter(),
+            null,
+            context -> List.of());
 
     // The unified /api/chat/approve dispatch calls these to decide whether to fall through to the
     // workflow gate. A null/blank sessionId (a workflow-only approve) must report "no agent gate"
@@ -1632,7 +1639,7 @@ class AgentLoopServiceTest {
   @Test
   @DisplayName("878 B2: the ceiling finalize is never grammar-constrained, even from a forced-tool session")
   void theFinalizeNeverInheritsATellingToolForcingProfile() {
-    var session = new AgentSession(new ArrayList<>(userMessage("q")), 8000);
+    var session = new AgentSession(new ArrayList<>(userMessage("q")), 8000, EngineContextTestFixtures.AGENT_LOOP);
     // E0a: a handoff to a non-primary agent, whose very next turn is forced to call a tool.
     session.recordHandoff("primary", "organizer", "delegating the ingest");
     assertTrue(
@@ -1812,7 +1819,7 @@ class AgentLoopServiceTest {
             service.cancelSession(sessionId.get());
           }
         };
-    service.runAgent(new AgentRequest(userMessage("cancel me"), List.of(), 5), sink);
+    service.runAgent(new AgentRequest(userMessage("cancel me"), List.of(), 5), sink, EngineContextTestFixtures.AGENT_LOOP);
 
     assertNull(
         lastEventOfType(events, AgentEvent.AgentDone.class),
@@ -1875,7 +1882,7 @@ class AgentLoopServiceTest {
             service.completeVirtualToolCall(sessionId.get(), v.callId(), true, "opened", null);
           }
         };
-    service.runAgent(new AgentRequest(userMessage("mixed channels"), List.of(), 6), sink);
+    service.runAgent(new AgentRequest(userMessage("mixed channels"), List.of(), 6), sink, EngineContextTestFixtures.AGENT_LOOP);
 
     var done = lastEventOfType(events, AgentEvent.AgentDone.class);
     assertNotNull(done, "the run reaches a grounded terminal");
@@ -2498,26 +2505,46 @@ class AgentLoopServiceTest {
         Set.of(ExecutorTag.AGENT));
     var catalog = OperationCatalog.of("core", List.of(failingOp));
     var handlers = new HandlerRegistry();
-    handlers.register(failingOpId, args -> { throw new RuntimeException("Tool crashed"); });
+    handlers.register(failingOpId, (args, context) -> { throw new RuntimeException("Tool crashed"); });
     var executor =
         new OperationDispatcher() {
           @Override
-          public OperationResult dispatch(Operation op, String argumentsJson) {
+          public OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext) {
             return handlers
                 .resolve(new OperationRef(op.binding().handlerId()))
                 .orElseThrow()
-                .execute(argumentsJson);
+                .execute(argumentsJson, EngineContextTestFixtures.AGENT_LOOP);
           }
 
           @Override
-          public OperationResult undo(Operation op, String executionId) {
+          public OperationResult dispatch(
+              Operation op,
+              String argumentsJson,
+              io.justsearch.agent.api.registry.InvocationProvenance provenance,
+              Optional<String> confirmationToken,
+              EngineContext engineContext) {
+            return dispatch(op, argumentsJson, engineContext);
+          }
+
+          @Override
+          public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
             if (!op.policy().undoSupported()) {
               return OperationResult.failure("Undo not supported by " + op.id().value());
             }
             return handlers
                 .resolve(new OperationRef(op.binding().handlerId()))
                 .orElseThrow()
-                .undo(executionId);
+                .undo(executionId, EngineContextTestFixtures.AGENT_LOOP);
+          }
+
+          @Override
+          public OperationResult undo(
+              Operation op,
+              String executionId,
+              io.justsearch.agent.api.registry.InvocationProvenance provenance,
+              Optional<String> confirmationToken,
+              EngineContext engineContext) {
+            return undo(op, executionId, engineContext);
           }
         };
     var service = observed(new AgentLoopService(ai, catalog, executor, stubEmitter(), null, null));
@@ -2652,6 +2679,119 @@ class AgentLoopServiceTest {
   }
 
   @Test
+  @DisplayName("C1: a fresh run replaces only session attribution and forwards caller context to dispatch")
+  void freshRun_forwardsCallerContextAndCreatesNewSessionId() {
+    var ai = new ScriptedAiService(
+        List.of(
+            ScriptedResponse.toolCall("call_context", "core_search", "{}"),
+            ScriptedResponse.textOnly("done")));
+    var searchTool = new StubTool("search", RiskTier.LOW, "result");
+    var dispatchedContext = new java.util.concurrent.atomic.AtomicReference<EngineContext>();
+    var service =
+        new AgentLoopService(
+            ai,
+            stubCatalog(searchTool),
+            capturingDispatcher(searchTool, dispatchedContext),
+            stubEmitter(),
+            null,
+            null);
+    var caller = callerContext("caller-session", "caller-grant");
+    var events = new CopyOnWriteArrayList<AgentEvent>();
+
+    service.runAgent(new AgentRequest(userMessage("search"), List.of(), 3), events::add, caller);
+
+    var started = lastEventOfType(events, AgentEvent.SessionStarted.class);
+    assertNotNull(started, "the run must publish its generated session id");
+    var forwarded = dispatchedContext.get();
+    assertNotNull(forwarded, "the real tool dispatch must receive the engine context");
+    assertEquals(started.sessionId(), forwarded.sessionId().orElseThrow());
+    assertNotEquals(caller.sessionId(), forwarded.sessionId(), "a new run must get a new session id");
+    assertEquals(caller.clientKind(), forwarded.clientKind());
+    assertEquals(caller.clientId(), forwarded.clientId());
+    assertEquals(caller.grantReference(), forwarded.grantReference());
+    assertEquals(caller.sourceTier(), forwarded.sourceTier());
+    assertEquals(caller.transport(), forwarded.transport());
+    assertEquals(caller.survival(), forwarded.survival());
+    assertEquals(caller.urgency(), forwarded.urgency());
+  }
+
+  @Test
+  @DisplayName("C1: resume dispatch uses the current caller context")
+  void resumeSession_usesCurrentCallerContextForDispatch() {
+    var ai = new ScriptedAiService(
+        List.of(
+            ScriptedResponse.toolCall("call_resume_context", "core_search", "{}"),
+            ScriptedResponse.textOnly("resumed")));
+    var searchTool = new StubTool("search", RiskTier.LOW, "result");
+    var dispatchedContext = new java.util.concurrent.atomic.AtomicReference<EngineContext>();
+    var runStore = new AgentRunStore(tempDir.resolve("agent-runs-context-resume"));
+    var persistedRequest = new AgentRequest(userMessage("persisted"), List.of(), 3);
+    runStore.startRun("persisted-session", persistedRequest, persistedRequest.messages(), 1000);
+    runStore.updateCheckpoint(
+        "persisted-session", "READY_FOR_LLM", persistedRequest.messages(), 0, 0, 0, "");
+    var service =
+        new AgentLoopService(
+            ai,
+            stubCatalog(searchTool),
+            capturingDispatcher(searchTool, dispatchedContext),
+            stubEmitter(),
+            null,
+            null,
+            runStore,
+            null);
+    var caller = callerContext("resume-caller-session", "resume-caller-grant");
+    var events = new CopyOnWriteArrayList<AgentEvent>();
+
+    service.resumeSession("persisted-session", events::add, caller);
+
+    var started = lastEventOfType(events, AgentEvent.SessionStarted.class);
+    var forwarded = dispatchedContext.get();
+    assertNotNull(started, "resume must create a new run");
+    assertNotNull(forwarded, "resume must reach the real tool dispatch");
+    assertNotEquals("persisted-session", started.sessionId());
+    assertEquals(started.sessionId(), forwarded.sessionId().orElseThrow());
+    assertCallerContext(caller, forwarded);
+  }
+
+  @Test
+  @DisplayName("C1: fork dispatch uses the current caller context")
+  void forkSession_usesCurrentCallerContextForDispatch() {
+    var ai = new ScriptedAiService(
+        List.of(
+            ScriptedResponse.toolCall("call_fork_context", "core_search", "{}"),
+            ScriptedResponse.textOnly("forked")));
+    var searchTool = new StubTool("search", RiskTier.LOW, "result");
+    var dispatchedContext = new java.util.concurrent.atomic.AtomicReference<EngineContext>();
+    var runStore = new AgentRunStore(tempDir.resolve("agent-runs-context-fork"));
+    var persistedRequest = new AgentRequest(userMessage("persisted"), List.of(), 3);
+    runStore.startRun("persisted-fork-session", persistedRequest, persistedRequest.messages(), 1000);
+    runStore.updateCheckpoint(
+        "persisted-fork-session", "DONE", persistedRequest.messages(), 1, 0, 0, "");
+    var service =
+        new AgentLoopService(
+            ai,
+            stubCatalog(searchTool),
+            capturingDispatcher(searchTool, dispatchedContext),
+            stubEmitter(),
+            null,
+            null,
+            runStore,
+            null);
+    var caller = callerContext("fork-caller-session", "fork-caller-grant");
+    var events = new CopyOnWriteArrayList<AgentEvent>();
+
+    service.forkSession("persisted-fork-session", "edited", events::add, caller);
+
+    var started = lastEventOfType(events, AgentEvent.SessionStarted.class);
+    var forwarded = dispatchedContext.get();
+    assertNotNull(started, "fork must create a new run");
+    assertNotNull(forwarded, "fork must reach the real tool dispatch");
+    assertNotEquals("persisted-fork-session", started.sessionId());
+    assertEquals(started.sessionId(), forwarded.sessionId().orElseThrow());
+    assertCallerContext(caller, forwarded);
+  }
+
+  @Test
   void resumeLastSession_unsupportedState_emitsTypedError() {
     var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("unused")));
     var searchTool = new StubTool("search", RiskTier.LOW, "r");
@@ -2678,7 +2818,7 @@ class AgentLoopServiceTest {
             runStore,
             null);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.resumeLastSession(events::add);
+    service.resumeLastSession(events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     var error = lastEventOfType(events, AgentEvent.AgentError.class);
     assertNotNull(error);
@@ -2713,7 +2853,7 @@ class AgentLoopServiceTest {
             runStore,
             null);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.resumeLastSession(events::add);
+    service.resumeLastSession(events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     var done = lastEventOfType(events, AgentEvent.AgentDone.class);
     assertNotNull(done);
@@ -2760,7 +2900,7 @@ class AgentLoopServiceTest {
             runStore,
             null);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.resumeLastSession(events::add);
+    service.resumeLastSession(events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     var done = lastEventOfType(events, AgentEvent.AgentDone.class);
     assertNotNull(done, "the resume must actually run, or the assertion below proves nothing");
@@ -2786,7 +2926,7 @@ class AgentLoopServiceTest {
         new AgentLoopService(
             ai, stubCatalog(searchTool), stubExecutor(searchTool), stubEmitter(),
             null, null, runStore, null);
-    service.resumeLastSession(new CopyOnWriteArrayList<AgentEvent>()::add);
+    service.resumeLastSession(new CopyOnWriteArrayList<AgentEvent>()::add, EngineContextTestFixtures.AGENT_LOOP);
 
     assertEquals(List.of(SamplingParams.AGENT), ai.recordedSampling,
         "an unpinned run must resume byte-identical to the AGENT constant");
@@ -2825,7 +2965,7 @@ class AgentLoopServiceTest {
             runStore,
             null);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.resumeSession("older_session", events::add);
+    service.resumeSession("older_session", events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     var done = lastEventOfType(events, AgentEvent.AgentDone.class);
     assertNotNull(done, "Resuming the older session must reach AgentDone");
@@ -2848,7 +2988,7 @@ class AgentLoopServiceTest {
             null);
 
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.resumeSession("does-not-exist", events::add);
+    service.resumeSession("does-not-exist", events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     var error = lastEventOfType(events, AgentEvent.AgentError.class);
     assertNotNull(error, "Unknown sessionId must emit an AgentError");
@@ -2882,7 +3022,7 @@ class AgentLoopServiceTest {
             runStore,
             null);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.resumeSession("session_unsupported_id", events::add);
+    service.resumeSession("session_unsupported_id", events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     var error = lastEventOfType(events, AgentEvent.AgentError.class);
     assertNotNull(error);
@@ -3133,7 +3273,7 @@ class AgentLoopServiceTest {
         };
     var t =
         new Thread(
-            () -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink, true));
+            () -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink, true, EngineContextTestFixtures.AGENT_LOOP_BACKGROUND));
     t.setDaemon(true);
     t.start();
     assertTrue(done.get(8, java.util.concurrent.TimeUnit.SECONDS), "background run completes");
@@ -3182,7 +3322,7 @@ class AgentLoopServiceTest {
             userMessage("do the thing"), List.of(), 1, List.of(), null, null, null, null,
             List.of(), effort);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.runAgent(request, events::add);
+    service.runAgent(request, events::add, EngineContextTestFixtures.AGENT_LOOP);
     return events;
   }
 
@@ -3376,7 +3516,7 @@ class AgentLoopServiceTest {
           };
       var loopThread =
           new Thread(
-              () -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink));
+              () -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink, EngineContextTestFixtures.AGENT_LOOP));
       loopThread.setDaemon(true);
       loopThread.start();
 
@@ -3432,7 +3572,7 @@ class AgentLoopServiceTest {
           new AgentRequest(
               userMessage("search"), List.of(), 4, List.of(), null, null, null, null, List.of(),
               "thorough");
-      var loopThread = new Thread(() -> service.runAgent(request, sink));
+      var loopThread = new Thread(() -> service.runAgent(request, sink, EngineContextTestFixtures.AGENT_LOOP));
       loopThread.setDaemon(true);
       loopThread.start();
 
@@ -3460,9 +3600,9 @@ class AgentLoopServiceTest {
     // 15x to Standard with nothing anywhere saying so. Asserted as a CONSEQUENCE (the budget the resumed
     // run actually got), not by reading the meta key back.
     int thorough = budgetAfterReconstruction("resume_thorough", "thorough",
-        (service, sink) -> service.resumeSession("resume_thorough", sink));
+        (service, sink) -> service.resumeSession("resume_thorough", sink, EngineContextTestFixtures.AGENT_LOOP));
     int standard = budgetAfterReconstruction("resume_standard", "standard",
-        (service, sink) -> service.resumeSession("resume_standard", sink));
+        (service, sink) -> service.resumeSession("resume_standard", sink, EngineContextTestFixtures.AGENT_LOOP));
     assertTrue(
         thorough > standard,
         "a resumed Thorough run must still be Thorough (got " + thorough + " vs Standard's "
@@ -3479,7 +3619,7 @@ class AgentLoopServiceTest {
     // Two sites drifted apart by one caller forgetting a field, so both are pinned. A fork rewinds
     // to the last user turn and re-runs — same durable intent, same rung.
     int thorough = budgetAfterReconstruction("fork_thorough", "thorough",
-        (service, sink) -> service.forkSession("fork_thorough", "", sink));
+        (service, sink) -> service.forkSession("fork_thorough", "", sink, EngineContextTestFixtures.AGENT_LOOP));
     assertEquals(AgentBudgetPolicy.initialBudget("thorough", 400, false), thorough);
   }
 
@@ -3490,7 +3630,7 @@ class AgentLoopServiceTest {
     // predates the rung, and the documented fallback is exactly the right reading of it. This is why
     // the persistence change needs no schema bump.
     int absent = budgetAfterReconstruction("resume_legacy", null,
-        (service, sink) -> service.resumeSession("resume_legacy", sink));
+        (service, sink) -> service.resumeSession("resume_legacy", sink, EngineContextTestFixtures.AGENT_LOOP));
     assertEquals(AgentBudgetPolicy.initialBudget(null, 400, false), absent);
   }
 
@@ -3528,7 +3668,7 @@ class AgentLoopServiceTest {
             }
           };
       var loopThread =
-          new Thread(() -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink));
+          new Thread(() -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink, EngineContextTestFixtures.AGENT_LOOP));
       loopThread.setDaemon(true);
       loopThread.start();
 
@@ -3608,7 +3748,7 @@ class AgentLoopServiceTest {
           }
         };
     var loopThread =
-        new Thread(() -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink));
+        new Thread(() -> service.runAgent(new AgentRequest(userMessage("search"), List.of(), 5), sink, EngineContextTestFixtures.AGENT_LOOP));
     loopThread.setDaemon(true);
     loopThread.start();
     assertTrue(finished.get(8, java.util.concurrent.TimeUnit.SECONDS), "the run completes");
@@ -3790,7 +3930,7 @@ class AgentLoopServiceTest {
           new AgentRequest(
               userMessage("search"), List.of(), 4, List.of(), null, null, null, null, List.of(),
               "thorough");
-      var loopThread = new Thread(() -> service.runAgent(request, sink));
+      var loopThread = new Thread(() -> service.runAgent(request, sink, EngineContextTestFixtures.AGENT_LOOP));
       loopThread.setDaemon(true);
       loopThread.start();
 
@@ -4322,13 +4462,13 @@ class AgentLoopServiceTest {
       AgentLoopService service, List<Map<String, Object>> messages, int maxIterations) {
     var request = new AgentRequest(messages, List.of(), maxIterations);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.runAgent(request, events::add);
+    service.runAgent(request, events::add, EngineContextTestFixtures.AGENT_LOOP);
     return events;
   }
 
   private static List<AgentEvent> runWithRequest(AgentLoopService service, AgentRequest request) {
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.runAgent(request, events::add);
+    service.runAgent(request, events::add, EngineContextTestFixtures.AGENT_LOOP);
     return events;
   }
 
@@ -4842,7 +4982,7 @@ class AgentLoopServiceTest {
   void pruneHandoffMessages_noExploration_isNoOp() {
     // Layout: [sys][user][handoff-call][handoff-sys][handoff-tool]
     // handoffAssistantIdx == 2 → early return, list unchanged
-    var session = new AgentSession(List.of(), 1000);
+    var session = new AgentSession(List.of(), 1000, EngineContextTestFixtures.AGENT_LOOP);
     List<Map<String, Object>> msgs = session.messages();
     msgs.add(systemMsg("system"));
     msgs.add(userMsg("hi"));
@@ -4860,7 +5000,7 @@ class AgentLoopServiceTest {
   void pruneHandoffMessages_singleToolPair_strippedAndBriefInjected() {
     // Layout: [sys][user][browse-call][browse-result][handoff-call][handoff-sys][handoff-tool]
     // After:  [sys][user][brief-sys][handoff-call][handoff-sys][handoff-tool]
-    var session = new AgentSession(List.of(), 1000);
+    var session = new AgentSession(List.of(), 1000, EngineContextTestFixtures.AGENT_LOOP);
     List<Map<String, Object>> msgs = session.messages();
     msgs.add(systemMsg("system"));
     msgs.add(userMsg("find stuff"));
@@ -4888,7 +5028,7 @@ class AgentLoopServiceTest {
     // Layout: [sys][user][search-call][search-result][browse-call][browse-result]
     //           [handoff-call][handoff-sys][handoff-tool]  (9 messages)
     // After:  [sys][user][brief-sys][handoff-call][handoff-sys][handoff-tool]  (6 messages)
-    var session = new AgentSession(List.of(), 1000);
+    var session = new AgentSession(List.of(), 1000, EngineContextTestFixtures.AGENT_LOOP);
     List<Map<String, Object>> msgs = session.messages();
     msgs.add(systemMsg("system"));
     msgs.add(userMsg("search then browse"));
@@ -4916,7 +5056,7 @@ class AgentLoopServiceTest {
     // That call must NOT appear in the research brief — only real tool calls do.
     // Layout: [sys][user][prev-brief-sys][old-handoff-call][old-handoff-sys][old-handoff-tool]
     //           [browse-call][browse-result][new-handoff-call][new-handoff-sys][new-handoff-tool]
-    var session = new AgentSession(List.of(), 1000);
+    var session = new AgentSession(List.of(), 1000, EngineContextTestFixtures.AGENT_LOOP);
     List<Map<String, Object>> msgs = session.messages();
     msgs.add(systemMsg("system"));
     msgs.add(userMsg("do stuff"));
@@ -5274,7 +5414,7 @@ class AgentLoopServiceTest {
    * Per Phase 11 of tempdoc 429: replaces the legacy {@code stubTool(...)} helper.
    * Produces an {@link Operation} (substrate type) with the matching {@link RiskTier},
    * a stable execute callback, and a wireName preserving the LLM-facing surface
-   * ({@code "search"}, {@code "ingest_files"}, etc.). The {@link #execute(String)} method
+   * ({@code "search"}, {@code "ingest_files"}, etc.). The {@link #execute(String, EngineContext)} method
    * is invoked by {@link OperationExecutor} via the {@link HandlerRegistry} wiring built
    * by {@link #buildSubstrate(StubTool...)}.
    */
@@ -5329,7 +5469,7 @@ class AgentLoopServiceTest {
       return this;
     }
 
-    OperationResult execute(String args) {
+    OperationResult execute(String args, EngineContext engineContext) {
       int nth = callCount.incrementAndGet();
       lastArgs = args;
       if (perCallStructuredData.isEmpty()) {
@@ -5398,6 +5538,78 @@ class AgentLoopServiceTest {
         Arrays.stream(tools).map(StubTool::toOperation).toList());
   }
 
+  private static EngineContext callerContext(String sessionId, String grantReference) {
+    return new EngineContext(
+        EngineContext.ClientKind.WEBVIEW,
+        "c1-caller-client",
+        Optional.of(sessionId),
+        Optional.of(grantReference),
+        "UNTRUSTED",
+        "AGENT_LOOP",
+        EngineContext.Survival.DURABLE,
+        EngineContext.Urgency.FOREGROUND);
+  }
+
+  private static void assertCallerContext(EngineContext expected, EngineContext actual) {
+    assertEquals(expected.clientKind(), actual.clientKind());
+    assertEquals(expected.clientId(), actual.clientId());
+    assertEquals(expected.grantReference(), actual.grantReference());
+    assertEquals(expected.sourceTier(), actual.sourceTier());
+    assertEquals(expected.transport(), actual.transport());
+    assertEquals(expected.survival(), actual.survival());
+    assertEquals(expected.urgency(), actual.urgency());
+  }
+
+  private static OperationDispatcher capturingDispatcher(
+      StubTool tool, java.util.concurrent.atomic.AtomicReference<EngineContext> captured) {
+    OperationDispatcher delegate = stubExecutor(tool);
+    return new OperationDispatcher() {
+      @Override
+      public OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext) {
+        captured.set(engineContext);
+        return delegate.dispatch(op, argumentsJson, engineContext);
+      }
+
+      @Override
+      public OperationResult dispatch(
+          Operation op,
+          String argumentsJson,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          EngineContext engineContext) {
+        captured.set(engineContext);
+        return delegate.dispatch(op, argumentsJson, provenance, engineContext);
+      }
+
+      @Override
+      public OperationResult dispatch(
+          Operation op,
+          String argumentsJson,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          Optional<String> confirmationToken,
+          EngineContext engineContext) {
+        captured.set(engineContext);
+        return delegate.dispatch(op, argumentsJson, provenance, confirmationToken, engineContext);
+      }
+
+      @Override
+      public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
+        captured.set(engineContext);
+        return delegate.undo(op, executionId, engineContext);
+      }
+
+      @Override
+      public OperationResult undo(
+          Operation op,
+          String executionId,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          Optional<String> confirmationToken,
+          EngineContext engineContext) {
+        captured.set(engineContext);
+        return delegate.undo(op, executionId, provenance, confirmationToken, engineContext);
+      }
+    };
+  }
+
   /**
    * Test-local {@link OperationDispatcher} implementation per tempdoc 429 §C decision A:
    * tests in {@code app-agent} cannot import the production
@@ -5411,15 +5623,15 @@ class AgentLoopServiceTest {
       OperationHandler handler =
           new OperationHandler() {
             @Override
-            public OperationResult execute(String args) {
-              return tool.execute(args);
+            public OperationResult execute(String args, EngineContext engineContext) {
+              return tool.execute(args, EngineContextTestFixtures.AGENT_LOOP);
             }
           };
       handlers.register(new OperationRef("core." + tool.wireName.replace('_', '-')), handler);
     }
     return new OperationDispatcher() {
       @Override
-      public OperationResult dispatch(Operation op, String argumentsJson) {
+      public OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext) {
         OperationHandler handler =
             handlers
                 .resolve(new OperationRef(op.binding().handlerId()))
@@ -5427,11 +5639,21 @@ class AgentLoopServiceTest {
                     () ->
                         new IllegalStateException(
                             "No handler registered for binding " + op.binding().handlerId()));
-        return handler.execute(argumentsJson);
+        return handler.execute(argumentsJson, EngineContextTestFixtures.AGENT_LOOP);
       }
 
       @Override
-      public OperationResult undo(Operation op, String executionId) {
+      public OperationResult dispatch(
+          Operation op,
+          String argumentsJson,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          Optional<String> confirmationToken,
+          EngineContext engineContext) {
+        return dispatch(op, argumentsJson, engineContext);
+      }
+
+      @Override
+      public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
         if (!op.policy().undoSupported()) {
           return OperationResult.failure("Undo not supported by " + op.id().value());
         }
@@ -5442,7 +5664,17 @@ class AgentLoopServiceTest {
                     () ->
                         new IllegalStateException(
                             "No handler registered for binding " + op.binding().handlerId()));
-        return handler.undo(executionId);
+        return handler.undo(executionId, EngineContextTestFixtures.AGENT_LOOP);
+      }
+
+      @Override
+      public OperationResult undo(
+          Operation op,
+          String executionId,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          Optional<String> confirmationToken,
+          EngineContext engineContext) {
+        return undo(op, executionId, engineContext);
       }
     };
   }

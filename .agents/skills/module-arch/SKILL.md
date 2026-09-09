@@ -18,6 +18,10 @@ Load this before creating modules, changing dependencies, or restructuring bound
 - **Deleted modules:** `app-ai`, `ai-worker`, `ai-bridge` — do not reference these
 - **ArchUnit enforces:** layering, env access restrictions, resource ownership, network egress isolation
 - **Convention plugins** in `build-logic/` enforce: Java version, dependency locking, PMD, Spotless, Error Prone
+- **Engine ports:** `SearchPort`, `IndexingService` and `DocumentService` require explicit `core`
+  `EngineContext` parameters. Preserve them through async callbacks; do not clone shared clients
+  into caller-specific views. The application source catalog owns trust projection; cooperative
+  identity and grant references do not confer authority. See `docs/explanation/19-module-architecture.md`.
 
 ## After Module Changes
 

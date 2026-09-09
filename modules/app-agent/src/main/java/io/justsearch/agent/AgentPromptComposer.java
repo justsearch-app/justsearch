@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.util.List;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -75,7 +77,7 @@ final class AgentPromptComposer {
           + " a long-running goal), call core_remember with one concise sentence. Do not"
           + " remember transient or trivial details.";
 
-  private final Supplier<List<String>> rootPathsSupplier; // nullable
+  private final java.util.function.Function<EngineContext, List<String>> rootPathsSupplier; // nullable
   /**
    * Slice 447 §X.11.5 Phase 5: agent retrospection consumer. When set and non-empty, the
    * supplier's String is appended to {@link #buildSystemPrompt} as a "Currently asserted conditions
@@ -85,7 +87,7 @@ final class AgentPromptComposer {
    */
   private volatile Supplier<String> conditionContextSupplier; // nullable
 
-  AgentPromptComposer(Supplier<List<String>> rootPathsSupplier) {
+  AgentPromptComposer(java.util.function.Function<EngineContext, List<String>> rootPathsSupplier) {
     this.rootPathsSupplier = rootPathsSupplier;
   }
 
@@ -93,12 +95,12 @@ final class AgentPromptComposer {
    * Builds the agent's system prompt: the default text, optionally extended with the indexed-root
    * preamble, then the condition-recovery context.
    */
-  String buildSystemPrompt() {
+  String buildSystemPrompt(EngineContext engineContext) {
     String basePrompt = DEFAULT_SYSTEM_PROMPT;
     if (rootPathsSupplier != null) {
       List<String> roots;
       try {
-        roots = rootPathsSupplier.get();
+        roots = rootPathsSupplier.apply(engineContext);
       } catch (Exception e) {
         LOG.warn("Failed to get root paths for system prompt", e);
         roots = null;

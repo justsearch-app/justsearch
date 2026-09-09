@@ -13,10 +13,12 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.gpl.GplEvalData;
 import io.justsearch.app.api.gpl.GplStatusProvider;
 import io.justsearch.app.api.gpl.RerankerService;
+import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.observability.HeadApiMetricCatalog;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.routes.AiRoutes;
 import io.justsearch.ui.api.routes.DebugRoutes;
@@ -511,7 +513,8 @@ public class LocalApiServer {
     // inflight gauges and slow-request timing also start/end an OTel span around the handler,
     // and the response gets an `X-Trace-Id` header (no-op trace ID when tracing is off, so the
     // header shape is stable). Spans named "http.<METHOD>.<route>" carry http.method,
-    // http.route, http.status_code attributes (all on the NdjsonSpanExporter allowlist).
+    // http.route, http.status_code attributes plus coarse engine.originator/engine.transport
+    // from the cached request context (all on the NdjsonSpanExporter allowlist).
     // The exception handler above sets ERROR status + records the exception on the active span.
     final io.opentelemetry.api.trace.Tracer httpTracer =
         io.opentelemetry.api.GlobalOpenTelemetry.getTracer("io.justsearch.ui.http");
@@ -565,6 +568,7 @@ public class LocalApiServer {
                 if (matched != null && !matched.isBlank() && !"*".equals(matched)) {
                   span.setAttribute("http.route", matched);
                 }
+                recordEngineProvenance(ctx, span);
                 if (status >= 500) {
                   span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR);
                 }
@@ -589,6 +593,22 @@ public class LocalApiServer {
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 
     this.app.start("127.0.0.1", bindPort);
+  }
+
+  /**
+   * Adds the request's coarse, low-cardinality engine attribution to its completion span.
+   *
+   * <p>The request context is resolved by the owning route/filter and cached on the Javalin
+   * request. Completion must consume that immutable value: resolving headers again here could
+   * produce a different attribution after a handler or middleware has changed the request.
+   */
+  static void recordEngineProvenance(Context request, io.opentelemetry.api.trace.Span span) {
+    Object value = request.attribute(RequestEngineContext.ATTRIBUTE);
+    if (!(value instanceof EngineContext context)) {
+      return;
+    }
+    span.setAttribute("engine.originator", EngineProvenance.originator(context));
+    span.setAttribute("engine.transport", context.transport());
   }
 
   /** H4: Returns a cached GPU capabilities snapshot (5s TTL) to avoid excessive NVML probes. */
@@ -756,12 +776,12 @@ public class LocalApiServer {
       return;
     }
     try {
-      boolean success = HeadAssemblyRef.workers().indexing().resetIndex();
+      boolean success = HeadAssemblyRef.workers().indexing().resetIndex(RequestEngineContext.get(ctx));
       if (!success) {
         ctx.status(500).json(Map.of("error", "Worker reset failed"));
         return;
       }
-      HeadAssemblyRef.workers().indexing().clearAllRoots();
+      HeadAssemblyRef.workers().indexing().clearAllRoots(RequestEngineContext.get(ctx));
       log.info("Index reset completed via /api/debug/reset-index");
       ctx.status(200).json(Map.of("reset", true));
     } catch (Exception e) {
@@ -796,7 +816,7 @@ public class LocalApiServer {
         return;
       }
       log.info("admin runtime reload triggered (reason={})", reason);
-      long swapDurationMs = HeadAssemblyRef.workers().indexing().reloadRuntime(reason);
+      long swapDurationMs = HeadAssemblyRef.workers().indexing().reloadRuntime(reason, RequestEngineContext.get(ctx));
       log.info("admin runtime reload complete in {}ms", swapDurationMs);
       ctx.status(200).json(Map.of("swapDurationMs", swapDurationMs));
     } catch (Exception e) {

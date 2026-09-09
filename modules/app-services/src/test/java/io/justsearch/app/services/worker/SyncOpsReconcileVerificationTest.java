@@ -32,7 +32,8 @@ final class SyncOpsReconcileVerificationTest {
           public <T> T execute(
               String operation,
               KnowledgeClient.RpcDeadlineCategory category,
-              java.util.function.Function<IngestServiceCalls, T> rpcFn) {
+              java.util.function.Function<IngestServiceCalls, T> rpcFn,
+              io.justsearch.core.context.EngineContext engineContext) {
             return (T) response; // canned; ignores the call function
           }
         };
@@ -45,7 +46,7 @@ final class SyncOpsReconcileVerificationTest {
     List<Call> calls = new CopyOnWriteArrayList<>();
     SyncDirectoryResponse resp =
         SyncDirectoryResponse.newBuilder().setSkipped(true).setDeleteDetectionUnverified(true).build();
-    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ false);
+    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ false, io.justsearch.app.services.TestEngineContexts.durableInternal());
     assertEquals(1, calls.size(), "must record exactly one verification outcome");
     assertEquals(root, calls.get(0).root());
     assertTrue(calls.get(0).unverified(), "cap-skipped reconcile must mark UNVERIFIED");
@@ -56,7 +57,7 @@ final class SyncOpsReconcileVerificationTest {
     List<Call> calls = new CopyOnWriteArrayList<>();
     SyncDirectoryResponse resp =
         SyncDirectoryResponse.newBuilder().setFilesAdded(2).setFilesDeleted(1).build();
-    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ false);
+    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ false, io.justsearch.app.services.TestEngineContexts.durableInternal());
     assertEquals(1, calls.size());
     assertEquals(false, calls.get(0).unverified(), "a clean full sync must clear UNVERIFIED");
   }
@@ -66,7 +67,7 @@ final class SyncOpsReconcileVerificationTest {
     List<Call> calls = new CopyOnWriteArrayList<>();
     // skipped=true but delete_detection_unverified=false → a transient user-activity yield.
     SyncDirectoryResponse resp = SyncDirectoryResponse.newBuilder().setSkipped(true).build();
-    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ false);
+    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ false, io.justsearch.app.services.TestEngineContexts.durableInternal());
     assertTrue(calls.isEmpty(), "a user-activity skip must NOT update verification state");
   }
 
@@ -78,7 +79,7 @@ final class SyncOpsReconcileVerificationTest {
     // recovery (core.reconcile-root) refresh the per-root state.
     List<Call> calls = new CopyOnWriteArrayList<>();
     SyncDirectoryResponse resp = SyncDirectoryResponse.newBuilder().setFilesAdded(5).build();
-    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ true);
+    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ true, io.justsearch.app.services.TestEngineContexts.durableInternal());
     assertEquals(1, calls.size(), "a force=true success must record a verification result");
     assertEquals(false, calls.get(0).unverified(), "force=true re-converge clears UNVERIFIED");
   }
@@ -89,7 +90,7 @@ final class SyncOpsReconcileVerificationTest {
     // verification result and must leave the prior state untouched.
     List<Call> calls = new CopyOnWriteArrayList<>();
     SyncDirectoryResponse resp = SyncDirectoryResponse.newBuilder().setSkipped(true).build();
-    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ true);
+    syncOpsReturning(resp, calls).syncDirectory(root.toString(), /* force= */ true, io.justsearch.app.services.TestEngineContexts.durableInternal());
     assertTrue(calls.isEmpty(), "a skipped force=true reconcile must NOT record a verification");
   }
 }

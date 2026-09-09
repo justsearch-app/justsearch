@@ -54,7 +54,7 @@ class ContributionRegistryTest {
         ops.stream()
             .collect(
                 java.util.stream.Collectors.<Operation, OperationRef, OperationHandler>toMap(
-                    Operation::id, o -> args -> OperationResult.success("ok")));
+                    Operation::id, o -> (args, context) -> OperationResult.success("ok")));
     return new ContributionRegistry.Installation(plugin(pluginId, refs), ops, handlers);
   }
 
@@ -78,7 +78,7 @@ class ContributionRegistryTest {
         ops.stream()
             .collect(
                 java.util.stream.Collectors.<Operation, OperationRef, OperationHandler>toMap(
-                    Operation::id, o -> args -> OperationResult.success("ok")));
+                    Operation::id, o -> (args, context) -> OperationResult.success("ok")));
     return new ContributionRegistry.Installation(
         plugin(pluginId, opRefs), ops, List.of(), prompts, List.of(), List.of(), List.of(), handlers);
   }

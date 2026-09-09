@@ -29,7 +29,7 @@ final class WorkflowToolRunnerImplTest {
 
   @Test
   void handlesOnlyProjectedWorkflowRefs() {
-    WorkflowToolRunnerImpl runner = runnerWith((body, audience, sink) -> {});
+    WorkflowToolRunnerImpl runner = runnerWith((body, audience, sink, engineContext) -> {});
     assertTrue(runner.handles(DEMO_OP), "a projected workflow op is handled");
     assertFalse(
         runner.handles(new OperationRef("core.restart-worker")), "a normal op is not handled");
@@ -42,7 +42,7 @@ final class WorkflowToolRunnerImplTest {
   void streamsNodeProgressAsAgentProgressAndReturnsFinalResponse() {
     // A fake workflow run that emits the real SSE vocabulary, terminating in `done`.
     WorkflowToolRunnerImpl.WorkflowExecutor fake =
-        (body, audience, sink) -> {
+        (body, audience, sink, engineContext) -> {
           // The runner sets the body itself — assert it routed the right workflow.
           assertEquals("core.demo-compose", body.get("workflowId"));
           sink.accept(new SseEvent("session_started", Map.of("sessionId", "s1")));
@@ -53,7 +53,7 @@ final class WorkflowToolRunnerImplTest {
         };
 
     List<AgentEvent> events = new ArrayList<>();
-    OperationResult result = runnerWith(fake).run(DEMO_OP, "{}", events::add);
+    OperationResult result = runnerWith(fake).run(DEMO_OP, "{}", events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success(), "a workflow that reaches `done` succeeds");
     assertEquals("the composed answer", result.message());
@@ -73,10 +73,10 @@ final class WorkflowToolRunnerImplTest {
   @Test
   void workflowErrorBecomesAFailureResultNotAnException() {
     WorkflowToolRunnerImpl.WorkflowExecutor failing =
-        (body, audience, sink) ->
+        (body, audience, sink, engineContext) ->
             sink.accept(new SseEvent("error", Map.of("error", "node n1 blew up")));
     List<AgentEvent> events = new ArrayList<>();
-    OperationResult result = runnerWith(failing).run(DEMO_OP, "{}", events::add);
+    OperationResult result = runnerWith(failing).run(DEMO_OP, "{}", events::add, io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success(), "a workflow error is a recoverable failure result");
     assertTrue(result.message().contains("node n1 blew up"));
   }
@@ -84,10 +84,10 @@ final class WorkflowToolRunnerImplTest {
   @Test
   void executorThrowBecomesAFailureResult() {
     WorkflowToolRunnerImpl.WorkflowExecutor throwing =
-        (body, audience, sink) -> {
+        (body, audience, sink, engineContext) -> {
           throw new IllegalStateException("engine offline");
         };
-    OperationResult result = runnerWith(throwing).run(DEMO_OP, "{}", e -> {});
+    OperationResult result = runnerWith(throwing).run(DEMO_OP, "{}", e -> {}, io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success(), "a runner exception never escapes — it becomes a failure result");
     assertTrue(result.message().contains("engine offline"));
   }

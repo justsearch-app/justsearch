@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.applauncher;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
@@ -35,7 +37,7 @@ final class SmokeDriver implements Launcher.SmokeDriverHandle {
   private SmokeDriver(Launcher.SmokeOptions options) throws Exception {
     this.environment = LauncherEnvironment.create(options.profile());
     HeadAssembly bootstrap = environment.HeadAssembly();
-    this.searchFn = bootstrap == null ? null : req -> bootstrap.workers().search().search(req);
+    this.searchFn = bootstrap == null ? null : req -> bootstrap.workers().search().search(req, io.justsearch.app.services.intent.EngineProvenance.context(EngineContext.ClientKind.CLI, "launcher", java.util.Optional.empty(), java.util.Optional.empty(), io.justsearch.agent.api.registry.TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND));
   }
 
   @Override

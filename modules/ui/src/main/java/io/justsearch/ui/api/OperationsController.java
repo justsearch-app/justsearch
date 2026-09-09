@@ -174,12 +174,12 @@ public final class OperationsController {
             ? Optional.empty()
             : Optional.of(request.confirmationToken());
     try {
-      result = dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken);
+      result = dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx));
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Slice 487 §4.4: the lattice produced a non-AUTO gate and no token was supplied.
       // Surface the gate behavior + the destination's ConfirmStrategy so the FE can
       // render trust-aware elicitation UX and re-invoke with the token.
-      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance.transport());
+      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -217,21 +217,11 @@ public final class OperationsController {
    * operator triage.
    */
   private InvocationProvenance resolveProvenance(Context ctx) {
-    String header = ctx.header("X-JustSearch-Transport");
-    java.time.Instant now = clock.instant();
-    if (header == null || header.isBlank()) {
-      return InvocationProvenance.uiButton(now);
-    }
-    TransportTag tag;
-    try {
-      tag = TransportTag.valueOf(header.trim().toUpperCase(java.util.Locale.ROOT));
-    } catch (IllegalArgumentException e) {
-      log.warn(
-          "Unknown X-JustSearch-Transport header value '{}'; falling back to BUTTON",
-          header);
-      return InvocationProvenance.uiButton(now);
-    }
-    return InvocationProvenance.fromTransport(tag, Optional.empty(), now);
+    var engineContext = RequestEngineContext.get(ctx);
+    var transport = TransportTag.valueOf(engineContext.transport());
+    var executor = InvocationProvenance.fromTransport(transport, Optional.empty(), clock.instant()).executor();
+    return io.justsearch.app.services.intent.EngineProvenance.invocation(
+        engineContext, executor, clock.instant(), Optional.empty());
   }
 
   /** Handles {@code POST /api/operations/{id}/undo}. */
@@ -280,7 +270,7 @@ public final class OperationsController {
     InvocationProvenance provenance = resolveProvenance(ctx);
     OperationResult result;
     try {
-      result = dispatcher.undo(op, executionId, provenance, confirmationToken);
+      result = dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx));
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Same typed 428 the invoke path emits — the capsule the FE mints must bind to the
       // reversal's canonical arguments, which is what is echoed here.
@@ -289,7 +279,7 @@ public final class OperationsController {
           op,
           e,
           OperationDispatcher.undoArguments(executionId),
-          provenance.transport());
+          provenance);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -368,7 +358,7 @@ public final class OperationsController {
       Operation op,
       io.justsearch.agent.api.registry.ConfirmationRequiredException e,
       String argumentsJson,
-      TransportTag transport) {
+      InvocationProvenance provenance) {
     java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("success", false);
     body.put("errorClass", io.justsearch.app.api.ApiErrorCode.CONFIRMATION_REQUIRED.name());
@@ -398,7 +388,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              transport);
+              provenance.transport(), RequestEngineContext.get(ctx), provenance);
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one

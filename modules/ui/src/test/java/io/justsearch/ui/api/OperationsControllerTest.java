@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -19,6 +20,7 @@ import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,7 @@ final class OperationsControllerTest {
 
   private Context mockContext(String idPathParam, String body) {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/operations/" + idPathParam + "/invoke");
     when(ctx.pathParam("id")).thenReturn(idPathParam);
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(any(String.class))).thenReturn(ctx);
@@ -65,7 +68,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("happy path — known operation, dispatcher returns success")
   void happyPath() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{}}");
@@ -102,7 +105,7 @@ final class OperationsControllerTest {
     // caller's transport nor a confirmation token. Stubbing the 2-arg form here would stub a method
     // the controller no longer calls (the mock would return null) — the arity moved with
     // production; this test's subject, wire-name resolution, did not.
-    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any()))
+    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("undone"));
 
     // The "undo the AI" affordance journals the agent TOOL wire-name (dots/dashes ->
@@ -120,7 +123,7 @@ final class OperationsControllerTest {
     // is the exact defect §C.7 closes.
     ArgumentCaptor<InvocationProvenance> prov =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any());
+    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.BUTTON,
         prov.getValue().transport(),
@@ -135,7 +138,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("undo declares the caller's transport, so the lattice judges the right source tier")
   void undoCarriesTheDeclaredTransport() throws Exception {
-    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any()))
+    when(dispatcher.undo(any(), eq("exec-1"), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("undone"));
     Context ctx = mockContext("core.ping-backend", "{\"executionId\":\"exec-1\"}");
     when(ctx.header("X-JustSearch-Transport")).thenReturn("AGENT_LOOP");
@@ -144,14 +147,14 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> prov =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any());
+    verify(dispatcher).undo(any(), eq("exec-1"), prov.capture(), any(), any(EngineContext.class));
     assertEquals(TransportTag.AGENT_LOOP, prov.getValue().transport());
   }
 
   @Test
   @DisplayName("handler returns failure — 200 with HANDLER_FAILURE errorClass")
   void handlerReturnsFailure() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.failure("worker not running"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{}}");
@@ -167,7 +170,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("handler throws — 500 with HANDLER_ERROR errorClass")
   void handlerThrows() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenThrow(new RuntimeException("boom"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{}}");
@@ -183,7 +186,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("empty body is treated as zero-args invocation")
   void emptyBody() throws Exception {
-    when(dispatcher.dispatch(any(), eq("{}"), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), eq("{}"), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "");
@@ -208,14 +211,14 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("dispatcher receives serialized args JSON")
   void dispatcherReceivesArgsJson() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "{\"args\":{\"foo\":\"bar\",\"n\":42}}");
     controller.handleInvoke(ctx);
 
     ArgumentCaptor<String> argsJson = ArgumentCaptor.forClass(String.class);
-    verify(dispatcher).dispatch(any(), argsJson.capture(), any(InvocationProvenance.class), any());
+    verify(dispatcher).dispatch(any(), argsJson.capture(), any(InvocationProvenance.class), any(), any(EngineContext.class));
     JsonNode parsed = MAPPER.readTree(argsJson.getValue());
     assertEquals("bar", parsed.get("foo").asText());
     assertEquals(42, parsed.get("n").asInt());
@@ -227,7 +230,7 @@ final class OperationsControllerTest {
     OperationResult result =
         OperationResult.success(
             "ok", Map.of("port", 9001, "elapsedMs", 123L));
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any())).thenReturn(result);
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenReturn(result);
 
     Context ctx = mockContext("core.ping-backend", "{}");
     controller.handleInvoke(ctx);
@@ -243,7 +246,7 @@ final class OperationsControllerTest {
   @DisplayName("OperationResult with executionId is mapped to wire response")
   void executionIdPassThrough() throws Exception {
     OperationResult result = OperationResult.success("ok", "550e8400-uuid");
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any())).thenReturn(result);
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class))).thenReturn(result);
 
     Context ctx = mockContext("core.ping-backend", "{}");
     controller.handleInvoke(ctx);
@@ -259,7 +262,7 @@ final class OperationsControllerTest {
     // TransportTag.BUTTON (FE ActionButton is the dominant caller) and ExecutorTag.UI,
     // and passes it to the dispatcher. Without this stub, the mocked dispatcher
     // returned null for the 3-arg overload and tests NPE'd.
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContext("core.ping-backend", "{}");
@@ -267,12 +270,15 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     InvocationProvenance captured = provenance.getValue();
     assertEquals(
         TransportTag.BUTTON, captured.transport());
     assertEquals(io.justsearch.agent.api.registry.ExecutorTag.UI, captured.executor());
-    assertTrue(captured.initiator().isEmpty(), "v1 HTTP endpoint has no initiator context");
+    assertEquals(
+        Optional.of("local-webview"),
+        captured.initiator(),
+        "v1 HTTP endpoint carries the resolved client identity as the initiator projection");
     assertNotNull(captured.occurredAt());
   }
 
@@ -298,7 +304,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("X-JustSearch-Transport=URL_BAR stamps URL_BAR provenance")
   void transportHeaderUrlBarStampsUrlBar() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "URL_BAR");
@@ -306,7 +312,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.URL_BAR, provenance.getValue().transport());
   }
@@ -314,7 +320,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("X-JustSearch-Transport=PALETTE stamps PALETTE provenance")
   void transportHeaderPaletteStampsPalette() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "PALETTE");
@@ -322,7 +328,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.PALETTE, provenance.getValue().transport());
   }
@@ -330,7 +336,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("X-JustSearch-Transport=URL_DEEPLINK stamps URL_DEEPLINK provenance")
   void transportHeaderDeeplinkStampsDeeplink() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "URL_DEEPLINK");
@@ -338,7 +344,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.URL_DEEPLINK,
         provenance.getValue().transport());
@@ -347,7 +353,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("transport header is case-insensitive (url_bar → URL_BAR)")
   void transportHeaderIsCaseInsensitive() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "url_bar");
@@ -355,7 +361,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.URL_BAR, provenance.getValue().transport());
   }
@@ -363,7 +369,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("unknown transport header falls back to BUTTON (no privilege escalation)")
   void unknownTransportFallsBackToButton() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "TIME_TRAVELLER");
@@ -371,7 +377,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.BUTTON, provenance.getValue().transport());
   }
@@ -379,7 +385,7 @@ final class OperationsControllerTest {
   @Test
   @DisplayName("blank transport header falls back to BUTTON (preserves prior behavior)")
   void blankTransportFallsBackToButton() throws Exception {
-    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any()))
+    when(dispatcher.dispatch(any(), any(), any(InvocationProvenance.class), any(), any(EngineContext.class)))
         .thenReturn(OperationResult.success("ok"));
 
     Context ctx = mockContextWithTransportHeader("core.ping-backend", "{}", "   ");
@@ -387,7 +393,7 @@ final class OperationsControllerTest {
 
     ArgumentCaptor<InvocationProvenance> provenance =
         ArgumentCaptor.forClass(InvocationProvenance.class);
-    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any());
+    verify(dispatcher).dispatch(any(), any(), provenance.capture(), any(), any(EngineContext.class));
     assertEquals(
         TransportTag.BUTTON, provenance.getValue().transport());
   }

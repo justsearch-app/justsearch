@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -117,7 +119,7 @@ public final class GatedOperationExecutor {
       String toolName,
       String argumentsJson,
       PendingApprovalSink pendingSink,
-      ApprovalGate gate) {
+      ApprovalGate gate, EngineContext engineContext) {
     String args = argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson;
     if (requiresApproval(op)) {
       pendingSink.onPending(callId, toolName, args, op.policy().risk());
@@ -132,7 +134,7 @@ public final class GatedOperationExecutor {
         return OperationResult.failure("User declined the operation");
       }
     }
-    return routeApproved(op, args);
+    return routeApproved(op, args, engineContext);
   }
 
   /**
@@ -141,20 +143,23 @@ public final class GatedOperationExecutor {
    * obtained (LOW risk auto-approves; higher risk passed {@link #execute}'s gate). Falls back to
    * the legacy sentinel token when no {@link ConsentCapsuleAuthority} is wired (test wiring).
    */
-  public OperationResult routeApproved(Operation op, String argumentsJson) {
-    return routeApproved(op, argumentsJson, Optional.empty());
+  public OperationResult routeApproved(Operation op, String argumentsJson, EngineContext engineContext) {
+    return routeApproved(op, argumentsJson, engineContext.sessionId(), engineContext);
   }
 
   /**
    * Tempdoc 561 P-A1 — overload that stamps a cross-domain {@code correlationId} (the agent loop's
    * sessionId) onto the dispatched call's {@link InvocationProvenance}, so the ActionEvent ledger
    * row this dispatch produces is filterable to the originating agent session — the join key the
-   * History projection (561 P-B1) consumes. The {@linkplain #routeApproved(Operation, String)
+   * History projection (561 P-B1) consumes. The {@linkplain #routeApproved(Operation, String, EngineContext)
    * 2-arg form} delegates here with {@link Optional#empty()} (the workflow runner / no-session
    * context), so 560's shared kernel and 561's session correlation compose in one path.
    */
   public OperationResult routeApproved(
-      Operation op, String argumentsJson, Optional<String> correlationId) {
+      Operation op, String argumentsJson, Optional<String> correlationId, EngineContext engineContext) {
+    if (!java.util.Objects.requireNonNull(correlationId, "correlationId").equals(engineContext.sessionId())) {
+      throw new IllegalArgumentException("Correlation ID disagrees with Engine context");
+    }
     BackendIntentRouter router = routerSupplier == null ? null : routerSupplier.get();
     if (router == null) {
       throw new IllegalStateException(
@@ -170,20 +175,17 @@ public final class GatedOperationExecutor {
     // Fix B: stamp the orchestrator's transport (AGENT_LOOP for the agent loop, WORKFLOW for the
     // workflow runner) so the lattice + audit ledger attribute the action correctly. ExecutorTag is
     // AGENT for both (both are autonomous backend orchestrators) — only the transport distinguishes.
+    if (!transport.name().equals(engineContext.transport())) {
+      throw new IllegalArgumentException("Orchestrator context has the wrong transport");
+    }
     Intent intent = new Intent(invocation, transport);
     // Tempdoc 561 P-A1 — stamp the sessionId as the cross-domain correlationId (the 6th component),
     // NOT the initiator. The canonical 6-arg constructor is required: the 4-arg shape
     // (transport, executor, initiator, occurredAt) would put correlationId in the initiator slot and
     // leave the real correlationId empty, silently defeating the History join key (561 P-B1).
     InvocationProvenance provenance =
-        new InvocationProvenance(
-            transport,
-            ExecutorTag.AGENT,
-            Optional.empty(),
-            Instant.now(),
-            Optional.empty(),
-            correlationId == null ? Optional.empty() : correlationId);
-    IntentDispatchResult result = router.dispatch(intent, provenance);
+        InvocationProvenance.fromEngineContext(engineContext, ExecutorTag.AGENT, Instant.now(), Optional.empty());
+    IntentDispatchResult result = router.dispatch(intent, provenance, engineContext);
     if (result instanceof IntentDispatchResult.Dispatched dispatched) {
       return dispatched.result();
     }

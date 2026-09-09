@@ -33,6 +33,7 @@ import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.TrustTier;
 import io.justsearch.agent.api.registry.TrustEvaluator;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.observability.advisory.OperationCompletionEvent;
 import io.justsearch.app.services.intent.ConsentCapsuleService;
 import io.justsearch.app.services.intent.CoreIntentSourceCatalog;
@@ -62,11 +63,11 @@ final class OperationExecutorImplTest {
   void coreProvenanceDispatchesToHandler() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test");
-    handlers.register(id, args -> OperationResult.success("invoked"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("invoked"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, false);
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals("invoked", result.message());
@@ -76,11 +77,11 @@ final class OperationExecutorImplTest {
   void trustedPluginProvenanceDispatchesToHandlerSameAsCore() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.plugin");
-    handlers.register(id, args -> OperationResult.success("plugin-invoked"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("plugin-invoked"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals("plugin-invoked", result.message());
@@ -90,12 +91,12 @@ final class OperationExecutorImplTest {
   void untrustedPluginThrowsUnsupportedOperation() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.untrusted");
-    handlers.register(id, args -> OperationResult.success("should-not-execute"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("should-not-execute"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.UNTRUSTED_PLUGIN, false);
     UnsupportedOperationException ex =
-        assertThrows(UnsupportedOperationException.class, () -> executor.dispatch(op, "{}"));
+        assertThrows(UnsupportedOperationException.class, () -> executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal()));
     assertTrue(
         ex.getMessage().contains("V1.5"),
         "UNTRUSTED_PLUGIN error should reference V1.5 sandbox: " + ex.getMessage());
@@ -110,12 +111,12 @@ final class OperationExecutorImplTest {
         id,
         new OperationHandler() {
           @Override
-          public OperationResult execute(String args) {
+          public OperationResult execute(String args, EngineContext engineContext) {
             return OperationResult.success("ok");
           }
 
           @Override
-          public OperationResult undo(String executionId) {
+          public OperationResult undo(String executionId, EngineContext engineContext) {
             handlerInvoked[0] = true;
             return OperationResult.success("should-not-be-called");
           }
@@ -123,7 +124,7 @@ final class OperationExecutorImplTest {
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, false); // undoSupported = false
-    OperationResult result = executor.undo(op, "exec-123");
+    OperationResult result = executor.undo(op, "exec-123", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertTrue(
@@ -140,19 +141,19 @@ final class OperationExecutorImplTest {
         id,
         new OperationHandler() {
           @Override
-          public OperationResult execute(String args) {
+          public OperationResult execute(String args, EngineContext engineContext) {
             return OperationResult.success("ok", "exec-456");
           }
 
           @Override
-          public OperationResult undo(String executionId) {
+          public OperationResult undo(String executionId, EngineContext engineContext) {
             return OperationResult.success("undone " + executionId);
           }
         });
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, true); // undoSupported = true
-    OperationResult result = executor.undo(op, "exec-456");
+    OperationResult result = executor.undo(op, "exec-456", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals("undone exec-456", result.message());
@@ -162,12 +163,12 @@ final class OperationExecutorImplTest {
   void successfulDispatchEmitsHistoryEntryWithSuccessOutcome() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.history-success");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
 
-    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}");
+    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(1, emitted.size(), "exactly one history entry should be emitted per dispatch");
@@ -183,12 +184,12 @@ final class OperationExecutorImplTest {
   void failedDispatchEmitsHistoryEntryWithFailureOutcome() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.history-failure");
-    handlers.register(id, args -> OperationResult.failure("nope"));
+    handlers.register(id, (args, engineContext) -> OperationResult.failure("nope"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
 
-    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}");
+    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(1, emitted.size());
@@ -201,7 +202,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.history-throw");
     handlers.register(
         id,
-        args -> {
+        (args, engineContext) -> {
           throw new RuntimeException("boom");
         });
     List<OperationHistoryEntry> emitted = new ArrayList<>();
@@ -210,7 +211,7 @@ final class OperationExecutorImplTest {
 
     assertThrows(
         RuntimeException.class,
-        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}"));
+        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal()));
     assertEquals(1, emitted.size(), "history entry must still be emitted on thrown failure");
     assertEquals(OperationOutcome.FAILURE, emitted.get(0).outcome());
   }
@@ -219,7 +220,7 @@ final class OperationExecutorImplTest {
   void historyEmitterFailureDoesNotBreakDispatch() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.history-emit-throws");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor =
         new OperationExecutorImpl(
             handlers,
@@ -228,7 +229,7 @@ final class OperationExecutorImplTest {
             },
             Clock.systemUTC());
 
-    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}");
+    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success(), "emitter failure must not propagate to dispatch caller");
   }
@@ -245,13 +246,13 @@ final class OperationExecutorImplTest {
   void metadataOnlyAuditEmitsHistoryEntry() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.audit-axis");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result =
-        executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.METADATA_ONLY), "{}");
+        executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.METADATA_ONLY), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(
@@ -263,13 +264,13 @@ final class OperationExecutorImplTest {
   void noneAuditSuppressesHistoryEntry() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.audit-axis");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result =
-        executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.NONE), "{}");
+        executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.NONE), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success(), "suppressing the audit record must not affect the dispatch");
     assertTrue(
@@ -281,7 +282,7 @@ final class OperationExecutorImplTest {
   void noneAuditSuppressesHistoryOnValidationFailure() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.audit-axis-validation");
-    handlers.register(id, args -> OperationResult.success("unreached"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("unreached"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
@@ -306,7 +307,7 @@ final class OperationExecutorImplTest {
             new Provenance(TrustTier.CORE, "test", "1.0"),
             Set.of(ExecutorTag.AGENT));
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals("BAD_REQUEST", result.errorCode().orElse(null));
@@ -321,7 +322,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.audit-axis-throw");
     handlers.register(
         id,
-        args -> {
+        (args, engineContext) -> {
           throw new RuntimeException("boom");
         });
     List<OperationHistoryEntry> emitted = new ArrayList<>();
@@ -330,7 +331,7 @@ final class OperationExecutorImplTest {
 
     assertThrows(
         RuntimeException.class,
-        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.NONE), "{}"));
+        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.NONE), "{}", io.justsearch.app.services.TestEngineContexts.internal()));
 
     assertTrue(
         emitted.isEmpty(),
@@ -351,7 +352,7 @@ final class OperationExecutorImplTest {
   void noneAuditSuppressesHistoryButStillFiresAdvisory() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.audit-axis-advisory");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
@@ -364,7 +365,7 @@ final class OperationExecutorImplTest {
     Operation op =
         makeOpWithAdvisoryClass(id, Optional.of(TEST_ADVISORY_CLASS), AuditPolicy.NONE);
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertTrue(emitted.isEmpty(), "AuditPolicy.NONE must suppress the history entry");
@@ -390,7 +391,7 @@ final class OperationExecutorImplTest {
     boolean[] handlerInvoked = {false};
     handlers.register(
         id,
-        args -> {
+        (args, engineContext) -> {
           handlerInvoked[0] = true;
           return OperationResult.success("should not reach here");
         });
@@ -416,7 +417,7 @@ final class OperationExecutorImplTest {
             new Provenance(TrustTier.CORE, "test", "1.0"),
             Set.of(ExecutorTag.AGENT));
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success(), "missing required arg must fail validation");
     assertEquals("BAD_REQUEST", result.errorCode().orElse(null));
@@ -436,7 +437,7 @@ final class OperationExecutorImplTest {
     boolean[] handlerInvoked = {false};
     handlers.register(
         id,
-        args -> {
+        (args, engineContext) -> {
           handlerInvoked[0] = true;
           return OperationResult.success("got args: " + args);
         });
@@ -462,7 +463,7 @@ final class OperationExecutorImplTest {
             new Provenance(TrustTier.CORE, "test", "1.0"),
             Set.of(ExecutorTag.AGENT));
 
-    OperationResult result = executor.dispatch(op, "{\"path\":\"/some/path\"}");
+    OperationResult result = executor.dispatch(op, "{\"path\":\"/some/path\"}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertTrue(handlerInvoked[0], "handler must be invoked when args validate");
@@ -476,7 +477,7 @@ final class OperationExecutorImplTest {
   void schemaValidationRejectsWrongType() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.wrong-type");
-    handlers.register(id, args -> OperationResult.success("should not reach"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("should not reach"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op =
@@ -499,7 +500,7 @@ final class OperationExecutorImplTest {
             new Provenance(TrustTier.CORE, "test", "1.0"),
             Set.of(ExecutorTag.AGENT));
 
-    OperationResult result = executor.dispatch(op, "{\"path\":42}");
+    OperationResult result = executor.dispatch(op, "{\"path\":42}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success(), "wrong-type arg must fail validation");
     assertEquals("BAD_REQUEST", result.errorCode().orElse(null));
@@ -514,11 +515,11 @@ final class OperationExecutorImplTest {
   void schemaValidationSkippedForEmptySchema() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.empty-schema");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     OperationResult result =
-        executor.dispatch(makeOp(id, TrustTier.CORE, false), "{\"anything\":\"goes\"}");
+        executor.dispatch(makeOp(id, TrustTier.CORE, false), "{\"anything\":\"goes\"}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
   }
@@ -532,7 +533,7 @@ final class OperationExecutorImplTest {
   void schemaValidationFailureEmitsFailureHistoryEntry() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.validation-history");
-    handlers.register(id, args -> OperationResult.success("unreached"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("unreached"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
@@ -557,7 +558,7 @@ final class OperationExecutorImplTest {
             new Provenance(TrustTier.CORE, "test", "1.0"),
             Set.of(ExecutorTag.AGENT));
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(1, emitted.size());
@@ -575,7 +576,7 @@ final class OperationExecutorImplTest {
   void threeArgDispatchThreadsProvenanceOntoHistoryEntry() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-success");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
@@ -587,7 +588,7 @@ final class OperationExecutorImplTest {
             Optional.of("user:alice"),
             Instant.parse("2026-05-12T08:30:00Z"));
     OperationResult result =
-        executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", provenance);
+        executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", provenance, io.justsearch.app.services.TestEngineContexts.forProvenance(provenance));
 
     assertTrue(result.success());
     assertEquals(1, emitted.size());
@@ -605,12 +606,12 @@ final class OperationExecutorImplTest {
   void legacyTwoArgDispatchDefaultsToSystemInternalProvenance() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-default");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(handlers, emitted::add, Clock.systemUTC());
 
-    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}");
+    OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(1, emitted.size());
@@ -626,7 +627,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.provenance-throw");
     handlers.register(
         id,
-        args -> {
+        (args, engineContext) -> {
           throw new RuntimeException("boom");
         });
     List<OperationHistoryEntry> emitted = new ArrayList<>();
@@ -637,12 +638,12 @@ final class OperationExecutorImplTest {
         new InvocationProvenance(
             TransportTag.AGENT_LOOP,
             ExecutorTag.AGENT,
-            Optional.empty(),
+            Optional.of("app-services-test"),
             Instant.parse("2026-05-12T08:30:00Z"));
 
     assertThrows(
         RuntimeException.class,
-        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", provenance));
+        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", provenance, io.justsearch.app.services.TestEngineContexts.forProvenance(provenance)));
     assertEquals(1, emitted.size());
     assertEquals(OperationOutcome.FAILURE, emitted.get(0).outcome());
     assertEquals(provenance, emitted.get(0).provenance());
@@ -654,15 +655,15 @@ final class OperationExecutorImplTest {
   void coreTierDispatchAcceptsUserFacingTransports() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-core");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, false);
     InvocationProvenance provenance =
         new InvocationProvenance(
-            TransportTag.BUTTON, ExecutorTag.UI, Optional.empty(), Instant.now());
+            TransportTag.BUTTON, ExecutorTag.UI, Optional.of("test-webview"), Instant.now());
 
-    OperationResult result = executor.dispatch(op, "{}", provenance);
+    OperationResult result = executor.dispatch(op, "{}", provenance, io.justsearch.app.services.TestEngineContexts.forProvenance(provenance));
     assertTrue(result.success());
   }
 
@@ -670,7 +671,7 @@ final class OperationExecutorImplTest {
   void trustedPluginCannotSpoofUserFacingButtonTransport() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-plugin");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
@@ -683,7 +684,7 @@ final class OperationExecutorImplTest {
 
     IllegalArgumentException ex =
         assertThrows(
-            IllegalArgumentException.class, () -> executor.dispatch(op, "{}", spoofed));
+            IllegalArgumentException.class, () -> executor.dispatch(op, "{}", spoofed, io.justsearch.app.services.TestEngineContexts.forProvenance(spoofed)));
     assertTrue(ex.getMessage().contains("TRUSTED_PLUGIN"));
     assertTrue(ex.getMessage().contains("BUTTON"));
   }
@@ -692,7 +693,7 @@ final class OperationExecutorImplTest {
   void trustedPluginMayDispatchWithPluginEmittedTransport() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-plugin-ok");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
@@ -703,7 +704,7 @@ final class OperationExecutorImplTest {
             Optional.of("plugin:advisor"),
             Instant.now());
 
-    OperationResult result = executor.dispatch(op, "{}", ok);
+    OperationResult result = executor.dispatch(op, "{}", ok, io.justsearch.app.services.TestEngineContexts.forProvenance(ok));
     assertTrue(result.success());
   }
 
@@ -711,7 +712,7 @@ final class OperationExecutorImplTest {
   void trustedPluginCannotSpoofUrlBarOrLlmEmission() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-plugin-mixed");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
@@ -725,11 +726,14 @@ final class OperationExecutorImplTest {
           TransportTag.MCP
         }) {
       InvocationProvenance spoof =
-          new InvocationProvenance(
-              forbidden, ExecutorTag.UI, Optional.empty(), Instant.now());
+          InvocationProvenance.fromEngineContext(
+              io.justsearch.app.services.TestEngineContexts.forTransport(forbidden),
+              ExecutorTag.UI,
+              Instant.now(),
+              Optional.empty());
       assertThrows(
           IllegalArgumentException.class,
-          () -> executor.dispatch(op, "{}", spoof),
+          () -> executor.dispatch(op, "{}", spoof, io.justsearch.app.services.TestEngineContexts.forProvenance(spoof)),
           "expected rejection of " + forbidden);
     }
   }
@@ -743,7 +747,7 @@ final class OperationExecutorImplTest {
   void advisoryEmittedWhenPolicyDeclaresAdvisoryClass() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.advisory-emit-test");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> history = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
@@ -761,7 +765,7 @@ final class OperationExecutorImplTest {
             Optional.of("user:advisor-test"),
             Instant.parse("2026-05-12T09:00:00Z"));
 
-    OperationResult result = executor.dispatch(op, "{}", provenance);
+    OperationResult result = executor.dispatch(op, "{}", provenance, io.justsearch.app.services.TestEngineContexts.forProvenance(provenance));
 
     assertTrue(result.success());
     assertEquals(1, history.size(), "exactly one history entry per dispatch");
@@ -777,7 +781,7 @@ final class OperationExecutorImplTest {
   void noAdvisoryEmittedWhenPolicyDoesNotDeclareAdvisoryClass() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.advisory-noop-test");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> history = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
@@ -789,7 +793,7 @@ final class OperationExecutorImplTest {
 
     Operation op = makeOpWithAdvisoryClass(id, Optional.empty());
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(1, history.size(), "history entry still emitted regardless of advisory class");
@@ -800,7 +804,7 @@ final class OperationExecutorImplTest {
   void unmappedAdvisoryClassDoesNotBreakDispatch() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.advisory-unmapped-test");
-    handlers.register(id, args -> OperationResult.success("ok"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> history = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
@@ -810,7 +814,7 @@ final class OperationExecutorImplTest {
         makeOpWithAdvisoryClass(
             id, Optional.of(new ResourceRef("core.advisory-not-registered")));
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(1, history.size());
@@ -821,7 +825,7 @@ final class OperationExecutorImplTest {
   void advisoryEmittedOnFailureOutcomeWhenAdvisoryClassDeclared() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.advisory-failure-test");
-    handlers.register(id, args -> OperationResult.failure("nope"));
+    handlers.register(id, (args, engineContext) -> OperationResult.failure("nope"));
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
         new OperationExecutorImpl(
@@ -832,7 +836,7 @@ final class OperationExecutorImplTest {
 
     Operation op = makeOpWithAdvisoryClass(id, Optional.of(TEST_ADVISORY_CLASS));
 
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(1, advisories.size());
@@ -870,13 +874,13 @@ final class OperationExecutorImplTest {
   void capabilityUnavailableReturnsFailureWithoutInvokingHandler() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-gated");
-    handlers.register(id, args -> OperationResult.success("should-not-run"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("should-not-run"));
     OperationDispatcher executor =
         new OperationExecutorImpl(
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> false);
 
     Operation op = makeOpWithCapability(id, RequiredCapability.WorkerOnline.INSTANCE);
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(Optional.of("CAPABILITY_UNAVAILABLE"), result.errorCode());
@@ -887,13 +891,13 @@ final class OperationExecutorImplTest {
   void capabilityAvailableAllowsDispatch() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-gated");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
         new OperationExecutorImpl(
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> true);
 
     Operation op = makeOpWithCapability(id, RequiredCapability.WorkerOnline.INSTANCE);
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals("ran", result.message());
@@ -903,11 +907,11 @@ final class OperationExecutorImplTest {
   void noCapabilityResolverSkipsCheck() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-gated");
-    handlers.register(id, args -> OperationResult.success("ran-without-resolver"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran-without-resolver"));
     OperationDispatcher executor = new OperationExecutorImpl(handlers);
 
     Operation op = makeOpWithCapability(id, RequiredCapability.WorkerOnline.INSTANCE);
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
   }
@@ -916,13 +920,13 @@ final class OperationExecutorImplTest {
   void emptyCapabilitySetAlwaysPasses() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-no-cap");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
         new OperationExecutorImpl(
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> false);
 
     Operation op = makeOp(id, TrustTier.CORE, false);
-    OperationResult result = executor.dispatch(op, "{}");
+    OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
   }
@@ -935,12 +939,12 @@ final class OperationExecutorImplTest {
         id,
         new OperationHandler() {
           @Override
-          public OperationResult execute(String args) {
+          public OperationResult execute(String args, EngineContext engineContext) {
             return OperationResult.success("ran");
           }
 
           @Override
-          public OperationResult undo(String executionId) {
+          public OperationResult undo(String executionId, EngineContext engineContext) {
             return OperationResult.success("undone — should not reach here");
           }
         });
@@ -967,7 +971,7 @@ final class OperationExecutorImplTest {
             new Provenance(TrustTier.CORE, "test", "1.0"),
             Set.of(ExecutorTag.AGENT));
 
-    OperationResult result = executor.undo(op, "exec-123");
+    OperationResult result = executor.undo(op, "exec-123", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertEquals(Optional.of("CAPABILITY_UNAVAILABLE"), result.errorCode());
   }
@@ -1028,7 +1032,7 @@ final class OperationExecutorImplTest {
   void globalHardStop_deniesUntrusted_leavesUserActionsAlone() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     var sink =
         new ArrayList<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>();
     var executor =
@@ -1046,15 +1050,19 @@ final class OperationExecutorImplTest {
     executor.setGlobalHardStop(hardStop);
     Operation op = makeMediumOp(id);
     InvocationProvenance agent =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
     InvocationProvenance user =
-        InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     // Engaged: the agent (UNTRUSTED) dispatch is DENIED outright + recorded DENIED.
     hardStop.engage();
     assertThrows(
         TrustGateDeniedException.class,
-        () -> executor.dispatch(op, "{}", agent, Optional.empty()),
+        () -> executor.dispatch(op, "{}", agent, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agent)),
         "hard stop denies the UNTRUSTED dispatch");
     assertEquals(
         io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED,
@@ -1062,14 +1070,14 @@ final class OperationExecutorImplTest {
         "the hard-stop denial is recorded as a DENIED ledger row");
 
     // Engaged: a user (TRUSTED BUTTON) dispatch is unaffected — TRUSTED×MEDIUM=AUTO → runs.
-    OperationResult userResult = executor.dispatch(op, "{}", user, Optional.empty());
+    OperationResult userResult = executor.dispatch(op, "{}", user, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(user));
     assertTrue(userResult.success(), "user/BUTTON action proceeds while the hard stop is engaged");
 
     // Released: the agent dispatch returns to normal gating (MEDIUM → confirmation-required).
     hardStop.release();
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(op, "{}", agent, Optional.empty()),
+        () -> executor.dispatch(op, "{}", agent, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agent)),
         "released → the normal lattice gate applies again (not a hard-stop deny)");
   }
 
@@ -1078,16 +1086,18 @@ final class OperationExecutorImplTest {
   void gateFireEmitsGatedOutcomeAndStillThrows() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     var sink = new ArrayList<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>();
     OperationDispatcher executor = latticeExecutorWithGateSink(handlers, new ConsentCapsuleService(), sink);
     Operation op = makeMediumOp(id);
     InvocationProvenance untrusted =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(op, "{}", untrusted, Optional.empty()),
+        () -> executor.dispatch(op, "{}", untrusted, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted)),
         "the gate still throws — the emit is additive, fail-closed preserved");
     assertEquals(1, sink.size(), "the gate firing was recorded");
     assertEquals(
@@ -1101,16 +1111,18 @@ final class OperationExecutorImplTest {
   void capsuleApprovalEmitsApprovedOutcome() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     ConsentCapsuleService capsule = new ConsentCapsuleService();
     var sink = new ArrayList<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>();
     OperationDispatcher executor = latticeExecutorWithGateSink(handlers, capsule, sink);
     Operation op = makeMediumOp(id);
     InvocationProvenance untrusted =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     String token = capsule.mint(id.value(), "{}");
-    OperationResult result = executor.dispatch(op, "{}", untrusted, Optional.of(token));
+    OperationResult result = executor.dispatch(op, "{}", untrusted, Optional.of(token), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted));
     assertTrue(result.success(), "capsule-authorized dispatch reaches the handler");
     assertEquals(1, sink.size());
     assertEquals(
@@ -1128,7 +1140,7 @@ final class OperationExecutorImplTest {
   void gateStillFailsClosedWhenOutcomeEmitterThrows() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
         new OperationExecutorImpl(
             handlers,
@@ -1144,11 +1156,13 @@ final class OperationExecutorImplTest {
             });
     Operation op = makeMediumOp(id);
     InvocationProvenance untrusted =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(op, "{}", untrusted, Optional.empty()),
+        () -> executor.dispatch(op, "{}", untrusted, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted)),
         "a throwing outcome emitter must not break the gate — still ConfirmationRequired, not the emitter's exception");
   }
 
@@ -1157,15 +1171,17 @@ final class OperationExecutorImplTest {
   void untrustedMediumWithoutTokenIsGated() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, new ConsentCapsuleService());
     Operation op = makeMediumOp(id);
     InvocationProvenance untrusted =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(op, "{}", untrusted, Optional.empty()),
+        () -> executor.dispatch(op, "{}", untrusted, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted)),
         "LLM-emitted MEDIUM op with no token hits the gate (the dead-end)");
   }
 
@@ -1174,15 +1190,17 @@ final class OperationExecutorImplTest {
   void validCapsuleSatisfiesTheGate() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     ConsentCapsuleService capsule = new ConsentCapsuleService();
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, capsule);
     Operation op = makeMediumOp(id);
     InvocationProvenance untrusted =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     String token = capsule.mint(id.value(), "{}");
-    OperationResult result = executor.dispatch(op, "{}", untrusted, Optional.of(token));
+    OperationResult result = executor.dispatch(op, "{}", untrusted, Optional.of(token), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted));
     assertTrue(result.success(), "capsule-authorized dispatch reaches the handler");
   }
 
@@ -1198,15 +1216,17 @@ final class OperationExecutorImplTest {
   void untrustedNonCapsuleTokenIsRejected() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-medium");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, new ConsentCapsuleService());
     Operation op = makeMediumOp(id);
     InvocationProvenance untrusted =
-        InvocationProvenance.fromTransport(TransportTag.LLM_EMISSION, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(op, "{}", untrusted, Optional.of("not-a-capsule")),
+        () -> executor.dispatch(op, "{}", untrusted, Optional.of("not-a-capsule"), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted)),
         "a fabricated non-capsule token no longer satisfies the gate for an UNTRUSTED source");
   }
 
@@ -1221,16 +1241,18 @@ final class OperationExecutorImplTest {
   void trustedHighNonCapsuleTokenIsRejected() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-high");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
         latticeExecutorWithCapsule(handlers, new ConsentCapsuleService());
     Operation op = makeHighOp(id);
     InvocationProvenance trusted =
-        InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(op, "{}", trusted, Optional.of("core.test-high")),
+        () -> executor.dispatch(op, "{}", trusted, Optional.of("core.test-high"), io.justsearch.app.services.TestEngineContexts.forProvenance(trusted)),
         "a nominal (op-id) token from a TRUSTED source no longer satisfies the gate after C2"
             + " step 3");
   }
@@ -1240,15 +1262,17 @@ final class OperationExecutorImplTest {
   void trustedHighValidCapsuleSatisfiesGate() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-high");
-    handlers.register(id, args -> OperationResult.success("ran"));
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     ConsentCapsuleService capsule = new ConsentCapsuleService();
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, capsule);
     Operation op = makeHighOp(id);
     InvocationProvenance trusted =
-        InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     String token = capsule.mint(id.value(), "{}");
-    OperationResult result = executor.dispatch(op, "{}", trusted, Optional.of(token));
+    OperationResult result = executor.dispatch(op, "{}", trusted, Optional.of(token), io.justsearch.app.services.TestEngineContexts.forProvenance(trusted));
     assertTrue(result.success(), "a bound capsule authorizes the TRUSTED HIGH dispatch");
   }
 
@@ -1352,8 +1376,9 @@ final class OperationExecutorImplTest {
   }
 
   private static InvocationProvenance agentLoop() {
-    return InvocationProvenance.fromTransport(
-        TransportTag.AGENT_LOOP, Optional.empty(), Instant.now());
+    return InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.AGENT_LOOP),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
   }
 
   private static Operation makeFamilyOp(OperationRef id, RiskTier risk) {
@@ -1387,23 +1412,23 @@ final class OperationExecutorImplTest {
   @Test
   void durableFamilyGrantSatisfiesMediumButNeverHigh() {
     HandlerRegistry handlers = new HandlerRegistry();
-    handlers.register(INGEST, args -> OperationResult.success("ingested"));
-    handlers.register(MUTATE, args -> OperationResult.success("mutated"));
+    handlers.register(INGEST, (args, engineContext) -> OperationResult.success("ingested"));
+    handlers.register(MUTATE, (args, engineContext) -> OperationResult.success("mutated"));
     var grants = new io.justsearch.app.services.intent.DurableGrantStore();
     grants.grantFamilyAllowAlways(FAMILY, io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
     // A permissive scope isolates the risk ceiling from the argument-scope rule under test below.
     OperationExecutorImpl executor =
-        latticeExecutorWithGrants(handlers, grants, (op, args) -> true);
+        latticeExecutorWithGrants(handlers, grants, (op, args, engineContext) -> true);
 
     OperationResult medium =
-        executor.dispatch(makeFamilyOp(INGEST, RiskTier.MEDIUM), "{}", agentLoop(), Optional.empty());
+        executor.dispatch(makeFamilyOp(INGEST, RiskTier.MEDIUM), "{}", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop()));
     assertTrue(medium.success(), "the MEDIUM family member is still auto-approved by the grant");
 
     assertThrows(
         ConfirmationRequiredException.class,
         () ->
             executor.dispatch(
-                makeFamilyOp(MUTATE, RiskTier.HIGH), "{}", agentLoop(), Optional.empty()),
+                makeFamilyOp(MUTATE, RiskTier.HIGH), "{}", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "a durable grant never satisfies a HIGH-risk gate — destructive work costs a fresh gesture");
   }
 
@@ -1411,24 +1436,24 @@ final class OperationExecutorImplTest {
   @Test
   void durablePerOperationGrantDoesNotSatisfyHighRiskGate() {
     HandlerRegistry handlers = new HandlerRegistry();
-    handlers.register(MUTATE, args -> OperationResult.success("mutated"));
+    handlers.register(MUTATE, (args, engineContext) -> OperationResult.success("mutated"));
     var grants = new io.justsearch.app.services.intent.DurableGrantStore();
     grants.grantAllowAlways(
         MUTATE.value(), io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
     OperationExecutorImpl executor =
-        latticeExecutorWithGrants(handlers, grants, (op, args) -> true);
+        latticeExecutorWithGrants(handlers, grants, (op, args, engineContext) -> true);
 
     assertThrows(
         ConfirmationRequiredException.class,
         () ->
             executor.dispatch(
-                makeFamilyOp(MUTATE, RiskTier.HIGH), "{}", agentLoop(), Optional.empty()),
+                makeFamilyOp(MUTATE, RiskTier.HIGH), "{}", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "'Always allow this action' cannot durably suppress a HIGH-risk gate");
     // Right-reason check: the SAME grant, on the same op at MEDIUM, does satisfy the gate — so the
     // throw above is the risk ceiling firing, not a missing/mismatched grant.
     assertTrue(
         executor
-            .dispatch(makeFamilyOp(MUTATE, RiskTier.MEDIUM), "{}", agentLoop(), Optional.empty())
+            .dispatch(makeFamilyOp(MUTATE, RiskTier.MEDIUM), "{}", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop()))
             .success(),
         "the refusal is risk-driven, not grant-absence");
   }
@@ -1446,22 +1471,22 @@ final class OperationExecutorImplTest {
     java.nio.file.Path inside = java.nio.file.Files.createFile(root.resolve("notes.txt"));
     java.nio.file.Path secret = java.nio.file.Files.createFile(outside.resolve("id_rsa"));
     HandlerRegistry handlers = new HandlerRegistry();
-    handlers.register(INGEST, args -> OperationResult.success("ingested"));
+    handlers.register(INGEST, (args, engineContext) -> OperationResult.success("ingested"));
     var grants = new io.justsearch.app.services.intent.DurableGrantStore();
     grants.grantAllowAlways(
         INGEST.value(), io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
     var scope =
         new io.justsearch.app.services.intent.IndexedRootGrantScope(Set.of(INGEST));
-    scope.bindIndexedRoots(() -> List.of(root));
+    scope.bindIndexedRoots(engineContext -> List.of(root));
     OperationExecutorImpl executor = latticeExecutorWithGrants(handlers, grants, scope);
     Operation ingest = makeFamilyOp(INGEST, RiskTier.MEDIUM);
 
     assertTrue(
-        executor.dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty()).success(),
+        executor.dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())).success(),
         "an in-root ingest is inside the containment the grant was granted against");
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.dispatch(ingest, pathsArgs(secret), agentLoop(), Optional.empty()),
+        () -> executor.dispatch(ingest, pathsArgs(secret), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "an out-of-root ingest is outside it ⇒ the grant does not apply ⇒ a fresh confirm");
   }
 
@@ -1485,39 +1510,39 @@ final class OperationExecutorImplTest {
         ConfirmationRequiredException.class,
         () ->
             executorFor(grants, unbound)
-                .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty()),
+                .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "(a) roots supplier never bound ⇒ confirm");
 
     // (b) the lookup throws — e.g. the Worker is unavailable.
     var throwing = new io.justsearch.app.services.intent.IndexedRootGrantScope(Set.of(INGEST));
     throwing.bindIndexedRoots(
-        () -> {
+        engineContext -> {
           throw new IllegalStateException("Worker unavailable");
         });
     assertThrows(
         ConfirmationRequiredException.class,
         () ->
             executorFor(grants, throwing)
-                .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty()),
+                .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "(b) roots supplier throws ⇒ confirm");
 
     // (c) no roots configured — the "nothing is contained" reading, not the "everything is" one.
     var empty = new io.justsearch.app.services.intent.IndexedRootGrantScope(Set.of(INGEST));
-    empty.bindIndexedRoots(List::of);
+    empty.bindIndexedRoots(engineContext -> List.of());
     assertThrows(
         ConfirmationRequiredException.class,
         () ->
             executorFor(grants, empty)
-                .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty()),
+                .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "(c) empty roots ⇒ confirm");
 
     // Right-reason control: the SAME grant + args DO proceed once the roots are actually bound, so
     // the three throws above are the adverse precondition firing, not a broken fixture.
     var bound = new io.justsearch.app.services.intent.IndexedRootGrantScope(Set.of(INGEST));
-    bound.bindIndexedRoots(() -> List.of(root));
+    bound.bindIndexedRoots(engineContext -> List.of(root));
     assertTrue(
         executorFor(grants, bound)
-            .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty())
+            .dispatch(ingest, pathsArgs(inside), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop()))
             .success());
   }
 
@@ -1525,7 +1550,7 @@ final class OperationExecutorImplTest {
       io.justsearch.app.services.intent.DurableGrantStore grants,
       io.justsearch.app.services.intent.DurableGrantScope scope) {
     HandlerRegistry handlers = new HandlerRegistry();
-    handlers.register(INGEST, args -> OperationResult.success("ingested"));
+    handlers.register(INGEST, (args, engineContext) -> OperationResult.success("ingested"));
     return latticeExecutorWithGrants(handlers, grants, scope);
   }
 
@@ -1568,12 +1593,12 @@ final class OperationExecutorImplTest {
         id,
         new OperationHandler() {
           @Override
-          public OperationResult execute(String args) {
+          public OperationResult execute(String args, EngineContext engineContext) {
             return OperationResult.success("ran", "exec-1");
           }
 
           @Override
-          public OperationResult undo(String executionId) {
+          public OperationResult undo(String executionId, EngineContext engineContext) {
             reached[0] = true;
             return OperationResult.success("undone " + executionId);
           }
@@ -1597,17 +1622,19 @@ final class OperationExecutorImplTest {
     // BUTTON is the strongest source tier there is (TRUSTED); TRUSTED × HIGH is TYPED_CONFIRM, so
     // even a direct user gesture must carry a capsule.
     InvocationProvenance button =
-        InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     ConfirmationRequiredException forward =
         assertThrows(
             ConfirmationRequiredException.class,
-            () -> executor.dispatch(op, "{}", button, Optional.empty()),
+            () -> executor.dispatch(op, "{}", button, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(button)),
             "control: the forward form is gated");
     ConfirmationRequiredException reversal =
         assertThrows(
             ConfirmationRequiredException.class,
-            () -> executor.undo(op, "exec-1", button, Optional.empty()),
+            () -> executor.undo(op, "exec-1", button, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(button)),
             "the reversal inherits the forward form's risk class, so it meets the same gate");
 
     assertEquals(
@@ -1632,10 +1659,12 @@ final class OperationExecutorImplTest {
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, capsule);
     Operation op = makeUndoableOp(id, RiskTier.HIGH);
     InvocationProvenance button =
-        InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     String token = capsule.mint(id.value(), OperationDispatcher.undoArguments("exec-1"));
-    OperationResult result = executor.undo(op, "exec-1", button, Optional.of(token));
+    OperationResult result = executor.undo(op, "exec-1", button, Optional.of(token), io.justsearch.app.services.TestEngineContexts.forProvenance(button));
 
     assertTrue(result.success(), "a bound capsule authorizes the reversal: " + result.message());
     assertEquals("undone exec-1", result.message());
@@ -1657,13 +1686,15 @@ final class OperationExecutorImplTest {
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, capsule);
     Operation op = makeUndoableOp(id, RiskTier.HIGH);
     InvocationProvenance button =
-        InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now());
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
 
     String forwardToken = capsule.mint(id.value(), "{}");
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.undo(op, "exec-1", button, Optional.of(forwardToken)),
+        () -> executor.undo(op, "exec-1", button, Optional.of(forwardToken), io.justsearch.app.services.TestEngineContexts.forProvenance(button)),
         "the forward invocation's capsule is bound to the forward arguments, not the reversal's");
     assertFalse(undoReached[0], "and the handler's undo is not reached");
   }
@@ -1678,7 +1709,7 @@ final class OperationExecutorImplTest {
     OperationDispatcher executor = latticeExecutorWithCapsule(handlers, new ConsentCapsuleService());
 
     OperationResult result =
-        executor.undo(makeUndoableOp(id, RiskTier.LOW), "exec-1", agentLoop(), Optional.empty());
+        executor.undo(makeUndoableOp(id, RiskTier.LOW), "exec-1", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop()));
 
     assertTrue(result.success(), "LOW is AUTO for every source tier — no new refusal");
     assertTrue(undoReached[0]);
@@ -1708,11 +1739,11 @@ final class OperationExecutorImplTest {
 
     assertThrows(
         TrustGateDeniedException.class,
-        () -> executor.dispatch(op, "{}", agentLoop(), Optional.empty()),
+        () -> executor.dispatch(op, "{}", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "control: the forward form is denied");
     assertThrows(
         TrustGateDeniedException.class,
-        () -> executor.undo(op, "exec-1", agentLoop(), Optional.empty()),
+        () -> executor.undo(op, "exec-1", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "the emergency circuit-breaker is not a forward-only control");
     assertFalse(undoReached[0]);
 
@@ -1735,7 +1766,7 @@ final class OperationExecutorImplTest {
     var grants = new io.justsearch.app.services.intent.DurableGrantStore();
     grants.grantAllowAlways(INGEST.value(), io.justsearch.agent.api.registry.SourceTier.UNTRUSTED);
     var scope = new io.justsearch.app.services.intent.IndexedRootGrantScope(Set.of(INGEST));
-    scope.bindIndexedRoots(() -> List.of(root));
+    scope.bindIndexedRoots(engineContext -> List.of(root));
     OperationExecutorImpl executor = latticeExecutorWithGrants(handlers, grants, scope);
     // Same shape as makeFamilyOp, but undoable — the family + MEDIUM risk is what the grant covers.
     Operation governed =
@@ -1760,13 +1791,13 @@ final class OperationExecutorImplTest {
     // Control: the grant DOES cover the forward invocation whose paths are inside a root.
     assertTrue(
         executor
-            .dispatch(governed, pathsArgs(inside), agentLoop(), Optional.empty())
+            .dispatch(governed, pathsArgs(inside), agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop()))
             .success(),
         "control: the durable grant covers the in-root forward invocation");
 
     assertThrows(
         ConfirmationRequiredException.class,
-        () -> executor.undo(governed, "exec-1", agentLoop(), Optional.empty()),
+        () -> executor.undo(governed, "exec-1", agentLoop(), Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agentLoop())),
         "…but it cannot cover a reversal, whose arguments name no path to contain");
     assertFalse(undoReached[0]);
   }
@@ -1784,8 +1815,12 @@ final class OperationExecutorImplTest {
         executor.undo(
             makeHighOp(id),
             "exec-1",
-            InvocationProvenance.fromTransport(TransportTag.BUTTON, Optional.empty(), Instant.now()),
-            Optional.empty());
+            InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty()),
+            Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON),
+            ExecutorTag.UI, Instant.now(), Optional.empty())));
 
     assertFalse(result.success());
     assertTrue(

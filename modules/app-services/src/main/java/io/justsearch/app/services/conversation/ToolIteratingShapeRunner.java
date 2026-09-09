@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentProfile;
 import io.justsearch.agent.api.AgentRequest;
@@ -93,7 +95,11 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
   }
 
   @Override
-  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink) {
+  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext incomingContext) {
+    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
+        incomingContext.clientKind(), incomingContext.clientId(), incomingContext.sessionId(),
+        incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
+        incomingContext.survival(), incomingContext.urgency());
     AgentService agent = agentServiceSupplier.get();
     if (agent == null || !agent.isAvailable()) {
       sink.accept(
@@ -129,6 +135,7 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
     // (e.g., navigate.url_*) are interposed between the final chunk and the done event
     // so a FE consumer sees them in lexical order with the response text they describe.
     final StringBuilder assistantText = new StringBuilder();
+    var runContext = new java.util.concurrent.atomic.AtomicReference<>(engineContext);
     // Tempdoc 550 F6: resolve the tool index once, then project each proposed batch through the
     // shared ProposedBatchProjection (same as the /api/agent path) with the shared evaluator.
     final Map<String, io.justsearch.agent.api.registry.Operation> opsByToolName =
@@ -136,15 +143,21 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
     agent.runAgent(
         request,
         event -> {
+          if (event instanceof AgentEvent.SessionStarted started) {
+            runContext.set(new EngineContext(engineContext.clientKind(), engineContext.clientId(),
+                java.util.Optional.of(started.sessionId()), engineContext.grantReference(),
+                engineContext.sourceTier(), engineContext.transport(),
+                engineContext.survival(), engineContext.urgency()));
+          }
           if (event instanceof AgentEvent.TextChunk chunk) {
             assistantText.append(chunk.text());
           }
           if (event instanceof AgentEvent.AgentDone) {
-            applyStreamConsumers(assistantText.toString(), audience, sink);
+            applyStreamConsumers(assistantText.toString(), audience, sink, runContext.get());
           }
           sink.accept(
               AgentEventSseTranslator.translate(event, intentGateEvaluator, opsByToolName));
-        });
+        }, engineContext);
   }
 
   /**
@@ -155,12 +168,12 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
    * fires.
    */
   private void applyStreamConsumers(
-      String fullText, Audience audience, Consumer<SseEvent> sink) {
+      String fullText, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext) {
     List<String> ids = AgentRunShape.definition().streamConsumerIds();
     if (ids.isEmpty() || fullText.isEmpty()) {
       return;
     }
-    ConversationContext ctx = simpleContext(audience);
+    ConversationContext ctx = simpleContext(audience, engineContext);
     for (String id : ids) {
       StreamConsumer consumer = streamConsumers.findById(id).orElse(null);
       if (consumer == null) {
@@ -192,8 +205,9 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
    * extraction only needs the assistant's full text + audience for the trust-lattice gate
    * inside {@code URLExtractor#onDone}.
    */
-  private static ConversationContext simpleContext(Audience audience) {
+  private static ConversationContext simpleContext(Audience audience, EngineContext engineContext) {
     return new ConversationContext() {
+      @Override public EngineContext engineContext() { return engineContext; }
       @Override
       public List<Map<String, Object>> messages() {
         return Collections.emptyList();

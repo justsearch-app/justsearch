@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.agent.api.memory.MemoryRecord;
 import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.core.context.EngineContext;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -26,7 +28,7 @@ final class RememberFactHandlerTest {
     var store = new FakeStore();
     OperationResult r =
         new RememberFactHandler(store)
-            .execute("{\"content\":\"the user is named Sam\",\"kind\":\"fact\"}");
+            .execute("{\"content\":\"the user is named Sam\",\"kind\":\"fact\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success());
     assertEquals(1, store.records.size());
     assertEquals("the user is named Sam", store.records.get(0).content());
@@ -38,9 +40,21 @@ final class RememberFactHandlerTest {
   @DisplayName("captures the conversation provenance via the context-aware overload")
   void capturesConversationId() {
     var store = new FakeStore();
+    EngineContext engineContext =
+        io.justsearch.app.services.intent.EngineProvenance.context(
+            EngineContext.ClientKind.INTERNAL,
+            "test-agent",
+            Optional.of("conv-9"),
+            Optional.empty(),
+            io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
+            EngineContext.Survival.INTERACTIVE,
+            EngineContext.Urgency.FOREGROUND);
     InvocationProvenance provenance =
-        InvocationProvenance.agentLoop(Instant.now(), Optional.of("conv-9"));
-    new RememberFactHandler(store).execute("{\"content\":\"prefers SI units\"}", provenance);
+        InvocationProvenance.fromEngineContext(
+            engineContext, ExecutorTag.AGENT, Instant.now(), Optional.empty());
+    new RememberFactHandler(store)
+        .execute(
+            "{\"content\":\"prefers SI units\"}", provenance, engineContext);
     assertEquals("conv-9", store.records.get(0).sourceConversationId());
     assertEquals("fact", store.records.get(0).kind()); // kind defaults to "fact"
   }
@@ -49,7 +63,7 @@ final class RememberFactHandlerTest {
   @DisplayName("empty content → failure, nothing persisted")
   void rejectsEmptyContent() {
     var store = new FakeStore();
-    OperationResult r = new RememberFactHandler(store).execute("{\"content\":\"  \"}");
+    OperationResult r = new RememberFactHandler(store).execute("{\"content\":\"  \"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(store.records.isEmpty());
   }

@@ -80,7 +80,7 @@ final class RemoteDocumentServiceContextBudgetTest {
 
     var result =
         service
-            .retrieveContextWithMeta("what is this?", docIds, 5)
+            .retrieveContextWithMeta("what is this?", docIds, 5, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             // Generous timeout; test validates correctness (200K cap), not latency.
             .get(6, TimeUnit.SECONDS);

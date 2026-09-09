@@ -5,10 +5,12 @@ plugins {
 }
 
 dependencies {
+  // Lane F C1: explicit EngineContext travels with operation and conversation invocations.
+  api(project(":modules:core"))
   // Annotation-only dep: Jackson annotations are wire-contract metadata
   // (per tempdoc 429 §E.5). The new registry substrate (Operation/Resource/Prompt
   // sealed types) requires @JsonTypeInfo/@JsonSubTypes for victools to honor
-  // sealed permits. No databind, no core — pure annotation jar.
+  // sealed permits. No databind; wire annotations remain metadata.
   api(libs.jackson.annotations)
   // Tempdoc 560 §4.3 — the ONE transactional composer + four shared substrates, reused by both the
   // Head (here) and the Worker (worker-services). Pure JDK module; keeps app-agent-api annotation-light.

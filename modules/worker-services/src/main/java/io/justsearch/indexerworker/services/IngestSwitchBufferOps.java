@@ -38,7 +38,6 @@ final class IngestSwitchBufferOps {
   static final String SWITCHBUF_OP_UPSERT = "UPSERT";
   static final String SWITCHBUF_OP_DELETE = "DELETE";
   static final String SWITCHBUF_OP_DELETE_PREFIX = "DELETE_PREFIX";
-  static final String SWITCHBUF_OP_SYNC_ROOT = "SYNC_ROOT";
   static final String SWITCHBUF_OP_PRUNE_PREFIX = "PRUNE_PREFIX";
   static final String SWITCHBUF_OP_VDU_UPDATE = "VDU_UPDATE";
   static final String SWITCHBUF_OP_VDU_MARK_FAILED = "VDU_MARK_FAILED";
@@ -131,12 +130,15 @@ final class IngestSwitchBufferOps {
   // ==================== Per-endpoint buffer methods ====================
 
   BatchResponse bufferSubmitBatchDuringSwitching(
-      SwitchBufferCapableQueue sbq, List<Path> validPaths, int totalFiles, int rejected) {
+      SwitchBufferCapableQueue sbq, List<Path> validPaths, int totalFiles, int rejected,
+      String collection, JobQueue.EnqueueProvenance provenance) {
     int accepted = 0;
     for (Path p : validPaths) {
       String normalized = PathNormalizer.normalizeKey(p);
       putSwitchBufferOrThrow(
-          sbq, switchBufferPathKey(normalized), SWITCHBUF_OP_UPSERT, normalized, "submitBatch");
+          sbq, switchBufferPathKey(normalized), SWITCHBUF_OP_UPSERT,
+          new io.justsearch.indexerworker.queue.SwitchBufferUpsert(normalized, collection, provenance)
+              .encode(), "submitBatch");
       accepted++;
     }
     metrics.recordBatchSubmitted(accepted);
@@ -163,15 +165,13 @@ final class IngestSwitchBufferOps {
   }
 
   SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(
-      SwitchBufferCapableQueue sbq, String rootPath, boolean force) throws Exception {
+      SwitchBufferCapableQueue sbq, String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance) throws Exception {
     String resolvedRoot = resolveNormalizedPathPrefix(rootPath);
-    String payload = syncDirectorySwitchBufferPayload(resolvedRoot, force);
-    putSwitchBufferOrThrow(
-        sbq,
-        switchBufferSyncRootKey(resolvedRoot),
-        SWITCHBUF_OP_SYNC_ROOT,
-        payload,
-        "syncDirectory");
+    if (!sbq.putSyncRoot(switchBufferSyncRootKey(resolvedRoot),
+        new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(resolvedRoot, force, provenance))) {
+      throw switchBufferUnavailable();
+    }
     return deferredSyncDirectoryResponse();
   }
 

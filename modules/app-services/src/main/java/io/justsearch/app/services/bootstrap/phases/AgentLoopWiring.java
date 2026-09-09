@@ -51,7 +51,7 @@ public final class AgentLoopWiring {
       OperationDispatcher operationExecutor,
       Function<String, String> operationMessageResolver,
       FileOperationLog fileOperationLog,
-      Supplier<List<String>> agentRootPaths,
+      Function<io.justsearch.core.context.EngineContext, List<String>> agentRootPaths,
       AgentRunStore agentRunStore,
       Telemetry telemetry,
       HeadHealthEventsEmitter headHealthEventsEmitter,

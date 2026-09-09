@@ -48,7 +48,7 @@ import tools.jackson.databind.json.JsonMapper;
  * and audited via the one action-event log.
  *
  * <p><b>Risk ceiling (tempdoc 875 C.2).</b> Neither scope can cover a {@link RiskTier#HIGH} operation —
- * see {@link #isAllowed(String, Optional, RiskTier, SourceTier)}.
+ * see {@link #isAllowed(String, Optional, RiskTier, EngineContext)}.
  *
  * <p><b>Persistence (560 §28).</b> Grants are persisted to {@code $JUSTSEARCH_HOME/ui/durable-grants.json}
  * so an allow-always survives a restart (previously process-lifetime only — a restart silently dropped
@@ -156,8 +156,9 @@ public final class DurableGrantStore {
   // ── Gate query ────────────────────────────────────────────────────────────────────────────────────
 
   /** True if an operation grant covers {@code operationId} at {@code risk} from {@code sourceTier}. */
-  public boolean isAllowed(String operationId, RiskTier risk, SourceTier sourceTier) {
-    return isAllowed(operationId, Optional.empty(), risk, sourceTier);
+  public boolean isAllowed(String operationId, RiskTier risk,
+      io.justsearch.core.context.EngineContext engineContext) {
+    return isAllowed(operationId, Optional.empty(), risk, engineContext);
   }
 
   /**
@@ -182,7 +183,9 @@ public final class DurableGrantStore {
    * because the product wanted blanket destructive approval.
    */
   public boolean isAllowed(
-      String operationId, Optional<String> capabilityFamily, RiskTier risk, SourceTier sourceTier) {
+      String operationId, Optional<String> capabilityFamily, RiskTier risk,
+      io.justsearch.core.context.EngineContext engineContext) {
+    SourceTier sourceTier = EngineProvenance.sourceTier(engineContext);
     Objects.requireNonNull(risk, "risk");
     if (risk == RiskTier.HIGH) {
       return false;

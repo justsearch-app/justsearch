@@ -155,6 +155,16 @@ Representative leaf modules that other modules depend on:
 
 ## Engine boundary
 
+Every `SearchPort`, `IndexingService` and `DocumentService` call carries a required
+`EngineContext` from `core`. It records caller identity, optional session/grant references,
+registered source tier and transport, and independent survival/urgency axes. Explicit parameters
+preserve this value through asynchronous service callbacks; the shared KnowledgeClient is never
+cloned into a caller-specific view. HTTP resolves one request attribute after security checks;
+internal producers choose their own axes. Cooperative client labels do not grant authority.
+The application source catalog validates transport/tier, and `EngineProvenance` projects dispatch
+provenance using the current executor and timestamp. Pending approvals retain both records so
+server-side completion does not replace the original caller with the approving browser.
+
 The Head and Body are one **Engine** JVM ([ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)). They meet at
 catalogued in-process **ports** — plain Java interfaces in contract modules — bound by the single
 composition root `EngineRoot` (`modules/app-engine`). The catalogue is

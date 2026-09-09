@@ -43,6 +43,7 @@ import io.justsearch.agent.api.registry.SurfaceRef;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.stream.SseEnvelope;
 import io.justsearch.app.api.stream.SseFrameKind;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.observability.intent.IntentEnvelopeChangeRegistry;
 import io.justsearch.app.observability.intent.IntentEnvelopeEvent;
 import io.justsearch.app.observability.navigation.NavigationHistoryEntry;
@@ -66,8 +67,14 @@ import org.junit.jupiter.api.Test;
  */
 final class BackendIntentRouterImplTest {
 
+  private static final EngineContext UI_CONTEXT =
+      io.justsearch.app.services.TestEngineContexts.ui();
   private static final InvocationProvenance UI_PROV =
-      InvocationProvenance.uiButton(Instant.parse("2026-05-13T10:00:00.000Z"));
+      InvocationProvenance.fromEngineContext(
+          UI_CONTEXT,
+          ExecutorTag.UI,
+          Instant.parse("2026-05-13T10:00:00.000Z"),
+          Optional.empty());
 
   private static Operation makeOp(String id) {
     return new Operation(
@@ -117,13 +124,18 @@ final class BackendIntentRouterImplTest {
             Optional.empty());
 
     @Override
-    public OperationResult dispatch(Operation op, String argumentsJson) {
+    public OperationResult dispatch(
+        Operation op, String argumentsJson, EngineContext engineContext) {
       throw new UnsupportedOperationException("Use provenance overload");
     }
 
     @Override
     public OperationResult dispatch(
-        Operation op, String argumentsJson, InvocationProvenance provenance) {
+        Operation op,
+        String argumentsJson,
+        InvocationProvenance provenance,
+        Optional<String> confirmationToken,
+        EngineContext engineContext) {
       this.lastOp = op;
       this.lastArgs = argumentsJson;
       this.lastProvenance = provenance;
@@ -131,7 +143,18 @@ final class BackendIntentRouterImplTest {
     }
 
     @Override
-    public OperationResult undo(Operation op, String executionId) {
+    public OperationResult undo(
+        Operation op, String executionId, EngineContext engineContext) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public OperationResult undo(
+        Operation op,
+        String executionId,
+        InvocationProvenance provenance,
+        Optional<String> confirmationToken,
+        EngineContext engineContext) {
       throw new UnsupportedOperationException();
     }
   }
@@ -150,7 +173,7 @@ final class BackendIntentRouterImplTest {
             ShellAddress.Invocation.of(new OperationRef("core.ping-backend"), "{}"),
             TransportTag.AGENT_LOOP);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     var dispatched = assertInstanceOf(IntentDispatchResult.Dispatched.class, result);
     assertTrue(dispatched.result().success(), "underlying dispatcher result is propagated");
@@ -173,7 +196,7 @@ final class BackendIntentRouterImplTest {
             ShellAddress.Invocation.of(new OperationRef("core.does-not-exist"), "{}"),
             TransportTag.AGENT_LOOP);
 
-    assertThrows(IllegalArgumentException.class, () -> router.dispatch(intent, UI_PROV));
+    assertThrows(IllegalArgumentException.class, () -> router.dispatch(intent, UI_PROV, UI_CONTEXT));
   }
 
   @Test
@@ -199,7 +222,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), new StateSnapshot(state)),
             TransportTag.LLM_EMISSION);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     var forwarded = assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     assertEquals("ie-test-nav-001", forwarded.envelopeId());
@@ -245,7 +268,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.LLM_EMISSION);
 
-    router.dispatch(intent, UI_PROV);
+    router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     List<NavigationHistoryEntry> recorded = navHistory.recent();
     assertEquals(1, recorded.size(), "one navigation entry recorded");
@@ -283,7 +306,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.LLM_EMISSION);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
   }
 
@@ -305,7 +328,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.LLM_EMISSION);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     var payload = assertInstanceOf(IntentEnvelopeEvent.class, captured.get().payload());
@@ -370,7 +393,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(
                 new SurfaceRef("core.danger-surface"), StateSnapshot.empty()),
             TransportTag.URL_BAR);
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     assertNotNull(
@@ -391,7 +414,7 @@ final class BackendIntentRouterImplTest {
         new Intent(
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.URL_BAR);
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     assertNotNull(

@@ -12,6 +12,7 @@ import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.Interface;
+import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.OperationDispatcher;
@@ -25,16 +26,20 @@ import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.agent.AgentLoopService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.OnlineAiService.StreamCallbacks;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.core.context.EngineContext;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -71,6 +76,15 @@ class AgentBatteryTest {
   private static OperationCatalog operationCatalog;
   private static OperationDispatcher operationExecutor;
   private static AgentToolEmitter agentToolEmitter;
+  private static final EngineContext BATTERY_ENGINE_CONTEXT =
+      EngineProvenance.context(
+          EngineContext.ClientKind.INTERNAL,
+          "agent-test-client",
+          Optional.of("agent-test-session"),
+          Optional.empty(),
+          TransportTag.AGENT_LOOP,
+          EngineContext.Survival.INTERACTIVE,
+          EngineContext.Urgency.FOREGROUND);
 
   // Result tracking for aggregate metrics
   private static final List<TestCaseResult> testResults =
@@ -101,7 +115,8 @@ class AgentBatteryTest {
     for (StubOperation s : stubs) {
       final StubOperation captured = s;
       handlers.register(
-          new OperationRef("core." + s.wireName.replace('_', '-')), args -> captured.execute(args));
+          new OperationRef("core." + s.wireName.replace('_', '-')),
+          (args, engineContext) -> captured.execute(args));
     }
     // Test-local OperationDispatcher impl per tempdoc 429 §C decision A — system-tests
     // cannot import the production OperationExecutorImpl from app-services. CORE-tier
@@ -109,20 +124,48 @@ class AgentBatteryTest {
     operationExecutor =
         new OperationDispatcher() {
           @Override
-          public OperationResult dispatch(Operation op, String argumentsJson) {
+          public OperationResult dispatch(
+              Operation op, String argumentsJson, EngineContext engineContext) {
             OperationHandler handler =
                 handlers.resolve(new OperationRef(op.binding().handlerId())).orElseThrow();
-            return handler.execute(argumentsJson);
+            return handler.execute(argumentsJson, engineContext);
           }
 
           @Override
-          public OperationResult undo(Operation op, String executionId) {
+          public OperationResult dispatch(
+              Operation op,
+              String argumentsJson,
+              InvocationProvenance provenance,
+              Optional<String> confirmationToken,
+              EngineContext engineContext) {
+            OperationHandler handler =
+                handlers.resolve(new OperationRef(op.binding().handlerId())).orElseThrow();
+            return handler.execute(argumentsJson, provenance, engineContext);
+          }
+
+          @Override
+          public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
             if (!op.policy().undoSupported()) {
               return OperationResult.failure("Undo not supported by " + op.id().value());
             }
             OperationHandler handler =
                 handlers.resolve(new OperationRef(op.binding().handlerId())).orElseThrow();
-            return handler.undo(executionId);
+            return handler.undo(executionId, engineContext);
+          }
+
+          @Override
+          public OperationResult undo(
+              Operation op,
+              String executionId,
+              InvocationProvenance provenance,
+              Optional<String> confirmationToken,
+              EngineContext engineContext) {
+            if (!op.policy().undoSupported()) {
+              return OperationResult.failure("Undo not supported by " + op.id().value());
+            }
+            OperationHandler handler =
+                handlers.resolve(new OperationRef(op.binding().handlerId())).orElseThrow();
+            return handler.undo(executionId, engineContext);
           }
         };
     agentToolEmitter = new InlineAgentToolEmitter();
@@ -187,7 +230,7 @@ class AgentBatteryTest {
             operationExecutor,
             agentToolEmitter,
             null,
-            () -> List.of(testCorpusRoot.toString()));
+            engineContext -> List.of(testCorpusRoot.toString()));
 
     log.info("Agent Battery setup complete: {} test cases loaded", testCases.size());
   }
@@ -416,7 +459,7 @@ class AgentBatteryTest {
             testCase.maxIterations());
 
     List<AgentEvent> events = new CopyOnWriteArrayList<>();
-    agentService.runAgent(request, events::add);
+    agentService.runAgent(request, events::add, BATTERY_ENGINE_CONTEXT);
 
     long durationMs = System.currentTimeMillis() - startTime;
 
@@ -681,8 +724,8 @@ class AgentBatteryTest {
           new Presentation(
               new I18nKey("test." + wireName + ".label"),
               new I18nKey("test." + wireName + ".description"),
-              java.util.Optional.empty(),
-              java.util.Optional.empty()),
+              Optional.empty(),
+              Optional.empty()),
           Interface.of("{\"type\":\"object\",\"properties\":{}}", "{\"type\":\"object\"}"),
           new OperationPolicy(
               risk,
@@ -831,9 +874,9 @@ class AgentBatteryTest {
     }
 
     @Override
-    public java.util.Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
+    public Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
       // Best-effort simulation: 10 tokens per message
-      return java.util.Optional.of(messages.size() * 10);
+      return Optional.of(messages.size() * 10);
     }
 
     @Override

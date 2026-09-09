@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
+
 /**
  * Backend half of the dual-{@code IntentRouter} topology (tempdoc 487 §4.3).
  *
@@ -8,7 +10,7 @@ package io.justsearch.agent.api.registry;
  * backend-side (LLM emission from a chat shape's {@code StreamConsumer},
  * agent-loop tool calls, future MCP requests, future scheduled triggers).
  * Dispatches {@link ShellAddress.Invocation} envelopes via
- * {@link OperationDispatcher#dispatch(Operation, String, InvocationProvenance)};
+ * {@link OperationDispatcher#dispatch(Operation, String, InvocationProvenance, EngineContext)};
  * emits {@link ShellAddress.Navigation} envelopes onto the always-on
  * {@code /api/intent/stream} SSE channel for the FE
  * {@code IntentRouter} to consume.
@@ -31,7 +33,7 @@ public interface BackendIntentRouter {
    *
    * <p>For {@link ShellAddress.Invocation}, the implementation looks up the
    * Operation in the {@link OperationCatalog}, then calls
-   * {@link OperationDispatcher#dispatch(Operation, String, InvocationProvenance)}
+   * {@link OperationDispatcher#dispatch(Operation, String, InvocationProvenance, EngineContext)}
    * and wraps the resulting {@link OperationResult} in
    * {@link IntentDispatchResult.Dispatched}. The lattice runs inside the
    * dispatcher.
@@ -49,5 +51,5 @@ public interface BackendIntentRouter {
    *     (for Navigation)
    * @return the dispatch outcome (sealed over Dispatched | Forwarded)
    */
-  IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance);
+  IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance, EngineContext engineContext);
 }

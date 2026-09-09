@@ -29,7 +29,7 @@ final class HierarchicalShapeRunnerTest {
   void noDocId() {
     var runner = new HierarchicalShapeRunner(() -> new StubAi(List.of()), () -> new StubDocs(Map.of()));
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of(), Audience.USER, events::add);
+    runner.run(Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err = events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
     assertEquals("NO_DOC_ID", err.payload().get("errorCode"));
@@ -43,7 +43,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // progress: loading, standard, then chunk + done.
     assertTrue(
@@ -73,7 +73,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Must emit splitting + sections + at least one summarizing + synthesis phases.
     assertTrue(events.stream().anyMatch(
@@ -99,7 +99,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -114,7 +114,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -129,7 +129,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -146,7 +146,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done =
         events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
@@ -166,7 +166,7 @@ final class HierarchicalShapeRunnerTest {
     runner.run(
         Map.of("docId", "missing-doc", "content", "inline fallback content"),
         Audience.USER,
-        events::add);
+        events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // docId is set so missing-doc routes through fetch first → returns null → falls back to
     // inline content → goes through small-doc single-pass.
@@ -186,7 +186,7 @@ final class HierarchicalShapeRunnerTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(docs.get(docId));
     }
   }

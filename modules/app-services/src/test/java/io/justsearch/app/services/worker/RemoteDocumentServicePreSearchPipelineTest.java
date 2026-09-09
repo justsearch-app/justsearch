@@ -86,7 +86,7 @@ final class RemoteDocumentServicePreSearchPipelineTest {
     RemoteDocumentService service = new RemoteDocumentService(() -> client);
 
     RetrieveContextParams params = RetrieveContextParams.of("what is the policy?", 5, 4096);
-    service.retrieveContext(params).toCompletableFuture().get(6, TimeUnit.SECONDS);
+    service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
 
     SearchRequest sent = capturedSearchRequest.get();
     assertTrue(sent != null, "Pre-search must have issued a search() RPC");
@@ -109,7 +109,7 @@ final class RemoteDocumentServicePreSearchPipelineTest {
     RemoteDocumentService service = new RemoteDocumentService(() -> client);
 
     RetrieveContextParams params = RetrieveContextParams.of("what is the policy?", 5, 4096);
-    service.retrieveContext(params).toCompletableFuture().get(6, TimeUnit.SECONDS);
+    service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
 
     RetrieveContextRequest forwarded = capturedRetrieveContextRequest.get();
     assertTrue(forwarded != null, "Discovered doc IDs must be forwarded to retrieveContext()");

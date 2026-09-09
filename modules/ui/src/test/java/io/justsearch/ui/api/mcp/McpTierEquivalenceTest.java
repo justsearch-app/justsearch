@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -221,7 +223,7 @@ final class McpTierEquivalenceTest {
             37L, 37L, 15L, hits, null, facets, Boolean.TRUE, null, null, null, null, null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -231,7 +233,7 @@ final class McpTierEquivalenceTest {
             () -> ctrl,
             () -> null,
             FIXED_CLOCK);
-    Map<String, Object> result = surface.callTool("justsearch_search", Map.of("query", "widget"), "s1");
+    Map<String, Object> result = surface.callTool("justsearch_search", Map.of("query", "widget"), "s1", TestRequestContexts.mcp("s1"));
 
     String text = textOf(result);
     Map<String, Object> structured = structuredOf(result);
@@ -291,7 +293,7 @@ final class McpTierEquivalenceTest {
             null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -301,7 +303,7 @@ final class McpTierEquivalenceTest {
             () -> ctrl,
             () -> null,
             FIXED_CLOCK);
-    Map<String, Object> result = surface.callTool("justsearch_search", Map.of("query", "widget"), "s1");
+    Map<String, Object> result = surface.callTool("justsearch_search", Map.of("query", "widget"), "s1", TestRequestContexts.mcp("s1"));
 
     String text = textOf(result);
     Map<String, Object> structured = structuredOf(result);
@@ -339,7 +341,7 @@ final class McpTierEquivalenceTest {
             new QualitySignals(0.9f, 0.1f, 0.5f, 5, 3));
 
     DocumentService documents = mock(DocumentService.class);
-    when(documents.retrieveContext(any())).thenReturn(CompletableFuture.completedFuture(result));
+    when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(result));
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
@@ -358,7 +360,7 @@ final class McpTierEquivalenceTest {
             () -> facade,
             FIXED_CLOCK);
     Map<String, Object> callResult =
-        surface.callTool("justsearch_answer", Map.of("query", "widget torque"), "s1");
+        surface.callTool("justsearch_answer", Map.of("query", "widget torque"), "s1", TestRequestContexts.mcp("s1"));
 
     String text = textOf(callResult);
     Map<String, Object> structured = structuredOf(callResult);
@@ -377,7 +379,7 @@ final class McpTierEquivalenceTest {
     // Tempdoc 770 §F.5: the answer path fires NO second search — the facet sidecar (a full hybrid
     // search at limit 0, per call, for a 3-field block rendered into the undelivered text tier) is
     // gone, and with it the `facets` fact on both tiers.
-    verify(facetAdapter, never()).search(any());
+    verify(facetAdapter, never()).search(any(), any(EngineContext.class));
     assertFalse(text.contains("--- Top sources & entities ---"), text);
     assertFalse(structured.containsKey("facets"), structured.toString());
     // HINTS (flattened list carries the comparative hint at minimum)
@@ -397,7 +399,7 @@ final class McpTierEquivalenceTest {
             "", 0, 0, 0, List.of(), "HYBRID", "NO_CHUNKS_FOUND", false, List.of());
 
     DocumentService documents = mock(DocumentService.class);
-    when(documents.retrieveContext(any())).thenReturn(CompletableFuture.completedFuture(zeroResult));
+    when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(zeroResult));
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
@@ -408,7 +410,7 @@ final class McpTierEquivalenceTest {
             "READY", true, 0, 10, 10, 0, "", "", 0, 0, 0, 0, 0, 0, 0, false, "", 0, true, "READY",
             Map.of("embeddingCoveragePercent", 50.0, "spladeCoveragePercent", 100.0));
     KnowledgeHttpApiAdapter facetAdapter = mock(KnowledgeHttpApiAdapter.class);
-    when(facetAdapter.status()).thenReturn(lowCoverageStatus);
+    when(facetAdapter.status(any(EngineContext.class))).thenReturn(lowCoverageStatus);
     KnowledgeSearchController facetCtrl = mock(KnowledgeSearchController.class);
     when(facetCtrl.getAdapter()).thenReturn(facetAdapter);
 
@@ -420,7 +422,7 @@ final class McpTierEquivalenceTest {
             () -> facade,
             FIXED_CLOCK);
     Map<String, Object> callResult =
-        surface.callTool("justsearch_answer", Map.of("query", "no matches here"), "s1");
+        surface.callTool("justsearch_answer", Map.of("query", "no matches here"), "s1", TestRequestContexts.mcp("s1"));
 
     String text = textOf(callResult);
     Map<String, Object> structured = structuredOf(callResult);

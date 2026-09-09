@@ -51,11 +51,11 @@ class VduBatchProcessorAbstentionTest {
 
     KnowledgeClient client = mock(KnowledgeClient.class);
     Path file = writeFile("doc.png");
-    when(client.countPendingVdu()).thenReturn(1);
-    when(client.queryPendingVduDocIds()).thenReturn(List.of(file.toString()));
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
+    when(client.countPendingVdu(any())).thenReturn(1);
+    when(client.queryPendingVduDocIds(any())).thenReturn(List.of(file.toString()));
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
     when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), anyString(), anyInt()))
+            anyString(), any(), any(VduUpdateOutcome.class), anyString(), anyInt(), any()))
         .thenReturn(true);
 
     VduBatchProcessor batchProcessor =
@@ -75,7 +75,7 @@ class VduBatchProcessorAbstentionTest {
             contentCaptor.capture(),
             eq(VduUpdateOutcome.VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT),
             enrichmentCaptor.capture(),
-            eq(2));
+            eq(2), any());
 
     assertNull(contentCaptor.getValue(), "the suspect/absent text must be omitted from the wire");
     String enrichment = enrichmentCaptor.getValue();
@@ -100,11 +100,11 @@ class VduBatchProcessorAbstentionTest {
 
     KnowledgeClient client = mock(KnowledgeClient.class);
     Path file = writeFile("doc3.png");
-    when(client.countPendingVdu()).thenReturn(1);
-    when(client.queryPendingVduDocIds()).thenReturn(List.of(file.toString()));
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
+    when(client.countPendingVdu(any())).thenReturn(1);
+    when(client.queryPendingVduDocIds(any())).thenReturn(List.of(file.toString()));
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
     when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), anyString(), anyInt()))
+            anyString(), any(), any(VduUpdateOutcome.class), anyString(), anyInt(), any()))
         .thenReturn(true);
 
     VduBatchProcessor batchProcessor =
@@ -122,7 +122,7 @@ class VduBatchProcessorAbstentionTest {
             contentCaptor.capture(),
             eq(VduUpdateOutcome.VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT),
             enrichmentCaptor.capture(),
-            eq(3));
+            eq(3), any());
 
     assertNull(contentCaptor.getValue(), "the suspect text must be omitted from the wire");
     String enrichment = enrichmentCaptor.getValue();
@@ -146,11 +146,11 @@ class VduBatchProcessorAbstentionTest {
 
     KnowledgeClient client = mock(KnowledgeClient.class);
     Path file = writeFile("doc2.png");
-    when(client.countPendingVdu()).thenReturn(1);
-    when(client.queryPendingVduDocIds()).thenReturn(List.of(file.toString()));
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
+    when(client.countPendingVdu(any())).thenReturn(1);
+    when(client.queryPendingVduDocIds(any())).thenReturn(List.of(file.toString()));
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
     when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), anyString(), anyInt()))
+            anyString(), any(), any(VduUpdateOutcome.class), anyString(), anyInt(), any()))
         .thenReturn(true);
 
     VduBatchProcessor batchProcessor =
@@ -167,7 +167,7 @@ class VduBatchProcessorAbstentionTest {
             eq("genuinely extracted text"),
             eq(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT),
             eq("{\"summary\":\"ok\"}"),
-            eq(1));
+            eq(1), any());
   }
 
   private Path writeFile(String name) throws Exception {

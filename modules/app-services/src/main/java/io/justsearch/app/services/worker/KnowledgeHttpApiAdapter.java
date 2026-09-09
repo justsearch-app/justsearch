@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.gpl.RerankerService;
 import io.justsearch.app.api.knowledge.FolderBrowseRequest;
@@ -69,12 +71,12 @@ public final class KnowledgeHttpApiAdapter {
 
   // ========== Search + status (delegated to KnowledgeSearchEngine) ==========
 
-  public KnowledgeSearchResponse search(KnowledgeSearchRequest req) {
-    return searchEngine.search(req);
+  public KnowledgeSearchResponse search(KnowledgeSearchRequest req, EngineContext engineContext) {
+    return searchEngine.search(req, engineContext);
   }
 
-  public KnowledgeStatus status() {
-    return searchEngine.status();
+  public KnowledgeStatus status(EngineContext engineContext) {
+    return searchEngine.status(engineContext);
   }
 
   /** Returns the current facet snapshot for filter normalization (366 Phase 6). */
@@ -115,8 +117,8 @@ public final class KnowledgeHttpApiAdapter {
 
   // ========== Ingest / scan / browse / suggest (direct Worker client pass-throughs) ==========
 
-  public KnowledgeIngestResponse ingest(List<Path> files) {
-    return ingest(files, null);
+  public KnowledgeIngestResponse ingest(List<Path> files, EngineContext engineContext) {
+    return ingest(files, null, engineContext);
   }
 
   /**
@@ -125,9 +127,9 @@ public final class KnowledgeHttpApiAdapter {
    * to {@code JobQueue.enqueue} and from there to {@code IndexingDocumentOps}'s {@code collection}
    * field write. A {@code null}/blank collection preserves the pre-811 untagged behaviour.
    */
-  public KnowledgeIngestResponse ingest(List<Path> files, String collection) {
+  public KnowledgeIngestResponse ingest(List<Path> files, String collection, EngineContext engineContext) {
     KnowledgeClient client = knowledgeServer.client();
-    BatchResponse r = client.submitBatch(files, false, collection);
+    BatchResponse r = client.submitBatch(files, false, collection, engineContext);
     return new KnowledgeIngestResponse(r.getAcceptedCount(), r.getErrorMessage());
   }
 
@@ -139,7 +141,7 @@ public final class KnowledgeHttpApiAdapter {
    * cleanly (empty otherwise).
    */
   public KnowledgeIngestResponse scanRoot(
-      String rootPath, String collection, List<String> excludeGlobs) {
+      String rootPath, String collection, List<String> excludeGlobs, EngineContext engineContext) {
     KnowledgeClient client = knowledgeServer.client();
     // Tempdoc 419 / T4: hold the worker-allocated scanId from the first event so the SSE endpoint at
     // GET /api/scans/{scanId}/progress can subscribe via the registry. The registry handles late
@@ -174,7 +176,7 @@ public final class KnowledgeHttpApiAdapter {
               io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL,
               excludeGlobs == null ? List.of() : excludeGlobs,
               cancelToken,
-              progressConsumer);
+              progressConsumer, engineContext);
     } catch (RuntimeException e) {
       // Synthesize a terminal so SSE subscribers always see a clean signal even on RPC failure.
       if (registry != null && scanIdHolder[0] != null) {
@@ -219,16 +221,16 @@ public final class KnowledgeHttpApiAdapter {
         proto.getTerminalReasonCode());
   }
 
-  public List<String> suggest(String query, int limit) {
+  public List<String> suggest(String query, int limit, EngineContext engineContext) {
     KnowledgeClient client = knowledgeServer.client();
-    return client.suggest(query, limit).getSuggestionsList();
+    return client.suggest(query, limit, engineContext).getSuggestionsList();
   }
 
-  public FolderBrowseResponse listFolders(FolderBrowseRequest req) {
+  public FolderBrowseResponse listFolders(FolderBrowseRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
     KnowledgeClient client = knowledgeServer.client();
     int maxFolders = req.maxFolders() == null ? 0 : req.maxFolders();
-    ListFoldersResponse proto = client.listFolders(req.parentPath(), maxFolders);
+    ListFoldersResponse proto = client.listFolders(req.parentPath(), maxFolders, engineContext);
 
     List<FolderBrowseResponse.Folder> folders = new ArrayList<>();
     for (FolderEntry entry : proto.getFoldersList()) {
@@ -242,12 +244,12 @@ public final class KnowledgeHttpApiAdapter {
     return new FolderBrowseResponse(folders, proto.getTookMs(), proto.getTruncated());
   }
 
-  public FolderFilesResponse listFolderFiles(FolderFilesRequest req) {
+  public FolderFilesResponse listFolderFiles(FolderFilesRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
     KnowledgeClient client = knowledgeServer.client();
     int limit = req.limit() == null ? 0 : req.limit();
     ListFolderFilesResponse proto = client.listFolderFiles(
-        req.folderPath(), limit, req.projection());
+        req.folderPath(), limit, req.projection(), engineContext);
 
     List<FolderFilesResponse.FileEntry> files = new ArrayList<>();
     for (FolderFileEntry entry : proto.getFilesList()) {

@@ -327,7 +327,7 @@ final class WorkerScanOpsTest {
     CloudPlaceholderRecorder stubRecorder =
         new CloudPlaceholderRecorder(queue) {
           @Override
-          void record(Path file) {
+          void record(Path file, String collection, JobQueue.EnqueueProvenance provenance) {
             recordCalls.incrementAndGet();
             recordedFiles.add(file);
           }

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -92,7 +93,7 @@ final class McpAppliedFiltersTest {
 
   private McpProtocolHandler handler(ArgumentCaptor<KnowledgeSearchRequest> captor) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(captor.capture()))
+    when(adapter.search(captor.capture(), any(EngineContext.class)))
         .thenAnswer(inv -> respondingTo(inv.getArgument(0)));
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
@@ -109,6 +110,7 @@ final class McpAppliedFiltersTest {
   private static String callSearch(McpProtocolHandler h, int id, String argumentsJson)
       throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(

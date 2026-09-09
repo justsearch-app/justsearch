@@ -480,7 +480,10 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           WorkerOperationalView.fallback(workerCapability.health().name()), true, null, sampledAtMs);
     }
     try {
-      WorkerOperationalView view = knowledgeServer.client().getWorkerOperationalView();
+      WorkerOperationalView view = knowledgeServer.client().getWorkerOperationalView(
+          io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
+              io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
       lastWorkerObservationAtMs = sampledAtMs;
       return new WorkerViewSample(view, false, null, sampledAtMs);
     } catch (Exception e) {

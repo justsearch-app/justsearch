@@ -77,7 +77,7 @@ final class ChatControllerHeartbeatTest {
               return null;
             })
         .when(engine)
-        .run(any(), any(), any(), any());
+        .run(any(), any(), any(), any(), any());
 
     scheduler = Executors.newSingleThreadScheduledExecutor();
     ChatController controller =
@@ -164,6 +164,7 @@ final class ChatControllerHeartbeatTest {
 
   private static Context mockContext(String body) {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/chat/dispatch");
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(anyString())).thenReturn(ctx);
     when(ctx.attributeOrCompute(anyString(), any())).thenReturn(new Object());

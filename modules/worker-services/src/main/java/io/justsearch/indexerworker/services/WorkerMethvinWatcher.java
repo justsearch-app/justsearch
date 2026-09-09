@@ -266,7 +266,9 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    */
   static JobQueue.EnqueueEntry entryForLiveEvent(Path path) {
     JobQueue.EnqueueEntry stated = JobQueue.EnqueueEntry.stat(path);
-    return stated.sizeBytes() == 0L ? JobQueue.EnqueueEntry.ofUnknownSize(path) : stated;
+    return new JobQueue.EnqueueEntry(path,
+        stated.sizeBytes() == 0L ? JobQueue.UNKNOWN_SIZE_BYTES : stated.sizeBytes(),
+        CallContext.none().provenance());
   }
 
   /**

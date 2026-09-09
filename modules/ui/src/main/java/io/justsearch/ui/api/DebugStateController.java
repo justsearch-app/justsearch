@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import io.javalin.http.Context;
@@ -68,17 +70,19 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
   }
 
   public void handleGetState(Context ctx) {
-    ctx.json(buildDebugState());
+    var engineContext = RequestEngineContext.get(ctx);
+    ctx.json(buildDebugState(engineContext));
   }
 
   /** Returns the raw Lucene commit user data map from the Worker. */
   public void handleGetCommitMetadata(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     if (knowledgeServer == null || !knowledgeServer.isReady()) {
       ctx.status(503).json(Map.of("error", "Worker not available"));
       return;
     }
     try {
-      Map<String, String> commitMetadata = knowledgeServer.client().getCommitMetadata();
+      Map<String, String> commitMetadata = knowledgeServer.client().getCommitMetadata(engineContext);
       ctx.json(commitMetadata);
     } catch (Exception e) {
       log.debug("Failed to fetch commit metadata: {}", e.getMessage());
@@ -88,7 +92,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
 
   /** Builds the debug state snapshot as a Jackson ObjectNode (reusable outside HTTP context). */
   @Override
-  public ObjectNode buildDebugState() {
+  public ObjectNode buildDebugState(EngineContext engineContext) {
     ObjectNode root = mapper.createObjectNode();
 
     // System
@@ -108,7 +112,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
     ObjectNode worker = root.putObject("worker");
     if (knowledgeServer != null && knowledgeServer.isReady()) {
       try {
-        var snapshot = knowledgeServer.client().getDebugWorkerState();
+        var snapshot = knowledgeServer.client().getDebugWorkerState(engineContext);
         ObjectNode snapNode = (ObjectNode) mapper.valueToTree(snapshot);
         worker.setAll(snapNode);
         // Lane F stage A item A11 deleted the Worker process: the index half now runs inside this

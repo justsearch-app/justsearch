@@ -85,13 +85,13 @@ final class GplFetchDocumentsByteBudgetTest {
             .build();
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(GPL_BATCH_SIZE).build();
-    when(knowledgeClient.listAllDocumentIds(0, GPL_BATCH_SIZE)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(GPL_BATCH_SIZE, GPL_BATCH_SIZE)).thenReturn(emptyPage);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), any())).thenReturn(emptyPage);
 
     // Every document is exactly at the worker's cap — the worst case the budget exists for.
     String maximalContent = "x".repeat(WORKER_CONTENT_CAP_CHARS);
     List<List<String>> requests = new ArrayList<>();
-    when(knowledgeClient.fetchDocuments(any()))
+    when(knowledgeClient.fetchDocuments(any(), any()))
         .thenAnswer(
             inv -> {
               @SuppressWarnings("unchecked")

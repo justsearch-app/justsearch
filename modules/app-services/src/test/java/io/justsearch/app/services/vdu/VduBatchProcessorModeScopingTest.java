@@ -46,11 +46,11 @@ class VduBatchProcessorModeScopingTest {
     Path file2 = writeFile("doc2.png");
     Path file3 = writeFile("doc3.png");
     List<String> docIds = List.of(file1.toString(), file2.toString(), file3.toString());
-    when(client.countPendingVdu()).thenReturn(docIds.size());
-    when(client.queryPendingVduDocIds()).thenReturn(docIds);
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
+    when(client.countPendingVdu(any())).thenReturn(docIds.size());
+    when(client.queryPendingVduDocIds(any())).thenReturn(docIds);
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
     when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt()))
+            anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt(), any()))
         .thenReturn(true);
 
     GpuCapabilitiesService gpuCapabilitiesService = mock(GpuCapabilitiesService.class);
@@ -83,8 +83,8 @@ class VduBatchProcessorModeScopingTest {
 
     KnowledgeClient client = mock(KnowledgeClient.class);
     List<String> docIds = List.of(writeFile("doc1.png").toString(), writeFile("doc2.png").toString());
-    when(client.countPendingVdu()).thenReturn(docIds.size());
-    when(client.queryPendingVduDocIds()).thenReturn(docIds);
+    when(client.countPendingVdu(any())).thenReturn(docIds.size());
+    when(client.queryPendingVduDocIds(any())).thenReturn(docIds);
 
     GpuCapabilitiesService gpuCapabilitiesService = mock(GpuCapabilitiesService.class);
     when(gpuCapabilitiesService.snapshot()).thenReturn(highVramSnapshot());
@@ -120,11 +120,11 @@ class VduBatchProcessorModeScopingTest {
             writeFile("doc1.png").toString(),
             writeFile("doc2.png").toString(),
             writeFile("doc3.png").toString());
-    when(client.countPendingVdu()).thenReturn(docIds.size());
-    when(client.queryPendingVduDocIds()).thenReturn(docIds);
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
+    when(client.countPendingVdu(any())).thenReturn(docIds.size());
+    when(client.queryPendingVduDocIds(any())).thenReturn(docIds);
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
     when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt()))
+            anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt(), any()))
         .thenReturn(true);
 
     GpuCapabilitiesService gpuCapabilitiesService = mock(GpuCapabilitiesService.class);

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -22,6 +23,7 @@ import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,14 +49,34 @@ final class AgentToolDispatcherRetryTest {
     final AtomicInteger dispatches = new AtomicInteger();
 
     @Override
-    public OperationResult dispatch(Operation op, String argumentsJson) {
+    public OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext) {
       dispatches.incrementAndGet();
       throw new IllegalStateException("transient failure");
     }
 
     @Override
-    public OperationResult undo(Operation op, String executionId) {
+    public OperationResult dispatch(
+        Operation op,
+        String argumentsJson,
+        io.justsearch.agent.api.registry.InvocationProvenance provenance,
+        Optional<String> confirmationToken,
+        EngineContext engineContext) {
+      return dispatch(op, argumentsJson, engineContext);
+    }
+
+    @Override
+    public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
       return OperationResult.failure("undo not supported");
+    }
+
+    @Override
+    public OperationResult undo(
+        Operation op,
+        String executionId,
+        io.justsearch.agent.api.registry.InvocationProvenance provenance,
+        Optional<String> confirmationToken,
+        EngineContext engineContext) {
+      return undo(op, executionId, engineContext);
     }
   }
 
@@ -85,7 +107,10 @@ final class AgentToolDispatcherRetryTest {
 
     OperationResult result =
         subject.executeOperationWithPolicy(
-            op, new ToolCallRequest("call_1", "core_retry_probe", "{}"), "session-1");
+            op,
+            new ToolCallRequest("call_1", "core_retry_probe", "{}"),
+            "session-1",
+            EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "an always-throwing handler must surface as a failure result");
     return dispatcher.dispatches.get();

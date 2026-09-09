@@ -55,7 +55,7 @@ final class HelpIngestMarkerRecoveryTest {
     new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
         .tryIngestHelpFiles(client, configFor(dataDir, workingDir));
 
-    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString());
+    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
     assertTrue(
         Files.readString(dataDir.resolve(MARKER)).trim().length() > 0,
         "the marker must be rewritten to the current version, not left naming the old one");
@@ -76,7 +76,7 @@ final class HelpIngestMarkerRecoveryTest {
     new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
         .tryIngestHelpFiles(client, configFor(dataDir, workingDir));
 
-    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString());
+    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -98,7 +98,7 @@ final class HelpIngestMarkerRecoveryTest {
     new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
         .tryIngestHelpFiles(second, configFor(dataDir, workingDir));
 
-    verify(second, never()).submitBatch(anyList(), anyBoolean(), anyString());
+    verify(second, never()).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
     assertEquals(
         current,
         Files.readString(dataDir.resolve(MARKER)).trim(),

@@ -53,8 +53,8 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:adapters-lucene` -> `:modules:configuration`, `:modules:core`, `:modules:indexing`
 - `:modules:ai-backend` -> `:modules:app-api`
 - `:modules:app-agent` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:configuration`, `:modules:core`, `:modules:telemetry`
-- `:modules:app-agent-api` -> `:modules:extension-substrate`
-- `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`
+- `:modules:app-agent-api` -> `:modules:core`, `:modules:extension-substrate`
+- `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`, `:modules:core`
 - `:modules:app-api-tck` -> `:modules:ai-backend`
 - `:modules:app-config` -> `:modules:configuration`
 - `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
@@ -101,10 +101,12 @@ graph TD
   app-agent --> configuration
   app-agent --> core
   app-agent --> telemetry
+  app-agent-api --> core
   app-agent-api --> extension-substrate
   app-api --> api-contract-projection-java
   app-api --> app-agent-api
   app-api --> configuration
+  app-api --> core
   app-api-tck --> ai-backend
   app-config --> configuration
   app-engine --> app-api

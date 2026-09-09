@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.ContextChunk;
@@ -74,14 +76,14 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   @Override
-  public CompletionStage<DocumentRecord> fetch(String docId) {
-    return fetchBatch(List.of(docId))
+  public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
+    return fetchBatch(List.of(docId), engineContext)
         .thenApply(map -> map.getOrDefault(docId,
             new DocumentRecord(docId, "", Map.of("error", "Not found"))));
   }
 
   @Override
-  public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+  public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
     if (docIds == null || docIds.isEmpty()) {
       return CompletableFuture.completedFuture(Map.of());
     }
@@ -93,7 +95,7 @@ public final class RemoteDocumentService implements DocumentService {
         // set), so nothing here bounds it. Paged under the byte budget so the reply can never reach
         // the transport ceiling regardless of how many ids arrive.
         FetchDocumentsResponse response =
-            BoundedDocumentFetch.fetchAll(ids -> clientSupplier.get().fetchDocuments(ids), docIds);
+            BoundedDocumentFetch.fetchAll(ids -> clientSupplier.get().fetchDocuments(ids, engineContext), docIds);
 
         Map<String, DocumentRecord> results = new LinkedHashMap<>();
         for (DocumentContent doc : response.getDocumentsList()) {
@@ -126,7 +128,7 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   @Override
-  public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars) {
+  public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
     if (docId == null || docId.isBlank()) {
       return CompletableFuture.completedFuture(
           new DocumentSlice("", "", Map.of(), false, false, 0, 0, "missing_doc_id"));
@@ -137,7 +139,7 @@ public final class RemoteDocumentService implements DocumentService {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            var response = clientSupplier.get().fetchDocumentSlice(docId, offset, max);
+            var response = clientSupplier.get().fetchDocumentSlice(docId, offset, max, engineContext);
 
             Map<String, Object> metadata = new HashMap<>(response.getMetadataMap());
             metadata.put("found", response.getFound());
@@ -177,11 +179,11 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   @Override
-  public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
+  public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            var response = clientSupplier.get().listAllDocumentIds(offset, limit);
+            var response = clientSupplier.get().listAllDocumentIds(offset, limit, engineContext);
             return new DocumentIdPage(
                 response.getDocIdsList(), response.getTotalCount(), response.getTookMs());
           } catch (Exception e) {
@@ -206,8 +208,8 @@ public final class RemoteDocumentService implements DocumentService {
    * @return result containing context and chunk usage metadata
    */
   @Override
-  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK) {
-    return retrieveContextWithMeta(question, docIds, topK, 0);
+  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, EngineContext engineContext) {
+    return retrieveContextWithMeta(question, docIds, topK, 0, engineContext);
   }
 
   /**
@@ -223,7 +225,7 @@ public final class RemoteDocumentService implements DocumentService {
    * @return result containing context and chunk usage metadata
    */
   @Override
-  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, int maxContextTokens) {
+  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
     if (question == null || question.isBlank() || docIds == null || docIds.isEmpty()) {
       return CompletableFuture.completedFuture(new ContextResult("", 0, 0, 0, List.of(),
           "", "EMPTY_REQUEST", false, List.of()));
@@ -234,7 +236,7 @@ public final class RemoteDocumentService implements DocumentService {
         log.debug("Retrieving RAG context: question='{}', docIds={}, topK={}, maxTokens={}",
             question, docIds.size(), topK, maxContextTokens);
 
-        RetrieveContextResponse response = clientSupplier.get().retrieveContext(question, docIds, topK, maxContextTokens);
+        RetrieveContextResponse response = clientSupplier.get().retrieveContext(question, docIds, topK, maxContextTokens, engineContext);
 
         // Semantics:
         // - chunksFound = total hits found (may exceed returned chunks list)
@@ -280,14 +282,14 @@ public final class RemoteDocumentService implements DocumentService {
         // Record fallback counter
         recordRagFallback();
         // Fall back to default implementation (concatenate full docs)
-        return retrieveContextFallback(docIds);
+        return retrieveContextFallback(docIds, engineContext);
       }
     });
   }
 
   @Override
   public CompletionStage<ContextResult> retrieveContext(
-      io.justsearch.app.api.RetrieveContextParams params) {
+      io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
     if (params.question() == null || params.question().isBlank()) {
       return CompletableFuture.completedFuture(new ContextResult("", 0, 0, 0, List.of(),
           "", "EMPTY_REQUEST", false, List.of()));
@@ -301,7 +303,7 @@ public final class RemoteDocumentService implements DocumentService {
         // then the RAG pipeline searches chunks within those docs.
         var effectiveParams = params;
         if (params.docIds().isEmpty()) {
-          Set<String> discoveredDocIds = preSearchForDocIds(params, params.topK() * 2);
+          Set<String> discoveredDocIds = preSearchForDocIds(params, params.topK() * 2, engineContext);
           if (!discoveredDocIds.isEmpty()) {
             effectiveParams = new io.justsearch.app.api.RetrieveContextParams(
                 params.question(), discoveredDocIds, params.topK(), params.maxContextTokens(),
@@ -319,12 +321,12 @@ public final class RemoteDocumentService implements DocumentService {
             effectiveParams.question(), effectiveParams.topK(), effectiveParams.docIds().size(),
             effectiveParams.autoEntityExtract(), effectiveParams.contextFormat());
 
-        RetrieveContextResponse response = clientSupplier.get().retrieveContext(effectiveParams);
+        RetrieveContextResponse response = clientSupplier.get().retrieveContext(effectiveParams, engineContext);
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
         log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
-        return retrieveContextFallback(params.docIds());
+        return retrieveContextFallback(params.docIds(), engineContext);
       }
     });
   }
@@ -334,7 +336,7 @@ public final class RemoteDocumentService implements DocumentService {
    * Uses the existing port search with optional filters to find top-matching documents.
    */
   private Set<String> preSearchForDocIds(
-      io.justsearch.app.api.RetrieveContextParams params, int limit) {
+      io.justsearch.app.api.RetrieveContextParams params, int limit, EngineContext engineContext) {
     try {
       // Build a search request with the same filters as the RAG request
       var searchBuilder = io.justsearch.ipc.SearchRequest.newBuilder()
@@ -411,7 +413,7 @@ public final class RemoteDocumentService implements DocumentService {
         searchBuilder.setFilters(filtersBuilder.build());
       }
 
-      var searchResponse = clientSupplier.get().search(searchBuilder.build());
+      var searchResponse = clientSupplier.get().search(searchBuilder.build(), engineContext);
       // Tempdoc 731 I1: preserve rank order (LinkedHashSet, not HashSet) so the discovered doc
       // universe forwarded to the downstream RetrieveContextRequest reflects the pipeline's
       // ranking, not an arbitrary hash order.
@@ -495,11 +497,11 @@ public final class RemoteDocumentService implements DocumentService {
    *
    * @return ContextResult with chunksUsed=0 to indicate fallback was used
    */
-  private ContextResult retrieveContextFallback(Set<String> docIds) {
+  private ContextResult retrieveContextFallback(Set<String> docIds, EngineContext engineContext) {
     try {
       Map<String, DocumentRecord> docs =
           BoundedDocumentFetch.fetchAll(
-                  ids -> clientSupplier.get().fetchDocuments(ids), List.copyOf(docIds))
+                  ids -> clientSupplier.get().fetchDocuments(ids, engineContext), List.copyOf(docIds))
           .getDocumentsList().stream()
           .collect(java.util.stream.Collectors.toMap(
               DocumentContent::getDocId,
@@ -548,7 +550,7 @@ public final class RemoteDocumentService implements DocumentService {
    */
   @Override
   public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-      String answerText, List<VerificationSource> sources, double threshold) {
+      String answerText, List<VerificationSource> sources, double threshold, EngineContext engineContext) {
     return CompletableFuture.supplyAsync(() -> {
       if (answerText == null || answerText.isBlank() || sources == null || sources.isEmpty()) {
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
@@ -571,7 +573,7 @@ public final class RemoteDocumentService implements DocumentService {
                 chunkDocIds,
                 chunkIndices,
                 anyText ? passageTexts : List.of(),
-                threshold);
+                threshold, engineContext);
         List<CitationMatchEntry> entries = new ArrayList<>(resp.getMatchesCount());
         for (var m : resp.getMatchesList()) {
           entries.add(new CitationMatchEntry(

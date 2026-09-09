@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.vdu;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
@@ -31,6 +33,9 @@ import org.slf4j.LoggerFactory;
  * ({@code isOnline()}), never for transitions (R4).
  */
 public class OfflineCoordinator {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "offline-enrichment-coordinator", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
     private static final Logger LOG = LoggerFactory.getLogger(OfflineCoordinator.class);
 
     // Tempdoc 518 Appendix F W4.2 — role-typed interface; off the concrete ILM. Tempdoc 737 R4:
@@ -107,13 +112,13 @@ public class OfflineCoordinator {
             LOG.info("Starting offline processing");
 
             // Recover any documents stuck in PROCESSING state from previous crash
-            int recovered = knowledgeClient.recoverVduProcessing();
+            int recovered = knowledgeClient.recoverVduProcessing(ENGINE_CONTEXT);
             if (recovered > 0) {
                 LOG.info("Recovered {} documents stuck in PROCESSING state", recovered);
             }
 
-            int pendingVdu = knowledgeClient.countPendingVdu();
-            int pendingEmbeddings = knowledgeClient.countPendingEmbeddings();
+            int pendingVdu = knowledgeClient.countPendingVdu(ENGINE_CONTEXT);
+            int pendingEmbeddings = knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT);
 
             LOG.info("Pending work: {} VDU files, {} embeddings", pendingVdu, pendingEmbeddings);
 
@@ -127,7 +132,7 @@ public class OfflineCoordinator {
 
             // Phase B: Embedding Processing (requires SLM in Indexing Mode)
             // Re-query count - VDU sets embedding_status to PENDING for re-embedding
-            pendingEmbeddings = knowledgeClient.countPendingEmbeddings();
+            pendingEmbeddings = knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT);
             if (pendingEmbeddings > 0) {
                 LOG.info("Phase B: Parking engine to Indexing Mode for {} pending embeddings",
                     pendingEmbeddings);
@@ -204,8 +209,8 @@ public class OfflineCoordinator {
         if (knowledgeClient == null) {
             return false;
         }
-        return knowledgeClient.countPendingVdu() > 0
-            || knowledgeClient.countPendingEmbeddings() > 0;
+        return knowledgeClient.countPendingVdu(ENGINE_CONTEXT) > 0
+            || knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT) > 0;
     }
 
     /**
@@ -213,7 +218,7 @@ public class OfflineCoordinator {
      */
     public int getPendingVduCount() {
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
-        return knowledgeClient == null ? 0 : knowledgeClient.countPendingVdu();
+        return knowledgeClient == null ? 0 : knowledgeClient.countPendingVdu(ENGINE_CONTEXT);
     }
 
     /**
@@ -221,7 +226,7 @@ public class OfflineCoordinator {
      */
     public int getPendingEmbeddingCount() {
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
-        return knowledgeClient == null ? 0 : knowledgeClient.countPendingEmbeddings();
+        return knowledgeClient == null ? 0 : knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT);
     }
 
     /**

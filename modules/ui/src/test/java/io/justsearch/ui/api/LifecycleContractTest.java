@@ -188,7 +188,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 2, 0, true, false));
 
     LocalApiServer server =
@@ -240,7 +240,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, null));
 
     LocalApiServer server =
@@ -282,7 +282,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
     LocalApiServer server =
@@ -339,7 +339,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
     LocalApiServer server =
@@ -391,7 +391,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
     LocalApiServer server =
@@ -439,7 +439,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenThrow(new RuntimeException("Worker unreachable (test)"));
 
     LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
@@ -489,7 +489,7 @@ final class LifecycleContractTest {
     KnowledgeClient mockClient = mock(KnowledgeClient.class);
     stubWorkerReady(mockKs);
     when(mockKs.client()).thenReturn(mockClient);
-    when(mockClient.getWorkerOperationalView())
+    when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenReturn(testWorkerView(true, 3, 0, null, true, 8, 4, 2, "STALLED"));
 
     LocalApiServer server =

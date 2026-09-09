@@ -75,7 +75,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     assertFalse(
         Files.exists(dataDir.resolve(".help-ingested-version")),
         "Marker file must NOT be written when eval.mode=true");
-    verify(client, never()).submitBatch(any(), anyBoolean(), anyString());
+    verify(client, never()).submitBatch(any(), anyBoolean(), anyString(), any());
   }
 
   @Test
@@ -99,7 +99,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
         Files.exists(dataDir.resolve(".help-ingested-version")),
         "Marker file must be written after successful ingest");
     // Production calls submitBatch exactly once with the full path list — no batching at this layer.
-    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString());
+    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), any());
   }
 
   /** Build a minimal KnowledgeServerConfig pointing at the temp directories. */

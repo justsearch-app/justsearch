@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.AgentService;
@@ -58,7 +60,7 @@ public final class BackgroundRunService {
    * Captures the run's sessionId from its {@link AgentEvent.SessionStarted} so the completed run can
    * be stamped {@code background=true}. Returns the sessionId (or null if the run never started).
    */
-  public String runInBackground(AgentRequest request) {
+  public String runInBackground(AgentRequest request, EngineContext engineContext) {
     Objects.requireNonNull(request, "request");
     AtomicReference<String> sessionId = new AtomicReference<>();
     Consumer<AgentEvent> capture =
@@ -71,7 +73,7 @@ public final class BackgroundRunService {
       // Tempdoc 561 P-D: background=true makes the run safe-by-default (the safety gate rejects
       // write/destructive tool calls — no watcher) AND marks the durable record background inside
       // AgentLoopService, so the presence projection (presenceSince) surfaces it on the user's return.
-      agentService.runAgent(request, capture, true);
+      agentService.runAgent(request, capture, true, engineContext);
     } catch (RuntimeException e) {
       LOG.warn("Background agent run failed", e);
     }
@@ -82,10 +84,10 @@ public final class BackgroundRunService {
    * Schedule a background run to start after {@code delay} (the scheduled-producer flavor of the
    * presence axis). Returns immediately; the run executes on the background scheduler thread.
    */
-  public void schedule(AgentRequest request, Duration delay) {
+  public void schedule(AgentRequest request, Duration delay, EngineContext engineContext) {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(delay, "delay");
-    scheduler.schedule(() -> runInBackground(request), Math.max(0, delay.toMillis()),
+    scheduler.schedule(() -> runInBackground(request, engineContext), Math.max(0, delay.toMillis()),
         java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 

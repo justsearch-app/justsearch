@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -296,7 +297,8 @@ final class ChatControllerLockedDispatchTest {
     @Override
     public void runAgent(
         io.justsearch.agent.api.AgentRequest request,
-        java.util.function.Consumer<io.justsearch.agent.api.AgentEvent> eventConsumer) {
+        java.util.function.Consumer<io.justsearch.agent.api.AgentEvent> eventConsumer,
+        EngineContext engineContext) {
       script.accept(eventConsumer);
     }
 
@@ -375,6 +377,7 @@ final class ChatControllerLockedDispatchTest {
 
   private static Context mockContext(String body, AtomicInteger status, AtomicReference<Object> json) {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/chat/dispatch");
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(anyString())).thenReturn(ctx);
     // The SSE writer takes a per-context lock via attributeOrCompute; a null would NPE the write.

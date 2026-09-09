@@ -1344,9 +1344,10 @@ class IndexingLoopTest {
       // W5.2: extractJob moved to JobBatchExtractor. Call via the package-private accessor
       // + reflection on the now-private extractJob method on the extractor.
       Method method =
-          JobBatchExtractor.class.getDeclaredMethod("extractJob", Path.class, String.class);
+          JobBatchExtractor.class.getDeclaredMethod("extractJob", Path.class, String.class,
+              JobQueue.EnqueueProvenance.class);
       method.setAccessible(true);
-      return method.invoke(loop.getExtractor(), file, null);
+      return method.invoke(loop.getExtractor(), file, null, null);
     }
 
     private void invokeWriteExtractedJob(IndexingLoop loop, Object extractedJob) throws Exception {

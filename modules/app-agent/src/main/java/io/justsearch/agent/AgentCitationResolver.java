@@ -76,7 +76,8 @@ final class AgentCitationResolver {
    * (sentence → source index) with the producer that scored them, or {@link Resolved#none()} when
    * matching is unavailable/failed/empty.
    */
-  Resolved resolve(String answer, List<AgentEvent.AgentSource> sources) {
+  Resolved resolve(String answer, List<AgentEvent.AgentSource> sources,
+      io.justsearch.core.context.EngineContext engineContext) {
     if (documentService == null || answer == null || answer.isBlank() || sources.isEmpty()) {
       return Resolved.none();
     }
@@ -110,7 +111,7 @@ final class AgentCitationResolver {
     try {
       DocumentService.CitationMatchResult result =
           documentService
-              .matchCitationsAgainst(answer, verificationSources, similarityThreshold)
+              .matchCitationsAgainst(answer, verificationSources, similarityThreshold, engineContext)
               .toCompletableFuture()
               .get(AgentTimeouts.citationMatchMs(), TimeUnit.MILLISECONDS);
       List<AgentEvent.AgentSentenceCite> out = new ArrayList<>();

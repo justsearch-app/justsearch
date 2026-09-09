@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
@@ -49,6 +51,9 @@ import org.slf4j.LoggerFactory;
  * }</pre>
  */
 public final class KnowledgeServerBootstrap implements Closeable {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "engine-bootstrap", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
     private static final Logger log = LoggerFactory.getLogger(KnowledgeServerBootstrap.class);
 
     private final KnowledgeServerConfig config;
@@ -323,10 +328,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private void awaitHealthyAndComplete() throws InterruptedException {
         long retryBudgetMs = config.healthCheckRetryBudgetMs();
         long healthCheckStartMs = System.currentTimeMillis();
-        boolean healthy = client.isHealthy();
+        boolean healthy = client.isHealthy(ENGINE_CONTEXT);
         while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
             Thread.sleep(1000);
-            healthy = client.isHealthy();
+            healthy = client.isHealthy(ENGINE_CONTEXT);
         }
         long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
 
@@ -467,12 +472,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 // Worker-side watcher (registered via WatchRoot during the root walk) is the sole
                 // event source, and the periodic sync + reindexPersistedRoots are the reconcile
                 // backstop. File-event integration now lives entirely in the Worker process.
-                client.reindexPersistedRoots();
+                client.reindexPersistedRoots(ENGINE_CONTEXT);
                 tryIngestHelpFiles(client, config);
                 client.startPeriodicSync();
             } else {
                 log.info("Worker recovery detected (generation {}); re-running catch-up initialization", prevGen + 1);
-                client.reindexPersistedRoots();
+                client.reindexPersistedRoots(ENGINE_CONTEXT);
                 client.startPeriodicSync();
             }
         } finally {
@@ -689,7 +694,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         if (client == null) {
             return false;
         }
-        boolean healthy = client.isHealthy();
+        boolean healthy = client.isHealthy(ENGINE_CONTEXT);
         // Item A11: the poll used to feed the spawner's hang detector, whose escalation was a
         // restart. There is no restart authority in stage A (§10) — a lost worker component reports
         // itself lost and stays that way until the user restarts the Engine.
@@ -846,7 +851,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             }
 
             // Ingest with collection tag
-            client.submitBatch(helpFiles, true, HELP_COLLECTION);
+            client.submitBatch(helpFiles, true, HELP_COLLECTION, ENGINE_CONTEXT);
             Files.writeString(marker, HELP_FILES_VERSION);
             log.info("Ingested {} built-in help files (collection={})", helpFiles.size(), HELP_COLLECTION);
 

@@ -256,7 +256,10 @@ final class CoreApiAssembly {
               java.time.Clock.systemUTC(),
               () ->
                   b.knowledgeServer != null
-                      ? b.knowledgeServer.client().getWatchedRoots()
+                      ? b.knowledgeServer.client().getWatchedRoots(
+                          io.justsearch.app.services.intent.EngineProvenance.internal(
+                              "index-drift-health-tap", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND))
                       : java.util.List.of()));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption
       // probe (one PowerShell shell-property read of the data-dir volume, cached 5s, fed to both the

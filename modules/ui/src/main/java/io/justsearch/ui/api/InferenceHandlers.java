@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
@@ -100,6 +102,7 @@ final class InferenceHandlers {
    * version (see git history if diffing behavior); only the assembly mechanism changed.
    */
   void handleInferenceStatus(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     OnlineAiService onlineAi = onlineAiService;
     InferenceStatusResponseBuilder builder = InferenceStatusResponseBuilder.builder()
         .mode(onlineAi.getCurrentMode())
@@ -107,8 +110,8 @@ final class InferenceHandlers {
         .starting(onlineAi.isStartingUp())
         .llmContextTokens(onlineAi.llmContextTokens())
         .configuredContextTokens(onlineAi.configuredContextTokens())
-        .embeddingQueueSize(countPendingEmbeddings())
-        .vduQueueSize(countPendingVdu());
+        .embeddingQueueSize(countPendingEmbeddings(engineContext))
+        .vduQueueSize(countPendingVdu(engineContext));
 
     // External server adoption diagnostics, CUDA warnings, and startup timer (best-effort; additive fields).
     if (onlineAi instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection) {
@@ -737,12 +740,12 @@ final class InferenceHandlers {
    *
    * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
    */
-  private int countPendingEmbeddings() {
+  private int countPendingEmbeddings(EngineContext engineContext) {
     if (knowledgeServer == null || !knowledgeServer.isReady()) {
       return 0;
     }
     try {
-      return knowledgeServer.client().countPendingEmbeddings();
+      return knowledgeServer.client().countPendingEmbeddings(engineContext);
     } catch (Exception e) {
       log.debug("Failed to count pending embeddings", e);
       return 0;
@@ -754,12 +757,12 @@ final class InferenceHandlers {
    *
    * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
    */
-  private int countPendingVdu() {
+  private int countPendingVdu(EngineContext engineContext) {
     if (knowledgeServer == null || !knowledgeServer.isReady()) {
       return 0;
     }
     try {
-      return knowledgeServer.client().countPendingVdu();
+      return knowledgeServer.client().countPendingVdu(engineContext);
     } catch (Exception e) {
       log.debug("Failed to count pending VDU", e);
       return 0;

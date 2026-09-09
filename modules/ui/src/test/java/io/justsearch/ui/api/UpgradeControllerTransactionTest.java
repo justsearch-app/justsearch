@@ -95,19 +95,24 @@ final class UpgradeControllerTransactionTest {
     var prepareCalls = new AtomicInteger();
     var workerEntered = new CountDownLatch(1);
     var releaseWorker = new CountDownLatch(1);
-    when(worker.prepareUpgrade(any(String.class)))
+    when(worker.prepareUpgrade(any(String.class), any(io.justsearch.core.context.EngineContext.class)))
         .thenAnswer(
             invocation -> {
               String preparationId = invocation.getArgument(0);
               if (prepareCalls.incrementAndGet() == 2) {
                 workerEntered.countDown();
-                assertTrue(releaseWorker.await(2, TimeUnit.SECONDS));
+                try {
+                  assertTrue(releaseWorker.await(2, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  throw new AssertionError("worker release was interrupted", e);
+                }
               }
               return readyWorker(preparationId);
             });
-    when(worker.upgradeStatus(any(String.class)))
+    when(worker.upgradeStatus(any(String.class), any(io.justsearch.core.context.EngineContext.class)))
         .thenAnswer(invocation -> readyWorker(invocation.getArgument(0)));
-    when(worker.cancelUpgrade(any(String.class)))
+    when(worker.cancelUpgrade(any(String.class), any(io.justsearch.core.context.EngineContext.class)))
         .thenAnswer(invocation -> readyWorker(invocation.getArgument(0)));
     var controller = new UpgradeController(leases, (preparationId, nonce) -> {}, () -> worker);
     Map<String, Object> capability = prepare(controller);
@@ -147,6 +152,7 @@ final class UpgradeControllerTransactionTest {
     var leases = new OperationLeaseServiceImpl();
     var controller = new UpgradeController(leases, () -> {});
     Context failed = mock(Context.class);
+    when(failed.path()).thenReturn("/api/upgrade/prepare");
     when(failed.json(any())).thenThrow(new IllegalStateException("response failed"));
 
     assertThrows(IllegalStateException.class, () -> controller.prepare(failed));
@@ -280,6 +286,7 @@ final class UpgradeControllerTransactionTest {
 
   private static Context jsonContext(AtomicReference<Map<String, Object>> body) {
     Context context = mock(Context.class);
+    when(context.path()).thenReturn("/api/upgrade/prepare");
     when(context.json(any()))
         .thenAnswer(
             invocation -> {
@@ -292,12 +299,14 @@ final class UpgradeControllerTransactionTest {
 
   private static Context requestContext(Map<String, Object> capability) {
     Context context = conflictContext();
+    when(context.path()).thenReturn("/api/upgrade/cancel");
     when(context.body()).thenReturn(capabilityBodyUnchecked(capability));
     return context;
   }
 
   private static Context conflictContext() {
     Context context = mock(Context.class);
+    when(context.path()).thenReturn("/api/upgrade/prepare");
     when(context.status(409)).thenReturn(context);
     when(context.json(any())).thenReturn(context);
     return context;
@@ -315,6 +324,7 @@ final class UpgradeControllerTransactionTest {
       boolean failFlush)
       throws Exception {
     Context context = mock(Context.class);
+    when(context.path()).thenReturn("/api/upgrade/commit-shutdown");
     HttpServletResponse response = mock(HttpServletResponse.class);
     when(context.body()).thenReturn(capabilityBody(capability));
     when(context.res()).thenReturn(response);

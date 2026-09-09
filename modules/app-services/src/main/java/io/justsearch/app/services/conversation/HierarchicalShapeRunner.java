@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.agent.api.registry.ConversationShapeRef;
@@ -107,7 +109,7 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
   }
 
   @Override
-  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink) {
+  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext) {
     String docId = asString(body.get("docId"));
     if (docId == null || docId.isBlank()) {
       emitError(sink, "No document ID provided", "NO_DOC_ID");
@@ -127,7 +129,7 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
 
     emitProgress(sink, "loading", "Loading document...");
 
-    String content = loadDocument(docId, asString(body.get("content")));
+    String content = loadDocument(docId, asString(body.get("content")), engineContext);
     if (content == null || content.isBlank()) {
       emitError(sink, "Document has no content", "NO_CONTENT");
       return;
@@ -306,12 +308,12 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
 
   // ---- Document loading ----
 
-  private String loadDocument(String docId, String providedContent) {
+  private String loadDocument(String docId, String providedContent, EngineContext engineContext) {
     DocumentService docs = documentsSupplier.get();
     if (docs != null) {
       try {
         DocumentRecord record =
-            docs.fetch(docId)
+            docs.fetch(docId, engineContext)
                 .toCompletableFuture()
                 .get(DOC_FETCH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         if (record != null && record.content() != null && !record.content().isBlank()) {

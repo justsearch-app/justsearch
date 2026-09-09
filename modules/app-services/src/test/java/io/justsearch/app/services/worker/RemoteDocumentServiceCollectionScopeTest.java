@@ -77,7 +77,7 @@ final class RemoteDocumentServiceCollectionScopeTest {
     RemoteDocumentService service = new RemoteDocumentService(() -> client);
     RetrieveContextParams params =
         RetrieveContextParams.of("what did the agent do?", 5, 4096, docIds, List.of(), collection);
-    service.retrieveContext(params).toCompletableFuture().get(6, TimeUnit.SECONDS);
+    service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
   }
 
   @Test

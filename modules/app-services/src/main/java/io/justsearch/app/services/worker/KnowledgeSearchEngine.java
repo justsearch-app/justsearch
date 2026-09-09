@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Message;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -562,8 +564,8 @@ final class KnowledgeSearchEngine {
   }
 
   // Tempdoc 556: status + facet-snapshot cache live in WorkerStatusCache; delegate.
-  public KnowledgeStatus status() {
-    return statusCache.status();
+  public KnowledgeStatus status(EngineContext engineContext) {
+    return statusCache.status(engineContext);
   }
 
   public String getCachedFacetSnapshot() {
@@ -585,7 +587,7 @@ final class KnowledgeSearchEngine {
 
 
 
-  public KnowledgeSearchResponse search(KnowledgeSearchRequest req) {
+  public KnowledgeSearchResponse search(KnowledgeSearchRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
 
     // 250 Phase 5c: Root span for the entire search pipeline
@@ -598,7 +600,7 @@ final class KnowledgeSearchEngine {
             .startSpan();
     Scope searchScope = searchSpan.makeCurrent();
     try {
-      KnowledgeSearchResponse resp = doSearch(req, searchSpan);
+      KnowledgeSearchResponse resp = doSearch(req, searchSpan, engineContext);
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
       return resp;
@@ -613,12 +615,12 @@ final class KnowledgeSearchEngine {
   }
 
   private KnowledgeSearchResponse doSearch(
-      KnowledgeSearchRequest req, Span searchSpan) {
+      KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext) {
     long doSearchStartNs = System.nanoTime();
     RerankerConfig rerankConfig = RerankerConfig.fromEnv();
 
     // 363: Refresh facet snapshot for QU grounding (non-blocking, cached with TTL)
-    statusCache.refreshFacetSnapshotIfStale();
+    statusCache.refreshFacetSnapshotIfStale(engineContext);
 
     KnowledgeClient client = knowledgeServer.client();
 
@@ -810,7 +812,7 @@ final class KnowledgeSearchEngine {
     boolean perSourceRetrieval = false;
     if (structuredAnalysis.detectedSources().size() >= 2) {
       resp = SearchPerSourceExecutor.execute(
-          client, baseReq, structuredAnalysis.detectedSources(), searchLimit);
+          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext);
       perSourceRetrieval = true;
     } else {
       // Single-source: inject detected sources as boost if no boost already set
@@ -819,9 +821,9 @@ final class KnowledgeSearchEngine {
         for (String src : structuredAnalysis.detectedSources()) {
           srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
         }
-        resp = client.search(baseReq.toBuilder().setBoostFilters(srcBoost.build()).build());
+        resp = client.search(baseReq.toBuilder().setBoostFilters(srcBoost.build()).build(), engineContext);
       } else {
-        resp = client.search(baseReq);
+        resp = client.search(baseReq, engineContext);
       }
     }
 
@@ -844,7 +846,7 @@ final class KnowledgeSearchEngine {
                     .setQuery(expandedQuery)
                     .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
                     .build();
-            resp = client.search(expandedReq);
+            resp = client.search(expandedReq, engineContext);
             expansionApplied = true;
             log.debug("LLM expansion applied to query");
           }
@@ -991,7 +993,7 @@ final class KnowledgeSearchEngine {
             tracer.spanBuilder("search/cross_encoder").setParent(Context.current()).startSpan();
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
           reranked = knowledgeServer.client().rerank(
-              req.query(), docTexts, rerankConfig.deadlineBudgetMs());
+              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext);
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen
           // order.

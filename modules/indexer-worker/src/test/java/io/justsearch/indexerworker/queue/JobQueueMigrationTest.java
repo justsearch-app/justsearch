@@ -823,6 +823,8 @@ final class JobQueueMigrationTest {
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
+      // This version already owns the privacy-safe ledger; V14 alters its existing columns.
+      stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
       stmt.execute("PRAGMA user_version = 10");
       stmt.execute(
           "INSERT INTO jobs(path, state, attempts, last_updated)"
@@ -902,6 +904,8 @@ final class JobQueueMigrationTest {
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
+      // This version already owns the privacy-safe ledger; V14 alters its existing columns.
+      stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_TABLE);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_UID_INDEX);
       stmt.execute("PRAGMA user_version = 11");
@@ -921,9 +925,9 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(13, rs.getInt(1));
+        assertEquals(14, rs.getInt(1));
       }
-      assertEquals(13, SqliteSchema.TARGET_VERSION);
+      assertEquals(14, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -958,19 +962,19 @@ final class JobQueueMigrationTest {
       assertEquals(1L, store.identityCount());
     }
 
-    // A V14 database was written by a newer binary: refused, not silently downgraded.
-    Path futurePath = tempDir.resolve("v14.db");
+    // A V15 database was written by a newer binary: refused, not silently downgraded.
+    Path futurePath = tempDir.resolve("v15.db");
     try (Connection conn =
             DriverManager.getConnection("jdbc:sqlite:" + futurePath.toAbsolutePath());
         Statement stmt = conn.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
-      stmt.execute("PRAGMA user_version = 14");
+      stmt.execute("PRAGMA user_version = 15");
     }
     SqliteJobQueue future = new SqliteJobQueue(futurePath);
     try {
       SQLException refusal = assertThrows(SQLException.class, future::open);
       assertTrue(
-          refusal.getMessage().contains("14"),
+          refusal.getMessage().contains("15"),
           "the refusal must name the unsupported version: " + refusal.getMessage());
     } finally {
       future.close();
@@ -1017,6 +1021,8 @@ final class JobQueueMigrationTest {
     try (Connection conn = DriverManager.getConnection(jdbcUrl);
         Statement stmt = conn.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
+      // This version already owns the privacy-safe ledger; V14 alters its existing columns.
+      stmt.execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_TABLE);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_UID_INDEX);
       stmt.execute(SqliteSchema.CREATE_DOCUMENT_IDENTITY_IMPORT_TABLE);
@@ -1034,7 +1040,7 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(13, rs.getInt(1));
+        assertEquals(14, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {

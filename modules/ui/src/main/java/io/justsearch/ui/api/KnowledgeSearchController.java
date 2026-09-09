@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
@@ -287,6 +289,7 @@ public class KnowledgeSearchController {
    * Body: { "query": "search text", "limit": 10 }
    */
   public void handleSearch(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     long startNs = System.nanoTime();
     try {
       // Tempdoc 502: inline state check removed — POST /api/knowledge/search is
@@ -418,7 +421,7 @@ public class KnowledgeSearchController {
           new KnowledgeSearchRequest(
               query, limit, modeText, sortText, cursorText, workerProjection, filters, boostFilters,
               facets, querySyntaxText, includeExcerpts, debug, pipelineConfig);
-      KnowledgeSearchResponse response = adapter.search(req);
+      KnowledgeSearchResponse response = adapter.search(req, engineContext);
 
       // Tempdoc 580 §17 (Track C P1) — stable per-query join key. The FE echoes it back with a
       // result-disposition (P3) so "what came of a result" joins to the persisted ranking features
@@ -692,10 +695,11 @@ public class KnowledgeSearchController {
    * GET /api/knowledge/status
    */
   public void handleStatus(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     try {
       if (isWorkerReady()) {
         try {
-          KnowledgeStatus indexStatus = adapter.status();
+          KnowledgeStatus indexStatus = adapter.status(engineContext);
           KnowledgeStatusView view = KnowledgeStatusView.from(indexStatus);
           cachedStatus = new CachedStatus(view, System.currentTimeMillis());
           ctx.json(view);
@@ -758,6 +762,7 @@ public class KnowledgeSearchController {
    * Body: { "paths": ["/path/to/file1", "/path/to/file2"], "collection": "notes" (optional) }
    */
   public void handleIngest(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
@@ -784,7 +789,7 @@ public class KnowledgeSearchController {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
         return;
       }
-      List<IngestCollectionPolicy.RootBinding> rootBindings = watchedRootBindings();
+      List<IngestCollectionPolicy.RootBinding> rootBindings = watchedRootBindings(engineContext);
 
       log.info("Knowledge ingest request: {} roots", paths.size());
 
@@ -827,7 +832,7 @@ public class KnowledgeSearchController {
           // precedent: no released users, no migration); they acquire a tag on re-index.
           String collection = IngestCollectionPolicy.resolve(requestedCollection, input, rootBindings);
           if (Files.isDirectory(input)) {
-              var scanResp = adapter.scanRoot(input.toString(), collection, excludeGlobs);
+              var scanResp = adapter.scanRoot(input.toString(), collection, excludeGlobs, engineContext);
               if (scanId == null && scanResp.scanId() != null && !scanResp.scanId().isEmpty()) {
                   scanId = scanResp.scanId();
               }
@@ -843,7 +848,7 @@ public class KnowledgeSearchController {
       }
       for (Map.Entry<String, List<Path>> group : singleFilesByCollection.entrySet()) {
           String collection = group.getKey().isEmpty() ? null : group.getKey();
-          var ingestResp = adapter.ingest(group.getValue(), collection);
+          var ingestResp = adapter.ingest(group.getValue(), collection, engineContext);
           totalAdmitted += ingestResp.accepted();
           if (ingestResp.error() != null && !ingestResp.error().isEmpty()) {
               terminalReasons.add("files:" + ingestResp.error());
@@ -878,9 +883,9 @@ public class KnowledgeSearchController {
    * Worker is not connected, an empty binding list makes every path resolve out-of-root, which is
    * the safe direction (a real tag rather than the pre-811 {@code null}).
    */
-  private List<IngestCollectionPolicy.RootBinding> watchedRootBindings() {
+  private List<IngestCollectionPolicy.RootBinding> watchedRootBindings(EngineContext engineContext) {
     try {
-      return knowledgeServer.client().getWatchedRoots().stream()
+      return knowledgeServer.client().getWatchedRoots(engineContext).stream()
           .filter(r -> r != null && r.path() != null)
           .map(r -> new IngestCollectionPolicy.RootBinding(r.path(), r.collection()))
           .toList();
@@ -896,6 +901,7 @@ public class KnowledgeSearchController {
    * <p>GET /api/knowledge/suggest?query=prefix&amp;limit=5
    */
   public void handleSuggest(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     try {
       if (!isWorkerReady()) {
         Map<String, Object> resp = new java.util.LinkedHashMap<>(
@@ -929,7 +935,7 @@ public class KnowledgeSearchController {
         // best-effort
       }
 
-      List<String> suggestions = adapter.suggest(query, limit);
+      List<String> suggestions = adapter.suggest(query, limit, engineContext);
       ctx.json(Map.of("suggestions", suggestions));
 
     } catch (KnowledgeClientException e) {
@@ -951,6 +957,7 @@ public class KnowledgeSearchController {
    * Body: { "parentPath": "D:\\Documents\\", "maxFolders": 200 }
    */
   public void handleListFolders(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
@@ -971,7 +978,7 @@ public class KnowledgeSearchController {
           redact(new SensitiveQuery(parentPath)), maxFolders);
 
       FolderBrowseRequest req = new FolderBrowseRequest(parentPath, maxFolders);
-      FolderBrowseResponse response = adapter.listFolders(req);
+      FolderBrowseResponse response = adapter.listFolders(req, engineContext);
       ctx.json(response);
 
     } catch (KnowledgeClientException e) {
@@ -990,6 +997,7 @@ public class KnowledgeSearchController {
    * Body: { "folderPath": "D:\\Documents\\Reports\\", "limit": 100 }
    */
   public void handleListFolderFiles(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
@@ -1015,7 +1023,7 @@ public class KnowledgeSearchController {
           redact(new SensitiveQuery(folderPath)), limit);
 
       FolderFilesRequest req = new FolderFilesRequest(folderPath, limit, projection);
-      FolderFilesResponse response = adapter.listFolderFiles(req);
+      FolderFilesResponse response = adapter.listFolderFiles(req, engineContext);
       ctx.json(response);
 
     } catch (KnowledgeClientException e) {

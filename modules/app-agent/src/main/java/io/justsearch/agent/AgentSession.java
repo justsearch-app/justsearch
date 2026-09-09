@@ -184,16 +184,25 @@ final class AgentSession {
   private boolean terminated;
 
   /** Backward-compatible constructor for single-agent sessions (no initial agent ID). */
-  AgentSession(List<Map<String, Object>> messages, int initialBudget) {
-    this(messages, initialBudget, null);
+  AgentSession(List<Map<String, Object>> messages, int initialBudget,
+      io.justsearch.core.context.EngineContext engineContext) {
+    this(messages, initialBudget, null, engineContext);
   }
 
-  AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId) {
+  AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId,
+      io.justsearch.core.context.EngineContext engineContext) {
+    this.engineContext = Objects.requireNonNull(engineContext, "engineContext");
     this.messages = new ArrayList<>(messages);
     this.budgetRemaining = new AtomicInteger(initialBudget);
     this.promptTokensConsumed = new AtomicInteger(0);
     this.completionTokensConsumed = new AtomicInteger(0);
     this.activeAgentId = initialAgentId != null ? initialAgentId : "primary";
+  }
+
+  private final io.justsearch.core.context.EngineContext engineContext;
+
+  io.justsearch.core.context.EngineContext engineContext() {
+    return engineContext;
   }
 
   List<Map<String, Object>> messages() {

@@ -151,6 +151,7 @@ final class ApiSecurityFilters {
     setupMcpOriginValidation(app);
     setupCors(app, prodMode);
     setupSessionTokenEnforcement(app);
+    app.before(ctx -> RequestEngineContext.get(ctx));
     setupOperationAdmission(app);
     setupCapabilityGates(app);
   }

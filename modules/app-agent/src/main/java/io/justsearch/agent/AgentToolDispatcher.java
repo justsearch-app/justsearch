@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentErrorCode;
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.ToolCallRequest;
@@ -81,7 +83,7 @@ final class AgentToolDispatcher {
     this.intentPreviewerSupplier = intentPreviewerSupplier;
   }
 
-  OperationResult executeOperationWithPolicy(Operation op, ToolCallRequest call, String sessionId) {
+  OperationResult executeOperationWithPolicy(Operation op, ToolCallRequest call, String sessionId, EngineContext engineContext) {
     Span toolSpan = GlobalOpenTelemetry.getTracer(AgentLoopService.TRACER_SCOPE).spanBuilder("execute_tool " + call.toolName())
         .setSpanKind(SpanKind.INTERNAL)
         .setAttribute("gen_ai.operation.name", "execute_tool")
@@ -102,7 +104,7 @@ final class AgentToolDispatcher {
       int attempt = 0;
       while (true) {
         try {
-          OperationResult result = dispatchToolCall(op, call, sessionId);
+          OperationResult result = dispatchToolCall(op, call, sessionId, engineContext);
           toolSpan.setStatus(StatusCode.OK);
           return result;
         } catch (Exception e) {
@@ -151,7 +153,7 @@ final class AgentToolDispatcher {
    * invariant (slice 487 Phase 1.7 §6.1 audit-test gate). New dispatch paths
    * must route through {@code backendIntentRouter}, not the executor directly.
    */
-  OperationResult dispatchToolCall(Operation op, ToolCallRequest call, String sessionId) {
+  OperationResult dispatchToolCall(Operation op, ToolCallRequest call, String sessionId, EngineContext engineContext) {
     BackendIntentRouter router = routerSupplier.get();
     if (router != null) {
       // Tempdoc 560 Phase 2 + 561 P-A1: the "mint a bound consent capsule + route through the intent
@@ -166,12 +168,12 @@ final class AgentToolDispatcher {
           call.arguments(),
           sessionId == null || sessionId.isBlank()
               ? java.util.Optional.empty()
-              : java.util.Optional.of(sessionId));
+              : java.util.Optional.of(sessionId), engineContext);
     }
     // Legacy fallback for test wiring without the intent router. Slice 487
     // Phase 1.7 audit-test gate ratifies this is the ONLY direct dispatcher
     // call site in modules/app-agent.
-    return operationExecutor.dispatch(op, call.arguments());
+    return operationExecutor.dispatch(op, call.arguments(), engineContext);
   }
 
   // Tempdoc S7 — the search tool's registered Operation id (AgentToolsOperationCatalog.SEARCH_INDEX

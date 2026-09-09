@@ -188,6 +188,42 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
+  /** The existing queue lock serializes coalescing with every other buffered admission. */
+  boolean putSyncRoot(String key, SwitchBufferSyncRoot incoming) {
+    lock.lock();
+    try {
+      return put(key, "SYNC_ROOT", preserveSyncAdmission(connSupplier.get(), key, incoming));
+    } catch (SQLException e) {
+      if (onWriteFailure != null) onWriteFailure.run();
+      log.error("Cannot preserve buffered sync attribution; caller must NOT ACK key={}", key, e);
+      return false;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private String preserveSyncAdmission(Connection conn, String key, SwitchBufferSyncRoot incoming)
+      throws SQLException {
+    if (incoming.provenance() != null) return incoming.encode();
+    try (PreparedStatement prior = conn.prepareStatement(
+        "SELECT op, payload FROM switch_buffer WHERE key = ?")) {
+      prior.setString(1, key);
+      try (ResultSet rows = prior.executeQuery()) {
+        if (!rows.next()) return incoming.encode();
+        if (!"SYNC_ROOT".equals(rows.getString(1))) {
+          throw new SQLException("Cannot coalesce maintenance over a different buffered operation");
+        }
+        try {
+          var previous = SwitchBufferSyncRoot.decode(rows.getString(2));
+          return new SwitchBufferSyncRoot(incoming.rootPath(), incoming.force(), previous.provenance()).encode();
+        } catch (IllegalArgumentException | tools.jackson.core.JacksonException malformed) {
+          // Do not erase an unreadable durable request by acknowledging a maintenance replacement.
+          throw new SQLException("Cannot coalesce maintenance over an unreadable SYNC_ROOT", malformed);
+        }
+      }
+    }
+  }
+
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
   List<SwitchBufferCapableQueue.SwitchBufferOp> listAll() {
     lock.lock();

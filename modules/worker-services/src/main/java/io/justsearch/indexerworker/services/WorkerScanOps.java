@@ -226,7 +226,7 @@ final class WorkerScanOps {
               return FileVisitResult.CONTINUE;
             }
             if (isCloudPlaceholder.test(file)) {
-              cloudPlaceholderRecorder.record(file);
+              cloudPlaceholderRecorder.record(file, collection, request.provenance());
               counters[2]++;
               return FileVisitResult.CONTINUE;
             }
@@ -237,7 +237,7 @@ final class WorkerScanOps {
             counters[1]++;
             bytes[0] += attrs.size();
             // 813 Slice B: the walk already holds the size — no extra stat.
-            batch.add(new JobQueue.EnqueueEntry(file, attrs.size()));
+            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance()));
             if (batch.size() >= ENQUEUE_BATCH_SIZE) {
               awaitQueueBelowThreshold();
               flushBatch(batch, collection, enqueueScanId, forceReindex);
@@ -418,15 +418,23 @@ final class WorkerScanOps {
    * but does not generate it.
    */
   record ScanRequest(
-      Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId) {
+      Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId,
+      JobQueue.EnqueueProvenance provenance) {
     public ScanRequest {
       Objects.requireNonNull(root, "root");
+      Objects.requireNonNull(provenance, "provenance");
       excludeGlobs = excludeGlobs == null ? List.of() : List.copyOf(excludeGlobs);
       mode = mode == null ? ScanMode.INITIAL : mode;
       scanId = scanId == null ? "" : scanId;
     }
 
-    /** Back-compat constructor for callers that don't supply a scanId. */
+    /** Internal maintenance scan without a caller's admission attribution. */
+    public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs,
+        String scanId) {
+      this(root, collection, mode, excludeGlobs, scanId, CallContext.none().provenance());
+    }
+
+    /** Internal maintenance scan without an externally allocated scan id. */
     public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs) {
       this(root, collection, mode, excludeGlobs, "");
     }

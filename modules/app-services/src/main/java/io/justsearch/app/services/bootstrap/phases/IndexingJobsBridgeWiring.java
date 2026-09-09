@@ -51,7 +51,11 @@ public final class IndexingJobsBridgeWiring {
         new RemoteIndexingJobsBridge(
             () -> {
               KnowledgeClient kc = knowledgeClientSupplier.get();
-              return kc == null ? null : (IndexingJobsSource) kc::subscribeIndexingJobs;
+              return kc == null ? null : (IndexingJobsSource) (onFrame, onError, onCompleted) ->
+                  kc.subscribeIndexingJobs(onFrame, onError, onCompleted,
+                      io.justsearch.app.services.intent.EngineProvenance.internal(
+                          "indexing-jobs-bridge", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
             });
     RemoteIndexingJobsBridge.Subscription subscription =
         bridge.subscribe(delta -> {

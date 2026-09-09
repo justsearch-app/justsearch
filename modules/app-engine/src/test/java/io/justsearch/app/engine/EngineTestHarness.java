@@ -127,7 +127,7 @@ final class EngineTestHarness implements AutoCloseable {
   }
 
   StatusResponse status() {
-    return client.getStatus();
+    return client.getStatus(TestEngineContexts.FOREGROUND);
   }
 
   /** The worker's coarse lifecycle state ({@code IDLE}, {@code INDEXING}, {@code PAUSED}, …). */
@@ -172,7 +172,7 @@ final class EngineTestHarness implements AutoCloseable {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        if (satisfied.test(client.search(marker, 10).getResultsCount())) {
+        if (satisfied.test(client.search(marker, 10, TestEngineContexts.FOREGROUND).getResultsCount())) {
           return true;
         }
       } catch (RuntimeException stillSettling) {

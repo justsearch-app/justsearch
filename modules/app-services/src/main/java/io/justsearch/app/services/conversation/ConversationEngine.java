@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ExecutionMode;
 import io.justsearch.agent.api.conversation.InjectorResult;
@@ -205,7 +207,7 @@ public final class ConversationEngine {
       ConversationShapeRef shapeId,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink) {
+      Consumer<SseEvent> sink, EngineContext engineContext) {
     Objects.requireNonNull(shapeId, "shapeId");
     Objects.requireNonNull(audience, "audience");
     Objects.requireNonNull(sink, "sink");
@@ -222,8 +224,8 @@ public final class ConversationEngine {
     validateAudience(shape, audience);
 
     switch (shape.executionMode()) {
-      case SHAPE_DRIVEN -> dispatchShapeDriven(shape, safeBody, audience, sink);
-      case SUBSTRATE_DRIVEN -> dispatchSubstrateDriven(shape, safeBody, audience, sink);
+      case SHAPE_DRIVEN -> dispatchShapeDriven(shape, safeBody, audience, sink, engineContext);
+      case SUBSTRATE_DRIVEN -> dispatchSubstrateDriven(shape, safeBody, audience, sink, engineContext);
     }
   }
 
@@ -259,7 +261,7 @@ public final class ConversationEngine {
       ConversationShape shape,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink) {
+      Consumer<SseEvent> sink, EngineContext engineContext) {
     ShapeRunner runner = runnersByShape.get(shape.id());
     if (runner == null) {
       throw new IllegalStateException(
@@ -290,7 +292,7 @@ public final class ConversationEngine {
     dispatchBody.put(RECORDS_TO_THREAD_KEY, recordKey != null);
 
     if (recordKey == null) {
-      runner.run(dispatchBody, audience, sink);
+      runner.run(dispatchBody, audience, sink, engineContext);
       return;
     }
 
@@ -318,7 +320,7 @@ public final class ConversationEngine {
             recordShapeDrivenAnswer(recordKey, shape, event.payload(), runId.get());
           }
           sink.accept(event);
-        });
+        }, engineContext);
   }
 
   /**
@@ -370,7 +372,7 @@ public final class ConversationEngine {
       ConversationShape shape,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink) {
+      Consumer<SseEvent> sink, EngineContext engineContext) {
     // Tempdoc 834 §4.3 — the turn-open marker is cleared HERE, in a finally around the whole
     // dispatch body, because that body has EIGHT exits (injector terminated, AI unavailable,
     // LlmStreamException, consumer onDone threw, controller next threw, STOP_SUCCESS, STOP_ERROR,
@@ -379,7 +381,7 @@ public final class ConversationEngine {
     // exactly the condition it encodes.
     var openTurnKey = new AtomicReference<String>();
     try {
-      dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey);
+      dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey, engineContext);
     } finally {
       String key = openTurnKey.get();
       if (key != null && conversationStore != null) {
@@ -397,7 +399,7 @@ public final class ConversationEngine {
       Map<String, Object> body,
       Audience audience,
       Consumer<SseEvent> sink,
-      AtomicReference<String> openTurnKey) {
+      AtomicReference<String> openTurnKey, EngineContext engineContext) {
     LOG.debug("Dispatching substrate-driven {} (audience={})", shape.id().value(), audience);
 
     // Resolve SPI implementations from registries.
@@ -430,7 +432,7 @@ public final class ConversationEngine {
     String threadId = threadRecordId(shape, sessionId, body);
     EngineConversationContext ctx =
         new EngineConversationContext(
-            initialMessages, audience, sessionId, shape.id().value(), body);
+            initialMessages, audience, sessionId, shape.id().value(), body, engineContext);
 
     // Tempdoc 610 §J.3 — seed the conversation's hidden retrieved-source ids (the store is the source
     // of truth, mirroring per-message exclude) so RAGContext can drop them from this turn's retrieval.

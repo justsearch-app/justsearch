@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.util.List;
 
 /**
@@ -30,7 +32,7 @@ public interface ExcludesService {
    * @return summary of the operation
    * @throws Exception on Worker IO failure, walk failure, or filesystem error
    */
-  ExcludesResult applyExcludes(boolean dryRun) throws Exception;
+  ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception;
 
   /**
    * Result of an apply (or preview) operation. Mirrors the pre-existing

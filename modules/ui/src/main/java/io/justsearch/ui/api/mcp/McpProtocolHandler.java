@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.agent.api.registry.ResourceCatalog;
 import io.justsearch.app.api.ApiErrorCode;
@@ -79,6 +81,7 @@ public final class McpProtocolHandler {
   }
 
   public void handlePost(Context ctx) {
+    var engineContext = io.justsearch.ui.api.RequestEngineContext.get(ctx);
     String sessionId = ctx.header("Mcp-Session-Id");
     String body = ctx.body();
 
@@ -118,13 +121,13 @@ public final class McpProtocolHandler {
       Object result = switch (method) {
         case "initialize" -> handleInitialize(ctx, params);
         case "tools/list" -> surface.listTools();
-        case "tools/call" -> handleToolsCall(params, sessionId);
+        case "tools/call" -> handleToolsCall(params, sessionId, engineContext);
         case "resources/list" -> surface.listResources(resourceCatalogs);
-        case "resources/read" -> handleResourcesRead(params);
+        case "resources/read" -> handleResourcesRead(params, engineContext);
         case "resources/subscribe" -> handleResourcesSubscribe(params, sessionId);
         case "resources/unsubscribe" -> handleResourcesUnsubscribe(params, sessionId);
         case "prompts/list" -> surface.listPrompts();
-        case "prompts/get" -> handlePromptsGet(params);
+        case "prompts/get" -> handlePromptsGet(params, engineContext);
         case "ping" -> Map.of();
         default -> {
           writeError(ctx, id, -32601, "Method not found: " + method);
@@ -249,7 +252,7 @@ public final class McpProtocolHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> handleToolsCall(Object paramsObj, String sessionId) {
+  private Map<String, Object> handleToolsCall(Object paramsObj, String sessionId, EngineContext engineContext) {
     var params = MAPPER.convertValue(paramsObj, Map.class);
     if (params == null) return McpToolSurface.errorContent("Invalid params", ApiErrorCode.INVALID_REQUEST);
     String toolName = (String) params.get("name");
@@ -260,24 +263,24 @@ public final class McpProtocolHandler {
     String requestedBy = sessionId != null && sessions.get(sessionId) != null
         ? sessions.get(sessionId).clientName
         : null;
-    return surface.callTool(toolName, arguments, sessionId, requestedBy);
+    return surface.callTool(toolName, arguments, sessionId, requestedBy, engineContext);
   }
 
-  private Map<String, Object> handleResourcesRead(Object paramsObj) {
+  private Map<String, Object> handleResourcesRead(Object paramsObj, EngineContext engineContext) {
     @SuppressWarnings("unchecked")
     var params = MAPPER.convertValue(paramsObj, Map.class);
     String uri = params != null ? (String) params.get("uri") : null;
-    return surface.readResource(uri);
+    return surface.readResource(uri, engineContext);
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> handlePromptsGet(Object paramsObj) {
+  private Map<String, Object> handlePromptsGet(Object paramsObj, EngineContext engineContext) {
     var params = MAPPER.convertValue(paramsObj, Map.class);
     if (params == null) return Map.of("messages", List.of());
     String name = (String) params.get("name");
     Map<String, String> arguments =
         (Map<String, String>) params.getOrDefault("arguments", Map.of());
-    return surface.getPrompt(name, arguments);
+    return surface.getPrompt(name, arguments, engineContext);
   }
 
   @SuppressWarnings("unchecked")

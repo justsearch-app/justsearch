@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.ipc.FetchDocumentSliceRequest;
 import io.justsearch.ipc.FetchDocumentSliceResponse;
 import io.justsearch.ipc.FetchDocumentsRequest;
@@ -63,7 +64,8 @@ class TestKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected <T> T executeSearchRpc(
-      String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc) {
+      String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc,
+      EngineContext engineContext) {
     if (search == null) {
       throw new UnsupportedOperationException("no SearchServiceCalls wired for " + operation);
     }
@@ -72,7 +74,8 @@ class TestKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected <T> T executeIngestRpc(
-      String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc) {
+      String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc,
+      EngineContext engineContext) {
     if (ingest == null) {
       throw new UnsupportedOperationException("no IngestServiceCalls wired for " + operation);
     }
@@ -81,13 +84,15 @@ class TestKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected <T> T executeHealthRpc(
-      String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc) {
+      String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc,
+      EngineContext engineContext) {
     throw new UnsupportedOperationException("no HealthServiceCalls wired for " + operation);
   }
 
   @Override
   protected ScanRootProgress executeScanRoot(
-      ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progress) {
+      ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progress,
+      EngineContext engineContext) {
     if (onScanRoot != null) {
       onScanRoot.accept(request);
     }
@@ -98,7 +103,8 @@ class TestKnowledgeClient extends KnowledgeClient {
 
   @Override
   public IndexingJobsStream subscribeIndexingJobs(
-      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted) {
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted,
+      EngineContext engineContext) {
     throw new UnsupportedOperationException("no job stream wired");
   }
 

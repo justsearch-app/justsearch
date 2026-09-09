@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.executor;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.app.services.intent.EngineProvenance;
+
 import io.justsearch.agent.api.registry.AuditPolicy;
 import io.justsearch.agent.api.registry.ConfirmationRequiredException;
 import io.justsearch.agent.api.registry.GateBehavior;
@@ -42,13 +45,21 @@ import java.util.function.Consumer;
  * know who did" — equivalence is intentional, not dead code), UNTRUSTED_PLUGIN throws
  * with a V1.5 sandbox doc pointer.
  *
- * <p>Per §E.3: {@link #undo(Operation, String)} checks
+ * <p>Per §E.3: {@link #undo(Operation, String, EngineContext)} checks
  * {@code op.policy().undoSupported()} before delegating; operations without undo
  * support fail fast with a typed denial, never reaching the handler. Per tempdoc 875 §C.7 it
  * then meets the SAME trust lattice a forward dispatch meets — a reversal is an operation and
  * inherits the risk class of its forward form.
  */
 public final class OperationExecutorImpl implements OperationDispatcher {
+  private static void validateEngineContext(
+      EngineContext engineContext, InvocationProvenance provenance) {
+    var projected = EngineProvenance.invocation(engineContext, provenance.executor(),
+        provenance.occurredAt(), provenance.signedIntentToken());
+    if (!projected.equals(provenance)) {
+      throw new IllegalArgumentException("Invocation provenance disagrees with Engine context");
+    }
+  }
 
   private static final org.slf4j.Logger LOG =
       org.slf4j.LoggerFactory.getLogger(OperationExecutorImpl.class);
@@ -288,18 +299,18 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   }
 
   @Override
-  public OperationResult dispatch(Operation op, String argumentsJson) {
-    // Legacy 2-arg overload — defaults to system-internal provenance. Per slice 490
-    // §4.B, new call sites should use the 3-arg overload to carry transport / executor
-    // context. The fallback preserves observed shape for tests, agent-loop callers,
-    // and any code path that has not yet been threaded for provenance.
-    return dispatch(op, argumentsJson, InvocationProvenance.systemInternal(clock.instant()));
+  public OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext) {
+    // Project the caller's required context for direct UI dispatch without a signed intent.
+    // Explicit executor/token callers use the canonical overload below.
+    return dispatch(op, argumentsJson,
+        EngineProvenance.invocation(engineContext,
+            io.justsearch.agent.api.registry.ExecutorTag.UI, clock.instant(), Optional.empty()), engineContext);
   }
 
   @Override
   public OperationResult dispatch(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
-    return dispatch(op, argumentsJson, provenance, Optional.empty());
+      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
+    return dispatch(op, argumentsJson, provenance, Optional.empty(), engineContext);
   }
 
   @Override
@@ -307,11 +318,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Operation op,
       String argumentsJson,
       InvocationProvenance provenance,
-      Optional<String> confirmationToken) {
+      Optional<String> confirmationToken, EngineContext engineContext) {
     Objects.requireNonNull(op, "op");
     Objects.requireNonNull(argumentsJson, "argumentsJson");
     Objects.requireNonNull(provenance, "provenance");
     Objects.requireNonNull(confirmationToken, "confirmationToken");
+    validateEngineContext(engineContext, provenance);
     // Slice 490 follow-up — provenance integrity validation. A {@code TRUSTED_PLUGIN}
     // caller cannot spoof user-facing transports (BUTTON / URL_BAR / LLM_EMISSION etc.)
     // — only system-tier or plugin-tier transports are admissible. {@code CORE}
@@ -323,7 +335,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     // validateProvenance (transport spoofing defense) and inputValidator.validate
     // (schema validation). Skipped silently when trust deps absent (legacy/test wiring).
     if (intentGateEvaluator != null) {
-      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken);
+      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, engineContext);
     }
 
     // Tempdoc 502 §B1: check required capabilities before dispatch.
@@ -359,8 +371,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     try {
       result =
           switch (op.provenance().tier()) {
-            case CORE -> dispatchCore(op, argumentsJson, provenance);
-            case TRUSTED_PLUGIN -> dispatchTrustedPlugin(op, argumentsJson, provenance);
+            case CORE -> dispatchCore(op, argumentsJson, provenance, engineContext);
+            case TRUSTED_PLUGIN -> dispatchTrustedPlugin(op, argumentsJson, provenance, engineContext);
             case UNTRUSTED_PLUGIN -> throw new UnsupportedOperationException(
                 "Untrusted plugin operations require V1.5 sandbox infrastructure. "
                     + "See docs/tempdocs/421-frontend-destination-architecture/421-stack.md "
@@ -527,12 +539,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   }
 
   @Override
-  public OperationResult undo(Operation op, String executionId) {
+  public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
     // Legacy 2-arg overload — defaults to system-internal provenance and no confirmation
     // token, exactly as the 2-arg dispatch does. Callers that know their transport should
     // use the 4-arg overload so the gate sees the real source tier.
     return undo(
-        op, executionId, InvocationProvenance.systemInternal(clock.instant()), Optional.empty());
+        op, executionId, EngineProvenance.invocation(engineContext,
+            io.justsearch.agent.api.registry.ExecutorTag.UI, clock.instant(), Optional.empty()),
+        Optional.empty(), engineContext);
   }
 
   /**
@@ -557,11 +571,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Operation op,
       String executionId,
       InvocationProvenance provenance,
-      Optional<String> confirmationToken) {
+      Optional<String> confirmationToken, EngineContext engineContext) {
     Objects.requireNonNull(op, "op");
     Objects.requireNonNull(executionId, "executionId");
     Objects.requireNonNull(provenance, "provenance");
     Objects.requireNonNull(confirmationToken, "confirmationToken");
+    validateEngineContext(engineContext, provenance);
     if (!op.policy().undoSupported()) {
       return OperationResult.failure("Undo not supported by " + op.id().value());
     }
@@ -569,7 +584,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     validateProvenance(op, provenance);
     if (intentGateEvaluator != null) {
       enforceTrustLattice(
-          op, OperationDispatcher.undoArguments(executionId), provenance, confirmationToken);
+          op, OperationDispatcher.undoArguments(executionId), provenance, confirmationToken, engineContext);
     }
     if (capabilityResolver != null) {
       var missingCap = checkCapabilities(op);
@@ -590,7 +605,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     Instant startTime = clock.instant();
     OperationResult result;
     try {
-      result = handler.undo(executionId);
+      result = handler.undo(executionId, engineContext);
     } catch (RuntimeException e) {
       emitHistory(op, startTime, OperationOutcome.FAILURE, e.getMessage(), provenance, Optional.empty());
       throw e;
@@ -601,7 +616,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   }
 
   private OperationResult dispatchCore(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
+      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
     OperationHandler handler =
         handlers
             .resolve(new OperationRef(op.binding().handlerId()))
@@ -612,11 +627,11 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     // transport / source-tier visibility (e.g., NavigateToSurfaceHandler) read it
     // from provenance. Handlers that don't override the overload get the default
     // delegation to execute(argumentsJson) — no behavior change.
-    return handler.execute(argumentsJson, provenance);
+    return handler.execute(argumentsJson, provenance, engineContext);
   }
 
   private OperationResult dispatchTrustedPlugin(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
+      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
     // V1's trust model is "you wrote it, or you know who did" — TRUSTED_PLUGIN
     // operations execute equivalently to CORE in V1. This is intentional, not dead
     // code: V1 plugins (per slice 3a.7) DO produce TRUSTED_PLUGIN-marked operations
@@ -626,7 +641,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     if (op.provenance().tier() != TrustTier.TRUSTED_PLUGIN) {
       throw new IllegalStateException("Expected TRUSTED_PLUGIN, got " + op.provenance().tier());
     }
-    return dispatchCore(op, argumentsJson, provenance);
+    return dispatchCore(op, argumentsJson, provenance, engineContext);
   }
 
   /**
@@ -655,7 +670,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Operation op,
       String argumentsJson,
       InvocationProvenance provenance,
-      Optional<String> confirmationToken) {
+      Optional<String> confirmationToken, EngineContext engineContext) {
     // Tempdoc 550 thesis III: ONE structural verdict (derived source tier + (SourceTier × RiskTier)
     // lattice gate + Global Hard Stop override), the same computation/instance the Preview endpoint
     // reads. The E2 hard-stop DENY (engaged → DENY every UNTRUSTED dispatch, user-driven untouched)
@@ -683,8 +698,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         var scope = this.durableGrantScope;
         if (durable != null
             && durable.isAllowed(
-                op.id().value(), op.policy().capabilityFamily(), op.policy().risk(), sourceTier)
-            && scope.coversArguments(op, argumentsJson)) {
+                op.id().value(), op.policy().capabilityFamily(), op.policy().risk(), engineContext)
+            && scope.coversArguments(op, argumentsJson, engineContext)) {
           emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
           return; // durable-grant-satisfied

@@ -402,7 +402,7 @@ public final class ActionLedgerProjection {
   /** Coarse originator attribution derived from the source transport. */
   public static String originatorOf(TransportTag transport) {
     return switch (transport) {
-      case LLM_EMISSION, AGENT_LOOP, MCP -> "agent";
+      case LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP -> "agent";
       case SYSTEM_INTERNAL, SCHEDULED, RULE_ENGINE -> "system";
       default -> "user";
     };

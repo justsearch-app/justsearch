@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.conversation.BranchesPreventDeletionException;
@@ -208,6 +210,7 @@ public final class ChatController {
   }
 
   private void dispatch(Context ctx, ConversationShapeRef shapeId, String route) {
+    var engineContext = RequestEngineContext.get(ctx);
     // Tempdoc 734 round-14 F4 — the locked gate runs BEFORE the SSE headers commit a 200: with chat
     // persistence encrypted and locked, a turn that would be recorded is accepted-and-dropped (the
     // append throws, nothing reaches disk, and the transcript after unlock holds no trace of it). The
@@ -244,7 +247,7 @@ public final class ChatController {
                   shapeId,
                   parsedBody,
                   readAudience(ctx),
-                  sseEvent -> sseWriter.writeEvent(ctx, sseEvent.name(), sseEvent.payload())));
+                  sseEvent -> sseWriter.writeEvent(ctx, sseEvent.name(), sseEvent.payload()), engineContext));
     } catch (Exception impossible) {
       // runToSink catches every mid-run failure and reports it ON THE RUN (§15.1.3); the only way
       // out of `around` is therefore a failure of the heartbeat plumbing itself, which must not be
@@ -273,9 +276,9 @@ public final class ChatController {
       ConversationShapeRef shapeId,
       Map<String, Object> body,
       Audience audience,
-      java.util.function.Consumer<SseEvent> sink) {
+      java.util.function.Consumer<SseEvent> sink, EngineContext engineContext) {
     try {
-      engine.run(shapeId, body, audience, sink);
+      engine.run(shapeId, body, audience, sink, engineContext);
     } catch (ConversationEngine.AudienceDeniedException denied) {
       LOG.info("Audience denied for shape {}: {}", shapeId.value(), denied.getMessage());
       sink.accept(errorEvent(denied.getMessage(), ApiErrorCode.INVALID_REQUEST));

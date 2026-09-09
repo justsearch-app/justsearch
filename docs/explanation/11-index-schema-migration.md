@@ -480,6 +480,13 @@ The Worker uses a cutover fence:
 - While in `SWITCHING`, mutating ingest RPCs are **durably buffered** into `jobs.db.switch_buffer`.
 - After restart on the new active generation, the Worker replays buffered ops before resuming normal processing.
 
+File UPSERT payloads are versioned and preserve collection plus the admitting caller's coarse
+originator and transport. Pre-C1 raw path payloads remain readable with unknown attribution.
+Replay retains the buffer if decoding or enqueueing fails.
+Directory sync uses versioned root/force payloads with paired nullable originator/transport fields;
+legacy unversioned root/force payloads retain unknown attribution. Replay runs as internal work
+and restores the original descriptive attribution separately, without reconstructing caller authority.
+
 **Fail-closed semantics:** Buffering is part of the write path—if `putSwitchBuffer()` fails (SQL error), the ingest port calls fail with `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. The `worker.switch_buffer.write_failures` telemetry counter tracks such failures.
 
 Buffered operations include (current):

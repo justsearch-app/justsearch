@@ -119,7 +119,7 @@ final class EngineReadWhileWriteTest {
             () -> {
               while (searching.get()) {
                 try {
-                  SearchResponse response = client.search("read while write probe", 10);
+                  SearchResponse response = client.search("read while write probe", 10, TestEngineContexts.FOREGROUND);
                   // Reading the payload is deliberate: a response object nobody touches would let
                   // a half-built response pass for a successful search.
                   if (response.getResultsCount() < 0) {
@@ -150,7 +150,7 @@ final class EngineReadWhileWriteTest {
       int accepted = 0;
       for (int from = 0; from < corpus.size(); from += SUBMIT_CHUNK) {
         int to = Math.min(from + SUBMIT_CHUNK, corpus.size());
-        accepted += client.submitBatch(corpus.subList(from, to)).getAcceptedCount();
+        accepted += client.submitBatch(corpus.subList(from, to), TestEngineContexts.FOREGROUND).getAcceptedCount();
       }
       assertTrue(accepted > 0, "the corpus must have been accepted for indexing");
 
@@ -182,7 +182,7 @@ final class EngineReadWhileWriteTest {
         awaitSearchable("read while write probe", 120_000),
         "the documents written during the concurrent read load must be findable afterwards");
     assertTrue(
-        client.getStatus().getCore().getDocCount() > 0,
+        client.getStatus(TestEngineContexts.FOREGROUND).getCore().getDocCount() > 0,
         "the index must report the documents it accepted");
     // The gauge must come back to rest. Polled rather than read once: shutdownNow interrupts the
     // readers, and an interrupted CALLER is released before the worker thread it handed the search
@@ -197,7 +197,7 @@ final class EngineReadWhileWriteTest {
   @DisplayName("many concurrent callers are all served, and the foreground gate balances")
   void manyConcurrentCallersAreAllServed(@TempDir Path tempDir) throws Exception {
     start(tempDir);
-    assertTrue(client.isHealthy(), "the engine must be healthy before the concurrent phase");
+    assertTrue(client.isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before the concurrent phase");
 
     CountDownLatch done = new CountDownLatch(STRESS_THREADS);
     AtomicInteger successCount = new AtomicInteger();
@@ -214,8 +214,8 @@ final class EngineReadWhileWriteTest {
                     for (int r = 0; r < STRESS_REQUESTS_PER_THREAD; r++) {
                       // Both sides of the port: a health call (ungated) and a search (gated), so
                       // the concurrency covers the ForegroundLoadGate path as well.
-                      boolean healthy = client.isHealthy();
-                      SearchResponse response = client.search("concurrent caller probe", 5);
+                      boolean healthy = client.isHealthy(TestEngineContexts.FOREGROUND);
+                      SearchResponse response = client.search("concurrent caller probe", 5, TestEngineContexts.FOREGROUND);
                       // This phase has an empty index; a successful search must return no hits.
                       if (healthy && response.getResultsCount() == 0) {
                         successCount.incrementAndGet();
@@ -304,7 +304,7 @@ final class EngineReadWhileWriteTest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline && searchError.get() == null) {
       try {
-        if (client.getStatus().getCore().getQueueDepth() == 0) {
+        if (client.getStatus(TestEngineContexts.FOREGROUND).getCore().getQueueDepth() == 0) {
           return true;
         }
       } catch (RuntimeException stillSettling) {
@@ -319,7 +319,7 @@ final class EngineReadWhileWriteTest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        if (client.search(marker, 10).getResultsCount() > 0) {
+        if (client.search(marker, 10, TestEngineContexts.FOREGROUND).getResultsCount() > 0) {
           return true;
         }
       } catch (RuntimeException stillSettling) {

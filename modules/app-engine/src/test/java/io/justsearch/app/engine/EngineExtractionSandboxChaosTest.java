@@ -183,7 +183,7 @@ final class EngineExtractionSandboxChaosTest {
 
     engine = EngineTestHarness.start(dataDir, dataDir.resolve("index"), Map.of());
     attachExtractorLog();
-    assertTrue(engine.client().isHealthy(), "the index half must be healthy before the chaos");
+    assertTrue(engine.client().isHealthy(TestEngineContexts.FOREGROUND), "the index half must be healthy before the chaos");
 
     // The silent-fallback trap: if the child command had failed its startup probe, extraction would
     // be in-process and every assertion below would pass while testing nothing.
@@ -253,7 +253,7 @@ final class EngineExtractionSandboxChaosTest {
         MARKER_AFTER_OOM);
 
     // --- The headline: one index half served through all three failure classes.
-    assertTrue(engine.client().isHealthy(),
+    assertTrue(engine.client().isHealthy(TestEngineContexts.FOREGROUND),
         "the index half must still be healthy after three sandbox failures");
     assertTrue(engine.awaitSearchable(MARKER_AFTER_TIMEOUT, 30_000)
             && engine.awaitSearchable(MARKER_AFTER_CRASH, 30_000)
@@ -327,7 +327,7 @@ final class EngineExtractionSandboxChaosTest {
    */
   private List<String> submitAndAwaitExtractorBranch(
       Path file, String branchPrefix, long timeoutMs) throws Exception {
-    assertEquals(1, engine.client().submitBatch(List.of(file.toAbsolutePath())).getAcceptedCount(),
+    assertEquals(1, engine.client().submitBatch(List.of(file.toAbsolutePath()), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the index half must accept " + file.getFileName());
     String name = file.getFileName().toString();
     long deadline = System.currentTimeMillis() + timeoutMs;
@@ -422,7 +422,7 @@ final class EngineExtractionSandboxChaosTest {
    * the previous failure, which is what "the next file extracts normally" means.
    */
   private void submitAndAwaitSearchable(Path file, String marker) throws Exception {
-    assertEquals(1, engine.client().submitBatch(List.of(file.toAbsolutePath())).getAcceptedCount(),
+    assertEquals(1, engine.client().submitBatch(List.of(file.toAbsolutePath()), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the index half must accept " + file.getFileName());
     assertTrue(engine.awaitSearchable(marker, 180_000),
         "the file after a sandbox failure must extract normally and become searchable: "

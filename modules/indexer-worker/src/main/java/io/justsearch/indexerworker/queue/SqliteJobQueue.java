@@ -332,6 +332,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return switchBufferOps.put(key, op, payload);
   }
 
+  @Override
+  public boolean putSyncRoot(String key, SwitchBufferSyncRoot payload) {
+    return switchBufferOps.putSyncRoot(key, payload);
+  }
+
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
   @Override
   public List<SwitchBufferCapableQueue.SwitchBufferOp> listSwitchBufferOps() {
@@ -403,12 +408,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // there, the re-enqueue re-stats the file, so its silence really does mean unknown.
       String sql = """
           INSERT OR REPLACE INTO jobs
-            (path, state, attempts, last_updated, collection, size_bytes, scan_id)
+            (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport)
           VALUES (
             ?, 'PENDING', 0, ?,
             COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
             ?,
-            COALESCE(?, (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?)))
+            COALESCE(?, (SELECT prior.scan_id FROM jobs prior WHERE prior.path = ?)),
+            COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
+            COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)))
           """;
 
       long now = System.currentTimeMillis();
@@ -436,6 +443,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
           stmt.setString(6, scan);
           stmt.setString(7, normalizedPath); // carry-forward lookup for scan_id
+          stmt.setString(8, entry.provenance() == null ? null : entry.provenance().originator());
+          stmt.setString(9, normalizedPath);
+          stmt.setString(10, entry.provenance() == null ? null : entry.provenance().transport());
+          stmt.setString(11, normalizedPath);
           stmt.addBatch();
           count++;
         }
@@ -531,7 +542,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       long now = System.currentTimeMillis();
 
       // Local carrier for a candidate row selected before any mutation happens.
-      record ClaimedRow(String path, String collection) {}
+      record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance) {}
 
       // Claim is atomic via an explicit transaction (BEGIN/COMMIT through the existing
       // inTransaction() helper), not a single UPDATE...RETURNING statement: SQLite's RETURNING
@@ -550,7 +561,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           inTransaction(
               () -> {
                 String selectSql = """
-                    SELECT path, collection FROM jobs
+                    SELECT path, collection, originator, transport FROM jobs
                     WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
                     ORDER BY last_updated ASC, path ASC
                     LIMIT ?
@@ -562,7 +573,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   selectStmt.setInt(2, limit);
                   try (ResultSet rs = selectStmt.executeQuery()) {
                     while (rs.next()) {
-                      claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2)));
+                      String originator = rs.getString(3);
+                      String transport = rs.getString(4);
+                      claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
+                          originator == null && transport == null ? null
+                              : new JobQueue.EnqueueProvenance(originator, transport)));
                     }
                   }
                 }
@@ -599,7 +614,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
                 List<IndexJob> claimed = new ArrayList<>(claimedRows.size());
                 for (ClaimedRow row : claimedRows) {
-                  claimed.add(new IndexJob(Path.of(row.path()), row.collection()));
+                  claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance()));
                 }
                 return claimed;
               });
@@ -1146,8 +1161,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         INSERT INTO ingestion_ledger (
           path_hash, collection, outcome_class, reason_code, retry_policy,
           diagnostic_summary, observed_at, source_size_bytes, source_modified_at,
-          source_kind, artifact_status, policy_id, parser_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          source_kind, artifact_status, policy_id, parser_id, originator, transport
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          CASE WHEN ? THEN ? ELSE (SELECT originator FROM jobs WHERE path = ?) END,
+          CASE WHEN ? THEN ? ELSE (SELECT transport FROM jobs WHERE path = ?) END)
         """;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       JobQueue.IngestionLedgerEntry normalizedEntry = normalizeLedgerEntry(normalizedPath, entry);
@@ -1164,6 +1181,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       stmt.setString(11, normalizedEntry.artifactStatus());
       stmt.setString(12, normalizedEntry.policyId());
       stmt.setString(13, normalizedEntry.parserId());
+      // A supplied entry is a claim snapshot, including explicitly unknown legacy attribution.
+      // Only a contextless queue operation may consult the current row; a newer admission must
+      // never rewrite the origin of an older claim that is finishing now.
+      stmt.setBoolean(14, entry != null);
+      stmt.setString(15, normalizedEntry.originator());
+      stmt.setString(16, normalizedPath);
+      stmt.setBoolean(17, entry != null);
+      stmt.setString(18, normalizedEntry.transport());
+      stmt.setString(19, normalizedPath);
       stmt.executeUpdate();
     }
   }
@@ -1182,7 +1208,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         entry.sourceKind() != null ? entry.sourceKind() : "UNKNOWN",
         entry.artifactStatus() != null ? entry.artifactStatus() : "NOT_CREATED",
         entry.policyId() != null ? entry.policyId() : "UNKNOWN",
-        entry.parserId() != null ? entry.parserId() : "UNKNOWN");
+        entry.parserId() != null ? entry.parserId() : "UNKNOWN",
+        entry.originator(), entry.transport());
   }
 
   private static void setNullableLong(PreparedStatement stmt, int index, Long value)

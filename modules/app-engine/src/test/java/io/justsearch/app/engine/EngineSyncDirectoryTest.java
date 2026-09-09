@@ -71,7 +71,7 @@ final class EngineSyncDirectoryTest {
     syncTestDir = tempDir.resolve("sync-test-data");
     Files.createDirectories(syncTestDir);
     harness = EngineTestHarness.start(tempDir.resolve("data"));
-    assertTrue(harness.client().isHealthy(), "the engine must be healthy before the sync tests");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before the sync tests");
   }
 
   @AfterAll
@@ -94,7 +94,7 @@ final class EngineSyncDirectoryTest {
   @Order(1)
   @DisplayName("syncDirectory on empty directory returns zeros")
   void syncEmptyDirectoryReturnsZeros() {
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertEquals(0, response.getFilesAdded(), "should add 0 files from an empty directory");
@@ -116,7 +116,7 @@ final class EngineSyncDirectoryTest {
     // "that + 2", which is unreachable if either file had already been indexed by then.
     long baseline = docCount();
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertTrue(
@@ -141,7 +141,7 @@ final class EngineSyncDirectoryTest {
     long baseline = docCount();
     assertEquals(
         1,
-        harness.client().submitBatch(List.of(orphanFile)).getAcceptedCount(),
+        harness.client().submitBatch(List.of(orphanFile), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the orphan-to-be must be accepted");
     assertTrue(harness.awaitIndexed(baseline + 1, 60_000), "orphan file should be indexed");
 
@@ -152,7 +152,7 @@ final class EngineSyncDirectoryTest {
     Files.delete(orphanFile);
     assertFalse(Files.exists(orphanFile), "file should be deleted from disk");
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertTrue(
@@ -177,7 +177,7 @@ final class EngineSyncDirectoryTest {
     long baseline = docCount();
     assertEquals(
         1,
-        harness.client().submitBatch(List.of(toDelete)).getAcceptedCount(),
+        harness.client().submitBatch(List.of(toDelete), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "the to-delete file must be accepted");
     assertTrue(harness.awaitIndexed(baseline + 1, 60_000), "the to-delete file should be indexed");
     assertTrue(
@@ -187,7 +187,7 @@ final class EngineSyncDirectoryTest {
     Files.writeString(newFile, "Brand new file - keyword: brandnew456");
     Files.delete(toDelete);
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertTrue(
@@ -214,7 +214,7 @@ final class EngineSyncDirectoryTest {
     Path activeFile = syncTestDir.resolve("active-test.txt");
     Files.writeString(activeFile, "Testing with force flag - keyword: activetest111");
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertFalse(response.getSkipped(), "should NOT skip when force=true");
@@ -232,7 +232,7 @@ final class EngineSyncDirectoryTest {
     Path nonExistent = tempDir.resolve("this-dir-does-not-exist-12345");
     assertFalse(Files.exists(nonExistent), "directory should not exist");
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(nonExistent.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(nonExistent.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     // Zeros or an error are both acceptable; a crash is not. That was the retired test's
@@ -252,7 +252,7 @@ final class EngineSyncDirectoryTest {
 
     long baseline = docCount();
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertTrue(
@@ -272,7 +272,7 @@ final class EngineSyncDirectoryTest {
     Path binaryFile = syncTestDir.resolve("unsupported.xyz");
     Files.write(binaryFile, new byte[] {0x00, 0x01, 0x02, 0x03});
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertTrue(
@@ -322,7 +322,7 @@ final class EngineSyncDirectoryTest {
     writeLayoutFile(layoutRoot, "forbiddenlayout897", "build", "classes", "App.class");
     writeLayoutFile(layoutRoot, "forbiddenlayout897", "src", "python", "module.pyc");
 
-    SyncDirectoryResponse response = harness.client().syncDirectory(layoutRoot.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(layoutRoot.toString(), true, TestEngineContexts.FOREGROUND);
 
     assertNotNull(response, "response should not be null");
     assertTrue(response.getError().isEmpty(), "layout sync should have no error");
@@ -348,7 +348,7 @@ final class EngineSyncDirectoryTest {
     }
     assertEquals(
         0,
-        harness.client().search("forbiddenlayout897", 10).getResultsCount(),
+        harness.client().search("forbiddenlayout897", 10, TestEngineContexts.FOREGROUND).getResultsCount(),
         "skipped directories and compiled extensions must not become searchable");
   }
 
@@ -411,7 +411,7 @@ final class EngineSyncDirectoryTest {
     }
 
     long startTime = System.currentTimeMillis();
-    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true);
+    SyncDirectoryResponse response = harness.client().syncDirectory(syncTestDir.toString(), true, TestEngineContexts.FOREGROUND);
     long elapsed = System.currentTimeMillis() - startTime;
 
     assertNotNull(response, "response should not be null");

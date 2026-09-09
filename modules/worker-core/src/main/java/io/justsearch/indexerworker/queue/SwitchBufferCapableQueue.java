@@ -31,6 +31,9 @@ public interface SwitchBufferCapableQueue extends JobQueue {
    */
   boolean putSwitchBuffer(String key, String op, String payload);
 
+  /** Atomically buffers sync; maintenance preserves an earlier admission's attribution. */
+  boolean putSyncRoot(String key, SwitchBufferSyncRoot payload);
+
   /** Returns the number of buffered ops currently in the durable switch buffer. */
   long switchBufferDepth();
 

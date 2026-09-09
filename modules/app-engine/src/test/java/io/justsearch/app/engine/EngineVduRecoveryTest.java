@@ -72,7 +72,7 @@ final class EngineVduRecoveryTest {
     testImageDir = tempDir.resolve("test-images");
     Files.createDirectories(testImageDir);
     harness = EngineTestHarness.start(tempDir.resolve("data"));
-    assertTrue(harness.client().isHealthy(), "the engine must be healthy before the VDU tests");
+    assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before the VDU tests");
   }
 
   @AfterEach
@@ -92,7 +92,7 @@ final class EngineVduRecoveryTest {
 
     // 2. Submit for indexing.
     assertEquals(
-        1, harness.client().submitBatch(List.of(testImage)).getAcceptedCount(), "should accept 1 file");
+        1, harness.client().submitBatch(List.of(testImage), TestEngineContexts.FOREGROUND).getAcceptedCount(), "should accept 1 file");
 
     // 3. Wait for indexing to complete.
     assertTrue(harness.awaitIndexed(1, 120_000), "document should be indexed");
@@ -101,7 +101,7 @@ final class EngineVduRecoveryTest {
     assertTrue(awaitPending(docId, 30_000), "document should be pending VDU after indexing");
 
     // 5. Inject PROCESSING (what a crash mid-extraction leaves behind).
-    int retryCount = harness.client().markVduProcessing(docId, 3);
+    int retryCount = harness.client().markVduProcessing(docId, 3, TestEngineContexts.FOREGROUND);
     assertTrue(retryCount >= 0, "should be able to mark VDU PROCESSING, got " + retryCount);
 
     // 6. PROCESSING is not PENDING.
@@ -109,7 +109,7 @@ final class EngineVduRecoveryTest {
         awaitNotPending(docId, 30_000), "a PROCESSING document should not appear in the pending list");
 
     // 7. Recover.
-    assertEquals(1, harness.client().recoverVduProcessing(), "should recover exactly 1 document");
+    assertEquals(1, harness.client().recoverVduProcessing(TestEngineContexts.FOREGROUND), "should recover exactly 1 document");
 
     // 8. Back to PENDING.
     assertTrue(awaitPending(docId, 30_000), "document should be PENDING again after recovery");
@@ -122,7 +122,7 @@ final class EngineVduRecoveryTest {
     // @TempDir, not by a best-effort directory clean.
     assertEquals(
         0,
-        harness.client().recoverVduProcessing(),
+        harness.client().recoverVduProcessing(TestEngineContexts.FOREGROUND),
         "should recover 0 documents when none are stuck");
   }
 
@@ -139,7 +139,7 @@ final class EngineVduRecoveryTest {
 
     assertEquals(
         3,
-        harness.client().submitBatch(List.of(img1, img2, img3)).getAcceptedCount(),
+        harness.client().submitBatch(List.of(img1, img2, img3), TestEngineContexts.FOREGROUND).getAcceptedCount(),
         "should accept 3 files");
     assertTrue(harness.awaitIndexed(3, 120_000), "all three documents should be indexed");
 
@@ -147,16 +147,16 @@ final class EngineVduRecoveryTest {
     assertTrue(awaitPending(docId2, 30_000), "doc 2 should be pending VDU after indexing");
     assertTrue(awaitPending(docId3, 30_000), "doc 3 should be pending VDU after indexing");
 
-    assertTrue(harness.client().markVduProcessing(docId1, 3) >= 0, "doc 1 should mark PROCESSING");
-    assertTrue(harness.client().markVduProcessing(docId2, 3) >= 0, "doc 2 should mark PROCESSING");
-    assertTrue(harness.client().markVduProcessing(docId3, 3) >= 0, "doc 3 should mark PROCESSING");
+    assertTrue(harness.client().markVduProcessing(docId1, 3, TestEngineContexts.FOREGROUND) >= 0, "doc 1 should mark PROCESSING");
+    assertTrue(harness.client().markVduProcessing(docId2, 3, TestEngineContexts.FOREGROUND) >= 0, "doc 2 should mark PROCESSING");
+    assertTrue(harness.client().markVduProcessing(docId3, 3, TestEngineContexts.FOREGROUND) >= 0, "doc 3 should mark PROCESSING");
 
     assertTrue(awaitNotPending(docId1, 30_000), "doc 1 should not be pending after PROCESSING");
     assertTrue(awaitNotPending(docId2, 30_000), "doc 2 should not be pending after PROCESSING");
     assertTrue(awaitNotPending(docId3, 30_000), "doc 3 should not be pending after PROCESSING");
 
     assertEquals(
-        3, harness.client().recoverVduProcessing(), "should recover all 3 documents");
+        3, harness.client().recoverVduProcessing(TestEngineContexts.FOREGROUND), "should recover all 3 documents");
 
     assertTrue(awaitPending(docId1, 30_000), "doc 1 should be PENDING after recovery");
     assertTrue(awaitPending(docId2, 30_000), "doc 2 should be PENDING after recovery");
@@ -188,7 +188,7 @@ final class EngineVduRecoveryTest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        if (harness.client().queryPendingVduDocIds(100).contains(docId) == expectPresent) {
+        if (harness.client().queryPendingVduDocIds(100, TestEngineContexts.FOREGROUND).contains(docId) == expectPresent) {
           return true;
         }
       } catch (RuntimeException stillSettling) {
@@ -211,7 +211,7 @@ final class EngineVduRecoveryTest {
 
   private String describePending() {
     try {
-      return harness.client().queryPendingVduDocIds(100).toString();
+      return harness.client().queryPendingVduDocIds(100, TestEngineContexts.FOREGROUND).toString();
     } catch (RuntimeException unreadable) {
       return "<unreadable: " + unreadable + ">";
     }

@@ -105,7 +105,7 @@ public final class JobBatchWriter {
     writeSpan.setAttribute("embedding.source", embeddingSource);
     try {
       if (staleResolver.tryHandleStale(
-          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write")) {
+          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance())) {
         batchStats.recordSkipped();
         return;
       }
@@ -160,7 +160,7 @@ public final class JobBatchWriter {
           new JobQueue.IngestionLedgerTransition(
               ex.filePath(),
               LedgerEntryFactory.forEnvelope(
-                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy())));
+                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance())));
 
       long latencyMs = System.currentTimeMillis() - ex.startTime();
       metrics.recordDocumentIndexed(latencyMs);
@@ -186,7 +186,7 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
       } else {
         journal.recordOutcomeSafely(
             ex.filePath(),
@@ -203,7 +203,7 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }

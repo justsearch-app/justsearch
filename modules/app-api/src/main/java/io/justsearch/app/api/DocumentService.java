@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +63,7 @@ public interface DocumentService {
    * @param docId canonical document identifier
    * @return async stage containing the resolved document payload
    */
-  CompletionStage<DocumentRecord> fetch(String docId);
+  CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext);
 
   /**
    * List parent document identifiers from the Worker-owned index.
@@ -69,7 +71,7 @@ public interface DocumentService {
    * <p>This optional seam exists for bounded evaluation snapshots. The default preserves this
    * interface's single abstract method, so simple {@code DocumentService} lambdas remain valid.
    */
-  default CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
+  default CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
     return CompletableFuture.failedFuture(
         new UnsupportedOperationException("Document ID enumeration is not configured"));
   }
@@ -80,13 +82,13 @@ public interface DocumentService {
    * @param docIds list of canonical document identifiers
    * @return async stage containing a map of docId to resolved document payload
    */
-  default CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+  default CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
     // Default implementation: sequential fetch (subclasses should override for efficiency)
     return CompletableFuture.supplyAsync(() -> {
       Map<String, DocumentRecord> results = new LinkedHashMap<>();
       for (String docId : docIds) {
         try {
-          DocumentRecord record = fetch(docId).toCompletableFuture().join();
+          DocumentRecord record = fetch(docId, engineContext).toCompletableFuture().join();
           results.put(docId, record);
         } catch (Exception e) {
           // Include failed docs with empty content, preserving exception details
@@ -125,8 +127,8 @@ public interface DocumentService {
    * @param topK number of chunks to retrieve (default: 5)
    * @return result containing context string and chunk usage metadata
    */
-  default CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK) {
-    return retrieveContextWithMeta(question, docIds, topK, 0);
+  default CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, EngineContext engineContext) {
+    return retrieveContextWithMeta(question, docIds, topK, 0, engineContext);
   }
 
   /**
@@ -142,9 +144,9 @@ public interface DocumentService {
    * @param maxContextTokens token budget (0 = use character budget fallback)
    * @return result containing context string and chunk usage metadata
    */
-  default CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, int maxContextTokens) {
+  default CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
     // Default: fall back to batch fetch and concatenate (no RAG - chunksUsed=0)
-    return fetchBatch(List.copyOf(docIds))
+    return fetchBatch(List.copyOf(docIds), engineContext)
         .thenApply(docs -> {
           StringBuilder sb = new StringBuilder();
           // Mirrors ContextBudgeter.sectionHeader ("[n] label\n") — app-api cannot depend on
@@ -249,10 +251,10 @@ public interface DocumentService {
    * @param params retrieval parameters
    * @return result containing context string, chunk metadata, and quality signals
    */
-  default CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params) {
+  default CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, EngineContext engineContext) {
     // Default: delegate to legacy method (ignoring new filter params)
     return retrieveContextWithMeta(
-        params.question(), params.docIds(), params.topK(), params.maxContextTokens());
+        params.question(), params.docIds(), params.topK(), params.maxContextTokens(), engineContext);
   }
 
   /**
@@ -453,19 +455,19 @@ public interface DocumentService {
    * @return result containing matched sentence-to-chunk mappings
    */
   default CompletionStage<CitationMatchResult> matchCitations(
-      String answerText, List<ContextCitation> citations, double threshold) {
+      String answerText, List<ContextCitation> citations, double threshold, EngineContext engineContext) {
     List<VerificationSource> sources =
         citations == null
             ? List.of()
             : citations.stream().map(c -> new VerificationSource(c, "")).toList();
-    return matchCitationsAgainst(answerText, sources, threshold);
+    return matchCitationsAgainst(answerText, sources, threshold, engineContext);
   }
 
   /**
    * Post-hoc citation matching against sources that may carry their own literal text
    * (tempdoc 836 §1.4).
    *
-   * <p>This is the real method; the {@link #matchCitations(String, List, double)} overload
+   * <p>This is the real method; the {@link #matchCitations(String, List, double, EngineContext)} overload
    * delegates here. A source whose {@link VerificationSource#literalText()} is non-blank is
    * verified against THAT text; a blank one is looked up from the index by its citation's
    * {@code (parentDocId, chunkIndex)}. The choice is per source, never all-or-nothing.
@@ -476,7 +478,7 @@ public interface DocumentService {
    * @return result containing matched sentence-to-source mappings
    */
   default CompletionStage<CitationMatchResult> matchCitationsAgainst(
-      String answerText, List<VerificationSource> sources, double threshold) {
+      String answerText, List<VerificationSource> sources, double threshold, EngineContext engineContext) {
     return CompletableFuture.completedFuture(
         new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of()));
   }
@@ -670,7 +672,7 @@ public interface DocumentService {
    * pattern.
    */
   static DocumentService unavailable() {
-    return docId ->
+    return (docId, engineContext) ->
         CompletableFuture.failedFuture(
             new UnsupportedOperationException("Document service not configured"));
   }
@@ -700,16 +702,16 @@ public interface DocumentService {
    * Fetch a slice of the document content (paged by character offsets).
    *
    * <p>Implementations should prefer serving slices from the Worker/index (extracted text) rather than reading raw
-   * files. The default implementation falls back to {@link #fetch(String)} and slices in-process.
+   * files. The default implementation falls back to {@link #fetch(String, EngineContext)} and slices in-process.
    *
    * @param docId canonical document identifier
    * @param offsetChars 0-based offset into the extracted text
    * @param maxChars maximum number of characters to return
    */
-  default CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars) {
+  default CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
     int offset = Math.max(0, offsetChars);
     int max = maxChars <= 0 ? 20_000 : maxChars;
-    return fetch(docId)
+    return fetch(docId, engineContext)
         .thenApply(
             record -> {
               if (record == null) {

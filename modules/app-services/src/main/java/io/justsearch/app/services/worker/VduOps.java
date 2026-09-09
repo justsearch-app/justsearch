@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.ipc.CircuitBreakerOpenException;
 import io.justsearch.ipc.MarkVduProcessingRequest;
 import io.justsearch.ipc.QueryPendingVduRequest;
@@ -10,7 +12,6 @@ import io.justsearch.ipc.UpdateVduResultRequest;
 import io.justsearch.ipc.VduUpdateOutcome;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,16 +26,16 @@ final class VduOps {
     private static final Logger log = LoggerFactory.getLogger(VduOps.class);
 
     private final IngestRpcExecutor rpc;
-    private final Supplier<StatusResponse> statusSupplier;
+    private final java.util.function.Function<EngineContext, StatusResponse> statusSupplier;
 
-    VduOps(IngestRpcExecutor rpc, Supplier<StatusResponse> statusSupplier) {
+    VduOps(IngestRpcExecutor rpc, java.util.function.Function<EngineContext, StatusResponse> statusSupplier) {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
         this.statusSupplier = Objects.requireNonNull(statusSupplier, "statusSupplier");
     }
 
-    int countPendingEmbeddings() {
+    int countPendingEmbeddings(EngineContext engineContext) {
         try {
-            StatusResponse response = statusSupplier.get();
+            StatusResponse response = statusSupplier.apply(engineContext);
             return response.getCore().getPendingEmbeddingCount();
         } catch (Exception e) {
             log.debug("Failed to count pending embeddings", e);
@@ -42,9 +43,9 @@ final class VduOps {
         }
     }
 
-    int countPendingVdu() {
+    int countPendingVdu(EngineContext engineContext) {
         try {
-            StatusResponse response = statusSupplier.get();
+            StatusResponse response = statusSupplier.apply(engineContext);
             return response.getCore().getPendingVduCount();
         } catch (Exception e) {
             log.debug("Failed to count pending VDU", e);
@@ -57,7 +58,7 @@ final class VduOps {
             String extractedContent,
             VduUpdateOutcome outcome,
             String enrichment,
-            int pageCount) {
+            int pageCount, EngineContext engineContext) {
         try {
             var builder =
                     UpdateVduResultRequest.newBuilder()
@@ -77,7 +78,7 @@ final class VduOps {
                     rpc.execute(
                             "updateVduResult",
                             KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
-                            stub -> stub.updateVduResult(request));
+                            stub -> stub.updateVduResult(request), engineContext);
 
             if (!response.getSuccess()) {
                 log.error("updateVduResult failed for {}: {}", docId, response.getError());
@@ -96,11 +97,11 @@ final class VduOps {
         }
     }
 
-    List<String> queryPendingVduDocIds() {
-        return queryPendingVduDocIds(100);
+    List<String> queryPendingVduDocIds(EngineContext engineContext) {
+        return queryPendingVduDocIds(100, engineContext);
     }
 
-    List<String> queryPendingVduDocIds(int limit) {
+    List<String> queryPendingVduDocIds(int limit, EngineContext engineContext) {
         try {
             var request = QueryPendingVduRequest.newBuilder().setLimit(limit).build();
 
@@ -108,7 +109,7 @@ final class VduOps {
                     rpc.execute(
                             "queryPendingVdu",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.queryPendingVdu(request));
+                            stub -> stub.queryPendingVdu(request), engineContext);
 
             log.debug(
                     "queryPendingVduDocIds: returned {} of {} pending",
@@ -125,7 +126,7 @@ final class VduOps {
         }
     }
 
-    int markVduProcessing(String docId, int maxRetries) {
+    int markVduProcessing(String docId, int maxRetries, EngineContext engineContext) {
         try {
             var request =
                     MarkVduProcessingRequest.newBuilder()
@@ -137,7 +138,7 @@ final class VduOps {
                     rpc.execute(
                             "markVduProcessing",
                             KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.markVduProcessing(request));
+                            stub -> stub.markVduProcessing(request), engineContext);
 
             if (!response.getSuccess()) {
                 log.warn("markVduProcessing failed for {}: {}", docId, response.getError());
@@ -157,7 +158,7 @@ final class VduOps {
         }
     }
 
-    int recoverVduProcessing() {
+    int recoverVduProcessing(EngineContext engineContext) {
         try {
             var request = RecoverVduProcessingRequest.newBuilder().build();
 
@@ -165,7 +166,7 @@ final class VduOps {
                     rpc.execute(
                             "recoverVduProcessing",
                             KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
-                            stub -> stub.recoverVduProcessing(request));
+                            stub -> stub.recoverVduProcessing(request), engineContext);
 
             int recovered = response.getRecoveredCount();
             if (recovered > 0) {

@@ -144,6 +144,6 @@ final class EngineScanRootFlowTest {
             firstProgress.countDown();
             token.cancel("test cancels on the first progress frame");
           }
-        });
+        }, TestEngineContexts.FOREGROUND);
   }
 }

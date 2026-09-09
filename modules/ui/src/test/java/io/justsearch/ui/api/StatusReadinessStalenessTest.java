@@ -165,7 +165,7 @@ final class StatusReadinessStalenessTest {
     Instant headStart = Instant.now().minusSeconds(600);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(ks.client()).thenReturn(client);
 
     StatusLifecycleHandler handler = newReachableHandler(indexBase, headStart, ks);
@@ -268,7 +268,7 @@ final class StatusReadinessStalenessTest {
   private static StatusLifecycleHandler reachableHandler(Path indexBase, Instant headStart) {
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     when(ks.client()).thenReturn(client);
     return newReachableHandler(indexBase, headStart, ks);
   }

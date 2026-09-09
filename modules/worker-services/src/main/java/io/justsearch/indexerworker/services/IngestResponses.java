@@ -82,11 +82,6 @@ final class IngestResponses {
 
   // ==================== Switch-buffer payload builders ====================
 
-  static String syncDirectorySwitchBufferPayload(String normalizedRoot, boolean force)
-      throws Exception {
-    return JSON.writeValueAsString(Map.of("root_path", normalizedRoot, "force", force));
-  }
-
   static String vduMarkFailedSwitchBufferPayload(String normalizedId, int retryCount)
       throws Exception {
     return JSON.writeValueAsString(

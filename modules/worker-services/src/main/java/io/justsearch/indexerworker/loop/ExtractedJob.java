@@ -18,7 +18,14 @@ public record ExtractedJob(
     long startTime,
     FileEnvelope envelope,
     String sourceSha256,
-    String docUid) {
+    String docUid,
+    io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance) {
+
+  /** Legacy fixture without admission attribution; production carries the claimed snapshot. */
+  public ExtractedJob(Path filePath, String collection, ValidatedExtractionArtifact artifact,
+      long startTime, FileEnvelope envelope, String sourceSha256, String docUid) {
+    this(filePath, collection, artifact, startTime, envelope, sourceSha256, docUid, null);
+  }
 
   /** Back-compatible test fixture shape; production extraction always supplies {@code docUid}. */
   public ExtractedJob(

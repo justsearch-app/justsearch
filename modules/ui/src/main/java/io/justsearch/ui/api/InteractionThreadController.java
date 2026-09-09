@@ -191,7 +191,13 @@ public final class InteractionThreadController {
               null,
               conversationId);
       // Schedule with zero delay so the HTTP thread returns immediately; the run executes detached.
-      backgroundRunService.schedule(request, java.time.Duration.ZERO);
+      var incomingContext = RequestEngineContext.get(ctx);
+      var engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
+          incomingContext.clientKind(), incomingContext.clientId(), incomingContext.sessionId(),
+          incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
+          io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+      backgroundRunService.schedule(request, java.time.Duration.ZERO, engineContext);
       ctx.json(Map.of("ok", true, "scheduled", true));
     } catch (Exception e) {
       log.error("Failed to schedule background run", e);

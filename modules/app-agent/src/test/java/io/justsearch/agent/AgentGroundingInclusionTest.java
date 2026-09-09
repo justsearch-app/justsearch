@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,7 +33,7 @@ final class AgentGroundingInclusionTest {
   }
 
   private static AgentSession session() {
-    return new AgentSession(new ArrayList<>(List.of(Map.of("role", "user", "content", "q"))), 8000);
+    return new AgentSession(new ArrayList<>(List.of(Map.of("role", "user", "content", "q"))), 8000, EngineContextTestFixtures.AGENT_LOOP);
   }
 
   private static ToolCallRequest searchCall(String id) {
@@ -424,7 +426,7 @@ final class AgentGroundingInclusionTest {
               .results(hits)
               .build();
       OperationResult result =
-          new io.justsearch.agent.tools.SearchTool(req -> response).execute("{\"query\":\"q\"}");
+          new io.justsearch.agent.tools.SearchTool((req, context) -> response).execute("{\"query\":\"q\"}", EngineContextTestFixtures.AGENT_LOOP);
       assertTrue(result.success(), result.message());
 
       var message = new LinkedHashMap<String, Object>();

@@ -125,7 +125,7 @@ final class KnowledgeServerHealthMonitorTest {
     monitor.tick(); // first tick: no prior wall stamp → never a resume
 
     verify(bootstrap, never()).client();
-    verify(client, never()).reindexPersistedRoots();
+    verify(client, never()).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -147,7 +147,7 @@ final class KnowledgeServerHealthMonitorTest {
     // property it asserted is stronger on the line above it — the monitor never even asks the
     // bootstrap for a client, so there is nothing it could have called on one.
     verify(bootstrap, never()).client();
-    verify(client, never()).reindexPersistedRoots();
+    verify(client, never()).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
   }
 
   /**
@@ -176,7 +176,7 @@ final class KnowledgeServerHealthMonitorTest {
     clock[0] += 3_600_000L; // a 1-hour gap → suspend/resume
     monitor.tick();
 
-    verify(client, times(1)).reindexPersistedRoots();
+    verify(client, times(1)).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
     verifyNoMoreInteractions(client);
   }
 

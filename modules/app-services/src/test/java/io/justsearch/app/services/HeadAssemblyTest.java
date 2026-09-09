@@ -75,7 +75,7 @@ class HeadAssemblyTest {
   @Test
   void appFacadeExposesFacade() throws Exception {
     SearchPort searchPort =
-        intent -> new Result(List.of(), Map.of(), null, Map.of());
+        (intent, engineContext) -> new Result(List.of(), Map.of(), null, Map.of());
     Telemetry telemetry = new NoopTelemetry();
 
     try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(searchPort, telemetry)) {
@@ -91,7 +91,8 @@ class HeadAssemblyTest {
    */
   @Test
   void registerAuthoredStoreRefusesADerivedCatalogEntry() throws Exception {
-    SearchPort searchPort = intent -> new Result(List.of(), Map.of(), null, Map.of());
+    SearchPort searchPort =
+        (intent, engineContext) -> new Result(List.of(), Map.of(), null, Map.of());
 
     try (HeadAssembly bootstrap =
         HeadAssembly.bootForSearchPortOnly(searchPort, new NoopTelemetry())) {
@@ -117,7 +118,8 @@ class HeadAssemblyTest {
 
     try (HeadAssembly bootstrap = new HeadAssembly(telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
       SearchRequest request = new SearchRequest(5, 0, true, null, List.of(), List.of(), null);
-      SearchResponse response = bootstrap.workers().search().search(request);
+      SearchResponse response =
+          bootstrap.workers().search().search(request, TestEngineContexts.internal());
       assertNotNull(response);
       assertNotNull(response.hits());
     }
@@ -223,9 +225,9 @@ class HeadAssemblyTest {
               io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
       var client =
           org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
-      org.mockito.Mockito.when(client.recoverVduProcessing()).thenReturn(0);
-      org.mockito.Mockito.when(client.countPendingVdu()).thenReturn(0);
-      org.mockito.Mockito.when(client.countPendingEmbeddings()).thenReturn(0);
+      org.mockito.Mockito.when(client.recoverVduProcessing(org.mockito.ArgumentMatchers.any())).thenReturn(0);
+      org.mockito.Mockito.when(client.countPendingVdu(org.mockito.ArgumentMatchers.any())).thenReturn(0);
+      org.mockito.Mockito.when(client.countPendingEmbeddings(org.mockito.ArgumentMatchers.any())).thenReturn(0);
       cap.transition(io.justsearch.app.api.lifecycle.CapabilityHealth.READY, null);
       org.mockito.Mockito.when(ks.workerCapability()).thenReturn(cap);
       org.mockito.Mockito.when(ks.isReady()).thenReturn(true);
@@ -244,8 +246,8 @@ class HeadAssemblyTest {
       // Drive synchronously (no virtual-thread indirection) — proves the supplier resolved the
       // POST-connect client, not a value frozen at bootstrap.
       coordinatorAfterConnect.startOfflineProcessing();
-      org.mockito.Mockito.verify(client).recoverVduProcessing();
-      org.mockito.Mockito.verify(client).countPendingVdu();
+      org.mockito.Mockito.verify(client).recoverVduProcessing(org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.verify(client).countPendingVdu(org.mockito.ArgumentMatchers.any());
     }
   }
 

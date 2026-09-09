@@ -154,7 +154,18 @@ This ensures transient crashes don't burn retry budget.
 
 ### Ingestion Ledger Privacy Contract (tempdoc 410 §8 + Slice E + Slice G.4)
 
-The Worker writes an `ingestion_ledger` audit row for every typed ingestion outcome (skip, success, failure, defer). Operators read these rows via `GET /api/diagnostics/ingestion/{recent,summary}` and via the `RecentIngestionEvents` / `IngestionOutcomeSummary` gRPC RPCs. Both surfaces marshal `JobQueue.IngestionEventView` records — never the raw queue row.
+The Worker writes an `ingestion_ledger` audit row for typed ingestion outcomes (skip, success, failure, defer). Operators read these rows via `GET /api/diagnostics/ingestion/{recent,summary}` and the in-process `RecentIngestionEvents` / `IngestionOutcomeSummary` calls. Both surfaces marshal `JobQueue.IngestionEventView` records — never the raw queue row.
+
+Schema V14 adds nullable `originator` and `transport` to both `jobs` and `ingestion_ledger`.
+The Engine bridge derives originator through the existing action-ledger projection and passes
+that value with the caller's Engine context. Batch submission and root scans persist it at
+admission. The atomic claim snapshots that attribution into the extraction/write job; terminal
+ledger writes use the snapshot, including an explicitly unknown legacy origin. A later admission
+of the same path cannot relabel an already claimed outcome. Contextless queue maintenance can
+recover attribution from the durable row. Maintenance re-enqueue preserves prior attribution; a new
+explicit admission replaces it. Legacy rows remain null. Watcher events identify the internal
+producer, and cloud-placeholder observations carry the observing scan's attribution. These
+database columns do not widen the export view described below.
 
 **Invariant:** any operator-visible export of ledger or queue data carries a `path_hash` (SHA-256 over the normalized absolute path), never the raw path, and never any path-derived field that could reverse-map to the user's filesystem.
 
@@ -224,6 +235,19 @@ The structural pin `ingestionEventViewExportContractIsPinned` is unchanged — `
 ### Durable cutover buffer (`switch_buffer`)
 
 During schema migration cutover (`SWITCHING` state), the Worker durably buffers mutating ingest operations into `jobs.db.switch_buffer` (rather than relying on UI/client retries). On restart after cutover, the Worker replays buffered ops against the new generation.
+
+Buffered UPSERT payload version 1 retains the absolute path, collection and admission provenance.
+Replay also accepts pre-C1 raw path payloads with unknown collection/provenance. Unknown versions
+or refused enqueues leave the durable buffer available for retry instead of acknowledging a loss.
+SYNC_ROOT version 1 carries root, force and paired nullable originator/transport fields. Explicit
+sync admissions retain their caller; INTERNAL/SYSTEM_INTERNAL maintenance preserves existing job
+attribution. Replay executes internally while retaining the separately persisted admission value.
+Legacy unversioned root/force payloads remain readable with unknown attribution. Missing versioned
+fields or provenance attached to an unversioned payload are malformed and remain buffered.
+The typed sync-buffer admission coalesces under the existing queue lock. A later maintenance
+sync retains earlier buffered caller attribution while applying its incoming root/force; a new
+explicit admission replaces it. Unreadable prior work refuses maintenance replacement. The shared
+SYNC_ROOT codec owns encoding and decoding for admission, coalescing and replay.
 
 This is the core correctness mechanism that prevents lost updates during blue/green pointer swaps.
 

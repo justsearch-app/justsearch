@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.vdu;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.aibackend.backend.EngineCircuitBreaker;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.gpu.VramRequirements;
@@ -25,6 +27,9 @@ import java.util.function.Supplier;
  * then updates index via gRPC to Worker (which owns IndexWriter).
  */
 public class VduBatchProcessor {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "vdu-batch-processor", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
     private static final Logger LOG = LoggerFactory.getLogger(VduBatchProcessor.class);
 
     private final VduProcessor vduProcessor;
@@ -139,7 +144,7 @@ public class VduBatchProcessor {
             LOG.info("VDU batch processing skipped: Worker not connected yet");
             return 0;
         }
-        int pendingCount = knowledgeClient.countPendingVdu();
+        int pendingCount = knowledgeClient.countPendingVdu(ENGINE_CONTEXT);
         if (pendingCount == 0) {
             LOG.info("No pending VDU files");
             vduCapabilityState.clearAll();
@@ -166,7 +171,7 @@ public class VduBatchProcessor {
         }
         vduCapabilityState.clear(VduCapabilityState.REASON_MISSING_MMPROJ);
 
-        List<String> pendingDocIds = knowledgeClient.queryPendingVduDocIds();
+        List<String> pendingDocIds = knowledgeClient.queryPendingVduDocIds(ENGINE_CONTEXT);
         if (pendingDocIds.isEmpty()) {
             LOG.info("No pending VDU doc IDs returned");
             vduCapabilityState.clearAll();
@@ -217,7 +222,7 @@ public class VduBatchProcessor {
 
             try {
                 // Mark as PROCESSING with retry count increment (poison pill protection)
-                int retryCount = knowledgeClient.markVduProcessing(docId, SchemaFields.VDU_MAX_RETRIES);
+                int retryCount = knowledgeClient.markVduProcessing(docId, SchemaFields.VDU_MAX_RETRIES, ENGINE_CONTEXT);
                 if (retryCount < 0) {
                     LOG.warn("VDU skipped (max retries exceeded or error): {}", docId);
                     recordSkipped();
@@ -283,7 +288,7 @@ public class VduBatchProcessor {
                     outcome,
                     enrichment,
                     result.pageCount()
-                );
+                , ENGINE_CONTEXT);
 
                 if (updated) {
                     if (gateVerdict.rejected()) {
@@ -339,7 +344,7 @@ public class VduBatchProcessor {
                 io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED,
                 buildErrorEnrichment(reason),
                 0
-            );
+            , ENGINE_CONTEXT);
         } catch (Exception e) {
             LOG.warn("Failed to mark VDU failed for: {}", docId, e);
         }

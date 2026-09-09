@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap.phases;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.AgentContextBudgets;
 import io.justsearch.agent.tools.AgentToolPaths;
 import io.justsearch.agent.tools.BrowseTool;
@@ -144,9 +146,9 @@ public final class AgentToolFactory {
     bindScanObservability(agentSearchAdapter, scanProgressRegistry, scanRollupLedger);
     FileOperationLog fileOperationLog =
         existingFileOperationLog != null ? existingFileOperationLog : fileOperationLog(dataDir);
-    Supplier<List<BrowseTool.RootInfo>> rootsSupplier =
-        () ->
-            indexingService.getWatchedRoots().stream()
+    java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier =
+        engineContext ->
+            indexingService.getWatchedRoots(engineContext).stream()
                 .map(
                     r ->
                         new BrowseTool.RootInfo(
@@ -180,7 +182,7 @@ public final class AgentToolFactory {
             agentSearchAdapter::ingest,
             agentSearchAdapter::scanRoot,
             rootsView,
-            () -> rootBindings(indexingService));
+            engineContext -> rootBindings(indexingService, engineContext));
     // Tempdoc 868 §B.2: the read tool rides the SAME roots view as search, so `path` validation
     // and `path_prefix` validation share one authority and one degrade-open rule. The fetch is the
     // Worker's FetchDocumentSlice via DocumentService — the Head still never reads document bytes.
@@ -227,9 +229,9 @@ public final class AgentToolFactory {
    * unlabeled document. Best-effort: a Worker-unavailable lookup yields an empty list, which makes
    * every path resolve out-of-root (`mcp-ingest`).
    */
-  static List<IngestCollectionPolicy.RootBinding> rootBindings(IndexingService indexingService) {
+  static List<IngestCollectionPolicy.RootBinding> rootBindings(IndexingService indexingService, EngineContext engineContext) {
     try {
-      return indexingService.getWatchedRoots().stream()
+      return indexingService.getWatchedRoots(engineContext).stream()
           .filter(r -> r != null && r.path() != null)
           .map(r -> new IngestCollectionPolicy.RootBinding(r.path(), r.collection()))
           .toList();

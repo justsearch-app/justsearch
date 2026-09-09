@@ -126,7 +126,7 @@ public class IndexingController {
   public void handleListRoots(Context ctx) {
     try {
       IndexingService indexing = indexingService();
-      List<IndexingService.WatchedRoot> roots = indexing.getWatchedRoots();
+      List<IndexingService.WatchedRoot> roots = indexing.getWatchedRoots(RequestEngineContext.get(ctx));
       boolean includeCounts = Boolean.parseBoolean(ctx.queryParam("counts") != null ? ctx.queryParam("counts") : "false");
 
       List<Map<String, Object>> payload =
@@ -186,7 +186,7 @@ public class IndexingController {
         }
       }
       IndexingService indexing = indexingService();
-      indexing.addWatchedRoot(collection, resolved);
+      indexing.addWatchedRoot(collection, resolved, RequestEngineContext.get(ctx));
       ctx.status(200).json(Map.of("status", "ok"));
     } catch (Exception e) {
       log.error("Failed to add watched root", e);
@@ -229,7 +229,7 @@ public class IndexingController {
       boolean alreadyWatched = false;
       try {
         alreadyWatched =
-            indexingService().getWatchedRoots().stream()
+            indexingService().getWatchedRoots(RequestEngineContext.get(ctx)).stream()
                 .anyMatch(
                     r ->
                         r.path() != null
@@ -261,7 +261,7 @@ public class IndexingController {
         return;
       }
       IndexingService indexing = indexingService();
-      int deletedJobs = indexing.removeWatchedRoot(collection, Path.of(path));
+      int deletedJobs = indexing.removeWatchedRoot(collection, Path.of(path), RequestEngineContext.get(ctx));
       ctx.status(200).json(Map.of(
           "status", "ok",
           "deletedJobs", deletedJobs
@@ -318,7 +318,7 @@ public class IndexingController {
                     ApiErrorHandler.routeOf(ctx)));
         return;
       }
-      int deleted = indexingService().deleteDocsByCollection(trimmed);
+      int deleted = indexingService().deleteDocsByCollection(trimmed, RequestEngineContext.get(ctx));
       ctx.status(200).json(Map.of("status", "ok", "collection", trimmed, "deletedDocs", deleted));
     } catch (KnowledgeClientException e) {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
@@ -336,8 +336,8 @@ public class IndexingController {
     try {
       boolean force = Boolean.parseBoolean(ctx.queryParam("force"));
       IndexingService indexing = indexingService();
-      indexing.reindexWatchedRoots(force);
-      indexing.flush();
+      indexing.reindexWatchedRoots(force, RequestEngineContext.get(ctx));
+      indexing.flush(RequestEngineContext.get(ctx));
 
       String status = force ? "force reindex triggered" : "reindex triggered";
       ctx.status(200).json(Map.of("status", status, "force", force));
@@ -368,7 +368,7 @@ public class IndexingController {
   public void handleApplyExcludes(Context ctx) {
     try {
       boolean dryRun = Boolean.parseBoolean(ctx.queryParam("dryRun"));
-      ExcludesService.ExcludesResult result = excludesService.applyExcludes(dryRun);
+      ExcludesService.ExcludesResult result = excludesService.applyExcludes(dryRun, RequestEngineContext.get(ctx));
       List<Map<String, Object>> perPattern = new ArrayList<>();
       for (ExcludesService.ExcludesResult.PatternMatch pm : result.perPattern()) {
         perPattern.add(Map.of("pattern", pm.pattern(), "matches", pm.matches()));
@@ -427,7 +427,7 @@ public class IndexingController {
         1800L,
         Map.of("source", "REST /api/indexing/migration/start", "reason", reason));
     try {
-      var outcome = indexingService().startMigration(reason);
+      var outcome = indexingService().startMigration(reason, RequestEngineContext.get(ctx));
       if (outcome.accepted()) {
         // Worker persists MIGRATING before acknowledging, then owns the asynchronous lifetime.
         handle.release(OpLeaseOutcome.SUCCESS);
@@ -451,7 +451,7 @@ public class IndexingController {
     try {
       String raw = ctx.queryParam("forceSwitching");
       boolean forceSwitching = Boolean.parseBoolean(raw == null ? "false" : raw);
-      var outcome = indexingService().requestCutover(forceSwitching);
+      var outcome = indexingService().requestCutover(forceSwitching, RequestEngineContext.get(ctx));
       if (outcome.accepted()) {
         ctx.status(202).json(Map.of("status", "cutover requested", "forceSwitching", forceSwitching,
             "restartRequired", outcome.restartRequired()));
@@ -469,7 +469,7 @@ public class IndexingController {
 
   public void handleMigrationRollback(Context ctx) {
     try {
-      var outcome = indexingService().rollbackMigration();
+      var outcome = indexingService().rollbackMigration(RequestEngineContext.get(ctx));
       if (outcome.accepted()) {
         ctx.status(202).json(Map.of("status", "rollback requested", "restartRequired", outcome.restartRequired()));
       } else {
@@ -488,7 +488,7 @@ public class IndexingController {
     try {
       Map<String, Object> body = ctx.bodyAsClass(Map.class);
       String reason = body == null ? "" : String.valueOf(body.getOrDefault("reason", ""));
-      boolean accepted = indexingService().pauseMigration(reason);
+      boolean accepted = indexingService().pauseMigration(reason, RequestEngineContext.get(ctx));
       if (accepted) {
         ctx.status(202).json(Map.of("status", "migration pause requested"));
       } else {
@@ -505,7 +505,7 @@ public class IndexingController {
 
   public void handleMigrationResume(Context ctx) {
     try {
-      boolean accepted = indexingService().resumeMigration();
+      boolean accepted = indexingService().resumeMigration(RequestEngineContext.get(ctx));
       if (accepted) {
         ctx.status(202).json(Map.of("status", "migration resume requested"));
       } else {
@@ -539,7 +539,7 @@ public class IndexingController {
           pruneMarkedOnly = Boolean.parseBoolean(String.valueOf(pmo));
         }
       }
-      var outcome = indexingService().runIndexGc(keepLatest, pruneMarkedOnly);
+      var outcome = indexingService().runIndexGc(keepLatest, pruneMarkedOnly, RequestEngineContext.get(ctx));
       if (outcome.accepted()) {
         ctx.status(202)
             .json(
@@ -587,7 +587,7 @@ public class IndexingController {
           } catch (NumberFormatException expected) { /* invalid input, keep default */ }
         }
       }
-      var outcome = indexingService().settleIndex(expungeDeletesOnly, Math.max(0, maxSegments));
+      var outcome = indexingService().settleIndex(expungeDeletesOnly, Math.max(0, maxSegments), RequestEngineContext.get(ctx));
       if (outcome.accepted()) {
         Map<String, Object> response = new java.util.LinkedHashMap<>();
         response.put("status", "settle completed");
@@ -629,7 +629,7 @@ public class IndexingController {
       List<Path> watchedPaths;
       if (workerAvailable()) {
         watchedPaths =
-            indexingService().getWatchedRoots().stream()
+            indexingService().getWatchedRoots(RequestEngineContext.get(ctx)).stream()
                 .map(IndexingService.WatchedRoot::path)
                 .toList();
       } else {
@@ -674,7 +674,7 @@ public class IndexingController {
       // FailedJobInfo) so the FE validates the surface against a generated schema → Zod projection;
       // the JSON is identical to the prior Map payload.
       List<FailedJob> jobs =
-          indexing.listFailedJobs(limit).stream()
+          indexing.listFailedJobs(limit, RequestEngineContext.get(ctx)).stream()
               .map(
                   j ->
                       new FailedJob(
@@ -724,7 +724,7 @@ public class IndexingController {
       }
       IndexingService indexing = indexingService();
       List<IndexingJobView> payload =
-          indexing.listFailedJobs(limit).stream().map(IndexingController::toJobView).toList();
+          indexing.listFailedJobs(limit, RequestEngineContext.get(ctx)).stream().map(IndexingController::toJobView).toList();
       ctx.json(new FailedIndexingJobsResponse(payload, payload.size()));
     } catch (Exception e) {
       log.error("Failed to list substrate-shaped failed jobs", e);
@@ -774,7 +774,7 @@ public class IndexingController {
       }
       IndexingService indexing = indexingService();
       Path rawPath = null;
-      for (IndexingService.WatchedRoot root : indexing.getWatchedRoots()) {
+      for (IndexingService.WatchedRoot root : indexing.getWatchedRoots(RequestEngineContext.get(ctx))) {
         if (root.path() != null && sha256Hex(root.path().toString()).equals(pathHash)) {
           rawPath = root.path();
           break;
@@ -791,7 +791,7 @@ public class IndexingController {
         return;
       }
       List<IndexingJobView> payload =
-          indexing.listFailedJobsByPathPrefix(rawPath, limit).stream()
+          indexing.listFailedJobsByPathPrefix(rawPath, limit, RequestEngineContext.get(ctx)).stream()
               .map(IndexingController::toJobView)
               .toList();
       ctx.json(new FailedIndexingJobsResponse(payload, payload.size()));
@@ -831,7 +831,7 @@ public class IndexingController {
         return;
       }
       IndexingService indexing = indexingService();
-      List<IndexingService.WatchedRoot> roots = indexing.getWatchedRoots();
+      List<IndexingService.WatchedRoot> roots = indexing.getWatchedRoots(RequestEngineContext.get(ctx));
       boolean includeCounts =
           Boolean.parseBoolean(
               ctx.queryParam("counts") != null ? ctx.queryParam("counts") : "false");
@@ -862,7 +862,7 @@ public class IndexingController {
                     // returned so the row's truthful state derives from job drain (tempdoc 599 §9.2).
                     IndexingService.JobCounts jobCounts = IndexingService.JobCounts.zero();
                     try {
-                      jobCounts = indexing.countJobsByPathPrefix(root.path());
+                      jobCounts = indexing.countJobsByPathPrefix(root.path(), RequestEngineContext.get(ctx));
                     } catch (Exception e) {
                       log.warn("Failed to count jobs under {}", root.path(), e);
                     }
@@ -993,7 +993,7 @@ public class IndexingController {
   public void handleClearFailedJobs(Context ctx) {
     try {
       IndexingService indexing = indexingService();
-      int deleted = indexing.clearFailedJobs();
+      int deleted = indexing.clearFailedJobs(RequestEngineContext.get(ctx));
       ctx.json(Map.of("status", "ok", "deletedCount", deleted));
     } catch (Exception e) {
       log.error("Failed to clear failed jobs", e);
@@ -1022,7 +1022,7 @@ public class IndexingController {
         }
       }
       IndexingService indexing = indexingService();
-      List<Map<String, Object>> events = indexing.recentIngestionEvents(limit);
+      List<Map<String, Object>> events = indexing.recentIngestionEvents(limit, RequestEngineContext.get(ctx));
       ctx.json(Map.of("events", events, "count", events.size()));
     } catch (Exception e) {
       log.error("Failed to fetch recent ingestion events", e);
@@ -1051,7 +1051,7 @@ public class IndexingController {
         }
       }
       IndexingService indexing = indexingService();
-      List<Map<String, Object>> rollups = indexing.ingestionOutcomeSummary(sinceMs);
+      List<Map<String, Object>> rollups = indexing.ingestionOutcomeSummary(sinceMs, RequestEngineContext.get(ctx));
       ctx.json(Map.of("rollups", rollups, "count", rollups.size()));
     } catch (Exception e) {
       log.error("Failed to fetch ingestion outcome summary", e);
@@ -1081,7 +1081,7 @@ public class IndexingController {
         return;
       }
       IndexingService indexing = indexingService();
-      Map<String, Object> result = indexing.resolvePathHash((String) hashValue);
+      Map<String, Object> result = indexing.resolvePathHash((String) hashValue, RequestEngineContext.get(ctx));
       ctx.json(result);
     } catch (Exception e) {
       log.error("Failed to resolve path hash", e);

@@ -47,11 +47,14 @@
         }
       ],
       "consumers": [
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OrchestrationPhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/search/SearchServiceImpl.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeHttpApiAdapter.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java",
         "modules/ui/src/main/java/io/justsearch/ui/api/KnowledgeSearchController.java"
       ],
-      "note": "Unchanged contract (design 3.3). SearchTrace stays the one authority for 'what the pipeline did' — see governance/execution-surfaces.v1.json, which governs that separately and must not be forked here."
+      "note": "C1 requires EngineContext on every search call. Consumers include typed callers, composition carriers and the HTTP adapter chain. SearchTrace remains the sole pipeline-execution authority governed by governance/execution-surfaces.v1.json."
     },
     {
       "id": "indexing",
@@ -76,10 +79,38 @@
         }
       ],
       "consumers": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/WorkerServices.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherCommands.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/AgentToolFactory.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/AgentToolHandlers.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationHandlerRegistrations.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OrchestrationAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OrchestrationPhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServiceGraphAssembler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/excludes/ExcludesServiceImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/observability/health/IndexDriftHealthTap.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/AddWatchedRootHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/BulkReindexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/CancelIndexingJobHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ClearFailedJobsHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/IndexGcHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RebuildIndexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReconcileRootHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReindexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RemoveWatchedRootHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ResolvePathHashHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RetryIndexingJobHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/SettleIndexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/MigrationOps.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridge.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java",
         "modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridge.java"
+        "modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java"
       ],
-      "note": "Design 3.3 has this gaining the provenance parameter (3.4) and an immediate index-and-return call (section 4). Neither is stage A's; both are additions to this entry when they land."
+      "note": "C1 requires EngineContext on every indexing-port call; the facade and all callers preserve it into the index half. Consumers include typed callers, composition carriers and the indexing-jobs subscription bridge. The immediate index-and-return capability remains the later section 4 operation work."
     },
     {
       "id": "operations",

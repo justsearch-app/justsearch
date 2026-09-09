@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.util.function.Function;
 
 /**
@@ -13,5 +15,5 @@ public interface IngestRpcExecutor {
     <T> T execute(
             String operation,
             KnowledgeClient.RpcDeadlineCategory category,
-            Function<IngestServiceCalls, T> rpc);
+            Function<IngestServiceCalls, T> rpc, EngineContext engineContext);
 }

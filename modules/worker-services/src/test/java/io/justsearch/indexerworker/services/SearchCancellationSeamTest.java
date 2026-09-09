@@ -89,7 +89,7 @@ final class SearchCancellationSeamTest {
         WorkerServiceException thrown =
             assertThrows(
                 WorkerServiceException.class,
-                () -> service.search(request, new CallContext(null, null, signal)),
+                () -> service.search(request, new CallContext(null, null, signal, CallContext.none().engineContext(), CallContext.none().provenance())),
                 "a search cancelled after " + signal.flipAfter + " polls must not return a result");
         assertEquals(
             WorkerServiceException.Status.CANCELLED,
@@ -126,7 +126,7 @@ final class SearchCancellationSeamTest {
                   .setLimit(10)
                   .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true).build())
                   .build(),
-              new CallContext(null, null, signal));
+              new CallContext(null, null, signal, CallContext.none().engineContext(), CallContext.none().provenance()));
 
       assertNotNull(response);
       assertEquals(1, response.getTotalHits(), "the search still answers normally");

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.InjectorResult;
@@ -76,6 +78,7 @@ public final class DocAccess implements ContextInjector {
 
   @Override
   public InjectorResult inject(ConversationContext ctx) {
+    var engineContext = ctx.engineContext();
     Map<String, Object> body = ctx.requestBody();
     // Per tempdoc 526 §13 §13.4 R8 — positional body.startChar/endChar
     // fallback is retired. Selection-range summarize is the typed body.selection
@@ -89,7 +92,7 @@ public final class DocAccess implements ContextInjector {
     String docId = asString(body.get("docId"));
     String providedContent = asString(body.get("content"));
 
-    Resolved resolved = resolveContent(docId, providedContent);
+    Resolved resolved = resolveContent(docId, providedContent, engineContext);
     String fullContent = resolved.content();
     if (fullContent == null || fullContent.isBlank()) {
       return InjectorResult.empty();
@@ -171,14 +174,14 @@ public final class DocAccess implements ContextInjector {
    * supplied; falls back to {@code providedContent} when the fetch returns nothing or the
    * service is unavailable.
    */
-  private Resolved resolveContent(String docId, String providedContent) {
+  private Resolved resolveContent(String docId, String providedContent, EngineContext engineContext) {
     String fallback = providedContent == null ? "" : providedContent;
     if (docId == null || docId.isBlank()) {
       return new Resolved(fallback, "", false);
     }
     try {
       DocumentRecord record =
-          documents.fetch(docId).toCompletableFuture().get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
+          documents.fetch(docId, engineContext).toCompletableFuture().get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
       if (record != null && record.content() != null && !record.content().isBlank()) {
         return new Resolved(record.content(), docId, true);
       }

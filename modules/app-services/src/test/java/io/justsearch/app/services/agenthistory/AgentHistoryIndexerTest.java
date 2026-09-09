@@ -242,8 +242,7 @@ class AgentHistoryIndexerTest {
     indexer.reconcileNow(() -> List.of("sess-up"), id -> doneEvents("WROTE-WHILE-UP"));
 
     verify(client, times(1))
-        .submitBatch(
-            List.of(historyDir.resolve("sess-up.md")), true, AgentHistoryIndexer.COLLECTION);
+        .submitBatch(org.mockito.ArgumentMatchers.eq(List.of(historyDir.resolve("sess-up.md"))), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(AgentHistoryIndexer.COLLECTION), org.mockito.ArgumentMatchers.any());
     assertFalse(
         Files.exists(marker(historyDir, "sess-up")),
         "a submitted transcript carries no pending marker");
@@ -273,7 +272,7 @@ class AgentHistoryIndexerTest {
 
     assertEquals(0, rebuilt, "a re-submit derives nothing — the healthy bytes are reused as-is");
     verify(client, times(1))
-        .submitBatch(List.of(historyDir.resolve("sess-r.md")), true, AgentHistoryIndexer.COLLECTION);
+        .submitBatch(org.mockito.ArgumentMatchers.eq(List.of(historyDir.resolve("sess-r.md"))), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(AgentHistoryIndexer.COLLECTION), org.mockito.ArgumentMatchers.any());
     assertFalse(Files.exists(marker(historyDir, "sess-r")), "the marker is cleared after the submit");
     assertTrue(
         Files.readString(historyDir.resolve("sess-r.md")).contains("RECOVER-ZQX"),
@@ -324,7 +323,7 @@ class AgentHistoryIndexerTest {
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
 
     KnowledgeClient failing = mock(KnowledgeClient.class);
-    when(failing.submitBatch(anyList(), anyBoolean(), anyString()))
+    when(failing.submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any()))
         .thenThrow(new IllegalStateException("worker RPC failed"));
     new AgentHistoryIndexer(historyDir, () -> failing)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
@@ -338,7 +337,7 @@ class AgentHistoryIndexerTest {
     new AgentHistoryIndexer(historyDir, () -> ok)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
     verify(ok, times(1))
-        .submitBatch(List.of(historyDir.resolve("sess-f.md")), true, AgentHistoryIndexer.COLLECTION);
+        .submitBatch(org.mockito.ArgumentMatchers.eq(List.of(historyDir.resolve("sess-f.md"))), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(AgentHistoryIndexer.COLLECTION), org.mockito.ArgumentMatchers.any());
     assertFalse(Files.exists(marker(historyDir, "sess-f")));
   }
 

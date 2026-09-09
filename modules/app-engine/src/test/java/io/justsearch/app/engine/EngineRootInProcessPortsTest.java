@@ -60,6 +60,17 @@ final class EngineRootInProcessPortsTest {
     }
   }
 
+  private static boolean hasMcpLedgerOutcome(Path db) throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement();
+        var rows = statement.executeQuery("SELECT originator, transport FROM ingestion_ledger")) {
+      if (!rows.next()) return false;
+      assertEquals("agent", rows.getString("originator"));
+      assertEquals("MCP", rows.getString("transport"));
+      return true;
+    }
+  }
+
   private static void publishConfig(Path dataDir, Path indexBase) throws Exception {
     Files.createDirectories(dataDir);
     Files.createDirectories(indexBase);
@@ -103,21 +114,26 @@ final class EngineRootInProcessPortsTest {
         "the gauge the gate feeds must be the one the indexing loop paces off");
 
     // (2) Ingest through the IndexingService side of the port.
-    BatchResponse submitted = client.submitBatch(List.of(doc));
+    var admission = new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.MCP_CLIENT, "mcp-port-test",
+        java.util.Optional.of("mcp-session"), java.util.Optional.empty(), "UNTRUSTED", "MCP",
+        io.justsearch.core.context.EngineContext.Survival.DURABLE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    BatchResponse submitted = client.submitBatch(List.of(doc), admission);
     assertTrue(submitted.getAcceptedCount() > 0, "the batch must be accepted: " + submitted);
 
     // The indexing loop drains asynchronously, exactly as it did across the wire.
     SearchResponse found = null;
     long deadline = System.currentTimeMillis() + 120_000;
     while (System.currentTimeMillis() < deadline) {
-      SearchResponse response = client.search("quokka", 10);
-      if (response.getResultsCount() > 0) {
+      SearchResponse response = client.search("quokka", 10, TestEngineContexts.FOREGROUND);
+      if (response.getResultsCount() > 0 && hasMcpLedgerOutcome(dataDir.resolve("jobs.db"))) {
         found = response;
         break;
       }
       Thread.sleep(250);
     }
-    assertNotNull(found, "the submitted document must become findable through the search port");
+    assertNotNull(found, "the submitted document must become findable with its admitted MCP provenance persisted");
     assertTrue(
         found.getResultsList().stream()
             .anyMatch(r -> r.getId().contains("engine-root-probe")),
@@ -130,7 +146,7 @@ final class EngineRootInProcessPortsTest {
     // one. startedTotal is the assertion that distinguishes the two — it can only advance if the
     // client's own executor gated the call.
     long startedBefore = built[0].foregroundLoad().startedTotal();
-    client.search("quokka", 10);
+    client.search("quokka", 10, TestEngineContexts.FOREGROUND);
     assertEquals(
         startedBefore + 1,
         built[0].foregroundLoad().startedTotal(),
@@ -168,7 +184,7 @@ final class EngineRootInProcessPortsTest {
     KnowledgeClientException raised =
         assertThrows(
             KnowledgeClientException.class,
-            () -> client.search("anything at all", 10),
+            () -> client.search("anything at all", 10, TestEngineContexts.FOREGROUND),
             "an elapsed budget must be reported");
     long elapsedMs = System.currentTimeMillis() - startedAtMs;
 

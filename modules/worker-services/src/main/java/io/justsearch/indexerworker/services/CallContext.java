@@ -20,6 +20,8 @@ package io.justsearch.indexerworker.services;
  *   <li>{@code cancel} — the call's cancellation signal, read by the two streaming methods
  *       (previously {@code ServerCallStreamObserver#isCancelled()} and
  *       {@code #setOnCancelHandler(Runnable)}).
+ *   <li>{@code engineContext} — caller attribution and independent work axes from the port.
+ *   <li>{@code provenance} — the application-owned originator projection for durable ingestion.
  * </ul>
  *
  * <p><b>No deadline field, deliberately.</b> No worker-side code reads a call deadline today —
@@ -32,25 +34,33 @@ package io.justsearch.indexerworker.services;
  * adapters and interceptors alike; {@code EngineKnowledgeClient} now fills the same two fields by
  * reading the current span and MDC in place, on the caller's own thread.
  */
-public record CallContext(String traceId, String requestId, CancelSignal cancel) {
+public record CallContext(String traceId, String requestId, CancelSignal cancel,
+    io.justsearch.core.context.EngineContext engineContext,
+    io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance) {
 
   /** Normalises a null cancellation signal to {@link CancelSignal#NEVER}. */
   public CallContext {
+    java.util.Objects.requireNonNull(engineContext, "engineContext");
+    java.util.Objects.requireNonNull(provenance, "provenance");
+    if (!engineContext.transport().equals(provenance.transport())) {
+      throw new IllegalArgumentException("Queue attribution disagrees with Engine transport");
+    }
     if (cancel == null) {
       cancel = CancelSignal.NEVER;
     }
   }
 
-  private static final CallContext NONE = new CallContext(null, null, CancelSignal.NEVER);
-
-  /** A context with trace/request ids but no cancellation signal. */
-  public static CallContext of(String traceId, String requestId) {
-    return new CallContext(traceId, requestId, CancelSignal.NEVER);
-  }
+  private static final CallContext NONE = new CallContext(null, null, CancelSignal.NEVER,
+      new io.justsearch.core.context.EngineContext(
+          io.justsearch.core.context.EngineContext.ClientKind.INTERNAL, "index-maintenance",
+          java.util.Optional.empty(), java.util.Optional.empty(), "TRUSTED", "SYSTEM_INTERNAL",
+          io.justsearch.core.context.EngineContext.Survival.DURABLE,
+          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND),
+      new io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL"));
 
   /**
-   * The empty context: no ids, never cancelled. For in-process callers with nothing to
-   * propagate (tests, boot-time warm-up paths).
+   * Explicit internal maintenance: no tracing ids, never cancelled, durable background work.
+   * Request paths receive their caller's context instead of using this producer context.
    */
   public static CallContext none() {
     return NONE;

@@ -85,7 +85,7 @@ public final class ChunkInfoController {
 
       DocumentService.ContextResult result =
           documentService()
-              .retrieveContextWithMeta(broadQuery, docIdSet, maxChunks)
+              .retrieveContextWithMeta(broadQuery, docIdSet, maxChunks, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
 

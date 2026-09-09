@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -18,18 +20,18 @@ public interface AgentService extends AgentRunQueries {
    * Start an agent session. Events are emitted to the consumer as the agent loop progresses. This
    * method blocks until the agent loop completes or is cancelled.
    */
-  void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer);
+  void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext);
 
   /**
    * Tempdoc 561 P-D — start an agent session marked as a BACKGROUND (non-interactive) run when
    * {@code background} is true: the safety gate becomes safe-by-default (no watcher → write/destructive
    * tool calls are rejected immediately, never silently auto-run). The default delegates to the
-   * interactive {@link #runAgent(AgentRequest, Consumer)} so implementations without background support
+   * interactive {@link #runAgent(AgentRequest, Consumer, EngineContext)} so implementations without background support
    * compile unchanged; {@code AgentLoopService} overrides it to thread the flag onto the session.
    */
   default void runAgent(
-      AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background) {
-    runAgent(request, eventConsumer);
+      AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background, EngineContext engineContext) {
+    runAgent(request, eventConsumer, engineContext);
   }
 
   /** Approve a pending tool call within a session. */

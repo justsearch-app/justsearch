@@ -30,18 +30,18 @@ final class EngineMigrationRestartDispatchTest {
         30_000L, 5_000, code -> { throw new AssertionError("unexpected fatal exit " + code); },
         restarts::incrementAndGet)) {
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
-      assertFalse(client.requestCutover(false).restartRequired(), "no building generation exists");
+      assertFalse(client.requestCutover(false, TestEngineContexts.FOREGROUND).restartRequired(), "no building generation exists");
       assertEquals(0, restarts.get(), "an idle cutover cannot restart the Engine");
-      var start = client.startMigration("manual");
+      var start = client.startMigration("manual", TestEngineContexts.FOREGROUND);
       assertTrue(start.accepted());
       assertTrue(start.restartRequired());
       assertEquals(1, restarts.get(), "the production client consumes the requirement");
-      assertTrue(client.requestCutover(true).restartRequired());
+      assertTrue(client.requestCutover(true, TestEngineContexts.FOREGROUND).restartRequired());
       assertEquals(1, restarts.get(), "requesting cutover is not promotion");
       // This fixture observes dispatch without terminating its JVM. Seed a genuine rollback
       // target; automatic promotion/reopen is proved separately under a process supervisor.
       new IndexGenerationManager(dataDir.resolve("index")).promoteBuildingGenerationToActive();
-      var rollback = client.rollbackMigration();
+      var rollback = client.rollbackMigration(TestEngineContexts.FOREGROUND);
       assertTrue(rollback.accepted());
       assertTrue(rollback.restartRequired());
       assertEquals(2, restarts.get());

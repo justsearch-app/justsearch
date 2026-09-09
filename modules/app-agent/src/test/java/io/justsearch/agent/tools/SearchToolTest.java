@@ -1,5 +1,7 @@
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.agent.api.registry.OperationResult;
@@ -30,7 +32,7 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
     tool =
         new SearchTool(
-            req -> {
+            (req, context) -> {
               capturedRequest.set(req);
               return stubbedResponse;
             });
@@ -40,7 +42,7 @@ class SearchToolTest {
   void executeWithValidQuery() {
     stubbedResponse = responseWithHits(1);
 
-    OperationResult result = tool.execute("{\"query\": \"test documents\"}");
+    OperationResult result = tool.execute("{\"query\": \"test documents\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertNotNull(capturedRequest.get());
@@ -51,14 +53,14 @@ class SearchToolTest {
 
   @Test
   void executeMissingQueryReturnsFailure() {
-    OperationResult result = tool.execute("{}");
+    OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("required"), result.message());
   }
 
   @Test
   void executeEmptyQueryReturnsFailure() {
-    OperationResult result = tool.execute("{\"query\": \"\"}");
+    OperationResult result = tool.execute("{\"query\": \"\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("required"), result.message());
   }
@@ -67,7 +69,7 @@ class SearchToolTest {
   void executeWithLimitAndMode() {
     stubbedResponse = emptyResponse();
 
-    tool.execute("{\"query\": \"find me\", \"limit\": 5, \"mode\": \"hybrid\"}");
+    tool.execute("{\"query\": \"find me\", \"limit\": 5, \"mode\": \"hybrid\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -83,7 +85,7 @@ class SearchToolTest {
   void executeDefaultModeFromConfig() {
     stubbedResponse = emptyResponse();
 
-    tool.execute("{\"query\": \"test query\"}");
+    tool.execute("{\"query\": \"test query\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -98,7 +100,7 @@ class SearchToolTest {
   void executeLimitCappedAtMax() {
     stubbedResponse = emptyResponse();
 
-    tool.execute("{\"query\": \"find me\", \"limit\": 100}");
+    tool.execute("{\"query\": \"find me\", \"limit\": 100}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -109,7 +111,7 @@ class SearchToolTest {
   void executeWithPathPrefix() {
     stubbedResponse = emptyResponse();
 
-    tool.execute("{\"query\": \"invoices\", \"path_prefix\": \"/docs/finance\"}");
+    tool.execute("{\"query\": \"invoices\", \"path_prefix\": \"/docs/finance\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -126,7 +128,7 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
 
     tool.execute(
-        "{\"query\": \"invoices\", \"docIds\": [\"/docs/a.md\", \"/docs/b.md\"]}");
+        "{\"query\": \"invoices\", \"docIds\": [\"/docs/a.md\", \"/docs/b.md\"]}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -139,7 +141,7 @@ class SearchToolTest {
     // Absent case: no docIds, no path_prefix — filters stays null (unscoped), the pre-S7 behavior.
     stubbedResponse = emptyResponse();
 
-    tool.execute("{\"query\": \"invoices\"}");
+    tool.execute("{\"query\": \"invoices\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -152,7 +154,7 @@ class SearchToolTest {
 
     tool.execute(
         "{\"query\": \"invoices\", \"path_prefix\": \"/docs/finance\","
-            + " \"docIds\": [\"/docs/finance/a.md\"]}");
+            + " \"docIds\": [\"/docs/finance/a.md\"]}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -165,11 +167,11 @@ class SearchToolTest {
   void executeCallbackError() {
     tool =
         new SearchTool(
-            req -> {
+            (req, context) -> {
               throw new RuntimeException("Connection refused");
             });
 
-    OperationResult result = tool.execute("{\"query\": \"test\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("Connection refused"), result.message());
   }
@@ -178,7 +180,7 @@ class SearchToolTest {
   void executeFormatsMultipleResults() {
     stubbedResponse = responseWithHits(3);
 
-    OperationResult result = tool.execute("{\"query\": \"reports\"}");
+    OperationResult result = tool.execute("{\"query\": \"reports\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("[1]"));
@@ -192,7 +194,7 @@ class SearchToolTest {
   void executeNoResults() {
     stubbedResponse = emptyResponse();
 
-    OperationResult result = tool.execute("{\"query\": \"nonexistent\"}");
+    OperationResult result = tool.execute("{\"query\": \"nonexistent\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("No results found"), result.message());
@@ -200,14 +202,14 @@ class SearchToolTest {
 
   @Test
   void executeNullArgumentsReturnsFailure() {
-    OperationResult result = tool.execute(null);
+    OperationResult result = tool.execute(null, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("No arguments"), result.message());
   }
 
   @Test
   void executeMalformedJsonReturnsFailure() {
-    OperationResult result = tool.execute("not json {{{");
+    OperationResult result = tool.execute("not json {{{", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("error") || result.message().contains("Search error"),
         result.message());
@@ -215,9 +217,9 @@ class SearchToolTest {
 
   @Test
   void executeNullResponseReturnsFailure() {
-    tool = new SearchTool(req -> null);
+    tool = new SearchTool((req, context) -> null);
 
-    OperationResult result = tool.execute("{\"query\": \"test\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("no response"), result.message());
   }
@@ -238,7 +240,7 @@ class SearchToolTest {
                     .build()))
             .build();
 
-    OperationResult result = tool.execute("{\"query\": \"test\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     // Quotes should be replaced with apostrophes, newlines with spaces
     assertFalse(result.message().contains("\"hello\""), "Quotes should be sanitized");
@@ -264,7 +266,7 @@ class SearchToolTest {
                     .build()))
             .build();
 
-    OperationResult result = tool.execute("{\"query\": \"taxes\"}");
+    OperationResult result = tool.execute("{\"query\": \"taxes\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
 
     Object raw = result.structuredData().get("searchResults");
@@ -299,7 +301,7 @@ class SearchToolTest {
                         .build()))
             .build();
 
-    OperationResult result = tool.execute("{\"query\": \"taxes\"}");
+    OperationResult result = tool.execute("{\"query\": \"taxes\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     List<?> feedback =
         assertInstanceOf(
@@ -321,7 +323,7 @@ class SearchToolTest {
   void feedbackEvidenceOmitsHitWithoutUidInsteadOfFallingBackToPath() {
     stubbedResponse = responseWithHits(1);
 
-    OperationResult result = tool.execute("{\"query\": \"documents\"}");
+    OperationResult result = tool.execute("{\"query\": \"documents\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     List<?> feedback =
         assertInstanceOf(
@@ -348,7 +350,7 @@ class SearchToolTest {
                     .build()))
             .build();
 
-    OperationResult result = tool.execute("{\"query\": \"taxes\"}");
+    OperationResult result = tool.execute("{\"query\": \"taxes\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
 
     assertEquals("taxes", result.structuredData().get("query"));
@@ -361,7 +363,7 @@ class SearchToolTest {
     // "query" should reflect the ACTUALLY EXECUTED text, not the LLM's raw input.
     stubbedResponse = emptyResponse();
 
-    OperationResult result = tool.execute("{\"query\": \"docs/reference/config.md\"}");
+    OperationResult result = tool.execute("{\"query\": \"docs/reference/config.md\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
 
     assertEquals("docs reference config", result.structuredData().get("query"));
@@ -374,15 +376,15 @@ class SearchToolTest {
     // "hybrid" (modeToPreset(null) == HYBRID), and an explicit mode is stamped verbatim (lowercase).
     stubbedResponse = emptyResponse();
 
-    OperationResult noModeArg = tool.execute("{\"query\": \"taxes\"}");
+    OperationResult noModeArg = tool.execute("{\"query\": \"taxes\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(noModeArg.success(), noModeArg.message());
     assertEquals("hybrid", noModeArg.structuredData().get("searchMode"));
 
-    OperationResult vectorMode = tool.execute("{\"query\": \"taxes\", \"mode\": \"vector\"}");
+    OperationResult vectorMode = tool.execute("{\"query\": \"taxes\", \"mode\": \"vector\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(vectorMode.success(), vectorMode.message());
     assertEquals("vector", vectorMode.structuredData().get("searchMode"));
 
-    OperationResult textMode = tool.execute("{\"query\": \"taxes\", \"mode\": \"TEXT\"}");
+    OperationResult textMode = tool.execute("{\"query\": \"taxes\", \"mode\": \"TEXT\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(textMode.success(), textMode.message());
     assertEquals("text", textMode.structuredData().get("searchMode"));
   }
@@ -396,7 +398,7 @@ class SearchToolTest {
     OperationResult result =
         tool.execute(
             "{\"query\": \"taxes\", \"mode\": \"vector\","
-                + " \"pipeline\": {\"sparseEnabled\": true, \"denseEnabled\": false}}");
+                + " \"pipeline\": {\"sparseEnabled\": true, \"denseEnabled\": false}}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals("custom", result.structuredData().get("searchMode"));
   }
@@ -422,7 +424,7 @@ class SearchToolTest {
                             null, null, "corrected query", null))))
             .build();
 
-    OperationResult result = tool.execute("{\"query\": \"test\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("corrected to"), result.message());
     assertTrue(result.message().contains("corrected query"), result.message());
@@ -459,7 +461,7 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
 
     tool.execute(
-        "{\"query\": \"docs/reference/configuration/environment-variables.md\"}");
+        "{\"query\": \"docs/reference/configuration/environment-variables.md\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     var req = capturedRequest.get();
     assertNotNull(req);
@@ -473,7 +475,7 @@ class SearchToolTest {
   void relativePathPrefix_emptyResults_showsHint() {
     stubbedResponse = emptyResponse();
 
-    OperationResult result = tool.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("HINT"), "Should contain HINT: " + result.message());
@@ -495,17 +497,17 @@ class SearchToolTest {
     // With roots known, an unresolvable relative path_prefix never reaches the index at all:
     // RootsView.validate rejects it first, and THAT is the message that has to name the roots the
     // model can recover with. Pinned here so the two branches cannot be confused for one another.
-    SearchTool.SearchCallback search = req -> emptyResponse();
+    SearchTool.SearchCallback search = (req, context) -> emptyResponse();
     var toolWithRoots =
         new SearchTool(
             search,
-            () ->
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\data\\docs", "docs"),
                     new BrowseTool.RootInfo("D:\\data\\notes", "notes")));
 
     OperationResult result =
-        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"nowhere/at/all\"}");
+        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"nowhere/at/all\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), result.message());
     assertTrue(
@@ -522,15 +524,15 @@ class SearchToolTest {
     // core_browse_folders emits — resolves to the absolute path and is NOT rejected.
     var captured = new AtomicReference<KnowledgeSearchRequest>();
     SearchTool.SearchCallback search =
-        req -> {
+        (req, context) -> {
           captured.set(req);
           return emptyResponse();
         };
     var toolWithRoots =
-        new SearchTool(search, () -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+        new SearchTool(search, context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
 
     OperationResult result =
-        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}");
+        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertEquals("D:\\data\\docs\\how-to", captured.get().filters().pathPrefix());
@@ -541,7 +543,7 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
 
     OperationResult result =
-        tool.execute("{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\stuff\"}");
+        tool.execute("{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\stuff\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertTrue(
@@ -559,17 +561,17 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
     var toolWithRoots =
         new SearchTool(
-            req -> {
+            (req, context) -> {
               capturedRequest.set(req);
               return stubbedResponse;
             },
-            () ->
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\docs", "docs"),
                     new BrowseTool.RootInfo("D:\\Projects", "Projects")));
 
     OperationResult result =
-        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}");
+        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), "Relative path matching root should resolve: " + result.message());
     assertNotNull(capturedRequest.get(), "Search should have been executed");
@@ -583,14 +585,14 @@ class SearchToolTest {
   void pathPrefix_relativePathNoMatch_rejected() {
     var toolWithRoots =
         new SearchTool(
-            req -> stubbedResponse,
-            () ->
+            (req, context) -> stubbedResponse,
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\Documents", "Documents"),
                     new BrowseTool.RootInfo("D:\\Projects", "Projects")));
 
     OperationResult result =
-        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"unknown/how-to\"}");
+        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"unknown/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "Relative path not matching any root should be rejected: " + result.message());
     assertTrue(result.message().contains("not an absolute path"), result.message());
@@ -600,11 +602,11 @@ class SearchToolTest {
   void pathPrefix_unixSlashRejected_whenRootsAvailable() {
     var toolWithRoots =
         new SearchTool(
-            req -> stubbedResponse,
-            () -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            (req, context) -> stubbedResponse,
+            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
 
     OperationResult result =
-        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"/how-to\"}");
+        toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "Unix-style /path should be rejected on Windows: " + result.message());
     assertTrue(result.message().contains("not an absolute path"), result.message());
@@ -615,18 +617,18 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
     var toolWithRoots =
         new SearchTool(
-            req -> {
+            (req, context) -> {
               capturedRequest.set(req);
               return stubbedResponse;
             },
-            () ->
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\Documents", "Documents"),
                     new BrowseTool.RootInfo("D:\\Projects", "Projects")));
 
     OperationResult result =
         toolWithRoots.execute(
-            "{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\how-to\"}");
+            "{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), "Valid rooted path should be accepted: " + result.message());
     assertNotNull(capturedRequest.get(), "Search should have been executed");
@@ -636,12 +638,12 @@ class SearchToolTest {
   void pathPrefix_absoluteButOutOfRoots_rejected() {
     var toolWithRoots =
         new SearchTool(
-            req -> stubbedResponse,
-            () -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            (req, context) -> stubbedResponse,
+            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
 
     OperationResult result =
         toolWithRoots.execute(
-            "{\"query\": \"test\", \"path_prefix\": \"C:\\\\other\\\\path\"}");
+            "{\"query\": \"test\", \"path_prefix\": \"C:\\\\other\\\\path\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "Out-of-root path should be rejected: " + result.message());
     assertTrue(result.message().contains("not under any indexed root"), result.message());
@@ -653,13 +655,13 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
     var toolWithRoots =
         new SearchTool(
-            req -> {
+            (req, context) -> {
               capturedRequest.set(req);
               return stubbedResponse;
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
 
-    OperationResult result = toolWithRoots.execute("{\"query\": \"test\"}");
+    OperationResult result = toolWithRoots.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "No path_prefix should be accepted: " + result.message());
     assertNotNull(capturedRequest.get());
   }
@@ -669,7 +671,7 @@ class SearchToolTest {
     // Tool without roots supplier should still work (original behavior)
     stubbedResponse = emptyResponse();
 
-    OperationResult result = tool.execute("{\"query\": \"test\", \"path_prefix\": \"/how-to\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\", \"path_prefix\": \"/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Without roots, all paths should be allowed: " + result.message());
   }
 
@@ -690,7 +692,7 @@ class SearchToolTest {
                     .build()))
             .build();
 
-    OperationResult result = tool.execute("{\"query\": \"test\"}");
+    OperationResult result = tool.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("Preview:"), "Should show content_preview fallback");
     assertTrue(result.message().contains("long preview"), result.message());
@@ -724,7 +726,7 @@ class SearchToolTest {
                       .build()))
               .build();
 
-      OperationResult result = tool.execute("{\"query\": \"test\"}");
+      OperationResult result = tool.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertTrue(result.success(), result.message());
       String output = result.message();

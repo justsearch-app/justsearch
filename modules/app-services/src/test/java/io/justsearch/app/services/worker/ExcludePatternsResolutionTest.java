@@ -109,7 +109,8 @@ final class ExcludePatternsResolutionTest {
     RecordingIndexingService indexing =
         new RecordingIndexingService(List.of(new IndexingService.WatchedRoot("default", root)));
     ExcludesService.ExcludesResult result =
-        new ExcludesServiceImpl(() -> indexing).applyExcludes(true);
+        new ExcludesServiceImpl(() -> indexing)
+            .applyExcludes(true, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(1, result.patterns(), "the settings pattern must have been picked up");
     assertEquals(1, result.matchedFiles());
@@ -126,37 +127,37 @@ final class ExcludePatternsResolutionTest {
     }
 
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return roots.stream().map(WatchedRoot::path).toList();
     }
 
     @Override
-    public List<WatchedRoot> getWatchedRoots() {
+    public List<WatchedRoot> getWatchedRoots(io.justsearch.core.context.EngineContext engineContext) {
       return roots;
     }
 
     @Override
-    public void addWatchedPath(Path path) {
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public void flush() {
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {
       // no-op
     }
 
     @Override
-    public int deleteDocsByPathPrefix(Path pathPrefix) {
+    public int deleteDocsByPathPrefix(Path pathPrefix, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("dry run must not delete");
     }
 
     @Override
-    public boolean deleteDocById(String docId) {
+    public boolean deleteDocById(String docId, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("dry run must not delete");
     }
   }

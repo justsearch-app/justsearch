@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.agent.api.registry.ConfirmStrategy;
@@ -106,7 +108,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   }
 
   @Override
-  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink) {
+  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext incomingContext) {
     WorkflowRef workflowId = resolveWorkflowId(body);
     Workflow workflow = workflowCatalog.findById(workflowId).orElse(null);
     if (workflow == null) {
@@ -126,6 +128,10 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     }
 
     String sessionId = UUID.randomUUID().toString();
+    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
+        incomingContext.clientKind(), incomingContext.clientId(), Optional.of(sessionId),
+        incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.WORKFLOW,
+        incomingContext.survival(), incomingContext.urgency());
     // Tempdoc 565 §15.C — persist + index this workflow run in the shared run-event space so the
     // unified thread projects it as a mode of the one window (not a bespoke surface). `psink` mirrors
     // every streamed event to the durable log; the meta carries the conversation link the thread scans
@@ -175,7 +181,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
               Map.of("nodeId", node.nodeId(), "kind", kindOf(node), "index", index)));
       try {
         switch (node) {
-          case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink);
+          case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext);
           case WorkflowNode.GateStep step -> {
             if (!runGateStep(step, psink)) {
               // User declined at the gate — terminate the workflow cleanly.
@@ -193,7 +199,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
             }
           }
           case WorkflowNode.ToolStep step -> {
-            ToolOutcome outcome = runToolStep(step, psink);
+            ToolOutcome outcome = runToolStep(step, psink, engineContext);
             if (outcome.cancelled()) {
               psink.accept(
                   new SseEvent(
@@ -255,7 +261,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
    * single terminal {@code done}; a sub-shape {@code error} aborts the workflow.
    */
   private String runLlmStep(
-      WorkflowNode.LlmStep step, String priorOutput, Audience audience, Consumer<SseEvent> sink) {
+      WorkflowNode.LlmStep step, String priorOutput, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext) {
     String seed = step.prompt() != null ? step.prompt() : priorOutput;
     // Pass the seed under both body contracts a conversation shape may read: `prompt` (single-turn
     // shapes — free-chat / ask / summarize via UserPromptInjector) and `messages` (the agent /
@@ -289,7 +295,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
           }
         };
 
-    engineSupplier.get().run(step.shape(), subBody, audience, filtered);
+    engineSupplier.get().run(step.shape(), subBody, audience, filtered, engineContext);
     if (errorMessage[0] != null) {
       throw new WorkflowAbortedException(
           "LLM step '" + step.nodeId() + "' failed: " + errorMessage[0]);
@@ -307,7 +313,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   }
 
   /** ToolStep — resolve the op, gate it if required, then route the approved call. */
-  private ToolOutcome runToolStep(WorkflowNode.ToolStep step, Consumer<SseEvent> sink) {
+  private ToolOutcome runToolStep(WorkflowNode.ToolStep step, Consumer<SseEvent> sink, EngineContext engineContext) {
     Operation op = resolveOperation(step.operation().value());
     if (op == null) {
       // Validation passed against the live catalog, so absence here is a race (server disconnected
@@ -330,7 +336,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     sink.accept(new SseEvent("tool_exec_started", Map.of("callId", callId, "toolName", toolName)));
     OperationResult result;
     try {
-      result = gatedExecutor.routeApproved(op, args);
+      result = gatedExecutor.routeApproved(op, args, engineContext);
     } catch (RuntimeException e) {
       LOG.warn("Workflow tool step '{}' dispatch failed", step.nodeId(), e);
       result = OperationResult.failure("Execution error: " + e.getMessage());

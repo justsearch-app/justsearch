@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.agenthistory;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.services.worker.KnowledgeClient;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +41,9 @@ import org.slf4j.LoggerFactory;
  * never stall the agent loop's final emit. Fully fail-soft: any error is logged, never propagated.
  */
 public final class AgentHistoryIndexer {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "agent-history-indexer", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
 
   /** The reserved collection tag for indexed agent transcripts (shared with the D4b search scope). */
   public static final String COLLECTION = "agent-history";
@@ -332,7 +337,7 @@ public final class AgentHistoryIndexer {
     if (client == null) {
       return; // marker stays; a later pass with a client submits it
     }
-    client.submitBatch(List.of(target), true, COLLECTION);
+    client.submitBatch(List.of(target), true, COLLECTION, ENGINE_CONTEXT);
     Files.deleteIfExists(pendingMarkerPath(sessionId));
   }
 
