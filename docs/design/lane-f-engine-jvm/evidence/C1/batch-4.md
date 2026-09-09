@@ -1,5 +1,9 @@
 # C1 batch 4: executor ownership and confinement
 
+Current execution ledger: [integrated-candidate.md](integrated-candidate.md). The notes below retain
+initial registry/composition findings; the producer, fanout, OCR, SSE and guard slices are now
+committed and pushed with dedicated evidence. C1 remains open for final integrated/live/hosted proof.
+
 Status: in progress, 2026-09-09, above `95ac489b2` in `worktree-lane-F-A`.
 Several composition slices compile and pass focused tests; later producer migrations and the
 registry self-close correction still require verification. The completed batch-3 pacing measurement
@@ -39,16 +43,17 @@ restoration run encountered an in-progress enrichment dependency compile and is 
 
 ## Required next proof
 
-Rerun the restored registry tests with the composition changes. Wire the same registry through all application/index owners,
-including the hidden OTel metric-reader scheduler, with actual urgency-based disjoint pools.
-Retire raw constructors and bare async calls, enforce extraction confinement, and execute the
-stage's rule-mutation, full stress-enabled suite and final live admission/pacing proof.
-The batch-3 continuous-load capture exposed parent SPLADE RMW churn. Its correction is committed
-at `95ac489b2`; [dedicated evidence](parent-splade-rmw.md) records 52 passing tests and three adverse
-mutations. The final installed candidate still needs fresh continuous-load proof.
+Restored integrated build/test/installDist164 is green. Rerun installed standard-model
+aggregate admission/fairness and continuous-load pacing on that bounded-executor candidate.
+Required hosted/platform checks remain separate. The original registry deadline/reentrancy,
+producer ownership, raw/async guard, confinement, and actual-exit mutation proofs are recorded in
+the dedicated evidence files linked from C1 section13 and the integrated ledger. Do not repeat
+old unperformed labels below as the current state.
 
-Keep raw evidence under this worktree's `tmp/` through lane completion plus 30 days; add exact
-commands, tested revision and accessible artifact paths as each proof executes.
+The parent SPLADE RMW correction95ac489b2 has52focused tests and three adverse mutations
+([parent-splade-rmw.md](parent-splade-rmw.md)); the new installed continuous-load run still has to
+show the churn is gone. Keep raw evidence under this worktree's tmp through lane completion plus
+30days, with exact command/revision/environment bindings in the current ledger.
 
 ## Composition decisions and current edits
 

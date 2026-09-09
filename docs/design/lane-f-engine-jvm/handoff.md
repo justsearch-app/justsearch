@@ -5,39 +5,53 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-0920-utc).
+Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-1021-utc).
 
-## Current C1 batch 4 checkpoint (2026-09-09 09:20 UTC)
+## Current C1 batch 4 checkpoint (2026-09-09 10:21 UTC)
 
 Worktree `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
-A/B are complete at their recorded proof tier. C1 is in progress; C2/D/E/F remain required.
-Lane decisions and autonomous merges remain authorized. Merge placement remains F/PR1.
-The original dirty tree was split into ten per-item WIP commits and pushed. Subsequent integration
-corrections are also checkpointed per item, with every commit pushed immediately. Continue this
-cadence and commit WIP at least hourly; cap worker follow-ups at three, then take the diff at root.
+A/B are complete at their recorded proof tier. C1 remains in progress; C2/D/E/F remain required.
+Lane decisions and autonomous merges remain authorized. Merge placement remains F/PR1 (draft718).
+The original dirty tree was split into ten per-item WIP commits and pushed; later slices follow
+that cadence. Push every commit immediately, checkpoint WIP at least hourly, and cap worker
+follow-ups at three before taking the diff at root. This is continuing work, not a pause.
 
-Latest pushed implementation is `e9ed79694` (per-source search lifetime/admission), following
-`71c4e17a3` (commit timer actual exit), `6d94ef433` (bounded scan replay), `ee48cf1b6`
-(KnowledgeServer reaper/deferred-model owners), and earlier fanout/pacing/task-group fixes.
-This checkpoint adds the bounded OCR producer and process-exit proof. See
-[evidence/C1/per-source-search.md](evidence/C1/per-source-search.md),
-[ocr-producers.md](evidence/C1/ocr-producers.md), [commit-timer.md](evidence/C1/commit-timer.md),
-and [scan-progress.md](evidence/C1/scan-progress.md). Local focused producer tests and their
-adverse mutations pass at the recorded revisions. Latest OCR command104 passed. Build58 and
-full worker-services 1,277 tests (two existing skips) predate these changes and are not final proof.
+Latest pushed revision65f65d36c follows239ac1a6c (launcher configuration funnel),
+c57525718 (frontend lint correction),4a57950ae (OCR fixture), SSE bound a46b4544c, direct/three-way fanout proof 6c89796f2,
+async guard 66d85feb1, raw/census guards 749ae81dc, and Lucene generation/NRT correction 3f6fdeae5.
+Earlier per-source search e9ed79694 and OCR d0d09bc72 are also complete at focused proof tier.
+All these slices have mutation evidence under evidence/C1. Fully executed run138 passes all five
+focused runtime lifetime/generation tests (93/93 tasks executed); independent shutdown review found
+no code defects. Restored run133 passes all 388 observability tests and whole-program dead-code;
+guards135 and their source/method-reference/arity/telemetry/unused-class mutations pass as recorded.
+WholeProgramDeadCodeTest's committed store did not grow or change.
 
-Remaining C1 work: bounded SSE replay/live handoff and executable raw/async producer guards are
-implemented but still receiving root verification. Complete their bite mutations, real three-
-Lucene-generation proof, direct chunk/three-way runtime-close proof, remaining Rule9/layering/
-WholeProgramDeadCode mutations, canonical sweep, full stress-enabled suite and installed standard-
-model aggregate admission/fairness plus continuous search/indexing proof. The batch-3 live evidence
-predates bounded executors. Execute SchemaMismatchStatusContractTest (currently compilation only)
-and required hosted/platform checks on the coherent candidate. C2/D/E/F then follow with F/PR1
-merge placement unchanged. No outstanding item is owner-gated.
+Integrated build140 found one redundant qualifier in the OCR chaos fixture. Fix 4a57950ae is pushed;
+restored build143 passes332 tasks, including configured integration and PMD checks. Full stress147 and integrated162 finished: only SystemAccessFunnelTest (fixed/pushed239ac1a6c)
+and the API thin-composer field ceiling failed in sequence. Root moved borrowed search state into
+CoreApiAssembly.Result and removed a constructor-only executor field; the30field ceiling stays.
+Restored integrated164 passes build/test/installDist with stress enabled:9718unit tests,
+zero failures/errors,25existing skips; configured integration36tests/zero failures/10skips.
+Both prior full XML snapshots are preserved; see the current ledger for cache/execution binding. Frontend run142
+passes483files/6474tests and typecheck141 passes; console teardown diagnostics match the pre-C1 log exactly and are documented as existing fixture noise.
+Lint148 found a dead initial assignment in admissionFetch; fix c57525718 is pushed and lint154,
+typecheck155 and seven focused tests156 pass. SchemaMismatchStatusContractTest executed in
+build140: one test passed (XML09:59:58UTC), now preserved in its own evidence directory.
+UI gates149 pass27/27, regen150 passes, engine-port144 and register-guard-resolution145 pass,
+store-recoverability146 passes, docs152/153 pass, logic-seams136 and JVM-option pin137 pass.
 
-The active session identity is `01a082dc-dfd6-7d60-be2e-a8d088229a67`; supply it for owned tools.
-No dev stack is running. This note is a recovery checkpoint during continuing work, not a pause.
-Older notes below are historical when they disagree with this current state.
+Remaining C1:
+full public preflight/local checks, final canonical/residue sweep, and installed standard-model
+aggregate admission/fairness plus continuous search/indexing proof on this bounded-executor candidate.
+Batch3 live proof used compact and predates bounded executors; it cannot close C1. The parent SPLADE
+RMW correction still needs the fresh live run. No final C1 acceptance is claimed yet. Required hosted/platform checks are running via draft718;
+CI wiring or intermediate successes are not final hosted proof. C2 owns its explicit operation-row
+urgency record and the design's awaitingProducer clauses remain labelled; nothing is owner-gated.
+
+The active session identity is01a082dc-dfd6-7d60-be2e-a8d088229a67. Only root runs Gradle; no dev
+stack is running. Use the dev tools and fresh isolated data with standard model after installDist.
+See evidence/C1/integrated-candidate.md for the advancing command/result ledger. Older notes below
+are historical when they disagree with this current state.
 
 
 Two handoffs live in this file. The first (2026-09-07) is from the design orchestrator to the
