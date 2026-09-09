@@ -32,7 +32,13 @@ public final class EngineFutures {
     return supplyAsync(supplier, executor, () -> {});
   }
 
-  /** Releases ownership only after actual task exit, or cancellation before the task starts. */
+  /**
+   * Releases ownership only after actual task exit, or cancellation before the task starts.
+   * Cleanup is attempted once. A cleanup failure after a running task's result was published is
+   * reported through the system logger; it cannot change that result or kill its executor worker.
+   * Pre-start cancellation/submission callers instead receive the cleanup failure directly or as
+   * a suppressed failure on their original refusal/timeout.
+   */
   public static <T> CompletableFuture<T> supplyAsync(
       Supplier<T> supplier, Executor executor, Runnable onActualExit) {
     Objects.requireNonNull(executor, "executor");
@@ -63,7 +69,11 @@ public final class EngineFutures {
           try { super.run(); }
           finally {
             lifetime.set(2);
-            onActualExit.run();
+            try { onActualExit.run(); }
+            catch (RuntimeException | Error cleanupFailure) {
+              System.getLogger(EngineFutures.class.getName()).log(System.Logger.Level.ERROR,
+                  "Engine task ownership cleanup failed after execution", cleanupFailure);
+            }
           }
         }
 

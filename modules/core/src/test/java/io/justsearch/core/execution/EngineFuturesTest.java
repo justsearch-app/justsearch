@@ -119,6 +119,58 @@ class EngineFuturesTest {
     assertDoesNotThrow(() -> EngineFutures.rethrowExecutorRefusal(new IllegalStateException("ordinary failure")));
   }
 
+  @Test
+  void runningSuccessCleanupFailureDoesNotKillExecutorWorker() throws Exception {
+    assertRunningCleanupFailureIsContained(false);
+  }
+
+  @Test
+  void runningTimeoutCleanupFailureDoesNotKillExecutorWorker() throws Exception {
+    assertRunningCleanupFailureIsContained(true);
+  }
+
+  private static void assertRunningCleanupFailureIsContained(boolean timeout) throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var interrupted = new CountDownLatch(1);
+    var cleanupCalls = new AtomicInteger();
+    var threadCount = new AtomicInteger();
+    var escaped = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+    try (var executor = Executors.newSingleThreadExecutor(task -> {
+      threadCount.incrementAndGet();
+      Thread thread = new Thread(task, "owned-future-cleanup-test");
+      thread.setUncaughtExceptionHandler((ignored, failure) -> escaped.set(failure));
+      return thread;
+    })) {
+      try {
+        var result = EngineFutures.supplyAsync(() -> {
+          entered.countDown();
+          try { release.await(); }
+          catch (InterruptedException expected) { interrupted.countDown(); await(release); }
+          return 42;
+        }, executor, () -> {
+          cleanupCalls.incrementAndGet();
+          throw new IllegalStateException("running cleanup failure");
+        });
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        if (timeout) {
+          result.orTimeout(20, TimeUnit.MILLISECONDS);
+          assertTrue(interrupted.await(5, TimeUnit.SECONDS));
+          assertInstanceOf(TimeoutException.class,
+              assertThrows(java.util.concurrent.ExecutionException.class,
+                  () -> result.get(5, TimeUnit.SECONDS)).getCause());
+          assertEquals(0, cleanupCalls.get(), "timeout is not actual exit");
+        }
+        release.countDown();
+        if (!timeout) assertEquals(42, result.get(5, TimeUnit.SECONDS));
+        executor.submit(() -> null).get(5, TimeUnit.SECONDS);
+        assertEquals(1, cleanupCalls.get());
+        assertEquals(1, threadCount.get(), "cleanup must not kill and replace the worker");
+        assertNull(escaped.get());
+      } finally { release.countDown(); }
+    }
+  }
+
   private static void await(CountDownLatch latch) {
     try { latch.await(); }
     catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
