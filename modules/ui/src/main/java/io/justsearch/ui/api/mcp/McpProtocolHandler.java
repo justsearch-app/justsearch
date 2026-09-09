@@ -84,6 +84,7 @@ public final class McpProtocolHandler {
     var engineContext = io.justsearch.ui.api.RequestEngineContext.get(ctx);
     String sessionId = ctx.header("Mcp-Session-Id");
     String body = ctx.body();
+    Object requestId = null;
 
     try {
       var node = MAPPER.readTree(body);
@@ -94,7 +95,17 @@ public final class McpProtocolHandler {
       // falls through to the normal request path below like any other request.
       boolean isNotification = !node.has("id");
       var id = isNotification ? null : node.get("id");
+      requestId = id;
       var params = node.has("params") ? node.get("params") : MAPPER.createObjectNode();
+
+      io.justsearch.app.api.EngineAdmissionException refused =
+          ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE);
+      if (refused != null) {
+        io.justsearch.ui.api.RequestEngineWork.status(ctx, refused);
+        if (!isNotification) writeError(ctx, id, -32000, refused.getMessage(),
+            io.justsearch.ui.api.RequestEngineWork.errorCode(refused));
+        return;
+      }
 
       if (method == null) {
         writeError(ctx, id, -32600, "Invalid Request: missing method");
@@ -138,7 +149,19 @@ public final class McpProtocolHandler {
       if (result != null) {
         writeResult(ctx, id, result);
       }
+    } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+      io.justsearch.ui.api.RequestEngineWork.status(ctx, refused);
+      writeError(ctx, requestId, -32000, refused.getMessage(),
+          io.justsearch.ui.api.RequestEngineWork.errorCode(refused));
     } catch (Exception e) {
+      var executorRefusal = io.justsearch.ui.api.ApiErrorHandler.executorRefusal(e);
+      if (executorRefusal != null) {
+        io.justsearch.ui.api.ApiErrorHandler.executorRefusalStatus(ctx, executorRefusal);
+        writeError(ctx, requestId, -32000,
+            io.justsearch.ui.api.ApiErrorHandler.sanitizeMessage(executorRefusal.getMessage()),
+            io.justsearch.ui.api.ApiErrorHandler.resolve(executorRefusal).name(), false);
+        return;
+      }
       log.warn("MCP protocol error", e);
       writeError(ctx, null, -32603, "Internal error: " + e.getMessage());
     }
@@ -348,12 +371,20 @@ public final class McpProtocolHandler {
    */
   private static void writeError(
       Context ctx, Object id, int code, String message, String errorCode) {
+    writeError(ctx, id, code, message, errorCode, null);
+  }
+
+  private static void writeError(
+      Context ctx, Object id, int code, String message, String errorCode, Boolean retrySafe) {
     try {
       var error = new LinkedHashMap<String, Object>();
       error.put("code", code);
       error.put("message", message);
       if (errorCode != null) {
-        error.put("data", Map.of("errorCode", errorCode));
+        var data = new LinkedHashMap<String, Object>();
+        data.put("errorCode", errorCode);
+        if (retrySafe != null) data.put("retrySafe", retrySafe);
+        error.put("data", data);
       }
       var response = new LinkedHashMap<String, Object>();
       response.put("jsonrpc", JSONRPC_VERSION);

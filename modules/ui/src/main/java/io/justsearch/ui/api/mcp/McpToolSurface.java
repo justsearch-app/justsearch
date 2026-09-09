@@ -2075,6 +2075,8 @@ public final class McpToolSurface {
 
   /** Project the existing API classification and sanitizer, without a parallel retry policy. */
   private static Map<String, Object> toolFailureContent(String tool, Exception e) {
+    var executorRefusal = io.justsearch.ui.api.ApiErrorHandler.executorRefusal(e);
+    if (executorRefusal != null) throw executorRefusal;
     // Future.get/join transport the cause in wrappers with no failure policy of their own.
     // Use the same cause for wording and classification, retaining the fallback for absent
     // or non-Exception causes. Identity tracking also bounds malformed cyclic cause chains.

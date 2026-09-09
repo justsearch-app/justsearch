@@ -41,8 +41,8 @@ public final class RequestEngineContext {
   /** Direct resume/fork/undo enters the same agent trust boundary as the shape runner. */
   public static EngineContext agent(Context request) {
     EngineContext incoming = get(request);
-    return EngineProvenance.context(incoming.clientKind(), incoming.clientId(), incoming.sessionId(),
-        incoming.grantReference(), TransportTag.AGENT_LOOP, incoming.survival(), incoming.urgency());
+    return EngineProvenance.rebase(incoming, incoming.sessionId(),
+        TransportTag.AGENT_LOOP, incoming.survival(), incoming.urgency());
   }
 
   /** Existing browser transport fallback; catalog resolution remains the trust authority. */

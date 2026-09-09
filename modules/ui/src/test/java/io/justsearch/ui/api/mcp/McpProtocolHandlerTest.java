@@ -43,6 +43,41 @@ import tools.jackson.databind.json.JsonMapper;
 
 class McpProtocolHandlerTest {
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void wrappedExecutorRefusalKeepsRpcIdentityAndExplicitlyDisallowsAutomaticReplay() throws Exception {
+    for (var reason : List.of(
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED)) {
+      var adapter = mock(KnowledgeHttpApiAdapter.class);
+      when(adapter.search(any(), any(EngineContext.class))).thenThrow(
+          new java.util.concurrent.CompletionException(
+              new io.justsearch.core.execution.EngineExecutorRejectedException(reason, "test.search", 7)));
+      var ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/mcp");
+      when(ctx.body()).thenReturn("""
+          {"jsonrpc":"2.0","id":"refused-7","method":"tools/call",
+           "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+          """);
+      when(ctx.contentType(anyString())).thenReturn(ctx);
+      when(ctx.status(anyInt())).thenReturn(ctx);
+      var response = ArgumentCaptor.forClass(String.class);
+      when(ctx.result(response.capture())).thenReturn(ctx);
+      handlerOver(adapter).handlePost(ctx);
+      var wire = MAPPER.readValue(response.getValue(), Map.class);
+      assertEquals("refused-7", wire.get("id"));
+      assertFalse(wire.containsKey("result"));
+      var error = (Map<String, Object>) wire.get("error");
+      var data = (Map<String, Object>) error.get("data");
+      assertEquals(false, data.get("retrySafe"));
+      boolean closed = reason == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED;
+      assertEquals(closed ? "SERVICE_UNAVAILABLE" : "ADMISSION_ENGINE_LIMIT", data.get("errorCode"));
+      verify(ctx).status(closed ? 503 : 429);
+      if (closed) verify(ctx, never()).header(eq("Retry-After"), anyString());
+      else verify(ctx).header("Retry-After", "7");
+    }
+  }
+
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-05-16T12:00:00Z"), ZoneId.of("UTC"));

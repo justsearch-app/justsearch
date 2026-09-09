@@ -80,7 +80,39 @@ public final class ApiErrorHandler {
      */
     public static Map<String, Object> toResponse(ApiErrorCode code, Exception e) {
         String message = sanitizeMessage(e != null ? e.getMessage() : null);
-        return buildTypedResponse(message, code);
+        var response = buildTypedResponse(message, code);
+        if (executorRefusal(e) != null) response.put("retrySafe", false);
+        return response;
+    }
+
+    /** Unwrap asynchronous transport wrappers without treating arbitrary nested failures as refusal. */
+    public static io.justsearch.core.execution.EngineExecutorRejectedException executorRefusal(Throwable failure) {
+        var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while ((failure instanceof java.util.concurrent.CompletionException
+                || failure instanceof java.util.concurrent.ExecutionException)
+                && failure.getCause() != null && seen.add(failure)) {
+            failure = failure.getCause();
+        }
+        return failure instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused
+            ? refused : null;
+    }
+
+    /** Common HTTP status/header projection, also used by the JSON-RPC envelope writer. */
+    public static void executorRefusalStatus(io.javalin.http.Context ctx,
+            io.justsearch.core.execution.EngineExecutorRejectedException failure) {
+        ctx.status(httpStatusFor(resolve(failure)));
+        if (failure.reason() != io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+            ctx.header("Retry-After", Integer.toString(failure.retryAfterSeconds()));
+        }
+    }
+
+    public static boolean writeExecutorRefusal(io.javalin.http.Context ctx, Exception failure,
+            Telemetry telemetry) {
+        var refused = executorRefusal(failure);
+        if (refused == null) return false;
+        executorRefusalStatus(ctx, refused);
+        ctx.json(toResponse(resolve(refused), refused, telemetry, routeOf(ctx)));
+        return true;
     }
 
     /**
@@ -144,8 +176,7 @@ public final class ApiErrorHandler {
         }
         ApiErrorCode code = resolve(e);
         recordError(telemetry, code, route);
-        String message = sanitizeMessage(e.getMessage());
-        return buildTypedResponse(message, code);
+        return toResponse(code, e);
     }
 
     /**
@@ -223,6 +254,16 @@ public final class ApiErrorHandler {
     public static ApiErrorCode resolve(Exception e) {
         if (e == null) {
             return ApiErrorCode.INTERNAL_ERROR;
+        }
+
+        if ((e instanceof java.util.concurrent.CompletionException
+                || e instanceof java.util.concurrent.ExecutionException)
+                && e.getCause() instanceof Exception cause) {
+            return resolve(cause);
+        }
+        if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused) {
+            return refused.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED
+                ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.ADMISSION_ENGINE_LIMIT;
         }
 
         // IndexRuntimeIOException: surface the specific reason
@@ -321,8 +362,7 @@ public final class ApiErrorHandler {
             return buildTypedResponse("An error occurred", ApiErrorCode.INTERNAL_ERROR);
         }
         ApiErrorCode code = resolve(e);
-        String message = sanitizeMessage(e.getMessage());
-        return buildTypedResponse(message, code);
+        return toResponse(code, e);
     }
 
     /**
@@ -335,7 +375,9 @@ public final class ApiErrorHandler {
     public static Map<String, Object> toResponse(Exception e, String customMessage) {
         ApiErrorCode code = resolve(e);
         String message = sanitizeMessage(customMessage);
-        return buildTypedResponse(message, code);
+        var response = buildTypedResponse(message, code);
+        if (executorRefusal(e) != null) response.put("retrySafe", false);
+        return response;
     }
 
     // ── Message sanitization ────────────────────────────────────────────────
@@ -414,6 +456,7 @@ public final class ApiErrorHandler {
         if (code == null) return 500;
         return switch (code) {
             case TIMEOUT -> 504;
+            case ADMISSION_CONTEXT_LIMIT, ADMISSION_ENGINE_LIMIT -> 429;
             case SERVICE_UNAVAILABLE, INDEX_UNAVAILABLE, AI_STARTING,
                  LLM_OVERLOADED, MANIFEST_UNAVAILABLE, SETTINGS_UNAVAILABLE -> 503;
             case NOT_FOUND -> 404;

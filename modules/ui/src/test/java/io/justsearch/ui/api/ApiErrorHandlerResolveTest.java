@@ -17,6 +17,36 @@ import org.junit.jupiter.api.Test;
 @DisplayName("ApiErrorHandler.resolve() and toResponse()")
 final class ApiErrorHandlerResolveTest {
 
+  @Test
+  void wrappedExecutorRefusalWritesBoundedRetryHeaderButNeverPromisesSafeReplay() {
+    var refusal = new io.justsearch.core.execution.EngineExecutorRejectedException(
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "test.http", 7);
+    var ctx = org.mockito.Mockito.mock(io.javalin.http.Context.class);
+    org.mockito.Mockito.when(ctx.path()).thenReturn("/test");
+    var failure = new java.util.concurrent.CompletionException(new java.util.concurrent.ExecutionException(refusal));
+    assertTrue(ApiErrorHandler.writeExecutorRefusal(ctx, failure, null));
+    org.mockito.Mockito.verify(ctx).status(429);
+    org.mockito.Mockito.verify(ctx).header("Retry-After", "7");
+    var response = ApiErrorHandler.toResponse(ApiErrorHandler.resolve(failure), failure);
+    assertEquals("ADMISSION_ENGINE_LIMIT", response.get("errorCode"));
+    assertEquals(false, response.get("retrySafe"));
+  }
+
+  @Test
+  void boundedExecutorRefusalsKeepCapacityClassificationThroughAsyncWrappers() {
+    var refused = new io.justsearch.core.execution.EngineExecutorRejectedException(
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "test", 3);
+    assertEquals(ApiErrorCode.ADMISSION_ENGINE_LIMIT, ApiErrorHandler.resolve(refused));
+    assertEquals(ApiErrorCode.ADMISSION_ENGINE_LIMIT,
+        ApiErrorHandler.resolve(new java.util.concurrent.CompletionException(refused)));
+    assertEquals(429, ApiErrorHandler.httpStatusFor(ApiErrorHandler.resolve(refused)));
+    assertEquals(3, refused.retryAfterSeconds());
+    var closed = new io.justsearch.core.execution.EngineExecutorRejectedException(
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED, "test", 3);
+    assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, ApiErrorHandler.resolve(closed));
+    assertEquals(503, ApiErrorHandler.httpStatusFor(ApiErrorHandler.resolve(closed)));
+  }
+
   // ── resolve() ──────────────────────────────────────────────────────────
 
   @Nested

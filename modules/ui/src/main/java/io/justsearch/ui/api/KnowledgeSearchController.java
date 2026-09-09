@@ -482,6 +482,7 @@ public class KnowledgeSearchController {
       ApiErrorCode code = ApiErrorHandler.resolve(e);
       ctx.status(http).json(ApiErrorHandler.toResponse(code, e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Knowledge search failed", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } finally {
@@ -712,6 +713,7 @@ public class KnowledgeSearchController {
       }
 
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Knowledge status check failed", e);
       ApiErrorCode code = ApiErrorHandler.resolve(e);
       Map<String, Object> errorResponse =
@@ -870,6 +872,7 @@ public class KnowledgeSearchController {
       ctx.json(resp);
 
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Knowledge ingest failed", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -943,6 +946,7 @@ public class KnowledgeSearchController {
       ApiErrorCode code = ApiErrorHandler.resolve(e);
       ctx.status(http).json(ApiErrorHandler.toResponse(code, e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Knowledge suggest failed", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -985,6 +989,7 @@ public class KnowledgeSearchController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Knowledge listFolders failed", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -1030,6 +1035,7 @@ public class KnowledgeSearchController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Knowledge listFolderFiles failed", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
