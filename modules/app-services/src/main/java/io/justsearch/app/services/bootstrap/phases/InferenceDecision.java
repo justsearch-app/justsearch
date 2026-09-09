@@ -42,12 +42,13 @@ public final class InferenceDecision {
   }
 
   /** Constructs the live inference manager, or returns null when AI is disabled / lite mode. */
-  public static InferenceLifecycleManager createInferenceManager(Telemetry telemetry) {
-    return createInferenceManager(telemetry,
+  public static InferenceLifecycleManager createInferenceManager(io.justsearch.core.execution.EngineExecutorRegistry executors, Telemetry telemetry) {
+    return createInferenceManager(executors, telemetry,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   public static InferenceLifecycleManager createInferenceManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry, io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     boolean aiEnabled = decideInferenceConfigured();
     boolean liteMode =
@@ -64,6 +65,7 @@ public final class InferenceDecision {
       log.info("Lite mode enabled — InferenceLifecycleManager init will be skipped.");
     }
     return BootstrapInferenceFactory.createInferenceManager(
+        executors,
         aiEnabled,
         BootstrapHelpers.currentResolvedConfig(),
         System.getProperty("user.dir"),

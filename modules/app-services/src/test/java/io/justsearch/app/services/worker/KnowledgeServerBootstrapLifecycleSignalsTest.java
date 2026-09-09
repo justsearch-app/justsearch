@@ -29,7 +29,7 @@ final class KnowledgeServerBootstrapLifecycleSignalsTest {
   @Test
   @DisplayName("energyState() is UNKNOWN — not reduced, not null — before the first poll")
   void energyStateNullSafe(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     EnergyState e = bootstrap.energyState();
     assertEquals(EnergyState.Intent.UNKNOWN, e.intent());
     assertFalse(e.reduced());
@@ -38,7 +38,7 @@ final class KnowledgeServerBootstrapLifecycleSignalsTest {
   @Test
   @DisplayName("recentlyResumed is false until a resume is marked, true inside the window, then clears")
   void resumeWindow(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     long t0 = 1_000_000_000L;
     assertFalse(bootstrap.recentlyResumed(t0), "no resume yet");
 

@@ -3,7 +3,8 @@ package io.justsearch.ui.observability;
 
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
-import java.util.concurrent.Executors;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -35,9 +36,11 @@ public final class GpuSaturationSampler {
   private final Supplier<GpuCapabilitiesService> gpuCapabilitiesSupplier;
   private final GpuSaturationMonitor monitor;
   private final ScheduledExecutorService executor;
+  private final EngineExecutorRegistry.Registration executorOwner;
   private final AtomicBoolean started = new AtomicBoolean(false);
 
   public GpuSaturationSampler(
+      EngineExecutorRegistry executors,
       Supplier<GpuCapabilitiesService> gpuCapabilitiesSupplier, GpuSaturationMonitor monitor) {
     this.gpuCapabilitiesSupplier = gpuCapabilitiesSupplier;
     this.monitor = monitor;
@@ -47,7 +50,16 @@ public final class GpuSaturationSampler {
           t.setDaemon(true);
           return t;
         };
-    this.executor = Executors.newSingleThreadScheduledExecutor(tf);
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new EngineExecutorSpec(
+        "head.gpu-saturation-sampler", EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+    try {
+      this.executor = executorOwner.openScheduled(tf);
+    } catch (RuntimeException | Error failure) {
+      try { executorOwner.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /**
@@ -71,12 +83,7 @@ public final class GpuSaturationSampler {
 
   /** Stops the sampler. Idempotent; safe to call without start. */
   public void stop() {
-    executor.shutdownNow();
-    try {
-      executor.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+    executorOwner.close();
   }
 
   /**

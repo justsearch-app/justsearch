@@ -74,6 +74,16 @@ class AuthorizationControllerTest {
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(anyString())).thenReturn(ctx);
     when(ctx.status(anyInt())).thenReturn(ctx);
+    Map<String, Object> attributes = new java.util.HashMap<>();
+    when(ctx.attribute(anyString()))
+        .thenAnswer(invocation -> attributes.get(invocation.getArgument(0)));
+    doAnswer(
+            invocation -> {
+              attributes.put(invocation.getArgument(0), invocation.getArgument(1));
+              return null;
+            })
+        .when(ctx)
+        .attribute(anyString(), any());
     return ctx;
   }
 
@@ -83,6 +93,13 @@ class AuthorizationControllerTest {
     verify(ctx, atLeastOnce()).result(captor.capture());
     byte[] last = captor.getAllValues().get(captor.getAllValues().size() - 1);
     return MAPPER.readValue(last, Map.class);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> capturedJsonObject(Context ctx) {
+    ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+    verify(ctx, atLeastOnce()).json(captor.capture());
+    return captor.getAllValues().get(captor.getAllValues().size() - 1);
   }
 
   /**
@@ -116,12 +133,13 @@ class AuthorizationControllerTest {
 
   @Test
   void approve_withExecuteTrue_dispatchesUsingStoredArgsAndReportsSuccess() throws Exception {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     when(dispatcher.dispatch(any(), any(), any(), any(), any()))
         .thenReturn(OperationResult.success("Indexed 1 item", Map.of()));
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, null, dispatcher, catalogs);
+            capsuleService, pendingStore, null, dispatcher, catalogs, admission);
     // The pending was created by an MCP caller; the approving request is a separate browser
     // gesture. Both the origin context and its exact invocation provenance must survive that
     // handoff, so approval cannot silently upgrade the dispatch to the browser's trusted context.
@@ -135,6 +153,9 @@ class AuthorizationControllerTest {
             "MCP",
             EngineContext.Survival.DURABLE,
             EngineContext.Urgency.BACKGROUND);
+    try (var original = admission.admit(pendingContext, false)) {
+      pendingContext = original.context();
+    }
     Instant pendingOccurredAt = Instant.parse("2026-07-02T11:59:30Z");
     var pendingProvenance =
         io.justsearch.agent.api.registry.InvocationProvenance.fromEngineContext(
@@ -182,7 +203,11 @@ class AuthorizationControllerTest {
 
     EngineContext dispatchedContext = contextCaptor.getValue();
     assertNotEquals(approvingContext, dispatchedContext);
-    assertEquals(pendingContext, dispatchedContext);
+    assertTrue(dispatchedContext.workId().isPresent());
+    assertNotEquals(pendingContext.workId(), dispatchedContext.workId());
+    assertEquals(pendingContext.withWorkId(dispatchedContext.workId().orElseThrow()), dispatchedContext);
+    assertThrows(io.justsearch.app.api.EngineAdmissionException.class, () -> admission.attach(dispatchedContext),
+        "the approval dispatch must release its child after completion");
     assertEquals(EngineContext.ClientKind.MCP_CLIENT, dispatchedContext.clientKind());
     assertEquals("mcp-client-7", dispatchedContext.clientId());
     assertEquals(Optional.of("session-7"), dispatchedContext.sessionId());
@@ -200,6 +225,50 @@ class AuthorizationControllerTest {
     assertEquals(pendingOccurredAt, dispatchedProvenance.occurredAt());
     assertEquals(Optional.of("signed-intent-7"), dispatchedProvenance.signedIntentToken());
     assertEquals(Optional.of("session-7"), dispatchedProvenance.correlationId());
+  }
+
+  @Test
+  void childAdmissionRefusalLeavesTheSingleUsePendingAvailableForRetry() {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(1, 1, 1);
+    var dispatcher = mock(OperationDispatcher.class);
+    var controller = new AuthorizationController(capsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    String pendingId = createPending("core.ingest-files");
+    try (var _ = admission.admit(TestRequestContexts.browser(), false)) {
+      var ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+      controller.handleApprove(ctx);
+      verify(ctx).status(429);
+      verify(ctx).header("Retry-After", "1");
+      assertEquals(Boolean.TRUE, capturedJsonObject(ctx).get("retrySafe"));
+      assertTrue(pendingStore.peek(pendingId).isPresent());
+      verifyNoInteractions(dispatcher);
+    }
+  }
+
+  @Test
+  void approve_lateAdmissionFailureAfterConsume_isUnsafeAndPendingIsConsumed() {
+    ConsentCapsuleService failingCapsuleService = mock(ConsentCapsuleService.class);
+    when(failingCapsuleService.mint(anyString(), anyString(), any(SourceTier.class)))
+        .thenThrow(
+            new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 1));
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
+    var controller =
+        new AuthorizationController(
+            failingCapsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    String pendingId = createPending("core.ingest-files");
+
+    Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    controller.handleApprove(ctx);
+
+    verify(ctx).status(429);
+    Map<String, Object> refusal = capturedJsonObject(ctx);
+    assertEquals(Boolean.FALSE, refusal.get("retrySafe"));
+    assertTrue(
+        pendingStore.peek(pendingId).isEmpty(),
+        "late failure must not restore the consumed pending");
+    verify(failingCapsuleService).mint(anyString(), anyString(), any(SourceTier.class));
+    verifyNoInteractions(dispatcher);
   }
 
   @Test

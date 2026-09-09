@@ -110,7 +110,7 @@ final class HeadlessAppUpgradeShutdownWiringTest {
     try {
       HttpClient client = HttpClient.newHttpClient();
       var prepared = JSON.readTree(post(client, server, "/api/upgrade/prepare", "{}").body());
-      try (var watcher = HeadlessApp.startShutdownRequestWatcher(runtimeDir,
+      try (var watcher = HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(), runtimeDir,
           HeadlessApp.shutdownRequestAcceptance(), HeadlessApp.shutdownRequestDispatcher(sequence),
           20L, ignored -> {})) {
         for (String nonce : new String[] {null, "wrong", prepared.get("shutdownNonce").asText()}) {
@@ -142,7 +142,7 @@ final class HeadlessAppUpgradeShutdownWiringTest {
   }
 
   private static LocalApiServer server(Path dataDir, UpgradeShutdownBridge bridge) {
-    return LocalApiServer.builder(new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
+    return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
             dataDir.resolve("index"))
         .upgradeShutdownAction(bridge).build();
   }

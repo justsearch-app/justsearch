@@ -18,7 +18,7 @@ class OperationSubstrateInitTest {
     OperationCatalog agentTools = OperationCatalog.of("core", List.of());
 
     OperationSubstrateInit.Output out =
-        OperationSubstrateInit.run(
+        OperationSubstrateInit.run(new io.justsearch.core.execution.TestEngineExecutors(),
             handlers,
             ops,
             agentTools,

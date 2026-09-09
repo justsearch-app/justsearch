@@ -121,6 +121,9 @@ class OpenAiCompatControllerTest {
   private static Context mockContext(String method, String path) {
     Context ctx = mock(Context.class);
     when(ctx.method()).thenReturn(HandlerType.valueOf(method));
+    org.mockito.Mockito.lenient().when(ctx.path()).thenReturn(path);
+    org.mockito.Mockito.lenient().when(ctx.attribute(RequestEngineContext.ATTRIBUTE))
+        .thenReturn(TestRequestContexts.browser());
     when(ctx.bodyAsBytes()).thenReturn(new byte[0]);
     when(ctx.headerMap()).thenReturn(Map.of("content-type", "application/json"));
     when(ctx.header("content-type")).thenReturn("application/json");

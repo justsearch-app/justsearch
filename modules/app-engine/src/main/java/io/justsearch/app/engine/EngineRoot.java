@@ -50,6 +50,18 @@ import org.slf4j.LoggerFactory;
  */
 public final class EngineRoot implements WorkerHost {
   private final EngineResourcePolicy resources = EngineResourcePolicy.load();
+  private final EngineAdmissionController admission = new EngineAdmissionController(resources);
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors =
+      new DefaultEngineExecutorRegistry(resources);
+
+  /** Process lifetime, deliberately independent of the restartable index-half close. */
+  public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+
+  /** The same owner is shared by the API front, library calls and ordered shutdown. */
+  public io.justsearch.app.api.EngineAdmissionService admission() { return admission; }
+
+  /** Existing mutation leases and new work admission freeze under one lock. */
+  public io.justsearch.app.api.OperationLeaseService operationLeases() { return admission; }
 
   /** Targets and live counters share one root; future producers explicitly report no live count. */
   public io.justsearch.core.context.RetainedStateBudget retainedState() {
@@ -73,7 +85,8 @@ public final class EngineRoot implements WorkerHost {
    */
   private static final long CLOSE_COMPLETION_TIMEOUT_MS = 2_000L;
 
-  private final Function<GpuSchedulingGauge, KnowledgeServer> serverFactory;
+  private final java.util.function.BiFunction<GpuSchedulingGauge,
+      io.justsearch.core.execution.EngineExecutorRegistry, KnowledgeServer> serverFactory;
   private final long deadlineMs;
   private final int batchSize;
   private final IntConsumer terminalWriterFaultAction;
@@ -140,14 +153,14 @@ public final class EngineRoot implements WorkerHost {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction) {
     this(
-        gauge -> {
+        (gauge, executorRegistry) -> {
           WorkerConfig workerConfig = WorkerConfig.load();
           // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
           // dev MCP tool from another process. Supplying the directory here is what re-arms it;
           // the no-arg bus (tests, any composition without a data dir) leaves reload disabled
           // rather than watching a path nobody writes.
           return new KnowledgeServer(
-              workerConfig,
+              executorRegistry, workerConfig,
               new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
               childRegistry);
         },
@@ -179,6 +192,17 @@ public final class EngineRoot implements WorkerHost {
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       Runnable requestedRestartAction) {
+    this((gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
+        terminalWriterFaultAction, requestedRestartAction);
+  }
+
+  private EngineRoot(
+      java.util.function.BiFunction<GpuSchedulingGauge,
+          io.justsearch.core.execution.EngineExecutorRegistry, KnowledgeServer> serverFactory,
+      long deadlineMs,
+      int batchSize,
+      IntConsumer terminalWriterFaultAction,
+      Runnable requestedRestartAction) {
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
     this.deadlineMs = deadlineMs;
@@ -194,7 +218,7 @@ public final class EngineRoot implements WorkerHost {
     if (client != null) {
       return client;
     }
-    KnowledgeServer started = serverFactory.apply(gpuScheduling);
+    KnowledgeServer started = serverFactory.apply(gpuScheduling, executors);
     synchronized (terminalWriterFaultOwnerLock) {
       if (terminalWriterExitAccepted) {
         throw new IOException("EngineRoot cannot restart after accepting a terminal writer fault");
@@ -220,8 +244,8 @@ public final class EngineRoot implements WorkerHost {
     // fresh orphan, and is only replaced with the real policy partway through start().
     ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     EngineKnowledgeClient built =
-        new EngineKnowledgeClient(started::appServices, gate, deadlineMs, batchSize, telemetry,
-            () -> requestRestart(started));
+        new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
+            () -> requestRestart(started), admission);
     this.client = built;
     log.info("Engine composed the index half in-process (no worker process, no channel)");
     return built;

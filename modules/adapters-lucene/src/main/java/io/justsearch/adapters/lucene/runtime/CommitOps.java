@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -334,17 +333,24 @@ public final class CommitOps {
   public void startCommitTimer() {
     if (commitTimer != null) return;
     long intervalMs = commitTimerIntervalMs();
-    ScheduledExecutorService executor =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "commit-timer");
-              t.setDaemon(true);
-              return t;
-            });
+    ScheduledExecutorService executor = session.executorRegistrations.openCommitTimer(r -> {
+      Thread t = new Thread(r, "commit-timer");
+      t.setDaemon(true);
+      return t;
+    });
     this.commitTimer = executor;
-    this.commitTimerFuture =
-        executor.scheduleAtFixedRate(
-            this::timerTick, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+    try {
+      this.commitTimerFuture =
+          executor.scheduleAtFixedRate(
+              this::timerTick, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+    } catch (RuntimeException | Error failure) {
+      try {
+        stopCommitTimer();
+      } catch (RuntimeException | Error cleanup) {
+        failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
     log.debug("Commit timer started (interval={}ms)", intervalMs);
   }
 
@@ -388,6 +394,17 @@ public final class CommitOps {
     ScheduledExecutorService executor = this.commitTimer;
     if (executor != null) {
       executor.shutdown();
+      try {
+        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+          executor.shutdownNow();
+          if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+            log.warn("Commit timer did not terminate within bounded shutdown window");
+          }
+        }
+      } catch (InterruptedException interrupted) {
+        executor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
       this.commitTimer = null;
       log.debug("Commit timer stopped");
     }

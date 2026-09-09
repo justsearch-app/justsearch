@@ -77,7 +77,7 @@ final class LifecycleContractTest {
     OnlineAiService __onlineAi = onlineAi;
 
     // No worker configured, inference offline => DEGRADED should still return 200.
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi).build();
     try {
       HttpResponse<String> resp =
           client.send(
@@ -110,7 +110,7 @@ final class LifecycleContractTest {
 
     // Simulate worker startup failure (worker bootstrap error) => ERROR => 503.
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServerStartError("worker failed to start (test)")
             .build();
     try {
@@ -142,7 +142,7 @@ final class LifecycleContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings.json"));
 
     OnlineAiService __onlineAi = OnlineAiService.unavailable();
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi).build();
     try {
       HttpResponse<String> resp =
           client.send(
@@ -192,7 +192,7 @@ final class LifecycleContractTest {
         .thenReturn(testWorkerView(true, 2, 0, true, false));
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
             .inferenceCapability(inferenceCap)
             .build();
@@ -244,7 +244,7 @@ final class LifecycleContractTest {
         .thenReturn(testWorkerView(true, 3, 0, null, null));
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
             .build();
     try {
@@ -286,7 +286,7 @@ final class LifecycleContractTest {
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
             .build();
     try {
@@ -343,7 +343,7 @@ final class LifecycleContractTest {
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
             .inferenceCapability(inferenceCap)
             .build();
@@ -395,7 +395,7 @@ final class LifecycleContractTest {
         .thenReturn(testWorkerView(true, 3, 0, null, true));
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(onlineAi)
             .knowledgeServer(mockKs)
             .inferenceCapability(inferenceCap)
             .build();
@@ -442,7 +442,7 @@ final class LifecycleContractTest {
     when(mockClient.getWorkerOperationalView(TestRequestContexts.internal()))
         .thenThrow(new RuntimeException("Worker unreachable (test)"));
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
         .knowledgeServer(mockKs)
         .build();
     try {
@@ -493,7 +493,7 @@ final class LifecycleContractTest {
         .thenReturn(testWorkerView(true, 3, 0, null, true, 8, 4, 2, "STALLED"));
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).onlineAiService(__onlineAi)
             .knowledgeServer(mockKs)
             .build();
     try {

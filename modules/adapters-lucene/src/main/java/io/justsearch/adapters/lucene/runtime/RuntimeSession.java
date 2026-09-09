@@ -64,6 +64,7 @@ final class RuntimeSession implements AutoCloseable {
   // ==========================================================================
 
   final IndexSchema schema;
+  final LuceneExecutorRegistrations executorRegistrations;
   final FieldMapper fieldMapper;
   final Supplier<CommitMetadataSource> metadataSourceSupplier;
   final CommitMetadataValidator metadataValidator;
@@ -336,6 +337,7 @@ final class RuntimeSession implements AutoCloseable {
   RuntimeSession(IndexSchema schema) {
     // Schema-derived
     this.schema = schema;
+    this.executorRegistrations = null;
     this.fieldMapper = schema.fieldMapper();
     this.metadataSourceSupplier = schema.metadataSourceSupplier();
     this.metadataValidator = schema.metadataValidator();
@@ -394,6 +396,7 @@ final class RuntimeSession implements AutoCloseable {
 
   RuntimeSession(LuceneRuntimeBuilder builder, Mode mode) {
     this.schema = builder.schema();
+    this.executorRegistrations = Objects.requireNonNull(builder.executorRegistrations(), "executorRegistrations");
     this.fieldMapper = schema.fieldMapper();
     this.metadataSourceSupplier = schema.metadataSourceSupplier();
     this.metadataValidator = schema.metadataValidator();

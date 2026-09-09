@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.util.EnergyState;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +26,13 @@ import org.junit.jupiter.api.Test;
  * item A11's deletion of {@code WorkerSpawner} taking the behaviour with it unnoticed.
  */
 final class EnergyStatePollerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static EnergyState reduced() {
     return new EnergyState(EnergyState.Intent.REDUCED, EnergyState.Source.BATTERY);
@@ -40,7 +49,7 @@ final class EnergyStatePollerTest {
     AtomicReference<EnergyState> probe = new AtomicReference<>(reduced());
 
     try (EnergyStatePoller poller =
-        new EnergyStatePoller(gauge, probe::get)) {
+        new EnergyStatePoller(processExecutors, gauge, probe::get)) {
       poller.poll();
       assertTrue(gauge.isEnergyReduced(), "the gauge is the in-process authority");
       assertTrue(gauge.shouldYieldGpuBackfill(), "energy alone is a reason to yield");
@@ -60,7 +69,8 @@ final class EnergyStatePollerTest {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
     gauge.setMainGpuActive(true);
 
-    try (EnergyStatePoller poller = new EnergyStatePoller(gauge, EnergyStatePollerTest::full)) {
+    try (EnergyStatePoller poller =
+        new EnergyStatePoller(processExecutors, gauge, EnergyStatePollerTest::full)) {
       poller.poll();
     }
 
@@ -72,7 +82,8 @@ final class EnergyStatePollerTest {
   @DisplayName("energyState() is UNKNOWN — not null — before the first poll")
   void unknownBeforeFirstPoll() {
     try (EnergyStatePoller poller =
-        new EnergyStatePoller(new GpuSchedulingGauge(), EnergyStatePollerTest::full)) {
+        new EnergyStatePoller(
+            processExecutors, new GpuSchedulingGauge(), EnergyStatePollerTest::full)) {
       assertEquals(EnergyState.Intent.UNKNOWN, poller.energyState().intent());
       assertFalse(poller.energyState().reduced(), "unknown must never read as reduced");
     }
@@ -86,7 +97,7 @@ final class EnergyStatePollerTest {
 
     try (EnergyStatePoller poller =
         new EnergyStatePoller(
-            gauge,
+            processExecutors, gauge,
             () -> {
               EnergyState next = probe.get();
               if (next == null) {
@@ -109,7 +120,7 @@ final class EnergyStatePollerTest {
   void singleArgConstructorWritesTheGauge() {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
     try (EnergyStatePoller poller =
-        new EnergyStatePoller(gauge, EnergyStatePollerTest::reduced)) {
+        new EnergyStatePoller(processExecutors, gauge, EnergyStatePollerTest::reduced)) {
       poller.poll();
     }
     assertTrue(gauge.isEnergyReduced());
@@ -125,7 +136,7 @@ final class EnergyStatePollerTest {
 
     EnergyStatePoller poller =
         new EnergyStatePoller(
-            gauge,
+            processExecutors, gauge,
             () -> {
               latch.get().countDown();
               return reduced();

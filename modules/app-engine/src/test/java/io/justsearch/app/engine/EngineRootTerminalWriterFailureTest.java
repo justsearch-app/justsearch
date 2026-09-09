@@ -91,7 +91,7 @@ final class EngineRootTerminalWriterFailureTest {
         new EngineRoot(
             gauge -> {
               server[0] =
-                  new KnowledgeServer(
+                  new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
                       WorkerConfig.load(), new InProcessWorkerSignalBus(gauge));
               return server[0];
             },

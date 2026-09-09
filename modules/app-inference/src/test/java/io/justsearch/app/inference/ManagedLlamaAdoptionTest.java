@@ -37,7 +37,7 @@ final class ManagedLlamaAdoptionTest {
     InferenceConfig config =
         new InferenceConfig(tmp.resolve("llama.exe"), tmp.resolve("model.gguf"), null, 1, 1, 0, false);
     LlamaServerOps ops =
-        new LlamaServerOps(
+        new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
             HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, () -> Mode.OFFLINE,
             new NoopPropsObserver(), () -> {}, ignored -> {},
             NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
@@ -60,7 +60,7 @@ final class ManagedLlamaAdoptionTest {
     process.killAfter = Integer.MAX_VALUE;
     InferenceConfig config =
         new InferenceConfig(tmp.resolve("llama.exe"), tmp.resolve("model.gguf"), null, 1, 1, 0, false);
-    LlamaServerOps ops = new LlamaServerOps(
+    LlamaServerOps ops = new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
         HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, () -> Mode.OFFLINE,
         new NoopPropsObserver(), () -> {}, ignored -> {},
         NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
@@ -241,11 +241,11 @@ final class ManagedLlamaAdoptionTest {
               model.toString(), "declared", "diagnostic-argv"));
       ops =
           termination == null && managedCrashHandler == null
-              ? new LlamaServerOps(
+              ? new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
                   HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, mode::get,
                   new NoopPropsObserver(), () -> {}, ignored -> {},
                   NoopInferenceTelemetryEvents.INSTANCE, registry)
-              : new LlamaServerOps(
+              : new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
                   HttpClient.newHttpClient(), new ObjectMapper(), () -> config, null, mode::get,
                   new NoopPropsObserver(), () -> {}, ignored -> {},
                   NoopInferenceTelemetryEvents.INSTANCE, registry,

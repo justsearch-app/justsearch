@@ -21,6 +21,8 @@ import io.justsearch.app.observability.health.OccurrenceLog;
 import io.justsearch.app.observability.health.Severity;
 import io.justsearch.app.observability.health.Source;
 import io.justsearch.telemetry.Telemetry;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +41,13 @@ import org.junit.jupiter.api.Test;
 @DisplayName("HealthEventStreamController")
 final class HealthEventStreamControllerTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
   private static final Source EVENT_SOURCE = Source.forProcess("head", "instance-1", "1.0");
 
   private ConditionStore conditions;
@@ -52,7 +61,9 @@ final class HealthEventStreamControllerTest {
     occurrences = new OccurrenceLog();
     registry = new HealthEventChangeRegistry();
     Telemetry telemetry = mock(Telemetry.class);
-    controller = new HealthEventStreamController(conditions, occurrences, registry, telemetry);
+    controller = new HealthEventStreamController(
+            processExecutors,
+              conditions, occurrences, registry, telemetry);
   }
 
   @AfterEach

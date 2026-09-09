@@ -243,7 +243,7 @@ public class VduBatchProcessor {
                     continue;
                 }
 
-                VduProcessor.VduResult result = vduProcessor.process(filePath);
+                VduProcessor.VduResult result = vduProcessor.process(filePath, ENGINE_CONTEXT);
                 circuitBreaker.recordSuccess();  // LLM call succeeded
 
                 // P0.4: Use explicit VduUpdateOutcome to distinguish SUCCESS_TEXT vs SUCCESS_EMPTY vs FAILED.

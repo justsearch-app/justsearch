@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
 import io.javalin.http.sse.SseClient;
@@ -20,7 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,25 +71,30 @@ public final class RunStreamController {
   private final RunChannelRegistry registry;
   private final ChatController chat;
   private final Clock clock;
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final SseHandler createHandler;
   private final SseHandler observeHandler;
 
-  public RunStreamController(RunChannelRegistry registry, ChatController chat) {
-    this(registry, chat, Clock.systemUTC());
+  public RunStreamController(
+      EngineExecutorRegistry processExecutors,
+      RunChannelRegistry registry, ChatController chat) {
+    this(processExecutors, registry, chat, Clock.systemUTC());
   }
 
-  public RunStreamController(RunChannelRegistry registry, ChatController chat, Clock clock) {
+  public RunStreamController(
+      EngineExecutorRegistry processExecutors,
+      RunChannelRegistry registry, ChatController chat, Clock clock) {
     this.registry = Objects.requireNonNull(registry, "registry");
     this.chat = Objects.requireNonNull(chat, "chat");
     this.clock = Objects.requireNonNull(clock, "clock");
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "run-stream-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.run-stream-heartbeat",
+            "run-stream-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
     this.createHandler = new SseHandler(this::streamNewRun);
     this.observeHandler = new SseHandler(this::streamExistingRun);
   }
@@ -133,7 +139,15 @@ public final class RunStreamController {
 
   /** Package-private so the run mechanics are testable without a live Jetty async context. */
   void streamNewRun(SseClient client) {
+    var front = RequestEngineWork.get(client.ctx());
+    try (var work = front == null ? null : front.retain()) {
+      streamNewRunOwned(client, work);
+    }
+  }
+
+  private void streamNewRunOwned(SseClient client, io.justsearch.app.api.EngineWorkHandle work) {
     var engineContext = RequestEngineContext.get(client.ctx());
+    var waiting = new java.util.concurrent.atomic.AtomicBoolean(true);
     Map<String, Object> body = readBody(client.ctx());
     ConversationShapeRef shapeId = shapeIdOf(body).orElseThrow();
     RunId runId = RunId.mint();
@@ -156,7 +170,9 @@ public final class RunStreamController {
     }
     try {
       try {
-        if (RunStreamWriter.attach(client, run, heartbeatScheduler, HEARTBEAT_SECONDS).isEmpty()) {
+        if (RunStreamWriter.attach(client, run, heartbeatScheduler, HEARTBEAT_SECONDS, () -> {
+          if (work != null && waiting.compareAndSet(true, false)) work.waitingClientGone();
+        }).isEmpty()) {
           // The cursor grammar was refused. That is a malformed REQUEST, not a dead client, so
           // there is nothing to run — return before the shape is dispatched.
           return;
@@ -178,6 +194,9 @@ public final class RunStreamController {
           ChatController.readAudience(client.ctx()),
           event -> run.publish(new RunFrame(event.name(), event.payload())), engineContext);
     } finally {
+      // Server retirement closes the same SSE client. Disarm the waiting-client transition first:
+      // normal completion must not masquerade as a client disconnect in the durable work row.
+      waiting.set(false);
       // The run is terminal whichever way the body left: refuse further publishes, close the
       // attached connections, and keep the ring readable for the linger so a tab reloading as the
       // answer lands still replays it.
@@ -243,6 +262,7 @@ public final class RunStreamController {
   /** Stops the heartbeat scheduler and retires every open run. Call on shutdown. */
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
     registry.clear();
   }
 
@@ -300,4 +320,39 @@ public final class RunStreamController {
   private static String message(Exception e) {
     return e.getMessage() == null ? e.toString() : e.getMessage();
   }
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

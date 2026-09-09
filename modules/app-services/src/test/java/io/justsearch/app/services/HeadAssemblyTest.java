@@ -78,9 +78,34 @@ class HeadAssemblyTest {
         (intent, engineContext) -> new Result(List.of(), Map.of(), null, Map.of());
     Telemetry telemetry = new NoopTelemetry();
 
-    try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(searchPort, telemetry)) {
+    try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(new io.justsearch.core.execution.TestEngineExecutors(), searchPort, telemetry)) {
       // Tempdoc 519 §5 / Step 4: bootstrap is itself the AppFacade (no separate accessor).
       assertNotNull(bootstrap);
+    }
+  }
+
+  @Test
+  void finalInferenceTransitionDrainsAfterManagerCloseEvenWhenAnotherHandleFails() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var head = HeadAssembly.bootForSearchPortOnly(executors,
+            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry())) {
+      var reasons = new java.util.concurrent.CopyOnWriteArrayList<String>();
+      var transitionLog = new io.justsearch.app.inference.AsyncInferenceTransitionLog(executors,
+          (timestamp, from, to, reason, success, duration, wireCode, generation) -> reasons.add(reason));
+      var logField = HeadAssembly.class.getDeclaredField("asyncTransitionLog");
+      logField.setAccessible(true);
+      logField.set(head, transitionLog);
+      var handles = new io.justsearch.app.services.bootstrap.OrchestrationHandles(
+          null, null, null, null, null, null,
+          () -> transitionLog.record(1, "ONLINE", "OFFLINE", "SHUTDOWN", true, 0, null, 1),
+          null, null, null, null, null, null,
+          () -> { throw new IllegalStateException("unrelated handle failure"); });
+      var handlesField = HeadAssembly.class.getDeclaredField("orchestration");
+      handlesField.setAccessible(true);
+      handlesField.set(head, handles);
+      assertThrows(IllegalStateException.class, head::close);
+      assertEquals(List.of("SHUTDOWN"), reasons,
+          "the log must stay open through the manager's final transition and drain on failure too");
     }
   }
 
@@ -95,7 +120,7 @@ class HeadAssemblyTest {
         (intent, engineContext) -> new Result(List.of(), Map.of(), null, Map.of());
 
     try (HeadAssembly bootstrap =
-        HeadAssembly.bootForSearchPortOnly(searchPort, new NoopTelemetry())) {
+        HeadAssembly.bootForSearchPortOnly(new io.justsearch.core.execution.TestEngineExecutors(), searchPort, new NoopTelemetry())) {
       StoreDescriptor derived =
           new StoreDescriptor(StoreCatalog.INDEX, tempDir, List::of, entries -> 0);
       IllegalArgumentException thrown =
@@ -116,7 +141,7 @@ class HeadAssemblyTest {
   void defaultConstructorBootsSearchRuntime() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
 
-    try (HeadAssembly bootstrap = new HeadAssembly(telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+    try (HeadAssembly bootstrap = new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(), telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
       SearchRequest request = new SearchRequest(5, 0, true, null, List.of(), List.of(), null);
       SearchResponse response =
           bootstrap.workers().search().search(request, TestEngineContexts.internal());
@@ -128,7 +153,7 @@ class HeadAssemblyTest {
   @Test
   void shutdownDirectiveReachesHeldInferenceManager() throws Exception {
     try (HeadAssembly assembly =
-        new HeadAssembly(
+        new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(),
             new NoopTelemetry(),
             new ConfigManagerBootstrap(),
             null,
@@ -163,7 +188,7 @@ class HeadAssemblyTest {
     // localCap IS ks.workerCapability() (the production invariant) and no mirror is needed.
     var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
     try (HeadAssembly bootstrap =
-        new HeadAssembly(
+        new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(),
             telemetry,
             new ConfigManagerBootstrap(),
             null,
@@ -204,7 +229,7 @@ class HeadAssemblyTest {
     Telemetry telemetry = new NoopTelemetry();
     var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
     try (HeadAssembly bootstrap =
-        new HeadAssembly(
+        new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(),
             telemetry,
             new ConfigManagerBootstrap(),
             null,
@@ -301,7 +326,7 @@ class HeadAssemblyTest {
 
       var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
       try (HeadAssembly bootstrap =
-          new HeadAssembly(
+          new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(),
               new NoopTelemetry(),
               new ConfigManagerBootstrap(),
               null,
@@ -347,7 +372,7 @@ class HeadAssemblyTest {
     Files.writeString(payload, "{\"features\":[\"one\"]}", StandardCharsets.UTF_8);
     System.setProperty("app.api.fake_capabilities", payload.toString());
 
-    try (HeadAssembly bootstrap = new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+    try (HeadAssembly bootstrap = new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
       FakeHttpExchange exchange = fakeExchange("GET", URI.create("http://localhost/infra/capabilities"));
       bootstrap.capabilitiesHandler().handle(exchange);
       assertEquals(200, exchange.statusCode);
@@ -364,7 +389,7 @@ class HeadAssemblyTest {
     System.setProperty("justsearch.prod", "true");
     TestResolvedConfigHelper.storeFromEnvironment();
 
-    try (HeadAssembly bootstrap = new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+    try (HeadAssembly bootstrap = new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
       FakeHttpExchange exchange = fakeExchange("GET", URI.create("http://localhost/infra/capabilities"));
       bootstrap.capabilitiesHandler().handle(exchange);
       assertEquals(200, exchange.statusCode);
@@ -377,7 +402,7 @@ class HeadAssemblyTest {
     Path missing = tempDir.resolve("missing.json");
     System.setProperty("app.api.fake_capabilities", missing.toString());
 
-    try (HeadAssembly bootstrap = new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+    try (HeadAssembly bootstrap = new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
       FakeHttpExchange exchange = fakeExchange("GET", URI.create("http://localhost/infra/capabilities"));
       bootstrap.capabilitiesHandler().handle(exchange);
       assertEquals(503, exchange.statusCode);
@@ -391,7 +416,7 @@ class HeadAssemblyTest {
     Files.writeString(payload, "{\"features\":[]}", StandardCharsets.UTF_8);
     System.setProperty("app.api.fake_capabilities", payload.toString());
 
-    try (HeadAssembly bootstrap = new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+    try (HeadAssembly bootstrap = new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
       FakeHttpExchange exchange = fakeExchange("POST", URI.create("http://localhost/infra/capabilities"));
       bootstrap.capabilitiesHandler().handle(exchange);
       assertEquals(405, exchange.statusCode);
@@ -419,7 +444,7 @@ class HeadAssemblyTest {
   void connectKnowledgeServerLateBindDoesNotThrowOnNullCtor() throws Exception {
     // Construct with knowledgeServer=null (the round-15 cold-start sequence).
     try (HeadAssembly bootstrap =
-        new HeadAssembly(new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
+        new HeadAssembly(new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null)) {
 
       // connectKnowledgeServer(null) is documented as a no-op (early return on ks == null).
       // Post-merge, this is the entire contract — the 429 substrate dispatches via

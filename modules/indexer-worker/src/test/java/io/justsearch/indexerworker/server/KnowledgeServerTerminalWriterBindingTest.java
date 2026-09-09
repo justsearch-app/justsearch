@@ -37,7 +37,7 @@ final class KnowledgeServerTerminalWriterBindingTest {
     RunningRuntime runtime =
         IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)).ephemeral().open();
     KnowledgeServer server =
-        new KnowledgeServer(WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+        new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
     AtomicInteger reports = new AtomicInteger();
     try {
       server.onTerminalWriterFailure(ignored -> reports.incrementAndGet());

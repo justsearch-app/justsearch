@@ -2,7 +2,8 @@
 package io.justsearch.app.services.vdu;
 
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import java.util.concurrent.Executors;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -36,9 +37,15 @@ public final class VduOfflineTriggerSampler {
   private final Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier;
   private final BooleanSupplier llmOnlineSupplier;
   private final ScheduledExecutorService executor;
+  private final EngineExecutorRegistry.Registration executorOwner;
+  private final EngineExecutorRegistry.Registration procedureOwner;
+  private final java.util.concurrent.ExecutorService procedureExecutor;
   private final AtomicBoolean started = new AtomicBoolean(false);
+  private final AtomicBoolean stopped = new AtomicBoolean(false);
+  private final AtomicBoolean procedurePending = new AtomicBoolean(false);
 
   public VduOfflineTriggerSampler(
+      EngineExecutorRegistry executors,
       Supplier<OfflineCoordinator> coordinatorSupplier,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
       BooleanSupplier llmOnlineSupplier) {
@@ -51,7 +58,26 @@ public final class VduOfflineTriggerSampler {
           t.setDaemon(true);
           return t;
         };
-    this.executor = Executors.newSingleThreadScheduledExecutor(tf);
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new EngineExecutorSpec(
+        "head.vdu-offline-trigger-sampler", EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+    EngineExecutorRegistry.Registration acquiredProcedure = null;
+    try {
+      this.executor = executorOwner.openScheduled(tf);
+      acquiredProcedure = executors.register(new EngineExecutorSpec(
+          "head.vdu-auto-trigger", EngineExecutorSpec.Kind.BACKGROUND,
+          EngineExecutorSpec.Mode.PLATFORM, 1, limits.maxQueue(), 1));
+      this.procedureExecutor = acquiredProcedure.open(
+          Thread.ofPlatform().daemon().name("vdu-auto-trigger").factory());
+      this.procedureOwner = acquiredProcedure;
+    } catch (RuntimeException | Error failure) {
+      if (acquiredProcedure != null) {
+        try { acquiredProcedure.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      }
+      try { executorOwner.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /** Starts the sampler. Idempotent: subsequent calls are no-ops. */
@@ -59,29 +85,30 @@ public final class VduOfflineTriggerSampler {
     if (!started.compareAndSet(false, true)) {
       return;
     }
-    var unused =
+    try {
+    var _ =
         executor.scheduleAtFixedRate(
             this::checkOnce, CHECK_INTERVAL_SECONDS, CHECK_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    } catch (RuntimeException | Error failure) {
+      started.set(false);
+      throw failure;
+    }
     log.debug("VduOfflineTriggerSampler started ({}s cadence)", CHECK_INTERVAL_SECONDS);
   }
 
   /** Stops the sampler. Idempotent; safe to call without start. */
   public void stop() {
-    executor.shutdownNow();
-    try {
-      executor.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+    stopped.set(true);
+    try { executorOwner.close(); } finally { procedureOwner.close(); }
   }
 
   /**
    * Visible for tests. Evaluates the pacing policy once and dispatches
-   * {@code startOfflineProcessing()} on a new virtual thread if conditions allow — mirrors the
-   * existing production trigger call sites' own dispatch pattern (never blocks the sampler's own
-   * thread on a real VDU run).
+   * {@code startOfflineProcessing()} on its bounded background owner when conditions allow.
+   * One pending or running procedure suffices; later ticks observe the durable pending work again.
    */
   void checkOnce() {
+    if (stopped.get() || procedurePending.get()) return;
     try {
       OfflineCoordinator coordinator = coordinatorSupplier.get();
       if (coordinator == null || coordinator.isProcessing()) {
@@ -103,7 +130,16 @@ public final class VduOfflineTriggerSampler {
             "Idle ({}ms since activity) and energy conditions met; auto-triggering VDU offline"
                 + " processing",
             msSinceActivity);
-        Thread.ofVirtual().name("vdu-auto-trigger").start(coordinator::startOfflineProcessing);
+        if (!procedurePending.compareAndSet(false, true)) return;
+        try {
+          procedureExecutor.execute(() -> {
+            try { coordinator.startOfflineProcessing(); }
+            finally { procedurePending.set(false); }
+          });
+        } catch (RuntimeException | Error failure) {
+          procedurePending.set(false);
+          throw failure;
+        }
       }
     } catch (RuntimeException e) {
       log.debug("VduOfflineTriggerSampler: check failed: {}", e.getMessage());

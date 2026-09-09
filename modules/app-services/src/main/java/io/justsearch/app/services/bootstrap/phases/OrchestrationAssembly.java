@@ -34,7 +34,7 @@ public final class OrchestrationAssembly {
 
   /** Builder for the OrchestrationHandles record. All inputs nullable. */
   public static OrchestrationHandles build(
-      Thread gplThread,
+      AutoCloseable gplWork,
       LambdaMartReranker reranker,
       JobQueueDepthMetricProducer jqdProducer,
       DocumentsIndexedRateMetricProducer dirProducer,
@@ -51,7 +51,7 @@ public final class OrchestrationAssembly {
       AutoCloseable indexingJobsBridge,
       AutoCloseable agentToolHandlers) {
     return new OrchestrationHandles(
-        gplThread == null ? null : (AutoCloseable) () -> stopThread(gplThread),
+        gplWork,
         reranker == null ? null : (AutoCloseable) reranker::close,
         jqdProducer == null ? null : (AutoCloseable) jqdProducer::stop,
         dirProducer == null ? null : (AutoCloseable) dirProducer::stop,
@@ -67,18 +67,6 @@ public final class OrchestrationAssembly {
         agentSearchAdapter == null ? null : (AutoCloseable) agentSearchAdapter::closeReranker,
         indexingJobsBridge,
         agentToolHandlers);
-  }
-
-  private static void stopThread(Thread t) {
-    t.interrupt();
-    try {
-      t.join(5_000);
-      if (t.isAlive()) {
-        log.warn("Thread {} did not terminate within 5s", t.getName());
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
   }
 
   private static void stopManager(

@@ -111,7 +111,7 @@ public final class OperationSubstrateInit {
    *     reads from {@code WorkerCapability} + {@code InferenceCapability}.
    * @return bundled substrate values for the caller to assign into bootstrap state.
    */
-  public static Output run(
+  public static Output run(io.justsearch.core.execution.EngineExecutorRegistry executors,
       HandlerRegistry operationHandlers,
       OperationCatalog operationCatalog,
       OperationCatalog agentToolsCatalog,
@@ -184,7 +184,7 @@ public final class OperationSubstrateInit {
     // operation-kind event. Owned here (beside the log it projects) rather than on the API
     // composition root, so its quiescence sweeper's lifetime is the substrate's.
     io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger =
-        new io.justsearch.app.observability.ledger.ScanRollupLedger(actionLedgerChangeRegistry);
+        new io.justsearch.app.observability.ledger.ScanRollupLedger(executors, actionLedgerChangeRegistry);
     // Tempdoc 550 E2: process-wide emergency stop the lattice consults (default released).
     io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop =
         new io.justsearch.app.services.registry.executor.GlobalHardStop();

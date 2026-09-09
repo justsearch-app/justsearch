@@ -62,7 +62,7 @@ final class DevReloadManagerTriggerTest {
 
   /** A server object with only the field {@code performReload}'s first step needs. */
   private static KnowledgeServer serverWith(InProcessWorkerSignalBus bus, Path dataDir) {
-    KnowledgeServer server = new KnowledgeServer(WorkerBootFixture.workerConfig(dataDir), bus);
+    KnowledgeServer server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(dataDir), bus);
     // start() assigns this from the injected bus; the test does not start the server, so it assigns
     // the same thing directly. Package-private for exactly this kind of access.
     server.signalBus = bus;

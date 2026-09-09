@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.TestEngineExecutors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,6 +25,13 @@ import org.junit.jupiter.api.Test;
  * over a real bootstrap rather than a mock).
  */
 final class KnowledgeServerHealthMonitorTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   @Test
   void tickTriggersInitializationOnErrorToReadyTransition() {
@@ -38,7 +47,7 @@ final class KnowledgeServerHealthMonitorTest {
               return true;
             });
 
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     monitor.tick();
 
     verify(bootstrap).checkHealth();
@@ -58,7 +67,7 @@ final class KnowledgeServerHealthMonitorTest {
               return true;
             });
 
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     monitor.tick();
 
     verify(bootstrap, times(1)).completeReadyInitializationFromMonitor();
@@ -73,7 +82,7 @@ final class KnowledgeServerHealthMonitorTest {
     when(bootstrap.workerCapability()).thenReturn(cap);
     when(bootstrap.checkHealth()).thenReturn(true);
 
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     monitor.tick();
 
     verify(bootstrap, never()).completeReadyInitializationFromMonitor();
@@ -88,7 +97,7 @@ final class KnowledgeServerHealthMonitorTest {
     when(bootstrap.workerCapability()).thenReturn(cap);
     when(bootstrap.checkHealth()).thenReturn(false);
 
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     monitor.tick();
 
     verify(bootstrap, never()).completeReadyInitializationFromMonitor();
@@ -102,7 +111,7 @@ final class KnowledgeServerHealthMonitorTest {
     when(bootstrap.workerCapability()).thenReturn(cap);
     doThrow(new RuntimeException("transient gRPC failure")).when(bootstrap).checkHealth();
 
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
 
     assertDoesNotThrow(monitor::tick);
     verify(bootstrap).checkHealth();
@@ -121,7 +130,7 @@ final class KnowledgeServerHealthMonitorTest {
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // first tick: no prior wall stamp → never a resume
 
     verify(bootstrap, never()).client();
@@ -138,7 +147,7 @@ final class KnowledgeServerHealthMonitorTest {
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // seed
     clock[0] += 10_500L; // a normal ~10s tick (with jitter), under the 30s threshold
     monitor.tick();
@@ -171,7 +180,7 @@ final class KnowledgeServerHealthMonitorTest {
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // seed
     clock[0] += 3_600_000L; // a 1-hour gap → suspend/resume
     monitor.tick();
@@ -197,7 +206,7 @@ final class KnowledgeServerHealthMonitorTest {
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // seed
     clock[0] += 3_600_000L;
     assertDoesNotThrow(monitor::tick);
@@ -207,13 +216,13 @@ final class KnowledgeServerHealthMonitorTest {
 
   @Test
   void constructorRejectsNullBootstrap() {
-    assertThrows(IllegalArgumentException.class, () -> new KnowledgeServerHealthMonitor(null));
+    assertThrows(IllegalArgumentException.class, () -> new KnowledgeServerHealthMonitor(processExecutors, null));
   }
 
   @Test
   void closeIsIdempotent() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     monitor.close();
     assertDoesNotThrow(monitor::close);
   }
@@ -221,8 +230,8 @@ final class KnowledgeServerHealthMonitorTest {
   @Test
   void nonPositivePollIntervalFallsBackToDefault() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(bootstrap, 0L).close());
-    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(bootstrap, -1L).close());
+    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 0L).close());
+    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(processExecutors, bootstrap, -1L).close());
   }
 
   /**
@@ -235,7 +244,7 @@ final class KnowledgeServerHealthMonitorTest {
   void tickIntervalSupplierIsClampedToTheConfiguredInterval() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     try (KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L)) {
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L)) {
       assertEquals(
           10_000L, monitor.nextTickDelayMs(), "no supplier keeps the configured fixed cadence");
 

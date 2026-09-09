@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Usage:
  * <pre>{@code
- * KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap();
+ * KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(executors);
  * bootstrap.start();
  *
  * // Use the client
@@ -107,11 +107,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * outlive it (the spawner went at A11). Constructed eagerly and started with the integration,
      * so {@link #energyState()} answers UNKNOWN — not null — before the first poll.
      */
-    private final io.justsearch.app.services.power.EnergyStatePoller energyPoller =
+    private final io.justsearch.app.services.power.EnergyStatePoller energyPoller;
         // Item A11: the second sink is gone. It wrote the OS energy-intent into the memory-mapped
         // signal file for a Worker process to read; there is no second process, and the gauge the
         // first argument writes is the one the indexing loop reads.
-        new io.justsearch.app.services.power.EnergyStatePoller(gpuScheduling);
+
 
     /** Tempdoc 630: epoch-ms of the most recent OS-resume handled, for the "Catching up" notice. */
     private final java.util.concurrent.atomic.AtomicLong lastResumeEpochMs =
@@ -168,21 +168,21 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private AppInstanceLock appLock;
     private IpcTelemetry ipcTelemetry;
 
-    public KnowledgeServerBootstrap() {
-        this(KnowledgeServerConfig.load(), new NoopTelemetry());
+    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors) {
+        this(executors, KnowledgeServerConfig.load(), new NoopTelemetry());
     }
 
     /** Tempdoc 627 Deliverable 10: production async-start ctor — loaded config + the injected shared capability. */
-    public KnowledgeServerBootstrap(WorkerCapability workerCapability) {
-        this(KnowledgeServerConfig.load(), new NoopTelemetry(), workerCapability);
+    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerCapability workerCapability) {
+        this(executors, KnowledgeServerConfig.load(), new NoopTelemetry(), workerCapability);
     }
 
-    public KnowledgeServerBootstrap(KnowledgeServerConfig config) {
-        this(config, new NoopTelemetry());
+    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors, KnowledgeServerConfig config) {
+        this(executors, config, new NoopTelemetry());
     }
 
-    public KnowledgeServerBootstrap(KnowledgeServerConfig config, Telemetry telemetry) {
-        this(config, telemetry, new WorkerCapability());
+    public KnowledgeServerBootstrap(io.justsearch.core.execution.EngineExecutorRegistry executors, KnowledgeServerConfig config, Telemetry telemetry) {
+        this(executors, config, telemetry, new WorkerCapability());
     }
 
     /**
@@ -192,8 +192,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * no-arg / 2-arg ctors keep their own instance for tests and isolated launchers.
      */
     public KnowledgeServerBootstrap(
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
         KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability) {
-        this(config, telemetry, workerCapability, WorkerHost.unavailable());
+        this(executors, config, telemetry, workerCapability, WorkerHost.unavailable());
     }
 
     /**
@@ -203,10 +204,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * than a fallback.
      */
     public KnowledgeServerBootstrap(
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
         KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability,
         WorkerHost workerHost) {
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
+        this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
         this.config = config;
         this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();

@@ -2,12 +2,16 @@
 package io.justsearch.ui.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.runtime.ManagedChild;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,7 +62,10 @@ final class ManagedChildReconcilerTest {
               "applied-A", "diagnostic-argv");
       registry.register(record);
 
-      new ManagedChildReconciler(registry, "applied-A").reconcile();
+      try (var processExecutors = new TestEngineExecutors();
+          var reconciler = new ManagedChildReconciler(processExecutors, registry, "applied-A")) {
+        reconciler.reconcile();
+      }
 
       assertTrue(child.isAlive());
       assertEquals(List.of(record), registry.snapshot());
@@ -80,7 +87,10 @@ final class ManagedChildReconcilerTest {
               ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
               "old-B", "diagnostic-argv"));
 
-      new ManagedChildReconciler(registry, "applied-A").reconcile();
+      try (var processExecutors = new TestEngineExecutors();
+          var reconciler = new ManagedChildReconciler(processExecutors, registry, "applied-A")) {
+        reconciler.reconcile();
+      }
 
       assertTrue(child.waitFor(Duration.ofSeconds(5)));
       assertTrue(registry.snapshot().isEmpty());
@@ -96,7 +106,10 @@ final class ManagedChildReconcilerTest {
       var registry = activeRegistry();
       registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), child.info().startInstant().orElseThrow()));
 
-      new ManagedChildReconciler(registry, null).reconcile();
+      try (var processExecutors = new TestEngineExecutors();
+          var reconciler = new ManagedChildReconciler(processExecutors, registry, null)) {
+        reconciler.reconcile();
+      }
 
       assertTrue(child.waitFor(Duration.ofSeconds(5)));
       assertTrue(registry.snapshot().isEmpty());
@@ -112,7 +125,10 @@ final class ManagedChildReconcilerTest {
       var registry = activeRegistry();
       registry.register(record(child, ManagedChild.normalizePath(Path.of("unrelated.exe")), child.info().startInstant().orElseThrow()));
 
-      new ManagedChildReconciler(registry, null).reconcile();
+      try (var processExecutors = new TestEngineExecutors();
+          var reconciler = new ManagedChildReconciler(processExecutors, registry, null)) {
+        reconciler.reconcile();
+      }
 
       assertTrue(child.isAlive());
       assertTrue(registry.snapshot().isEmpty(), "proved stale record is removed");
@@ -129,7 +145,10 @@ final class ManagedChildReconcilerTest {
       var registry = activeRegistry();
       registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), Instant.EPOCH));
 
-      new ManagedChildReconciler(registry, null).reconcile();
+      try (var processExecutors = new TestEngineExecutors();
+          var reconciler = new ManagedChildReconciler(processExecutors, registry, null)) {
+        reconciler.reconcile();
+      }
 
       assertTrue(child.isAlive());
       assertTrue(registry.snapshot().isEmpty());
@@ -148,7 +167,11 @@ final class ManagedChildReconcilerTest {
           child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), child.info().startInstant().orElseThrow());
       registry.register(record);
 
-      new ManagedChildReconciler(registry, null, ignored -> false).reconcile();
+      try (var processExecutors = new TestEngineExecutors();
+          var reconciler =
+              new ManagedChildReconciler(processExecutors, registry, null, ignored -> false)) {
+        reconciler.reconcile();
+      }
 
       assertTrue(child.isAlive());
       assertEquals(List.of(record), registry.snapshot());
@@ -156,6 +179,16 @@ final class ManagedChildReconcilerTest {
       child.destroyForcibly();
       child.waitFor(Duration.ofSeconds(5));
     }
+  }
+
+  @Test
+  void closeReleasesOwnedRegistrationWithoutClosingProcessRegistry() {
+    var processExecutors = spy(new TestEngineExecutors());
+    try (var reconciler = new ManagedChildReconciler(processExecutors, activeRegistry(), null)) {
+      // Construction owns one HTTP registration even when no child needs probing.
+    }
+    verify(processExecutors, never()).close();
+    processExecutors.close();
   }
 
   private static MutableManagedChildRegistry activeRegistry() {

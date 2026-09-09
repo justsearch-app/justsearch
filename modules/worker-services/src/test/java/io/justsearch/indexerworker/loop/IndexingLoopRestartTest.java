@@ -102,7 +102,7 @@ final class IndexingLoopRestartTest {
     IndexCountOps indexCountOps = mock(IndexCountOps.class);
     WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
     // signalBus.isMainGpuActive defaults to false (Mockito boolean default).
-    return new IndexingLoop(
+    return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
         queue,
         coordinator,
         commitOps,

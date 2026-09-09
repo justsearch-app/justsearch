@@ -38,7 +38,7 @@ class VduBatchProcessorModeScopingTest {
   void modeTransitionsAreBatchScopedNotPerDocument() throws Exception {
     VduProcessor vduProcessor = mock(VduProcessor.class);
     when(vduProcessor.hasVisionCapability()).thenReturn(true);
-    when(vduProcessor.process(any(Path.class)))
+    when(vduProcessor.process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
         .thenReturn(new VduProcessor.VduResult("extracted text", "{}", 1));
 
     KnowledgeClient client = mock(KnowledgeClient.class);
@@ -69,7 +69,7 @@ class VduBatchProcessorModeScopingTest {
     assertEquals(3, processed, "all three documents should have been processed");
     verify(vduProcessor, times(1)).enterVduMode();
     verify(vduProcessor, times(1)).exitVduMode();
-    verify(vduProcessor, times(3)).process(any(Path.class));
+    verify(vduProcessor, times(3)).process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
   }
 
   @Test
@@ -101,7 +101,7 @@ class VduBatchProcessorModeScopingTest {
 
     assertEquals(0, processed, "batch should be skipped entirely, not attempted per-document");
     verify(vduProcessor, times(1)).enterVduMode();
-    verify(vduProcessor, times(0)).process(any(Path.class));
+    verify(vduProcessor, times(0)).process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
     // exitVduMode is only meaningful once mode was actually entered; the batch bails before that.
     verify(vduProcessor, times(0)).exitVduMode();
   }
@@ -111,7 +111,7 @@ class VduBatchProcessorModeScopingTest {
   void interruptStopsEarlyButStillExitsVduMode() throws Exception {
     VduProcessor vduProcessor = mock(VduProcessor.class);
     when(vduProcessor.hasVisionCapability()).thenReturn(true);
-    when(vduProcessor.process(any(Path.class)))
+    when(vduProcessor.process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
         .thenReturn(new VduProcessor.VduResult("extracted text", "{}", 1));
 
     KnowledgeClient client = mock(KnowledgeClient.class);
@@ -149,7 +149,7 @@ class VduBatchProcessorModeScopingTest {
     assertEquals(1, processed, "only the first document should have been processed before the interrupt");
     verify(vduProcessor, times(1)).enterVduMode();
     verify(vduProcessor, times(1)).exitVduMode();
-    verify(vduProcessor, times(1)).process(any(Path.class));
+    verify(vduProcessor, times(1)).process(any(Path.class), org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
   }
 
   private Path writeFile(String name) throws Exception {

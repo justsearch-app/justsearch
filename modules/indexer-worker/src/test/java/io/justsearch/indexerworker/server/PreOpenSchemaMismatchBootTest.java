@@ -64,7 +64,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), "f".repeat(64), 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     IndexGenerationManager.State after = stateAfterBoot(layout);
@@ -96,7 +96,7 @@ final class PreOpenSchemaMismatchBootTest {
     root.addAppender(appender);
     try {
       KnowledgeServer refusing =
-          new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+          new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       IOException ex = assertThrows(IOException.class, refusing::start);
       assertTrue(
           KnowledgeServer.isSchemaMismatch(ex),
@@ -144,7 +144,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.publishConfig(
         layout.dataDir(), layout.indexBase(), "REBUILD_BACKUP_FIRST");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     // Review S7: this asserted `isRunning()`, which after item A9 is two booleans start() sets —
     // it no longer means "a socket is accepting", so it reads as a much stronger claim than it
@@ -177,7 +177,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), "f".repeat(64), 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "blue_green_migrat");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertNotNull(
@@ -212,7 +212,7 @@ final class PreOpenSchemaMismatchBootTest {
     appender.start();
     root.addAppender(appender);
     try {
-      server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
       assertNotNull(
@@ -291,7 +291,7 @@ final class PreOpenSchemaMismatchBootTest {
     appender.start();
     root.addAppender(appender);
     try {
-      server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
       assertEquals(
@@ -318,7 +318,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), WorkerBootFixture.NO_FINGERPRINT, 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     IndexGenerationManager.State after = stateAfterBoot(layout);
@@ -337,7 +337,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), WorkerBootFixture.NO_FINGERPRINT, 0);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertEquals(

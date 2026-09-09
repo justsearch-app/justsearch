@@ -50,11 +50,16 @@ public final class InteractionThreadController {
   private final io.justsearch.agent.BackgroundRunService backgroundRunService;
 
   public InteractionThreadController(ConversationStore conversationStore, AgentService agentService) {
+    this(conversationStore, agentService, null);
+  }
+
+  public InteractionThreadController(ConversationStore conversationStore, AgentService agentService,
+      io.justsearch.app.api.EngineAdmissionService admission) {
     this.conversationStore = Objects.requireNonNull(conversationStore, "conversationStore");
     this.agentService = Objects.requireNonNull(agentService, "agentService");
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
-    this.backgroundRunService = new io.justsearch.agent.BackgroundRunService(agentService);
+    this.backgroundRunService = new io.justsearch.agent.BackgroundRunService(agentService, admission);
   }
 
   /** Handles {@code GET /api/thread/{id}}. */

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.ipc.IndexingJobView;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -39,6 +40,19 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("indexing-jobs bridge — re-subscribe after flow failure (review blocker 2)")
 final class IndexingJobsBridgeResubscribeTest {
 
+  private final List<TestEngineExecutors> processExecutors = new java.util.ArrayList<>();
+
+  @org.junit.jupiter.api.AfterEach
+  void closeProcessExecutors() {
+    processExecutors.forEach(TestEngineExecutors::close);
+  }
+
+  private TestEngineExecutors executors() {
+    TestEngineExecutors value = new TestEngineExecutors();
+    processExecutors.add(value);
+    return value;
+  }
+
   private static IndexingJobsFrame snapshotFrame(long seq, String pathHash) {
     return IndexingJobsFrame.newBuilder()
         .setSeq(seq)
@@ -66,7 +80,7 @@ final class IndexingJobsBridgeResubscribeTest {
           return () -> {};
         };
 
-    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(() -> source);
+    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(executors(), () -> source);
     List<RemoteIndexingJobsBridge.Delta> seen = new CopyOnWriteArrayList<>();
     bridge.subscribe(seen::add);
     bridge.start().join();
@@ -111,7 +125,7 @@ final class IndexingJobsBridgeResubscribeTest {
           return () -> {};
         };
 
-    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(() -> alwaysFails);
+    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(executors(), () -> alwaysFails);
     bridge.start().exceptionally(t -> null).join();
 
     // Give the backoff room to exhaust its per-minute budget.
@@ -141,7 +155,7 @@ final class IndexingJobsBridgeResubscribeTest {
           return () -> {};
         };
 
-    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(() -> source);
+    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(executors(), () -> source);
     bridge.start().join();
     bridge.stop();
 

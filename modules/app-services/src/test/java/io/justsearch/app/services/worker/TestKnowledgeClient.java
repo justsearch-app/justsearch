@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.ipc.FetchDocumentSliceRequest;
 import io.justsearch.ipc.FetchDocumentSliceResponse;
 import io.justsearch.ipc.FetchDocumentsRequest;
@@ -50,13 +51,16 @@ class TestKnowledgeClient extends KnowledgeClient {
   private final IngestServiceCalls ingest;
   private final Consumer<ScanRootRequest> onScanRoot;
 
-  TestKnowledgeClient(SearchServiceCalls search) {
-    this(search, null, null);
+  TestKnowledgeClient(EngineExecutorRegistry executors, SearchServiceCalls search) {
+    this(executors, search, null, null);
   }
 
   TestKnowledgeClient(
-      SearchServiceCalls search, IngestServiceCalls ingest, Consumer<ScanRootRequest> onScanRoot) {
-    super(/*deadlineMs=*/ 5000, DEFAULT_BATCH_SIZE, IpcTelemetry.noop());
+      EngineExecutorRegistry executors,
+      SearchServiceCalls search,
+      IngestServiceCalls ingest,
+      Consumer<ScanRootRequest> onScanRoot) {
+    super(executors, /*deadlineMs=*/ 5000, DEFAULT_BATCH_SIZE, IpcTelemetry.noop());
     this.search = search;
     this.ingest = ingest;
     this.onScanRoot = onScanRoot;

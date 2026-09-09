@@ -2,11 +2,14 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.app.api.scan.ScanProgressEvent;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -49,23 +52,46 @@ public final class ScanProgressRegistry implements AutoCloseable {
 
   private final long retentionMs;
   private final Map<String, ScanBuffer> buffers = new HashMap<>();
+  private final EngineExecutorRegistry.Registration pruneRegistration;
   private final java.util.concurrent.ScheduledExecutorService pruneExecutor;
 
-  public ScanProgressRegistry() {
-    this(30_000L);
+  public ScanProgressRegistry(EngineExecutorRegistry processExecutors) {
+    this(processExecutors, 30_000L);
   }
 
   /** Visible for tests so retention can be made tight without long sleeps. */
-  ScanProgressRegistry(long retentionMs) {
+  ScanProgressRegistry(EngineExecutorRegistry processExecutors, long retentionMs) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
     this.retentionMs = retentionMs;
-    this.pruneExecutor =
-        java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "scan-progress-prune");
-              t.setDaemon(true);
-              return t;
-            });
-    this.pruneExecutor.scheduleAtFixedRate(this::pruneStale, 60, 60, TimeUnit.SECONDS);
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.scan-progress-prune",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.pruneRegistration = registration;
+      this.pruneExecutor =
+          registration.openScheduled(
+              r -> {
+                Thread t = new Thread(r, "scan-progress-prune");
+                t.setDaemon(true);
+                return t;
+              });
+      this.pruneExecutor.scheduleAtFixedRate(this::pruneStale, 60, 60, TimeUnit.SECONDS);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   /** Registers a scan with its cancel handle. Idempotent; second call replaces the token. */
@@ -195,6 +221,7 @@ public final class ScanProgressRegistry implements AutoCloseable {
   @Override
   public void close() {
     pruneExecutor.shutdownNow();
+    pruneRegistration.close();
   }
 
   // ===================================================================================

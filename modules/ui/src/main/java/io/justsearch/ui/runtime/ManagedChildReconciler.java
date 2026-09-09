@@ -3,6 +3,8 @@ package io.justsearch.ui.runtime;
 
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -10,22 +12,30 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Identity-safe predecessor cleanup performed before any child-capable bootstrap begins. */
-public final class ManagedChildReconciler {
+public final class ManagedChildReconciler implements AutoCloseable {
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(2);
+  private static final String HTTP_EXECUTOR_NAME = "head.child-reconciliation.http";
 
   private final ManagedChildRegistry registry;
   private final String declaredLlamaConfigHash;
   private final Termination termination;
-  private final HttpClient http = HttpClient.newBuilder().connectTimeout(PROBE_TIMEOUT).build();
+  private final EngineExecutorRegistry.Registration httpRegistration;
+  private final HttpClient http;
   private final ObjectMapper json = new ObjectMapper();
+  private boolean closed;
 
-  public ManagedChildReconciler(ManagedChildRegistry registry, String declaredLlamaConfigHash) {
-    this(registry, declaredLlamaConfigHash, ManagedChildReconciler::terminateMatched);
+  public ManagedChildReconciler(
+      EngineExecutorRegistry processExecutors,
+      ManagedChildRegistry registry,
+      String declaredLlamaConfigHash) {
+    this(processExecutors, registry, declaredLlamaConfigHash, ManagedChildReconciler::terminateMatched);
   }
 
   @FunctionalInterface
@@ -34,11 +44,54 @@ public final class ManagedChildReconciler {
   }
 
   ManagedChildReconciler(
-      ManagedChildRegistry registry, String declaredLlamaConfigHash, Termination termination) {
-    this.registry = registry;
+      EngineExecutorRegistry processExecutors,
+      ManagedChildRegistry registry,
+      String declaredLlamaConfigHash,
+      Termination termination) {
+    this.registry = Objects.requireNonNull(registry, "registry");
     this.declaredLlamaConfigHash = declaredLlamaConfigHash;
-    this.termination = termination;
+    this.termination = Objects.requireNonNull(termination, "termination");
+    HttpResources resources = openHttpResources(processExecutors);
+    this.httpRegistration = resources.registration();
+    this.http = resources.client();
   }
+
+  private static HttpResources openHttpResources(EngineExecutorRegistry processExecutors) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                HTTP_EXECUTOR_NAME,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ExecutorService executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "head-child-reconciliation-http");
+                thread.setDaemon(true);
+                return thread;
+              });
+      HttpClient client =
+          HttpClient.newBuilder().connectTimeout(PROBE_TIMEOUT).executor(executor).build();
+      return new HttpResources(registration, client);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record HttpResources(
+      EngineExecutorRegistry.Registration registration, HttpClient client) {}
 
   public void reconcile() throws IOException {
     for (ManagedChild child : registry.snapshot()) reconcile(child);
@@ -106,5 +159,31 @@ public final class ManagedChildReconciler {
       if (e instanceof InterruptedException) Thread.currentThread().interrupt();
     }
     return !handle.isAlive();
+  }
+
+  /** Stops the probe client within the bounded HTTP shutdown window and releases its registration. */
+  @Override
+  public synchronized void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    try {
+      http.shutdownNow();
+      boolean terminated = false;
+      try {
+        terminated = http.awaitTermination(PROBE_TIMEOUT);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+      }
+      // HttpClient.close() waits indefinitely in the JDK when the client is not terminated. Only
+      // invoke it after the bounded shutdown has completed; the registry registration remains the
+      // owner of the supplied executor and is always released, even after a timeout.
+      if (terminated || http.isTerminated()) {
+        http.close();
+      }
+    } finally {
+      httpRegistration.close();
+    }
   }
 }

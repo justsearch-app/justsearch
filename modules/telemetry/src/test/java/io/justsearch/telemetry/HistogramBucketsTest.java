@@ -30,7 +30,7 @@ class HistogramBucketsTest {
             .build();
     var catalog = MetricCatalog.of("test.buckets", List.of(def));
     try (var t =
-        new LocalTelemetry(tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog))) {
       var hist = t.registry().<EmptyTags>buildHistogram("test.buckets.latency_ms");
       hist.record(12, EmptyTags.INSTANCE);
       t.flush();

@@ -212,8 +212,8 @@ final class EngineReadWhileWriteTest {
                 () -> {
                   try {
                     for (int r = 0; r < STRESS_REQUESTS_PER_THREAD; r++) {
-                      // Both sides of the port: a health call (ungated) and a search (gated), so
-                      // the concurrency covers the ForegroundLoadGate path as well.
+                      // Both foreground port calls are counted by urgency, including health.
+                      // Exercise both dispatch families and verify one increment per actual call.
                       boolean healthy = client.isHealthy(TestEngineContexts.FOREGROUND);
                       SearchResponse response = client.search("concurrent caller probe", 5, TestEngineContexts.FOREGROUND);
                       // This phase has an empty index; a successful search must return no hits.
@@ -249,9 +249,9 @@ final class EngineReadWhileWriteTest {
             + " so the retired test's 95% tolerance would now only hide a real defect ("
             + failCount.get() + " failed of " + total + ")");
     assertEquals(
-        startedBefore + total,
+        startedBefore + 2L * total,
         server.foregroundLoad().startedTotal(),
-        "each of the " + total + " searches must have passed the foreground gate exactly once — a"
+        "each of the " + total + " health/search pairs must pass the foreground gate twice — a"
             + " shortfall means the production path is not gated, a surplus means a nested call is"
             + " double-counting");
     assertTrue(
@@ -282,7 +282,7 @@ final class EngineReadWhileWriteTest {
     root =
         new EngineRoot(
             g -> {
-              built[0] = new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g));
+              built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];
             },
             30_000L,

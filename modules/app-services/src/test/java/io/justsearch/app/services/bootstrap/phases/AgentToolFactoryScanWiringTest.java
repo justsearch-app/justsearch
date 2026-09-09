@@ -21,6 +21,7 @@ import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.ScanProgressRegistry;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.lang.reflect.Field;
@@ -50,15 +51,18 @@ final class AgentToolFactoryScanWiringTest {
   // KnowledgeHttpApiAdapter's constructor builds a KnowledgeSearchEngine, which reads the global
   // reranker config — so the adapter cannot be constructed without a published ConfigStore.
   private ConfigStore previousConfigStore;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void publishConfigStore() {
     previousConfigStore = ConfigStore.globalOrNull();
     TestResolvedConfigHelper.storeWithDefaults();
+    processExecutors = new TestEngineExecutors();
   }
 
   @AfterEach
   void restoreConfigStore() {
+    processExecutors.close();
     TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
   }
 
@@ -84,7 +88,7 @@ final class AgentToolFactoryScanWiringTest {
     assertNull(boundField(adapter, "scanProgressRegistry"), "unbound before the wiring call");
     assertNull(boundField(adapter, "scanRollupLedger"), "unbound before the wiring call");
 
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.bindScanObservability(adapter, registry, ledger);
 
@@ -96,7 +100,7 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("a null adapter (prerequisites unmet in build) is a no-op, not an NPE")
   void nullAdapterIsNoOp() {
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       assertDoesNotThrow(
           () -> AgentToolFactory.bindScanObservability(null, registry, mock(ScanRollupLedger.class)));
     }
@@ -112,7 +116,7 @@ final class AgentToolFactoryScanWiringTest {
     WorkerCapability capability = mock(WorkerCapability.class);
     when(capability.available()).thenReturn(true);
 
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       boolean registered =
           AgentToolHandlers.registerLateBound(
@@ -310,7 +314,7 @@ final class AgentToolFactoryScanWiringTest {
   @DisplayName("the freshly built adapter — the normal async-Worker boot — gets the scan bindings")
   void freshAdapterGetsScanBindings(@TempDir Path dataDir) {
     KnowledgeClient client = mock(KnowledgeClient.class);
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.Output out =
           AgentToolFactory.assemble(
@@ -458,7 +462,7 @@ final class AgentToolFactoryScanWiringTest {
   @DisplayName("a null collaborator does not clobber an already-bound one")
   void nullCollaboratorDoesNotUnbind() {
     KnowledgeHttpApiAdapter adapter = agentAdapter();
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.bindScanObservability(adapter, registry, ledger);
       AgentToolFactory.bindScanObservability(adapter, null, null);

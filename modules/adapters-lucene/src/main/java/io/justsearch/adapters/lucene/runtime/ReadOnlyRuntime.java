@@ -42,6 +42,11 @@ public final class ReadOnlyRuntime implements LuceneRuntime {
   }
 
   @Override
+  public LuceneExecutorRegistrations executorRegistrations() {
+    return session.executorRegistrations;
+  }
+
+  @Override
   public ReadPathOps readPathOps() {
     return session.readPathOps;
   }

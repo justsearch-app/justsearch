@@ -36,7 +36,7 @@ final class KnowledgeServerWorkerDownCodeTest {
   @Test
   @DisplayName("never-started sites pass worker.spawn.failed; the prose becomes the detail")
   void neverStartedYieldsSpawnFailed(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     bootstrap.transitionWorkerDown(
         LifecycleReasonCode.WORKER_SPAWN_FAILED, "Health check failed after 4200ms");
@@ -53,7 +53,7 @@ final class KnowledgeServerWorkerDownCodeTest {
   @Test
   @DisplayName("the was-READY sites pass worker.lost — the distinction the user could not see")
   void lostYieldsWorkerLost(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
 
@@ -69,7 +69,7 @@ final class KnowledgeServerWorkerDownCodeTest {
     // the only fatal reason a dying worker could name. A deliberate refusal is not a crash, and its
     // remedy is a policy that permits a rebuild, not a corruption repair.
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     bootstrap.transitionWorkerDown(
         LifecycleReasonCode.WORKER_SPAWN_FAILED,
@@ -89,7 +89,7 @@ final class KnowledgeServerWorkerDownCodeTest {
   @DisplayName("the corruption axis overrides either generic code, and carries the remedy as detail")
   void corruptMarkerOverridesTheGenericCode(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_CORRUPT);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
 
@@ -107,7 +107,7 @@ final class KnowledgeServerWorkerDownCodeTest {
   @DisplayName("an unrelated fatal reason is NOT read as corruption")
   void unrelatedMarkerKeepsTheGenericCode(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, "out_of_memory");
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
 
@@ -121,7 +121,7 @@ final class KnowledgeServerWorkerDownCodeTest {
   @DisplayName("end-to-end latch: the corrupt cause survives the restart-then-give-up sequence")
   void corruptCauseSurvivesTheSupervisionSequence(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_CORRUPT);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     var cap = bootstrap.workerCapability();
 
     bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");

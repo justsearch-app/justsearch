@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   implementation(project(":modules:app-api"))
   implementation(project(":modules:worker-core"))
   implementation(project(":modules:worker-services"))

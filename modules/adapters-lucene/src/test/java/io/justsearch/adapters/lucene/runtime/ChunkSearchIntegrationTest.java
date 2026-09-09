@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSort;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexing.SchemaFields;
@@ -256,7 +257,7 @@ class ChunkSearchIntegrationTest {
   @DisplayName("generic ReadPath projection reconstructs non-stored chunk_content")
   void genericReadPathProjectionReconstructsChunkContent() throws Exception {
     indexDoc("doc-slices", "Parent prefix");
-    String firstId = indexChunk("doc-slices", 0, 2, " first 🚀 slice\r\n");
+    String firstId = indexChunk("doc-slices", 0, 2, " first ðŸš€ slice\r\n");
     String secondId = indexChunk("doc-slices", 1, 2, "```java\r\nsecond();\r\n```");
     commitAndRefresh();
     assertChunkContentNotStored(firstId);
@@ -288,7 +289,7 @@ class ChunkSearchIntegrationTest {
           "internally fetched slice geometry must not leak through projection semantics");
     }
 
-    assertEquals(" first 🚀 slice\r\n", contentById.get(firstId));
+    assertEquals(" first ðŸš€ slice\r\n", contentById.get(firstId));
     assertEquals("```java\r\nsecond();\r\n```", contentById.get(secondId));
   }
 
@@ -417,7 +418,7 @@ class ChunkSearchIntegrationTest {
 
     commitAndRefresh();
 
-    var result = runtime.chunkSearchOps().searchChunksHybrid("apple", v, Set.of("doc-1"), 1, true, null);
+    var result = runtime.chunkSearchOps().searchChunksHybrid("apple", v, Set.of("doc-1"), 1, true, null, EngineContext.Urgency.FOREGROUND);
 
     assertNotNull(result);
     assertEquals(1, result.hits().size(), "Should return exactly 1 fused hit");
@@ -437,7 +438,7 @@ class ChunkSearchIntegrationTest {
     var result =
         runtime
             .chunkSearchOps()
-            .searchChunksHybrid("the", vector, Set.of("doc-1"), 1, true, null);
+            .searchChunksHybrid("the", vector, Set.of("doc-1"), 1, true, null, EngineContext.Urgency.FOREGROUND);
 
     assertEquals(1, result.hits().size(), "the direct RAG path must still execute chunk KNN");
     assertEquals(chunkId, result.hits().get(0).docId());
@@ -460,7 +461,7 @@ class ChunkSearchIntegrationTest {
     int limit = 10;
     int cap = runtime.resolvedConfig().hybridSearch().vectorOnlyCapLowSignal();
 
-    var result = runtime.chunkSearchOps().searchChunksHybrid("nonmatching-query", far, Set.of("doc-1"), limit, true, null);
+    var result = runtime.chunkSearchOps().searchChunksHybrid("nonmatching-query", far, Set.of("doc-1"), limit, true, null, EngineContext.Urgency.FOREGROUND);
 
     assertNotNull(result);
     assertEquals(Math.min(cap, limit), result.hits().size(),
@@ -588,7 +589,7 @@ class ChunkSearchIntegrationTest {
   @Test
   @DisplayName(
       "findParentDocIdsWithChunks: a parent with SEVERAL chunk docs is still classified "
-          + "chunked, and a chunkless sibling among the same candidates is not (review Fix 2 — "
+          + "chunked, and a chunkless sibling among the same candidates is not (review Fix 2 â€” "
           + "per-parent existence probes, not a shared result-window)")
   void findParentDocIdsWithChunksHandlesMultiChunkParent() throws Exception {
     // Parent C owns 3 chunk docs; parent D has none.
@@ -612,7 +613,7 @@ class ChunkSearchIntegrationTest {
     indexDoc("doc-p1", "The quick brown fox jumps");
     indexDoc("doc-p2", "A red fox runs through the forest");
 
-    // A chunk doc that ALSO carries a CONTENT field mentioning the query term — this is exactly
+    // A chunk doc that ALSO carries a CONTENT field mentioning the query term â€” this is exactly
     // what the IS_CHUNK MUST_NOT clause must keep out of full-doc results.
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
         SchemaFields.DOC_ID, "chunk:fox-000",
@@ -629,13 +630,13 @@ class ChunkSearchIntegrationTest {
 
     // Unscoped (empty docIds): both parents match, and the chunk doc is excluded despite its
     // CONTENT field containing "fox". null additionalFilter is accepted.
-    var unscoped = runtime.chunkSearchOps().searchFullDocs("fox", Set.of(), 10, null);
+    var unscoped = runtime.chunkSearchOps().searchFullDocs("fox", Set.of(), 10, null, EngineContext.Urgency.FOREGROUND);
     assertNotNull(unscoped);
     assertEquals(2, unscoped.hits().size(), "Unscoped search returns both parent docs");
     Set<String> unscopedIds =
         unscoped.hits().stream().map(h -> h.docId()).collect(java.util.stream.Collectors.toSet());
     assertEquals(Set.of("doc-p1", "doc-p2"), unscopedIds,
-        "Only the two parents come back — never the chunk doc (IS_CHUNK MUST_NOT)");
+        "Only the two parents come back â€” never the chunk doc (IS_CHUNK MUST_NOT)");
 
     // Scoped to {doc-p2}: only doc-p2 comes back.
     var scoped = runtime.chunkSearchOps().searchFullDocs("fox", Set.of("doc-p2"), 10, null);
@@ -643,7 +644,7 @@ class ChunkSearchIntegrationTest {
     assertEquals("doc-p2", scoped.hits().get(0).docId());
 
     // Blank query is empty regardless of scope.
-    var blank = runtime.chunkSearchOps().searchFullDocs("   ", Set.of(), 10, null);
+    var blank = runtime.chunkSearchOps().searchFullDocs("   ", Set.of(), 10, null, EngineContext.Urgency.FOREGROUND);
     assertTrue(blank.hits().isEmpty(), "Blank query yields no full-doc hits");
 
     // Regression: searchFullDocsForDocs keeps its return-empty-on-empty-scope contract, which
@@ -663,7 +664,7 @@ class ChunkSearchIntegrationTest {
 
     // Null queryVector forces the BM25 (searchFullDocs) branch; both parents match "coral".
     var result =
-        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", null, Set.of(), 10, null);
+        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", null, Set.of(), 10, null, EngineContext.Urgency.FOREGROUND);
     assertNotNull(result);
     assertEquals(2, result.hits().size(), "BM25 union path returns both matching parents");
     Set<String> ids =
@@ -679,7 +680,7 @@ class ChunkSearchIntegrationTest {
     // Regular parent: matches the BM25 leg via content, carries no vector of its own.
     indexDoc("doc-1", "Coral reefs support diverse marine life");
 
-    // A "poisoned" chunk doc that also happens to carry parent-level content + vector — the
+    // A "poisoned" chunk doc that also happens to carry parent-level content + vector â€” the
     // latent double-surface trap this guard exists to prevent. A chunk doc must never be
     // eligible for the doc-level union, regardless of what fields it carries.
     float[] queryVector = new float[] {1f, 0f, 0f, 0f};
@@ -698,7 +699,7 @@ class ChunkSearchIntegrationTest {
     // Non-null, non-empty queryVector and no query-skip condition -> dispatches to the hybrid
     // branch (searchHybridFiltered), not the BM25 (searchFullDocs) fallback.
     var result =
-        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", queryVector, Set.of(), 10, null);
+        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", queryVector, Set.of(), 10, null, EngineContext.Urgency.FOREGROUND);
 
     assertNotNull(result);
     for (var hit : result.hits()) {
@@ -716,8 +717,8 @@ class ChunkSearchIntegrationTest {
    * to drop {@code pathPrefix} on the premise that a chunk's {@code PATH} "stores parentDocId, not
    * the file path". It stores both: the parent's {@code DOC_ID} IS its absolute path. Dropping the
    * scope let the chunk branch retrieve candidates from outside the requested prefix, which enter
-   * the fused candidate union the response reports as {@code totalHits} and — at a high enough fused
-   * rank — leak into {@code results}.
+   * the fused candidate union the response reports as {@code totalHits} and â€” at a high enough fused
+   * rank â€” leak into {@code results}.
    */
   @Test
   @DisplayName("chunk retrieval is scoped by pathPrefix (out-of-prefix parents must not come back)")
@@ -785,7 +786,7 @@ class ChunkSearchIntegrationTest {
   void chunkFilterCarriesDefaultCollectionScopeWithoutFilters() {
     // Tempdoc 811 item 3 supersedes the previous contract (an all-default filter set produced NO
     // chunk filter). The default agent-history exclusion is part of the default scope, so it must
-    // be present on the chunk branch too — otherwise agent-history chunks enter the fused union
+    // be present on the chunk branch too â€” otherwise agent-history chunks enter the fused union
     // whenever no pathPrefix/doc_ids filter is set.
     var filters = LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder().build();
     var q = QueryFilterBuilder.buildChunkFilterQuery(filters);
@@ -795,7 +796,7 @@ class ChunkSearchIntegrationTest {
     assertTrue(s.contains("*:*"), "the pure-negative filter is anchored with MatchAllDocs: " + s);
   }
 
-  // ========== Tempdoc 811 item 3 — collection scoping on the chunk branch ==========
+  // ========== Tempdoc 811 item 3 â€” collection scoping on the chunk branch ==========
 
   @Test
   @DisplayName("an agent-history parent's chunk is excluded from a default-scope chunk search")
@@ -868,10 +869,10 @@ class ChunkSearchIntegrationTest {
     assertEquals(
         2,
         result.hits().size(),
-        "the MUST_NOT only matches docs carrying the agent-history tag — untagged chunks pass");
+        "the MUST_NOT only matches docs carrying the agent-history tag â€” untagged chunks pass");
   }
 
-  // ========== Tempdoc 811 D-1 — the null-filters bypass ==========
+  // ========== Tempdoc 811 D-1 â€” the null-filters bypass ==========
 
   @Test
   @DisplayName("a null-filters text search still excludes agent-history documents")
@@ -911,16 +912,16 @@ class ChunkSearchIntegrationTest {
   // ========== Chunk-leg tie-break (lane F PR 0b) ==========
 
   /**
-   * Lane F PR 0b — a chunk BM25 tie must break on a key that is stable ACROSS INDEX BUILDS.
+   * Lane F PR 0b â€” a chunk BM25 tie must break on a key that is stable ACROSS INDEX BUILDS.
    *
    * <p>Three chunks with byte-identical content tie exactly on BM25, and each is committed on its
    * own so each lands in its own segment. Two things could decide their order, and both are
    * per-build random:
    *
    * <ul>
-   *   <li>Lucene's INTERNAL docId — what {@code searcher.search(query, n)} falls back to. It
+   *   <li>Lucene's INTERNAL docId â€” what {@code searcher.search(query, n)} falls back to. It
    *       follows the commit order, which a different segment layout renumbers.
-   *   <li>the chunk's {@code doc_id} — what the first version of this fix sorted on. On a chunk row
+   *   <li>the chunk's {@code doc_id} â€” what the first version of this fix sorted on. On a chunk row
    *       that is {@code ChunkIds.newChunkDocId()} = {@code "chunk:" + UUID.randomUUID()}
    *       ({@code ChunkIds.java:51-53}), minted fresh per ingest and deliberately not derived from
    *       the parent or the chunk index. Stable within one index, uncorrelated between two.
@@ -929,7 +930,7 @@ class ChunkSearchIntegrationTest {
    * <p>So the fixture mints REAL chunk ids through {@code ChunkIds.newChunkDocId()} and forces both
    * adversaries: the commit order is non-ascending, and the minted ids are re-drawn until their
    * lexicographic order disagrees with the chunk-index order. Under either of those two tie-breaks
-   * this test fails deterministically — not with probability 5/6. What must hold is that both
+   * this test fails deterministically â€” not with probability 5/6. What must hold is that both
    * builds return the chunks in {@code parent_doc_id} then {@code chunk_index} order, which two
    * ingests of the same corpus agree on.
    */
@@ -943,7 +944,7 @@ class ChunkSearchIntegrationTest {
 
     List<String> expected = List.of("0", "1", "2");
 
-    // Build A: the discriminating layout — the HIGHEST chunk index is committed first, so the
+    // Build A: the discriminating layout â€” the HIGHEST chunk index is committed first, so the
     // internal-docId order disagrees with the chunk-index order.
     TieBreakProbe buildA = probeTiedChunkOrder(List.of(2, 0, 1));
     assertNotEquals(
@@ -968,7 +969,7 @@ class ChunkSearchIntegrationTest {
     assertEquals(
         expected, buildB.sortedChunkIndexOrder(), "chunk BM25 ties must break on parent+index");
 
-    // The two builds drew different chunk ids — the point of the whole test. If this ever held,
+    // The two builds drew different chunk ids â€” the point of the whole test. If this ever held,
     // the two builds would share a doc_id ordering and the assertions above would prove nothing
     // about cross-build stability.
     assertNotEquals(
@@ -982,11 +983,11 @@ class ChunkSearchIntegrationTest {
   }
 
   /**
-   * Lane F PR 0b — the FIRST tie-break comparator, {@code parent_doc_id}, exercised on its own.
+   * Lane F PR 0b â€” the FIRST tie-break comparator, {@code parent_doc_id}, exercised on its own.
    *
    * <p>{@link #chunkBm25TiesBreakOnAKeyThatIsStableAcrossBuilds} uses one parent, so {@code
    * chunk_index} alone decides it and a {@code parent_doc_id} comparator that silently did nothing
-   * — a missing docvalues column, a misspelled field — would still let it pass. Across parents
+   * â€” a missing docvalues column, a misspelled field â€” would still let it pass. Across parents
    * that hole is real: every chunk's index is 0, so with {@code parent_doc_id} inert the order
    * falls straight through to the per-ingest UUID, which is the defect this whole change exists to
    * remove.
@@ -1017,12 +1018,12 @@ class ChunkSearchIntegrationTest {
   }
 
   /**
-   * Lane F PR 0b, second review B1 — the DENSE chunk leg, which the two tests above do not reach.
+   * Lane F PR 0b, second review B1 â€” the DENSE chunk leg, which the two tests above do not reach.
    *
    * <p>{@code searchChunksText}/{@code searchChunksSplade} go through {@code
    * searchChunksWithStableTieBreak}. {@code searchChunkVector} does not: it builds a {@link
    * org.apache.lucene.search.KnnFloatVectorQuery} and hands it to {@code ReadPathOps.search},
-   * which until this change sorted by {@code buildRuntimeSort(RELEVANCE, doc_id)} — the DOCUMENT
+   * which until this change sorted by {@code buildRuntimeSort(RELEVANCE, doc_id)} â€” the DOCUMENT
    * tie-break, whose secondary key on a chunk row is the per-ingest {@code
    * ChunkIds.newChunkDocId()} UUID. So the leg the two tests above certify was fixed while the
    * dense leg beside it still ordered its ties at random per build.
@@ -1075,11 +1076,11 @@ class ChunkSearchIntegrationTest {
   }
 
   /**
-   * Lane F PR 0b, second review B1 — the two cursor branches the {@code Sort} override adds.
+   * Lane F PR 0b, second review B1 â€” the two cursor branches the {@code Sort} override adds.
    *
    * <p>{@code SearchAfterCursorHelper} encodes and decodes against the {@code RuntimeSearchSort},
    * not against the Lucene {@code Sort} the search actually ran with. Combining the two would
-   * therefore page through an order the cursor does not describe — silently. So an inbound cursor
+   * therefore page through an order the cursor does not describe â€” silently. So an inbound cursor
    * is refused outright, and an outbound one is withheld. Both directions are asserted here
    * because only one of them is on the path the chunk legs take, and the untaken branch is the
    * one that would rot.
@@ -1157,7 +1158,7 @@ class ChunkSearchIntegrationTest {
 
   /**
    * Draws one real chunk id per key and assigns them so the ids' lexicographic order is {@link
-   * #DENSE_TIE_ADVERSARIAL_KEYS} — the exact reverse of what the tie-break must produce.
+   * #DENSE_TIE_ADVERSARIAL_KEYS} â€” the exact reverse of what the tie-break must produce.
    *
    * <p>Assigning a sorted draw rather than re-drawing until the permutation appears keeps this
    * deterministic: a 4-key re-draw loop would hit the wanted permutation with probability 1/24 per
@@ -1338,7 +1339,7 @@ class ChunkSearchIntegrationTest {
       List<String> chunkIndexOrderIfSortedByDocId,
       List<String> rawInternalDocIdOrder) {}
 
-  /** Content shared by every tie-break chunk — identical text means an identical BM25 score. */
+  /** Content shared by every tie-break chunk â€” identical text means an identical BM25 score. */
   private static final String TIE_CHUNK_TEXT = "tiebreakalpha tiebreakbeta";
 
   /**
@@ -1484,7 +1485,7 @@ class ChunkSearchIntegrationTest {
   }
 
   /**
-   * Indexes a chunk document carrying its PARENT's collection tag — what
+   * Indexes a chunk document carrying its PARENT's collection tag â€” what
    * {@code ChunkDocumentWriter} writes since tempdoc 811 item 3.
    */
   private void indexChunkInCollection(
@@ -1595,8 +1596,8 @@ class ChunkSearchIntegrationTest {
     int end = newContent.length();
     parent.put(SchemaFields.CONTENT, newContent);
     writeParent(parent);
-    // The parent moved to a new revision, so the chunks already cut from it are stale — exactly the
-    // state the read-path guard (tempdoc 931 §E item 5) refuses to reconstruct from. Production
+    // The parent moved to a new revision, so the chunks already cut from it are stale â€” exactly the
+    // state the read-path guard (tempdoc 931 Â§E item 5) refuses to reconstruct from. Production
     // regenerates them after a parent rewrite; this fixture re-cuts them the same way, so the
     // sibling chunks stay readable while a genuinely stale chunk still fails closed.
     for (Map<String, Object> chunk : chunkDocuments.getOrDefault(parentDocId, List.of())) {
@@ -1614,8 +1615,8 @@ class ChunkSearchIntegrationTest {
   }
 
   /**
-   * Indexes a chunk stamped with the revision of the parent content it was cut from — what
-   * {@code ChunkDocumentWriter} writes since tempdoc 931 §C.1, and what the read path checks before
+   * Indexes a chunk stamped with the revision of the parent content it was cut from â€” what
+   * {@code ChunkDocumentWriter} writes since tempdoc 931 Â§C.1, and what the read path checks before
    * re-slicing the text out of the parent.
    */
   private void indexChunkDoc(String parentDocId, Map<String, Object> fields) {

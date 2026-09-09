@@ -10,14 +10,14 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchFil
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchHit;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchResult;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import org.apache.lucene.search.Query;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -308,7 +308,8 @@ public final class HybridSearchOps {
       float[] queryVector,
       int limit,
       boolean debug,
-      String logPrefix) {
+      String logPrefix,
+      EngineContext.Urgency urgency) {
     long startTime = System.currentTimeMillis();
 
     // Compute candidate limits from config
@@ -332,25 +333,15 @@ public final class HybridSearchOps {
     SearchResult textResult;
     SearchResult vectorResult;
 
-    try {
-      var executor = Executors.newVirtualThreadPerTaskExecutor();
-      try {
-        var textFuture =
-            CompletableFuture.supplyAsync(
-                () -> textLeg.search(queryText, textCandidateLimit), executor);
-        var vectorFuture =
-            CompletableFuture.supplyAsync(
-                () -> vectorLeg.search(queryVector, vectorCandidateLimit), executor);
-        textResult = textFuture.join();
-        vectorResult = vectorFuture.join();
-      } finally {
-        executor.close();
-      }
-    } catch (Exception e) {
-      log.warn("Parallel search failed, falling back to sequential: {}", e.getMessage());
-      log.debug("Parallel search failed (stack trace)", e);
-      textResult = textLeg.search(queryText, textCandidateLimit);
-      vectorResult = vectorLeg.search(queryVector, vectorCandidateLimit);
+    try (var executor = session.executorRegistrations.openSearchFanout(urgency)) {
+      var textFuture =
+          EngineFutures.supplyAsync(
+              () -> textLeg.search(queryText, textCandidateLimit), executor);
+      var vectorFuture =
+          EngineFutures.supplyAsync(
+              () -> vectorLeg.search(queryVector, vectorCandidateLimit), executor);
+      textResult = textFuture.join();
+      vectorResult = vectorFuture.join();
     }
 
     if (log.isDebugEnabled()) {
@@ -449,7 +440,8 @@ public final class HybridSearchOps {
    * @param syntax how the text leg parses {@code queryText} (tempdoc 821 §P / register F-046)
    * @return search results ordered by fused RRF score
    */
-  SearchResult searchHybrid(String queryText, float[] queryVector, int limit, QuerySyntax syntax) {
+  SearchResult searchHybrid(String queryText, float[] queryVector, int limit, QuerySyntax syntax,
+      EngineContext.Urgency urgency) {
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
     }
@@ -462,7 +454,7 @@ public final class HybridSearchOps {
     return executeHybrid(
         (t, l) -> textQueryOps.searchText(t, l, null, null, syntax),
         (v, l) -> readPathOps.searchVector(v, l),
-        queryText, queryVector, limit, false, "Hybrid");
+        queryText, queryVector, limit, false, "Hybrid", urgency);
   }
 
   /**
@@ -475,15 +467,16 @@ public final class HybridSearchOps {
    * @return search results ordered by RRF fusion score
    */
   public SearchResult searchHybridFiltered(
-      String queryText, float[] queryVector, int limit, Query filter) {
-    return searchHybridFiltered(queryText, queryVector, limit, filter, QuerySyntax.SIMPLE);
+      String queryText, float[] queryVector, int limit, Query filter, EngineContext.Urgency urgency) {
+    return searchHybridFiltered(queryText, queryVector, limit, filter, QuerySyntax.SIMPLE, urgency);
   }
 
   /** Filtered hybrid search parsing the text leg with {@code syntax} (tempdoc 821 §P). */
   public SearchResult searchHybridFiltered(
-      String queryText, float[] queryVector, int limit, Query filter, QuerySyntax syntax) {
+      String queryText, float[] queryVector, int limit, Query filter, QuerySyntax syntax,
+      EngineContext.Urgency urgency) {
     if (filter == null) {
-      return searchHybrid(queryText, queryVector, limit, syntax);
+      return searchHybrid(queryText, queryVector, limit, syntax, urgency);
     }
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
@@ -501,7 +494,8 @@ public final class HybridSearchOps {
         queryVector,
         limit,
         false,
-        "Filtered hybrid");
+        "Filtered hybrid",
+        urgency);
   }
 
   /**
@@ -519,7 +513,8 @@ public final class HybridSearchOps {
       float[] queryVector,
       int limit,
       RuntimeSearchFilters filters,
-      QuerySyntax syntax) {
+      QuerySyntax syntax,
+      EngineContext.Urgency urgency) {
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
     }
@@ -536,7 +531,8 @@ public final class HybridSearchOps {
         queryVector,
         limit,
         true,
-        "Hybrid(debug)");
+        "Hybrid(debug)",
+        urgency);
   }
 
 }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.scan.ScanProgressEvent;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -22,16 +23,19 @@ import org.junit.jupiter.api.Test;
 final class ScanProgressRegistryTest {
 
   private ScanProgressRegistry registry;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     // Tight retention for the past-retention test; other tests don't depend on the value.
-    registry = new ScanProgressRegistry(50);
+    registry = new ScanProgressRegistry(processExecutors, 50);
   }
 
   @AfterEach
   void tearDown() {
     registry.close();
+    processExecutors.close();
   }
 
   @Test

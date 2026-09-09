@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.observability.health.ConditionStore;
 import io.justsearch.app.observability.health.HealthEventChangeRegistry;
@@ -10,7 +12,6 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
@@ -37,18 +38,21 @@ public final class HealthEventStreamController {
   @SuppressWarnings("unused")
   private final Telemetry telemetry;
 
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
   public HealthEventStreamController(
+      EngineExecutorRegistry processExecutors,
       ConditionStore conditions,
       OccurrenceLog occurrences,
       HealthEventChangeRegistry changes,
       Telemetry telemetry) {
-    this(conditions, occurrences, changes, telemetry, Clock.systemUTC());
+    this(processExecutors, conditions, occurrences, changes, telemetry, Clock.systemUTC());
   }
 
   public HealthEventStreamController(
+      EngineExecutorRegistry processExecutors,
       ConditionStore conditions,
       OccurrenceLog occurrences,
       HealthEventChangeRegistry changes,
@@ -59,13 +63,13 @@ public final class HealthEventStreamController {
     this.changes = Objects.requireNonNull(changes, "changes");
     this.telemetry = telemetry;
     this.clock = Objects.requireNonNull(clock, "clock");
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "health-events-stream-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.health-events-stream-heartbeat",
+            "health-events-stream-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
   }
 
   public void handle(SseClient sseClient) {
@@ -86,5 +90,42 @@ public final class HealthEventStreamController {
   /** Stops the heartbeat scheduler. Call on shutdown. */
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
+
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

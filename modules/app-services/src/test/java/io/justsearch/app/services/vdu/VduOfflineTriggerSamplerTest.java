@@ -42,7 +42,7 @@ final class VduOfflineTriggerSamplerTest {
         .startOfflineProcessing();
 
     var sampler =
-        new VduOfflineTriggerSampler(() -> coordinator, () -> ks, () -> false);
+        new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> ks, () -> false);
     sampler.checkOnce();
 
     assertTrue(triggered.await(5, TimeUnit.SECONDS), "startOfflineProcessing should have been dispatched");
@@ -55,7 +55,7 @@ final class VduOfflineTriggerSamplerTest {
     when(coordinator.isProcessing()).thenReturn(false);
     when(coordinator.getPendingVduCount()).thenReturn(0);
 
-    var sampler = new VduOfflineTriggerSampler(() -> coordinator, () -> null, () -> false);
+    var sampler = new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> null, () -> false);
     sampler.checkOnce();
 
     verify(coordinator, never()).startOfflineProcessing();
@@ -67,7 +67,7 @@ final class VduOfflineTriggerSamplerTest {
     OfflineCoordinator coordinator = mock(OfflineCoordinator.class);
     when(coordinator.isProcessing()).thenReturn(true);
 
-    var sampler = new VduOfflineTriggerSampler(() -> coordinator, () -> null, () -> false);
+    var sampler = new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> null, () -> false);
     sampler.checkOnce();
 
     verify(coordinator, never()).getPendingVduCount();
@@ -81,7 +81,7 @@ final class VduOfflineTriggerSamplerTest {
     when(coordinator.isProcessing()).thenReturn(false);
     when(coordinator.getPendingVduCount()).thenReturn(3);
 
-    var sampler = new VduOfflineTriggerSampler(() -> coordinator, () -> null, () -> true);
+    var sampler = new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> null, () -> true);
     sampler.checkOnce();
 
     verify(coordinator, never()).startOfflineProcessing();
@@ -91,7 +91,7 @@ final class VduOfflineTriggerSamplerTest {
   @DisplayName("a checkOnce exception does not propagate (transient probe failures must not kill the sampler)")
   void exceptionDuringCheckDoesNotPropagate() {
     var sampler =
-        new VduOfflineTriggerSampler(
+        new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(),
             () -> {
               throw new RuntimeException("simulated failure");
             },
@@ -108,7 +108,7 @@ final class VduOfflineTriggerSamplerTest {
     when(coordinator.isProcessing()).thenReturn(false);
     when(coordinator.getPendingVduCount()).thenReturn(0);
 
-    var sampler = new VduOfflineTriggerSampler(() -> coordinator, () -> null, () -> false);
+    var sampler = new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> null, () -> false);
     sampler.start();
     sampler.start(); // second call is a no-op
     sampler.stop();

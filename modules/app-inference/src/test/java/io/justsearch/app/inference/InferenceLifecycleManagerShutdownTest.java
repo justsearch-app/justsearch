@@ -23,7 +23,7 @@ final class InferenceLifecycleManagerShutdownTest {
   private static void assertCloseStopsServer(boolean stop) {
     try (MockedConstruction<LlamaServerOps> construction =
         Mockito.mockConstruction(LlamaServerOps.class)) {
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(fakeConfig());
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
       LlamaServerOps fakeServerOps = construction.constructed().getFirst();
 
       manager.setStopServerOnClose(stop);
@@ -36,7 +36,7 @@ final class InferenceLifecycleManagerShutdownTest {
   private static void assertCloseLeavesServerRunning(boolean stop) {
     try (MockedConstruction<LlamaServerOps> construction =
         Mockito.mockConstruction(LlamaServerOps.class)) {
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(fakeConfig());
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
       LlamaServerOps fakeServerOps = construction.constructed().getFirst();
 
       manager.setStopServerOnClose(stop);

@@ -14,6 +14,8 @@ import io.javalin.http.Context;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.observability.CapabilitiesChangeRegistry;
 import io.justsearch.telemetry.Telemetry;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +32,13 @@ import org.junit.jupiter.api.Test;
 @DisplayName("CapabilitiesStreamController")
 final class CapabilitiesStreamControllerTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
   private CapabilitiesChangeRegistry registry;
   private CapabilitiesStreamController controller;
 
@@ -37,7 +46,9 @@ final class CapabilitiesStreamControllerTest {
   void setUp() {
     registry = new CapabilitiesChangeRegistry();
     Telemetry telemetry = mock(Telemetry.class);
-    controller = new CapabilitiesStreamController(registry, telemetry);
+    controller = new CapabilitiesStreamController(
+            processExecutors,
+              registry, telemetry);
   }
 
   @AfterEach

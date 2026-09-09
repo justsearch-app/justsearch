@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.observability.metrics;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.agent.api.registry.ResourceRef;
 import io.justsearch.app.observability.metrics.JobQueueDepthMetricChangeRegistry;
 import io.justsearch.app.observability.metrics.JobQueueDepthMetricResourceCatalog;
@@ -11,7 +13,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -65,16 +66,19 @@ public final class JobQueueDepthMetricProducer {
   private final TimeseriesSnapshotHolder holder;
   private final JobQueueDepthMetricChangeRegistry registry;
   private final Clock clock;
+  private final EngineExecutorRegistry.Registration schedulerRegistration;
   private final ScheduledExecutorService scheduler;
 
   public JobQueueDepthMetricProducer(
+      EngineExecutorRegistry processExecutors,
       Supplier<RrdMetricStore> rrdStoreSupplier,
       TimeseriesSnapshotHolder holder,
       JobQueueDepthMetricChangeRegistry registry) {
-    this(rrdStoreSupplier, holder, registry, Clock.systemUTC());
+    this(processExecutors, rrdStoreSupplier, holder, registry, Clock.systemUTC());
   }
 
   public JobQueueDepthMetricProducer(
+      EngineExecutorRegistry processExecutors,
       Supplier<RrdMetricStore> rrdStoreSupplier,
       TimeseriesSnapshotHolder holder,
       JobQueueDepthMetricChangeRegistry registry,
@@ -83,13 +87,13 @@ public final class JobQueueDepthMetricProducer {
     this.holder = Objects.requireNonNull(holder, "holder");
     this.registry = Objects.requireNonNull(registry, "registry");
     this.clock = Objects.requireNonNull(clock, "clock");
-    this.scheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "metrics-job-queue-depth-producer");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openScheduler(
+            processExecutors,
+            "head.metrics-job-queue-depth-producer",
+            "metrics-job-queue-depth-producer");
+    this.schedulerRegistration = resources.registration();
+    this.scheduler = resources.scheduler();
   }
 
   /** Schedules the periodic tick. Idempotent at the scheduler level. */
@@ -102,6 +106,7 @@ public final class JobQueueDepthMetricProducer {
   /** Stops the scheduler. Call on shutdown. */
   public void stop() {
     scheduler.shutdownNow();
+    schedulerRegistration.close();
   }
 
   /**
@@ -211,4 +216,41 @@ public final class JobQueueDepthMetricProducer {
     }
     return true;
   }
+
+  private static SchedulerResources openScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
+
 }

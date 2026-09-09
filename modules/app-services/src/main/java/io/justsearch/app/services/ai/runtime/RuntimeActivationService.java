@@ -44,6 +44,8 @@ import io.justsearch.configuration.RepoRootLocator;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.EffectivePolicy;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -65,6 +67,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -76,7 +79,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Important: install ≠ activate. Runtime packs can be imported safely without changing any runtime pointers.
  */
-public final class RuntimeActivationService implements io.justsearch.app.api.RuntimeActivationService {
+public final class RuntimeActivationService
+    implements io.justsearch.app.api.RuntimeActivationService, AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(RuntimeActivationService.class);
 
   private static final ObjectMapper MAPPER =
@@ -85,8 +89,8 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
           .enable(SerializationFeature.INDENT_OUTPUT)
           .build();
 
-  private static final HttpClient HTTP =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+  private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(3);
+  private static final String HTTP_EXECUTOR_NAME = "head.runtime-activation.http";
 
   private static final String STATUS_FILE = "runtime-activation-state.json";
 
@@ -159,6 +163,9 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
 
   private final Path aiHome;
   private final Path statusPath;
+  private final EngineExecutorRegistry.Registration httpRegistration;
+  private final HttpClient http;
+  private boolean closed;
 
   /** Memo for {@link #variantsRoot()}; re-derived when it stops naming a directory (913 H1). */
   private volatile Path variantsRoot;
@@ -295,20 +302,22 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
   private volatile List<String> lastSelfTestEffectiveFlags = List.of();
 
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService) {
-    this(onlineAi, settingsStore, gpuCapabilitiesService, policyService, null, null);
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService, null, null);
   }
 
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache) {
-    this(onlineAi, settingsStore, gpuCapabilitiesService, policyService, workerFeatureCache, null);
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService, workerFeatureCache, null);
   }
 
   /**
@@ -319,6 +328,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * compatibility, matching {@code workerFeatureCache}.
    */
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
@@ -326,6 +336,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       WorkerFeatureCache workerFeatureCache,
       InferenceCapability inferenceCapability) {
     this(
+        processExecutors,
         onlineAi,
         settingsStore,
         gpuCapabilitiesService,
@@ -343,6 +354,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * for graceful degradation and existing test compatibility, matching {@code workerFeatureCache}.
    */
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
@@ -351,6 +363,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       InferenceCapability inferenceCapability,
       AiInstallService aiInstallService) {
     this(
+        processExecutors,
         onlineAi,
         settingsStore,
         gpuCapabilitiesService,
@@ -368,6 +381,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * compatibility, matching {@code workerFeatureCache}/{@code inferenceCapability}.
    */
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
@@ -376,6 +390,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       InferenceCapability inferenceCapability,
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
     this.onlineAi = Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
     this.gpuCapabilitiesService = gpuCapabilitiesService == null ? new GpuCapabilitiesService() : gpuCapabilitiesService;
@@ -387,7 +402,45 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     this.aiHome = resolveAiHome();
     this.statusPath = aiHome.resolve("ai").resolve(STATUS_FILE);
     loadStatusBestEffort();
+    HttpResources resources = openHttpResources(processExecutors);
+    this.httpRegistration = resources.registration();
+    this.http = resources.client();
   }
+
+  private static HttpResources openHttpResources(EngineExecutorRegistry processExecutors) {
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                HTTP_EXECUTOR_NAME,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ExecutorService executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "head-runtime-activation-http");
+                thread.setDaemon(true);
+                return thread;
+              });
+      HttpClient client = HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).executor(executor).build();
+      return new HttpResources(registration, client);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record HttpResources(
+      EngineExecutorRegistry.Registration registration, HttpClient client) {}
 
   public AiRuntimeActivationStatus getActivationStatus() {
     synchronized (lock) {
@@ -1314,7 +1367,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
               .timeout(Duration.ofSeconds(2))
               .GET()
               .build();
-      HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
       return resp.statusCode() == 200;
     } catch (Exception e) {
       return false;
@@ -1337,7 +1390,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
               .timeout(Duration.ofSeconds(20))
               .POST(HttpRequest.BodyPublishers.ofString(json))
               .build();
-      HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() != 200) {
         throw new SelfTestException("Chat request failed: status=" + resp.statusCode());
       }
@@ -1897,6 +1950,31 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       return t.getClass().getSimpleName();
     }
     return m;
+  }
+
+  /** Stops the self-test client within a bounded window and releases its owned registration. */
+  @Override
+  public synchronized void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    try {
+      http.shutdownNow();
+      boolean terminated = false;
+      try {
+        terminated = http.awaitTermination(HTTP_TIMEOUT);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+      }
+      // HttpClient.close() waits indefinitely in the JDK when the client is not terminated. Only
+      // call it after the bounded shutdown has completed; the registration owns the supplied pool.
+      if (terminated || http.isTerminated()) {
+        http.close();
+      }
+    } finally {
+      httpRegistration.close();
+    }
   }
 
   record SelfTestResult(

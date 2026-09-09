@@ -10,7 +10,9 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.OperationLeaseService;
+import io.justsearch.app.engine.EngineAdmissionController;
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import io.justsearch.app.services.HeadAssembly;
@@ -40,6 +42,7 @@ final class HeadlessAppShutdownWiringTest {
     var exitCode = new AtomicInteger(-1);
     var manifestCompleted = new java.util.concurrent.atomic.AtomicBoolean();
     OperationLeaseService leases = mock(OperationLeaseService.class);
+    EngineAdmissionService admission = mock(EngineAdmissionService.class);
     var watcher = mock(io.justsearch.app.engine.ShutdownRequestWatcher.class);
     RuntimeManifestPublisher manifest = mock(RuntimeManifestPublisher.class);
     LocalApiServer api = mock(LocalApiServer.class);
@@ -48,6 +51,7 @@ final class HeadlessAppShutdownWiringTest {
     KnowledgeServerBootstrap knowledge = mock(KnowledgeServerBootstrap.class);
     var tracing = mock(io.justsearch.telemetry.TracingBootstrap.class);
     Telemetry telemetry = mock(Telemetry.class);
+    var executors = mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
     AppInstanceLock instanceLock = mock(AppInstanceLock.class);
     when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
     Thread faultThread =
@@ -68,6 +72,8 @@ final class HeadlessAppShutdownWiringTest {
                 telemetry,
                 instanceLock,
                 leases,
+                admission,
+                executors,
                 () -> watcher),
             code -> {
               assertTrue(manifestCompleted.get(), "manifest completion precedes process exit");
@@ -85,6 +91,7 @@ final class HeadlessAppShutdownWiringTest {
     var order =
         inOrder(
             leases,
+            admission,
             watcher,
             manifest,
             api,
@@ -93,9 +100,11 @@ final class HeadlessAppShutdownWiringTest {
             knowledge,
             tracing,
             telemetry,
+            executors,
             instanceLock);
     order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
     order.verify(leases).freezeAdmission(Reason.RESTART.wire());
+    order.verify(admission).cancelInteractive(Reason.RESTART.wire());
     order.verify(watcher).close();
     order.verify(api).stop();
     order.verify(health).close();
@@ -104,6 +113,7 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(knowledge).closeForUpgrade();
     order.verify(tracing).close();
     order.verify(telemetry).close();
+    order.verify(executors).close();
     order.verify(instanceLock).close();
     order.verify(manifest).completeShutdown(Reason.RESTART.wire(), true, "GRACEFUL");
   }
@@ -114,19 +124,64 @@ final class HeadlessAppShutdownWiringTest {
     for (Reason reason : Reason.values()) {
       HeadAssembly assembly = mock(HeadAssembly.class);
       OperationLeaseService leases = mock(OperationLeaseService.class);
+      EngineAdmissionService admission = mock(EngineAdmissionService.class);
+      LocalApiServer api = mock(LocalApiServer.class);
       var sequence =
           new EngineShutdownSequence(
               Path.of("build", "shutdown-wiring", reason.wire()),
               HeadlessApp.orderedShutdownSteps(
-                  null, assembly, null, null, null, null, null, null, leases, () -> null),
+                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null),
               code -> {});
 
       sequence.run(reason);
 
-      var order = inOrder(leases, assembly);
+      var order = inOrder(leases, admission, api, assembly);
       order.verify(leases).freezeAdmission(reason.wire());
+      order.verify(admission).cancelInteractive(reason.wire());
+      order.verify(api).stop();
       order.verify(assembly).setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
       order.verify(assembly).close();
+    }
+  }
+
+  @Test
+  @DisplayName("shutdown cancellation leaves durable admission work alive")
+  void shutdownCancellationExcludesDurableWorkWithRealController() {
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var durableContext =
+        new io.justsearch.core.context.EngineContext(
+            io.justsearch.core.context.EngineContext.ClientKind.MCP_CLIENT,
+            "durable-shutdown-test",
+            java.util.Optional.of("durable-shutdown-test"),
+            java.util.Optional.empty(),
+            "UNTRUSTED",
+            "MCP",
+            io.justsearch.core.context.EngineContext.Survival.DURABLE,
+            io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    try (var interactive = admission.admit(io.justsearch.ui.api.TestRequestContexts.browser(), false);
+        var durable = admission.admit(durableContext, false)) {
+      var sequence =
+          new EngineShutdownSequence(
+              Path.of("build", "shutdown-wiring", "durable-exclusion"),
+              HeadlessApp.orderedShutdownSteps(
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  OperationLeaseService.noOp(),
+                  admission,
+                  mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
+                  () -> null),
+              ignored -> {});
+
+      sequence.run(Reason.RESTART);
+
+      assertEquals(java.util.Optional.of("restart"), interactive.cancellationReason());
+      assertTrue(durable.cancellationReason().isEmpty());
     }
   }
 
@@ -146,6 +201,8 @@ final class HeadlessAppShutdownWiringTest {
                 null,
                 null,
                 OperationLeaseService.noOp(),
+                null,
+                mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
                 () -> null),
             ignored -> {});
 
@@ -164,7 +221,7 @@ final class HeadlessAppShutdownWiringTest {
     var fired = new CountDownLatch(1);
 
     try (var _ =
-        HeadlessApp.startShutdownRequestWatcher(
+        HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> fired.countDown(),
@@ -186,7 +243,7 @@ final class HeadlessAppShutdownWiringTest {
     var fired = new CountDownLatch(1);
 
     try (var _ =
-        HeadlessApp.startShutdownRequestWatcher(
+        HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> fired.countDown(),
@@ -209,7 +266,7 @@ final class HeadlessAppShutdownWiringTest {
         () -> {
           HeadlessApp.clearPriorShutdownRequest(runtime, ignored -> false);
           watcherStarted.set(true);
-          HeadlessApp.startShutdownRequestWatcher(
+          HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
               runtime,
               r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
               ignored -> {},
@@ -255,11 +312,13 @@ final class HeadlessAppShutdownWiringTest {
                 null,
                 instanceLock,
                 OperationLeaseService.noOp(),
+                null,
+                mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
                 watcherRef::get),
             ignored -> {});
 
     try (var _ =
-        HeadlessApp.startShutdownRequestWatcher(
+        HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             ignored -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
             request -> sequence.run(request.reason()),

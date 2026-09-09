@@ -81,7 +81,7 @@ final class JvmMetricCatalogSmokeTest {
   void constructingAgainstLocalTelemetryWiresGauges() throws Exception {
     Path tmp = Files.createTempDirectory("jvm-catalog-smoke");
     try (LocalTelemetry tel =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp, 500, "test-jvm", "0", "metrics.ndjson", List.of(JvmMetricCatalog.catalogFor("head")))) {
       JvmMetricCatalog cat = new JvmMetricCatalog(tel.registry(), "head");
       assertNotNull(cat.threadsLive);

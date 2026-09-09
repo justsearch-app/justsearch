@@ -2,6 +2,10 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import io.justsearch.ipc.CircuitBreakerOpenException;
 import io.justsearch.ipc.BatchRequest;
 import io.justsearch.ipc.BatchResponse;
@@ -50,11 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,6 +149,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     private final SearchRpcOps searchRpcOps;
     private final RootLifecycleOps rootLifecycleOps;
     private final ExecutorService walkExecutor;
+    private final EngineExecutorRegistry.Registration walkRegistration;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     // Persistent root tracking - survives restarts via JSON file
@@ -193,6 +194,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * <b>port</b> property (a per-call bounded-work bound, stage A §2), not a channel property,
      * which is why it is validated here rather than in a transport.
      *
+     * @param executors the process registry whose registrations this client owns and closes
      * @param deadlineMs the base deadline every {@link RpcDeadlineCategory} multiplies
      * @param batchSize maximum files per batch submission (must be &lt;= Worker MAX_BATCH_SIZE)
      * @param telemetry the IPC telemetry for metrics recording; {@code null} means no-op. Carried
@@ -200,7 +202,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      *     change; item A10 audits every {@code IpcTelemetry} metric name before deleting it
      *     (stage A §5), rather than dropping them silently at the transport swap.
      */
-    protected KnowledgeClient(long deadlineMs, int batchSize, IpcTelemetry telemetry) {
+    protected KnowledgeClient(
+            EngineExecutorRegistry executors,
+            long deadlineMs,
+            int batchSize,
+            IpcTelemetry telemetry) {
+        Objects.requireNonNull(executors, "executors");
         this.deadlineMs = deadlineMs;
         if (batchSize <= 0 || batchSize > MAX_BATCH_SIZE) {
             log.warn("Invalid batchSize {}, using default {}. Valid range: 1-{}",
@@ -222,15 +229,35 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         // Tempdoc 626 §Axis-C — a force=false reconcile's delete-detection outcome updates the
         // per-root verification state; an orphan-prune records a one-shot drift-corrected signal. Both
         // callbacks run later on the periodic-sync thread.
-        this.syncOps = new SyncOps(ingestRpcExecutor, watchedRoots,
+        this.syncOps = new SyncOps(executors, ingestRpcExecutor, watchedRoots,
             this.watchedRootsState::setDeleteDetectionUnverified,
             (root, count) ->
                 this.watchedRootsState.recordDriftCorrected(root, count, System.currentTimeMillis()));
-        this.walkExecutor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "walk-bg");
-            t.setDaemon(true);
-            return t;
-        });
+        EngineExecutorRegistry.Limits background = executors.limits(Kind.BACKGROUND);
+        EngineExecutorRegistry.Registration newWalkRegistration = null;
+        ExecutorService newWalkExecutor;
+        try {
+            newWalkRegistration =
+                executors.register(
+                    new EngineExecutorSpec(
+                        "knowledge-client-root-walk",
+                        Kind.BACKGROUND,
+                        Mode.PLATFORM,
+                        1,
+                        background.maxQueue(),
+                        1));
+            newWalkExecutor = newWalkRegistration.open(r -> {
+                Thread t = new Thread(r, "walk-bg");
+                t.setDaemon(true);
+                return t;
+            });
+        } catch (RuntimeException | Error failure) {
+            if (newWalkRegistration != null) newWalkRegistration.close();
+            syncOps.stopPeriodicSync();
+            throw failure;
+        }
+        this.walkRegistration = newWalkRegistration;
+        this.walkExecutor = newWalkExecutor;
         // Tempdoc 418 Phase B — RootLifecycleOps dispatches Worker-side ScanRoot RPCs
         // for the watched-root walk and registers Worker-side watchers via WatchRoot/UnwatchRoot.
         // Backpressure stays Head-side (between progress events); batching, admission, and
@@ -258,12 +285,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         // Tempdoc 418 B-H.3 — Worker now owns backpressure (queue-depth aware throttle inside
         // WorkerScanOps) and cancellation (via ServerCallStreamObserver.isCancelled()), so Head
         // no longer needs the queue-depth supplier or its in-callback await loop.
-        this.rootLifecycleOps = new RootLifecycleOps(watchedRoots, watchedRootsState,
-            this::getExcludeMatcher, scanRootFn, workerWatchFn,
-            this::executeDeleteByPath, this::deleteById,
-            syncOps, walkExecutor);
-        rootsStore.migrateLegacyRootsFileIfNeeded();
-        watchedRootsState.loadPersistedRoots();
+        try {
+            this.rootLifecycleOps = new RootLifecycleOps(watchedRoots, watchedRootsState,
+                this::getExcludeMatcher, scanRootFn, workerWatchFn,
+                this::executeDeleteByPath, this::deleteById,
+                syncOps, walkExecutor);
+            rootsStore.migrateLegacyRootsFileIfNeeded();
+            watchedRootsState.loadPersistedRoots();
+        } catch (RuntimeException | Error failure) {
+            closeBaseExecutors();
+            throw failure;
+        }
     }
 
     public void reindexPersistedRoots(EngineContext engineContext) {
@@ -1612,35 +1644,36 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * reason it shows up on Windows first is only that Windows refuses to delete a directory that
      * is open, where POSIX would have unlinked it and hidden the defect.
      *
-     * <p>The wait is bounded because a shutdown must terminate: if the walk has not drained in
-     * {@value #WALK_SHUTDOWN_TIMEOUT_MS} ms the close proceeds and says so, which is strictly more
-     * information than the silent version gave.
+     * <p>The wait is bounded by the Engine executor registry's owner-close deadline. If the walk
+     * has not drained when that deadline expires, close proceeds and reports the still-live owner.
      */
-    private void awaitWalkExecutorTermination() {
-        walkExecutor.shutdownNow();
-        try {
-            if (!walkExecutor.awaitTermination(WALK_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                log.warn(
-                    "Background root walk did not stop within {}ms; closing anyway. Files under the"
-                        + " watched roots may still be read briefly after this returns.",
-                    WALK_SHUTDOWN_TIMEOUT_MS);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+    private void closeWalkExecutor() {
+        walkRegistration.close();
+        if (!walkExecutor.isTerminated()) {
+            log.warn(
+                "Background root walk did not stop within the Engine executor close deadline;"
+                    + " closing anyway. Files under the watched roots may still be read briefly"
+                    + " after this returns.");
         }
     }
 
-    /** Bound on how long {@link #close()} waits for the background walk to stop. */
-    private static final long WALK_SHUTDOWN_TIMEOUT_MS = 5_000L;
+    /** Releases the transport-independent executor owners after close or subclass construction failure. */
+    protected final void closeBaseExecutors() {
+        try {
+            stopPeriodicSync();
+        } finally {
+            closeWalkExecutor();
+        }
+    }
 
     @Override
     public final void close() {
         if (closed.compareAndSet(false, true)) {
-            // Stop periodic sync first
-            stopPeriodicSync();
-
-            awaitWalkExecutorTermination();
-            closeTransport();
+            try {
+                closeBaseExecutors();
+            } finally {
+                closeTransport();
+            }
             log.info("{} closed", getClass().getSimpleName());
         }
     }

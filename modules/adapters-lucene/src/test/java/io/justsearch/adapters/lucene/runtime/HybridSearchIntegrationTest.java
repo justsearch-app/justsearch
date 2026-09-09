@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchFilters;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchResult;
 import io.justsearch.indexing.SchemaFields;
@@ -112,7 +113,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     // Query: "fox" with vector pointing in +X direction
     float[] queryVector = new float[] {1.0f, 0.0f, 0.0f, 0.0f};
 
-    SearchResult result = runtime.hybridSearchOps().searchHybrid("fox", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE);
+    SearchResult result = runtime.hybridSearchOps().searchHybrid("fox", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND);
 
     assertNotNull(result);
     assertTrue(result.hits().size() >= 2, "Should return at least 2 documents");
@@ -147,7 +148,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     System.setProperty("justsearch.config", cfg.toString());
     System.setProperty("index.hybrid.fusion_strategy", "rrf");
     // Tempdoc 636 shipped leg-arbitration + recall-complete default-ON (commits 65821feeb/3b534ba73).
-    // This test isolates the candidate-multiplier → cross-signal-RRF mechanism it is named for, so the
+    // This test isolates the candidate-multiplier â†’ cross-signal-RRF mechanism it is named for, so the
     // always-on levers (which re-weight fusion and splice each leg's pool) must be disabled here.
     System.setProperty("index.hybrid.leg_arbitration_enabled", "false");
     System.setProperty("index.hybrid.leg_recall_complete_enabled", "false");
@@ -239,7 +240,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     System.setProperty("index.hybrid.text_candidate_multiplier", "1");
     System.setProperty("index.hybrid.vector_candidate_multiplier", "1");
     new LifecycleTestAccessor(runtime).refreshConfigForTests();
-    var small = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE);
+    var small = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND);
     var smallIds = small.hits().stream().map(h -> h.docId()).toList();
     assertFalse(
         smallIds.contains("both"),
@@ -254,7 +255,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     System.setProperty("index.hybrid.text_candidate_multiplier", "2");
     System.setProperty("index.hybrid.vector_candidate_multiplier", "2");
     new LifecycleTestAccessor(runtime).refreshConfigForTests();
-    var large = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE);
+    var large = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND);
     assertEquals(
         "both",
         large.hits().get(0).docId(),
@@ -340,7 +341,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     runtime.commitOps().maybeRefreshBlocking();
 
     float[] queryVector = new float[] {1.0f, 0.0f, 0.0f, 0.0f};
-    SearchResult result = runtime.hybridSearchOps().searchHybrid("uniqueterm", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE);
+    SearchResult result = runtime.hybridSearchOps().searchHybrid("uniqueterm", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND);
 
     assertNotNull(result);
 
@@ -379,28 +380,28 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     // Null query text should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid(null, validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE));
+        () -> runtime.hybridSearchOps().searchHybrid(null, validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND));
 
     // Blank query text should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid("  ", validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE));
+        () -> runtime.hybridSearchOps().searchHybrid("  ", validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND));
 
     // Null vector should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid("query", null, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE));
+        () -> runtime.hybridSearchOps().searchHybrid("query", null, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND));
 
     // Empty vector should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid("query", new float[0], 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE));
+        () -> runtime.hybridSearchOps().searchHybrid("query", new float[0], 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND));
 
     runtime.close();
   }
 
   /**
-   * Tempdoc 821 §P: the HYBRID entry points must forward the caller's syntax to their text leg.
+   * Tempdoc 821 Â§P: the HYBRID entry points must forward the caller's syntax to their text leg.
    *
    * <p>This is the headline production path and the one the gRPC-level tests cannot reach (with no
    * embedding service every request degrades to {@code Bm25Only}), so hardcoding SIMPLE at
@@ -408,7 +409,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
    *
    * <p>The discriminator is per-hit PROVENANCE, not hit count: the dense leg returns all three docs
    * either way, so only "which docs did the BM25 leg contribute" separates a LUCENE parse (required
-   * clauses → doc-a alone) from a SIMPLE one (escaped → token OR → all three).
+   * clauses â†’ doc-a alone) from a SIMPLE one (escaped â†’ token OR â†’ all three).
    */
   @Test
   void hybridEntryPointsForwardQuerySyntaxToTheTextLeg() throws Exception {
@@ -433,7 +434,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     float[] queryVector = new float[] {1.0f, 0.0f, 0.0f, 0.0f};
     org.apache.lucene.search.Query passThrough = new org.apache.lucene.search.MatchAllDocsQuery();
 
-    // searchHybridFiltered → searchTextWithFilter (the Bm25Dense leg's non-debug path)
+    // searchHybridFiltered â†’ searchTextWithFilter (the Bm25Dense leg's non-debug path)
     assertEquals(
         1,
         bm25ContributedDocIds(
@@ -442,7 +443,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
                     queryVector,
                     10,
                     passThrough,
-                    LuceneRuntimeTypes.QuerySyntax.LUCENE))
+                    LuceneRuntimeTypes.QuerySyntax.LUCENE, EngineContext.Urgency.FOREGROUND))
             .size(),
         "LUCENE required clauses must reach the filtered hybrid's text leg");
     assertEquals(
@@ -453,23 +454,23 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
                     queryVector,
                     10,
                     passThrough,
-                    LuceneRuntimeTypes.QuerySyntax.SIMPLE))
+                    LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND))
             .size(),
-        "SIMPLE escapes them into a token OR — all three docs come from the text leg");
+        "SIMPLE escapes them into a token OR â€” all three docs come from the text leg");
 
-    // searchHybridWithDebug → searchText (the Bm25Dense leg's debug path, a separate lambda)
+    // searchHybridWithDebug â†’ searchText (the Bm25Dense leg's debug path, a separate lambda)
     assertEquals(
         1,
         bm25ContributedDocIds(
                 hybridOps.searchHybridWithDebug(
-                    "+shared +alpha", queryVector, 10, null, LuceneRuntimeTypes.QuerySyntax.LUCENE))
+                    "+shared +alpha", queryVector, 10, null, LuceneRuntimeTypes.QuerySyntax.LUCENE, EngineContext.Urgency.FOREGROUND))
             .size(),
         "the debug hybrid path must forward the syntax too");
     assertEquals(
         3,
         bm25ContributedDocIds(
                 hybridOps.searchHybridWithDebug(
-                    "+shared +alpha", queryVector, 10, null, LuceneRuntimeTypes.QuerySyntax.SIMPLE))
+                    "+shared +alpha", queryVector, 10, null, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND))
             .size(),
         "and must stay SIMPLE for a SIMPLE caller");
 

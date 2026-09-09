@@ -4,10 +4,11 @@ package io.justsearch.app.services.power;
 import io.justsearch.app.util.EnergyState;
 import io.justsearch.app.util.WindowsPowerStatus;
 import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import java.io.Closeable;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -46,20 +47,27 @@ public final class EnergyStatePoller implements Closeable {
   public static final long POLL_INTERVAL_MS = 15_000L;
 
   private final GpuSchedulingGauge gauge;
+  private final EngineExecutorRegistry processExecutors;
   private final Supplier<EnergyState> probe;
   private final AtomicReference<EnergyState> latest = new AtomicReference<>(EnergyState.unknown());
   private ScheduledExecutorService scheduler;
+  private EngineExecutorRegistry.Registration schedulerRegistration;
   private ScheduledFuture<?> task;
 
   /**
    * @param gauge the in-process GPU-scheduling gauge this poller writes (required)
    */
-  public EnergyStatePoller(GpuSchedulingGauge gauge) {
-    this(gauge, EnergyStatePoller::probeHost);
+  public EnergyStatePoller(
+      EngineExecutorRegistry processExecutors, GpuSchedulingGauge gauge) {
+    this(processExecutors, gauge, EnergyStatePoller::probeHost);
   }
 
   /** Test seam: an injectable probe standing in for the host's {@code GetSystemPowerStatus}. */
-  EnergyStatePoller(GpuSchedulingGauge gauge, Supplier<EnergyState> probe) {
+  EnergyStatePoller(
+      EngineExecutorRegistry processExecutors,
+      GpuSchedulingGauge gauge,
+      Supplier<EnergyState> probe) {
+    this.processExecutors = Objects.requireNonNull(processExecutors, "processExecutors");
     this.gauge = Objects.requireNonNull(gauge, "gauge");
     this.probe = Objects.requireNonNull(probe, "probe");
   }
@@ -76,13 +84,34 @@ public final class EnergyStatePoller implements Closeable {
       return;
     }
     if (scheduler == null || scheduler.isShutdown()) {
-      scheduler =
-          Executors.newSingleThreadScheduledExecutor(
-              r -> {
-                Thread t = new Thread(r, "energy-state-poller");
-                t.setDaemon(true);
-                return t;
-              });
+      EngineExecutorRegistry.Limits background =
+          processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+      EngineExecutorRegistry.Registration registration =
+          processExecutors.register(
+              new EngineExecutorSpec(
+                  "head.energy-state-poller",
+                  EngineExecutorSpec.Kind.BACKGROUND,
+                  EngineExecutorSpec.Mode.SCHEDULED,
+                  1,
+                  background.maxQueue(),
+                  1));
+      try {
+        scheduler =
+            registration.openScheduled(
+                r -> {
+                  Thread t = new Thread(r, "energy-state-poller");
+                  t.setDaemon(true);
+                  return t;
+                });
+        schedulerRegistration = registration;
+      } catch (RuntimeException | Error failure) {
+        try {
+          registration.close();
+        } catch (RuntimeException | Error cleanupFailure) {
+          failure.addSuppressed(cleanupFailure);
+        }
+        throw failure;
+      }
     }
     task = scheduler.scheduleAtFixedRate(this::poll, 0, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
@@ -115,6 +144,10 @@ public final class EnergyStatePoller implements Closeable {
     if (scheduler != null) {
       scheduler.shutdownNow();
       scheduler = null;
+    }
+    if (schedulerRegistration != null) {
+      schedulerRegistration.close();
+      schedulerRegistration = null;
     }
   }
 

@@ -4,7 +4,8 @@ package io.justsearch.app.engine;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Objects;
-import java.util.concurrent.Executors;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -54,6 +55,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
   private final Function<ShutdownRequest, Acceptance> acceptance;
   private final long pollIntervalMs;
   private final AtomicBoolean fired = new AtomicBoolean();
+  private final EngineExecutorRegistry.Registration executorOwner;
   private volatile ScheduledExecutorService executor;
   private volatile Thread workerThread;
 
@@ -63,6 +65,7 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
    * @param onRequest what to run when a request is accepted; in production, the ordered shutdown
    */
   public ShutdownRequestWatcher(
+      EngineExecutorRegistry executors,
       Path runtimeDir,
       Function<ShutdownRequest, Acceptance> acceptance,
       Consumer<ShutdownRequest> onRequest,
@@ -71,6 +74,10 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
     this.acceptance = Objects.requireNonNull(acceptance, "acceptance");
     this.onRequest = onRequest;
     this.pollIntervalMs = pollIntervalMs;
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new EngineExecutorSpec(
+        "engine.shutdown-request-watcher", EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
   }
 
   /** Starts polling. Idempotent; a second call is ignored. */
@@ -79,15 +86,20 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
       return;
     }
     executor =
-        Executors.newSingleThreadScheduledExecutor(
+        executorOwner.openScheduled(
             r -> {
               Thread t = new Thread(r, THREAD_NAME);
               t.setDaemon(true);
               workerThread = t;
               return t;
             });
-    executor.scheduleWithFixedDelay(
-        this::pollOnce, pollIntervalMs, pollIntervalMs, TimeUnit.MILLISECONDS);
+    try {
+      executor.scheduleWithFixedDelay(
+          this::pollOnce, pollIntervalMs, pollIntervalMs, TimeUnit.MILLISECONDS);
+    } catch (RuntimeException | Error failure) {
+      executorOwner.close();
+      throw failure;
+    }
     log.info(
         "Watching {} for shutdown requests every {}ms on {}",
         ShutdownRequest.pathIn(runtimeDir),
@@ -162,10 +174,13 @@ public final class ShutdownRequestWatcher implements AutoCloseable {
       if (Thread.currentThread() == workerThread) {
         // The accepted request runs the ordered shutdown on this executor thread. Interrupting
         // ourselves here would leave the interrupt flag set for every later close step.
+        // The process registry retains this instance through actual exit and final shutdown.
         e.shutdown();
       } else {
-        e.shutdownNow();
+        executorOwner.close();
       }
+    } else {
+      executorOwner.close();
     }
     workerThread = null;
   }

@@ -48,7 +48,6 @@ public record OrchestrationHandles(
   @Override
   public void close() {
     List<AutoCloseable> ordered = new ArrayList<>(14);
-    ordered.add(gplAutoTrigger);
     ordered.add(lambdaMartReranker);
     ordered.add(jobQueueDepthProducer);
     ordered.add(documentsIndexedRateProducer);
@@ -62,6 +61,8 @@ public record OrchestrationHandles(
     ordered.add(agentSearchAdapterReranker);
     ordered.add(indexingJobsBridge);
     ordered.add(agentToolHandlers);
+    // GPL can still call inference and the Worker; stop its producer before either dependency.
+    ordered.add(gplAutoTrigger);
     Collections.reverse(ordered);
     IllegalStateException failure = null;
     for (AutoCloseable handle : ordered) {

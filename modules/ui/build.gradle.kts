@@ -29,6 +29,7 @@ plugins {
 }
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   implementation(project(":modules:core"))
   implementation(project(":modules:configuration"))
   implementation(project(":modules:ort-common"))  // 347: GpuAutoDetection for startup probe
@@ -93,6 +94,9 @@ testing {
       useJUnitJupiter()
       dependencies {
         implementation(project())
+        // C1 real HTTP disconnect proof reads the Engine's actual pacing gauge. Test-only:
+        // the frontend production layer still cannot depend on Worker service internals.
+        implementation(project(":modules:worker-services"))
         implementation(testFixtures(project(":modules:configuration")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)

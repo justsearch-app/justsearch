@@ -7,6 +7,7 @@ import io.justsearch.app.services.worker.RemoteDocumentService;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.telemetry.LocalTelemetry;
 import io.justsearch.telemetry.Telemetry;
+import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,10 @@ public final class BootstrapDocumentService {
 
   /** Construct a supplier-aware DocumentService backed by the gRPC Worker client. */
   public static DocumentService create(
-      Supplier<KnowledgeClient> clientSupplier, Telemetry telemetry) {
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier,
+      Telemetry telemetry) {
     log.info(
         "Using RemoteDocumentService (gRPC, supplier-aware) for document fetching - avoids index"
             + " locking");
@@ -33,6 +37,6 @@ public final class BootstrapDocumentService {
         telemetry instanceof LocalTelemetry lt
             ? new RagMetricCatalog(lt.registry())
             : RagMetricCatalog.noop();
-    return new RemoteDocumentService(clientSupplier, ragCatalog);
+    return new RemoteDocumentService(foregroundExecutor, backgroundExecutor, clientSupplier, ragCatalog);
   }
 }

@@ -227,6 +227,7 @@ public class IndexingLoop implements Closeable {
    * @param signalBus The signal bus for coordination
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -234,7 +235,7 @@ public class IndexingLoop implements Closeable {
       IndexCountOps indexCountOps,
       Supplier<ResolvedConfig> resolvedConfigSupplier,
       WorkerSignalBus signalBus) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         null, null, null, null, null,
@@ -254,6 +255,7 @@ public class IndexingLoop implements Closeable {
    * @param embeddingService The embedding service for vector generation (may be null)
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -262,7 +264,7 @@ public class IndexingLoop implements Closeable {
       Supplier<ResolvedConfig> resolvedConfigSupplier,
       WorkerSignalBus signalBus,
       EmbeddingService embeddingService) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         embeddingService, null, null, null, null,
@@ -276,6 +278,7 @@ public class IndexingLoop implements Closeable {
    * typed histogram.
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -286,7 +289,7 @@ public class IndexingLoop implements Closeable {
       EmbeddingService embeddingService,
       IndexingPipelineMetricCatalog pipelineCatalog,
       ExtractionMetricCatalog extractionCatalog) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         embeddingService, pipelineCatalog, extractionCatalog,
@@ -314,6 +317,7 @@ public class IndexingLoop implements Closeable {
    *     extractor is created)
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -349,7 +353,7 @@ public class IndexingLoop implements Closeable {
     }
     this.contentExtractor = contentExtractor != null
         ? contentExtractor
-        : ExtractionSandboxFactory.inProcessStructured(extractionCatalog);
+        : ExtractionSandboxFactory.inProcessStructured(timeboxRegistration, extractionCatalog);
     this.pipelineCatalog = pipelineCatalog;
     this.outcomeWriteFailureCounter =
         ingestionOutcomeCatalog == null

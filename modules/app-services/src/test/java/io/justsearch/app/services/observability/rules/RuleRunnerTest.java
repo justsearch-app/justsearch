@@ -12,6 +12,7 @@ import io.justsearch.app.observability.health.Severity;
 import io.justsearch.app.observability.health.Source;
 import io.justsearch.app.observability.health.ThresholdPhase;
 import io.justsearch.app.observability.health.ThresholdState;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.telemetry.RrdMetricStore;
 import io.justsearch.telemetry.RrdMetricStore.TimeSeriesResult;
 import java.time.Clock;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -42,9 +44,11 @@ final class RuleRunnerTest {
   private HealthEventChangeRegistry changes;
   private RecordingListener listener;
   private RuleEmitter emitter;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     clock = new MutableClock(T0);
     rrd = new StubRrdStore();
     signalSource = new SignalSource(rrd, clock);
@@ -55,6 +59,11 @@ final class RuleRunnerTest {
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     emitter = new RuleEmitter(conditions, changes, HEAD_SRC, clock);
+  }
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
   }
 
   /** The standard memory-pressure rule: for=60s, keep_firing_for=30s. */
@@ -75,6 +84,7 @@ final class RuleRunnerTest {
   private RuleRunner buildRunner(Rule rule) {
     RuleCatalog catalog = RuleCatalog.ofRules(List.of(rule));
     return new RuleRunner(
+        processExecutors,
         catalog, evaluator, signalSource, scheduler, emitter, Duration.ofSeconds(5));
   }
 

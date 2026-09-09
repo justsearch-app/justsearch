@@ -44,11 +44,13 @@ public final class IndexingJobsBridgeWiring {
   public record Output(RemoteIndexingJobsBridge bridge, RemoteIndexingJobsBridge.Subscription subscription) {}
 
   public static Output wire(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Supplier<KnowledgeClient> knowledgeClientSupplier,
       IndexingJobsChangeRegistry indexingJobsChangeRegistry,
       ActionLedgerChangeRegistry actionLedgerChangeRegistry) {
     RemoteIndexingJobsBridge bridge =
         new RemoteIndexingJobsBridge(
+            executors,
             () -> {
               KnowledgeClient kc = knowledgeClientSupplier.get();
               return kc == null ? null : (IndexingJobsSource) (onFrame, onError, onCompleted) ->

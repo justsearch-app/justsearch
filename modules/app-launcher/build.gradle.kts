@@ -31,6 +31,7 @@ distributions {
 val commonJvmArgs = listOf("--sun-misc-unsafe-memory-access=warn")
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   implementation(libs.slf4j.api)  // Internal logging only
   runtimeOnly(libs.logback.classic)
   runtimeOnly(libs.logstash.logback.encoder)

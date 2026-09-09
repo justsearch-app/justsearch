@@ -37,6 +37,9 @@ public sealed interface LuceneRuntime extends AutoCloseable
    */
   LuceneRuntimeBuilder origin();
 
+  /** Exact bounded executor bundle used by this runtime session. */
+  LuceneExecutorRegistrations executorRegistrations();
+
   // ==========================================================================
   // Read-side ops — valid in every phase
   // ==========================================================================

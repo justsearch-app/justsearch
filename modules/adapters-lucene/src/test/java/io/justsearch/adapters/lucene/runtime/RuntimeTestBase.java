@@ -3,6 +3,8 @@ package io.justsearch.adapters.lucene.runtime;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import io.justsearch.core.execution.TestEngineExecutors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
@@ -12,6 +14,20 @@ import tools.jackson.databind.ObjectMapper;
  * SystemPropertyExtension that saves/restores common system properties.
  */
 abstract class RuntimeTestBase {
+
+  private final TestEngineExecutors testExecutors = new TestEngineExecutors();
+  private final LuceneExecutorRegistrations luceneExecutors =
+      new LuceneExecutorRegistrations(testExecutors);
+
+  @AfterEach
+  void closeTestExecutors() {
+    luceneExecutors.close();
+    testExecutors.close();
+  }
+
+  LuceneRuntimeBuilder withTestExecutors(LuceneRuntimeBuilder builder) {
+    return builder.withExecutorRegistrations(luceneExecutors);
+  }
 
   @TempDir Path tempDir;
 
@@ -61,14 +77,14 @@ abstract class RuntimeTestBase {
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
 
-      return new IndexSchema(
+      LuceneRuntimeBuilder builder = new IndexSchema(
               fieldMapper,
               new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(),
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
-          .open();
+          .ephemeral();
+      return withTestExecutors(builder).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -133,14 +149,14 @@ abstract class RuntimeTestBase {
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
 
-      return new IndexSchema(
+      LuceneRuntimeBuilder builder = new IndexSchema(
               fieldMapper,
               new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(),
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
-          .open();
+          .ephemeral();
+      return withTestExecutors(builder).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

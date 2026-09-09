@@ -97,7 +97,7 @@ final class RichDocumentInProcessTest {
     // 2. Compose the index half in this JVM (was: spawn a Worker process and connect to its port)
     root =
         new EngineRoot(
-            g -> new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g)),
+            g -> new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g)),
             30_000L,
             5_000);
     KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());

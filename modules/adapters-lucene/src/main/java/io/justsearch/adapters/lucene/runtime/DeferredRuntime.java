@@ -107,6 +107,11 @@ public final class DeferredRuntime implements LuceneRuntime {
   }
 
   @Override
+  public LuceneExecutorRegistrations executorRegistrations() {
+    return session.executorRegistrations;
+  }
+
+  @Override
   public ReadPathOps readPathOps() {
     return session.readPathOps;
   }

@@ -1179,7 +1179,7 @@ class IndexingLoopTest {
       when(indexCountOps.countByField(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
-          new IndexingLoop(
+          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               queue,
               queue.indexingCoordinator,
               commitOps,
@@ -1192,7 +1192,7 @@ class IndexingLoopTest {
               null,
               null,
               null,
-              new TimeboxedContentExtractor(
+              new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                   providerReturning("unused"),
                   Duration.ofSeconds(5),
                   (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
@@ -1255,7 +1255,7 @@ class IndexingLoopTest {
       when(indexCountOps.countByField(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
-          new IndexingLoop(
+          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               queue,
               queue.indexingCoordinator,
               commitOps,
@@ -1268,7 +1268,7 @@ class IndexingLoopTest {
               null,
               null,
               null,
-              new TimeboxedContentExtractor(
+              new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                   providerReturning("unused"),
                   Duration.ofSeconds(5),
                   (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
@@ -1319,7 +1319,7 @@ class IndexingLoopTest {
                 return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);
               });
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      return new IndexingLoop(
+      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
           queue,
           queue.indexingCoordinator,
           mock(CommitOps.class),
@@ -1332,7 +1332,7 @@ class IndexingLoopTest {
           null,
           null,
           null,
-          new TimeboxedContentExtractor(
+          new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               provider,
               Duration.ofSeconds(5),
               (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
@@ -1587,7 +1587,7 @@ class IndexingLoopTest {
       encoderBindings.bindSpladeEncoder(mock(SpladeEncoder.class));
       encoderBindings.bindNerService(nerService);
 
-      return new IndexingLoop(
+      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
           queue,
           coordinator,
           commitOps,
@@ -1600,7 +1600,7 @@ class IndexingLoopTest {
           null,
           null,
           null,
-          new TimeboxedContentExtractor(
+          new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               new ContentExtractorProvider() {
                 @Override
                 public ExtractionResult extract(Path file) {

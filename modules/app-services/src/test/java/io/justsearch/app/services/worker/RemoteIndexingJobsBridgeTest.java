@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -37,16 +38,19 @@ final class RemoteIndexingJobsBridgeTest {
 
   private StubIndexingJobsSource stub;
   private RemoteIndexingJobsBridge bridge;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
     stub = new StubIndexingJobsSource();
-    bridge = new RemoteIndexingJobsBridge(() -> stub);
+    processExecutors = new TestEngineExecutors();
+    bridge = new RemoteIndexingJobsBridge(processExecutors, () -> stub);
   }
 
   @AfterEach
   void tearDown() {
     if (bridge != null) bridge.stop();
+    if (processExecutors != null) processExecutors.close();
   }
 
   @Test

@@ -29,6 +29,7 @@ import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.ModelRegistry;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +42,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 class RuntimeActivationServiceTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
 
   @TempDir Path tmp;
 
@@ -57,6 +60,7 @@ class RuntimeActivationServiceTest {
       else System.setProperty(entry.getKey(), entry.getValue());
     }
     prevProps.clear();
+    processExecutors.close();
   }
 
   @Test
@@ -71,7 +75,7 @@ class RuntimeActivationServiceTest {
         """);
 
     RuntimeActivationService service =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -110,7 +114,7 @@ class RuntimeActivationServiceTest {
 
     EnterprisePolicyService policy = new EnterprisePolicyServiceImpl();
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -146,7 +150,7 @@ class RuntimeActivationServiceTest {
 
     EnterprisePolicyService policy = new EnterprisePolicyServiceImpl();
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -203,7 +207,7 @@ class RuntimeActivationServiceTest {
     setHome(tmp);
     // 4-arg constructor — no WorkerFeatureCache
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null, null);
@@ -258,7 +262,7 @@ class RuntimeActivationServiceTest {
   }
 
   private RuntimeActivationService createServiceWithCache(WorkerFeatureCache cache) {
-    return new RuntimeActivationService(
+    return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
         null, null, cache);
@@ -502,7 +506,7 @@ class RuntimeActivationServiceTest {
     Files.writeString(variantDir.resolve("BITAA6D.tmp"), "partial-download", StandardCharsets.UTF_8);
 
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null, null);
@@ -596,7 +600,7 @@ class RuntimeActivationServiceTest {
     store.save(s);
 
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(), store, null, new EnterprisePolicyServiceImpl());
     svc.startActivate("cuda12");
     AiRuntimeActivationStatus st = awaitDone(svc, 60_000);
@@ -635,7 +639,7 @@ class RuntimeActivationServiceTest {
   }
 
   private RuntimeActivationService createServiceWithSettingsFile() {
-    return new RuntimeActivationService(
+    return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json")),
         null,
@@ -687,7 +691,7 @@ class RuntimeActivationServiceTest {
   }
 
   private RuntimeActivationService createServiceWithInstallHelper(AiInstallService installService) {
-    return new RuntimeActivationService(
+    return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
         null,

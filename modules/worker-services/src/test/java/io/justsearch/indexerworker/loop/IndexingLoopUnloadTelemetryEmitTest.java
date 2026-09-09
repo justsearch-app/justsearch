@@ -296,7 +296,7 @@ final class IndexingLoopUnloadTelemetryEmitTest {
     DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
     IndexCountOps indexCountOps = mock(IndexCountOps.class);
     WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
-    return new IndexingLoop(
+    return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
         queue,
         coordinator,
         commitOps,

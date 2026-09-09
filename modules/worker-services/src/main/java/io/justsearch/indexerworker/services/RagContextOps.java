@@ -9,6 +9,8 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypesRuntimeSearchFiltersBuilder;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
@@ -224,20 +226,6 @@ final class RagContextOps {
    *
    * @return fully-built RetrieveContextResponse for all paths
    */
-  /** Legacy overload for existing callers (no filters). */
-  RetrieveContextResponse executeRetrieval(
-      String question, Set<String> docIds, int topK, int maxContextTokens,
-      boolean allowQueryEmbeddings) {
-    return executeRetrieval(
-        io.justsearch.ipc.RetrieveContextRequest.newBuilder()
-            .setQuestion(question)
-            .addAllDocIds(docIds)
-            .setTopK(topK)
-            .setMaxContextTokens(maxContextTokens)
-            .build(),
-        docIds, topK, maxContextTokens, allowQueryEmbeddings);
-  }
-
   /**
    * Executes the full RAG retrieval flow with filter support.
    *
@@ -247,7 +235,8 @@ final class RagContextOps {
   RetrieveContextResponse executeRetrieval(
       io.justsearch.ipc.RetrieveContextRequest request,
       Set<String> docIds, int topK, int maxContextTokens,
-      boolean allowQueryEmbeddings) {
+      boolean allowQueryEmbeddings,
+      EngineContext.Urgency urgency) {
 
     String question = request.getQuestion();
 
@@ -287,7 +276,7 @@ final class RagContextOps {
 
     ChunkContextResult chunkContext =
         searchChunksWithMeta(question, effectiveDocIds, topK, maxContextTokens,
-            allowQueryEmbeddings, filters, request.getExcludedChunksList());
+            allowQueryEmbeddings, filters, request.getExcludedChunksList(), urgency);
     if (chunkContext.context() != null && !chunkContext.context().isBlank()) {
       log.debug(
           "RAG: Found {} chars from chunks (chunksUsed={}, chunksFoundTotal={})",
@@ -435,20 +424,10 @@ final class RagContextOps {
       Set<String> docIds,
       int topK,
       int maxContextTokens,
-      boolean allowQueryEmbeddings) {
-    // Legacy overload without filters
-    return searchChunksWithMeta(
-        question, docIds, topK, maxContextTokens, allowQueryEmbeddings, null, List.of());
-  }
-
-  ChunkContextResult searchChunksWithMeta(
-      String question,
-      Set<String> docIds,
-      int topK,
-      int maxContextTokens,
       boolean allowQueryEmbeddings,
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
-      List<io.justsearch.ipc.ChunkRef> excludedChunks) {
+      List<io.justsearch.ipc.ChunkRef> excludedChunks,
+      EngineContext.Urgency urgency) {
     // stage_id is cleaned up by the outer MdcContext.request() scope in WorkerSearchService
     MDC.put("stage_id", "retrieve");
     commitOps.maybeRefresh();
@@ -530,14 +509,14 @@ final class RagContextOps {
             "RAG using chunk-level hybrid search (Phase 6) for question: '{}'", question);
         result =
             chunkSearchOps.searchChunksHybrid(
-                question, queryVector, docIds, overRetrieveK, true, chunkFilter);
+                question, queryVector, docIds, overRetrieveK, true, chunkFilter, urgency);
         effectiveMode = "CHUNK_HYBRID";
       } else {
         log.debug(
             "RAG using doc-first hybrid search (BM25 + vector) for question: '{}'", question);
         result =
             chunkSearchOps.searchChunksHybrid(
-                question, queryVector, docIds, overRetrieveK, false, chunkFilter);
+                question, queryVector, docIds, overRetrieveK, false, chunkFilter, urgency);
         effectiveMode = "HYBRID";
       }
     } else {
@@ -559,7 +538,7 @@ final class RagContextOps {
         ragConfig.unionEnabled()
             ? buildUnionCandidates(
                 question, queryVector, docIds, ragFilters, excludedChunks, overRetrieveK,
-                result.hits())
+                result.hits(), urgency)
             : List.of();
     List<LuceneRuntimeTypes.SearchHit> candidateHits =
         unionHits.isEmpty()
@@ -734,11 +713,13 @@ final class RagContextOps {
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       int limit,
-      List<LuceneRuntimeTypes.SearchHit> chunkHits) {
+      List<LuceneRuntimeTypes.SearchHit> chunkHits,
+      EngineContext.Urgency urgency) {
     try {
       return buildUnionCandidatesUnsafe(
-          question, queryVector, docIds, ragFilters, excludedChunks, limit, chunkHits);
+          question, queryVector, docIds, ragFilters, excludedChunks, limit, chunkHits, urgency);
     } catch (RuntimeException e) {
+      EngineFutures.rethrowExecutorRefusal(e);
       // Fix 3 (review F3): WARN, not debug — a systemically-failing union leg would otherwise be
       // silently inert on every query (the "inert green" class).
       log.warn("RAG union leg failed; continuing with chunk hits only: {}", e.toString());
@@ -753,7 +734,8 @@ final class RagContextOps {
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       int limit,
-      List<LuceneRuntimeTypes.SearchHit> chunkHits) {
+      List<LuceneRuntimeTypes.SearchHit> chunkHits,
+      EngineContext.Urgency urgency) {
     // Doc-level user filters (mime, language, ...) — same builder the two-stage pre-filter
     // uses; entity/metadata/path/date filters arrive pre-resolved through docIds already, so
     // this is at worst redundant, never wrong.
@@ -762,7 +744,7 @@ final class RagContextOps {
     // exclusion + agent-history MUST_NOT), which is what "no filters" has always meant.
     org.apache.lucene.search.Query docFilter = docLevelFilterFor(ragFilters);
     LuceneRuntimeTypes.SearchResult unionRaw =
-        chunkSearchOps.searchDocLevelUnion(question, queryVector, docIds, limit, docFilter);
+        chunkSearchOps.searchDocLevelUnion(question, queryVector, docIds, limit, docFilter, urgency);
     if (unionRaw.hits().isEmpty()) {
       return List.of();
     }

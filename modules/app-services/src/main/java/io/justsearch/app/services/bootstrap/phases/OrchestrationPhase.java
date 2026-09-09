@@ -43,6 +43,7 @@ public final class OrchestrationPhase {
 
   /** Bundled inputs. */
   public record Input(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Path dataDir,
       Telemetry telemetry,
       Supplier<SearchPort> searchPortSupplier,
@@ -57,6 +58,8 @@ public final class OrchestrationPhase {
       SubstratePhase.Output substrateOut,
       CapabilityGraph capabilities,
       Function<String, String> operationMessageResolver,
+      // The one Engine admission owner shared with LocalApiServer and the agent loop.
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
       FileOperationLog fileOperationLog,
       AgentRunStore agentRunStore,
       Function<io.justsearch.core.context.EngineContext, List<String>> agentRootPaths,
@@ -81,7 +84,7 @@ public final class OrchestrationPhase {
       ServiceGraph initialServices,
       OrchestrationHandles orchestrationHandles,
       GplJobCoordinator gplJobCoordinator,
-      Thread gplAutoTriggerThread,
+      AutoCloseable gplAutoTrigger,
       Path gplSnapshotFile,
       Path lambdaMartModelFile) {}
 
@@ -162,7 +165,8 @@ public final class OrchestrationPhase {
                     in.substrateOut().healthOut().conditionStore())
                 .asPredicate(),
             // Tempdoc 565 §3.A: back the answer↔source citation matcher with the document service.
-            in.documentService());
+            in.documentService(),
+            in.engineAdmission());
 
     // Initial ServiceGraph (LateBoundServices = null at this point).
     io.justsearch.app.api.SearchService initialSearch =
@@ -186,6 +190,7 @@ public final class OrchestrationPhase {
     // GPL training + auto-trigger.
     var gplWired =
         GplOrchestration.wire(
+            in.executors(),
             in.dataDir(),
             in.knowledgeClientSupplier(),
             in.onlineAiService(),
@@ -207,7 +212,7 @@ public final class OrchestrationPhase {
     // OrchestrationHandles — LIFO teardown bundle.
     OrchestrationHandles orchestrationHandles =
         OrchestrationAssembly.build(
-            gplWired.autoTriggerThread(),
+            gplWired.autoTrigger(),
             in.lambdaMartReranker(),
             in.substrateOut().metricsOut() == null
                 ? null
@@ -239,7 +244,7 @@ public final class OrchestrationPhase {
         initialServices,
         orchestrationHandles,
         gplWired.coordinator(),
-        gplWired.autoTriggerThread(),
+        gplWired.autoTrigger(),
         gplWired.snapshotFile(),
         lambdaMartModelFile);
   }

@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.FolderBrowseEngine;
 import io.justsearch.adapters.lucene.runtime.SuggestOps;
+import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -864,10 +865,12 @@ public final class WorkerSearchService {
       }
 
       try {
+        CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
-            embeddingCompat().allowed());
+            embeddingCompat().allowed(), normalizedCallContext.engineContext().urgency());
       } catch (RuntimeException e) {
+        EngineFutures.rethrowExecutorRefusal(e);
         log.error("RetrieveContext failed", e);
         throw WorkerServiceException.internal("RetrieveContext failed: " + e.getMessage());
       }

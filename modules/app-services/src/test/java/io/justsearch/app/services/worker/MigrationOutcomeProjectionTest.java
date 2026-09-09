@@ -25,7 +25,9 @@ final class MigrationOutcomeProjectionTest {
         .setAccepted(accepted).setRestartRequired(restartRequired).build());
     when(calls.rollbackMigration(any())).thenReturn(MigrationRollbackResponse.newBuilder()
         .setAccepted(accepted).setRestartRequired(restartRequired).build());
-    try (var client = new TestKnowledgeClient(null, calls, null)) {
+    try (var client =
+        new TestKnowledgeClient(
+            new io.justsearch.core.execution.TestEngineExecutors(), null, calls, null)) {
       var expected = new MigrationOutcome(accepted, restartRequired);
       assertEquals(expected, client.startMigration("manual", io.justsearch.app.services.TestEngineContexts.durableInternal()));
       assertEquals(expected, client.requestCutover(true, io.justsearch.app.services.TestEngineContexts.durableInternal()));

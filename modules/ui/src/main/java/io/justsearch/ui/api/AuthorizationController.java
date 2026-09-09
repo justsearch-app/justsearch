@@ -85,6 +85,7 @@ public final class AuthorizationController {
   private final io.justsearch.agent.api.registry.OperationDispatcher dispatcher;
 
   private final List<io.justsearch.agent.api.registry.OperationCatalog> catalogs;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   public AuthorizationController(ConsentCapsuleAuthority capsuleService) {
     this(capsuleService, null, null);
@@ -111,11 +112,21 @@ public final class AuthorizationController {
       io.justsearch.app.services.intent.DurableGrantStore durableGrantStore,
       io.justsearch.agent.api.registry.OperationDispatcher dispatcher,
       List<io.justsearch.agent.api.registry.OperationCatalog> catalogs) {
+    this(capsuleService, pendingStore, durableGrantStore, dispatcher, catalogs, null);
+  }
+
+  public AuthorizationController(ConsentCapsuleAuthority capsuleService,
+      io.justsearch.app.services.intent.PendingAuthorizationStore pendingStore,
+      io.justsearch.app.services.intent.DurableGrantStore durableGrantStore,
+      io.justsearch.agent.api.registry.OperationDispatcher dispatcher,
+      List<io.justsearch.agent.api.registry.OperationCatalog> catalogs,
+      io.justsearch.app.api.EngineAdmissionService admission) {
     this.capsuleService = Objects.requireNonNull(capsuleService, "capsuleService");
     this.pendingStore = pendingStore;
     this.durableGrantStore = durableGrantStore;
     this.dispatcher = dispatcher;
     this.catalogs = catalogs == null ? List.of() : List.copyOf(catalogs);
+    this.admission = admission;
   }
 
   /**
@@ -132,6 +143,7 @@ public final class AuthorizationController {
    * user never saw.
    */
   public void handleApprove(Context ctx) {
+    io.justsearch.app.api.EngineWorkHandle executionWork = null;
     try {
       if (pendingStore == null) {
         ctx.status(400)
@@ -144,6 +156,21 @@ public final class AuthorizationController {
       if (pendingNode == null || !pendingNode.isTextual() || pendingNode.asText().isBlank()) {
         ctx.status(400).contentType("application/json").result("{\"error\":\"missing pendingId\"}");
         return;
+      }
+      boolean execute = body.has("execute") && body.get("execute").asBoolean(false);
+      // Reserve the child before consuming the single-use approval. Capacity refusal must leave
+      // the pending action available for retry, and the child's attribution is the origin's.
+      if (execute && admission != null) {
+        var candidate = pendingStore.peek(pendingNode.asText());
+        if (candidate.isPresent()) {
+          try {
+            executionWork = admission.admit(childContext(candidate.get()), false);
+          } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+            ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE, refused);
+            RequestEngineWork.writeRefusal(ctx, refused);
+            return;
+          }
+        }
       }
       var pending = pendingStore.consume(pendingNode.asText());
       if (pending.isEmpty()) {
@@ -179,15 +206,27 @@ public final class AuthorizationController {
       // is bound to. Everything else about the gate is unchanged — this re-dispatch goes
       // through enforceTrustLattice exactly like any other, and only proceeds because the
       // capsule just minted from a real approval gesture satisfies it.
-      boolean execute = body.has("execute") && body.get("execute").asBoolean(false);
       if (execute) {
-        executeApprovedPending(payload, pending.get(), capsule);
+        executeApprovedPending(payload, pending.get(), capsule,
+            executionWork == null ? childContext(pending.get()) : executionWork.context());
       }
       ctx.contentType("application/json").result(MAPPER.writeValueAsBytes(payload));
+    } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+      RequestEngineWork.writeRefusal(ctx, refused);
     } catch (Exception e) {
       log.error("Failed to mint consent capsule", e);
       ctx.status(400).contentType("application/json").result("{\"error\":\"bad request\"}");
+    } finally {
+      if (executionWork != null) executionWork.close();
     }
+  }
+
+  private static io.justsearch.core.context.EngineContext childContext(
+      io.justsearch.app.services.intent.PendingAuthorization pending) {
+    var origin = pending.engineContext();
+    return new io.justsearch.core.context.EngineContext(origin.clientKind(), origin.clientId(),
+        origin.sessionId(), origin.grantReference(), origin.sourceTier(), origin.transport(),
+        origin.survival(), origin.urgency());
   }
 
   /**
@@ -258,7 +297,7 @@ public final class AuthorizationController {
   private void executeApprovedPending(
       Map<String, Object> payload,
       io.justsearch.app.services.intent.PendingAuthorization pending,
-      String capsule) {
+      String capsule, io.justsearch.core.context.EngineContext executionContext) {
     if (dispatcher == null) {
       payload.put("executed", false);
       payload.put("executeMessage", "Server-side execution is not available in this deployment.");
@@ -280,7 +319,7 @@ public final class AuthorizationController {
           pending.provenance();
       io.justsearch.agent.api.registry.OperationResult result =
           dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
-              pending.engineContext());
+              executionContext);
       payload.put("executed", true);
       payload.put("executeSuccess", result.success());
       payload.put("executeMessage", result.message());

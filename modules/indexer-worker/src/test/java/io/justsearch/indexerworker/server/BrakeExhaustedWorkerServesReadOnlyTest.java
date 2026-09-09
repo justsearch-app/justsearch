@@ -87,7 +87,7 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
     // 3. Boot a real Worker over that data directory, under the production policy.
     WorkerBootFixture.publishConfig(
         layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     // (a) the Worker took the exhausted-brake path AND finished starting. The first assertion is
@@ -211,7 +211,7 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     assertTrue(server.rebuildBrakeExhaustedForTest(), "precondition: the brake is spent");
 
@@ -229,7 +229,7 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
 
     clearAutoRebuildFieldsByHand(layout.indexBase());
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     assertFalse(
         server.rebuildBrakeExhaustedForTest(),

@@ -32,7 +32,7 @@ final class UpgradeLifecycleContractTest {
     var leases = new OperationLeaseServiceImpl();
     var shutdown = new CountDownLatch(1);
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -104,7 +104,7 @@ final class UpgradeLifecycleContractTest {
     var active =
         leases.register("indexing.migration", OpCriticality.MUST_COMPLETE, 60, Map.of());
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -143,7 +143,7 @@ final class UpgradeLifecycleContractTest {
     var active =
         leases.register("agent.answer", OpCriticality.INTERRUPTIBLE, 60, Map.of());
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -197,7 +197,7 @@ final class UpgradeLifecycleContractTest {
             });
     ownerHandle.set(active);
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -397,7 +397,7 @@ final class UpgradeLifecycleContractTest {
 
   private static LocalApiServer reconciliationServer(
       Path dataDir, boolean headReady, boolean workerReady) {
-    return LocalApiServer.builder(
+    return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
             dataDir.resolve("index"))
         .upgradeReconciliation(dataDir, () -> "2.0.0", () -> headReady, () -> workerReady)

@@ -43,8 +43,13 @@ public final class ConfigStore {
    *
    * @param store the ConfigStore to publish globally (must not be null)
    */
-  public static void setGlobal(ConfigStore store) {
+  public static synchronized void setGlobal(ConfigStore store) {
     GLOBAL = Objects.requireNonNull(store, "store");
+  }
+
+  /** Restores a scoped publisher's predecessor, including uninitialized state, if it still owns the global. */
+  public static synchronized void restoreGlobal(ConfigStore installed, ConfigStore previous) {
+    if (GLOBAL == Objects.requireNonNull(installed, "installed")) GLOBAL = previous;
   }
 
   /**
@@ -78,7 +83,7 @@ public final class ConfigStore {
    * restore the pre-test state when no ConfigStore was set before the test ran.
    */
   @SuppressWarnings("unused") // Called from TestResolvedConfigHelper (test fixtures)
-  static void clearGlobal() {
+  static synchronized void clearGlobal() {
     GLOBAL = null;
   }
 

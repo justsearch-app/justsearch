@@ -12,6 +12,7 @@
 extra["coverage.enforce"] = "true"
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:configuration"))
   api(project(":modules:app-api"))
   api(project(":modules:app-agent"))

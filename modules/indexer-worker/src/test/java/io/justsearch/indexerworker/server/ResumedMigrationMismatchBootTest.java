@@ -67,7 +67,7 @@ final class ResumedMigrationMismatchBootTest {
         "precondition: a FRESH budget — this is the boot the brake test cannot reach");
 
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertNotNull(

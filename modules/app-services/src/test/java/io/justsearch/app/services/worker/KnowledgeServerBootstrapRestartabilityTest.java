@@ -43,7 +43,7 @@ final class KnowledgeServerBootstrapRestartabilityTest {
   @Timeout(90)
   @DisplayName("a second start() reaches the spawn step instead of the already-started guard")
   void secondStartIsNotBlockedByTheStartedGuard(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     Exception first = failingStart(bootstrap);
     Exception second = failingStart(bootstrap);
@@ -64,7 +64,7 @@ final class KnowledgeServerBootstrapRestartabilityTest {
   @Timeout(90)
   @DisplayName("startWithRetry on a non-transient failure runs once and lands DEGRADED")
   void nonTransientFailureIsNotRetriedAndNarratesOnce(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
 
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 

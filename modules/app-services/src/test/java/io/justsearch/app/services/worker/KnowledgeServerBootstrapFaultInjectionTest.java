@@ -19,7 +19,7 @@ final class KnowledgeServerBootstrapFaultInjectionTest {
       throws Exception {
     WorkerHost host = mock(WorkerHost.class);
     when(host.start(any(), any())).thenThrow(new IOException("host reached"));
-    var bootstrap = new KnowledgeServerBootstrap(config(dir, false), null, null, host);
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config(dir, false), null, null, host);
 
     assertThrows(IOException.class, () -> bootstrap.startWithRetry(3, 0));
     verify(host, never()).start(any(), any());
@@ -32,7 +32,7 @@ final class KnowledgeServerBootstrapFaultInjectionTest {
   void productionCannotInjectAnIndexBootFailure(@TempDir Path dir) throws Exception {
     WorkerHost host = mock(WorkerHost.class);
     when(host.start(any(), any())).thenThrow(new IOException("host reached"));
-    var bootstrap = new KnowledgeServerBootstrap(config(dir, true), null, null, host);
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config(dir, true), null, null, host);
 
     IOException failure = assertThrows(IOException.class, bootstrap::start);
     assertEquals("host reached", failure.getMessage());

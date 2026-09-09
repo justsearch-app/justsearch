@@ -33,7 +33,6 @@ import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -120,8 +119,7 @@ public class LocalApiServer {
   private volatile KnowledgeSearchController knowledgeSearchController;
   // Tempdoc 419 / T4: shared scan-progress registry (adapter producer -> ScanProgressController),
   // one per process, closed on shutdown.
-  private final io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry =
-      new io.justsearch.app.services.worker.ScanProgressRegistry();
+  private final io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry;
   private volatile ScanProgressController scanProgressController;
   // Tempdoc 374 alpha.27: the single GPU/VRAM access point (owns its nvidia-smi-fallback VramDetector).
   private final GpuCapabilitiesService gpuCapabilitiesService;
@@ -132,6 +130,7 @@ public class LocalApiServer {
   private final String sessionToken;
   private final boolean prodMode;
   private final ExecutorService slowRequestExecutor;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
   // Tempdoc 583 Stage 4: the request-filter security plumbing collaborator.
   private final ApiSecurityFilters securityFilters;
   /** H4: Cache TTL for GPU snapshot to avoid excessive NVML probes. */
@@ -144,12 +143,14 @@ public class LocalApiServer {
   /** Creates a new builder. Required: settingsStore, indexBasePath. The bootstrap and per-service
    * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.). */
   public static Builder builder(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
       Path indexBasePath) {
-    return new Builder(settingsStore, indexBasePath);
+    return new Builder(executors, settingsStore, indexBasePath);
   }
 
   private LocalApiServer(Builder b) {
+    this.scanProgressRegistry = new io.justsearch.app.services.worker.ScanProgressRegistry(b.executors);
     this.telemetry = b.telemetry;
     this.lambdaMartReranker = b.lambdaMartReranker;
     // §31 Phase 4: read helpers/infra from the bootstrap's ServicePhase output rather than
@@ -202,8 +203,7 @@ public class LocalApiServer {
         b.HeadAssembly != null && b.HeadAssembly.workers().excludes() != null
             ? b.HeadAssembly.workers().excludes()
             : new io.justsearch.app.services.excludes.ExcludesServiceImpl(indexingSvcSupplier);
-    // Tempdoc 542 Phase 3: op-lease SPI from ServicePhase output (no-op when not running
-    // under dev-runner — env var absent).
+    // Real process-local lease admission; only the dev-runner file projection is optional.
     io.justsearch.app.api.OperationLeaseService leaseSvc =
         b.operationLeaseService != null
             ? b.operationLeaseService
@@ -228,7 +228,7 @@ public class LocalApiServer {
     ResourceApiModule resourceApiModule =
         b.HeadAssembly != null
             ? new ResourceApiModule(
-                b.HeadAssembly, this.telemetry, b.runtimeManifestPublisher, b.indexBasePath)
+                b.HeadAssembly, this.telemetry, b.runtimeManifestPublisher, b.indexBasePath, b.engineAdmission)
             : null;
     MetaApiModule metaApiModule = new MetaApiModule(() -> this.app, () -> this.apiModules);
     UpgradeApiModule upgradeApiModule =
@@ -320,8 +320,14 @@ public class LocalApiServer {
     ConfigStore cs = ConfigStore.globalOrNull();
     this.prodMode = cs != null && cs.get().policy().prodMode();
     this.sessionToken = b.sessionToken;
+    var backgroundLimits = b.executors.limits(
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    this.slowRequestOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.slow-request-dump", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+        1, backgroundLimits.maxQueue(), 1));
     this.slowRequestExecutor =
-        Executors.newSingleThreadExecutor(
+        slowRequestOwner.open(
             r -> {
               Thread t = new Thread(r, "slow-request-dump");
               t.setDaemon(true);
@@ -333,7 +339,7 @@ public class LocalApiServer {
     this.securityFilters =
         new ApiSecurityFilters(
             this.prodMode, this.sessionToken, this.eventBuffer, this.slowRequestExecutor,
-            this.HeadAssemblyRef, leaseSvc);
+            this.HeadAssemblyRef, leaseSvc, b.engineAdmission);
 
     // Bind to explicit port when provided (dev/prod), otherwise pick a free port.
     int bindPort = configuredPort == null ? 0 : configuredPort;
@@ -490,9 +496,13 @@ public class LocalApiServer {
                         "errorCode",
                         ApiErrorCode.STORE_LOCKED.name())));
 
+    app.exception(io.justsearch.core.execution.EngineExecutorRejectedException.class,
+        (failure, ctx) -> ApiErrorHandler.writeExecutorRefusal(ctx, failure, telemetry));
+
     // Global fallback: catch any unhandled exception that slips past per-controller try-catch blocks.
     // This ensures all error responses use the standardized ApiErrorHandler shape instead of Javalin's default.
     app.exception(Exception.class, (e, ctx) -> {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Unhandled exception on {} {}", ctx.method(), ctx.path(), e);
       // Tempdoc 518 Appendix G Wave A.2: stamp the per-request HTTP span (started by the
       // global before hook) with the exception. The after hook still runs and ends the span;
@@ -974,7 +984,7 @@ public class LocalApiServer {
   }
 
   public void stop() {
-    slowRequestExecutor.shutdownNow();
+    slowRequestOwner.close();
     // Tempdoc 419 / T4: stop the periodic prune thread on shutdown.
     try {
       scanProgressRegistry.close();
@@ -1044,7 +1054,9 @@ public class LocalApiServer {
         }
       }
     }
-    app.stop();
+    try { app.stop(); } finally {
+      try { core.openAiCompatController().close(); } finally { core.aiRuntimeController().close(); }
+    }
   }
 
   private static boolean isBindFailure(Throwable t) {
@@ -1064,6 +1076,7 @@ public class LocalApiServer {
 
   /** Builder for {@link LocalApiServer}. Required: settingsStore, indexBasePath. */
   public static final class Builder {
+    final io.justsearch.core.execution.EngineExecutorRegistry executors;
     final io.justsearch.app.services.settings.UiSettingsStore settingsStore;
     // Tempdoc 583 Stage 2: package-private so ConversationApiAssembly (same package) can read
     // the inputs it needs for the extracted ConversationEngine/agent/chat/MCP wiring.
@@ -1100,13 +1113,16 @@ public class LocalApiServer {
     /** Tempdoc 805 G.1: the normal-quit ordered shutdown (POST /api/lifecycle/shutdown). */
     Runnable lifecycleShutdownAction = () -> {};
     io.justsearch.app.api.OperationLeaseService operationLeaseService;
+    io.justsearch.app.api.EngineAdmissionService engineAdmission;
     Path upgradeDataDir;
     Supplier<String> upgradeRunningVersion =
         () -> EnvRegistry.APP_VERSION.get().orElse("");
     java.util.function.BooleanSupplier upgradeHeadReady;
     java.util.function.BooleanSupplier upgradeWorkerReady;
 
-    Builder(io.justsearch.app.services.settings.UiSettingsStore settingsStore, Path indexBasePath) {
+    Builder(io.justsearch.core.execution.EngineExecutorRegistry executors,
+        io.justsearch.app.services.settings.UiSettingsStore settingsStore, Path indexBasePath) {
+      this.executors = java.util.Objects.requireNonNull(executors, "executors");
       this.settingsStore = settingsStore;
       this.indexBasePath = indexBasePath;
     }
@@ -1194,6 +1210,11 @@ public class LocalApiServer {
     @SuppressWarnings("unused") // UpgradeLifecycleContractTest; see UnreferencedCodeTest.KNOWN_UNREFERENCED
     Builder operationLeaseService(io.justsearch.app.api.OperationLeaseService service) {
       this.operationLeaseService = service;
+      return this;
+    }
+
+    public Builder engineAdmission(io.justsearch.app.api.EngineAdmissionService service) {
+      this.engineAdmission = java.util.Objects.requireNonNull(service);
       return this;
     }
 

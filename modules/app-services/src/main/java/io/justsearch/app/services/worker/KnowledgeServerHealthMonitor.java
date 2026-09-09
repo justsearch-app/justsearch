@@ -2,12 +2,13 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
-
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.io.Closeable;
-import java.util.concurrent.Executors;
+import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -86,6 +87,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   private final KnowledgeServerBootstrap bootstrap;
   private final long pollIntervalMs;
+  private final EngineExecutorRegistry.Registration executorRegistration;
   private final ScheduledExecutorService executor;
   private final LongSupplier nowMs;
   private final BootRecoveryPolicy recoveryPolicy;
@@ -126,12 +128,16 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    */
   private volatile boolean closed;
 
-  public KnowledgeServerHealthMonitor(KnowledgeServerBootstrap bootstrap) {
-    this(bootstrap, DEFAULT_POLL_INTERVAL_MS);
+  public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors, KnowledgeServerBootstrap bootstrap) {
+    this(processExecutors, bootstrap, DEFAULT_POLL_INTERVAL_MS);
   }
 
-  public KnowledgeServerHealthMonitor(KnowledgeServerBootstrap bootstrap, long pollIntervalMs) {
-    this(bootstrap, pollIntervalMs, System::currentTimeMillis);
+  public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
+      KnowledgeServerBootstrap bootstrap,
+      long pollIntervalMs) {
+    this(processExecutors, bootstrap, pollIntervalMs, System::currentTimeMillis);
   }
 
   /**
@@ -139,8 +145,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    *     unit-testable without a real clock or a real OS suspend (tempdoc 630)
    */
   public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
       KnowledgeServerBootstrap bootstrap, long pollIntervalMs, LongSupplier nowMs) {
-    this(bootstrap, pollIntervalMs, nowMs, BootRecoveryPolicy.defaults());
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, BootRecoveryPolicy.defaults());
   }
 
   /**
@@ -148,6 +155,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    *     test can exercise the give-up path without waiting out the production backoff
    */
   public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
       KnowledgeServerBootstrap bootstrap,
       long pollIntervalMs,
       LongSupplier nowMs,
@@ -159,13 +167,35 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     this.pollIntervalMs = pollIntervalMs > 0 ? pollIntervalMs : DEFAULT_POLL_INTERVAL_MS;
     this.nowMs = nowMs;
     this.recoveryPolicy = recoveryPolicy != null ? recoveryPolicy : BootRecoveryPolicy.defaults();
-    this.executor =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "knowledge-server-health-monitor");
-              t.setDaemon(true);
-              return t;
-            });
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.knowledge-server-health-monitor",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.executorRegistration = registration;
+      this.executor =
+          registration.openScheduled(
+              r -> {
+                Thread t = new Thread(r, "knowledge-server-health-monitor");
+                t.setDaemon(true);
+                return t;
+              });
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   public void start() {
@@ -676,6 +706,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } finally {
+      executorRegistration.close();
     }
   }
 }

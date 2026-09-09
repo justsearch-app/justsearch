@@ -74,6 +74,11 @@ public final class RunningRuntime implements LuceneRuntime {
   }
 
   @Override
+  public LuceneExecutorRegistrations executorRegistrations() {
+    return session.executorRegistrations;
+  }
+
+  @Override
   public ReadPathOps readPathOps() {
     return session.readPathOps;
   }

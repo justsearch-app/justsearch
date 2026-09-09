@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.telemetry;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import io.justsearch.telemetry.catalog.CounterMetric;
 import io.justsearch.telemetry.catalog.Exemplars;
 import io.justsearch.telemetry.catalog.GaugeMetric;
@@ -36,7 +40,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +50,8 @@ public final class LocalTelemetry implements Telemetry {
 	private static final Logger log = LoggerFactory.getLogger(LocalTelemetry.class);
 
 	private final SdkMeterProvider meterProvider;
-	private final ScheduledExecutorService flushScheduler;
+	private final EngineExecutorRegistry.Registration exportRegistration;
+	private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledFuture<?> heartbeatFuture;
 	private final Path metricsFile;
 	private final DateTimeFormatter iso = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
@@ -56,13 +60,25 @@ public final class LocalTelemetry implements Telemetry {
   private final RrdMetricStore rrdStore;
   private final CatalogRegistry registry;
 
-  public LocalTelemetry(Path dataDir, long flushMs, String serviceName, String serviceVersion) {
-    this(dataDir, flushMs, serviceName, serviceVersion, "metrics.ndjson", List.<MetricCatalog>of());
+  @SuppressWarnings("PMD.UnusedFormalParameter") // serviceVersion remains metadata-only
+  public LocalTelemetry(
+      EngineExecutorRegistry processExecutors,
+      Path dataDir,
+      long flushMs,
+      String serviceName,
+      String serviceVersion) {
+    this(processExecutors, dataDir, flushMs, serviceName, serviceVersion, "metrics.ndjson", List.<MetricCatalog>of());
   }
 
+  @SuppressWarnings("PMD.UnusedFormalParameter") // serviceVersion remains metadata-only
   public LocalTelemetry(
-      Path dataDir, long flushMs, String serviceName, String serviceVersion, String metricsFileName) {
-    this(dataDir, flushMs, serviceName, serviceVersion, metricsFileName, List.<MetricCatalog>of());
+      EngineExecutorRegistry processExecutors,
+      Path dataDir,
+      long flushMs,
+      String serviceName,
+      String serviceVersion,
+      String metricsFileName) {
+    this(processExecutors, dataDir, flushMs, serviceName, serviceVersion, metricsFileName, List.<MetricCatalog>of());
   }
 
   /**
@@ -80,14 +96,17 @@ public final class LocalTelemetry implements Telemetry {
    * for this constructor; then construct the typed catalog instance against
    * {@link #registry()}.
    */
-  @SuppressWarnings("PMD.UnusedFormalParameter") // interface contract — local impl ignores service identity
+  @SuppressWarnings("PMD.UnusedFormalParameter") // serviceVersion remains metadata-only
   public LocalTelemetry(
+      EngineExecutorRegistry processExecutors,
       Path dataDir,
       long flushMs,
       String serviceName,
       String serviceVersion,
       String metricsFileName,
       List<MetricCatalog> catalogs) {
+		Objects.requireNonNull(processExecutors, "processExecutors");
+		Objects.requireNonNull(serviceName, "serviceName");
 		Objects.requireNonNull(dataDir, "dataDir");
     Objects.requireNonNull(metricsFileName, "metricsFileName");
     Objects.requireNonNull(catalogs, "catalogs");
@@ -147,16 +166,35 @@ public final class LocalTelemetry implements Telemetry {
             || Boolean.parseBoolean(
                 System.getProperty("justsearch.telemetry.metrics.exemplars", "false"));
     boolean exemplarsExportEnabled = !catalogs.isEmpty() || envExemplarsOptIn;
-		MetricReader reader = PeriodicMetricReader.builder(
-        new NdjsonMetricExporter(
-            this.metricsFile,
-            exemplarsExportEnabled,
-            healthState,
-            rrdStore,
-            Map.copyOf(exemplarPoliciesByName),
-            Map.copyOf(tagKeyOrderByMetric)))
-			.setInterval(java.time.Duration.ofMillis(Math.max(1000, flushMs)))
-			.build();
+		EngineExecutorRegistry.Limits backgroundLimits = processExecutors.limits(Kind.BACKGROUND);
+		int timerQueue = backgroundLimits.maxQueue();
+		if (timerQueue < 1) {
+			throw new IllegalArgumentException("Telemetry requires a positive BACKGROUND timer queue");
+		}
+		EngineExecutorRegistry.Registration exportRegistration = null;
+		EngineExecutorRegistry.Registration heartbeatRegistration = null;
+		SdkMeterProvider builtMeterProvider = null;
+		MetricReader reader = null;
+		ScheduledFuture<?> heartbeatFuture;
+		try {
+			exportRegistration = processExecutors.register(new EngineExecutorSpec(
+				"telemetry." + serviceName + ".export", Kind.BACKGROUND, Mode.SCHEDULED, 1, timerQueue, 1));
+			ScheduledExecutorService exportScheduler = exportRegistration.openScheduled(runnable -> {
+				Thread t = new Thread(runnable, "telemetry-export");
+				t.setDaemon(true);
+				return t;
+			});
+			reader = PeriodicMetricReader.builder(
+					new NdjsonMetricExporter(
+							this.metricsFile,
+							exemplarsExportEnabled,
+							healthState,
+							rrdStore,
+							Map.copyOf(exemplarPoliciesByName),
+							Map.copyOf(tagKeyOrderByMetric)))
+				.setInterval(java.time.Duration.ofMillis(Math.max(1000, flushMs)))
+				.setExecutor(exportScheduler)
+				.build();
 
 		// Tempdoc 417 Phase 2f cleanup: hardcoded Views are gone. The `pipeline.stage_ms`,
 		// `api.request_ms`, and `api.stream.ttft_ms` histograms now come from typed catalog
@@ -192,18 +230,34 @@ public final class LocalTelemetry implements Telemetry {
       providerBuilder = providerBuilder.registerView(selector, viewBuilder.build());
     }
 
-		this.meterProvider = providerBuilder.build();
-    this.registry = new CatalogRegistry(this.meterProvider, definitionsByName, gaugeHandles, healthState);
-
-		this.flushScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-			Thread t = new Thread(r, "telemetry-flush");
-			t.setDaemon(true);
-			return t;
-		});
+			builtMeterProvider = providerBuilder.build();
+			heartbeatRegistration = processExecutors.register(new EngineExecutorSpec(
+				"telemetry." + serviceName + ".heartbeat", Kind.BACKGROUND, Mode.SCHEDULED, 1, timerQueue, 1));
+			ScheduledExecutorService heartbeatScheduler = heartbeatRegistration.openScheduled(runnable -> {
+				Thread t = new Thread(runnable, "telemetry-heartbeat");
+				t.setDaemon(true);
+				return t;
+			});
     long period = Math.max(60_000, flushMs * 4); // rare heartbeat backup
-    this.heartbeatFuture =
-        this.flushScheduler.scheduleAtFixedRate(
+    heartbeatFuture =
+        heartbeatScheduler.scheduleAtFixedRate(
             this::writeMetricsHeartbeat, period, period, TimeUnit.MILLISECONDS);
+		} catch (RuntimeException | Error failure) {
+			if (builtMeterProvider != null) {
+				closeOnConstructionFailure(failure, builtMeterProvider);
+			} else if (reader != null) {
+				closeOnConstructionFailure(failure, reader);
+			}
+			closeOnConstructionFailure(failure, heartbeatRegistration);
+			closeOnConstructionFailure(failure, exportRegistration);
+			closeOnConstructionFailure(failure, rrdStore);
+			throw failure;
+		}
+		this.exportRegistration = exportRegistration;
+		this.heartbeatRegistration = heartbeatRegistration;
+		this.heartbeatFuture = heartbeatFuture;
+		this.meterProvider = builtMeterProvider;
+    this.registry = new CatalogRegistry(this.meterProvider, definitionsByName, gaugeHandles, healthState);
 
 		// Always-on baseline gauge: routes through the catalog substrate per tempdoc 417 alignment
 		// follow-up. {@link BaselineMetricCatalog} is appended to {@code catalogs} above so the
@@ -214,6 +268,15 @@ public final class LocalTelemetry implements Telemetry {
 			new BaselineMetricCatalog(this.registry);
 		} catch (Exception e) {
 			log.warn("Failed to register baseline uptime gauge", e);
+		}
+	}
+
+	private static void closeOnConstructionFailure(Throwable failure, AutoCloseable resource) {
+		if (resource == null) return;
+		try {
+			resource.close();
+		} catch (Throwable cleanupFailure) {
+			failure.addSuppressed(cleanupFailure);
 		}
 	}
 
@@ -381,16 +444,22 @@ public final class LocalTelemetry implements Telemetry {
 				}
 			}
 		}
-		this.flushScheduler.shutdown();
     if (heartbeatFuture != null) {
       heartbeatFuture.cancel(true);
     }
-		try {
-			this.flushScheduler.awaitTermination(2, TimeUnit.SECONDS);
-		} catch (InterruptedException ignored) {
-			Thread.currentThread().interrupt();
-		}
-		this.meterProvider.close();
+    // LocalTelemetry owns both registrations and their concrete scheduler instances. The
+    // injected process registry remains process-owned and is deliberately never closed here.
+    try {
+      this.heartbeatRegistration.close();
+    } catch (Exception ignored) {
+      // best-effort scheduler shutdown
+    }
+    this.meterProvider.close();
+    try {
+      this.exportRegistration.close();
+    } catch (Exception ignored) {
+      // best-effort scheduler shutdown
+    }
     this.rrdStore.close();
 	}
 

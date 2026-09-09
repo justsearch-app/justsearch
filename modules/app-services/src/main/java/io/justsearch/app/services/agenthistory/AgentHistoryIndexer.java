@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * write + the blocking ingest RPC run on a daemon single-thread executor — a slow/hung worker can
  * never stall the agent loop's final emit. Fully fail-soft: any error is logged, never propagated.
  */
-public final class AgentHistoryIndexer {
+public final class AgentHistoryIndexer implements AutoCloseable {
   private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
       "agent-history-indexer", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
 
@@ -82,31 +82,75 @@ public final class AgentHistoryIndexer {
   private final Path historyDir;
   private final Supplier<KnowledgeClient> clientSupplier;
   private final ExecutorService executor;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration executorOwner;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration retryOwner;
+  private final java.util.concurrent.atomic.AtomicBoolean reconciliationNeeded = new java.util.concurrent.atomic.AtomicBoolean();
+  private final java.util.concurrent.atomic.AtomicBoolean reconciliationQueued = new java.util.concurrent.atomic.AtomicBoolean();
+  private volatile Runnable reconciliation;
+  private volatile boolean closed;
 
   /**
    * Wire a terminal-run transcript indexer onto a {@code RunEventStore} listener registrar (the
    * one-line composition seam, mirroring {@code AgentDispositionWiring.register}).
    */
   public static AgentHistoryIndexer register(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       java.util.function.Consumer<java.util.function.BiConsumer<String, Map<String, Object>>>
           addEventListener,
       Path historyDir,
       Supplier<KnowledgeClient> clientSupplier) {
-    var indexer = new AgentHistoryIndexer(historyDir, clientSupplier);
-    addEventListener.accept(indexer::onEvent);
+    var indexer = new AgentHistoryIndexer(executors, historyDir, clientSupplier);
+    try { addEventListener.accept(indexer::onEvent); }
+    catch (RuntimeException | Error failure) {
+      try { indexer.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
     return indexer;
   }
 
-  public AgentHistoryIndexer(Path historyDir, Supplier<KnowledgeClient> clientSupplier) {
+  public AgentHistoryIndexer(io.justsearch.core.execution.EngineExecutorRegistry executors,
+      Path historyDir, Supplier<KnowledgeClient> clientSupplier) {
     this.historyDir = historyDir;
     this.clientSupplier = clientSupplier;
-    this.executor =
-        Executors.newSingleThreadExecutor(
+    var limits = executors.limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.agent-history-indexer", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, limits.maxQueue(), 1));
+    io.justsearch.core.execution.EngineExecutorRegistry.Registration acquiredRetry = null;
+    try {
+    this.executor = executorOwner.open(
             r -> {
               Thread t = new Thread(r, "agent-history-indexer");
               t.setDaemon(true);
               return t;
             });
+      acquiredRetry = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+          "head.agent-history-retry", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+          io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+      var retryTimer = acquiredRetry.openScheduled(Thread.ofPlatform().daemon().name("agent-history-retry").factory());
+      retryTimer.scheduleWithFixedDelay(this::retryReconciliation, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
+      this.retryOwner = acquiredRetry;
+    } catch (RuntimeException | Error failure) {
+      if (acquiredRetry != null) {
+        try { acquiredRetry.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      }
+      try { executorOwner.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
+  @Override
+  public void close() {
+    closed = true;
+    try { retryOwner.close(); }
+    finally { closeWorker(); }
+  }
+
+  private void closeWorker() {
+    executor.shutdown();
+    try { executor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS); }
+    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+    finally { executorOwner.close(); }
   }
 
   /**
@@ -123,7 +167,14 @@ public final class AgentHistoryIndexer {
     }
     Map<String, Object> payload = payloadOf(record);
     boolean errored = "error".equals(eventType);
-    executor.execute(() -> writeAndIndex(sessionId, payload, errored));
+    if (closed) return;
+    try { executor.execute(() -> writeAndIndex(sessionId, payload, errored)); }
+    catch (java.util.concurrent.RejectedExecutionException refused) {
+      // The terminal event is already durable. Retain one reconciliation obligation rather than
+      // buffering another copy of every refused payload on the synchronous event-listener path.
+      reconciliationNeeded.set(true);
+      LOG.debug("Agent-history queue full; retrying from durable run events", refused);
+    }
   }
 
   /**
@@ -157,7 +208,28 @@ public final class AgentHistoryIndexer {
    *     or the store is locked
    */
   public void reconcile(Supplier<List<String>> sessionIds, Function<String, List<?>> eventLoader) {
-    executor.execute(() -> reconcileNow(sessionIds, eventLoader));
+    reconciliation = () -> reconcileNow(sessionIds, eventLoader);
+    reconciliationNeeded.set(true);
+    retryReconciliation();
+  }
+
+  private void retryReconciliation() {
+    Runnable scan = reconciliation;
+    if (closed || scan == null || !reconciliationNeeded.get()
+        || !reconciliationQueued.compareAndSet(false, true)) return;
+    try {
+      executor.execute(() -> {
+        reconciliationNeeded.set(false);
+        try { scan.run(); }
+        catch (RuntimeException failure) {
+          reconciliationNeeded.set(true);
+          LOG.warn("Agent-history reconciliation will retry", failure);
+        } finally { reconciliationQueued.set(false); }
+      });
+    } catch (java.util.concurrent.RejectedExecutionException refused) {
+      reconciliationQueued.set(false);
+      // Do not clear the obligation until the worker has actually begun the canonical scan.
+    }
   }
 
   /**
@@ -182,6 +254,7 @@ public final class AgentHistoryIndexer {
     try {
       ids = sessionIds.get();
     } catch (RuntimeException e) {
+      reconciliationNeeded.set(true);
       LOG.warn("Agent-history reconciliation could not list runs", e);
       return 0;
     }
@@ -207,6 +280,7 @@ public final class AgentHistoryIndexer {
               resubmitted++;
             }
           } catch (IOException | RuntimeException e) {
+            reconciliationNeeded.set(true);
             LOG.debug(
                 "Agent-history transcript {} is still pending index: {}", sessionId, e.toString());
           }
@@ -215,8 +289,9 @@ public final class AgentHistoryIndexer {
       }
       if (rebuilt >= MAX_REBUILDS_PER_PASS) {
         LOG.info(
-            "Agent-history reconciliation stopped at {} rebuilds; the rest resume next start",
+            "Agent-history reconciliation stopped at {} rebuilds; the rest resume next pass",
             MAX_REBUILDS_PER_PASS);
+        reconciliationNeeded.set(true);
         break;
       }
       Map<String, Object> terminal;
@@ -319,6 +394,7 @@ public final class AgentHistoryIndexer {
       markPending(sessionId);
       submitAndClearPending(sessionId, target);
     } catch (Exception e) {
+      reconciliationNeeded.set(true);
       // Fail-soft — a failed history index must never affect the run or the user.
       LOG.warn("Failed to index agent-history transcript for session {}", sessionId, e);
     }
@@ -335,6 +411,7 @@ public final class AgentHistoryIndexer {
   private void submitAndClearPending(String sessionId, Path target) throws IOException {
     KnowledgeClient client = clientSupplier.get();
     if (client == null) {
+      reconciliationNeeded.set(true);
       return; // marker stays; a later pass with a client submits it
     }
     client.submitBatch(List.of(target), true, COLLECTION, ENGINE_CONTEXT);

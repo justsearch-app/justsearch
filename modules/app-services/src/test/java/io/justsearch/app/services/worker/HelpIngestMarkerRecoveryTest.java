@@ -52,7 +52,7 @@ final class HelpIngestMarkerRecoveryTest {
     Files.writeString(dataDir.resolve(MARKER), "v1");
     KnowledgeClient client = mock(KnowledgeClient.class);
 
-    new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
+    new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(dataDir, workingDir))
         .tryIngestHelpFiles(client, configFor(dataDir, workingDir));
 
     verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
@@ -73,7 +73,7 @@ final class HelpIngestMarkerRecoveryTest {
     Files.writeString(dataDir.resolve(MARKER), "\0\0not-a-version\0");
     KnowledgeClient client = mock(KnowledgeClient.class);
 
-    new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
+    new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(dataDir, workingDir))
         .tryIngestHelpFiles(client, configFor(dataDir, workingDir));
 
     verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
@@ -89,13 +89,13 @@ final class HelpIngestMarkerRecoveryTest {
     // Ingest once to learn the current version token rather than hardcoding it — a literal here
     // would silently stop matching the day HELP_FILES_VERSION is bumped, which is exactly the
     // moment this assertion needs to still mean something.
-    new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
+    new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(dataDir, workingDir))
         .tryIngestHelpFiles(first, configFor(dataDir, workingDir));
     String current = Files.readString(dataDir.resolve(MARKER)).trim();
     assertEquals(1, org.mockito.Mockito.mockingDetails(first).getInvocations().size());
 
     KnowledgeClient second = mock(KnowledgeClient.class);
-    new KnowledgeServerBootstrap(configFor(dataDir, workingDir))
+    new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(dataDir, workingDir))
         .tryIngestHelpFiles(second, configFor(dataDir, workingDir));
 
     verify(second, never()).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());

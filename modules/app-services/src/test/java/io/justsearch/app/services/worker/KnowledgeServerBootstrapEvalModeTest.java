@@ -69,7 +69,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     KnowledgeServerConfig config = configFor(dataDir, tempDir.resolve("working"));
     KnowledgeClient client = mock(KnowledgeClient.class);
 
-    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
+    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config);
     bootstrap.tryIngestHelpFiles(client, config);
 
     assertFalse(
@@ -92,7 +92,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     // Don't stub submitBatch — default null return is fine; production ignores the return value.
     KnowledgeClient client = mock(KnowledgeClient.class);
 
-    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
+    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), config);
     bootstrap.tryIngestHelpFiles(client, config);
 
     assertTrue(

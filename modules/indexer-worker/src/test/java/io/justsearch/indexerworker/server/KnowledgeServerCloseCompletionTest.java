@@ -51,7 +51,7 @@ final class KnowledgeServerCloseCompletionTest {
   @DisplayName("false before any close, true after one that completes")
   void awaitClosedDistinguishesTheTwoStates(@TempDir Path tempDir) throws Exception {
     KnowledgeServer server =
-        new KnowledgeServer(WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+        new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
 
     assertFalse(
         server.awaitClosed(0),
@@ -73,7 +73,7 @@ final class KnowledgeServerCloseCompletionTest {
   void closeWaitsPastTheFormerDeferredInitializationTimeout(@TempDir Path tempDir)
       throws Exception {
     KnowledgeServer server =
-        new KnowledgeServer(WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+        new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
     server.deferredModelInit = new CompletableFuture<>();
     var init = server.deferredModelInit;
 
@@ -105,7 +105,7 @@ final class KnowledgeServerCloseCompletionTest {
   @DisplayName("an exceptional deferred initializer still permits complete cleanup")
   void exceptionalDeferredModelInitializationStillCloses(@TempDir Path tempDir) throws Exception {
     KnowledgeServer server =
-        new KnowledgeServer(WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+        new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
     server.deferredModelInit =
         CompletableFuture.failedFuture(new IllegalStateException("model initialization failed"));
 

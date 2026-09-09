@@ -38,7 +38,7 @@ final class HeadlessAppStartErrorTest {
   @DisplayName("a latched schema mismatch replaces the crash message with its remedy")
   void refusalDetailReplacesTheSpawnSymptom(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     Exception boom =
         assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
@@ -56,7 +56,7 @@ final class HeadlessAppStartErrorTest {
   @Timeout(180)
   @DisplayName("an ordinary failure is untouched — the exception message is still the truth there")
   void plainFailureKeepsTheExceptionMessage(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     Exception boom = assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
     assertEquals(boom.getMessage(), HeadlessApp.startErrorFor(bootstrap, boom));

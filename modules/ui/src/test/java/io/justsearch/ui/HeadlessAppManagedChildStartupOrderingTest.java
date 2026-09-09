@@ -32,11 +32,12 @@ final class HeadlessAppManagedChildStartupOrderingTest {
           }
         });
 
-    try (var caller = Executors.newSingleThreadExecutor()) {
+    try (var caller = Executors.newSingleThreadExecutor();
+        var bootstrap = Executors.newSingleThreadExecutor()) {
       var started =
           caller.submit(
               () ->
-                  HeadlessApp.startChildCapableAsyncAfterOwnershipReconciliation(
+                  HeadlessApp.startChildCapableAsyncAfterOwnershipReconciliation(bootstrap,
                       publisher,
                       () -> reconciled.set(true),
                       () -> {

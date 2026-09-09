@@ -38,7 +38,11 @@ final class SyncOpsReconcileVerificationTest {
           }
         };
     Map<Path, Instant> watchedRoots = new ConcurrentHashMap<>();
-    return new SyncOps(rpc, watchedRoots, (r, unv) -> sink.add(new Call(r, unv)));
+    return new SyncOps(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        rpc,
+        watchedRoots,
+        (r, unv) -> sink.add(new Call(r, unv)));
   }
 
   @Test

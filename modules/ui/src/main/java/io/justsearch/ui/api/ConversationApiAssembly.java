@@ -365,7 +365,7 @@ final class ConversationApiAssembly {
     shapeRunners.add(toolIteratingShapeRunner);
     shapeRunners.add(
         new io.justsearch.app.services.conversation.HierarchicalShapeRunner(
-            onlineAiSupplier, docsSupplier));
+            onlineAiSupplier, docsSupplier, b.engineAdmission));
     if (workflowShapeRunner != null) {
       shapeRunners.add(workflowShapeRunner);
     }
@@ -383,7 +383,7 @@ final class ConversationApiAssembly {
             onlineAiSupplier,
             // Slice 496 §3.B: file-backed ConversationStore for PERSISTENT shapes.
             // Store conversations alongside the index data (same parent directory).
-            conversationStore);
+            conversationStore, b.engineAdmission);
     // Tempdoc 560 Phase 2 — late-bind the engine into the workflow runner (LlmStep delegation).
     engineHolder[0] = conversationEngine;
     // Tempdoc 560 WS5 — the streaming workflow-as-tool runner is late-bound through the agentSupplier
@@ -406,7 +406,7 @@ final class ConversationApiAssembly {
                 ? b.HeadAssembly.substrate().conversation().intentGateEvaluator()
                 : null);
     AgentController agentController =
-        new AgentController(agentSupplier, conversationEngine, agentSseWriter, telemetry);
+        new AgentController(b.executors, agentSupplier, conversationEngine, agentSseWriter, telemetry);
     // Tempdoc 560 Phase 2 — the workflow approve/reject endpoints complete the runner's gates.
     agentController.setWorkflowGateRegistry(workflowGateRegistry);
     // Tempdoc 584/585 — the read sub-controller depends on the NARROW AgentRunQueries surface
@@ -416,7 +416,7 @@ final class ConversationApiAssembly {
     AgentToolsController agentToolsController =
         new AgentToolsController(agentSupplier, virtualOperationStore);
     ChatController chatController =
-        new ChatController(
+        new ChatController(b.executors,
             conversationEngine,
             new SseWriter(apiCatalog),
             telemetry,
@@ -430,7 +430,7 @@ final class ConversationApiAssembly {
     // sink-taking entry point rather than around it, so a mid-run failure reaches every observer of
     // the run instead of only the socket that started it.
     RunStreamController runStreamController =
-        new RunStreamController(runChannelRegistry, chatController);
+        new RunStreamController(b.executors, runChannelRegistry, chatController);
     io.justsearch.ui.api.mcp.McpProtocolHandler mcpProtocolHandler = null;
     if (registryPresent) {
       // Tempdoc 501 Phase 15: thread the runtime-manifest publisher through so the

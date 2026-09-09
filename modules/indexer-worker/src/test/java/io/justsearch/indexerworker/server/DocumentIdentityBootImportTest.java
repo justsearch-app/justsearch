@@ -58,7 +58,7 @@ final class DocumentIdentityBootImportTest {
     WorkerBootFixture.seed(layout.activePath(), null, 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "FAIL_CLOSED");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     try (SqliteDocumentIdentityStore probe =
@@ -84,7 +84,7 @@ final class DocumentIdentityBootImportTest {
     String generationId =
         layout.genManager().readStateBestEffort().active_generation();
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.close();
     server = null;
@@ -96,7 +96,7 @@ final class DocumentIdentityBootImportTest {
     WorkerBootFixture.seedDocument(
         layout.activePath(), null, "after-import.txt", "after-import-uid", "added post-import");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertEquals(List.of(3L, 3L, 0L), importRow(dbPath, generationId));
@@ -145,7 +145,7 @@ final class DocumentIdentityBootImportTest {
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "FAIL_CLOSED");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     try (SqliteDocumentIdentityStore probe = new SqliteDocumentIdentityStore(dbPath)) {
@@ -186,7 +186,7 @@ final class DocumentIdentityBootImportTest {
     WorkerBootFixture.publishConfig(
         layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.releaseModelReadyLatchForTests();
 
@@ -283,7 +283,7 @@ final class DocumentIdentityBootImportTest {
     IndexGenerationManager postMigration = new IndexGenerationManager(layout.indexBase());
     postMigration.promoteBuildingGenerationToActive();
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.releaseModelReadyLatchForTests();
 
@@ -415,7 +415,7 @@ final class DocumentIdentityBootImportTest {
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     awaitGreenUid(docId, blueUid, Duration.ofSeconds(15));

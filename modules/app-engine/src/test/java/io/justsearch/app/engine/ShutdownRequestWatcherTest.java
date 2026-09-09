@@ -53,7 +53,7 @@ final class ShutdownRequestWatcherTest {
               code -> {});
 
       try (var watcher =
-          new ShutdownRequestWatcher(
+          new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
               runtime, r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
               r -> sequence.run(r.reason()), 50L)) {
         watcher.pollOnce();
@@ -75,7 +75,7 @@ final class ShutdownRequestWatcherTest {
         ShutdownRequest.pathIn(runtime), "{ this is not json", StandardCharsets.UTF_8);
 
     try (var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime, r -> ShutdownRequestWatcher.Acceptance.ACCEPT, ran::set, 50L)) {
       watcher.pollOnce();
       assertTrue(ran.get() == null, "a corrupt file must never be read as a shutdown");
@@ -96,7 +96,7 @@ final class ShutdownRequestWatcherTest {
     var ran = new AtomicReference<ShutdownRequest>();
 
     try (var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime, r -> ShutdownRequestWatcher.Acceptance.REFUSE, ran::set, 50L)) {
       watcher.pollOnce();
       assertTrue(ran.get() == null, "a refused request must not shut the Engine down");
@@ -113,7 +113,7 @@ final class ShutdownRequestWatcherTest {
     var ran = new AtomicReference<ShutdownRequest>();
     writeRequest(new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep"), runtime);
 
-    try (var watcher = new ShutdownRequestWatcher(runtime, ignored -> null, ran::set, 50L)) {
+    try (var watcher = new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(), runtime, ignored -> null, ran::set, 50L)) {
       watcher.pollOnce();
       assertTrue(ran.get() == null);
       assertFalse(watcher.hasFired());
@@ -129,7 +129,7 @@ final class ShutdownRequestWatcherTest {
     var ran = new AtomicReference<ShutdownRequest>();
     writeRequest(new ShutdownRequest(Reason.UPGRADE, Long.MAX_VALUE, "nonce", "updater", "prep"), runtime);
 
-    try (var watcher = new ShutdownRequestWatcher(runtime, ignored -> decision.get(), ran::set, 50L)) {
+    try (var watcher = new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(), runtime, ignored -> decision.get(), ran::set, 50L)) {
       watcher.pollOnce();
       assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
       assertFalse(watcher.hasFired());
@@ -151,7 +151,7 @@ final class ShutdownRequestWatcherTest {
     var fileStillPresentWhenActing = new AtomicReference<Boolean>();
 
     try (var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> fileStillPresentWhenActing.set(Files.exists(ShutdownRequest.pathIn(runtime))),
@@ -173,7 +173,7 @@ final class ShutdownRequestWatcherTest {
     var count = new java.util.concurrent.atomic.AtomicInteger();
 
     try (var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> count.incrementAndGet(),
@@ -199,7 +199,7 @@ final class ShutdownRequestWatcherTest {
     writeRequest(new ShutdownRequest(Reason.HANG, Long.MAX_VALUE, null, "supervisor", null), runtime);
 
     try (var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> {
@@ -229,7 +229,7 @@ final class ShutdownRequestWatcherTest {
     writeRequest(new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null), runtime);
 
     var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime,
             r -> ShutdownRequestWatcher.Acceptance.ACCEPT,
             r -> {
@@ -249,6 +249,68 @@ final class ShutdownRequestWatcherTest {
   }
 
   @Test
+  void callbackCanCloseProcessRegistryWithoutInterruptingItselfOrSkippingOtherOwners(@TempDir Path tempDir)
+      throws Exception {
+    var registry = new DefaultEngineExecutorRegistry();
+    var spec = new io.justsearch.core.execution.EngineExecutorSpec(
+        "other-shutdown-owner", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, 1, 1);
+    var other = registry.register(spec).open(Thread.ofPlatform().daemon().factory());
+    var otherEntered = new CountDownLatch(1);
+    var otherInterrupted = new CountDownLatch(1);
+    var releaseOther = new CountDownLatch(1);
+    var registryReturned = new CountDownLatch(1);
+    var releaseCallback = new CountDownLatch(1);
+    var callbackExited = new CountDownLatch(1);
+    var callbackInterrupted = new AtomicReference<Boolean>();
+    var watcherRef = new AtomicReference<ShutdownRequestWatcher>();
+    Path runtime = runtimeDir(tempDir);
+    other.submit(() -> {
+      otherEntered.countDown();
+      try { new CountDownLatch(1).await(); }
+      catch (InterruptedException expected) {
+        otherInterrupted.countDown();
+        releaseOther.await();
+      }
+      return null;
+    });
+    assertTrue(otherEntered.await(1, TimeUnit.SECONDS));
+    writeRequest(new ShutdownRequest(Reason.QUIT, Long.MAX_VALUE, null, "test", null), runtime);
+    var watcher = new ShutdownRequestWatcher(registry, runtime,
+        request -> ShutdownRequestWatcher.Acceptance.ACCEPT, request -> {
+          try {
+            watcherRef.get().close();
+            registry.close();
+            callbackInterrupted.set(Thread.currentThread().isInterrupted());
+            registryReturned.countDown();
+            releaseCallback.await();
+          } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+          } finally {
+            callbackExited.countDown();
+          }
+        }, 10L);
+    watcherRef.set(watcher);
+    try {
+      watcher.start();
+      assertTrue(otherInterrupted.await(1, TimeUnit.SECONDS));
+      assertFalse(registryReturned.await(50, TimeUnit.MILLISECONDS), "close must await the other owner");
+      releaseOther.countDown();
+      assertTrue(registryReturned.await(1, TimeUnit.SECONDS));
+      assertEquals(Boolean.FALSE, callbackInterrupted.get());
+      assertTrue(other.isTerminated());
+      assertTrue(registry.snapshot().registrations().stream().anyMatch(
+          row -> row.spec().name().equals("engine.shutdown-request-watcher") && row.liveInstances() == 1));
+    } finally {
+      releaseOther.countDown();
+      releaseCallback.countDown();
+      callbackExited.await(1, TimeUnit.SECONDS);
+      watcher.close();
+      registry.close();
+    }
+  }
+
+  @Test
   @DisplayName("an expired request is discarded before acceptance and never fires")
   void expiredRequestIsDiscarded(@TempDir Path tempDir) throws Exception {
     Path runtime = runtimeDir(tempDir);
@@ -256,7 +318,7 @@ final class ShutdownRequestWatcherTest {
     writeRequest(new ShutdownRequest(Reason.RESTART, 1L, null, "stale-supervisor", null), runtime);
 
     try (var watcher =
-        new ShutdownRequestWatcher(
+        new ShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
             runtime, r -> ShutdownRequestWatcher.Acceptance.ACCEPT, ran::set, 50L)) {
       watcher.pollOnce();
     }

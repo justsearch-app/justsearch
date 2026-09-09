@@ -321,7 +321,7 @@ final class SmokeDriverTest {
     io.justsearch.configuration.resolved.ConfigStore.setGlobal(
         new io.justsearch.configuration.resolved.ConfigStore(rcBuilder.build()));
 
-    LocalTelemetry telemetry = new LocalTelemetry(dataDir, 5_000, "launcher-test", "test");
+    LocalTelemetry telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), dataDir, 5_000, "launcher-test", "test");
     LauncherEnvironment environment =
         org.mockito.Mockito.mock(LauncherEnvironment.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     SmokeDriver.installCommandRunnerFactory(env -> commands);

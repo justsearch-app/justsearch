@@ -177,7 +177,7 @@ public class VduProcessor {
      * @return extracted and enriched content
      * @throws VduException if processing fails
      */
-    public VduResult process(Path filePath) throws VduException {
+    public VduResult process(Path filePath, io.justsearch.core.context.EngineContext engineContext) throws VduException {
         if (!hasVisionCapability()) {
             throw new VduException(
                 "Vision capability not available — no vision projector (mmproj) configured. "
@@ -257,7 +257,8 @@ public class VduProcessor {
 
                     byte[] imageBytes = imagePreparer.prepare(pageImages.get(idx));
                     OnlineAiService.VisionCompletionResult pageResult =
-                        aiService.visionCompletionDetailed(PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS)
+                        aiService.visionCompletionDetailed(PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
+                            SamplingParams.VDU, null, engineContext)
                             .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                             .join();
                     sentPageResults.add(pageResult);
@@ -297,7 +298,7 @@ public class VduProcessor {
             // pass, and processing continues into Pass 2 exactly as the PASS band would.
             GateVerdict resolvedVerdict = stage1Verdict;
             if (stage1Verdict.band() == GateVerdict.Band.AMBIGUOUS) {
-                resolvedVerdict = runAgreementProbe(legiblePageIndices, pageImages, sentPageResults, filePath);
+                resolvedVerdict = runAgreementProbe(legiblePageIndices, pageImages, sentPageResults, filePath, engineContext);
                 if (resolvedVerdict.rejected()) {
                     LOG.info("VDU Stage 2 rejected output for {} (agreement={}, probedPage={})",
                         filePath.getFileName(), resolvedVerdict.agreement(), resolvedVerdict.probedPage());
@@ -315,7 +316,7 @@ public class VduProcessor {
                 enrichment = aiService.chatCompletion(
                     List.of(Map.of("role", "user", "content", pass2Prompt)),
                     PASS2_MAX_TOKENS,
-                    SamplingParams.VDU
+                    SamplingParams.VDU, engineContext
                 )
                     .orTimeout(VDU_CHAT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .join();
@@ -505,7 +506,7 @@ public class VduProcessor {
         List<Integer> legiblePageIndices,
         List<Path> pageImages,
         List<OnlineAiService.VisionCompletionResult> sentPageResults,
-        Path filePath) throws IOException {
+        Path filePath, io.justsearch.core.context.EngineContext engineContext) throws IOException {
         int worstIdx = worstSignalIndex(sentPageResults);
         int pageIndex = legiblePageIndices.get(worstIdx);
         String originalPageText = sentPageResults.get(worstIdx).content();
@@ -514,7 +515,7 @@ public class VduProcessor {
         OnlineAiService.VisionCompletionResult probeResult =
             aiService.visionCompletionDetailed(
                     PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
-                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED)
+                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext)
                 .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .join();
 

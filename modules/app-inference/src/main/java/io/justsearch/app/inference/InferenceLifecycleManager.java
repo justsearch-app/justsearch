@@ -99,6 +99,8 @@ public class InferenceLifecycleManager
 
   // Collaborators (composed)
   private final HttpClient httpClient;
+  private final java.util.concurrent.ExecutorService httpExecutor;
+  private final InferenceExecutorRegistrations executorRegistrations;
   private final ObjectMapper objectMapper;
   private final TokenEndpointOps tokenOps;
   private final OnlineModeOps onlineOps;
@@ -122,8 +124,10 @@ public class InferenceLifecycleManager
 
   // ==================== Constructors ====================
 
-  public InferenceLifecycleManager(InferenceConfig config) {
-    this(config, NoopInferenceTelemetryEvents.INSTANCE,
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config) {
+    this(executorRegistry, config, NoopInferenceTelemetryEvents.INSTANCE,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
@@ -136,21 +140,22 @@ public class InferenceLifecycleManager
     runner.setTransitionLog(log);
   }
 
-  public InferenceLifecycleManager(InferenceConfig config, InferenceTelemetryEvents events) {
-    this(config, events, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events) {
+    this(executorRegistry, config, events, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
       InferenceConfig config,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
     this.events = Objects.requireNonNull(events, "events");
     this.config = config;
     this.gpuCapabilitiesService = new GpuCapabilitiesService();
-    this.httpClient =
-        HttpClient.newBuilder().connectTimeout(HTTP_CLIENT_CONNECT_TIMEOUT).build();
-    this.objectMapper = new ObjectMapper();
-
     Object lock = new Object();
     ModeStateMachine modeState = new ModeStateMachine();
     this.runner = new TransitionRunner(lock, modeState, events);
@@ -178,32 +183,61 @@ public class InferenceLifecycleManager
           }
         };
 
-    this.tokenOps =
-        new TokenEndpointOps(
-            httpClient, objectMapper, runner::currentMode, () -> this.config.serverPort());
-    this.onlineOps =
-        new OnlineModeOps(
-            httpClient,
-            objectMapper,
-            runner::currentMode,
-            () -> this.config.serverPort(),
-            () -> runner.view().lastKnownModelId(),
-            () -> this.config.modelPath().getFileName().toString(),
-            this.events);
-    this.serverOps =
-        new LlamaServerOps(
-            httpClient,
-            objectMapper,
-            () -> this.config,
-            gpuCapabilitiesService,
-            runner::currentMode,
-            propsObserver,
-            // goOfflineFromMaxCrashes — method ref deferred until serverOps init completes.
-            this::handleMaxCrashOffline,
-            // goOfflineFromExternalFailure — same.
-            this::handleExternalFailureOffline,
-            this.events,
-            childRegistry);
+    java.util.concurrent.ExecutorService openedHttp = null;
+    OnlineModeOps openedOnline = null;
+    LlamaServerOps openedServer = null;
+    try {
+      openedHttp = executorRegistrations.http.open(namedDaemonFactory("inference-http"));
+      HttpClient createdHttpClient =
+          HttpClient.newBuilder()
+              .executor(openedHttp)
+              .connectTimeout(HTTP_CLIENT_CONNECT_TIMEOUT)
+              .build();
+      ObjectMapper createdObjectMapper = new ObjectMapper();
+      TokenEndpointOps createdTokenOps =
+          new TokenEndpointOps(
+              createdHttpClient,
+              createdObjectMapper,
+              runner::currentMode,
+              () -> this.config.serverPort());
+      openedOnline =
+          new OnlineModeOps(
+              executorRegistrations,
+              createdHttpClient,
+              createdObjectMapper,
+              runner::currentMode,
+              () -> this.config.serverPort(),
+              () -> runner.view().lastKnownModelId(),
+              () -> this.config.modelPath().getFileName().toString(),
+              this.events);
+      openedServer =
+          new LlamaServerOps(
+              executorRegistrations,
+              createdHttpClient,
+              createdObjectMapper,
+              () -> this.config,
+              gpuCapabilitiesService,
+              runner::currentMode,
+              propsObserver,
+              this::handleMaxCrashOffline,
+              this::handleExternalFailureOffline,
+              this.events,
+              childRegistry);
+      this.httpExecutor = openedHttp;
+      this.httpClient = createdHttpClient;
+      this.objectMapper = createdObjectMapper;
+      this.tokenOps = createdTokenOps;
+      this.onlineOps = openedOnline;
+      this.serverOps = openedServer;
+    } catch (RuntimeException | Error failure) {
+      closeAfterConstructionFailure(openedServer, openedOnline, openedHttp, failure);
+      try {
+        executorRegistrations.close();
+      } catch (RuntimeException closeFailure) {
+        failure.addSuppressed(closeFailure);
+      }
+      throw failure;
+    }
 
     LOG.info(
         "InferenceLifecycleManager created with config: serverPort={}, contextSize={}, gpuLayers={}",
@@ -1000,6 +1034,14 @@ public class InferenceLifecycleManager
     return onlineOps.chatCompletion(messages, maxTokens, sampling);
   }
 
+  public CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    return onlineOps.chatCompletion(messages, maxTokens, sampling, work);
+  }
+
   public CompletableFuture<String> visionCompletion(
       String prompt, byte[] imageBytes, int maxTokens) {
     return onlineOps.visionCompletion(prompt, imageBytes, maxTokens);
@@ -1016,12 +1058,35 @@ public class InferenceLifecycleManager
     return onlineOps.visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed);
   }
 
+  public CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    return onlineOps.visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed, work);
+  }
+
   public CompletableFuture<String> summarize(String content, int maxTokens) {
     return onlineOps.summarize(content, maxTokens);
   }
 
+  public CompletableFuture<String> summarize(
+      String content, int maxTokens, io.justsearch.app.api.EngineWorkHandle work) {
+    return onlineOps.summarize(content, maxTokens, work);
+  }
+
   public CompletableFuture<String> askQuestion(String context, String question, int maxTokens) {
     return onlineOps.askQuestion(context, question, maxTokens);
+  }
+
+  public CompletableFuture<String> askQuestion(
+      String context,
+      String question,
+      int maxTokens,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    return onlineOps.askQuestion(context, question, maxTokens, work);
   }
 
   public void streamChat(
@@ -1110,8 +1175,25 @@ public class InferenceLifecycleManager
       Consumer<Throwable> onError,
       SamplingParams sampling,
       boolean requireSentinel) {
+    stream(messages, tools, maxTokens, onContent, onReasoning, onToolCallDelta,
+        onUsage, onComplete, onError, sampling, requireSentinel, null);
+  }
+
+  public void stream(
+      List<Map<String, Object>> messages,
+      List<Map<String, Object>> tools,
+      int maxTokens,
+      Consumer<String> onContent,
+      Consumer<String> onReasoning,
+      Consumer<JsonNode> onToolCallDelta,
+      Consumer<AiUsage> onUsage,
+      Consumer<String> onComplete,
+      Consumer<Throwable> onError,
+      SamplingParams sampling,
+      boolean requireSentinel,
+      io.justsearch.app.api.EngineWorkHandle work) {
     onlineOps.stream(messages, tools, maxTokens, onContent, onReasoning, onToolCallDelta,
-        onUsage, onComplete, onError, sampling, requireSentinel);
+        onUsage, onComplete, onError, sampling, requireSentinel, work);
   }
 
   /** Returns the last observed llama-server context size (n_ctx), or null if unknown. */
@@ -1182,6 +1264,11 @@ public class InferenceLifecycleManager
     return tokenOps.countTokens(text);
   }
 
+  public Optional<Integer> countTokens(
+      String text, io.justsearch.app.api.EngineWorkHandle work) {
+    return onlineOps.callOwned(work, () -> tokenOps.countTokens(text));
+  }
+
   public Optional<String> applyTemplate(List<Map<String, Object>> messages) {
     return tokenOps.applyTemplate(messages);
   }
@@ -1198,6 +1285,13 @@ public class InferenceLifecycleManager
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
     return tokenOps.countPromptTokens(messages, tools);
+  }
+
+  public Optional<Integer> countPromptTokens(
+      List<Map<String, Object>> messages,
+      List<Map<String, Object>> tools,
+      io.justsearch.app.api.EngineWorkHandle work) {
+    return onlineOps.callOwned(work, () -> tokenOps.countPromptTokens(messages, tools));
   }
 
   public boolean supportsTokenize() {
@@ -1396,9 +1490,47 @@ public class InferenceLifecycleManager
       onlineOps.shutdown();
       serverOps.shutdown();
       httpClient.close();
+      cancelQueued(httpExecutor);
+      executorRegistrations.close();
       runner.runForceOffline(TransitionReason.SHUTDOWN, null);
       if (terminationFailure != null) throw terminationFailure;
       LOG.info("InferenceLifecycleManager closed");
+    }
+  }
+
+  private static java.util.concurrent.ThreadFactory namedDaemonFactory(String name) {
+    return runnable -> {
+      Thread thread = new Thread(runnable, name);
+      thread.setDaemon(true);
+      return thread;
+    };
+  }
+
+  private static void cancelQueued(java.util.concurrent.ExecutorService executor) {
+    for (Runnable queued : executor.shutdownNow()) {
+      if (queued instanceof java.util.concurrent.Future<?> future) future.cancel(false);
+    }
+  }
+
+  private static void closeAfterConstructionFailure(
+      LlamaServerOps server,
+      OnlineModeOps online,
+      java.util.concurrent.ExecutorService http,
+      Throwable primary) {
+    try {
+      if (server != null) server.shutdown();
+    } catch (RuntimeException failure) {
+      primary.addSuppressed(failure);
+    }
+    try {
+      if (online != null) online.shutdown();
+    } catch (RuntimeException failure) {
+      primary.addSuppressed(failure);
+    }
+    try {
+      if (http != null) cancelQueued(http);
+    } catch (RuntimeException failure) {
+      primary.addSuppressed(failure);
     }
   }
 

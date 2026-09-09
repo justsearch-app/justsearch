@@ -2175,7 +2175,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       } else {
         onlineAi.switchToOnlineMode(); // LEGACY-FALLBACK: no reconciler wired (test/non-configured)
       }
-      CompletableFuture<String> answer = onlineAi.askQuestion("Reply with exactly OK.", "OK");
+      CompletableFuture<String> answer = onlineAi.askQuestion("Reply with exactly OK.", "OK",
+          io.justsearch.app.services.intent.EngineProvenance.internal("post-install-smoke-test",
+              io.justsearch.core.context.EngineContext.Survival.DURABLE,
+              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
       long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(SMOKE_TEST_TIMEOUT_MS);
       String result;
       while (true) {

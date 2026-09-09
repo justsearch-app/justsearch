@@ -59,7 +59,7 @@ final class WatcherTransitionMatrixGuardTest {
     Files.delete(goneRoot);
 
     try (WorkerMethvinWatcher watcher =
-        new WorkerMethvinWatcher(mock(JobQueue.class), null, delete, reconcile)) {
+        new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), mock(JobQueue.class), null, delete, reconcile)) {
 
       // Cell: DELETE while watched root is PRESENT → forwarded to the delete sink.
       watcher.handleDelete(presentRoot, child);

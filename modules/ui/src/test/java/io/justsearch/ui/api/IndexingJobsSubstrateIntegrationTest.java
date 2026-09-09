@@ -24,6 +24,7 @@ import io.justsearch.app.services.registry.operations.handlers.RetryIndexingJobH
 import io.justsearch.app.services.worker.IndexingJobsSource;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -83,6 +84,13 @@ import org.junit.jupiter.api.Test;
 @DisplayName("Slice 445 substrate integration")
 final class IndexingJobsSubstrateIntegrationTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
   private StubIndexingJobsSource stubService;
   private RemoteIndexingJobsBridge bridge;
   private IndexingJobsChangeRegistry changeRegistry;
@@ -95,7 +103,7 @@ final class IndexingJobsSubstrateIntegrationTest {
     // Lane F item A6 moved the bridge onto an IndexingJobsSource; item A14 deleted the gRPC
     // service that used to be one. The fake IS the source, so the substrate below it is exercised
     // end to end exactly as before.
-    bridge = new RemoteIndexingJobsBridge(() -> stubService);
+    bridge = new RemoteIndexingJobsBridge(processExecutors, () -> stubService);
     changeRegistry = new IndexingJobsChangeRegistry();
 
     // Wire bridge → registry forwarding (mirrors HeadAssembly line-for-line).
@@ -117,13 +125,16 @@ final class IndexingJobsSubstrateIntegrationTest {
 
     telemetry = mock(Telemetry.class);
     controller =
-        new IndexingJobsStreamController(changeRegistry, bridge, telemetry, Clock.systemUTC());
+        new IndexingJobsStreamController(
+            processExecutors,
+              changeRegistry, bridge, telemetry, Clock.systemUTC());
   }
 
   @AfterEach
   void tearDown() {
     if (controller != null) controller.shutdown();
     if (bridge != null) bridge.stop();
+    processExecutors.close();
   }
 
   @Test

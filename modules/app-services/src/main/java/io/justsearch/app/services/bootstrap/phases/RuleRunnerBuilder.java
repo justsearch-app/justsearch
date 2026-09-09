@@ -30,7 +30,7 @@ public final class RuleRunnerBuilder {
 
   private RuleRunnerBuilder() {}
 
-  public static RuleRunner build(
+  public static RuleRunner build(io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       ConditionStore conditionStore,
       HealthEventChangeRegistry healthEventChangeRegistry,
@@ -61,7 +61,7 @@ public final class RuleRunnerBuilder {
     RuleEmitter emitter =
         new RuleEmitter(conditionStore, healthEventChangeRegistry, headSource, clock);
     Duration tickInterval = resolveTickInterval();
-    return new RuleRunner(catalog, evaluator, signalSource, scheduler, emitter, tickInterval);
+    return new RuleRunner(executors, catalog, evaluator, signalSource, scheduler, emitter, tickInterval);
   }
 
   private static Duration resolveTickInterval() {

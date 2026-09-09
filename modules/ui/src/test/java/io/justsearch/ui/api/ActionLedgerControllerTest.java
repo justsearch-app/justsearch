@@ -15,12 +15,15 @@ import io.justsearch.app.observability.ledger.ActionEventJournal;
 import io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry;
 import io.justsearch.app.observability.navigation.NavigationHistoryStore;
 import io.justsearch.app.observability.operations.OperationHistoryStore;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,6 +38,13 @@ import tools.jackson.databind.ObjectMapper;
  */
 @DisplayName("ActionLedgerController — P-B1 correlationId/originator projection filter")
 final class ActionLedgerControllerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -52,7 +62,8 @@ final class ActionLedgerControllerTest {
 
   private ActionLedgerController wiredController(ActionLedgerChangeRegistry changes) {
     return new ActionLedgerController(
-        new OperationHistoryStore(), new NavigationHistoryStore(), null, changes, Clock.systemUTC());
+            processExecutors,
+              new OperationHistoryStore(), new NavigationHistoryStore(), null, changes, Clock.systemUTC());
   }
 
   /** Captures the byte[] the controller writes via {@code ctx.result(byte[])}. */

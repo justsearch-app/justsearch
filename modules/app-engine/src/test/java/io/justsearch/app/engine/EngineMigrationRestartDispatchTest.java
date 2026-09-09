@@ -26,7 +26,7 @@ final class EngineMigrationRestartDispatchTest {
     EngineTestHarness.publishConfig(dataDir, dataDir.resolve("index"), Map.of());
     var restarts = new AtomicInteger();
     try (var root = new EngineRoot(
-        gauge -> new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(gauge)),
+        gauge -> new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(gauge)),
         30_000L, 5_000, code -> { throw new AssertionError("unexpected fatal exit " + code); },
         restarts::incrementAndGet)) {
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());

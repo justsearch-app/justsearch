@@ -686,7 +686,7 @@ final class KnowledgeSearchEngine {
     if (isExpansionEligible(
         pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
         effectiveQueryType)) {
-      expansionFuture = startExpansionAsync(queryText);
+      expansionFuture = startExpansionAsync(queryText, engineContext);
     } else if (effectiveQueryType == QueryType.NAVIGATIONAL || effectiveQueryType == QueryType.EXACT_MATCH) {
       expansionSkipReason = "QUERY_TYPE_" + effectiveQueryType.name();
     } else if (!pipelineConfig.expansionEnabled()) {
@@ -712,13 +712,13 @@ final class KnowledgeSearchEngine {
         && effectiveQueryType != QueryType.NAVIGATIONAL
         && effectiveQueryType != QueryType.EXACT_MATCH
         && quService.isAvailable()) {
-      quFuture = quService.extract(queryText, statusCache.getCachedFacetSnapshot());
+      quFuture = quService.extract(queryText, statusCache.getCachedFacetSnapshot(), engineContext);
     }
 
     // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
     CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
     if (hasExplicitFilters && normService.isAvailable()) {
-      normFuture = normService.normalize(req.filters(), statusCache.getCachedFacetSnapshot());
+      normFuture = normService.normalize(req.filters(), statusCache.getCachedFacetSnapshot(), engineContext);
     }
 
     // 256-G3: PipelineConfig is the sole pipeline control on wire. Deprecated mode field no longer set.
@@ -759,6 +759,7 @@ final class KnowledgeSearchEngine {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
         log.debug("Filter normalization failed: {}", e.getCause().getMessage());
       }
     }
@@ -786,6 +787,7 @@ final class KnowledgeSearchEngine {
         Thread.currentThread().interrupt();
         log.debug("QU interrupted");
       } catch (ExecutionException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
         log.debug("QU extraction failed: {}", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
       }
     }
@@ -859,9 +861,11 @@ final class KnowledgeSearchEngine {
           Thread.currentThread().interrupt();
           expansionSkipReason = "FAILED";
         } catch (ExecutionException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           expansionSkipReason = "FAILED";
           log.debug("LLM expansion failed: {}", e.getCause().getMessage());
         } catch (RuntimeException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           // The expansion re-search is an OPTIONAL enhancement over an answer we already hold, and
           // this block's contract (line 779) is "falls back to base results on timeout or error".
           // Only the checked failures were caught, so a failing re-search took the whole search
@@ -1273,21 +1277,13 @@ final class KnowledgeSearchEngine {
    * <p>Uses {@link SamplingParams#DETERMINISTIC} to minimize hallucination risk. The caller
    * must wait on the returned future within {@link #EXPANSION_BUDGET_MS} and cancel on timeout.
    */
-  private CompletableFuture<String> startExpansionAsync(String query) {
-    CompletableFuture<String> future = new CompletableFuture<>();
+  private CompletableFuture<String> startExpansionAsync(String query, EngineContext engineContext) {
     List<Map<String, Object>> messages =
         List.of(
             Map.of("role", "system", "content", EXPANSION_SYSTEM_PROMPT),
             Map.of("role", "user", "content", query));
-    StringBuilder buf = new StringBuilder();
-    onlineAiService.streamChat(
-        messages,
-        EXPANSION_MAX_TOKENS,
-        buf::append,
-        fr -> future.complete(buf.toString().strip()),
-        future::completeExceptionally,
-        SamplingParams.DETERMINISTIC);
-    return future;
+    return onlineAiService.chatCompletion(
+        messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext);
   }
 
   /**

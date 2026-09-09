@@ -11,6 +11,9 @@ import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.adapters.lucene.runtime.TextQueryOps;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.SearchOutcome;
 import io.justsearch.indexerworker.services.WorkerServiceException;
@@ -33,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,18 +75,21 @@ public final class SearchExecutor {
   private final HybridSearchOps hybridSearchOps;
   private final ChunkSearchOps chunkSearchOps;
   private final Supplier<ResolvedConfig> resolvedConfigSupplier;
+  private final LuceneExecutorRegistrations executorRegistrations;
 
   public SearchExecutor(
       TextQueryOps textQueryOps,
       ReadPathOps readPathOps,
       HybridSearchOps hybridSearchOps,
       ChunkSearchOps chunkSearchOps,
-      Supplier<ResolvedConfig> resolvedConfigSupplier) {
+      Supplier<ResolvedConfig> resolvedConfigSupplier,
+      LuceneExecutorRegistrations executorRegistrations) {
     this.textQueryOps = textQueryOps;
     this.readPathOps = readPathOps;
     this.hybridSearchOps = hybridSearchOps;
     this.chunkSearchOps = chunkSearchOps;
     this.resolvedConfigSupplier = resolvedConfigSupplier;
+    this.executorRegistrations = Objects.requireNonNull(executorRegistrations, "executorRegistrations");
   }
 
   /**
@@ -371,7 +375,8 @@ public final class SearchExecutor {
             case LegSet.ThreeWay tw -> {
               spladeExecuted = true;
               yield runThreeWay(
-                  tw, queryString, runtimeFilters, boostRuntimeFilters, syntax, debug, retrievalSpan);
+                  tw, queryString, runtimeFilters, boostRuntimeFilters, syntax, debug, retrievalSpan,
+                  ctx.engineContext().urgency());
             }
             case LegSet.Bm25Dense bd ->
                 debug
@@ -380,13 +385,15 @@ public final class SearchExecutor {
                         toFloatArray(bd.vector().vector()),
                         bd.retrievalLimit(),
                         runtimeFilters,
-                        syntax)
+                        syntax,
+                        ctx.engineContext().urgency())
                     : hybridSearchOps.searchHybridFiltered(
                         queryString,
                         toFloatArray(bd.vector().vector()),
                         bd.retrievalLimit(),
                         QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters),
-                        syntax);
+                        syntax,
+                        ctx.engineContext().urgency());
             case LegSet.DenseOnly d ->
                 // Tempdoc 549 Slice 3c (U2): single dense leg, no fusion.
                 HitProvenanceProjector.attachSingleLeg(
@@ -476,7 +483,8 @@ public final class SearchExecutor {
       LuceneRuntimeTypes.RuntimeSearchFilters boostRuntimeFilters,
       LuceneRuntimeTypes.QuerySyntax syntax,
       boolean debug,
-      Span retrievalSpan) {
+      Span retrievalSpan,
+      EngineContext.Urgency urgency) {
     ResolvedConfig rc3 = resolvedConfigSupplier.get();
     ResolvedConfig.HybridSearch hs3 = rc3 != null ? rc3.hybridSearch() : null;
     int candidateMax = Math.max(hs3 != null ? hs3.candidateLimitMax() : 100, tw.retrievalLimit());
@@ -487,9 +495,9 @@ public final class SearchExecutor {
 
     Context otelCtx = Context.current().with(retrievalSpan);
     LuceneRuntimeTypes.SearchResult result;
-    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    try (var executor = executorRegistrations.openSearchFanout(urgency)) {
       var bm25F =
-          CompletableFuture.supplyAsync(
+          EngineFutures.supplyAsync(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
@@ -505,7 +513,7 @@ public final class SearchExecutor {
               },
               executor);
       var denseF =
-          CompletableFuture.supplyAsync(
+          EngineFutures.supplyAsync(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
@@ -519,7 +527,7 @@ public final class SearchExecutor {
               },
               executor);
       var spladeF =
-          CompletableFuture.supplyAsync(
+          EngineFutures.supplyAsync(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(

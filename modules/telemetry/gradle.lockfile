@@ -4,7 +4,7 @@
 # To regenerate this file, run: ./gradlew :modules:telemetry:dependencies --write-locks
 ch.qos.logback:logback-classic:1.5.32=testCompileClasspath,testRuntimeClasspath
 ch.qos.logback:logback-core:1.5.32=testCompileClasspath,testRuntimeClasspath
-com.fasterxml.jackson.core:jackson-annotations:2.21=testCompileClasspath,testRuntimeClasspath
+com.fasterxml.jackson.core:jackson-annotations:2.21=compileClasspath,integrationTestCompileClasspath,integrationTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testFixturesCompileClasspath,testFixturesRuntimeClasspath,testRuntimeClasspath
 com.github.ben-manes.caffeine:caffeine:3.0.5=annotationProcessor,integrationTestAnnotationProcessor,testAnnotationProcessor,testFixturesAnnotationProcessor
 com.github.kevinstern:software-and-algorithms:1.0=annotationProcessor,integrationTestAnnotationProcessor,testAnnotationProcessor,testFixturesAnnotationProcessor
 com.google.auto.service:auto-service-annotations:1.0.1=annotationProcessor,integrationTestAnnotationProcessor,testAnnotationProcessor,testFixturesAnnotationProcessor

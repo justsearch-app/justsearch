@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.observability.rules;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import dev.cel.runtime.CelEvaluationException;
 import dev.cel.runtime.CelRuntime;
 import java.time.Duration;
@@ -11,7 +13,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
@@ -50,6 +51,7 @@ public final class RuleRunner {
   private final DwellTimeScheduler scheduler;
   private final RuleEmitter emitter;
   private final Duration tickInterval;
+  private final EngineExecutorRegistry.Registration executorRegistration;
   private final ScheduledExecutorService executor;
 
   /** Cached compiled programs per (rule, expression-key). */
@@ -62,6 +64,7 @@ public final class RuleRunner {
   private volatile ScheduledFuture<?> running;
 
   public RuleRunner(
+      EngineExecutorRegistry processExecutors,
       RuleCatalog catalog,
       CelEvaluator evaluator,
       SignalSource signalSource,
@@ -77,9 +80,31 @@ public final class RuleRunner {
     if (tickInterval.isZero() || tickInterval.isNegative()) {
       throw new IllegalArgumentException("tickInterval must be > 0, got " + tickInterval);
     }
-    this.executor =
-        Executors.newSingleThreadScheduledExecutor(daemonThreadFactory("rule-runner"));
-    precompileAll();
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.rule-runner",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.executorRegistration = registration;
+      this.executor =
+          registration.openScheduled(daemonThreadFactory("rule-runner"));
+      precompileAll();
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   /** Starts periodic evaluation. Idempotent: a second call is a no-op. */
@@ -108,6 +133,8 @@ public final class RuleRunner {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       executor.shutdownNow();
+    } finally {
+      executorRegistration.close();
     }
   }
 

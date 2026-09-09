@@ -2,6 +2,10 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 
 import io.justsearch.ipc.PruneRequest;
 import io.justsearch.ipc.PruneResponse;
@@ -13,7 +17,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +44,7 @@ final class SyncOps {
 
     private final IngestRpcExecutor rpc;
     private final Map<Path, Instant> watchedRoots;
+    private final EngineExecutorRegistry.Registration schedulerRegistration;
     /**
      * Tempdoc 626 §Axis-C — records the per-root delete-detection verification outcome of a force=false
      * reconcile so the FE can show a "couldn't verify" state instead of a false "✓ indexed". No-op until
@@ -59,28 +63,42 @@ final class SyncOps {
     private ScheduledFuture<?> syncTask;
     private final AtomicLong currentRootIndex = new AtomicLong(0);
 
-    SyncOps(IngestRpcExecutor rpc, Map<Path, Instant> watchedRoots) {
-        this(rpc, watchedRoots, (root, unverified) -> {}, (root, count) -> {});
+    SyncOps(
+        EngineExecutorRegistry executors, IngestRpcExecutor rpc, Map<Path, Instant> watchedRoots) {
+        this(executors, rpc, watchedRoots, (root, unverified) -> {}, (root, count) -> {});
     }
 
     SyncOps(
+        EngineExecutorRegistry executors,
         IngestRpcExecutor rpc,
         Map<Path, Instant> watchedRoots,
         java.util.function.BiConsumer<Path, Boolean> recordUnverified) {
-        this(rpc, watchedRoots, recordUnverified, (root, count) -> {});
+        this(executors, rpc, watchedRoots, recordUnverified, (root, count) -> {});
     }
 
     SyncOps(
+        EngineExecutorRegistry executors,
         IngestRpcExecutor rpc,
         Map<Path, Instant> watchedRoots,
         java.util.function.BiConsumer<Path, Boolean> recordUnverified,
         java.util.function.BiConsumer<Path, Integer> recordDriftCorrected) {
+        Objects.requireNonNull(executors, "executors");
         this.rpc = Objects.requireNonNull(rpc, "rpc");
         this.watchedRoots = Objects.requireNonNull(watchedRoots, "watchedRoots");
         this.recordUnverified =
             recordUnverified == null ? (root, unverified) -> {} : recordUnverified;
         this.recordDriftCorrected =
             recordDriftCorrected == null ? (root, count) -> {} : recordDriftCorrected;
+        EngineExecutorRegistry.Limits background = executors.limits(Kind.BACKGROUND);
+        this.schedulerRegistration =
+            executors.register(
+                new EngineExecutorSpec(
+                    "knowledge-client-periodic-sync",
+                    Kind.BACKGROUND,
+                    Mode.SCHEDULED,
+                    1,
+                    background.maxQueue(),
+                    1));
     }
 
     // ========== RPC helpers ==========
@@ -193,7 +211,7 @@ final class SyncOps {
         }
 
         syncScheduler =
-                Executors.newSingleThreadScheduledExecutor(
+                schedulerRegistration.openScheduled(
                         r -> {
                             Thread t = new Thread(r, "sync-scheduler");
                             t.setDaemon(true);
@@ -244,16 +262,10 @@ final class SyncOps {
             syncTask = null;
         }
         if (syncScheduler != null) {
-            syncScheduler.shutdown();
-            try {
-                if (!syncScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    syncScheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                syncScheduler.shutdownNow();
-            }
+            schedulerRegistration.close();
             syncScheduler = null;
+        } else {
+            schedulerRegistration.close();
         }
         log.debug("Periodic sync scheduler stopped");
     }

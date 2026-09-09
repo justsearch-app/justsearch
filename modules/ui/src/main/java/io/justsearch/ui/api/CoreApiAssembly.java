@@ -215,6 +215,7 @@ final class CoreApiAssembly {
     io.justsearch.ui.observability.GpuSaturationMonitor gpuSaturationMonitor = new io.justsearch.ui.observability.GpuSaturationMonitor();
     io.justsearch.ui.observability.GpuSaturationSampler gpuSaturationSampler =
         new io.justsearch.ui.observability.GpuSaturationSampler(
+            b.executors,
             () -> gpuCapabilitiesService, gpuSaturationMonitor);
     statusLifecycleHandler.setGpuSaturationMonitor(gpuSaturationMonitor);
     // Tempdoc 672 follow-up: idle/energy-aware VDU auto-trigger sampler, same shape as
@@ -223,6 +224,7 @@ final class CoreApiAssembly {
     final HeadAssembly headForVduSampler = b.HeadAssembly;
     io.justsearch.app.services.vdu.VduOfflineTriggerSampler vduOfflineTriggerSampler =
         new io.justsearch.app.services.vdu.VduOfflineTriggerSampler(
+            b.executors,
             () ->
                 headForVduSampler != null
                     ? headForVduSampler.headInfraRegistry().offlineCoordinator()
@@ -354,7 +356,7 @@ final class CoreApiAssembly {
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(llamaServerPortSupplier, telemetry);
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry);
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).
@@ -370,7 +372,7 @@ final class CoreApiAssembly {
     EffectiveConfigController effectiveConfigController =
         new EffectiveConfigController(portSupplier, b.settingsStore, enterprisePolicyService,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(), b.indexBasePath,
-            ConfigStore.globalOrNull());
+            ConfigStore.globalOrNull(), b.engineAdmission);
     SessionPoliciesController sessionPoliciesController =
         b.knowledgeServer != null
             ? new SessionPoliciesController(b.knowledgeServer.client())
@@ -394,6 +396,7 @@ final class CoreApiAssembly {
     } else {
       runtimeActivationHelper =
           new RuntimeActivationService(
+              b.executors,
               onlineAi,
               b.settingsStore,
               gpuCapabilitiesService,
@@ -417,7 +420,8 @@ final class CoreApiAssembly {
       }
     }
     AiRuntimeController aiRuntimeController =
-        new AiRuntimeController(runtimeActivationHelper, telemetry);
+        new AiRuntimeController(runtimeActivationHelper, telemetry,
+            b.HeadAssembly == null || b.HeadAssembly.serviceOut() == null);
     // Tempdoc 656 Task 4: read-only reconciliation of the model registry against on-disk
     // presence — reuses aiInstallHelper + runtimeActivationHelper, no new resolution logic.
     AiModelsController aiModelsController =

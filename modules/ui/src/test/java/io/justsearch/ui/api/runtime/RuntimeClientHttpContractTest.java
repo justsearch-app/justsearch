@@ -41,7 +41,7 @@ class RuntimeClientHttpContractTest {
               config.showJavalinBanner = false;
               config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
             });
-    new RuntimeApiRoutes(publisher).register(app);
+    new RuntimeApiRoutes(new io.justsearch.core.execution.TestEngineExecutors(), publisher).register(app);
     app.start("127.0.0.1", 0);
     client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
   }

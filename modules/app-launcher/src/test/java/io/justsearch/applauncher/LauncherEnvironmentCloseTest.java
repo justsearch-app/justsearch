@@ -17,24 +17,47 @@ final class LauncherEnvironmentCloseTest {
   @TempDir Path tempDir;
   private String originalConfig;
   private String originalEgress;
+  private String originalDataDir;
 
   @BeforeEach
   void captureProperties() {
     originalConfig = System.getProperty("justsearch.config");
     originalEgress = System.getProperty("egress.block_all");
+    originalDataDir = System.getProperty("justsearch.data.dir");
   }
 
   @AfterEach
   void restoreProperties() {
+    LauncherEnvironment.resetFactories();
     restoreProperty("justsearch.config", originalConfig);
     restoreProperty("egress.block_all", originalEgress);
+    restoreProperty("justsearch.data.dir", originalDataDir);
+  }
+
+  @Test
+  void failingConfigConstructionRestoresPropertiesBeforeAnyOtherOwnerExists() throws Exception {
+    System.setProperty("justsearch.config", "previous-config");
+    System.setProperty("egress.block_all", "false");
+    var failure = new java.io.IOException("config failure");
+    LauncherEnvironment.installFactories(() -> { throw failure; },
+        (executors, dataDir, profile) -> { throw new AssertionError("telemetry must not start"); },
+        (executors, telemetry, config) -> { throw new AssertionError("assembly must not start"); });
+    try {
+      org.junit.jupiter.api.Assertions.assertSame(failure,
+          org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+              () -> LauncherEnvironment.create("smoke")));
+      assertEquals("previous-config", System.getProperty("justsearch.config"));
+      assertEquals("false", System.getProperty("egress.block_all"));
+    } finally {
+      LauncherEnvironment.resetFactories();
+    }
   }
 
   @Test
   void closeClearsSystemPropertiesWhenUnsetPreviously() throws Exception {
     System.setProperty("justsearch.config", "temp-config");
     System.setProperty("egress.block_all", "true");
-    LocalTelemetry telemetry = new LocalTelemetry(tempDir, 1_000, "launcher-test", "close-null");
+    LocalTelemetry telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 1_000, "launcher-test", "close-null");
     LauncherEnvironment environment =
         allocateEnvironment(telemetry, null, null, tempDir.resolve("profile-null"));
 
@@ -45,10 +68,46 @@ final class LauncherEnvironmentCloseTest {
   }
 
   @Test
+  void failureAfterConfigPublicationRestoresPriorStoreIncludingUninitializedState() throws Exception {
+    var original = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    var originalDataDir = System.getProperty("justsearch.data.dir");
+    System.setProperty("justsearch.data.dir", tempDir.toString());
+    try {
+      for (var previous : new io.justsearch.configuration.resolved.ConfigStore[] {
+          null, Mockito.mock(io.justsearch.configuration.resolved.ConfigStore.class)}) {
+        var current = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+        if (current != null) io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(current, previous);
+        else if (previous != null) io.justsearch.configuration.resolved.ConfigStore.setGlobal(previous);
+        var failure = new IllegalStateException("telemetry construction failed after publication");
+        LauncherEnvironment.installFactories(
+            () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+            (executors, dataDir, profile) -> {
+              org.junit.jupiter.api.Assertions.assertNotNull(
+                  io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
+              org.junit.jupiter.api.Assertions.assertNotSame(previous,
+                  io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
+              throw failure;
+            },
+            (executors, telemetry, config) -> { throw new AssertionError("assembly must not start"); });
+        org.junit.jupiter.api.Assertions.assertSame(failure,
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> LauncherEnvironment.create("smoke")));
+        org.junit.jupiter.api.Assertions.assertSame(previous,
+            io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
+      }
+    } finally {
+      restoreProperty("justsearch.data.dir", originalDataDir);
+      var current = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+      if (current != null) io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(current, original);
+      else if (original != null) io.justsearch.configuration.resolved.ConfigStore.setGlobal(original);
+    }
+  }
+
+  @Test
   void closeRestoresPreviousSystemProperties() throws Exception {
     System.setProperty("justsearch.config", "temp-config");
     System.setProperty("egress.block_all", "true");
-    LocalTelemetry telemetry = new LocalTelemetry(tempDir, 1_000, "launcher-test", "close-restore");
+    LocalTelemetry telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 1_000, "launcher-test", "close-restore");
     LauncherEnvironment environment =
         allocateEnvironment(telemetry, "previous-config", "false", tempDir.resolve("profile-restore"));
 
@@ -59,8 +118,28 @@ final class LauncherEnvironmentCloseTest {
   }
 
   @Test
+  void smokeDefaultUsesResolvedPathWithoutLiteralInterpolationAndRestoresItOnFailure() throws Exception {
+    System.clearProperty("justsearch.data.dir");
+    Path expected = io.justsearch.configuration.EnvRegistry.DATA_DIR.get()
+        .map(io.justsearch.configuration.PlatformPaths::expandUserHomePlaceholders)
+        .map(Path::of).orElseGet(() -> Path.of(System.getProperty("user.home"), ".justsearch-smoke"));
+    var failure = new IllegalStateException("stop before telemetry creates files");
+    LauncherEnvironment.installFactories(
+        () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+        (executors, dataDir, profile) -> {
+          assertEquals(expected, dataDir);
+          assertEquals(expected, io.justsearch.configuration.resolved.ConfigStore.global().get().paths().dataDir());
+          throw failure;
+        }, null);
+    org.junit.jupiter.api.Assertions.assertSame(failure,
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+            () -> LauncherEnvironment.create("smoke")));
+    assertEquals(null, System.getProperty("justsearch.data.dir"));
+  }
+
+  @Test
   void accessorsReturnAssignedValues() throws Exception {
-    LocalTelemetry telemetry = new LocalTelemetry(tempDir, 1_000, "launcher-test", "accessors");
+    LocalTelemetry telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 1_000, "launcher-test", "accessors");
     Path profile = tempDir.resolve("profile-accessors");
     LauncherEnvironment environment =
         allocateEnvironment(telemetry, null, null, profile);
@@ -86,6 +165,7 @@ final class LauncherEnvironmentCloseTest {
     setField(environment, "previousEgressProperty", previousEgress);
     setField(environment, "configManager", null);
     setField(environment, "telemetry", telemetry);
+    setField(environment, "executors", new io.justsearch.core.execution.TestEngineExecutors());
     setField(environment, "HeadAssembly", null);
     return environment;
   }

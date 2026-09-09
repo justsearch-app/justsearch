@@ -32,7 +32,6 @@ import io.justsearch.app.services.braininstall.BrainInstallServiceImpl;
 import io.justsearch.app.services.brainruntime.BrainRuntimeServiceImpl;
 import io.justsearch.app.services.diagnostics.DiagnosticsServiceImpl;
 import io.justsearch.app.services.excludes.ExcludesServiceImpl;
-import io.justsearch.app.services.lease.OperationLeaseServiceImpl;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.packimport.PackImportServiceImpl;
@@ -75,6 +74,8 @@ public final class ServicePhase {
 
   /** Bundled inputs (record keeps the parameter surface manageable). */
   public record Input(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
       KnowledgeServerBootstrap knowledgeServer,
       KnowledgeClient knowledgeClient,
       IndexingService indexingService,
@@ -94,7 +95,8 @@ public final class ServicePhase {
       // Tempdoc 672 follow-up: live supplier for the Head's own activity/energy signals (used to
       // abort an in-progress VDU batch if the user becomes active mid-run) — same live-reference
       // rationale as knowledgeClientSupplier above.
-      Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier) {}
+      Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
+      OperationLeaseService operationLeases) {}
 
   /**
    * Inference-manager teardown handles (tempdoc 737 Phase 1). Bundles the GPU-broadcast listener
@@ -182,7 +184,7 @@ public final class ServicePhase {
     // (moved from below) so the runtime reconciler can read the online-AI policy ceiling.
     EnterprisePolicyService enterprisePolicy = new EnterprisePolicyServiceImpl();
     if (in.inferenceManager() != null) {
-      onlineAiService = new OnlineAiServiceImpl(in.inferenceManager());
+      onlineAiService = new OnlineAiServiceImpl(in.engineAdmission(), in.inferenceManager());
       gpuListener = InferenceWiring.wireGpuStatusBroadcast(in.inferenceManager(), in.knowledgeServer());
       // Tempdoc 672 follow-up: composed once here and threaded down as a single BooleanSupplier —
       // VduBatchProcessor doesn't need to know about KnowledgeServerBootstrap/EnergyState itself,
@@ -287,6 +289,7 @@ public final class ServicePhase {
         };
     RuntimeActivationService runtimeActivationHelper =
         new RuntimeActivationService(
+            in.executors(),
             onlineAiService,
             in.settingsStore(),
             gpuCapabilitiesService,
@@ -342,9 +345,8 @@ public final class ServicePhase {
             debugProviderSupplier,
             statusProviderSupplier);
 
-    // Tempdoc 542: op-lease SPI. Reads JUSTSEARCH_DEV_RUNNER_STATE_ROOT env var; no-op when
-    // unset (production / non-dev-runner launch). Single Java writer to op-leases.json.
-    OperationLeaseService operationLeaseService = new OperationLeaseServiceImpl();
+    // One precomposed process-local admission owner; only its dev-runner file projection is optional.
+    OperationLeaseService operationLeaseService = java.util.Objects.requireNonNull(in.operationLeases());
 
     // Tempdoc 617: both services run their work on background threads that outlive the HTTP
     // request, so the request-scoped mutation lease is released while multi-GB asset writes are

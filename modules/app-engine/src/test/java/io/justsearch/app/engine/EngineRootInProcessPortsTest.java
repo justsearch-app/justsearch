@@ -98,7 +98,7 @@ final class EngineRootInProcessPortsTest {
     root =
         new EngineRoot(
             g -> {
-              built[0] = new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g));
+              built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];
             },
             30_000L,
@@ -173,7 +173,7 @@ final class EngineRootInProcessPortsTest {
     root =
         new EngineRoot(
             g -> {
-              built[0] = new KnowledgeServer(WorkerConfig.load(), new InProcessWorkerSignalBus(g));
+              built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];
             },
             1L,

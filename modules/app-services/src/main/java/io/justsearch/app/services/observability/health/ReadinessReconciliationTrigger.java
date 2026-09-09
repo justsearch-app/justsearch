@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.observability.health;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -54,13 +56,41 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
   private static final Logger log =
       LoggerFactory.getLogger(ReadinessReconciliationTrigger.class);
 
-  private final ExecutorService executor =
-      Executors.newSingleThreadExecutor(
-          runnable -> {
-            Thread thread = new Thread(runnable, "readiness-reconcile");
-            thread.setDaemon(true);
-            return thread;
-          });
+  private final EngineExecutorRegistry.Registration executorRegistration;
+  private final ExecutorService executor;
+
+  public ReadinessReconciliationTrigger(EngineExecutorRegistry processExecutors) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.readiness-reconcile",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ExecutorService executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "readiness-reconcile");
+                thread.setDaemon(true);
+                return thread;
+              });
+      this.executorRegistration = registration;
+      this.executor = executor;
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
 
   /** Coalescing latch: true while exactly one reconcile is queued and not yet started. */
   private final AtomicBoolean pending = new AtomicBoolean(false);
@@ -135,5 +165,6 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
       return;
     }
     executor.shutdownNow();
+    executorRegistration.close();
   }
 }

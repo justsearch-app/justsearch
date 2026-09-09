@@ -76,6 +76,7 @@ public final class SubstratePhase {
    * otherwise Ready. No clear Degraded scenario at the surface today.
    */
   public static io.justsearch.app.services.bootstrap.PhaseOutcome<Output> runWithOutcome(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
       Supplier<KnowledgeClient> knowledgeClientSupplier,
@@ -97,6 +98,7 @@ public final class SubstratePhase {
     try {
       return new io.justsearch.app.services.bootstrap.PhaseOutcome.Ready<>(
           runInternal(
+              executors,
               telemetry,
               knowledgeServerSupplier,
               knowledgeClientSupplier,
@@ -125,6 +127,7 @@ public final class SubstratePhase {
    * the single entry point is the sealed-sum {@code runWithOutcome(...)} above.
    */
   private static Output runInternal(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
       Supplier<KnowledgeClient> knowledgeClientSupplier,
@@ -217,13 +220,13 @@ public final class SubstratePhase {
     // Resource + Metric substrates (no cross-deps; independent).
     ResourceSubstrateInit.Output resourceOut =
         ResourceSubstrateInit.run(BootstrapHelpers.initialRuntimeContext());
-    MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(telemetry);
+    MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(executors, telemetry);
 
     // Operation substrate — needs handlers + 2 catalogs + capability resolver.
     // Runs BEFORE the indexing-jobs bridge so its ActionLedgerChangeRegistry is available to the
     // bridge's terminal-outcome translator (tempdoc 550 thesis I); neither depends on the other.
     OperationSubstrateInit.Output operationOut =
-        OperationSubstrateInit.run(
+        OperationSubstrateInit.run(executors,
             operationHandlers,
             operationCatalog,
             agentToolsCatalog,
@@ -235,6 +238,7 @@ public final class SubstratePhase {
     // action-ledger registry (terminal indexing outcomes fan into the ONE log; tempdoc 550 thesis I).
     var bridgeOut =
         IndexingJobsBridgeWiring.wire(
+            executors,
             knowledgeClientSupplier,
             resourceOut.indexingJobsChangeRegistry(),
             operationOut.actionLedgerChangeRegistry());
@@ -242,7 +246,7 @@ public final class SubstratePhase {
     // Health substrate — needs healthRecoveryProjector + advisoryChangeRegistry + advisoryLogs
     // (from operationOut) + conditionRecoveryIndexChangeRegistry (from resourceOut).
     HealthSubstrateInit.Output healthOut =
-        HealthSubstrateInit.run(
+        HealthSubstrateInit.run(executors,
             BootstrapHelpers.resolveOccurrenceBufferSize(),
             operationOut.healthRecoveryProjector(),
             operationOut.advisoryChangeRegistry(),
@@ -251,7 +255,7 @@ public final class SubstratePhase {
 
     // Rule runner — needs telemetry + health condition store/registry/source.
     RuleRunner ruleRunner =
-        RuleRunnerBuilder.build(
+        RuleRunnerBuilder.build(executors,
             telemetry,
             healthOut.conditionStore(),
             healthOut.healthEventChangeRegistry(),

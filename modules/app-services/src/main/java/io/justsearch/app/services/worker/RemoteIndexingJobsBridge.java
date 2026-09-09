@@ -2,6 +2,8 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.app.api.indexing.IndexingJobView;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
 import java.util.ArrayList;
@@ -83,6 +85,8 @@ public final class RemoteIndexingJobsBridge {
   }
 
   private final Supplier<IndexingJobsSource> sourceSupplier;
+  private final EngineExecutorRegistry.Registration reconnectRegistration;
+  private final java.util.concurrent.ScheduledExecutorService reconnects;
   private volatile KnowledgeClient.IndexingJobsStream stream;
   private final List<Consumer<Delta>> listeners = new CopyOnWriteArrayList<>();
   /**
@@ -112,14 +116,6 @@ public final class RemoteIndexingJobsBridge {
 
   static final int RECONNECT_MAX_PER_MINUTE = 6;
 
-  private final java.util.concurrent.ScheduledExecutorService reconnects =
-      java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "indexing-jobs-bridge-reconnect");
-            t.setDaemon(true);
-            return t;
-          });
-
   private final java.util.concurrent.atomic.AtomicInteger consecutiveFailures =
       new java.util.concurrent.atomic.AtomicInteger();
 
@@ -139,8 +135,38 @@ public final class RemoteIndexingJobsBridge {
    * the client and asks it for a {@link KnowledgeClient.IndexingJobsStream}, so the same fan-out
    * works whether the frames arrive over a socket or from the worker's change stream in this JVM.
    */
-  public RemoteIndexingJobsBridge(Supplier<IndexingJobsSource> sourceSupplier) {
+  public RemoteIndexingJobsBridge(
+      EngineExecutorRegistry processExecutors, Supplier<IndexingJobsSource> sourceSupplier) {
     this.sourceSupplier = Objects.requireNonNull(sourceSupplier, "sourceSupplier");
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.indexing-jobs-bridge-reconnect",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.reconnectRegistration = registration;
+      this.reconnects =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, "indexing-jobs-bridge-reconnect");
+                thread.setDaemon(true);
+                return thread;
+              });
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -215,6 +241,7 @@ public final class RemoteIndexingJobsBridge {
         log.warn("RemoteIndexingJobsBridge: closing the indexing-jobs flow failed", e);
       }
     }
+    reconnectRegistration.close();
   }
 
   /**

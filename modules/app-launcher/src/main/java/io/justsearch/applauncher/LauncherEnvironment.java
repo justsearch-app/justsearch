@@ -30,8 +30,12 @@ final class LauncherEnvironment implements AutoCloseable {
   private final Path profilePath;
   private final String previousConfigProperty;
   private final String previousEgressProperty;
+  private final String previousDataDirProperty;
+  private final ConfigStore previousConfigStore;
+  private final ConfigStore installedConfigStore;
   private final ConfigManagerBootstrap configManager;
   private final LocalTelemetry telemetry;
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final HeadAssembly HeadAssembly;
   private static final ConfigManagerFactory DEFAULT_CONFIG_MANAGER_FACTORY =
       ConfigManagerBootstrap::new;
@@ -41,9 +45,9 @@ final class LauncherEnvironment implements AutoCloseable {
   // LayeringEnforcementTest rule) so app-launcher can import their DEFINITIONS without
   // depending on `ui`.
   private static final TelemetryFactory DEFAULT_TELEMETRY_FACTORY =
-      (dataDir, profile) ->
+      (executors, dataDir, profile) ->
           new LocalTelemetry(
-              dataDir,
+              executors, dataDir,
               5_000,
               "justsearch-launcher",
               profile,
@@ -86,9 +90,9 @@ final class LauncherEnvironment implements AutoCloseable {
                   // Worker — its memory/threads do not flow to either of those metric files).
                   io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher")));
   private static final AppFacadeFactory DEFAULT_APP_FACADE_FACTORY =
-      (telemetry, configManager) ->
+      (executors, telemetry, configManager) ->
           new HeadAssembly(
-              telemetry,
+              executors, telemetry,
               configManager,
               null,
               new io.justsearch.app.services.settings.UiSettingsStore(
@@ -127,19 +131,54 @@ final class LauncherEnvironment implements AutoCloseable {
     this.profilePath = resolveProfilePath(profile);
     this.previousConfigProperty = System.getProperty(EnvRegistry.CONFIG_PATH.sysProp());
     this.previousEgressProperty = System.getProperty("egress.block_all");
-    System.setProperty("justsearch.config", profilePath.toString());
-    System.setProperty("egress.block_all", "true");
-    this.configManager = configManagerFactory.create();
-    // Initialize ConfigStore so downstream code (SmokeDriver, etc.) can use ordinal-based resolution.
-    ResolvedConfigBuilder rcBuilder = ResolvedConfig.builder();
-    rcBuilder.contributeBaseSources();
-    ConfigStore.setGlobal(new ConfigStore(rcBuilder.build()));
-    this.telemetry = telemetryFactory.create(PlatformPaths.resolveDataDir(), profile);
-    // Phase 3d: construct the Launcher JVM catalog so its async gauges are wired to the
-    // Launcher's LocalTelemetry registry (matches LocalApiServer ("head") / KnowledgeServer
-    // ("worker") wireup pattern).
-    io.justsearch.telemetry.JvmRuntimeGauges.register(this.telemetry, "launcher");
-    this.HeadAssembly = appFacadeFactory.create(telemetry, configManager);
+    this.previousDataDirProperty = System.getProperty(EnvRegistry.DATA_DIR.sysProp());
+    ConfigStore previousStore = ConfigStore.globalOrNull();
+    ConfigStore installedStore = null;
+    io.justsearch.core.execution.EngineExecutorRegistry createdExecutors = null;
+    LocalTelemetry createdTelemetry = null;
+    try {
+      System.setProperty("justsearch.config", profilePath.toString());
+      System.setProperty("egress.block_all", "true");
+      ConfigManagerBootstrap createdConfig = configManagerFactory.create();
+      ResolvedConfigBuilder rcBuilder = ResolvedConfig.builder();
+      rcBuilder.contributeBaseSources();
+      if ("smoke".equals(profile)) {
+        rcBuilder.putDefault(EnvRegistry.DATA_DIR.sysProp(),
+            Path.of(System.getProperty("user.home"), ".justsearch-smoke").toString());
+      }
+      installedStore = new ConfigStore(rcBuilder.build());
+      ConfigStore.setGlobal(installedStore);
+      Path resolvedDataDir = installedStore.get().paths().dataDir();
+      if (resolvedDataDir != null) {
+        // Keep legacy PlatformPaths consumers aligned with this scoped resolved configuration.
+        System.setProperty(EnvRegistry.DATA_DIR.sysProp(), resolvedDataDir.toString());
+      }
+      createdExecutors = loadExecutors(java.util.ServiceLoader.load(
+          io.justsearch.core.execution.EngineExecutorRegistry.class).stream().toList());
+      createdTelemetry = telemetryFactory.create(
+          createdExecutors, PlatformPaths.resolveDataDir(), profile);
+      io.justsearch.telemetry.JvmRuntimeGauges.register(createdTelemetry, "launcher");
+      this.HeadAssembly = appFacadeFactory.create(createdExecutors, createdTelemetry, createdConfig);
+      this.configManager = createdConfig;
+      this.executors = createdExecutors;
+      this.telemetry = createdTelemetry;
+      this.previousConfigStore = previousStore;
+      this.installedConfigStore = installedStore;
+    } catch (Exception | Error failure) {
+      if (createdTelemetry != null) {
+        try { createdTelemetry.close(); } catch (RuntimeException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      if (createdExecutors != null) {
+        try { createdExecutors.close(); } catch (RuntimeException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      if (installedStore != null) ConfigStore.restoreGlobal(installedStore, previousStore);
+      restoreProperties();
+      throw failure;
+    }
   }
 
   @SuppressWarnings("unused") // Called from LauncherEnvironmentCloseTest
@@ -168,12 +207,14 @@ final class LauncherEnvironment implements AutoCloseable {
 
   @FunctionalInterface
   interface TelemetryFactory {
-    LocalTelemetry create(Path dataDir, String profile) throws Exception;
+    LocalTelemetry create(io.justsearch.core.execution.EngineExecutorRegistry executors,
+        Path dataDir, String profile) throws Exception;
   }
 
   @FunctionalInterface
   interface AppFacadeFactory {
-    HeadAssembly create(LocalTelemetry telemetry, ConfigManagerBootstrap configManager)
+    HeadAssembly create(io.justsearch.core.execution.EngineExecutorRegistry executors,
+        LocalTelemetry telemetry, ConfigManagerBootstrap configManager)
         throws Exception;
   }
 
@@ -189,7 +230,27 @@ final class LauncherEnvironment implements AutoCloseable {
   @Override
   public void close() {
     Faults.debugAndContinue(LOG, "shutdown", () -> HeadAssembly.close());
-    telemetry.close();
+    try {
+      telemetry.close();
+    } finally {
+      try { executors.close(); } finally { restoreProperties(); }
+    }
+  }
+
+  static io.justsearch.core.execution.EngineExecutorRegistry loadExecutors(
+      java.util.List<java.util.ServiceLoader.Provider<
+          io.justsearch.core.execution.EngineExecutorRegistry>> providers) {
+    if (providers.size() != 1) {
+      throw new IllegalStateException("Expected exactly one Engine executor registry provider, found "
+          + providers.size());
+    }
+    return providers.getFirst().get();
+  }
+
+  private void restoreProperties() {
+    if (installedConfigStore != null) ConfigStore.restoreGlobal(installedConfigStore, previousConfigStore);
+    if (previousDataDirProperty == null) System.clearProperty(EnvRegistry.DATA_DIR.sysProp());
+    else System.setProperty(EnvRegistry.DATA_DIR.sysProp(), previousDataDirProperty);
     if (previousConfigProperty == null) {
       System.clearProperty("justsearch.config");
     } else {

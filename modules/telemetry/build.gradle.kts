@@ -10,6 +10,8 @@ plugins {
 val sourceSets = the<SourceSetContainer>()
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
+  api(project(":modules:core"))
   api(libs.opentelemetry.api)
   implementation(libs.opentelemetry.sdk)
   api(libs.opentelemetry.sdk.metrics)
