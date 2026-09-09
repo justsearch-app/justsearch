@@ -127,7 +127,8 @@ final class EngineTestHarness implements AutoCloseable {
   }
 
   StatusResponse status() {
-    return client.getStatus(TestEngineContexts.FOREGROUND);
+    // Observation must not create the foreground contention these helpers are waiting on.
+    return client.getStatus(TestEngineContexts.BACKGROUND);
   }
 
   /** The worker's coarse lifecycle state ({@code IDLE}, {@code INDEXING}, {@code PAUSED}, …). */

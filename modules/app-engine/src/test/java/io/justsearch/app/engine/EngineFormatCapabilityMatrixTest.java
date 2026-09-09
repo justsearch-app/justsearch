@@ -137,6 +137,7 @@ final class EngineFormatCapabilityMatrixTest {
   private static List<Map<String, Object>> ledger;
 
   @BeforeAll
+  @Timeout(600) // Class-level @Timeout does not cover lifecycle methods.
   static void indexTheMatrix() throws Exception {
     // A sibling of the Engine's data directory, never a parent of it: nothing here should be
     // able to enqueue the Lucene index into itself.
@@ -234,7 +235,7 @@ final class EngineFormatCapabilityMatrixTest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (true) {
       List<Map<String, Object>> matrixEvents =
-          harness.client().recentIngestionEvents(LEDGER_LIMIT, TestEngineContexts.FOREGROUND).stream()
+          harness.client().recentIngestionEvents(LEDGER_LIMIT, TestEngineContexts.BACKGROUND).stream()
               .filter(event -> MATRIX_PATH_HASHES.contains(event.get("pathHash")))
               .toList();
       if (matrixEvents.size() >= expectedRows || System.currentTimeMillis() >= deadline) {

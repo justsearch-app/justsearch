@@ -147,3 +147,36 @@ evidence pages. Filtered stress188 stops on modules with no matching test names.
 stress190 is running and reported a format-matrix initialization timeout. Hosted1c7fcfff9 still
 has ADR-coverage (corrected3ccf3749b) and indexing-to-action-ledger integration failures. No final
 C1 acceptance is claimed.
+
+
+## Integrated190 and observer correction
+
+Run190 completed FAILED in14m38s (368tasks:94executed,17fromcache,257up-to-date).
+Snapshot tmp/c1-integrated-native-stress-results-190/manifest.json contains1597unit suites,
+9712represented tests,1failure,0errors,25skips; configured integration36tests,0failures,10skips.
+The lower count includes the matrix's failed setup rather than its11 normal cases. Existing
+NativeSessionHandleConcurrentStressTest executed at11:07:40UTC and passed; the three GPU waiter
+cases passed, and all six ForegroundLoadGate cases executed at11:20:59UTC and passed. Their
+meaning and native shutdown limits are unchanged. All XML was copied before focused reruns.
+
+The sole failure is EngineFormatCapabilityMatrixTest.indexTheMatrix: exact XML says30seconds,
+not the class's600seconds. JUnit class-level Timeout does not apply to BeforeAll. Its120second
+index wait was interrupted while processing the third fixture, after fixture generation and
+Engine boot consumed about17seconds. The same log shows the test's own status polls activating
+foreground pacing. EngineTestHarness.status had been mechanically stamped FOREGROUND in C1,
+although it is an observer; the existing EngineForegroundPacingTest correctly uses BACKGROUND
+for these reads. Root corrects the helper and matrix ledger polling to BACKGROUND, and applies
+the already-declared600second suite budget explicitly to setup. Content, ledger, identity and
+bounded120second convergence assertions remain unchanged. Focused restored202 passes all13cases: matrix11 (16.003s including setup), Engine foreground
+pacing1 (27.433s), broken-child workflow1 (3.436s). XML is preserved in tmp/c1-matrix-restored-202/.
+This Engine pacing test uses the deterministic fixture path; final standard-model pacing is
+still required. The read-only audit independently confirms the setup timeout and that the new
+broken-child workflow ran later than the failed matrix, so it could not contaminate that setup.
+
+Public claims local-subset197 passed lock completeness/install and54/55analytics files; only
+world-state.test's performance assertion failed at10108ms against its unchanged10000ms bound
+while integrated190 was running. With Gradle stopped, standalone200 passes all16world-state
+checks. No threshold/suppression changed. The remaining manifest commands201 PASS, including governance tests, docs, skills, and canonical
+Markdown. Together197 plus targeted200 and continuation201 reconcile the Public claims local
+subset. This does not replace the separate hosted ADR gate or hosted integration tier.
+Local npm reported the existing ini7 engine-range warning on Node24.12.0; it was not hidden.
