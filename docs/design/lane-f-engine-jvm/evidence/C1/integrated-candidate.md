@@ -81,3 +81,44 @@ its old loadSensitive/system/updateSchemas reports as fresh164 execution. Full t
 tmp/c1-batch4-integrated-green-164/manifest.json. Source fix65f65d36c is pushed. Exact previous
 red results are preserved rather than overwritten. Installed standard-model live proof and final
 hosted/platform proof remain outstanding.
+
+
+## Installed standard-model campaign (2026-09-09, in progress)
+
+Installed revision `db368e353`, stamp `ddfbc9256c22bbd4`, Windows/Temurin 25.0.2.
+The current worktree dev runner rebuilt/installed before launch. The attached older MCP
+preflight still requires the deleted Worker distribution; its other checks passed. The
+worktree runner uses the same shared lease and single Engine distribution (the already
+recorded stale-helper correction), not a second stack or restored Worker artifact.
+
+Aggregate run165/166: owned run `ad26d7c9-3cd2-449f-8611-5f807aa9e965`, API54446,
+fresh `tmp/c1-final-standard-aggregate-data`, eval mode and aggregate limit3. Initial
+`worker.core.indexedDocuments=0`; standard activation completed and inference status
+reported `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, online/available, CUDA12, context32768, two slots.
+`node scripts/jseval/lane-f/admission-loop.mjs --capture tmp/c1-final-standard-aggregate --base-url http://127.0.0.1:54446`
+and `--analyze tmp/c1-final-standard-aggregate` both PASS. Each arm offered4, admitted2,
+returned2 HTTP429 `ADMISSION_ENGINE_LIMIT`, with no per-context rejection. Baseline and
+final active count1; configured per-context16/aggregate3. Independent raw JSON reread:
+many-context latest overflow headers37.0783ms precede first holder terminal1235.7305ms;
+one-context10.73ms precedes1050.2529ms. Each holder reports one done, zero errors, EOF.
+This is reduced-cap aggregate proof, not saturation of the default64. Stop succeeded,
+ports closed. Logs165/166 and captures are under tmp/c1-final-standard-*.
+
+Default run167/169: owned run `a7a93cdb-cd78-4069-9b74-b95fabe35ae3`, API61400,
+fresh `tmp/c1-final-standard-default-data`, eval mode, default aggregate64/per-context16.
+Initial indexedDocuments0; standard activation completed. The fairness capture command
+`node scripts/jseval/lane-f/admission-loop.mjs --capture-fairness tmp/c1-final-standard-fairness --base-url http://127.0.0.1:61400`
+passes:16 holders complete with one done/zero errors/EOF each; same-client search,
+suggest and MCP each return429 `ADMISSION_CONTEXT_LIMIT` with Retry-After1; health and
+another client's search return200. Independent raw reread: latest probe headers1672.918ms,
+earliest holder terminal7971.5026ms, final terminal120576.8286ms. Active baseline/final1.
+Raw `tmp/c1-final-standard-fairness/fairness.json`; log169.
+
+Run170 is now running continuous hybrid search while ingesting the identity-verified469-file
+synthetic corpus through jseval. This is pacing evidence, not corpus/search-quality certification;
+the corpus warnings remain in its log. Results and SPLADE correction proof remain pending.
+The owned default stack must stay up until this campaign completes, then be stopped normally.
+
+Hosted run34339800148 at the same revision has failures in Public claims, model-free Build,
+and app-ui unit tests under active triage. Other successes are partial hosted evidence, not
+final C1 acceptance. Workflow signal classification is preserved in tmp/c1-workflow-signal-168.txt.

@@ -5,9 +5,9 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-1021-utc).
+Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-1035-utc).
 
-## Current C1 batch 4 checkpoint (2026-09-09 10:21 UTC)
+## Current C1 batch 4 checkpoint (2026-09-09 10:35 UTC)
 
 Worktree `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
 A/B are complete at their recorded proof tier. C1 remains in progress; C2/D/E/F remain required.
@@ -16,7 +16,7 @@ The original dirty tree was split into ten per-item WIP commits and pushed; late
 that cadence. Push every commit immediately, checkpoint WIP at least hourly, and cap worker
 follow-ups at three before taking the diff at root. This is continuing work, not a pause.
 
-Latest pushed revision65f65d36c follows239ac1a6c (launcher configuration funnel),
+Latest pushed revision db368e353 follows65f65d36c and239ac1a6c (launcher configuration funnel),
 c57525718 (frontend lint correction),4a57950ae (OCR fixture), SSE bound a46b4544c, direct/three-way fanout proof 6c89796f2,
 async guard 66d85feb1, raw/census guards 749ae81dc, and Lucene generation/NRT correction 3f6fdeae5.
 Earlier per-source search e9ed79694 and OCR d0d09bc72 are also complete at focused proof tier.
@@ -48,8 +48,10 @@ RMW correction still needs the fresh live run. No final C1 acceptance is claimed
 CI wiring or intermediate successes are not final hosted proof. C2 owns its explicit operation-row
 urgency record and the design's awaitingProducer clauses remain labelled; nothing is owner-gated.
 
-The active session identity is01a082dc-dfd6-7d60-be2e-a8d088229a67. Only root runs Gradle; no dev
-stack is running. Use the dev tools and fresh isolated data with standard model after installDist.
+The active session identity is01a082dc-dfd6-7d60-be2e-a8d088229a67. Only root runs Gradle; the owned default-cap run a7a93cdb-cd78-4069-9b74-b95fabe35ae3
+is active on API61400 with a fresh index and standard model. Aggregate166 and fairness169 pass;
+continuous hybrid search/indexing170 is running. Stop the owned stack after the campaign.
+Hosted34339800148 has three failures under triage; see the advancing ledger.
 See evidence/C1/integrated-candidate.md for the advancing command/result ledger. Older notes below
 are historical when they disagree with this current state.
 
