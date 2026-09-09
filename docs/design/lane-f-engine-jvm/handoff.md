@@ -5,9 +5,9 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-1035-utc).
+Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-1104-utc).
 
-## Current C1 batch 4 checkpoint (2026-09-09 10:35 UTC)
+## Current C1 batch 4 checkpoint (2026-09-09 11:04 UTC)
 
 Worktree `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
 A/B are complete at their recorded proof tier. C1 remains in progress; C2/D/E/F remain required.
@@ -48,10 +48,26 @@ RMW correction still needs the fresh live run. No final C1 acceptance is claimed
 CI wiring or intermediate successes are not final hosted proof. C2 owns its explicit operation-row
 urgency record and the design's awaitingProducer clauses remain labelled; nothing is owner-gated.
 
-The active session identity is01a082dc-dfd6-7d60-be2e-a8d088229a67. Only root runs Gradle; the owned default-cap run a7a93cdb-cd78-4069-9b74-b95fabe35ae3
-is active on API61400 with a fresh index and standard model. Aggregate166 and fairness169 pass;
-continuous hybrid search/indexing170 is running. Stop the owned stack after the campaign.
-Hosted34339800148 has three failures under triage; see the advancing ledger.
+The active session identity is01a082dc-dfd6-7d60-be2e-a8d088229a67. No dev stack is active.
+Aggregate166 and fairness169 pass with the standard model; continuous hybrid search/indexing170
+FAILED after native GPU calls stalled and15 foreground callers waited uninterruptibly behind one
+native session. Admission correctly retained actual work; cancelled waiters could not leave.
+Interruptible waiter acquisition3b6a9914e passes focused and adverse proof; active native leases remain unchanged. Integrated190 is still required.
+Two unregistered compact-model llama processes abandoned on September7 were also found and retired
+only after process identity, absent parents and no connected clients were verified. The standard
+stack was stopped through its owner. Fresh pacing must run without those co-resident processes;
+the passed admission captures prove wire/count ordering, not uncontaminated performance.
+Hosted34339800148's three failures were traced and corrected: strict test-source compiler errors
+(09c329b46/9629f240b), the generator's vulnerable js-yaml dependency (2ea41b2d4), and the declared
+aggregate-cap configuration growth (1c7fcfff9). Strict focused181 and public-claims subjects180 pass
+locally; final hosted proof is still required. Latest pushed revision3ccf3749b (after native waiter fix3b6a9914e and Engine confinement proof d20ebf450).
+C1-14 exact Tika-import mutation185 fails for the intended forbidden dependency; restored186
+passes, including the same-session real Engine index/search/ledger proof for five routed families
+and the three decoder formats. These are committed in d20ebf450. ADR0048 reconciliation3ccf3749b
+fixes the next hosted Public claims failure. Hosted system integration still fails the live
+indexing-to-action-ledger projection; root-directed triage is active. Integrated190 also reported
+a format-matrix initialization timeout under investigation. Native shutdown quiescence is recorded
+as required D1 implementation, not established by the waiter fix or permissive old CPU stress test. C2 starts only after remaining C1 acceptance is reconciled.
 See evidence/C1/integrated-candidate.md for the advancing command/result ledger. Older notes below
 are historical when they disagree with this current state.
 

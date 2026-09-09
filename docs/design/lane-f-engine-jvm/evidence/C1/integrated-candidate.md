@@ -114,11 +114,36 @@ another client's search return200. Independent raw reread: latest probe headers1
 earliest holder terminal7971.5026ms, final terminal120576.8286ms. Active baseline/final1.
 Raw `tmp/c1-final-standard-fairness/fairness.json`; log169.
 
-Run170 is now running continuous hybrid search while ingesting the identity-verified469-file
-synthetic corpus through jseval. This is pacing evidence, not corpus/search-quality certification;
-the corpus warnings remain in its log. Results and SPLADE correction proof remain pending.
-The owned default stack must stay up until this campaign completes, then be stopped normally.
+Run170 FAILED (exit1): continuous hybrid search while ingesting the identity-verified469-file
+synthetic corpus through jseval. All469 reached the index, but at approximately186s enrichment
+stalled (embedding2.3%, SPLADE50.3%, NER0/469) with GPU100% and11.5–11.6GiB VRAM use. Status
+returned429 repeatedly; readiness declared the backend unreachable and the query retried five
+times with429 before failing. Health remained READY. The relaxed jseval document floor must not
+be used as proof: the next run must reconcile all469 inputs independently. This is no pacing or
+SPLADE-success claim. Raw log: tmp/c1-final-standard-pacing-170.txt.
 
-Hosted run34339800148 at the same revision has failures in Public claims, model-free Build,
-and app-ui unit tests under active triage. Other successes are partial hosted evidence, not
-final C1 acceptance. Workflow signal classification is preserved in tmp/c1-workflow-signal-168.txt.
+Thread dumps tmp/c1-pacing-stall-176.json (10:43:01UTC) and177.json (10:43:53UTC) independently show
+indexing-loop in OnnxEmbeddingEncoder native OrtSession.run, one foreground reranker in native
+OrtSession.run, and15 foreground callers blocked in NativeSessionHandle.acquire's uninterruptible
+GPU semaphore. The Engine deadline already interrupts work and retains admission until actual
+exit. The targeted correction makes that existing interrupt effective for waiters, while an issued
+native lease remains held until actual exit. It introduces no new cancellation state or owner.
+
+The owned default stack was stopped normally; its receipt is under main's tmp/dev-runner/runs/
+a7a93cdb-cd78-4069-9b74-b95fabe35ae3/stop-report.json. Two unregistered compact llama processes
+(PIDs25200/32540, created September7, absent parents43212/14972) had remained on GPU throughout
+this campaign. Exact executable/model/port/start-time, absence of established clients, and the
+ownership register were checked before retiring only these abandoned processes. World-state178
+and the session's cleanup output retain the evidence. Admission166/169's raw count/order evidence
+still holds, but carries this co-resident-hardware caveat; it is not a performance benchmark.
+Fresh pacing is required without these abandoned consumers.
+
+Hosted34339800148's three failures and local corrections are reconciled in hosted-ci.md.
+Strict focused181 passes; new waiter proof182 initially failed compilation because ort-common did
+not declare Mockito. Root added the existing catalog dependency and regenerated locks in183
+(PASS). Focused waiter plus real Engine broken-child workflow proof184 passes; restored186 passes,
+Tika mutation185 fails correctly, and native waiter mutation187 fails correctly. See their owning
+evidence pages. Filtered stress188 stops on modules with no matching test names. Full integrated
+stress190 is running and reported a format-matrix initialization timeout. Hosted1c7fcfff9 still
+has ADR-coverage (corrected3ccf3749b) and indexing-to-action-ledger integration failures. No final
+C1 acceptance is claimed.
