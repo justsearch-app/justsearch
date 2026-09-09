@@ -5,9 +5,9 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-0758-utc).
+Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-0920-utc).
 
-## Current C1 batch 4 checkpoint (2026-09-09 07:58 UTC)
+## Current C1 batch 4 checkpoint (2026-09-09 09:20 UTC)
 
 Worktree `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
 A/B are complete at their recorded proof tier. C1 is in progress; C2/D/E/F remain required.
@@ -16,25 +16,24 @@ The original dirty tree was split into ten per-item WIP commits and pushed. Subs
 corrections are also checkpointed per item, with every commit pushed immediately. Continue this
 cadence and commit WIP at least hourly; cap worker follow-ups at three, then take the diff at root.
 
-Latest implementation: `b017a13f3` (C1-7 search admission/runtime ownership), following `0dca9a597`
-(C1-10 child pacing) and `caaa9ebd9` (C1-5 actual-exit task groups). Earlier fixes include explicit
-shared Lucene fixtures, BackgroundRunService timer ownership, standalone admission composition,
-inference cancellation ownership, history overflow retry and shutdown-drain corrections. See
-[evidence/C1/fanout-ownership.md](evidence/C1/fanout-ownership.md),
-[fixture-and-background.md](evidence/C1/fixture-and-background.md), and
-[integration-corrections.md](evidence/C1/integration-corrections.md) for tested sources and limits.
-Build58 passed; the latest service-boundary correction passed focused tests and PMD in run61.
-Full worker-services passed 1,277 tests (two existing skips) before that final correction. Focused
-fanout proofs and mutations cover admission, pacing, actual virtual instance capacity and runtime
-closure. This is not a full/stress/live/hosted C1 pass.
+Latest pushed implementation is `e9ed79694` (per-source search lifetime/admission), following
+`71c4e17a3` (commit timer actual exit), `6d94ef433` (bounded scan replay), `ee48cf1b6`
+(KnowledgeServer reaper/deferred-model owners), and earlier fanout/pacing/task-group fixes.
+This checkpoint adds the bounded OCR producer and process-exit proof. See
+[evidence/C1/per-source-search.md](evidence/C1/per-source-search.md),
+[ocr-producers.md](evidence/C1/ocr-producers.md), [commit-timer.md](evidence/C1/commit-timer.md),
+and [scan-progress.md](evidence/C1/scan-progress.md). Local focused producer tests and their
+adverse mutations pass at the recorded revisions. Latest OCR command104 passed. Build58 and
+full worker-services 1,277 tests (two existing skips) predate these changes and are not final proof.
 
-Next implement the remaining KnowledgeServer reaper/deferred-model registered owners,
-SearchPerSourceExecutor lifetime/urgency ownership, OCR executor policy/child placement, retained
-ScanProgress bounds and CommitOps actual-exit shutdown safety. Finish the executable producer
-census, generation-cap proof and remaining architecture/gate mutations. Then run the final full
-suite with stress and repeat installed standard-model aggregate admission/fairness and continuous
-search/indexing proof; batch-3 live evidence predates the bounded executors. Update canonical docs
-and derived outputs at the governed boundary. No outstanding item is owner-gated.
+Remaining C1 work: bounded SSE replay/live handoff and executable raw/async producer guards are
+implemented but still receiving root verification. Complete their bite mutations, real three-
+Lucene-generation proof, direct chunk/three-way runtime-close proof, remaining Rule9/layering/
+WholeProgramDeadCode mutations, canonical sweep, full stress-enabled suite and installed standard-
+model aggregate admission/fairness plus continuous search/indexing proof. The batch-3 live evidence
+predates bounded executors. Execute SchemaMismatchStatusContractTest (currently compilation only)
+and required hosted/platform checks on the coherent candidate. C2/D/E/F then follow with F/PR1
+merge placement unchanged. No outstanding item is owner-gated.
 
 The active session identity is `01a082dc-dfd6-7d60-be2e-a8d088229a67`; supply it for owned tools.
 No dev stack is running. This note is a recovery checkpoint during continuing work, not a pause.

@@ -95,7 +95,7 @@ final class ExtractionRoutingTest {
   @Test
   void modeSwitchSelectsTheSandbox() {
     try (TimeboxedContentExtractor inProcess =
-        ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+        ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             ExtractionSandboxFactory.Mode.IN_PROCESS,
             TikaExtractionPolicy.defaults(),
             Duration.ofSeconds(5),
@@ -109,7 +109,7 @@ final class ExtractionRoutingTest {
       assertThrows(
           IllegalArgumentException.class,
           () ->
-              ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+              ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
                   mode,
                   TikaExtractionPolicy.defaults(),
                   Duration.ofSeconds(5),

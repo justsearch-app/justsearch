@@ -516,7 +516,7 @@ final class PersistentExtractionSandboxTest {
     try (TestMetricRegistry registry = new TestMetricRegistry(ExtractionMetricCatalog.DEFINITIONS)) {
       ExtractionMetricCatalog catalog = new ExtractionMetricCatalog(registry);
       try (TimeboxedContentExtractor extractor =
-          ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+          ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
               ExtractionSandboxFactory.Mode.PROCESS,
               TikaExtractionPolicy.defaults(),
               OcrRoutingConfig.disabled(),

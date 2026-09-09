@@ -161,6 +161,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       try {
         this.indexingLoop =
             new IndexingLoop(
+                executors.pdfOcr(),
                 executors.extractionTimebox(),
                 ctx.jobQueue(),
                 ingestRunning.indexingCoordinator(),
@@ -529,12 +530,13 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       OcrMetricCatalog ocrCatalog,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     String mode = EnvRegistry.EXTRACTION_SANDBOX_MODE.getString("auto").trim();
-    OcrRoutingConfig ocrConfig = resolvedOcrConfig();
+    OcrRoutingConfig ocrConfig = resolvedOcrConfig().withWorkerLimit(executors.pdfOcr().spec().threadCount());
     logEffectiveOcrConfig(ocrConfig);
     TikaExtractionPolicy extractionPolicy = resolvedExtractionPolicy();
     ExtractionSandboxFactory.Mode sandboxMode = parseSandboxMode(mode);
     if (sandboxMode == ExtractionSandboxFactory.Mode.IN_PROCESS) {
       return ExtractionSandboxFactory.inProcessStructured(
+          executors.pdfOcr(),
           executors.extractionTimebox(), catalog, ocrConfig, ocrCatalog, extractionPolicy);
     }
     String rawCommand = EnvRegistry.EXTRACTION_SANDBOX_COMMAND.getString("");
@@ -576,6 +578,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       }
     }
     return ExtractionSandboxFactory.create(
+        executors.pdfOcr(),
         executors.extractionTimebox(),
         executors.sandboxReaders(),
         sandboxMode,

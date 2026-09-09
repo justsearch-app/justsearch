@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.core.execution.EngineFutures;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -13,11 +15,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import javax.imageio.ImageIO;
 import org.apache.pdfbox.Loader;
@@ -47,9 +49,6 @@ final class PdfOcrEngine {
   private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(PdfOcrEngine.class);
   static final int DEFAULT_RENDER_DPI = 300;
   private static final long DEFAULT_BUDGET_MS = 30_000L;
-  /** Bounded wait for worker unwind in {@link #shutdownAndAwaitTermination(ExecutorService)}. */
-  private static final long POOL_TERMINATION_AWAIT_MS = 5_000L;
-
   /** Substitutable process starter so tests can inject stub children (no real tesseract needed). */
   @FunctionalInterface
   interface ProcessStarter {
@@ -62,8 +61,10 @@ final class PdfOcrEngine {
   private final int renderDpi;
   private final int poolSize;
   private final Logger log;
+  private final IntFunction<ExecutorService> poolFactory;
 
   PdfOcrEngine(
+      IntFunction<ExecutorService> poolFactory,
       OcrRoutingConfig ocrConfig,
       ProcessStarter processStarter,
       String executable,
@@ -71,6 +72,7 @@ final class PdfOcrEngine {
       int poolSize,
       Logger log) {
     this(
+        poolFactory,
         ocrConfig,
         new Invocation(
             executable == null || executable.isBlank() ? "tesseract" : executable, processStarter),
@@ -81,21 +83,31 @@ final class PdfOcrEngine {
   }
 
   PdfOcrEngine(
+      IntFunction<ExecutorService> poolFactory,
       OcrRoutingConfig ocrConfig,
       Supplier<TikaOcrRuntime.RuntimePaths> runtimeSupplier,
       int renderDpi,
       int poolSize,
       Logger log) {
-    this(ocrConfig, null, Objects.requireNonNull(runtimeSupplier, "runtimeSupplier"), renderDpi, poolSize, log);
+    this(
+        poolFactory,
+        ocrConfig,
+        null,
+        Objects.requireNonNull(runtimeSupplier, "runtimeSupplier"),
+        renderDpi,
+        poolSize,
+        log);
   }
 
   private PdfOcrEngine(
+      IntFunction<ExecutorService> poolFactory,
       OcrRoutingConfig ocrConfig,
       Invocation fixedInvocation,
       Supplier<TikaOcrRuntime.RuntimePaths> runtimeSupplier,
       int renderDpi,
       int poolSize,
       Logger log) {
+    this.poolFactory = Objects.requireNonNull(poolFactory, "poolFactory");
     this.ocrConfig = ocrConfig == null ? OcrRoutingConfig.defaults() : ocrConfig;
     this.fixedInvocation = fixedInvocation;
     this.runtimeSupplier = runtimeSupplier;
@@ -111,10 +123,16 @@ final class PdfOcrEngine {
    * a construction-time snapshot would leave the engine stuck on a stale executable/tessdata
    * (the {@code standalone-capability-stays-stuck} failure shape).
    */
-  static PdfOcrEngine create(OcrRoutingConfig ocrConfig, Logger log) {
+  static PdfOcrEngine create(
+      IntFunction<ExecutorService> poolFactory, OcrRoutingConfig ocrConfig, Logger log) {
     OcrRoutingConfig cfg = ocrConfig == null ? OcrRoutingConfig.defaults() : ocrConfig;
     return new PdfOcrEngine(
-        cfg, TikaOcrRuntime::resolve, cfg.effectiveRenderDpi(), cfg.effectiveOcrWorkers(), log);
+        poolFactory,
+        cfg,
+        TikaOcrRuntime::resolve,
+        cfg.effectiveRenderDpi(),
+        cfg.effectiveOcrWorkers(),
+        log);
   }
 
   /** Resolves the executable + spawn environment for one engine call from the current runtime. */
@@ -174,7 +192,8 @@ final class PdfOcrEngine {
     try {
       tempDir = Files.createTempDirectory("justsearch-ocr-");
       Path base = tempDir.resolve("image");
-      PageOcr page = runTesseract(invocation, live, image, base, remainingBudgetMs(deadlineNanos));
+      PageOcr page = runTesseract(invocation, live, image, base, remainingBudgetMs(deadlineNanos),
+          () -> Thread.currentThread().isInterrupted());
       if (page.failureReason() != null) {
         return OcrEngineResult.failed(page.failureReason());
       }
@@ -212,13 +231,15 @@ final class PdfOcrEngine {
     boolean sawTimeout = false;
     int oversizePagesSkipped = 0;
     OcrSkipReason spawnFailure = null;
+    EngineExecutorRejectedException executorRefusal = null;
     List<PageTask> tasks = new ArrayList<>();
     StringBuilder merged = new StringBuilder();
     List<OcrConfidenceExtractor.Summary> confidences = new ArrayList<>();
     int pagesProcessed = 0;
     try {
       tempDir = Files.createTempDirectory("justsearch-ocr-");
-      pool = Executors.newFixedThreadPool(poolSize, daemonFactory());
+      pool = Objects.requireNonNull(poolFactory.apply(poolSize), "poolFactory returned null");
+      ExecutorService executionPool = pool;
       Semaphore inFlight = new Semaphore(poolSize);
       try (PDDocument document = Loader.loadPDF(pdf.toFile())) {
         PDFRenderer renderer = new PDFRenderer(document);
@@ -259,7 +280,8 @@ final class PdfOcrEngine {
                 pool.submit(
                     () -> {
                       try {
-                        return runTesseract(invocation, live, png, base, remainingBudgetMs(deadlineNanos));
+                        return runTesseract(invocation, live, png, base, remainingBudgetMs(deadlineNanos),
+                            executionPool::isShutdown);
                       } finally {
                         inFlight.release();
                         deleteQuietly(png);
@@ -304,30 +326,45 @@ final class PdfOcrEngine {
           sawTimeout = true;
           break;
         } catch (ExecutionException e) {
+          EngineFutures.rethrowExecutorRefusal(e);
+          rethrowFatal(e);
           spawnFailure = OcrSkipReason.UNKNOWN;
         }
       }
     } catch (InterruptedException e) {
       interrupted = true;
+    } catch (EngineExecutorRejectedException e) {
+      executorRefusal = e;
     } catch (IOException | RuntimeException e) {
+      EngineFutures.rethrowExecutorRefusal(e);
+      rethrowFatal(e);
       log.debug("PDF OCR failed for {}: {}", pdf.getFileName(), e.getMessage());
-      if (pagesProcessed == 0) {
-        return finishAfterCleanup(pool, live, tempDir, OcrEngineResult.failed(OcrSkipReason.UNKNOWN));
-      }
       spawnFailure = OcrSkipReason.UNKNOWN;
     } finally {
-      cancelAll(tasks);
+      try {
+        cancelAll(tasks);
+      } finally {
+        try {
+          shutdownAndAwaitTermination(pool, live);
+        } finally {
+          try {
+            killAll(live);
+          } finally {
+            if (live.isEmpty()) deleteRecursively(tempDir);
+          }
+        }
+      }
     }
     if (interrupted) {
       cancelAll(tasks);
       truncated = true;
     }
 
-    shutdownAndAwaitTermination(pool);
-    killAll(live);
-    deleteRecursively(tempDir);
     if (interrupted) {
       Thread.currentThread().interrupt();
+    }
+    if (executorRefusal != null) {
+      throw executorRefusal;
     }
 
     OcrSkipReason failure = null;
@@ -348,16 +385,18 @@ final class PdfOcrEngine {
         pagesProcessed);
   }
 
-  private OcrEngineResult finishAfterCleanup(
-      ExecutorService pool, Set<Process> live, Path tempDir, OcrEngineResult result) {
-    shutdownAndAwaitTermination(pool);
-    killAll(live);
-    deleteRecursively(tempDir);
-    return result;
+  private static void rethrowFatal(Throwable failure) {
+    Throwable cause = failure;
+    while (cause instanceof ExecutionException
+        || cause instanceof java.util.concurrent.CompletionException) {
+      cause = cause.getCause();
+    }
+    if (cause instanceof Error fatal) throw fatal;
   }
 
   private PageOcr runTesseract(
-      Invocation invocation, Set<Process> live, Path image, Path outputBase, long remainingBudgetMs)
+      Invocation invocation, Set<Process> live, Path image, Path outputBase, long remainingBudgetMs,
+      java.util.function.BooleanSupplier cancelled)
       throws InterruptedException {
     long waitMs = Math.min(remainingBudgetMs, perInvocationTimeoutMs());
     if (waitMs <= 0) {
@@ -378,6 +417,9 @@ final class PdfOcrEngine {
     try {
       process = invocation.starter().start(command);
       live.add(process);
+      // A starter can consume interruption before publishing the process. The owning pool
+      // remains shut down, so late registration must observe that durable lifecycle fact.
+      if (cancelled.getAsBoolean()) throw new InterruptedException("OCR owner cancelled");
       boolean exited = process.waitFor(waitMs, TimeUnit.MILLISECONDS);
       if (!exited) {
         process.destroyForcibly();
@@ -396,10 +438,13 @@ final class PdfOcrEngine {
       }
       throw e;
     } catch (IOException | RuntimeException e) {
+      EngineFutures.rethrowExecutorRefusal(e);
+      rethrowFatal(e);
       log.debug("Tesseract invocation failed for {}: {}", image.getFileName(), e.getMessage());
       return PageOcr.failed(OcrSkipReason.UNKNOWN);
     } finally {
       if (process != null) {
+        terminateAndWait(process);
         live.remove(process);
       }
     }
@@ -495,10 +540,32 @@ final class PdfOcrEngine {
   }
 
   private void killAll(Set<Process> live) {
+    Throwable failure = null;
     for (Process process : live) {
-      process.destroyForcibly();
+      try {
+        terminateAndWait(process);
+        live.remove(process);
+      } catch (RuntimeException | Error cleanup) {
+        if (failure == null) failure = cleanup;
+        else if (failure != cleanup) failure.addSuppressed(cleanup);
+      }
     }
-    live.clear();
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    if (failure instanceof Error fatal) throw fatal;
+  }
+
+  private static void terminateAndWait(Process process) {
+    if (!process.isAlive()) return;
+    process.destroyForcibly();
+    boolean interrupted = Thread.interrupted();
+    try {
+      while (process.isAlive()) {
+        try { process.waitFor(); }
+        catch (InterruptedException cancelled) { interrupted = true; }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
   }
 
   private static void cancelAll(List<PageTask> tasks) {
@@ -508,37 +575,17 @@ final class PdfOcrEngine {
   }
 
   /**
-   * Signals cancellation, then blocks (bounded) until every worker thread has actually unwound.
-   * The bounded wait is what lets the subsequent {@link #killAll(Set)} sweep be trusted: a worker
-   * interrupted between {@code starter.start()} returning and its own {@code live.add(process)}
-   * (i.e., not yet registered) still finishes registering and then dies on its own
-   * {@code catch (InterruptedException)} — {@code destroyForcibly} then deregister — because that
-   * thread's interrupted status was already set by {@link #cancelAll} / {@code shutdownNow}, so
-   * its next blocking call throws immediately. Returning to the caller (and thus to
-   * {@code killAll}) without waiting for that unwind left a real window where a spawned child had
-   * neither been swept by {@code killAll} (not registered yet) nor destroyed by its own worker
-   * (which hadn't gotten there yet) — observed as a CI-only flake on a slow/oversubscribed
-   * GitHub-hosted runner (run 29159503718,
-   * {@code PdfOcrEngineTest.interruptDestroysAllRegisteredChildren}).
+   * Kills registered processes, then waits for actual task exit. A process whose starter
+   * consumed interruption observes the pool shutdown state after registration and kills/waits
+   * itself. The final sweep and temp cleanup therefore run only after tasks and children exit.
    */
-  private void shutdownAndAwaitTermination(ExecutorService pool) {
+  private void shutdownAndAwaitTermination(ExecutorService pool, Set<Process> live) {
     if (pool == null) {
       return;
     }
     pool.shutdownNow();
-    try {
-      pool.awaitTermination(POOL_TERMINATION_AWAIT_MS, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-  }
-
-  private static java.util.concurrent.ThreadFactory daemonFactory() {
-    return runnable -> {
-      Thread thread = new Thread(runnable, "PdfOcrEngine-worker");
-      thread.setDaemon(true);
-      return thread;
-    };
+    try { killAll(live); }
+    finally { pool.close(); }
   }
 
   private static String readQuietly(Path path) {

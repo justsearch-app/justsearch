@@ -13,7 +13,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntFunction;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -40,24 +42,30 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   private final PdfOcrEngine ocrEngine;
   private final ExtractionFallbackBudget fallbackBudget;
 
-  public PolicyDrivenTikaExtractor() {
-    this(TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled());
-  }
-
-  public PolicyDrivenTikaExtractor(TikaExtractionPolicy policy) {
-    this(policy, OcrRoutingConfig.disabled());
-  }
-
-  public PolicyDrivenTikaExtractor(TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig) {
-    this(policy, ocrConfig, OcrMetricCatalog.noop());
+  public PolicyDrivenTikaExtractor(IntFunction<ExecutorService> poolFactory) {
+    this(poolFactory, TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled());
   }
 
   public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory, TikaExtractionPolicy policy) {
+    this(poolFactory, policy, OcrRoutingConfig.disabled());
+  }
+
+  public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig) {
+    this(poolFactory, policy, ocrConfig, OcrMetricCatalog.noop());
+  }
+
+  public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory,
       TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog) {
-    this(policy, ocrConfig, ocrMetricCatalog, ExtractionFallbackBudget.defaults());
+    this(poolFactory, policy, ocrConfig, ocrMetricCatalog, ExtractionFallbackBudget.defaults());
   }
 
   public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
       OcrMetricCatalog ocrMetricCatalog,
@@ -71,7 +79,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor = new StructuredContentExtractor(this.policy.maxExtractedChars());
-    this.ocrEngine = PdfOcrEngine.create(this.ocrConfig, log);
+    this.ocrEngine = PdfOcrEngine.create(poolFactory, this.ocrConfig, log);
   }
 
   public TikaExtractionPolicy policy() {

@@ -11,6 +11,16 @@ import io.justsearch.core.execution.TestEngineExecutors;
 public final class TestWorkerExecutorRegistrations {
   private TestWorkerExecutorRegistrations() {}
 
+  public static EngineExecutorRegistry.Registration ocr() {
+    return new TestEngineExecutors().register(new EngineExecutorSpec(
+        "test-pdf-ocr", Kind.BACKGROUND, Mode.PLATFORM, 4, 64, 1));
+  }
+
+  public static java.util.function.IntFunction<java.util.concurrent.ExecutorService> ocrFactory() {
+    var owner = ocr();
+    return workers -> owner.open(Thread.ofPlatform().daemon().name("test-pdf-ocr-", 0).factory());
+  }
+
   public static EngineExecutorRegistry.Registration timebox() {
     return new TestEngineExecutors()
         .register(

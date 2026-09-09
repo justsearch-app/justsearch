@@ -51,7 +51,7 @@ final class ExtractionSandboxLatencyBenchmarkTest {
 
     ExtractionSandbox inProcess =
         new InProcessExtractionSandbox(
-            new PolicyDrivenTikaExtractor(
+            new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(),
                 TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled()));
 
     StringBuilder table = new StringBuilder();

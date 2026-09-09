@@ -57,6 +57,7 @@ public final class ExtractionSandboxFactory {
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
@@ -64,11 +65,12 @@ public final class ExtractionSandboxFactory {
       Duration timeout,
       ExtractionMetricCatalog catalog,
       List<String> processCommand) {
-    return create(timeboxRegistration, readerRegistration, mode, policy,
+    return create(ocrRegistration, timeboxRegistration, readerRegistration, mode, policy,
         OcrRoutingConfig.disabled(), timeout, catalog, OcrMetricCatalog.noop(), processCommand);
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
@@ -77,11 +79,12 @@ public final class ExtractionSandboxFactory {
       Duration timeout,
       ExtractionMetricCatalog catalog,
       List<String> processCommand) {
-    return create(timeboxRegistration, readerRegistration, mode, policy, ocrConfig, timeout,
+    return create(ocrRegistration, timeboxRegistration, readerRegistration, mode, policy, ocrConfig, timeout,
         catalog, OcrMetricCatalog.noop(), processCommand);
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
@@ -92,6 +95,7 @@ public final class ExtractionSandboxFactory {
       OcrMetricCatalog ocrMetricCatalog,
       List<String> processCommand) {
     return create(
+        ocrRegistration,
         timeboxRegistration,
         readerRegistration,
         mode,
@@ -105,6 +109,7 @@ public final class ExtractionSandboxFactory {
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
@@ -115,12 +120,13 @@ public final class ExtractionSandboxFactory {
       OcrMetricCatalog ocrMetricCatalog,
       List<String> processCommand,
       PoolSettings poolSettings) {
-    return create(timeboxRegistration, readerRegistration, mode, policy, ocrConfig, timeout,
+    return create(ocrRegistration, timeboxRegistration, readerRegistration, mode, policy, ocrConfig, timeout,
         catalog, ocrMetricCatalog, processCommand, poolSettings,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
   public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       EngineExecutorRegistry.Registration readerRegistration,
       Mode mode,
@@ -134,7 +140,8 @@ public final class ExtractionSandboxFactory {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     TikaExtractionPolicy effectivePolicy = policy == null ? TikaExtractionPolicy.defaults() : policy;
     OcrRoutingConfig effectiveOcrConfig =
-        ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig;
+        (ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig)
+            .withWorkerLimit(ocrRegistration.spec().threadCount());
     Duration effectiveTimeout =
         timeout == null ? TimeboxedContentExtractor.DEFAULT_TIMEOUT : timeout;
     PoolSettings effectivePool = poolSettings == null ? PoolSettings.defaults() : poolSettings;
@@ -142,7 +149,7 @@ public final class ExtractionSandboxFactory {
     if (mode == Mode.IN_PROCESS) {
       return new TimeboxedContentExtractor(
           timeboxRegistration,
-          inProcessSandbox(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog),
+          inProcessSandbox(ocrRegistration, effectivePolicy, effectiveOcrConfig, ocrMetricCatalog),
           effectiveTimeout,
           catalog);
     }
@@ -165,7 +172,7 @@ public final class ExtractionSandboxFactory {
         return new TimeboxedContentExtractor(timeboxRegistration, pool, backstop, catalog);
       }
       ContentExtractorProvider provider =
-          contributionProvider(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog);
+          contributionProvider(ocrRegistration, effectivePolicy, effectiveOcrConfig, ocrMetricCatalog);
       return new TimeboxedContentExtractor(
           timeboxRegistration,
           new RoutingExtractionSandbox(new InProcessExtractionSandbox(provider), pool, provider),
@@ -255,8 +262,9 @@ public final class ExtractionSandboxFactory {
   }
 
   private static ExtractionSandbox inProcessSandbox(
+      EngineExecutorRegistry.Registration ocrRegistration,
       TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog) {
-    return new InProcessExtractionSandbox(contributionProvider(policy, ocrConfig, ocrMetricCatalog));
+    return new InProcessExtractionSandbox(contributionProvider(ocrRegistration, policy, ocrConfig, ocrMetricCatalog));
   }
 
   // Tempdoc 560 §4.4/§6: the in-process extractor is pulled through the Worker's contribution
@@ -264,32 +272,39 @@ public final class ExtractionSandboxFactory {
   // composition is a single CORE Tika catch-all, so this is behaviorally identical to the direct
   // delegate — but the extractor now IS a declared, composable contribution.
   private static ContentExtractorProvider contributionProvider(
+      EngineExecutorRegistry.Registration ocrRegistration,
       TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog) {
     return ExtractorContributionRegistry.withCoreTika(
-        new PolicyDrivenTikaExtractor(policy, ocrConfig, ocrMetricCatalog));
+        new PolicyDrivenTikaExtractor(
+            workers -> ocrRegistration.open(Thread.ofPlatform().daemon().name("pdf-ocr-", 0).factory()),
+            policy, ocrConfig.withWorkerLimit(ocrRegistration.spec().threadCount()), ocrMetricCatalog));
   }
 
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog) {
-    return inProcessStructured(timeboxRegistration, catalog, OcrRoutingConfig.disabled());
+    return inProcessStructured(ocrRegistration, timeboxRegistration, catalog, OcrRoutingConfig.disabled());
   }
 
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog, OcrRoutingConfig ocrConfig) {
-    return inProcessStructured(timeboxRegistration, catalog, ocrConfig, OcrMetricCatalog.noop());
+    return inProcessStructured(ocrRegistration, timeboxRegistration, catalog, ocrConfig, OcrMetricCatalog.noop());
   }
 
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog, OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog) {
-    return inProcessStructured(timeboxRegistration, catalog, ocrConfig, ocrMetricCatalog,
+    return inProcessStructured(ocrRegistration, timeboxRegistration, catalog, ocrConfig, ocrMetricCatalog,
         TikaExtractionPolicy.defaults());
   }
 
   /** As above, with an explicit policy (tempdoc 799 §N.2 — operator worker.limits.*). */
   public static TimeboxedContentExtractor inProcessStructured(
+      EngineExecutorRegistry.Registration ocrRegistration,
       EngineExecutorRegistry.Registration timeboxRegistration,
       ExtractionMetricCatalog catalog,
       OcrRoutingConfig ocrConfig,
@@ -298,10 +313,11 @@ public final class ExtractionSandboxFactory {
     TikaExtractionPolicy effectivePolicy =
         policy == null ? TikaExtractionPolicy.defaults() : policy;
     OcrRoutingConfig effectiveOcrConfig =
-        ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig;
+        (ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig)
+            .withWorkerLimit(ocrRegistration.spec().threadCount());
     return new TimeboxedContentExtractor(
         timeboxRegistration,
-        inProcessSandbox(effectivePolicy, effectiveOcrConfig, ocrMetricCatalog),
+        inProcessSandbox(ocrRegistration, effectivePolicy, effectiveOcrConfig, ocrMetricCatalog),
         TimeboxedContentExtractor.DEFAULT_TIMEOUT,
         catalog);
   }

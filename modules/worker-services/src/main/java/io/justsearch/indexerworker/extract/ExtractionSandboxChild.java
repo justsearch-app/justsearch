@@ -96,12 +96,22 @@ public final class ExtractionSandboxChild {
 
     PolicyDrivenTikaExtractor extractor(TikaExtractionPolicy p, OcrRoutingConfig o) {
       if (extractor == null || !Objects.equals(policy, p) || !Objects.equals(ocrConfig, o)) {
-        extractor = new PolicyDrivenTikaExtractor(p, o);
+        extractor = new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, p, o);
         policy = p;
         ocrConfig = o;
       }
       return extractor;
     }
+  }
+
+  /** External-process-only OCR factory; the parent projects its resolved worker limit in each frame. */
+  public static java.util.concurrent.ExecutorService openOcrPool(int workers) {
+    if (workers < 1) throw new IllegalArgumentException("OCR workers must be resolved and positive");
+    return new java.util.concurrent.ThreadPoolExecutor(
+        workers, workers, 0, java.util.concurrent.TimeUnit.MILLISECONDS,
+        new java.util.concurrent.ArrayBlockingQueue<>(workers),
+        Thread.ofPlatform().daemon().name("parser-child-ocr-", 0).factory(),
+        new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
   }
 
   static long parentPid(String[] args) {

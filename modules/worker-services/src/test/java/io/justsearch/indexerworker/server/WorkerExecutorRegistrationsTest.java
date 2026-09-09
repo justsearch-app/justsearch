@@ -71,12 +71,15 @@ final class WorkerExecutorRegistrationsTest {
               23,
               1),
           registrations.deferredModelInit().spec());
+      assertEquals(new EngineExecutorSpec(WorkerExecutorRegistrations.PDF_OCR,
+          Kind.BACKGROUND, Mode.PLATFORM, 7, 23, 1), registrations.pdfOcr().spec());
       assertTrue(registry.registrations.stream().noneMatch(RecordingRegistration::closed));
     }
 
     assertTrue(registry.registrations.stream().allMatch(RecordingRegistration::closed));
     assertEquals(
         List.of(
+            WorkerExecutorRegistrations.PDF_OCR,
             WorkerExecutorRegistrations.DEFERRED_MODEL_INIT,
             WorkerExecutorRegistrations.STUCK_JOB_REAPER,
             WorkerExecutorRegistrations.SANDBOX_READERS,
@@ -104,7 +107,7 @@ final class WorkerExecutorRegistrationsTest {
 
   @Test
   void rollbackAcrossSingletonOwnersClosesEveryEarlierRegistrationInReverseOrder() {
-    RecordingRegistry registry = new RecordingRegistry(5);
+    RecordingRegistry registry = new RecordingRegistry(6);
 
     EngineExecutorRejectedException failure =
         assertThrows(
@@ -114,6 +117,7 @@ final class WorkerExecutorRegistrationsTest {
     assertEquals(Reason.INSTANCE_LIMIT, failure.reason());
     assertEquals(
         List.of(
+            WorkerExecutorRegistrations.DEFERRED_MODEL_INIT,
             WorkerExecutorRegistrations.STUCK_JOB_REAPER,
             WorkerExecutorRegistrations.SANDBOX_READERS,
             WorkerExecutorRegistrations.EXTRACTION_TIMEBOX,

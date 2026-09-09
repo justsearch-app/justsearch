@@ -1179,7 +1179,7 @@ class IndexingLoopTest {
       when(indexCountOps.countByField(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
-          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               queue,
               queue.indexingCoordinator,
               commitOps,
@@ -1255,7 +1255,7 @@ class IndexingLoopTest {
       when(indexCountOps.countByField(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
-          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               queue,
               queue.indexingCoordinator,
               commitOps,
@@ -1319,7 +1319,7 @@ class IndexingLoopTest {
                 return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);
               });
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
           queue,
           queue.indexingCoordinator,
           mock(CommitOps.class),
@@ -1587,7 +1587,7 @@ class IndexingLoopTest {
       encoderBindings.bindSpladeEncoder(mock(SpladeEncoder.class));
       encoderBindings.bindNerService(nerService);
 
-      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
           queue,
           coordinator,
           commitOps,

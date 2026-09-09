@@ -15,6 +15,7 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   public static final String EXTRACTION_TIMEBOX = "index.extraction-timebox";
   public static final String SANDBOX_READERS = "index.extraction-sandbox-readers";
   public static final String STUCK_JOB_REAPER = "index.stuck-job-reaper";
+  public static final String PDF_OCR = "index.pdf-ocr";
   public static final String DEFERRED_MODEL_INIT = "index.deferred-model-init";
 
   private final EngineExecutorRegistry.Registration watcherReconcile;
@@ -22,6 +23,7 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   private final EngineExecutorRegistry.Registration sandboxReaders;
   private final EngineExecutorRegistry.Registration stuckJobReaper;
   private final EngineExecutorRegistry.Registration deferredModelInit;
+  private final EngineExecutorRegistry.Registration pdfOcr;
 
   public WorkerExecutorRegistrations(EngineExecutorRegistry registry) {
     Objects.requireNonNull(registry, "registry");
@@ -83,6 +85,8 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
                   1,
                   limits.maxQueue(),
                   1));
+      pdfOcr = acquire(registry, acquired, new EngineExecutorSpec(
+          PDF_OCR, Kind.BACKGROUND, Mode.PLATFORM, limits.maxThreads(), limits.maxQueue(), 1));
     } catch (RuntimeException | Error failure) {
       closeReverse(acquired, failure);
       throw failure;
@@ -109,11 +113,14 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
     return deferredModelInit;
   }
 
+  public EngineExecutorRegistry.Registration pdfOcr() { return pdfOcr; }
+
   @Override
   public void close() {
     RuntimeException failure = null;
     for (EngineExecutorRegistry.Registration registration :
         List.of(
+            pdfOcr,
             deferredModelInit,
             stuckJobReaper,
             sandboxReaders,

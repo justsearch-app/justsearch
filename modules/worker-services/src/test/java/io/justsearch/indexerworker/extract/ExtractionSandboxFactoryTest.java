@@ -12,7 +12,7 @@ final class ExtractionSandboxFactoryTest {
   @Test
   void inProcessFactoryReturnsTimeboxedExtractorWithDefaultPolicy() {
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null)) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null)) {
       assertNotNull(extractor);
       assertEquals(
           TikaExtractionPolicy.defaults().policyId(), extractor.extractionPolicy().policyId());
@@ -39,7 +39,7 @@ final class ExtractionSandboxFactoryTest {
     List<String> command = List.of("java", "-cp", "ignored", "ExtractionSandboxChild");
 
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+        ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             ExtractionSandboxFactory.Mode.PROCESS,
             policy,
             Duration.ofSeconds(5),

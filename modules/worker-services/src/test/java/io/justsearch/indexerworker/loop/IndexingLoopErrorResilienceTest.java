@@ -133,7 +133,7 @@ final class IndexingLoopErrorResilienceTest {
     DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
     IndexCountOps indexCountOps = mock(IndexCountOps.class);
     WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
-    return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+    return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
         queue,
         coordinator,
         commitOps,
