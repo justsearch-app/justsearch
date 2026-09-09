@@ -220,6 +220,18 @@ Settled empirical facts. Each was an open question that got answered.
   `TerminalWriterSupervisedRecoveryE2ETest`. This narrow ordering repair does
   not establish general NativeSessionHandle concurrency safety.
 
+### F-017: cancelled GPU waiters must leave admission without releasing active native work
+
+- **Finding (2026-09-09):** NativeSessionHandle's uninterruptible GPU semaphore kept
+  cancelled Engine calls alive behind stalled native inference. Engine deadlines already
+  interrupt the owning work thread; GPU acquisition now honours that interrupt.
+- **Ownership:** interrupted waiters restore interruption and throw cancellation. A permit
+  acquired before cancellation but not handed to a lease is released exactly once. Issued
+  leases still retain their permit until native work exits; this is not native-call termination.
+- **Verification:** NativeSessionHandleGpuWaiterCancellationTest covers blocked, pre-interrupted
+  and post-acquire interruption with a mocked native session boundary. Real-model pacing and
+  overall native close/quiescence remain separate proof obligations.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.

@@ -328,6 +328,12 @@ it is history, not a second current contract. Evidence records retain the experi
 | 2026-09-09 | Stage D2 checklist drafted (`stages/D2.md`) with its decisions: one new component-map endpoint over D1's registry plus C1's two registers, the three runtime slice surfaces and the build-time exporter made projections; `verification` boots with `encoders` and `generative` `absent` under a five-second first-cut bound; `CURSOR_EXPIRED` is a new code beside `CURSOR_INVALID`; index-and-return plumbs Lucene's sequence numbers so `durable` waits on a covering commit, port-level only; the generic MCP-client recovery harness is D2's; four SQLite stores get the ephemeral variant. | §4; §10; [D2](stages/D2.md) |
 | 2026-09-09 | Stage F checklist drafted (`stages/F.md`): the residue bar is 17.3's "only labelled hits" (the brief's "empty" is not reachable without renaming modules and capability tokens, which stay, labelled); `00-program-overview.md` is absent from the repo, so the report-back uses the sibling lanes' sections plus E's table and the residue grep; `RuntimeGpuLease.Holder.WORKER` is renamed at F. | §17.3 row F; §19; [F](stages/F.md) |
 
+**2026-09-09 C1 native waiter correction.** Standard-model pacing exposed GPU permit waiters
+ignoring the existing Engine deadline interrupt. C1 makes the same semaphore acquisition
+interruptible; issued native leases still retain ownership until actual exit. No new cancellation
+registry is introduced. The owning decision and proof are in
+[C1 native GPU waiter cancellation](stages/C1.md#2026-09-09-native-gpu-waiter-cancellation).
+
 **2026-09-08 continuation corrections.** C1's current corrections and initial policy are in
 [its owning checklist](stages/C1.md#01-corrections-found-while-implementing-appended-per-item).
 The imported design commits are f463b540d, 1304a854d and 395078f04; B's hosted evidence was
