@@ -40,6 +40,11 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private final Map<Bucket, Integer> counts = new HashMap<>();
   private String preparationId;
 
+  /** Explicit standalone-launcher provider; the full Engine root supplies its already-loaded policy. */
+  public EngineAdmissionController() {
+    this(EngineResourcePolicy.load());
+  }
+
   EngineAdmissionController(EngineResourcePolicy policy) {
     this(policy.execution().get("perContextLimit"), policy.execution().get("aggregateLimit"),
         policy.execution().get("retryAfterSeconds"), new OperationLeaseServiceImpl());

@@ -90,14 +90,18 @@ final class LauncherEnvironment implements AutoCloseable {
                   // Worker — its memory/threads do not flow to either of those metric files).
                   io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher")));
   private static final AppFacadeFactory DEFAULT_APP_FACADE_FACTORY =
-      (executors, telemetry, configManager) ->
-          new HeadAssembly(
-              executors, telemetry,
-              configManager,
-              null,
-              new io.justsearch.app.services.settings.UiSettingsStore(
-                  io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-              null);
+      (executors, telemetry, configManager) -> {
+        var admission = loadAdmission(java.util.ServiceLoader.load(
+            io.justsearch.app.api.EngineAdmissionService.class).stream().toList());
+        if (!(admission instanceof io.justsearch.app.api.OperationLeaseService leases)) {
+          throw new IllegalStateException("Engine admission provider must also own operation leases");
+        }
+        return new HeadAssembly(
+            executors, telemetry, configManager, null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), leases, admission);
+      };
   private static volatile ConfigManagerFactory configManagerFactory = DEFAULT_CONFIG_MANAGER_FACTORY;
   private static volatile TelemetryFactory telemetryFactory = DEFAULT_TELEMETRY_FACTORY;
   private static volatile AppFacadeFactory appFacadeFactory = DEFAULT_APP_FACADE_FACTORY;
@@ -243,6 +247,14 @@ final class LauncherEnvironment implements AutoCloseable {
     if (providers.size() != 1) {
       throw new IllegalStateException("Expected exactly one Engine executor registry provider, found "
           + providers.size());
+    }
+    return providers.getFirst().get();
+  }
+
+  static io.justsearch.app.api.EngineAdmissionService loadAdmission(
+      java.util.List<java.util.ServiceLoader.Provider<io.justsearch.app.api.EngineAdmissionService>> providers) {
+    if (providers.size() != 1) {
+      throw new IllegalStateException("Expected exactly one Engine admission provider, found " + providers.size());
     }
     return providers.getFirst().get();
   }

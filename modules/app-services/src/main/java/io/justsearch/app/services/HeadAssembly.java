@@ -80,7 +80,7 @@ public final class HeadAssembly implements AutoCloseable {
   // Netty server it used to hold alongside it (the infra-health gRPC endpoint).
   private io.justsearch.app.services.bootstrap.phases.InfraPhase.Output infraOut;
   private final AtomicBoolean closed = new AtomicBoolean(false);
-  private final java.util.List<io.justsearch.app.services.encryption.UnlockDeferredScan> unlockScans =
+  private final List<io.justsearch.app.services.encryption.UnlockDeferredScan> unlockScans =
       new java.util.ArrayList<>();
   private final io.justsearch.app.services.vdu.OfflineCoordinator offlineCoordinator;
   private final Telemetry telemetry;
@@ -308,45 +308,6 @@ public final class HeadAssembly implements AutoCloseable {
     }
   }
 
-  /** Create a bootstrap that wires the shared pipeline-backed search runtime. */
-  public HeadAssembly(
-      io.justsearch.core.execution.EngineExecutorRegistry executors,
-      Telemetry telemetry,
-      ConfigManagerBootstrap configManager,
-      KnowledgeServerBootstrap knowledgeServer,
-      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      // Tempdoc 627 Deliverable 10: the one shared WorkerCapability created before the async
-      // worker-start fork. Null on the standalone/test paths (CapabilityPhase then builds its own).
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability) {
-    this(executors, telemetry, configManager, knowledgeServer, settingsStore, sharedWorkerCapability,
-        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
-  }
-
-  public HeadAssembly(
-      io.justsearch.core.execution.EngineExecutorRegistry executors,
-      Telemetry telemetry,
-      ConfigManagerBootstrap configManager,
-      KnowledgeServerBootstrap knowledgeServer,
-      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
-      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry) {
-    this(executors, telemetry, configManager, knowledgeServer, settingsStore, sharedWorkerCapability,
-        managedChildRegistry, new io.justsearch.app.services.lease.OperationLeaseServiceImpl(), null);
-  }
-
-  public HeadAssembly(
-      io.justsearch.core.execution.EngineExecutorRegistry executors,
-      Telemetry telemetry,
-      ConfigManagerBootstrap configManager,
-      KnowledgeServerBootstrap knowledgeServer,
-      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
-      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
-      io.justsearch.app.api.OperationLeaseService operationLeases) {
-    this(executors, telemetry, configManager, knowledgeServer, settingsStore, sharedWorkerCapability,
-        managedChildRegistry, operationLeases, null);
-  }
-
   /**
    * Constructs the head with the one Engine admission owner shared by the API and agent paths.
    * The separate parameter keeps the existing operation-lease compatibility seam while making
@@ -363,6 +324,7 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     Objects.requireNonNull(telemetry, "telemetry");
+    Objects.requireNonNull(engineAdmission, "engineAdmission");
     this.executors = Objects.requireNonNull(executors, "executors");
     this.foregroundDocumentOwner = documentExecutorOwner(executors,
         io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND, "foreground");

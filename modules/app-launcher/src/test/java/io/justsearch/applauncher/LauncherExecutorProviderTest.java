@@ -41,6 +41,26 @@ class LauncherExecutorProviderTest {
     }
   }
 
+  @Test
+  void standaloneAdmissionProviderOwnsTheSameFreezeAndWorkBoundary() {
+    var providers = ServiceLoader.load(io.justsearch.app.api.EngineAdmissionService.class).stream().toList();
+    var admission = LauncherEnvironment.loadAdmission(providers);
+    org.junit.jupiter.api.Assertions.assertInstanceOf(io.justsearch.app.api.OperationLeaseService.class, admission);
+    assertThrows(IllegalStateException.class, () -> LauncherEnvironment.loadAdmission(List.of()));
+    assertThrows(IllegalStateException.class,
+        () -> LauncherEnvironment.loadAdmission(List.of(providers.getFirst(), providers.getFirst())));
+    var context = new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.INTERNAL, "launcher-test",
+        java.util.Optional.empty(), java.util.Optional.empty(), "internal", "launcher-test",
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    try (var work = admission.admit(context, false)) {
+      assertEquals(1, admission.activeWorkCount());
+      org.junit.jupiter.api.Assertions.assertTrue(work.context().workId().isPresent());
+    }
+    assertEquals(0, admission.activeWorkCount());
+  }
+
   private static ServiceLoader.Provider<EngineExecutorRegistry> provider(
       EngineExecutorRegistry registry, AtomicInteger creations) {
     return new ServiceLoader.Provider<>() {
