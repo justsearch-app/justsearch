@@ -35,3 +35,13 @@ Retain through lane completion plus30 days. No full/stress/live/hosted claim fol
 
 Restored run133 passed all observability tests, WholeProgramDeadCodeTest and observability PMD.
 Log: tmp/c1-batch4-restored-133.txt; XML: tmp/c1-batch4-green-133.
+
+
+Hosted correction (2026-09-09): CI34339800148 rejects the test fixture's discarded
+getDeclaredField return under Error Prone ReturnValueIgnored. The fixture now consumes
+that result to require a Queue-typed buffered field before identifying the handoff listener.
+This retains the existing reflection-based concurrency fixture and all assertions. Local
+builds skip Error Prone on test sources by default; the restored check must explicitly use
+-PskipErrorProneTests=false. This WIP checkpoint has diff-check proof only; focused strict
+compile/test and hosted rerun remain required after the live pacing campaign finishes.
+Raw error: tmp/c1-hosted-triage/unit-tests-app-ui-102427739671.log:1480.

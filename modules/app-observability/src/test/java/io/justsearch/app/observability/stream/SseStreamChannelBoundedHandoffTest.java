@@ -60,8 +60,9 @@ final class SseStreamChannelBoundedHandoffTest {
     listenersField.setAccessible(true);
     for (Object listener : (Set<?>) listenersField.get(channel)) {
       try {
-        listener.getClass().getDeclaredField("buffered");
-        return listener;
+        if (Queue.class.isAssignableFrom(listener.getClass().getDeclaredField("buffered").getType())) {
+          return listener;
+        }
       } catch (NoSuchFieldException ignored) {
         // The ordinary subscriber has no handoff queue.
       }
