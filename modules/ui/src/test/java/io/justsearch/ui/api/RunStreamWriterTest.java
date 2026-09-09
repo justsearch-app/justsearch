@@ -28,9 +28,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -300,6 +307,97 @@ final class RunStreamWriterTest {
     verify(h.client).close();
   }
 
+  @Test
+  @DisplayName("a close during run_started cannot create an observer or heartbeat")
+  void closeDuringRunStartedReleasesBeforeResourcesAreCreated() {
+    RunChannel run = openAsk("run-close-during-primer");
+    Harness h = new Harness(null, null);
+    AtomicInteger creatorGone = new AtomicInteger();
+    h.onSend = event -> {
+      if (RunStreamWriter.RUN_STARTED_EVENT.equals(event)) {
+        assertTrue(h.closeCallback != null, "onClose must be installed before the first write");
+        h.simulateClientClose();
+      }
+    };
+
+    assertTrue(
+        RunStreamWriter.attach(
+                h.client, run, h.scheduler, HEARTBEAT_SECONDS, creatorGone::incrementAndGet)
+            .isPresent());
+
+    assertEquals(List.of(RunStreamWriter.RUN_STARTED_EVENT), h.eventNames());
+    assertEquals(1, creatorGone.get(), "the creator transition is one-shot");
+    assertEquals(0, run.observerCount(), "the close happened before subscription creation");
+    verify(h.scheduler, never())
+        .scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+    assertTrue(h.connectionFuture().isDone(), "the pre-created request future completes on close");
+  }
+
+  @Test
+  @DisplayName("a close during synchronous replay removes the returned subscription")
+  void closeDuringSynchronousReplayDoesNotLeaveResourcesBehind() {
+    RunChannel run = openAsk("run-close-during-replay");
+    run.publish(new RunFrame("chunk", Map.of("text", "one")));
+    Harness h = new Harness(null, null);
+    AtomicInteger creatorGone = new AtomicInteger();
+    h.onSend = event -> {
+      if ("chunk".equals(event)) {
+        h.simulateClientClose();
+      }
+    };
+
+    assertTrue(
+        RunStreamWriter.attach(
+                h.client, run, h.scheduler, HEARTBEAT_SECONDS, creatorGone::incrementAndGet)
+            .isPresent());
+
+    assertEquals(List.of(RunStreamWriter.RUN_STARTED_EVENT, "chunk"), h.eventNames());
+    assertEquals(1, creatorGone.get(), "the creator transition is one-shot");
+    assertEquals(
+        0,
+        run.observerCount(),
+        "the subscription returned by replay is immediately removed");
+    verify(h.scheduler, never())
+        .scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+    assertTrue(h.connectionFuture().isDone());
+  }
+
+  @Test
+  @DisplayName("client close and run retirement race without repeating cleanup")
+  void closeAndRetireRaceIsOneShot() throws Exception {
+    RunChannel run = openAsk("run-close-retire-race");
+    Harness h = new Harness(null, null);
+    AtomicInteger creatorGone = new AtomicInteger();
+    assertTrue(
+        RunStreamWriter.attach(
+                h.client, run, h.scheduler, HEARTBEAT_SECONDS, creatorGone::incrementAndGet)
+            .isPresent());
+
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      var close = executor.submit(() -> {
+        start.await();
+        h.simulateClientClose();
+        return null;
+      });
+      var retire = executor.submit(() -> {
+        start.await();
+        registry.retire(run.id());
+        return null;
+      });
+      start.countDown();
+      close.get();
+      retire.get();
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertEquals(1, creatorGone.get(), "close and terminal retirement share one cleanup path");
+    assertEquals(0, run.observerCount());
+    assertTrue(h.connectionFuture().isDone());
+  }
+
   // ── harness ──────────────────────────────────────────────────────────────────────────────────
 
   private record Frame(String event, String data) {}
@@ -309,19 +407,44 @@ final class RunStreamWriterTest {
     private final ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
     private final ScheduledFuture<?> heartbeatFuture = mock(ScheduledFuture.class);
     private final List<Frame> sent = new ArrayList<>();
+    private final AtomicBoolean terminated = new AtomicBoolean();
+    private Runnable closeCallback;
+    private Supplier<? extends CompletableFuture<?>> futureSupplier;
+    private java.util.function.Consumer<String> onSend;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Harness(String sinceSeqParam, String sinceParam) {
       Context ctx = mock(Context.class);
       when(client.ctx()).thenReturn(ctx);
+      when(client.terminated()).thenAnswer(inv -> terminated.get());
       when(ctx.queryParam(RunStreamWriter.CURSOR_PARAM)).thenReturn(sinceSeqParam);
       when(ctx.queryParam(RunStreamWriter.ENVELOPE_CURSOR_PARAM)).thenReturn(sinceParam);
+      doAnswer(inv -> {
+            futureSupplier = inv.getArgument(0);
+            return null;
+          })
+          .when(ctx)
+          .future(any());
+      doAnswer(inv -> {
+            closeCallback = inv.getArgument(0);
+            return null;
+          })
+          .when(client)
+          .onClose(any());
+      doAnswer(inv -> {
+            terminated.set(true);
+            if (closeCallback != null) closeCallback.run();
+            return null;
+          })
+          .when(client)
+          .close();
       doAnswer(
               inv -> {
                 Object data = inv.getArgument(1, Object.class);
                 sent.add(
                     new Frame(
                         inv.getArgument(0, String.class), data == null ? "" : data.toString()));
+                if (onSend != null) onSend.accept(inv.getArgument(0, String.class));
                 return null;
               })
           .when(client)
@@ -345,6 +468,16 @@ final class RunStreamWriterTest {
       ArgumentCaptor<Runnable> onClose = ArgumentCaptor.forClass(Runnable.class);
       verify(client).onClose(onClose.capture());
       return onClose.getValue();
+    }
+
+    private void simulateClientClose() {
+      terminated.set(true);
+      if (closeCallback != null) closeCallback.run();
+    }
+
+    private CompletableFuture<?> connectionFuture() {
+      assertTrue(futureSupplier != null, "attach must register the request future");
+      return futureSupplier.get();
     }
   }
 }

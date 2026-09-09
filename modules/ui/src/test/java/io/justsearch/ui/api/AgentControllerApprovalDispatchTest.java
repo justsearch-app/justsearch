@@ -90,7 +90,7 @@ final class AgentControllerApprovalDispatchTest {
   }
 
   private static AgentController controller(AgentService svc, WorkflowGateRegistry reg) {
-    AgentController ctrl = new AgentController(() -> svc, null, null, null);
+    AgentController ctrl = new AgentController(new io.justsearch.core.execution.TestEngineExecutors(), () -> svc, null, null, null);
     if (reg != null) {
       ctrl.setWorkflowGateRegistry(reg);
     }

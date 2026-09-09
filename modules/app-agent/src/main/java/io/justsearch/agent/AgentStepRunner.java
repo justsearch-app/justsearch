@@ -138,17 +138,7 @@ final class AgentStepRunner {
       AtomicReference<AgentEventTracing.Sequencer> traceSequencerRef,
       Consumer<AgentEvent> sink) {
         if (session.isCancelled()) {
-          errorEmitter.emitError(
-              sink,
-              "Session cancelled",
-              AgentErrorCode.CANCELLED,
-              AgentErrorClass.CANCELLED,
-              RetryAction.ABORT,
-              null);
-          // F1: state-first, durability-second.
-          session.markTerminated(TerminalDisposition.CANCELLED, null, CancelTrigger.USER);
-          checkpointer.checkpoint(sessionId, session, "CANCELLED", "Session cancelled");
-          return IterationOutcome.terminated(false);
+          return cancelledIteration(session, sessionId, sink);
         }
 
         // Tempdoc 565 §30 — DIRECTION authority: drain a queued human STEERING directive at the
@@ -247,7 +237,7 @@ final class AgentStepRunner {
         // tool schemas this iteration will pass. The chat template renders those schemas into the
         // prompt, so counting messages alone measured a different prompt, not an approximation of
         // this one. `tools` is the list built a few lines above and handed to the LLM call below.
-        var projectedTokens = onlineAiService.countPromptTokens(session.messages(), tools);
+        var projectedTokens = onlineAiService.countPromptTokens(session.messages(), tools, session.engineContext());
         if (projectedTokens.isPresent()) {
           int tokens = projectedTokens.get();
           int budgetSnapshot;
@@ -350,6 +340,7 @@ final class AgentStepRunner {
               session.clearContextGate();
             }
 
+            if (session.isCancelled()) return cancelledIteration(session, sessionId, sink);
             if (ctxDecision == AgentSession.ContextGateDecision.STOP) {
               errorEmitter.emitError(
                   sink,
@@ -444,7 +435,7 @@ final class AgentStepRunner {
               // check below against the now-shorter message history so it reflects reality.
               // Same tool list as the projection above (878 §D.6): a recompute that measured a
               // different prompt than the check it is correcting would be its own defect.
-              var recomputed = onlineAiService.countPromptTokens(session.messages(), tools);
+              var recomputed = onlineAiService.countPromptTokens(session.messages(), tools, session.engineContext());
               if (recomputed.isPresent()) {
                 tokens = recomputed.get();
                 synchronized (session) {
@@ -505,6 +496,7 @@ final class AgentStepRunner {
               }
             }
 
+            if (session.isCancelled()) return cancelledIteration(session, sessionId, sink);
             if (decision == AgentSession.BudgetGateDecision.STOP) {
               errorEmitter.emitError(
                   sink,
@@ -600,6 +592,11 @@ final class AgentStepRunner {
           } else {
             result = llmCaller.callLlmWithRetries(session, tools, sink);
           }
+        } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+          sink.accept(session.cancellationEvent());
+          session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
+          checkpointer.checkpoint(sessionId, session, "CANCELLED", cancelled.reasonCode());
+          return IterationOutcome.terminated(false);
         } catch (Exception e) {
           errorEmitter.emitError(
               sink,
@@ -720,18 +717,8 @@ final class AgentStepRunner {
           ToolCallRequest call = toolCalls.get(ci);
 
           if (session.isCancelled()) {
-            errorEmitter.emitError(
-                sink,
-                "Session cancelled",
-                AgentErrorCode.CANCELLED,
-                AgentErrorClass.CANCELLED,
-                RetryAction.ABORT,
-                null);
-            // F1: state-first, durability-second.
-            session.markTerminated(TerminalDisposition.CANCELLED, null, CancelTrigger.USER);
-            checkpointer.checkpoint(sessionId, session, "CANCELLED", "Session cancelled");
-            return IterationOutcome.terminated(false);
-          }
+          return cancelledIteration(session, sessionId, sink);
+        }
 
           // Handoff detection — before regular tool resolution (handoff tools are not in
           // toolRegistry)
@@ -1401,4 +1388,12 @@ final class AgentStepRunner {
     session.recordCompression(compressor.compressToolMessages(session.messages()));
     checkpointer.checkpoint(sessionId, session, "AFTER_TOOL_RESULT", "Virtual tool completed: " + call.toolName());
   }
+  private IterationOutcome cancelledIteration(AgentSession session, String sessionId, Consumer<AgentEvent> sink) {
+    agentTelemetry.recordError(AgentErrorCode.CANCELLED, AgentErrorClass.CANCELLED);
+    sink.accept(session.cancellationEvent());
+    session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
+    checkpointer.checkpoint(sessionId, session, "CANCELLED", session.cancellationReason());
+    return IterationOutcome.terminated(false);
+  }
+
 }

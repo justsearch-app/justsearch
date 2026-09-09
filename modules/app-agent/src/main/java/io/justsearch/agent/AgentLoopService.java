@@ -443,6 +443,21 @@ public final class AgentLoopService implements AgentService {
   @Override
   public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background,
       EngineContext engineContext) {
+    try (var work = engineAdmission == null ? null : engineAdmission.attach(engineContext)) {
+      runAgentOwned(request, eventConsumer, background,
+          work == null ? engineContext : work.context(), work);
+    }
+  }
+
+  private volatile io.justsearch.app.api.EngineAdmissionService engineAdmission;
+
+  /** Composition supplies the Engine's one admission owner before exposing this lazy service. */
+  public void setEngineAdmission(io.justsearch.app.api.EngineAdmissionService admission) {
+    this.engineAdmission = admission;
+  }
+
+  private void runAgentOwned(AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background,
+      EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
     String sessionId = UUID.randomUUID().toString();
 
     // Calculate initial token budget
@@ -465,7 +480,9 @@ public final class AgentLoopService implements AgentService {
     var session = new AgentSession(request.messages(), initialBudget, effectiveAgentId,
         new EngineContext(engineContext.clientKind(), engineContext.clientId(),
             java.util.Optional.of(sessionId), engineContext.grantReference(), engineContext.sourceTier(),
-            engineContext.transport(), engineContext.survival(), engineContext.urgency()));
+            engineContext.transport(), engineContext.survival(), engineContext.urgency(), engineContext.workId()), work);
+    var cancellation = work == null ? null : work.onCancel(reason -> session.cancelFromWork());
+    try {
     // Tempdoc 577 §2.14 Root II (#14) — carry the model's context window (n_ctx) onto the session so
     // each budget event can report cognitive headroom (promptTokens ÷ n_ctx) beside the economic budget.
     session.contextWindow(contextWindow);
@@ -636,6 +653,10 @@ public final class AgentLoopService implements AgentService {
       session.markTerminated(TerminalDisposition.MAX_ITERATIONS, null, null);
       checkpoint(sessionId, session, LifecycleState.DONE.name(), "Max iterations reached");
 
+    } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+      sink.accept(session.cancellationEvent());
+      session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
+      checkpoint(sessionId, session, LifecycleState.CANCELLED.name(), cancelled.reasonCode());
     } catch (Exception e) {
       LOG.error("Agent loop error", e);
       agentSpan.recordException(e);
@@ -680,6 +701,9 @@ public final class AgentLoopService implements AgentService {
       // here, with attach refusing an already-removed session — so a reattach arriving in the gap
       // saw "gone" for a run whose answer had just landed.
       session.observation().retire();
+    }
+    } finally {
+      if (cancellation != null) cancellation.close();
     }
   }
 

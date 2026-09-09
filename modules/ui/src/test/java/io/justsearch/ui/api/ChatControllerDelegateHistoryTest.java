@@ -191,7 +191,7 @@ final class ChatControllerDelegateHistoryTest {
   private static JsonNode loadHistory(
       FileConversationStore store, AgentService agent, String sessionId) {
     ChatController controller =
-        new ChatController(
+        new ChatController(new io.justsearch.core.execution.TestEngineExecutors(),
             null,
             new SseWriter(null),
             null,

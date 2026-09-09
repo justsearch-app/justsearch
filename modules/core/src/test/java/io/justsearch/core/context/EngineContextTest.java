@@ -24,11 +24,11 @@ final class EngineContextTest {
       }
     }
     assertEquals(Set.of("clientKind", "clientId", "sessionId", "grantReference", "sourceTier",
-        "transport", "survival", "urgency"),
+        "transport", "survival", "urgency", "workId"),
         Arrays.stream(EngineContext.class.getRecordComponents())
             .map(java.lang.reflect.RecordComponent::getName).collect(Collectors.toSet()));
     assertEquals(Set.of("clientKind", "clientId", "sessionId", "grantReference", "sourceTier",
-        "transport", "survival", "urgency", "toString", "hashCode"),
+        "transport", "survival", "urgency", "workId", "toString", "hashCode"),
         Arrays.stream(EngineContext.class.getDeclaredMethods())
             .filter(m -> java.lang.reflect.Modifier.isPublic(m.getModifiers()))
             .filter(m -> !java.lang.reflect.Modifier.isStatic(m.getModifiers()))

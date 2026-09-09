@@ -123,6 +123,7 @@ export interface CoreAgentRunErrorPayload {
   errorClass?: string;
   retryAction?: string;
   retryAttempt?: number;
+  reasonCode?: string;
   i18nKey?: string;
   trace?: TracePayload;
 }

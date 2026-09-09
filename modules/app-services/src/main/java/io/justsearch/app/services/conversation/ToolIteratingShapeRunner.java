@@ -96,9 +96,8 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
 
   @Override
   public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext incomingContext) {
-    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
-        incomingContext.clientKind(), incomingContext.clientId(), incomingContext.sessionId(),
-        incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
+    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.rebase(
+        incomingContext, incomingContext.sessionId(), io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
         incomingContext.survival(), incomingContext.urgency());
     AgentService agent = agentServiceSupplier.get();
     if (agent == null || !agent.isAvailable()) {
@@ -147,7 +146,7 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
             runContext.set(new EngineContext(engineContext.clientKind(), engineContext.clientId(),
                 java.util.Optional.of(started.sessionId()), engineContext.grantReference(),
                 engineContext.sourceTier(), engineContext.transport(),
-                engineContext.survival(), engineContext.urgency()));
+                engineContext.survival(), engineContext.urgency(), engineContext.workId()));
           }
           if (event instanceof AgentEvent.TextChunk chunk) {
             assistantText.append(chunk.text());

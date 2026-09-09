@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -96,9 +95,16 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
 
   private final Supplier<OnlineAiService> onlineAiSupplier;
   private final Supplier<DocumentService> documentsSupplier;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   public HierarchicalShapeRunner(
       Supplier<OnlineAiService> onlineAiSupplier, Supplier<DocumentService> documentsSupplier) {
+    this(onlineAiSupplier, documentsSupplier, null);
+  }
+
+  public HierarchicalShapeRunner(Supplier<OnlineAiService> onlineAiSupplier,
+      Supplier<DocumentService> documentsSupplier, io.justsearch.app.api.EngineAdmissionService admission) {
+    this.admission = admission;
     this.onlineAiSupplier = onlineAiSupplier;
     this.documentsSupplier = documentsSupplier;
   }
@@ -110,6 +116,14 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
 
   @Override
   public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext) {
+    try (var work = admission == null ? null : admission.attach(engineContext)) {
+      runOwned(body, sink, work == null ? engineContext : work.context(), work);
+    }
+  }
+
+  private void runOwned(Map<String, Object> body, Consumer<SseEvent> sink,
+      EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
+    checkWork(work);
     String docId = asString(body.get("docId"));
     if (docId == null || docId.isBlank()) {
       emitError(sink, "No document ID provided", "NO_DOC_ID");
@@ -151,7 +165,7 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
 
     if (totalTokens < budget.hierarchicalThreshold()) {
       emitProgress(sink, "standard", "Document is small, using single-pass summarization");
-      streamSingleSynthesis(onlineAi, content, docId, false, 0, sink);
+      streamSingleSynthesis(onlineAi, content, docId, false, 0, sink, work);
       return;
     }
 
@@ -186,8 +200,10 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
                         "user",
                         "SECTION " + (i + 1) + " of " + sectionCount + "\n\n" + sections.get(i))),
                 SECTION_MAX_TOKENS,
-                SECTION_TIMEOUT_SECONDS);
+                SECTION_TIMEOUT_SECONDS, work);
         sectionSummaries.add(sectionSummary);
+      } catch (java.util.concurrent.CancellationException cancelled) {
+        throw cancelled;
       } catch (TimeoutException e) {
         LOG.warn("Section {} summarization timed out", i + 1);
         String excerpt = sections.get(i);
@@ -210,7 +226,7 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
         "Synthesizing final summary from " + sectionCount + " sections...");
 
     String combined = formatSectionSummaries(sectionSummaries);
-    streamSynthesis(onlineAi, combined, docId, sectionCount, failedSections, sink);
+    streamSynthesis(onlineAi, combined, docId, sectionCount, failedSections, sink, work);
   }
 
   // ---- Phase helpers ----
@@ -221,12 +237,12 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
       String docId,
       boolean hierarchical,
       int sectionCount,
-      Consumer<SseEvent> sink) {
+      Consumer<SseEvent> sink, io.justsearch.app.api.EngineWorkHandle work) {
     List<Map<String, Object>> messages =
         List.of(
             msg("system", SYNTHESIS_SYSTEM_PROMPT),
             msg("user", "Summarize the following text:\n\n" + content));
-    streamFinalToSink(ai, messages, docId, hierarchical, sectionCount, 0, sink);
+    streamFinalToSink(ai, messages, docId, hierarchical, sectionCount, 0, sink, work);
   }
 
   private void streamSynthesis(
@@ -235,7 +251,7 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
       String docId,
       int sectionCount,
       int failedSections,
-      Consumer<SseEvent> sink) {
+      Consumer<SseEvent> sink, io.justsearch.app.api.EngineWorkHandle work) {
     List<Map<String, Object>> messages =
         List.of(
             msg("system", SYNTHESIS_SYSTEM_PROMPT),
@@ -244,65 +260,47 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
                 "Write a coherent summary from the section summaries below.\n"
                     + "Prefer concise paragraphs and bullets. Do not invent missing parts.\n\n"
                     + combinedSummaries));
-    streamFinalToSink(ai, messages, docId, true, sectionCount, failedSections, sink);
+    streamFinalToSink(ai, messages, docId, true, sectionCount, failedSections, sink, work);
   }
 
   private void streamFinalToSink(
-      OnlineAiService ai,
-      List<Map<String, Object>> messages,
-      String docId,
-      boolean hierarchical,
-      int sectionCount,
-      int failedSections,
-      Consumer<SseEvent> sink) {
-    AtomicBoolean terminal = new AtomicBoolean(false);
+      OnlineAiService ai, List<Map<String, Object>> messages, String docId,
+      boolean hierarchical, int sectionCount, int failedSections,
+      Consumer<SseEvent> sink, io.justsearch.app.api.EngineWorkHandle work) {
     CountDownLatch latch = new CountDownLatch(1);
-    AtomicReference<String> finishReasonRef = new AtomicReference<>();
-
-    ai.streamChat(
-        messages,
-        SYNTHESIS_MAX_TOKENS,
-        chunk -> {
-          if (chunk != null && !chunk.isEmpty()) {
-            sink.accept(new SseEvent("chunk", Map.of("text", chunk)));
-          }
-        },
-        finishReason -> {
-          finishReasonRef.set(finishReason);
-          if (terminal.compareAndSet(false, true)) {
-            Map<String, Object> done = new LinkedHashMap<>();
-            done.put("docId", docId);
-            done.put("hierarchical", hierarchical);
-            if (hierarchical) {
-              done.put("sections", sectionCount);
-              done.put("failedSections", failedSections);
-            }
-            if (finishReason != null) {
-              done.put("finishReason", finishReason);
-            }
-            sink.accept(new SseEvent("done", done));
-          }
-          latch.countDown();
-        },
-        err -> {
-          if (terminal.compareAndSet(false, true)) {
-            LOG.error("Hierarchical synthesis failed", err);
-            emitError(sink, err.getMessage() == null ? "Synthesis failed" : err.getMessage(),
-                "SYNTHESIS_FAILED");
-          }
-          latch.countDown();
-        });
-
+    AtomicReference<String> finishReason = new AtomicReference<>();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    checkWork(work);
+    ai.stream(new OnlineAiService.StreamRequest(messages, SYNTHESIS_MAX_TOKENS, null, null, true, work),
+        OnlineAiService.StreamSink.of(chunk -> {
+          checkWork(work);
+          if (chunk != null && !chunk.isEmpty()) sink.accept(new SseEvent("chunk", Map.of("text", chunk)));
+        }, reason -> { finishReason.set(reason); latch.countDown(); },
+        error -> { failure.set(error); latch.countDown(); }));
     try {
-      if (!latch.await(SYNTHESIS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-          && terminal.compareAndSet(false, true)) {
-        emitError(sink, "Synthesis timeout", "TIMEOUT");
+      awaitStream(latch, SYNTHESIS_TIMEOUT_SECONDS, work);
+      checkWork(work);
+      Throwable error = failure.get();
+      if (error instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
+      if (error != null) {
+        LOG.error("Hierarchical synthesis failed", error);
+        emitError(sink, error.getMessage() == null ? "Synthesis failed" : error.getMessage(), "SYNTHESIS_FAILED");
+        return;
       }
-    } catch (InterruptedException e) {
+      Map<String, Object> done = new LinkedHashMap<>();
+      done.put("docId", docId);
+      done.put("hierarchical", hierarchical);
+      if (hierarchical) {
+        done.put("sections", sectionCount);
+        done.put("failedSections", failedSections);
+      }
+      if (finishReason.get() != null) done.put("finishReason", finishReason.get());
+      sink.accept(new SseEvent("done", done));
+    } catch (TimeoutException timeout) {
+      emitError(sink, "Synthesis timeout", "TIMEOUT");
+    } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      if (terminal.compareAndSet(false, true)) {
-        emitError(sink, "Interrupted", "INTERRUPTED");
-      }
+      emitError(sink, "Interrupted", "INTERRUPTED");
     }
   }
 
@@ -352,37 +350,55 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
       OnlineAiService ai,
       List<Map<String, Object>> messages,
       int maxTokens,
-      int timeoutSeconds)
+      int timeoutSeconds, io.justsearch.app.api.EngineWorkHandle work)
       throws Exception {
     StringBuilder out = new StringBuilder();
     AtomicReference<Throwable> err = new AtomicReference<>();
     CountDownLatch latch = new CountDownLatch(1);
 
-    ai.streamChat(
-        messages,
-        maxTokens,
-        chunk -> {
-          if (chunk != null) {
-            out.append(chunk);
-          }
-        },
-        complete -> latch.countDown(),
-        e -> {
-          err.set(e);
-          latch.countDown();
-        },
-        SamplingParams.DETERMINISTIC,
-        false);
-
-    if (!latch.await(timeoutSeconds, TimeUnit.SECONDS)) {
-      throw new TimeoutException("section summarize timeout");
-    }
+    checkWork(work);
+    ai.stream(new OnlineAiService.StreamRequest(messages, maxTokens, null, SamplingParams.DETERMINISTIC, false, work),
+        OnlineAiService.StreamSink.of(chunk -> {
+          checkWork(work);
+          if (chunk != null) out.append(chunk);
+        }, complete -> latch.countDown(), e -> { err.set(e); latch.countDown(); }));
+    awaitStream(latch, timeoutSeconds, work);
+    checkWork(work);
     Throwable t = err.get();
     if (t != null) {
       if (t instanceof Exception ex) throw ex;
       throw new RuntimeException(t);
     }
     return out.toString();
+  }
+
+  private static void checkWork(io.justsearch.app.api.EngineWorkHandle work) {
+    if (work != null) work.cancellationReason().ifPresent(reason -> {
+      throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
+    });
+  }
+
+  private static void awaitStream(CountDownLatch latch, int timeoutSeconds,
+      io.justsearch.app.api.EngineWorkHandle work) throws InterruptedException, TimeoutException {
+    boolean interrupted = false;
+    try {
+      if (latch.await(timeoutSeconds, TimeUnit.SECONDS)) return;
+      if (work == null) throw new TimeoutException("summary stream timeout");
+      work.cancel("deadline_exceeded");
+    } catch (InterruptedException cancellation) {
+      if (work == null) throw cancellation;
+      interrupted = true;
+      work.cancel("caller_interrupted");
+    }
+    try {
+      for (;;) {
+        try { latch.await(); break; }
+        catch (InterruptedException repeated) { interrupted = true; }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+    checkWork(work);
   }
 
   // ---- Token + section helpers (lifted self-contained from TokenEstimationUtils) ----

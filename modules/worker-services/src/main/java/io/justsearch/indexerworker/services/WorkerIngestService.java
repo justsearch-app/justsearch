@@ -1936,6 +1936,12 @@ public final class WorkerIngestService {
     final Object emitLock = new Object();
     java.util.concurrent.atomic.AtomicReference<IndexingJobChangeFeed.Subscription> subRef =
         new java.util.concurrent.atomic.AtomicReference<>();
+    java.util.concurrent.atomic.AtomicBoolean closeRequested = new java.util.concurrent.atomic.AtomicBoolean();
+    Runnable closeSubscription = () -> {
+      closeRequested.set(true);
+      IndexingJobChangeFeed.Subscription subscription = subRef.getAndSet(null);
+      if (subscription != null) subscription.close();
+    };
     java.util.concurrent.atomic.AtomicLong frameSeq =
         new java.util.concurrent.atomic.AtomicLong(0L);
 
@@ -1961,21 +1967,20 @@ public final class WorkerIngestService {
                       .build());
             } catch (RuntimeException e) {
               log.warn("subscribeIndexingJobs: delta delivery failed; closing subscription", e);
-              IndexingJobChangeFeed.Subscription s = subRef.get();
-              if (s != null) s.close();
+              closeSubscription.run();
             }
           }
         };
 
-    ctx.onCancel(
-        () -> {
-          IndexingJobChangeFeed.Subscription s = subRef.get();
-          if (s != null) s.close();
-        });
+    ctx.onCancel(closeSubscription);
 
     try {
       var snap = feed.subscribeWithSnapshot(consumer);
       subRef.set(snap.subscription());
+      if (closeRequested.get() || ctx.cancelled()) {
+        closeSubscription.run();
+        return;
+      }
 
       io.justsearch.ipc.IndexingJobsSnapshot.Builder snapBuilder =
           io.justsearch.ipc.IndexingJobsSnapshot.newBuilder();
@@ -1990,8 +1995,12 @@ public final class WorkerIngestService {
                 .build());
       }
     } catch (java.sql.SQLException e) {
+      closeSubscription.run();
       log.error("subscribeIndexingJobs: snapshot read failed", e);
       throw WorkerServiceException.internal("snapshot read failed: " + e.getMessage());
+    } catch (RuntimeException | Error failure) {
+      closeSubscription.run();
+      throw failure;
     }
   }
 

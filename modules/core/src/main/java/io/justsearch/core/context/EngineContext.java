@@ -3,6 +3,7 @@ package io.justsearch.core.context;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Identity, attribution and independent work axes carried explicitly across Engine ports.
@@ -27,7 +28,16 @@ public record EngineContext(
     String sourceTier,
     String transport,
     Survival survival,
-    Urgency urgency) {
+    Urgency urgency,
+    Optional<UUID> workId) {
+
+  /** Unattached caller attribution; the Engine mints work identity at admission. */
+  public EngineContext(ClientKind clientKind, String clientId, Optional<String> sessionId,
+      Optional<String> grantReference, String sourceTier, String transport, Survival survival,
+      Urgency urgency) {
+    this(clientKind, clientId, sessionId, grantReference, sourceTier, transport, survival, urgency,
+        Optional.empty());
+  }
 
   public EngineContext {
     Objects.requireNonNull(clientKind, "clientKind");
@@ -39,6 +49,19 @@ public record EngineContext(
     requireIdentifier(transport, "transport");
     Objects.requireNonNull(survival, "survival");
     Objects.requireNonNull(urgency, "urgency");
+    Objects.requireNonNull(workId, "workId");
+  }
+
+  /** Exact process-local lifecycle linkage, never a client credential or durable operation key. */
+  public EngineContext withWorkId(UUID id) {
+    return new EngineContext(clientKind, clientId, sessionId, grantReference, sourceTier, transport,
+        survival, urgency, Optional.of(id));
+  }
+
+  /** Explicit work-owner transition; survival and attribution remain independent. */
+  public EngineContext withUrgency(Urgency next) {
+    return new EngineContext(clientKind, clientId, sessionId, grantReference, sourceTier, transport,
+        survival, next, workId);
   }
 
   private static void requireIdentifier(String value, String field) {

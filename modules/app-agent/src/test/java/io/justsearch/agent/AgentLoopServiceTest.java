@@ -4354,6 +4354,11 @@ class AgentLoopServiceTest {
       }
 
       @Override
+      public void stream(StreamRequest request, StreamSink sink) {
+        baseAi.stream(request, sink);
+      }
+
+      @Override
       public Optional<Integer> countPromptTokens(
           List<Map<String, Object>> messages) {
         return baseAi.countPromptTokens(messages);
@@ -4438,6 +4443,11 @@ class AgentLoopServiceTest {
           StreamCallbacks callbacks,
           SamplingParams sampling) {
         baseAi.streamChatWithTools(messages, tools, maxTokens, callbacks, sampling);
+      }
+
+      @Override
+      public void stream(StreamRequest request, StreamSink sink) {
+        baseAi.stream(request, sink);
       }
 
       @Override
@@ -5766,6 +5776,22 @@ class AgentLoopServiceTest {
     }
 
     @Override
+    public void stream(StreamRequest request, StreamSink sink) {
+      streamChatWithTools(
+          request.messages(),
+          request.tools(),
+          request.maxTokens(),
+          new StreamCallbacks(
+              sink.onContent(),
+              sink.onReasoning(),
+              sink.onToolCallDelta(),
+              sink.onUsage(),
+              sink.onComplete(),
+              sink.onError()),
+          request.sampling());
+    }
+
+    @Override
     public Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
       // Best-effort simulation: 10 tokens per message
       return Optional.of(messages.size() * 10);
@@ -5863,6 +5889,22 @@ class AgentLoopServiceTest {
       // The provider reports the REAL prompt — which is what the context-pressure trigger reads.
       callbacks.onUsage().accept(new OnlineAiService.AiUsage(realPrompt, 5, realPrompt + 5));
       callbacks.onComplete().accept(null);
+    }
+
+    @Override
+    public void stream(StreamRequest request, StreamSink sink) {
+      streamChatWithTools(
+          request.messages(),
+          request.tools(),
+          request.maxTokens(),
+          new StreamCallbacks(
+              sink.onContent(),
+              sink.onReasoning(),
+              sink.onToolCallDelta(),
+              sink.onUsage(),
+              sink.onComplete(),
+              sink.onError()),
+          request.sampling());
     }
 
     @Override

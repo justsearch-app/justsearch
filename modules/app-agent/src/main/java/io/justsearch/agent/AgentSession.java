@@ -191,6 +191,12 @@ final class AgentSession {
 
   AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId,
       io.justsearch.core.context.EngineContext engineContext) {
+    this(messages, initialBudget, initialAgentId, engineContext, null);
+  }
+
+  AgentSession(List<Map<String, Object>> messages, int initialBudget, String initialAgentId,
+      io.justsearch.core.context.EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
+    this.work = work;
     this.engineContext = Objects.requireNonNull(engineContext, "engineContext");
     this.messages = new ArrayList<>(messages);
     this.budgetRemaining = new AtomicInteger(initialBudget);
@@ -200,6 +206,23 @@ final class AgentSession {
   }
 
   private final io.justsearch.core.context.EngineContext engineContext;
+  // Borrowed from runAgent's try-with-resources; model producers retain their own reference.
+  private final io.justsearch.app.api.EngineWorkHandle work;
+
+  io.justsearch.app.api.EngineWorkHandle work() { return work; }
+
+  String cancellationReason() {
+    return work == null ? "user_stop" : work.cancellationReason().orElse("user_stop");
+  }
+
+  CancelTrigger cancellationTrigger() {
+    return cancellationReason().equals("user_stop") ? CancelTrigger.USER : CancelTrigger.SYSTEM;
+  }
+
+  AgentEvent.AgentError cancellationEvent() {
+    return new AgentEvent.AgentError("Session cancelled", "CANCELLED", "CANCELLED", "ABORT",
+        null, io.justsearch.agent.api.TraceContext.none(), cancellationReason());
+  }
 
   io.justsearch.core.context.EngineContext engineContext() {
     return engineContext;
@@ -309,6 +332,11 @@ final class AgentSession {
   }
 
   void cancel() {
+    if (work != null) work.cancel("user_stop");
+    cancelFromWork();
+  }
+
+  void cancelFromWork() {
     cancelled = true;
     approvalGates.values().forEach(g -> g.future().complete(false));
     // §13.5 Phase B — cancel pending virtual-tool waits with a

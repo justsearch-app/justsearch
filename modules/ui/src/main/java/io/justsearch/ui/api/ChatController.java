@@ -89,22 +89,25 @@ public final class ChatController {
   private final SseHeartbeat heartbeat;
 
   public ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
       ConversationStore conversationStore,
       Supplier<OnlineAiService> onlineAi,
       Supplier<AgentService> agentService) {
-    this(engine, sseWriter, telemetry, conversationStore, onlineAi, agentService,
+    this(executors, engine, sseWriter, telemetry, conversationStore, onlineAi, agentService,
         // A lambda, not a method reference: the reference would bind (and null-check) the writer at
         // construction, and this controller has constructors that legitimately pass nothing useful.
         new SseHeartbeat(
+            executors,
             (ctx, event, payload) -> sseWriter.writeEvent(ctx, event, payload),
             "chat-stream-heartbeat"));
   }
 
   /** Test seam: an {@link SseHeartbeat} whose scheduler and cadence a test can drive. */
   ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
@@ -132,24 +135,26 @@ public final class ChatController {
   }
 
   public ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
       ConversationStore conversationStore,
       Supplier<OnlineAiService> onlineAi) {
-    this(engine, sseWriter, telemetry, conversationStore, onlineAi, AgentService::unavailable);
+    this(executors, engine, sseWriter, telemetry, conversationStore, onlineAi, AgentService::unavailable);
   }
 
   public ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
       ConversationStore conversationStore) {
-    this(engine, sseWriter, telemetry, conversationStore, OnlineAiService::unavailable);
+    this(executors, engine, sseWriter, telemetry, conversationStore, OnlineAiService::unavailable);
   }
 
-  public ChatController(ConversationEngine engine, SseWriter sseWriter, Telemetry telemetry) {
-    this(engine, sseWriter, telemetry, ConversationStore.noop());
+  public ChatController(io.justsearch.core.execution.EngineExecutorRegistry executors, ConversationEngine engine, SseWriter sseWriter, Telemetry telemetry) {
+    this(executors, engine, sseWriter, telemetry, ConversationStore.noop());
   }
 
   /** Returns a handler that runs the supplied shape via the engine. */
@@ -285,6 +290,9 @@ public final class ChatController {
     } catch (ConversationEngine.ShapeNotFoundException notFound) {
       LOG.error("Shape not registered: {}", shapeId.value());
       sink.accept(errorEvent(notFound.getMessage(), ApiErrorCode.NOT_FOUND));
+    } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+      sink.accept(new SseEvent("error", Map.of("message", cancelled.getMessage(),
+          "errorCode", ApiErrorCode.SERVICE_UNAVAILABLE.name(), "reasonCode", cancelled.reasonCode())));
     } catch (Exception e) {
       LOG.error("Chat dispatch failed for shape {}", shapeId.value(), e);
       sink.accept(errorEvent(message(e), ApiErrorCode.BAD_REQUEST));
@@ -698,8 +706,10 @@ public final class ChatController {
     }
     String summary;
     try {
-      summary = onlineAi.get().summarize(transcript.toString()).get(60, TimeUnit.SECONDS);
+      summary = onlineAi.get().summarize(transcript.toString(),
+          OnlineAiService.DEFAULT_SUMMARY_TOKENS, RequestEngineContext.get(ctx)).get(60, TimeUnit.SECONDS);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       LOG.warn("Compaction summarize failed for {}", sessionId, e);
       Map<String, Object> err = new LinkedHashMap<>();
       err.put("error", "Summarization unavailable");

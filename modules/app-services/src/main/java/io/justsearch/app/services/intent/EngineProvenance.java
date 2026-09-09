@@ -31,6 +31,14 @@ public final class EngineProvenance {
         TransportTag.SYSTEM_INTERNAL, survival, urgency);
   }
 
+  /** Rebase attribution at an existing trust boundary without losing exact work ownership. */
+  public static EngineContext rebase(EngineContext incoming, Optional<String> sessionId,
+      TransportTag transport, EngineContext.Survival survival, EngineContext.Urgency urgency) {
+    return new EngineContext(incoming.clientKind(), incoming.clientId(), sessionId,
+        incoming.grantReference(), IntentGateEvaluator.sourceTierFor(SOURCES, transport).name(),
+        transport.name(), survival, urgency, incoming.workId());
+  }
+
   /**
    * Executor identity and signed intent remain dispatch inputs, never inferred from a client label
    * or an opaque grant reference. Registry enums remain authoritative for transport and source tier.

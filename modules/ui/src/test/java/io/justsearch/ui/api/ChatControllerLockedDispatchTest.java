@@ -239,7 +239,7 @@ final class ChatControllerLockedDispatchTest {
             OnlineAiService::unavailable,
             store);
     AgentController controller =
-        new AgentController(
+        new AgentController(new io.justsearch.core.execution.TestEngineExecutors(),
             () -> agent, engine, new AgentSseWriter(new SseWriter(null), () -> agent, null), null);
 
     AtomicInteger status = new AtomicInteger(200);
@@ -271,7 +271,7 @@ final class ChatControllerLockedDispatchTest {
             IterationControllerRegistry.of(List.of()),
             OnlineAiService::unavailable,
             store);
-    ChatController controller = new ChatController(engine, new SseWriter(null), null, store);
+    ChatController controller = new ChatController(new io.justsearch.core.execution.TestEngineExecutors(), engine, new SseWriter(null), null, store);
 
     AtomicInteger status = new AtomicInteger(200);
     AtomicReference<Object> json = new AtomicReference<>();
@@ -359,7 +359,7 @@ final class ChatControllerLockedDispatchTest {
             IterationControllerRegistry.of(List.of()),
             () -> ai,
             store);
-    ChatController controller = new ChatController(engine, new SseWriter(null), null, store);
+    ChatController controller = new ChatController(new io.justsearch.core.execution.TestEngineExecutors(), engine, new SseWriter(null), null, store);
 
     AtomicInteger status = new AtomicInteger(200);
     AtomicReference<Object> json = new AtomicReference<>();

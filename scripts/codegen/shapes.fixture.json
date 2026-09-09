@@ -559,6 +559,14 @@
             "objectType": null
           },
           {
+            "name": "reasonCode",
+            "type": "STRING",
+            "optional": true,
+            "enumValues": [],
+            "elementType": null,
+            "objectType": null
+          },
+          {
             "name": "i18nKey",
             "type": "STRING",
             "optional": true,

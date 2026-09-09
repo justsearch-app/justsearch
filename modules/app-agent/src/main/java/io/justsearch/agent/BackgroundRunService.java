@@ -35,14 +35,25 @@ public final class BackgroundRunService {
 
   private final AgentService agentService;
   private final ScheduledExecutorService scheduler;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   public BackgroundRunService(AgentService agentService) {
-    this(agentService, defaultScheduler());
+    this(agentService, defaultScheduler(), null);
+  }
+
+  public BackgroundRunService(AgentService agentService, io.justsearch.app.api.EngineAdmissionService admission) {
+    this(agentService, defaultScheduler(), admission);
   }
 
   BackgroundRunService(AgentService agentService, ScheduledExecutorService scheduler) {
+    this(agentService, scheduler, null);
+  }
+
+  BackgroundRunService(AgentService agentService, ScheduledExecutorService scheduler,
+      io.justsearch.app.api.EngineAdmissionService admission) {
     this.agentService = Objects.requireNonNull(agentService, "agentService");
     this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+    this.admission = admission;
   }
 
   private static ScheduledExecutorService defaultScheduler() {
@@ -69,11 +80,15 @@ public final class BackgroundRunService {
             sessionId.set(started.sessionId());
           }
         };
-    try {
+    // A presence callback starts distinct work. Never retain a finished scheduling request's id.
+    var child = new EngineContext(engineContext.clientKind(), engineContext.clientId(),
+        engineContext.sessionId(), engineContext.grantReference(), engineContext.sourceTier(),
+        engineContext.transport(), engineContext.survival(), engineContext.urgency());
+    try (var work = admission == null ? null : admission.admit(child, false)) {
       // Tempdoc 561 P-D: background=true makes the run safe-by-default (the safety gate rejects
       // write/destructive tool calls — no watcher) AND marks the durable record background inside
       // AgentLoopService, so the presence projection (presenceSince) surfaces it on the user's return.
-      agentService.runAgent(request, capture, true, engineContext);
+      agentService.runAgent(request, capture, true, work == null ? child : work.context());
     } catch (RuntimeException e) {
       LOG.warn("Background agent run failed", e);
     }

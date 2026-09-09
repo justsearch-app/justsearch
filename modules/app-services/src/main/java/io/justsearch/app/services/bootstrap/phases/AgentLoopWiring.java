@@ -37,6 +37,44 @@ public final class AgentLoopWiring {
 
   private AgentLoopWiring() {}
 
+  /** Compatibility wiring for isolated callers that do not compose Engine admission. */
+  public static AgentService wire(
+      boolean inferenceConfigured,
+      OnlineAiService onlineAiService,
+      OperationCatalog agentToolsCatalog,
+      OperationDispatcher operationExecutor,
+      Function<String, String> operationMessageResolver,
+      FileOperationLog fileOperationLog,
+      Function<io.justsearch.core.context.EngineContext, List<String>> agentRootPaths,
+      AgentRunStore agentRunStore,
+      Telemetry telemetry,
+      HeadHealthEventsEmitter headHealthEventsEmitter,
+      Supplier<String> conditionContextSupplier,
+      BackendIntentRouter backendIntentRouter,
+      io.justsearch.agent.api.registry.ConsentCapsuleAuthority consentCapsuleAuthority,
+      io.justsearch.agent.api.registry.IntentPreviewer intentPreviewer,
+      java.util.function.Predicate<String> availabilityProbe,
+      io.justsearch.app.api.DocumentService citationDocumentService) {
+    return wire(
+        inferenceConfigured,
+        onlineAiService,
+        agentToolsCatalog,
+        operationExecutor,
+        operationMessageResolver,
+        fileOperationLog,
+        agentRootPaths,
+        agentRunStore,
+        telemetry,
+        headHealthEventsEmitter,
+        conditionContextSupplier,
+        backendIntentRouter,
+        consentCapsuleAuthority,
+        intentPreviewer,
+        availabilityProbe,
+        citationDocumentService,
+        null);
+  }
+
   /**
    * Constructs the head's {@link AgentService}.
    *
@@ -63,7 +101,8 @@ public final class AgentLoopWiring {
       io.justsearch.agent.api.registry.IntentPreviewer intentPreviewer,
       java.util.function.Predicate<String> availabilityProbe,
       // Tempdoc 565 §3.A — the document service that backs the answer↔source citation matcher.
-      io.justsearch.app.api.DocumentService citationDocumentService) {
+      io.justsearch.app.api.DocumentService citationDocumentService,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     if (!inferenceConfigured) {
       return AgentService.unavailable();
     }
@@ -97,6 +136,8 @@ public final class AgentLoopWiring {
     agentHolder[0].setConsentCapsuleAuthority(consentCapsuleAuthority);
     // Tempdoc 561 P-D1: the pending-approval event carries the backend gate verdict.
     agentHolder[0].setIntentPreviewer(intentPreviewer);
+    // The agent and LocalApiServer must share the EngineRoot admission owner.
+    agentHolder[0].setEngineAdmission(engineAdmission);
     // Tempdoc 565 §3.A: the terminal answer carries verifiable local-passage citations.
     // Tempdoc 799 §N.2: the cutoff comes from justsearch.citation.match_threshold. This MUST read
     // the same key as ConversationApiAssembly's StreamingCitationMatcher — 565 §15.A unified the

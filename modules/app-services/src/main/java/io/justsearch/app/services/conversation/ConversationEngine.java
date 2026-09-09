@@ -94,6 +94,7 @@ public final class ConversationEngine {
   private final IterationControllerRegistry iterationControllers;
   private final Supplier<OnlineAiService> onlineAiSupplier;
   private final io.justsearch.agent.api.conversation.ConversationStore conversationStore;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   /**
    * Constructs the engine. Phase B-compatible overload (registries + LLM source default to
@@ -140,6 +141,21 @@ public final class ConversationEngine {
       IterationControllerRegistry iterationControllers,
       Supplier<OnlineAiService> onlineAiSupplier,
       io.justsearch.agent.api.conversation.ConversationStore conversationStore) {
+    this(catalog, shapeRunners, promptContributors, contextInjectors, streamConsumers,
+        iterationControllers, onlineAiSupplier, conversationStore, null);
+  }
+
+  public ConversationEngine(
+      ConversationShapeCatalog catalog,
+      Iterable<ShapeRunner> shapeRunners,
+      PromptContributorRegistry promptContributors,
+      ContextInjectorRegistry contextInjectors,
+      StreamConsumerRegistry streamConsumers,
+      IterationControllerRegistry iterationControllers,
+      Supplier<OnlineAiService> onlineAiSupplier,
+      io.justsearch.agent.api.conversation.ConversationStore conversationStore,
+      io.justsearch.app.api.EngineAdmissionService admission) {
+    this.admission = admission;
     this.catalog = Objects.requireNonNull(catalog, "catalog");
     Map<ConversationShapeRef, ShapeRunner> idx = new LinkedHashMap<>();
     for (ShapeRunner r : shapeRunners) {
@@ -208,6 +224,20 @@ public final class ConversationEngine {
       Map<String, Object> body,
       Audience audience,
       Consumer<SseEvent> sink, EngineContext engineContext) {
+    try (var work = admission == null ? null : admission.attach(engineContext)) {
+      EngineContext context = work == null ? engineContext : work.context();
+      if (work != null) work.cancellationReason().ifPresent(reason -> {
+        throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
+      });
+      runAdmitted(shapeId, body, audience, sink, context, work);
+    }
+  }
+
+  private void runAdmitted(
+      ConversationShapeRef shapeId,
+      Map<String, Object> body,
+      Audience audience,
+      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
     Objects.requireNonNull(shapeId, "shapeId");
     Objects.requireNonNull(audience, "audience");
     Objects.requireNonNull(sink, "sink");
@@ -224,8 +254,8 @@ public final class ConversationEngine {
     validateAudience(shape, audience);
 
     switch (shape.executionMode()) {
-      case SHAPE_DRIVEN -> dispatchShapeDriven(shape, safeBody, audience, sink, engineContext);
-      case SUBSTRATE_DRIVEN -> dispatchSubstrateDriven(shape, safeBody, audience, sink, engineContext);
+      case SHAPE_DRIVEN -> dispatchShapeDriven(shape, safeBody, audience, sink, engineContext, work);
+      case SUBSTRATE_DRIVEN -> dispatchSubstrateDriven(shape, safeBody, audience, sink, engineContext, work);
     }
   }
 
@@ -261,7 +291,7 @@ public final class ConversationEngine {
       ConversationShape shape,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink, EngineContext engineContext) {
+      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
     ShapeRunner runner = runnersByShape.get(shape.id());
     if (runner == null) {
       throw new IllegalStateException(
@@ -317,6 +347,7 @@ public final class ConversationEngine {
             runId.compareAndSet(null, s);
           }
           if ("done".equals(event.name())) {
+            checkWork(work);
             recordShapeDrivenAnswer(recordKey, shape, event.payload(), runId.get());
           }
           sink.accept(event);
@@ -372,7 +403,7 @@ public final class ConversationEngine {
       ConversationShape shape,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink, EngineContext engineContext) {
+      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
     // Tempdoc 834 §4.3 — the turn-open marker is cleared HERE, in a finally around the whole
     // dispatch body, because that body has EIGHT exits (injector terminated, AI unavailable,
     // LlmStreamException, consumer onDone threw, controller next threw, STOP_SUCCESS, STOP_ERROR,
@@ -381,7 +412,7 @@ public final class ConversationEngine {
     // exactly the condition it encodes.
     var openTurnKey = new AtomicReference<String>();
     try {
-      dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey, engineContext);
+      dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey, engineContext, work);
     } finally {
       String key = openTurnKey.get();
       if (key != null && conversationStore != null) {
@@ -399,7 +430,7 @@ public final class ConversationEngine {
       Map<String, Object> body,
       Audience audience,
       Consumer<SseEvent> sink,
-      AtomicReference<String> openTurnKey, EngineContext engineContext) {
+      AtomicReference<String> openTurnKey, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
     LOG.debug("Dispatching substrate-driven {} (audience={})", shape.id().value(), audience);
 
     // Resolve SPI implementations from registries.
@@ -541,11 +572,13 @@ public final class ConversationEngine {
         return;
       }
       accumulatedFinalText = finalText;
+      checkWork(work);
 
       // Stream consumers: onDone dispatch. Collect message deltas + done-payload entries.
       List<Map<String, Object>> aggregateDeltas = new ArrayList<>();
       mergedDoneEntries.clear();
       for (StreamConsumer consumer : consumers) {
+        checkWork(work);
         StreamConsumerResult result;
         try {
           result = consumer.onDone(finalText, ctx);
@@ -581,6 +614,7 @@ public final class ConversationEngine {
       // Append the assistant message and any consumer message deltas before the next
       // iteration's decision + LLM call.
       Map<String, Object> assistantMsg = assistantMessage(finalText);
+      checkWork(work);
       ctx.appendMessage(assistantMsg);
       ctx.appendMessages(aggregateDeltas);
       // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
@@ -612,6 +646,7 @@ public final class ConversationEngine {
 
       switch (decision) {
         case STOP_SUCCESS -> {
+          checkWork(work);
           emitDone(sink, accumulatedFinalText, ctx.iteration() + 1, mergedDoneEntries);
           return;
         }
@@ -625,7 +660,14 @@ public final class ConversationEngine {
 
     // Reached hard cap without STOP_*
     LOG.warn("Substrate-driven shape {} reached iteration hard cap {}", shape.id().value(), hardCap);
+    checkWork(work);
     emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+  }
+
+  private static void checkWork(io.justsearch.app.api.EngineWorkHandle work) {
+    if (work != null) work.cancellationReason().ifPresent(reason -> {
+      throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
+    });
   }
 
   /**
@@ -658,12 +700,34 @@ public final class ConversationEngine {
       Consumer<SseEvent> sink)
       throws LlmStreamException {
 
+    try (var work = admission == null ? null : admission.attach(ctx.engineContext())) {
+      return streamLlmOwned(ai, messages, maxTokens, sampling, consumers, ctx, usageOut,
+          reasoningOut, sink, work);
+    }
+  }
+
+  private String streamLlmOwned(
+      OnlineAiService ai,
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      List<StreamConsumer> consumers,
+      EngineConversationContext ctx,
+      AtomicReference<OnlineAiService.AiUsage> usageOut,
+      AtomicReference<List<ReasoningTrace>> reasoningOut,
+      Consumer<SseEvent> sink,
+      io.justsearch.app.api.EngineWorkHandle work) throws LlmStreamException {
+
     CountDownLatch latch = new CountDownLatch(1);
     StringBuilder fullText = new StringBuilder();
     AtomicReference<String> completionText = new AtomicReference<>();
     AtomicReference<Throwable> error = new AtomicReference<>();
     AtomicLong lastActivityNanos = new AtomicLong(System.nanoTime());
     AtomicBoolean abandoned = new AtomicBoolean(false);
+    try (var _ = work == null ? null : work.onCancel(reason -> {
+      abandoned.set(true);
+      error.compareAndSet(null, new io.justsearch.app.api.EngineWorkCancelledException(reason));
+    })) {
     // Tempdoc 848 §2.2 — accumulate reasoning exactly as `fullText` accumulates content: reasoning is
     // a property of an LLM CALL, and this is the one place a call happens, so a shape-layer
     // accumulator would need one copy per shape and would drift.
@@ -679,7 +743,7 @@ public final class ConversationEngine {
     AtomicLong reasoningStartNanos = new AtomicLong(-1);
 
     ai.stream(
-        new OnlineAiService.StreamRequest(messages, maxTokens, sampling),
+        new OnlineAiService.StreamRequest(messages, maxTokens, null, sampling, true, work),
         new OnlineAiService.StreamSink(
             chunk -> {
               if (abandoned.get()) {
@@ -722,7 +786,7 @@ public final class ConversationEngine {
               latch.countDown();
             },
             err -> {
-              error.set(err);
+              error.compareAndSet(null, err);
               latch.countDown();
             }));
 
@@ -735,6 +799,12 @@ public final class ConversationEngine {
       while (!latch.await(STALL_POLL_MS, TimeUnit.MILLISECONDS)) {
         if (System.nanoTime() - lastActivityNanos.get() >= llmStallDeadline.toNanos()) {
           abandoned.set(true);
+          if (work != null) {
+            work.cancel("deadline_exceeded");
+            // The producer releases this latch after its active callback exits. Ending the turn
+            // here would let an error overtake a chunk still being written by that callback.
+            continue;
+          }
           LOG.error(
               "LLM stream produced nothing for {} — abandoning the turn (producer never returned)",
               llmStallDeadline);
@@ -744,12 +814,25 @@ public final class ConversationEngine {
         }
       }
     } catch (InterruptedException e) {
+      abandoned.set(true);
+      if (work != null) work.cancel("caller_interrupted");
+      if (work != null) {
+        boolean drained = false;
+        while (!drained) {
+          try { latch.await(); drained = true; }
+          catch (InterruptedException repeated) { /* Retain ownership until the transport terminal. */ }
+        }
+      }
       Thread.currentThread().interrupt();
-      throw new LlmStreamException("LLM call interrupted", "INTERRUPTED");
+      throw new LlmStreamException("LLM call interrupted",
+          work == null ? "INTERRUPTED" : work.cancellationReason().orElseThrow());
     }
 
     if (error.get() != null) {
       Throwable err = error.get();
+      if (err instanceof io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+        throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode());
+      }
       throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR");
     }
 
@@ -767,6 +850,7 @@ public final class ConversationEngine {
     // finish_reason, not the response body. See the comment on the onComplete
     // callback above.
     return fullText.toString();
+    }
   }
 
   /**

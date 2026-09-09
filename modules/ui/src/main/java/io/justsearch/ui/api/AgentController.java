@@ -90,6 +90,7 @@ final class AgentController {
   private io.justsearch.app.services.conversation.WorkflowGateRegistry workflowGateRegistry;
 
   AgentController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Supplier<AgentService> agentServiceSupplier,
       ConversationEngine engine,
       AgentSseWriter sseWriter,
@@ -104,6 +105,7 @@ final class AgentController {
     // keeps construction as total as it was before the heartbeat moved out of this class.
     this.heartbeat =
         new SseHeartbeat(
+            executors,
             (ctx, event, payload) -> sseWriter.writeEvent(ctx, event, payload),
             "agent-stream-heartbeat");
   }

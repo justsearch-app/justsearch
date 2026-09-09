@@ -128,9 +128,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     }
 
     String sessionId = UUID.randomUUID().toString();
-    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
-        incomingContext.clientKind(), incomingContext.clientId(), Optional.of(sessionId),
-        incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.WORKFLOW,
+    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.rebase(
+        incomingContext, Optional.of(sessionId), io.justsearch.agent.api.registry.TransportTag.WORKFLOW,
         incomingContext.survival(), incomingContext.urgency());
     // Tempdoc 565 §15.C — persist + index this workflow run in the shared run-event space so the
     // unified thread projects it as a mode of the one window (not a bespoke surface). `psink` mirrors

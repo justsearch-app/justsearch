@@ -48,7 +48,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings.json"));
     AgentService __agent = new ContractAgentService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       String body =
           """
@@ -125,7 +125,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings-error.json"));
     AgentService __agent = new ContractAgentErrorService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       String body =
           """
@@ -167,7 +167,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings-session.json"));
     AgentService __agent = new PersistedSessionAgentService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       HttpResponse<String> lastResponse =
           client.send(
@@ -214,7 +214,7 @@ final class AgentSseContractTest {
     AgentService __agent = new PersistedSessionAgentService();
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       // GET /api/chat/sessions
       HttpResponse<String> listResp =
@@ -331,7 +331,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings-resume.json"));
     AgentService __agent = new PersistedSessionAgentService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       HttpResponse<String> response =
           client.send(
@@ -634,7 +634,7 @@ final class AgentSseContractTest {
     AgentService __agent = new ContractHandoffAgentService();
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index-handoff")).agentService(__agent).build();
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index-handoff")).agentService(__agent).build();
     try {
       String body =
           """
@@ -689,7 +689,7 @@ final class AgentSseContractTest {
     AgentService __agent = agentService;
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index-profiles")).agentService(__agent)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index-profiles")).agentService(__agent)
             .build();
     try {
       String body =

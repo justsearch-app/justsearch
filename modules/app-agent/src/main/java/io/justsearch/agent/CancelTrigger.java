@@ -16,5 +16,7 @@ enum CancelTrigger {
   /** Token budget was exhausted and graceful finalize did not produce a response. */
   BUDGET,
   /** Session was terminated because the loop guard tripped on repeated identical tool calls. */
-  TOOL_LOOP
+  TOOL_LOOP,
+  /** Engine shutdown, caller interruption, or a work deadline cancelled the run. */
+  SYSTEM
 }

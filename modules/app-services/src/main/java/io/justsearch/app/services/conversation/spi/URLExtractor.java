@@ -116,9 +116,8 @@ public final class URLExtractor implements StreamConsumer {
   @Override
   public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
     var incomingContext = ctx.engineContext();
-    var engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
-        incomingContext.clientKind(), incomingContext.clientId(), incomingContext.sessionId(),
-        incomingContext.grantReference(), TransportTag.LLM_EMISSION,
+    var engineContext = io.justsearch.app.services.intent.EngineProvenance.rebase(
+        incomingContext, incomingContext.sessionId(), TransportTag.LLM_EMISSION,
         incomingContext.survival(), incomingContext.urgency());
     List<SseEvent> events = new ArrayList<>();
     List<Map<String, Object>> sideEffects = new ArrayList<>();

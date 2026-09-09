@@ -238,6 +238,12 @@ final class HierarchicalShapeRunnerTest {
     }
 
     @Override
+    public void stream(StreamRequest request, StreamSink sink) {
+      streamChat(request.messages(), request.maxTokens(), sink.onContent(), sink.onComplete(),
+          sink.onError(), request.sampling(), request.requireSentinel());
+    }
+
+    @Override
     public void streamChat(
         List<Map<String, Object>> messages, int maxTokens,
         Consumer<String> onChunk, Consumer<String> onComplete, Consumer<Throwable> onError,
@@ -332,6 +338,12 @@ final class HierarchicalShapeRunnerTest {
         // Section call — fail.
         onError.accept(new RuntimeException("section LLM failure"));
       }
+    }
+
+    @Override
+    public void stream(StreamRequest request, StreamSink sink) {
+      streamChat(request.messages(), request.maxTokens(), sink.onContent(), sink.onComplete(),
+          sink.onError(), request.sampling(), request.requireSentinel());
     }
 
     @Override
