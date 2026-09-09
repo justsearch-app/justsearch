@@ -54,6 +54,14 @@ passes28 sandbox cases and retains a failing lost-slot counterfactual. Final str
 CI34386342721 repeats the Chrome APT failure; [the bounded source preparation](evidence/C1/playwright-apt.md)
 passes nine local filesystem cases, preserving all integrity and measurement checks. Push and
 verify the current hosted run, then complete fresh stress and live acceptance before C2.
+Full418 now passes at clean5c2f0ef3b, including all five recovery cases. Hosted34387563666
+passes12/13 jobs including axe; Public claims finds a newly published smol-toml advisory,
+[corrected in the frontend development lockfile](evidence/C1/dependency-advisory.md).
+Primary423 proves the initial scan and all469 files, but has four unclassified load failures.
+Slow receipts confirm HTTP200 responses beyond its30s client timeout, within the existing
+60s CPU rerank allowance; the mismatch is proven, but the four exact error types were not logged.
+The normal jseval retriever already allows90s. Align that instrument next, retain failures,
+and obtain fresh live/hosted proof. See final-candidate.md for exact artifacts and remaining arms.
 Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
 inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.
 That checkpoint precedes the governance sweep. See [OCR correction](evidence/C1/ocr-component-close.md) and
