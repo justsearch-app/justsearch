@@ -145,6 +145,8 @@ public final class KnowledgeServer implements Closeable {
   private static final long STALE_PROCESSING_MS = LivenessWindows.REAPER_STALE_MS; // 5 min liveness window
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
+  private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
+  private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
   private io.justsearch.indexerworker.queue.SqlitePathResolutionStore pathResolutionStore;
@@ -606,25 +608,7 @@ public final class KnowledgeServer implements Closeable {
       // startup; this re-queues PROCESSING rows orphaned WITHOUT a restart (worker claimed a job
       // then died mid-process while the Head/UI keep running), so the rail never shows a dead job
       // as perpetually "running". Age-bounded → never touches actively-draining jobs.
-      JobQueue reaperQueue = jobQueue;
-      stuckJobReaper =
-          java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-              r -> {
-                Thread t = new Thread(r, "stuck-job-reaper");
-                t.setDaemon(true);
-                return t;
-              });
-      stuckJobReaper.scheduleWithFixedDelay(
-          () -> {
-            try {
-              reaperQueue.recoverStuckJobs(STALE_PROCESSING_MS);
-            } catch (RuntimeException reapErr) {
-              log.warn("stuck-job reaper tick failed (will retry): {}", reapErr.toString());
-            }
-          },
-          REAP_INTERVAL_MS,
-          REAP_INTERVAL_MS,
-          TimeUnit.MILLISECONDS);
+      startStuckJobReaper(jobQueue);
 
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
@@ -1079,7 +1063,7 @@ public final class KnowledgeServer implements Closeable {
       // Models load in a background thread while the ports are already answering. Callers
       // are null-safe: search degrades to BM25, IndexingLoop skips embedding/SPLADE,
       // ingest queues jobs normally. Models become available via volatile setters.
-      deferredModelInit = CompletableFuture.supplyAsync(this::initDeferredModels);
+      startDeferredModelInitialization(this::initDeferredModels);
 
     } catch (Exception e) {
       log.error("Failed to start KnowledgeServer", e);
@@ -1103,6 +1087,34 @@ public final class KnowledgeServer implements Closeable {
       closeQuietly();
       throw new IOException("Failed to start KnowledgeServer", e);
     }
+  }
+
+  /** Opens the server-owned periodic queue producer on its registered background scheduler. */
+  void startStuckJobReaper(JobQueue reaperQueue) {
+    Objects.requireNonNull(reaperQueue, "reaperQueue");
+    stuckJobReaper = workerExecutors.stuckJobReaper().openScheduled(r -> {
+      Thread thread = new Thread(r, "stuck-job-reaper");
+      thread.setDaemon(true);
+      return thread;
+    });
+    stuckJobReapTask = stuckJobReaper.scheduleWithFixedDelay(() -> {
+      try {
+        reaperQueue.recoverStuckJobs(STALE_PROCESSING_MS);
+      } catch (RuntimeException failure) {
+        log.warn("stuck-job reaper tick failed (will retry): {}", failure.toString());
+      }
+    }, REAP_INTERVAL_MS, REAP_INTERVAL_MS, TimeUnit.MILLISECONDS);
+  }
+
+  /** The executor remains an actual-exit owner even if its exposed completion is canceled. */
+  void startDeferredModelInitialization(java.util.function.Supplier<ModelContext> initializer) {
+    Objects.requireNonNull(initializer, "initializer");
+    deferredModelExecutor = workerExecutors.deferredModelInit().open(r -> {
+      Thread thread = new Thread(r, "deferred-model-init");
+      thread.setDaemon(true);
+      return thread;
+    });
+    deferredModelInit = io.justsearch.core.execution.EngineFutures.supplyAsync(initializer, deferredModelExecutor);
   }
 
   /**
@@ -2200,13 +2212,16 @@ public final class KnowledgeServer implements Closeable {
     running = false;
 
     // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
+    if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
     if (stuckJobReaper != null) {
       stuckJobReaper.shutdownNow();
+      stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
     }
 
     // The initializer publishes model/runtime fields that the remaining close steps release. It
     // must finish before those fields are closed and before the Engine exits: JVM shutdown hooks
     // may tear down native ORT environment state concurrently with a still-running initializer.
+    if (deferredModelExecutor != null) deferredModelExecutor.close();
     if (deferredModelInit != null) {
       try {
         deferredModelInit.join();

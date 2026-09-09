@@ -14,10 +14,14 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   public static final String WATCHER_RECONCILE = "index.watcher-reconcile";
   public static final String EXTRACTION_TIMEBOX = "index.extraction-timebox";
   public static final String SANDBOX_READERS = "index.extraction-sandbox-readers";
+  public static final String STUCK_JOB_REAPER = "index.stuck-job-reaper";
+  public static final String DEFERRED_MODEL_INIT = "index.deferred-model-init";
 
   private final EngineExecutorRegistry.Registration watcherReconcile;
   private final EngineExecutorRegistry.Registration extractionTimebox;
   private final EngineExecutorRegistry.Registration sandboxReaders;
+  private final EngineExecutorRegistry.Registration stuckJobReaper;
+  private final EngineExecutorRegistry.Registration deferredModelInit;
 
   public WorkerExecutorRegistrations(EngineExecutorRegistry registry) {
     Objects.requireNonNull(registry, "registry");
@@ -57,6 +61,28 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
                   limits.maxThreads(),
                   limits.maxQueue(),
                   2));
+      stuckJobReaper =
+          acquire(
+              registry,
+              acquired,
+              new EngineExecutorSpec(
+                  STUCK_JOB_REAPER,
+                  Kind.BACKGROUND,
+                  Mode.SCHEDULED,
+                  1,
+                  limits.maxQueue(),
+                  1));
+      deferredModelInit =
+          acquire(
+              registry,
+              acquired,
+              new EngineExecutorSpec(
+                  DEFERRED_MODEL_INIT,
+                  Kind.BACKGROUND,
+                  Mode.PLATFORM,
+                  1,
+                  limits.maxQueue(),
+                  1));
     } catch (RuntimeException | Error failure) {
       closeReverse(acquired, failure);
       throw failure;
@@ -75,11 +101,24 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
     return sandboxReaders;
   }
 
+  public EngineExecutorRegistry.Registration stuckJobReaper() {
+    return stuckJobReaper;
+  }
+
+  public EngineExecutorRegistry.Registration deferredModelInit() {
+    return deferredModelInit;
+  }
+
   @Override
   public void close() {
     RuntimeException failure = null;
     for (EngineExecutorRegistry.Registration registration :
-        List.of(sandboxReaders, extractionTimebox, watcherReconcile)) {
+        List.of(
+            deferredModelInit,
+            stuckJobReaper,
+            sandboxReaders,
+            extractionTimebox,
+            watcherReconcile)) {
       try {
         registration.close();
       } catch (RuntimeException closeFailure) {

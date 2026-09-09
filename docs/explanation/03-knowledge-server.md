@@ -91,7 +91,11 @@ The ingest port surface (`IngestServiceCalls`) enforces caps before the queue ev
 
 On startup, `recoverStuckJobs()` resets all `PROCESSING` jobs back to `PENDING`. This heals incomplete work from a prior crash without burning retry budget (since `attempts` = failures, not claims).
 
-The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and the loop continues to the next batch. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; Worker gRPC health exposes the failed loop state while its serving flag stays independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state. Because `recoverStuckJobs()` runs only at boot, a fatal in-process loop death requires restart to recover stranded jobs.
+The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and the loop continues to the next batch. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; the index health port exposes the failed loop state while serving readiness remains independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state.
+
+KnowledgeServer also runs an age-bounded reaper every two minutes. It requeues `PROCESSING` rows whose last update exceeds the five-minute liveness window; actively processed jobs refresh that timestamp through heartbeats. This can recover orphaned rows without a process restart, but does not itself restart a failed indexing loop.
+
+The reaper owns the registered background scheduler `index.stuck-job-reaper`. Shutdown cancels the periodic task and waits for its actual exit before closing the job queue. Deferred model initialization similarly owns `index.deferred-model-init`; shutdown waits for its executor to terminate before closing published model and runtime resources, even when the initializer's exposed future has been canceled. Both registrations have one thread and one live instance, with queue capacity supplied by the Engine background policy.
 
 ### Schema versioning & migrations
 

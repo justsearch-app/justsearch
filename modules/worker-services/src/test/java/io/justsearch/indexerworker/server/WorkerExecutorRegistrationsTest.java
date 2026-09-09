@@ -53,10 +53,36 @@ final class WorkerExecutorRegistrationsTest {
               23,
               2),
           registrations.sandboxReaders().spec());
+      assertEquals(
+          new EngineExecutorSpec(
+              WorkerExecutorRegistrations.STUCK_JOB_REAPER,
+              Kind.BACKGROUND,
+              Mode.SCHEDULED,
+              1,
+              23,
+              1),
+          registrations.stuckJobReaper().spec());
+      assertEquals(
+          new EngineExecutorSpec(
+              WorkerExecutorRegistrations.DEFERRED_MODEL_INIT,
+              Kind.BACKGROUND,
+              Mode.PLATFORM,
+              1,
+              23,
+              1),
+          registrations.deferredModelInit().spec());
       assertTrue(registry.registrations.stream().noneMatch(RecordingRegistration::closed));
     }
 
     assertTrue(registry.registrations.stream().allMatch(RecordingRegistration::closed));
+    assertEquals(
+        List.of(
+            WorkerExecutorRegistrations.DEFERRED_MODEL_INIT,
+            WorkerExecutorRegistrations.STUCK_JOB_REAPER,
+            WorkerExecutorRegistrations.SANDBOX_READERS,
+            WorkerExecutorRegistrations.EXTRACTION_TIMEBOX,
+            WorkerExecutorRegistrations.WATCHER_RECONCILE),
+        registry.closedNames);
   }
 
   @Test
@@ -71,6 +97,25 @@ final class WorkerExecutorRegistrationsTest {
     assertEquals(Reason.INSTANCE_LIMIT, failure.reason());
     assertEquals(
         List.of(
+            WorkerExecutorRegistrations.EXTRACTION_TIMEBOX,
+            WorkerExecutorRegistrations.WATCHER_RECONCILE),
+        registry.closedNames);
+  }
+
+  @Test
+  void rollbackAcrossSingletonOwnersClosesEveryEarlierRegistrationInReverseOrder() {
+    RecordingRegistry registry = new RecordingRegistry(5);
+
+    EngineExecutorRejectedException failure =
+        assertThrows(
+            EngineExecutorRejectedException.class,
+            () -> new WorkerExecutorRegistrations(registry));
+
+    assertEquals(Reason.INSTANCE_LIMIT, failure.reason());
+    assertEquals(
+        List.of(
+            WorkerExecutorRegistrations.STUCK_JOB_REAPER,
+            WorkerExecutorRegistrations.SANDBOX_READERS,
             WorkerExecutorRegistrations.EXTRACTION_TIMEBOX,
             WorkerExecutorRegistrations.WATCHER_RECONCILE),
         registry.closedNames);
