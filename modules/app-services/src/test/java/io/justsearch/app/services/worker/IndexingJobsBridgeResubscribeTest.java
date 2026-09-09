@@ -2,16 +2,21 @@
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.ipc.IndexingJobView;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -39,6 +44,40 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(60)
 @DisplayName("indexing-jobs bridge — re-subscribe after flow failure (review blocker 2)")
 final class IndexingJobsBridgeResubscribeTest {
+  @Test
+  void synchronousAdmissionAndExecutorRefusalUseTheExistingRetryPath() throws Exception {
+    for (RuntimeException refusal : List.of(
+        new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, 1),
+        new RejectedExecutionException("bounded stream executor is full"))) {
+      AtomicInteger attempts = new AtomicInteger();
+      CountDownLatch recovered = new CountDownLatch(1);
+      IndexingJobsSource source = (onFrame, onError, onCompleted) -> {
+        if (attempts.incrementAndGet() == 1) throw refusal;
+        onFrame.accept(snapshotFrame(2, "after-synchronous-refusal"));
+        recovered.countDown();
+        return () -> {};
+      };
+      RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(executors(), () -> source);
+      List<RemoteIndexingJobsBridge.Delta> seen = new CopyOnWriteArrayList<>();
+      var listener = bridge.subscribe(seen::add);
+      try {
+        var first = bridge.start();
+        assertTrue(first.isCompletedExceptionally(), "the opening refusal remains observable");
+        assertSame(refusal, assertThrows(CompletionException.class, first::join).getCause());
+        assertTrue(recovered.await(10, TimeUnit.SECONDS), "retry needs no second caller of start()");
+        assertEquals(2, attempts.get());
+        assertTrue(seen.stream()
+            .filter(delta -> delta instanceof RemoteIndexingJobsBridge.Delta.SnapshotReplaced)
+            .map(delta -> (RemoteIndexingJobsBridge.Delta.SnapshotReplaced) delta)
+            .anyMatch(snapshot -> snapshot.items().stream()
+                .anyMatch(row -> "after-synchronous-refusal".equals(row.pathHash()))));
+      } finally {
+        listener.close();
+        bridge.stop();
+      }
+    }
+  }
+
 
   private final List<TestEngineExecutors> processExecutors = new java.util.ArrayList<>();
 

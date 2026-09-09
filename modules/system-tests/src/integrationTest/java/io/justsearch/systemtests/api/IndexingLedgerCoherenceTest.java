@@ -124,6 +124,7 @@ class IndexingLedgerCoherenceTest {
 
       // Liveness: the indexing run produced new terminal index events in the one log (the translator
       // is wired live end-to-end). The in-flight-leak invariant was asserted on every fetch above.
+      if (!sawNew) BACKEND.preserveLogOnFailure();
       assertTrue(
           sawNew,
           "indexing run added terminal kind=index events to the unified ledger (live Thesis I wiring)");

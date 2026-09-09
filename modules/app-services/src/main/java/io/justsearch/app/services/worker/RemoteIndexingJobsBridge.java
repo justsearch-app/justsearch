@@ -396,11 +396,17 @@ public final class RemoteIndexingJobsBridge {
           scheduleResubscribe(t);
         };
 
-    stream =
-        source.subscribe(
-            onFrame,
-            onError,
-            () -> log.info("RemoteIndexingJobsBridge stream completed by producer"));
+    try {
+      stream =
+          source.subscribe(
+              onFrame,
+              onError,
+              () -> log.info("RemoteIndexingJobsBridge stream completed by producer"));
+    } catch (RuntimeException failure) {
+      // Bounded admission/executor refusal happens before a subscription can report onError.
+      // Preserve the failed start future and use the same retry budget as asynchronous failures.
+      onError.accept(failure);
+    }
   }
 
   /**

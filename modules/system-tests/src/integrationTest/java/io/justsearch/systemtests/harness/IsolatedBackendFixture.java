@@ -541,7 +541,8 @@ public final class IsolatedBackendFixture {
   }
 
   /**
-   * Copies the evidence a boot failure leaves behind into {@link #resolveFailureLogDir()}.
+   * Copies boot or test-body failure evidence into {@link #resolveFailureLogDir()}. Call before
+   * {@link #stop()} when a live assertion fails, so teardown cannot delete its diagnostics.
    *
    * <p>{@code backend.log} is only the child JVM's redirected stdout/stderr — the Engine's actual
    * application log is {@code <dataDir>/logs/engine.log}
@@ -558,7 +559,7 @@ public final class IsolatedBackendFixture {
    * exists. The previous {@code app.log} copy could never fire: that file is written by the
    * app-launcher process, which this fixture never spawns.
    */
-  private void preserveLogOnFailure() {
+  public void preserveLogOnFailure() {
     logsPreserved = true;
     Path dest = resolveFailureLogDir();
     copyIfPresent(backendLog, dest.resolve("backend.log"));
