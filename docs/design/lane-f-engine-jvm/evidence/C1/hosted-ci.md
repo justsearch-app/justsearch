@@ -93,3 +93,26 @@ Raw status, logs and extracted fixture evidence: `tmp/c1-hosted-status-269.json`
 `tmp/c1-docs-validate-restored-264.txt`, `tmp/c1-docs-validate-runtime-268.txt`.
 The integration-test-results artifact10106694706 expires2026-12-08T13:17:16Z. The log filename
 system-green reflects the job conclusion only; the summary above preserves its failed attempts.
+
+## Hosted44039df47 — 2026-09-09
+
+[CI34363379524](https://github.com/justsearch-app/justsearch/actions/runs/34363379524) passes at
+44039df47e88320a79d314cda4b23d49b845604b, including Windows-native, public claims, all three unit
+lanes, and both advisory jobs. This revision includes the runtime/reload-close correction and the
+interrupted-publisher regression; it precedes the OCR correction now being implemented.
+
+The system job102506184543 completes in7m4s. Downloaded integration XML represents88 cases:
+zero failures/errors,42 skips and no failure/error/flakyFailure/rerunFailure entries. The indexing
+ledger and writer/migration recovery cases execute without skips. All five installed recovery
+fixture outputs are available in the downloaded artifact. Thus this pass is inspected system
+evidence, not merely a successful job label or wiring claim.
+
+The previously reproduced Windows concurrent-reader rename defect remains required production
+work despite this green run. Earlier failed attempts remain recorded above. Final C1 still needs
+proof after the remaining ordered corrections; this checkpoint does not close the stage.
+
+Raw evidence: `tmp/c1-hosted-status-292.json`, `tmp/c1-workflow-signal-health-293.json`,
+`tmp/c1-hosted-system-293.txt`, `tmp/c1-hosted-artifacts-293.json`,
+`tmp/c1-hosted-artifacts-293/`, `tmp/c1-hosted-proof-summary-293.json`.
+The integration-test-results artifact10109174357 expires2026-12-08T14:24:20Z. Local extracted
+copies remain accessible through lane-F acceptance; the SHA-256 inventory covers their contents.
