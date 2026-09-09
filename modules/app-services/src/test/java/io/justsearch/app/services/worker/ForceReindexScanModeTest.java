@@ -70,7 +70,7 @@ final class ForceReindexScanModeTest {
             (p, engineContext) -> null,
             (s, engineContext) -> null,
             mock(SyncOps.class),
-            walkExecutor);
+            walkExecutor, (body, context) -> walkExecutor.execute(() -> body.accept(context)));
 
     ops.reindexWatchedRoots(force, io.justsearch.app.services.TestEngineContexts.durableInternal());
     walkExecutor.shutdown();

@@ -47,6 +47,13 @@ import java.util.function.Function;
  */
 class TestKnowledgeClient extends KnowledgeClient {
 
+  @Override
+  protected void executeRootWalk(java.util.concurrent.ExecutorService executor,
+      Consumer<EngineContext> body,
+      EngineContext context) {
+    executor.execute(() -> body.accept(context));
+  }
+
   private final SearchServiceCalls search;
   private final IngestServiceCalls ingest;
   private final Consumer<ScanRootRequest> onScanRoot;

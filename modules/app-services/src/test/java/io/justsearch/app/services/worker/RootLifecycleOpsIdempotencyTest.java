@@ -50,7 +50,7 @@ final class RootLifecycleOpsIdempotencyTest {
         (p, engineContext) -> null, // deleteByPathFn
         (s, engineContext) -> null, // deleteByIdFn
         mock(SyncOps.class),
-        walkExecutor);
+        walkExecutor, (body, context) -> walkExecutor.execute(() -> body.accept(context)));
   }
 
   @Test

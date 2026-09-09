@@ -92,7 +92,7 @@ final class WatchedRootScanCollectionTest {
               (p, engineContext) -> null,
               (s, engineContext) -> null,
               mock(SyncOps.class),
-              walkExecutor);
+              walkExecutor, (body, context) -> walkExecutor.execute(() -> body.accept(context)));
     }
 
     /** Drains the queued walk, then reports what each arm saw. */

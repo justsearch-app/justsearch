@@ -731,6 +731,47 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
+  @Override
+  public void reindexPersistedRoots(EngineContext engineContext) {
+    try (var batch = admission.attach(engineContext)) {
+      super.reindexPersistedRoots(batch.context());
+    }
+  }
+
+  @Override
+  public void reindexWatchedRoots(boolean force, EngineContext engineContext) {
+    try (var batch = admission.attach(engineContext)) {
+      super.reindexWatchedRoots(force, batch.context());
+    }
+  }
+
+  @Override
+  protected void executeRootWalk(ExecutorService executor, Consumer<EngineContext> body,
+      EngineContext engineContext) {
+    var owner = admission.attach(engineContext);
+    var trace = io.opentelemetry.context.Context.current();
+    String requestId = currentRequestId();
+    var task = new OwnedStreamTask(owner, owner, () -> {
+      String previousRequest = currentRequestId();
+      try (var _ = trace.makeCurrent()) {
+        if (requestId == null) org.slf4j.MDC.remove("request_id");
+        else org.slf4j.MDC.put("request_id", requestId);
+        body.accept(owner.context());
+      } finally {
+        if (previousRequest == null) org.slf4j.MDC.remove("request_id");
+        else org.slf4j.MDC.put("request_id", previousRequest);
+      }
+    }, false);
+    try {
+      task.armCancellation();
+      task.executeOn(executor);
+    } catch (RuntimeException | Error failure) {
+      task.cancel(false);
+      if (failure instanceof java.util.concurrent.RejectedExecutionException) throw engineLimit();
+      throw failure;
+    }
+  }
+
   private void executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
       boolean countForeground) {
     var owner = work.retain();
@@ -745,7 +786,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
-  /** A queued stream task releases its retained work when cancellation prevents actual start. */
+  /** A queued stream or root walk releases its retained work if it never starts. */
   private final class OwnedStreamTask implements Runnable, Future<Void> {
     private static final int QUEUED = 0;
     private static final int RUNNING = 1;

@@ -289,7 +289,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             this.rootLifecycleOps = new RootLifecycleOps(watchedRoots, watchedRootsState,
                 this::getExcludeMatcher, scanRootFn, workerWatchFn,
                 this::executeDeleteByPath, this::deleteById,
-                syncOps, walkExecutor);
+                syncOps, walkExecutor,
+                (body, context) -> executeRootWalk(walkExecutor, body, context));
             rootsStore.migrateLegacyRootsFileIfNeeded();
             watchedRootsState.loadPersistedRoots();
         } catch (RuntimeException | Error failure) {
@@ -297,6 +298,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             throw failure;
         }
     }
+
+    /** Retain exact work before a root walk enters its bounded executor queue. */
+    protected abstract void executeRootWalk(
+        ExecutorService executor, java.util.function.Consumer<EngineContext> body,
+        EngineContext engineContext);
 
     public void reindexPersistedRoots(EngineContext engineContext) {
         rootLifecycleOps.reindexPersistedRoots(engineContext);

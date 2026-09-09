@@ -42,6 +42,7 @@ final class RootLifecycleOps {
     private final java.util.function.BiFunction<String, EngineContext, DeleteByIdResponse> deleteByIdFn;
     private final SyncOps syncOps;
     private final ExecutorService walkExecutor;
+    private final java.util.function.BiConsumer<java.util.function.Consumer<EngineContext>, EngineContext> submitWalk;
 
     // ===== Tempdoc 599 §16/A1 — non-blocking folder-availability cache =====
     // U4 (the design's verified constraint) forbids a per-poll Files.isDirectory on the Head REQUEST
@@ -68,7 +69,8 @@ final class RootLifecycleOps {
             java.util.function.BiFunction<Path, EngineContext, DeleteByPathResponse> deleteByPathFn,
             java.util.function.BiFunction<String, EngineContext, DeleteByIdResponse> deleteByIdFn,
             SyncOps syncOps,
-            ExecutorService walkExecutor) {
+            ExecutorService walkExecutor,
+            java.util.function.BiConsumer<java.util.function.Consumer<EngineContext>, EngineContext> submitWalk) {
         this.watchedRoots = Objects.requireNonNull(watchedRoots, "watchedRoots");
         this.watchedRootsState = Objects.requireNonNull(watchedRootsState, "watchedRootsState");
         this.excludeMatcherSupplier =
@@ -79,6 +81,7 @@ final class RootLifecycleOps {
         this.deleteByIdFn = Objects.requireNonNull(deleteByIdFn, "deleteByIdFn");
         this.syncOps = Objects.requireNonNull(syncOps, "syncOps");
         this.walkExecutor = Objects.requireNonNull(walkExecutor, "walkExecutor");
+        this.submitWalk = Objects.requireNonNull(submitWalk, "submitWalk");
     }
 
     /**
@@ -202,11 +205,11 @@ final class RootLifecycleOps {
         // label across every arm and every restart, so this records the same literal the add path
         // normalizes to and the reindex paths now read back.
         recordCollection(normalized, IngestCollectionPolicy.DEFAULT_COLLECTION);
-        walkExecutor.execute(
-                () -> walkAndSubmit(
+        submitWalk.accept(
+                ownedContext -> walkAndSubmit(
                         normalized,
                         IngestCollectionPolicy.DEFAULT_COLLECTION,
-                        io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, engineContext));
+                        io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
     }
 
     /**
@@ -323,9 +326,9 @@ final class RootLifecycleOps {
         //    are handled by walkAndSubmit() on the walk-bg thread. Tempdoc 821 §3-C2 — the scan arm
         //    carries the SAME label the watcher arm just got, so the root's own initial scan admits
         //    documents under its collection instead of dropping the tag.
-        walkExecutor.execute(
-                () -> walkAndSubmit(
-                        normalized, collectionName, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, engineContext));
+        submitWalk.accept(
+                ownedContext -> walkAndSubmit(
+                        normalized, collectionName, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
     }
 
     int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
@@ -467,8 +470,8 @@ final class RootLifecycleOps {
 
             // force=true OR has excludes: prune orphans then walk asynchronously with
             // backpressure. walkAndSubmit() handles batching, state marking, and persistence.
-            walkExecutor.execute(() -> {
-                syncOps.pruneMissing(root.toString(), engineContext);
+            submitWalk.accept(ownedContext -> {
+                syncOps.pruneMissing(root.toString(), ownedContext);
                 // The root's own persisted label (885 §UD open item 4), falling back to the
                 // default for a root persisted before the label was recorded. Re-sending the label
                 // the add path wrote is what stops one root's documents oscillating between
@@ -476,8 +479,8 @@ final class RootLifecycleOps {
                 // Tempdoc 821 §3-C3 — THIS is what makes the user's force-reindex real. The
                 // scan used to go out as SCAN_MODE_INITIAL regardless, so the Worker admitted the
                 // same paths and the batch extractor skipped every one of them as UNCHANGED.
-                walkAndSubmit(root, collectionOf(root), scanMode, engineContext);
-            });
+                walkAndSubmit(root, collectionOf(root), scanMode, ownedContext);
+            }, engineContext);
         }
         watchedRootsState.persist();
     }
@@ -505,11 +508,11 @@ final class RootLifecycleOps {
             // what every arm sent before.
             String collection = collectionOf(normalized);
             startWatcherIfAvailable(collection, normalized, engineContext);
-            walkExecutor.execute(
-                () -> walkAndSubmit(
+            submitWalk.accept(
+                ownedContext -> walkAndSubmit(
                     normalized,
                     collection,
-                    io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, engineContext));
+                    io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
         }
         // Runs after all walks complete (single-thread executor serializes tasks).
         int count = rootsToReindex.size();
