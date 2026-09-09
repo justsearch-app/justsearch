@@ -69,7 +69,8 @@ final class CoreApiAssembly {
       AiModelsController aiModelsController,
       HeadHttpInflightMetricCatalog inflightCatalog,
       HeadGpuMetricCatalog gpuCatalog,
-      KnowledgeSearchController knowledgeSearchController) {}
+      KnowledgeSearchController knowledgeSearchController,
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch) {}
 
   static Result assemble(
       LocalApiServer.Builder b,
@@ -501,10 +502,13 @@ final class CoreApiAssembly {
 
     // Log server start event
     eventBuffer.info("LocalApiServer", "API Server starting");
+    // The core search cohort keeps the borrowed Head owner for both eager and late wiring.
+    var perSourceSearch = b.perSourceSearch != null ? b.perSourceSearch
+        : b.HeadAssembly == null ? null : b.HeadAssembly.perSourceSearch();
     KnowledgeSearchController knowledgeSearchController = b.knowledgeServer != null
         ? new KnowledgeSearchController(
             b.knowledgeServer,
-            b.perSourceSearch != null ? b.perSourceSearch : b.HeadAssembly.perSourceSearch(),
+            perSourceSearch,
             telemetry,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(),
             b.lambdaMartReranker,
@@ -545,7 +549,8 @@ final class CoreApiAssembly {
         aiModelsController,
         inflightCatalog,
         gpuCatalog,
-        knowledgeSearchController);
+        knowledgeSearchController,
+        perSourceSearch);
   }
 
   private static io.justsearch.app.services.lifecycle.WorkerCapability resolveWorkerCapability(

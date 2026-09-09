@@ -129,7 +129,6 @@ public class LocalApiServer {
   private final AtomicInteger inflightRequests = new AtomicInteger(0);
   private final String sessionToken;
   private final boolean prodMode;
-  private final ExecutorService slowRequestExecutor;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
   // Tempdoc 583 Stage 4: the request-filter security plumbing collaborator.
   private final ApiSecurityFilters securityFilters;
@@ -138,7 +137,6 @@ public class LocalApiServer {
   private volatile GpuCapabilities cachedGpuSnapshot;
   private volatile long gpuSnapshotTimestamp;
   private final RerankerService lambdaMartReranker;
-  private final io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
   private final HeadApiMetricCatalog apiCatalog;
 
   /** Creates a new builder. Required: settingsStore, indexBasePath. The bootstrap and per-service
@@ -152,8 +150,6 @@ public class LocalApiServer {
   }
 
   private LocalApiServer(Builder b) {
-    this.perSourceSearch = b.perSourceSearch != null ? b.perSourceSearch
-        : b.HeadAssembly == null ? null : b.HeadAssembly.perSourceSearch();
     this.scanProgressRegistry = new io.justsearch.app.services.worker.ScanProgressRegistry(b.executors);
     this.telemetry = b.telemetry;
     this.lambdaMartReranker = b.lambdaMartReranker;
@@ -330,7 +326,7 @@ public class LocalApiServer {
         "head.slow-request-dump", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
         io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
         1, backgroundLimits.maxQueue(), 1));
-    this.slowRequestExecutor =
+    ExecutorService slowRequestExecutor =
         slowRequestOwner.open(
             r -> {
               Thread t = new Thread(r, "slow-request-dump");
@@ -342,7 +338,7 @@ public class LocalApiServer {
     // install() binds them inside buildAndStartApp, keeping the loopback bind policy single-authority.
     this.securityFilters =
         new ApiSecurityFilters(
-            this.prodMode, this.sessionToken, this.eventBuffer, this.slowRequestExecutor,
+            this.prodMode, this.sessionToken, this.eventBuffer, slowRequestExecutor,
             this.HeadAssemblyRef, leaseSvc, b.engineAdmission);
 
     // Bind to explicit port when provided (dev/prod), otherwise pick a free port.
@@ -923,7 +919,7 @@ public class LocalApiServer {
     if (ks != null && this.knowledgeSearchController == null) {
       KnowledgeSearchController ctrl = new KnowledgeSearchController(
           ks,
-          this.perSourceSearch,
+          core.perSourceSearch(),
           this.telemetry,
           this.HeadAssemblyRef != null ? this.HeadAssemblyRef.inference().onlineAi() : OnlineAiService.unavailable(),
           this.lambdaMartReranker,

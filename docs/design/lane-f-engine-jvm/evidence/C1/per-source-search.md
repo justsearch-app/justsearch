@@ -59,3 +59,14 @@ ran Gradle outside the assigned no-build scope; root repeated verification exclu
 
 Full/stress, installed standard-model, hosted/platform and final stage-wide evidence remain
 required. This producer slice is not a claim of C1 completion.
+
+
+Full integrated162 caught LocalApiServer's thin-composer guard (32instance fields vs30).
+Root keeps the borrowed per-source owner beside its controller in existing CoreApiAssembly.Result,
+so eager and late wiring still receive the same Head/test owner, and makes slowRequestExecutor
+constructor-local while its registration remains owned until stop. No new wrapper, registry or
+field-ceiling increase is needed. Integrated164 passes build, full test with stress enabled,
+PMD and UI installDist (368tasks;22executed346up-to-date). The thin-composer guard and allUI tests
+pass without modifying the guard. Tested base239ac1a6c plus this two-file ownership placement.
+Logs tmp/c1-batch4-integrated-restored-{162,164}.txt; full XML and timestamp manifests preserved in
+tmp/c1-batch4-integrated-results-162 and tmp/c1-batch4-integrated-green-164. Live/hosted proof remains.
