@@ -44,3 +44,12 @@ mutant directories and tmp/c1-batch4-green-{128,133}. Retain through lane comple
 Full/stress/live/hosted proof remains separate. Rule9 async proof is recorded in async-guard.md.
 
 Restored run135 passed launcher guards and PMD; XML retained in tmp/c1-batch4-guards-green-135.
+
+
+Hosted registry-test correction (2026-09-09): CI34339800148 rejects direct first.compareTo(first)
+and second.compareTo(second) under Error Prone SelfComparison. The test now evaluates the full
+2x2 deadline comparison matrix, preserving reflexivity, earlier/later ordering and the separate
+queued FIFO execution proof. No assertion is removed or checker suppressed. WIP proof checkpoint:
+diff-check only; run DefaultEngineExecutorRegistryTest plus strict test compilation with
+-PskipErrorProneTests=false after the live campaign, then require hosted rerun. Raw errors:
+tmp/c1-hosted-triage/build-no-model-blobs-102427739629.log:3037,3041.

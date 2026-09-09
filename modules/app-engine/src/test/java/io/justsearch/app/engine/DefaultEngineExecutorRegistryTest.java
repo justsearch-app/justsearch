@@ -431,10 +431,13 @@ class DefaultEngineExecutorRegistryTest {
       var executor = registration.openScheduled(DAEMON);
       var first = executor.schedule(() -> {}, 1, TimeUnit.DAYS);
       var second = executor.schedule(() -> {}, 2, TimeUnit.DAYS);
-      assertEquals(0, first.compareTo(first));
-      assertEquals(0, second.compareTo(second));
-      assertTrue(first.compareTo(second) < 0);
-      assertTrue(second.compareTo(first) > 0);
+      var deadlines = List.of(first, second);
+      for (int left = 0; left < deadlines.size(); left++) {
+        for (int right = 0; right < deadlines.size(); right++) {
+          assertEquals(Integer.compare(left, right),
+              Integer.signum(deadlines.get(left).compareTo(deadlines.get(right))));
+        }
+      }
       first.cancel(false);
       second.cancel(false);
       var order = new java.util.concurrent.CopyOnWriteArrayList<Integer>();
