@@ -133,3 +133,11 @@ Evidence: `tmp/c1-hosted-364.json`, `tmp/c1-hosted-artifacts-364.jsonl`,
 `tmp/c1-hosted-system-364/`, `tmp/c1-hosted-summary-364.json`.
 Integration artifact10115115676 expires2026-12-08T16:36:48Z; local extracted copies remain
 accessible through lane acceptance and are included in the committed SHA-256 inventory.
+
+## C1 final checkpoint and external browser-index skew
+
+CI34383091150 at0b4b13ad0 passes Windows-native/system and other jobs but fails axe browser
+installation on both attempts. CI34386342721 at41c575f21 repeats that exact Google Chrome
+APT hash mismatch. These are failed hosted checkpoints, not successful accessibility proof.
+See [source preparation](playwright-apt.md) for raw attempts, the bounded correction and
+its still-required current hosted verification.

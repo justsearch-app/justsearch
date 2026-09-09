@@ -51,6 +51,9 @@ both attempts. Current evidence and exact remaining checks are in
 [final candidate](evidence/C1/final-candidate.md). Broader400 then exposes the parser fixture's
 one-second cold-start assumption; [the test-only correction](evidence/C1/parser-fixture-startup.md)
 passes28 sandbox cases and retains a failing lost-slot counterfactual. Final stress is still required.
+CI34386342721 repeats the Chrome APT failure; [the bounded source preparation](evidence/C1/playwright-apt.md)
+passes nine local filesystem cases, preserving all integrity and measurement checks. Push and
+verify the current hosted run, then complete fresh stress and live acceptance before C2.
 Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
 inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.
 That checkpoint precedes the governance sweep. See [OCR correction](evidence/C1/ocr-component-close.md) and

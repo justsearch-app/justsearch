@@ -791,6 +791,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+      - name: Prepare APT sources for Playwright Chromium
+        # Google Chrome is a separate distribution. Its unrelated repository must not block
+        # Ubuntu dependency installation; retain signature/hash verification for every source.
+        run: |
+          node --test scripts/ci/test-prepare-playwright-apt.mjs
+          sudo "$(command -v node)" scripts/ci/prepare-playwright-apt.mjs
+
       - name: Install headless Chromium
         # `--with-deps` installs the shared libraries Chromium needs; those are apt packages,
         # not part of the cached browser directory, so this step runs on a cache hit too.

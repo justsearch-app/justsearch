@@ -37,7 +37,9 @@ Measured axe fails before measurement at Install headless Chromium: Google's Chr
 Packages.gz SHA256 disagrees with its signed index. Attempt2 fails identically. Both attempts
 are preserved: `tmp/c1-hosted-failure-394.txt`, `tmp/c1-hosted-failure-retry-398.txt`. Job/revision metadata: `tmp/c1-hosted-checkpoint-401.json`.
 No checksum verification or accessibility check is relaxed. A current successful hosted run
-including this advisory remains mandatory.
+including this advisory remains mandatory. CI34386342721 repeats the same pre-measurement
+hash failure at41c575f21. [Playwright APT preparation](playwright-apt.md) now excludes only
+dedicated Chrome source files, with nine local fail-closed filesystem cases; hosted proof is pending.
 
 ## Broader run after MCP correction
 
