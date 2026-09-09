@@ -13,12 +13,25 @@ Latest state: [Current C1 verification checkpoint](#current-c1-verification-chec
 [the complete review](evidence/C1/independent-review-2026-09-09.md) and
 [the correction ledger](evidence/C1/independent-review-fixes.md) before continuing below.
 The production observer and interrupted-handoff blockers reproduce and pass restored251.
-Next implementation is RuntimeSession close, then the remaining must-fixes in the supplied order.
+RuntimeSession close and its enclosing reload/close ownership are implemented and independently
+reviewed: bounded waits retain live resources; reload and close share a lock; failed server close
+retains its index lock and completion latch for retry. Next implementation is OCR child/pool
+termination and one pool per component, then the remaining must-fixes in the supplied order.
 C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
 Each subsequent item commit must be build-green and pushed immediately; earlier red WIP
 authorization is historical. Raw evidence hashes and the last full-run summary are now committed
-artifacts. Full252 stopped on two PMD tasks in pending root-scan edits; those are mechanically
-corrected and256 verifies the build. A full stress/hosted green remains required after all fixes.
+artifacts. Full267 passes before the final reload-lock correction. Full271 includes that correction
+but fails one fanout test that assumes child exit implies parent admission release. The strengthened
+parent/child regression and all runtime ownership tests pass274; complete build273 passes. The
+last-full-run summary honestly remains271 FAIL. See [runtime-close evidence](evidence/C1/runtime-close.md)
+and [fanout parent-exit evidence](evidence/C1/fanout-parent-exit.md). Full stress/current hosted green
+and final live standard-model proof remain required after the ordered fixes.
+
+Hosted34356123502 at6bf931408 fails Windows supervisor-state rename and docs headings. Its system
+job passes only after writer recovery's third attempt; earlier failures include EPERM and a close
+deadline hang. Final-guard fatal boot/ingest witnesses are now captured, with exact100 acceptance
+and incarnation2 recovery. The docs headings are corrected; bounded production rename retry remains
+required. These findings are in [hosted-ci.md](evidence/C1/hosted-ci.md).
 
 Continue autonomously in `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch
 `worktree-lane-F-A`. A/B are complete at their recorded tiers; C1 is open. C2/D1/D2/E/F remain

@@ -12,12 +12,14 @@ import java.util.concurrent.ThreadFactory;
 /** The bounded executor registrations owned by one Lucene runtime. */
 public final class LuceneExecutorRegistrations implements AutoCloseable {
   private final EngineExecutorRegistry.Registration commitTimer;
+  private final EngineExecutorRegistry.Registration nrtClose;
   private final EngineExecutorRegistry.Registration foregroundSearchFanout;
   private final EngineExecutorRegistry.Registration backgroundSearchFanout;
 
   public LuceneExecutorRegistrations(EngineExecutorRegistry registry) {
     Objects.requireNonNull(registry, "registry");
     EngineExecutorRegistry.Registration commit = null;
+    EngineExecutorRegistry.Registration nrt = null;
     EngineExecutorRegistry.Registration foreground = null;
     EngineExecutorRegistry.Registration background = null;
     try {
@@ -25,6 +27,8 @@ public final class LuceneExecutorRegistrations implements AutoCloseable {
       commit = registry.register(new EngineExecutorSpec(
           "head.lucene.commit-timer", EngineExecutorSpec.Kind.BACKGROUND,
           EngineExecutorSpec.Mode.SCHEDULED, 1, backgroundLimits.maxQueue(), 3));
+      nrt = registry.register(EngineExecutorSpec.virtual(
+          "head.lucene.nrt-close", EngineExecutorSpec.Kind.BACKGROUND, 3));
       int maxInstances = registry.maxConcurrentWork();
       foreground = registry.register(EngineExecutorSpec.virtual(
           "head.lucene.search-fanout-foreground", EngineExecutorSpec.Kind.FOREGROUND,
@@ -33,9 +37,13 @@ public final class LuceneExecutorRegistrations implements AutoCloseable {
           EngineExecutorSpec.virtual("head.lucene.search-fanout-background",
               EngineExecutorSpec.Kind.BACKGROUND, maxInstances));
       this.commitTimer = commit;
+      this.nrtClose = nrt;
       this.foregroundSearchFanout = foreground;
       this.backgroundSearchFanout = background;
     } catch (RuntimeException | Error failure) {
+      if (nrt != null) {
+        try { nrt.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      }
       if (foreground != null) {
         try { foreground.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
       }
@@ -53,6 +61,8 @@ public final class LuceneExecutorRegistrations implements AutoCloseable {
     return commitTimer.openScheduled(Objects.requireNonNull(factory, "factory"));
   }
 
+  ExecutorService openNrtClose() { return nrtClose.openVirtual(); }
+
   public ExecutorService openSearchFanout(EngineContext.Urgency urgency) {
     Objects.requireNonNull(urgency, "urgency");
     return switch (urgency) {
@@ -65,7 +75,7 @@ public final class LuceneExecutorRegistrations implements AutoCloseable {
   public void close() {
     RuntimeException first = null;
     for (EngineExecutorRegistry.Registration registration :
-        new EngineExecutorRegistry.Registration[] {backgroundSearchFanout, foregroundSearchFanout, commitTimer}) {
+        new EngineExecutorRegistry.Registration[] {backgroundSearchFanout, foregroundSearchFanout, nrtClose, commitTimer}) {
       try { registration.close(); }
       catch (RuntimeException failure) { if (first == null) first = failure; else first.addSuppressed(failure); }
     }

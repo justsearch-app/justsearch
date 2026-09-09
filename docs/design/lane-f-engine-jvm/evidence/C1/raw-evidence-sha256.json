@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-09T14:13:17.531311+00:00",
-  "baseHead": "0b45b4a0ffb96266e11a47dc2d9d7f8ea587b7c9",
+  "generatedAt": "2026-09-09T14:14:48.397899+00:00",
+  "baseHead": "3ee27a2271df0fa559fd709b3b7d36b901fe7d82",
   "scope": "Every literal tmp-path citation in C1 evidence Markdown at generation, with brace/glob expansion and recursive hashes for available directory citations. The shared dev-runner path resolves in the main repo. Bare tmp/ denotes a storage root, not a raw artifact. Unresolved strings are retained honestly, never treated as proof.",
   "retention": "Local raw artifacts remain in this lane worktree through lane F acceptance. Hosted artifacts retain their run-specific expiry. Hashes establish identity, not availability; citations name accessible local paths or hosted run artifacts.",
   "citations": [
@@ -20748,7 +20748,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 73,
+      "line": 86,
       "citation": "tmp/c1-review-integrated-252.txt",
       "status": "available",
       "files": [
@@ -20757,7 +20757,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 73,
+      "line": 86,
       "citation": "tmp/c1-review-integrated-results-252/manifest.json",
       "status": "available",
       "files": [
@@ -20766,7 +20766,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 74,
+      "line": 87,
       "citation": "tmp/c1-review-compile-255.txt",
       "status": "available",
       "files": [
@@ -20775,7 +20775,7 @@
     },
     {
       "document": "docs/design/lane-f-engine-jvm/evidence/C1/independent-review-fixes.md",
-      "line": 74,
+      "line": 87,
       "citation": "tmp/c1-review-compile-restored-256.txt",
       "status": "available",
       "files": [
@@ -29001,6 +29001,159 @@
       "status": "available",
       "files": [
         "tmp/c1-root-batch-results-246/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 29,
+      "citation": "tmp/c1-runtime-close-before-258.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-close-before-258.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 30,
+      "citation": "tmp/c1-runtime-close-results-258/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-close-results-258/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 32,
+      "citation": "tmp/c1-runtime-close-restored-259.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-close-restored-259.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 32,
+      "citation": "tmp/c1-runtime-close-results-259/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-close-results-259/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 34,
+      "citation": "tmp/c1-runtime-close-restored-260.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-close-restored-260.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 37,
+      "citation": "tmp/c1-runtime-owner-retry-261.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-owner-retry-261.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 40,
+      "citation": "tmp/c1-runtime-integrated-262.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-integrated-262.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 41,
+      "citation": "tmp/c1-runtime-integrated-results-262/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-integrated-results-262/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 43,
+      "citation": "tmp/c1-runtime-review-restored-265.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-review-restored-265.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 46,
+      "citation": "tmp/c1-runtime-integrated-restored-266.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-integrated-restored-266.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 53,
+      "citation": "tmp/c1-runtime-overlay-267.patch",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-overlay-267.patch"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 54,
+      "citation": "tmp/c1-runtime-integrated-restored-267.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-integrated-restored-267.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 55,
+      "citation": "tmp/c1-runtime-integrated-results-267/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-integrated-results-267/manifest.json"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 66,
+      "citation": "tmp/c1-runtime-swap-restored-270.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-swap-restored-270.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 75,
+      "citation": "tmp/c1-runtime-overlay-271.patch",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-overlay-271.patch"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 80,
+      "citation": "tmp/c1-runtime-final-integrated-271.txt",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-final-integrated-271.txt"
+      ]
+    },
+    {
+      "document": "docs/design/lane-f-engine-jvm/evidence/C1/runtime-close.md",
+      "line": 81,
+      "citation": "tmp/c1-runtime-final-integrated-results-271/manifest.json",
+      "status": "available",
+      "files": [
+        "tmp/c1-runtime-final-integrated-results-271/manifest.json"
       ]
     },
     {
@@ -109064,6 +109217,66 @@
     "tmp/c1-root-batch-results-246/manifest.json": {
       "bytes": 360312,
       "sha256": "ecc1939a156f91312a6266ca03ab36e264de9a6be4f222eb897a297ce225c314"
+    },
+    "tmp/c1-runtime-close-before-258.txt": {
+      "bytes": 33276,
+      "sha256": "01b4ef690accfa4706ef2d092537bfd3ac57d71a5ed6200dde570aa854fa0b8e"
+    },
+    "tmp/c1-runtime-close-results-258/manifest.json": {
+      "bytes": 417653,
+      "sha256": "d40902cfe0949ca96fd4e12aafc33074a2a7328f9ab1489383a01141c0950310"
+    },
+    "tmp/c1-runtime-close-restored-259.txt": {
+      "bytes": 39526,
+      "sha256": "94364f3defbd2799c3293c287714ed9072fc1f6d8cbbc6506c880dc71aec73dd"
+    },
+    "tmp/c1-runtime-close-results-259/manifest.json": {
+      "bytes": 419664,
+      "sha256": "c7676af57abafdae1c7dde1d475f7ca45f219334e69945fe7d8e3b8ca1563dfd"
+    },
+    "tmp/c1-runtime-close-restored-260.txt": {
+      "bytes": 8480,
+      "sha256": "c2492cc5d244d29c69431b093158c6c134abef1164e75d94c1150607cfb58b67"
+    },
+    "tmp/c1-runtime-owner-retry-261.txt": {
+      "bytes": 52673,
+      "sha256": "6587ec8737733b5b85d4e31ae02bfdddc72138cd6d8b59442e39dc5fb100ca74"
+    },
+    "tmp/c1-runtime-integrated-262.txt": {
+      "bytes": 78977,
+      "sha256": "18c8211a0b916cfe2df8456db5abcb1ed66e130e28ddc59d43875d8873f2d9de"
+    },
+    "tmp/c1-runtime-integrated-results-262/manifest.json": {
+      "bytes": 415786,
+      "sha256": "151b3311f4c202602aaa080e1203ae57bb9a759a709a4c10fbf78e35873ddc02"
+    },
+    "tmp/c1-runtime-review-restored-265.txt": {
+      "bytes": 39203,
+      "sha256": "246271e343336b4b83272849ed595fe8528a0c4cd94e08f287f59744071837c0"
+    },
+    "tmp/c1-runtime-integrated-restored-266.txt": {
+      "bytes": 72329,
+      "sha256": "dfffe17e7444fd7206f001371d0a235634fe25302b3b99370f00cc7ca1b5a94e"
+    },
+    "tmp/c1-runtime-overlay-267.patch": {
+      "bytes": 71189,
+      "sha256": "46939974acc1c9a481d54e3c1f91c798b58dd881b37524db53019ba6ddec2187"
+    },
+    "tmp/c1-runtime-integrated-restored-267.txt": {
+      "bytes": 122820,
+      "sha256": "a79ad8870e4d5c33d5b461ee298e00295ceb8b2fae15bac362b7d218ae279abc"
+    },
+    "tmp/c1-runtime-integrated-results-267/manifest.json": {
+      "bytes": 503317,
+      "sha256": "cf74e43a571d2402c390ce2489671156e1fa27711b53b62ebb8da27ed351970e"
+    },
+    "tmp/c1-runtime-swap-restored-270.txt": {
+      "bytes": 42447,
+      "sha256": "a05438efeb11365db49615ae87bbe31cbe3f0c2325fcbb6cf1ca3884c44a80e1"
+    },
+    "tmp/c1-runtime-overlay-271.patch": {
+      "bytes": 78646,
+      "sha256": "db582bde2b76f2923fd57c811c46dd26a67cc834a4633f907b147e768ef9eb62"
     },
     "tmp/c1-batch4-scan-progress-66.txt": {
       "bytes": 43228,

@@ -4,6 +4,7 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -32,6 +33,31 @@ class EngineLuceneGenerationCapacityTest {
   private static final String COMMIT_TIMER = "head.lucene.commit-timer";
 
   @TempDir Path tempDir;
+
+  @Test
+  void productionNrtCloseRegistrationCapsInstancesAtThree() throws Exception {
+    try (var registry = new DefaultEngineExecutorRegistry();
+        var bundle = new LuceneExecutorRegistrations(registry)) {
+      var field = LuceneExecutorRegistrations.class.getDeclaredField("nrtClose");
+      field.setAccessible(true);
+      var registration = (io.justsearch.core.execution.EngineExecutorRegistry.Registration) field.get(bundle);
+      try (var first = registration.openVirtual();
+          var second = registration.openVirtual();
+          var third = registration.openVirtual()) {
+        assertFalse(first.isShutdown());
+        assertFalse(second.isShutdown());
+        assertFalse(third.isShutdown());
+        var failure = assertThrows(EngineExecutorRejectedException.class, registration::openVirtual);
+        assertEquals(EngineExecutorRejectedException.Reason.INSTANCE_LIMIT, failure.reason());
+        var row = registry.snapshot().registrations().stream()
+            .filter(value -> value.spec().name().equals("head.lucene.nrt-close")).findFirst().orElseThrow();
+        assertEquals(3, row.liveInstances());
+      }
+      try (var replacement = registration.openVirtual()) {
+        assertFalse(replacement.isShutdown(), "terminated close owners must release their instance slots");
+      }
+    }
+  }
 
   @Test
   void productionBundleCapsActualRuntimeGenerationsAndReusesOnlyAfterActualExit()

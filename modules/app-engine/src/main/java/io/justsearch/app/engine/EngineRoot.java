@@ -212,11 +212,14 @@ public final class EngineRoot implements WorkerHost {
   }
 
   @Override
-  public KnowledgeClient start(GpuSchedulingGauge gpuScheduling, IpcTelemetry telemetry)
+  public synchronized KnowledgeClient start(GpuSchedulingGauge gpuScheduling, IpcTelemetry telemetry)
       throws IOException {
     Objects.requireNonNull(gpuScheduling, "gpuScheduling");
     if (client != null) {
       return client;
+    }
+    if (server != null) {
+      throw new IOException("EngineRoot cannot start while its previous server close is incomplete");
     }
     KnowledgeServer started = serverFactory.apply(gpuScheduling, executors);
     synchronized (terminalWriterFaultOwnerLock) {
@@ -289,11 +292,10 @@ public final class EngineRoot implements WorkerHost {
   }
 
   @Override
-  public void close() {
+  public synchronized void close() {
     KnowledgeServer s;
     synchronized (terminalWriterFaultOwnerLock) {
       s = server;
-      server = null;
     }
     EngineKnowledgeClient c = client;
     client = null;
@@ -305,6 +307,7 @@ public final class EngineRoot implements WorkerHost {
         s.close();
       } catch (IOException e) {
         log.warn("Error closing the in-process index half", e);
+        throw new IllegalStateException("In-process index close incomplete; owner retained for retry", e);
       }
       // Stage-A checkpoint. The first version of this block read `s.isRunning()` and warned if it
       // was still true — which it never could be, because close() sets `running = false` in its
@@ -325,10 +328,15 @@ public final class EngineRoot implements WorkerHost {
                   + " lock may still be held; a subsequent open on the same data directory can fail"
                   + " with a lock error whose real cause is here.",
               CLOSE_COMPLETION_TIMEOUT_MS);
+          throw new IllegalStateException("In-process index close did not complete; owner retained for retry");
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         log.warn("Interrupted while confirming the index half finished closing");
+        throw new IllegalStateException("Interrupted confirming in-process index close", e);
+      }
+      synchronized (terminalWriterFaultOwnerLock) {
+        if (server == s) server = null;
       }
     }
   }

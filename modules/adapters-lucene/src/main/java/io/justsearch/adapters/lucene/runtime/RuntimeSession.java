@@ -17,7 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -25,7 +27,6 @@ import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.AlreadyClosedException;
-import org.apache.lucene.util.ThreadInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -208,6 +209,9 @@ final class RuntimeSession implements AutoCloseable {
   final PruneOps pruneOps; // null in READ_ONLY / DEFERRED / test ctor
 
   private volatile boolean closed;
+  static final long CLOSE_WAIT_NANOS = TimeUnit.SECONDS.toNanos(5);
+  private final ReentrantLock closeLock = new ReentrantLock();
+  private NrtReopenThreads.CloseAttempt nrtCloseAttempt;
   private int taskOwners;
 
   /** Linearizes one terminal-writer notification against this runtime's intentional retirement. */
@@ -532,11 +536,6 @@ final class RuntimeSession implements AutoCloseable {
     this.chunkSearchOps =
         new ChunkSearchOps(this, bridge, this.hybridSearchOps, this.readPathOps, components.idField());
 
-    // 5. Start NRT refresh thread if components produced one (read+write mode).
-    if (crtrt != null) {
-      crtrt.start();
-    }
-
     // 6. Capture openTimeCommitUserData snapshot. Must happen before any writes.
     if (openTimeCommitUserData == null) {
       this.openTimeCommitUserData = latestCommitUserDataBestEffort();
@@ -556,13 +555,14 @@ final class RuntimeSession implements AutoCloseable {
     this.validationMode =
         "warn".equalsIgnoreCase(vm) ? ValidationMode.WARN : ValidationMode.FAIL;
 
-    // 8. Start commit timer for RUNNING mode only. READ_ONLY/DEFERRED have no writer.
+    // Activate the timer before NRT: timer refusal must not strand a live reopen thread in a
+    // constructor whose runtime never reaches a caller. No writes are pending during activation.
     if (mode == Mode.RUNNING) {
       try {
         commitOps.startCommitTimer();
+        if (crtrt != null) crtrt.start();
       } catch (RuntimeException | Error failure) {
-        // A refused timer occurs after the writer/directory and NRT thread were opened.
-        // No runtime reaches the caller, so this constructor must retire those resources.
+        // No runtime reaches the caller, so this constructor must retire its opened resources.
         try { close(); }
         catch (RuntimeException | Error cleanup) {
           if (cleanup != failure) failure.addSuppressed(cleanup);
@@ -725,9 +725,12 @@ final class RuntimeSession implements AutoCloseable {
   // ==========================================================================
 
   /** One generation lease per fanout group, retained before any child can be accepted. */
-  synchronized Runnable retainTaskLifetime() {
+  Runnable retainTaskLifetime() {
     if (closed) throw new IllegalStateException("Lucene runtime is closing");
-    taskOwners++;
+    synchronized (this) {
+      if (closed) throw new IllegalStateException("Lucene runtime is closing");
+      taskOwners++;
+    }
     var released = new java.util.concurrent.atomic.AtomicBoolean();
     return () -> {
       if (!released.compareAndSet(false, true)) return;
@@ -738,54 +741,92 @@ final class RuntimeSession implements AutoCloseable {
     };
   }
 
-  @Override
-  public synchronized void close() {
-    retireTerminalWriterFailureNotifications();
-    if (closed) return;
-    closed = true;
-    boolean interrupted = Thread.interrupted();
+  boolean isClosing() { return closed; }
+
+  void stopNrtUntil(long deadlineNanos) {
+    ControlledRealTimeReopenThread<IndexSearcher> thread;
+    NrtReopenThreads.CloseAttempt attempt;
+    synchronized (this) {
+      thread = crtrt;
+      if (thread == null) return;
+      if (nrtCloseAttempt == null) {
+        if (!thread.isAlive()) {
+          // Constructor rollback (including registration refusal) has no live NRT owner to join.
+          thread.close();
+          crtrt = null;
+          return;
+        }
+        nrtCloseAttempt = new NrtReopenThreads.CloseAttempt(thread, executorRegistrations);
+      }
+      attempt = nrtCloseAttempt;
+      if (!attempt.owns(thread)) throw new IllegalStateException("NRT close owner does not match thread");
+    }
     try {
-      // Accepted children may not have acquired their searcher yet. Keep the snapshot live until
-      // every actual-exit callback releases its generation owner; cancellation alone is insufficient.
-      while (taskOwners != 0) {
-        try { wait(); }
+      attempt.awaitUntil(deadlineNanos);
+    } catch (RuntimeException | Error failure) {
+      synchronized (this) {
+        // A failed task can be retried only once its executor really exited. Preserve the NRT
+        // thread and snapshot: a completed exceptional Future alone never proves NRT exit.
+        if (nrtCloseAttempt == attempt && attempt.isTerminated()) nrtCloseAttempt = null;
+      }
+      throw failure;
+    }
+    synchronized (this) {
+      if (crtrt == thread) {
+        crtrt = null;
+        nrtCloseAttempt = null;
+      }
+    }
+  }
+
+  @Override
+  public void close() {
+    retireTerminalWriterFailureNotifications();
+    synchronized (this) { closed = true; }
+    long deadlineNanos = System.nanoTime() + CLOSE_WAIT_NANOS;
+    boolean interrupted = Thread.interrupted();
+    boolean acquired = false;
+    try {
+      while (!acquired) {
+        long remaining = deadlineNanos - System.nanoTime();
+        if (remaining <= 0) {
+          log.warn("Lucene close deadline exceeded waiting for another close owner");
+          throw new IllegalStateException("Lucene close already in progress");
+        }
+        try { acquired = closeLock.tryLock(remaining, TimeUnit.NANOSECONDS); }
         catch (InterruptedException expected) { interrupted = true; }
       }
-      closeResources();
+      if (commitOps != null) commitOps.requestCommitTimerStop();
+      // Accepted children may not have acquired their searcher yet. Keep the snapshot live until
+      // every actual-exit callback releases its generation owner; cancellation alone is insufficient.
+      synchronized (this) {
+        while (taskOwners != 0) {
+          long remaining = deadlineNanos - System.nanoTime();
+          if (remaining <= 0) {
+            log.warn("Lucene close deadline exceeded with {} generation owners outstanding", taskOwners);
+            throw new IllegalStateException("Lucene generation owners still active: " + taskOwners);
+          }
+          try { TimeUnit.NANOSECONDS.timedWait(this, remaining); }
+          catch (InterruptedException expected) { interrupted = true; }
+        }
+      }
+      closeResources(deadlineNanos);
     } finally {
+      if (acquired) closeLock.unlock();
       if (interrupted) Thread.currentThread().interrupt();
     }
   }
 
-  private void closeResources() {
+  private void closeResources(long deadlineNanos) {
     boolean interrupted = Thread.interrupted();
     try {
-      // Capture snapshot before nulling — close from the captured copy.
-      LifecycleSnapshot snap = snapshot;
-      snapshot = null; // atomic — all ops fail-fast on subsequent calls
-
-      if (commitOps != null) {
-        try {
-          commitOps.stopCommitTimer();
-        } catch (RuntimeException e) {
-          log.warn("commit timer stop error: {}", e.getMessage());
-        }
-      }
-      // ExecutorService.close restores interruption after its children exit. Defer that flag until
-      // the NRT thread has joined and all Lucene resources are closed, too.
+      if (commitOps != null) commitOps.stopCommitTimerUntil(deadlineNanos);
       interrupted |= Thread.interrupted();
-      if (crtrt != null) {
-        while (true) {
-          try {
-            crtrt.close();
-            break;
-          } catch (ThreadInterruptedException expected) {
-            interrupted = true;
-            Thread.interrupted();
-          }
-        }
-        crtrt = null;
-      }
+      stopNrtUntil(deadlineNanos);
+      interrupted |= Thread.interrupted();
+      // Only actual owner exit permits invalidating the snapshot and releasing Lucene resources.
+      LifecycleSnapshot snap = snapshot;
+      snapshot = null;
       if (snap != null) {
         if (snap.searcherManager() != null) {
           try {
@@ -849,6 +890,7 @@ final class RuntimeSession implements AutoCloseable {
     // === Released above ===
     //   snapshot       — nulled (atomic publish; ops fail-fast on subsequent calls)
     //   crtrt          — closed and nulled (NRT thread joined)
+    //   nrtCloseAttempt — retained on timeout; cleared after its executor exits (retry on failure)
     //   commitOps      — timer stopped (executor shutdown)
     //   snap.{searcherManager, writer, directory} — closed
     //   snap.indexPath (when ephemeral) — recursive delete
@@ -872,6 +914,7 @@ final class RuntimeSession implements AutoCloseable {
     //
     // === Not released — synchronization primitive (final, no resources) ===
     //   writeBarrier (ReentrantReadWriteLock — held only during normal ops)
+    //   closeLock (ReentrantLock — serializes close attempts outside the admission monitor)
     //
     // === Not released — ops collaborators ===
     //   readPathOps, writePathOps, hybridSearchOps, textQueryOps, chunkSearchOps,

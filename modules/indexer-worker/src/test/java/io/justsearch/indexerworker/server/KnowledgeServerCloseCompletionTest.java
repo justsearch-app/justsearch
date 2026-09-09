@@ -29,13 +29,9 @@ import org.junit.jupiter.api.io.TempDir;
  * without both directions asserted a future refactor could quietly restore a constant-valued
  * predicate — which is what happened once already.
  *
- * <p><b>What it does NOT pin, stated because the falsification proved it.</b> Moving the latch back
- * to its old mid-{@code close()} position does not red this test, and the mutation was run to check:
- * both positions satisfy "false before, true after a NORMAL close". The latch's position only
- * matters for a close that throws PARTWAY — between the old countdown point and the end — and
- * asserting that needs a fault injected into one of the intervening steps (a Lucene runtime whose
- * close throws), which this unit has no seam for. So the position is argued in the production
- * comment rather than pinned here, and this file does not claim otherwise.
+ * <p>The partial-failure case is exercised across the real enclosing owners by
+ * app-engine's EngineRootTerminalWriterFailureTest: a held Lucene generation times out close,
+ * keeps this latch false and the index lock held, then a retry releases both after actual exit.
  */
 @DisplayName("KnowledgeServer.awaitClosed — close completion is observable")
 final class KnowledgeServerCloseCompletionTest {

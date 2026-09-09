@@ -76,6 +76,7 @@ import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -130,6 +131,10 @@ public final class KnowledgeServer implements Closeable {
   private Path buildingIndexPath;
   private IndexGenerationManager indexGenerationManager;
   private IndexRootLock indexRootLock;
+  private boolean closePrepared;
+  private final Object closeLock = new Object();
+  private final ReentrantLock runtimeSwapLock = new ReentrantLock();
+  private volatile boolean closeStarted;
   private volatile boolean migrationEnumeratorDone;
 
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
@@ -1303,7 +1308,7 @@ public final class KnowledgeServer implements Closeable {
    * supplier re-read. Returns the swap duration in milliseconds. Before item A9 the
    * reconstruction step also re-registered the gRPC service wrappers.
    *
-   * <p>Synchronized so concurrent reload triggers serialize. Errors during open
+   * <p>Serialized with other reloads and shutdown. Errors during open
    * leave the old runtime in place and re-throw — callers see a hard failure
    * rather than a half-swapped state.
    *
@@ -1312,29 +1317,36 @@ public final class KnowledgeServer implements Closeable {
    * @param reason low-cardinality tag for telemetry ("admin_triggered" / etc.)
    * @return total swap duration (ms) including drain + open
    */
-  public synchronized long swapRuntime(
+  public long swapRuntime(
       java.util.function.Supplier<RunningRuntime> opener,
       java.time.Duration drainTimeout,
       io.justsearch.adapters.lucene.runtime.SwapReason reason) {
     Objects.requireNonNull(opener, "opener");
     Objects.requireNonNull(drainTimeout, "drainTimeout");
     Objects.requireNonNull(reason, "reason");
-    long startNanos = System.nanoTime();
-    LuceneRuntime old = this.ingestLifecycle;
-    if (old instanceof RunningRuntime running) {
-      running.drainAndClose(drainTimeout, reason);
-    } else if (old != null) {
-      try {
-        old.close();
-      } catch (Exception e) {
-        log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+    if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
+      long startNanos = System.nanoTime();
+      LuceneRuntime old = this.ingestLifecycle;
+      if (old instanceof RunningRuntime running) {
+        running.drainAndClose(drainTimeout, reason);
+      } else if (old != null) {
+        try {
+          old.close();
+        } catch (Exception e) {
+          log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+        }
       }
+      RunningRuntime fresh = opener.get();
+      publishIngestLifecycle(fresh);
+      this.searchLifecycle = fresh;
+      reconstructAppServicesAfterDeferredUpgrade();
+      return (System.nanoTime() - startNanos) / 1_000_000L;
+    } finally {
+      runtimeSwapLock.unlock();
     }
-    RunningRuntime fresh = opener.get();
-    publishIngestLifecycle(fresh);
-    this.searchLifecycle = fresh;
-    reconstructAppServicesAfterDeferredUpgrade();
-    return (System.nanoTime() - startNanos) / 1_000_000L;
   }
 
   /**
@@ -2204,246 +2216,278 @@ public final class KnowledgeServer implements Closeable {
 
   @Override
   public void close() throws IOException {
-    LuceneRuntime currentIngest = ingestLifecycle;
-    if (currentIngest instanceof RunningRuntime runningRuntime) {
-      runningRuntime.retireTerminalWriterFailureNotifications();
-    }
-    log.info("Shutting down KnowledgeServer...");
-    running = false;
-
-    // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
-    if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
-    if (stuckJobReaper != null) {
-      stuckJobReaper.shutdownNow();
-      stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
-    }
-
-    // The initializer publishes model/runtime fields that the remaining close steps release. It
-    // must finish before those fields are closed and before the Engine exits: JVM shutdown hooks
-    // may tear down native ORT environment state concurrently with a still-running initializer.
-    if (deferredModelExecutor != null) deferredModelExecutor.close();
-    if (deferredModelInit != null) {
+    synchronized (closeLock) {
+      if (shutdownLatch.getCount() == 0) return;
+      closeStarted = true;
+      boolean acquired;
       try {
-        deferredModelInit.join();
-      } catch (java.util.concurrent.CompletionException
-          | java.util.concurrent.CancellationException e) {
-        log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
-      }
-    }
-
-    // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
-    // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
-    // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
-    // counter in the system (e.g., worker.documents.indexed.total's last value never reaches
-    // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
-    // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
-    // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
-    // inference VRAM handoff. The actual embeddingService.close() runs later in the close
-    // sequence — this emit reflects intent regardless of whether close() succeeds.
-    if (embeddingService != null && embeddingTelemetry != null) {
-      embeddingTelemetry.onUnload(
-          io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
-      if (telemetry instanceof LocalTelemetry lt) {
-        lt.flush();
-      }
-    }
-
-    // Stop sentinel thread
-    if (sentinelThread != null) {
-      sentinelThread.interrupt();
-      try {
-        sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
-      } catch (InterruptedException e) {
+        acquired = runtimeSwapLock.tryLock(5, TimeUnit.SECONDS);
+      } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
+        throw new IOException("Interrupted waiting for active runtime replacement; server retained", interrupted);
       }
-    }
-
-    // Stop indexing loop (via application services registry)
-    if (appServices != null) {
-      try {
-        appServices.close();
-      } catch (Exception e) {
-        log.warn("Error closing application services", e);
+      if (!acquired) {
+        log.warn("Server close deadline exceeded; active runtime replacement still owns the server");
+        throw new IOException("Active runtime replacement prevented close; server retained for retry");
       }
-    }
-
-    // Close disambiguation service (after indexing loop which uses it)
-    if (disambiguationService != null) {
       try {
-        disambiguationService.close();
-      } catch (Exception e) {
-        log.warn("Error closing disambiguation service", e);
-      }
-    }
+        if (!closePrepared) {
+          LuceneRuntime currentIngest = ingestLifecycle;
+          if (currentIngest instanceof RunningRuntime runningRuntime) {
+            runningRuntime.retireTerminalWriterFailureNotifications();
+          }
+          log.info("Shutting down KnowledgeServer...");
+          running = false;
 
-    // Close SPLADE encoder (after indexing loop which uses it)
-    if (spladeEncoderInstance != null) {
-      try {
-        spladeEncoderInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing SPLADE encoder", e);
-      }
-    }
+          // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
+          if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
+          if (stuckJobReaper != null) {
+            stuckJobReaper.shutdownNow();
+            stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
+          }
 
-    // Close BGE-M3 encoder (after indexing loop which uses it)
-    if (bgeM3EncoderInstance != null) {
-      try {
-        bgeM3EncoderInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing BGE-M3 encoder", e);
-      }
-    }
+          // The initializer publishes model/runtime fields that the remaining close steps release. It
+          // must finish before those fields are closed and before the Engine exits: JVM shutdown hooks
+          // may tear down native ORT environment state concurrently with a still-running initializer.
+          if (deferredModelExecutor != null) deferredModelExecutor.close();
+          if (deferredModelInit != null) {
+            try {
+              deferredModelInit.join();
+            } catch (java.util.concurrent.CompletionException
+                | java.util.concurrent.CancellationException e) {
+              log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
+            }
+          }
 
-    // 360: Close search reranker (ORT session + tokenizer)
-    if (searchRerankerInstance != null) {
-      try {
-        searchRerankerInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing search reranker", e);
-      }
-    }
+          // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
+          // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
+          // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
+          // counter in the system (e.g., worker.documents.indexed.total's last value never reaches
+          // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
+          // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
+          // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
+          // inference VRAM handoff. The actual embeddingService.close() runs later in the close
+          // sequence — this emit reflects intent regardless of whether close() succeeds.
+          if (embeddingService != null && embeddingTelemetry != null) {
+            embeddingTelemetry.onUnload(
+                io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
+            if (telemetry instanceof LocalTelemetry lt) {
+              lt.flush();
+            }
+          }
 
-    // Tempdoc 397 §14.26 T2-C1/C2: close any surface-owned SessionHandle that wasn't covered
-    // by the encoder closes above (e.g., citation scorer's handle, which is wired to
-    // appServices rather than owned by a local encoder instance). Handle closes are
-    // idempotent, so double-closing the encoder-owned handles is safe.
-    if (inferenceSurface != null) {
-      try {
-        inferenceSurface.close();
-      } catch (Exception e) {
-        log.warn("Error closing inference surface handles", e);
-      }
-    }
+          // Stop sentinel thread
+          if (sentinelThread != null) {
+            sentinelThread.interrupt();
+            try {
+              sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
 
-    // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
-    // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
-    // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
+          // Stop indexing loop (via application services registry)
+          if (appServices != null) {
+            try {
+              appServices.close();
+            } catch (Exception e) {
+              log.warn("Error closing application services", e);
+            }
+          }
 
-    // Close tracing (flush spans) before telemetry shuts down.
-    if (tracingBootstrap != null) {
-      try {
-        tracingBootstrap.close();
-      } catch (Exception e) {
-        log.warn("Error closing tracing", e);
-      }
-    }
+          // Close disambiguation service (after indexing loop which uses it)
+          if (disambiguationService != null) {
+            try {
+              disambiguationService.close();
+            } catch (Exception e) {
+              log.warn("Error closing disambiguation service", e);
+            }
+          }
 
-    // Close telemetry (flush best-effort) after loop shutdown so the last stage/commit timings are captured.
-    if (telemetry != null) {
-      try {
-        telemetry.close();
-      } catch (Exception e) {
-        log.warn("Error closing telemetry", e);
+          // Close SPLADE encoder (after indexing loop which uses it)
+          if (spladeEncoderInstance != null) {
+            try {
+              spladeEncoderInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing SPLADE encoder", e);
+            }
+          }
+
+          // Close BGE-M3 encoder (after indexing loop which uses it)
+          if (bgeM3EncoderInstance != null) {
+            try {
+              bgeM3EncoderInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing BGE-M3 encoder", e);
+            }
+          }
+
+          // 360: Close search reranker (ORT session + tokenizer)
+          if (searchRerankerInstance != null) {
+            try {
+              searchRerankerInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing search reranker", e);
+            }
+          }
+
+          // Tempdoc 397 §14.26 T2-C1/C2: close any surface-owned SessionHandle that wasn't covered
+          // by the encoder closes above (e.g., citation scorer's handle, which is wired to
+          // appServices rather than owned by a local encoder instance). Handle closes are
+          // idempotent, so double-closing the encoder-owned handles is safe.
+          if (inferenceSurface != null) {
+            try {
+              inferenceSurface.close();
+            } catch (Exception e) {
+              log.warn("Error closing inference surface handles", e);
+            }
+          }
+
+          // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
+          // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
+          // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
+
+          // Close tracing (flush spans) before telemetry shuts down.
+          if (tracingBootstrap != null) {
+            try {
+              tracingBootstrap.close();
+            } catch (Exception e) {
+              log.warn("Error closing tracing", e);
+            }
+          }
+
+          // Close telemetry (flush best-effort) after loop shutdown so the last stage/commit timings are captured.
+          if (telemetry != null) {
+            try {
+              telemetry.close();
+            } catch (Exception e) {
+              log.warn("Error closing telemetry", e);
+            } finally {
+              telemetry = null;
+            }
+          }
+
+          // Stop migration enumerator thread (best-effort)
+          if (migrationEnumeratorThread != null) {
+            migrationEnumeratorThread.interrupt();
+            try {
+              migrationEnumeratorThread.join(10_000);  // Allow 10s for large directory walks
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+
+          // Stop migration cutover monitor thread (best-effort)
+          if (migrationCutoverThread != null) {
+            migrationCutoverThread.interrupt();
+            try {
+              migrationCutoverThread.join(10_000);  // Allow 10s for cutover cleanup
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+
+          closePrepared = true;
+        }
+
+        // A timed-out runtime still owns live Lucene children. Attempt both runtimes, but preserve
+        // the enclosing stores, executor registrations and root lock if either needs a close retry.
+        IOException runtimeCloseFailure = null;
+        if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) {
+          try {
+            ingestLifecycle.close();
+          } catch (Exception e) {
+            log.warn("Error closing ingest runtime", e);
+            runtimeCloseFailure = new IOException("Ingest runtime close incomplete", e);
+          }
+        }
+        if (searchLifecycle != null) {
+          try {
+            searchLifecycle.close();
+          } catch (Exception e) {
+            log.warn("Error closing search runtime", e);
+            if (runtimeCloseFailure == null) {
+              runtimeCloseFailure = new IOException("Search runtime close incomplete", e);
+            } else {
+              runtimeCloseFailure.addSuppressed(e);
+            }
+          }
+        }
+        if (runtimeCloseFailure != null) throw runtimeCloseFailure;
+
+        // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
+        // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
+        // outcome.
+        if (embeddingService != null) {
+          try {
+            embeddingService.close();
+          } catch (Exception e) {
+            log.warn("Error closing embedding service", e);
+          }
+        }
+
+        // Close auxiliary jobs.db stores before the queue connection.
+        if (documentIdentityStore != null) {
+          try {
+            documentIdentityStore.close();
+          } catch (Exception e) {
+            log.warn("Error closing document-identity store", e);
+          }
+        }
+
+        if (pathResolutionStore != null) {
+          try {
+            pathResolutionStore.close();
+          } catch (Exception e) {
+            log.warn("Error closing path-resolution store", e);
+          }
+        }
+
+        // Close job queue
+        if (jobQueue != null) {
+          try {
+            jobQueue.close();
+          } catch (Exception e) {
+            log.warn("Error closing job queue", e);
+          }
+        }
+
+        // Close signal bus
+        if (signalBus != null) {
+          try {
+            signalBus.close();
+          } catch (Exception e) {
+            log.warn("Error closing signal bus", e);
+          }
+        }
+
+        try { workerExecutors.close(); }
+        finally { luceneExecutors.close(); }
+
+        if (indexRootLock != null) {
+          try {
+            indexRootLock.close();
+          } catch (Exception e) {
+            log.warn("Error closing index root lock", e);
+          } finally {
+            indexRootLock = null;
+          }
+        }
+
+        // Stage-A checkpoint (re-review). This countdown used to sit ~90 lines earlier, where the gRPC
+        // server's termination used to be, and the comment there called it "releasing the shutdown
+        // latch". It marked a point in the MIDDLE of close(): the Lucene runtimes, the embedding
+        // service, the migration threads and the index root lock were all still to come. So the latch
+        // answered "close() got past step N", which is not a fact anyone wants.
+        //
+        // It is the last statement of close() now, so it means exactly one thing: this server ran its
+        // shutdown to completion. That is what EngineRoot.close() consults.
+        shutdownLatch.countDown();
+        log.info("KnowledgeServer shutdown complete");
       } finally {
-        telemetry = null;
+        runtimeSwapLock.unlock();
       }
     }
-
-    // Stop migration enumerator thread (best-effort)
-    if (migrationEnumeratorThread != null) {
-      migrationEnumeratorThread.interrupt();
-      try {
-        migrationEnumeratorThread.join(10_000);  // Allow 10s for large directory walks
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-
-    // Stop migration cutover monitor thread (best-effort)
-    if (migrationCutoverThread != null) {
-      migrationCutoverThread.interrupt();
-      try {
-        migrationCutoverThread.join(10_000);  // Allow 10s for cutover cleanup
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-
-    // Close Lucene runtimes
-    if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) {
-      try {
-        ingestLifecycle.close();
-      } catch (Exception e) {
-        log.warn("Error closing ingest runtime", e);
-      }
-    }
-    if (searchLifecycle != null) {
-      try {
-        searchLifecycle.close();
-      } catch (Exception e) {
-        log.warn("Error closing search runtime", e);
-      }
-    }
-
-    // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
-    // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
-    // outcome.
-    if (embeddingService != null) {
-      try {
-        embeddingService.close();
-      } catch (Exception e) {
-        log.warn("Error closing embedding service", e);
-      }
-    }
-
-    // Close auxiliary jobs.db stores before the queue connection.
-    if (documentIdentityStore != null) {
-      try {
-        documentIdentityStore.close();
-      } catch (Exception e) {
-        log.warn("Error closing document-identity store", e);
-      }
-    }
-
-    if (pathResolutionStore != null) {
-      try {
-        pathResolutionStore.close();
-      } catch (Exception e) {
-        log.warn("Error closing path-resolution store", e);
-      }
-    }
-
-    // Close job queue
-    if (jobQueue != null) {
-      try {
-        jobQueue.close();
-      } catch (Exception e) {
-        log.warn("Error closing job queue", e);
-      }
-    }
-
-    // Close signal bus
-    if (signalBus != null) {
-      try {
-        signalBus.close();
-      } catch (Exception e) {
-        log.warn("Error closing signal bus", e);
-      }
-    }
-
-    try { workerExecutors.close(); }
-    finally { luceneExecutors.close(); }
-
-    if (indexRootLock != null) {
-      try {
-        indexRootLock.close();
-      } catch (Exception e) {
-        log.warn("Error closing index root lock", e);
-      } finally {
-        indexRootLock = null;
-      }
-    }
-
-    // Stage-A checkpoint (re-review). This countdown used to sit ~90 lines earlier, where the gRPC
-    // server's termination used to be, and the comment there called it "releasing the shutdown
-    // latch". It marked a point in the MIDDLE of close(): the Lucene runtimes, the embedding
-    // service, the migration threads and the index root lock were all still to come. So the latch
-    // answered "close() got past step N", which is not a fact anyone wants.
-    //
-    // It is the last statement of close() now, so it means exactly one thing: this server ran its
-    // shutdown to completion. That is what EngineRoot.close() consults.
-    shutdownLatch.countDown();
-    log.info("KnowledgeServer shutdown complete");
   }
 
   /**

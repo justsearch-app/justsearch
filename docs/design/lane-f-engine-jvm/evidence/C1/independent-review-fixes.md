@@ -35,8 +35,14 @@ Neither compile failure is claimed as adverse behavioral proof.
 
 ## Remaining work, required in the owner's order
 
-- Bound RuntimeSession owner/timer/NRT waits and avoid holding its admission monitor across close;
-  preserve actual owner lifetime rather than releasing Lucene under a running child.
+Runtime close is implemented and independently reviewed. It rejects late retains promptly, bounds
+generation/timer/NRT waits, retains live resources on timeout, and retries through the server and
+Engine root without releasing the enclosing index lock early. A registered NRT close task handles
+the real zero-delay Lucene loop; reload and close share bounded serialization. Run267 is full green
+before the reload-lock correction; final271 has one fanout test timing failure, now corrected with
+an explicit parent-cleanup owner and passing focused274. Build273 passes. See
+[runtime-close.md](runtime-close.md) and [fanout-parent-exit.md](fanout-parent-exit.md).
+
 - Bound PDF child/pool termination and use one OCR pool per component, preserving extracted text.
 - Aggregate every EngineKnowledgeClient registration close; report late worker failures and Error.
 - Discard a sandbox slot if reader submission fails after write; correlate protocol request/response.
@@ -45,6 +51,9 @@ Neither compile failure is claimed as adverse behavioral proof.
 - Register the routing sandbox logic seam and executor consult region; remove the completed B row;
   reconcile architecture floors, aggregate-refusal oracle, schema version, double-release and real
   shutdown admission tests.
+- Correct the remaining Windows supervisor rename under concurrent readers; hosted34356123502
+  still fails this production boundary after publisher serialization. Preserve both failed writer
+  attempts even though the advisory system job passes on its third attempt.
 - Complete independent review of all fixes; run full stress-enabled verification and final live
   standard-model pacing/admission, then obtain and record current hosted green including the
   advisory system tier. A successful overall workflow does not excuse a failed advisory job.
@@ -60,9 +69,13 @@ their combined tested revisions have evidence.
 
 [Raw evidence SHA-256 inventory](raw-evidence-sha256.json) lists every literal temporary-path
 citation, brace/glob expansion and available file hash, including directory contents. The
-[last completed full-run summary](last-full-run-summary.json) records integrated252's failure
+[last completed full-run summary](last-full-run-summary.json) records integrated271's failure
 honestly; focused green is not substituted for that full run. Inventory generation resolved all
 literal raw-file references; bare tmp/ citations denote storage roots, not individual artifacts.
+
+Full267 completed with zero failures. Full271 has one fanout parent/child release timing assertion;
+its immutable reports remain preserved even after focused274 passes the stronger test. The last
+full-run JSON is not rewritten to green based on that focused result.
 
 Full252 requested the entire stress-enabled build and isolated integration tier. It stopped on
 two PMD tasks in the pending root-scan correction: one named-but-unused scope variable and two

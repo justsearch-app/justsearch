@@ -4,15 +4,24 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import io.justsearch.adapters.lucene.runtime.SwapReason;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.indexerworker.util.IndexRootLock;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +35,94 @@ import org.junit.jupiter.api.io.TempDir;
 
 @Timeout(180)
 final class EngineRootTerminalWriterFailureTest {
+
+  @Test
+  void activeReloadPreventsTeardownAndRetryClosesItsPublishedGeneration(@TempDir Path tempDir)
+      throws Exception {
+    Started started = start(tempDir, ignored -> {});
+    var field = KnowledgeServer.class.getDeclaredField("ingestLifecycle");
+    field.setAccessible(true);
+    var old = (RunningRuntime) field.get(started.server());
+    var openerEntered = new CountDownLatch(1);
+    var releaseOpener = new CountDownLatch(1);
+    var fresh = new AtomicReference<RunningRuntime>();
+    var swapFailure = new AtomicReference<Throwable>();
+    Thread swap = Thread.ofPlatform().start(() -> {
+      try {
+        started.server().swapRuntime(() -> {
+          openerEntered.countDown();
+          boolean interrupted = false;
+          while (releaseOpener.getCount() != 0) {
+            try { releaseOpener.await(); }
+            catch (InterruptedException expected) { interrupted = true; }
+          }
+          if (interrupted) Thread.currentThread().interrupt();
+          var replacement = old.origin().open();
+          fresh.set(replacement);
+          return replacement;
+        }, Duration.ofSeconds(5), SwapReason.UNKNOWN);
+      } catch (Throwable failure) { swapFailure.set(failure); }
+    });
+    try {
+      assertTrue(openerEntered.await(5, TimeUnit.SECONDS));
+      long startedClose = System.nanoTime();
+      var failure = assertThrows(IllegalStateException.class, started.root()::close);
+      assertTrue(failure.getCause().getMessage().contains("Active runtime replacement"));
+      assertTrue(System.nanoTime() - startedClose < TimeUnit.SECONDS.toNanos(7));
+      assertFalse(started.server().awaitClosed(0));
+      try (var competing = new IndexRootLock(tempDir.resolve("data/index"))) {
+        assertThrows(IOException.class, competing::acquire);
+      }
+      assertTimeoutPreemptively(Duration.ofMillis(500), () ->
+          assertThrows(IllegalStateException.class, () -> started.server().swapRuntime(
+              () -> { throw new AssertionError("a later reload must not invoke its opener"); },
+              Duration.ofSeconds(1), SwapReason.UNKNOWN)));
+      releaseOpener.countDown();
+      swap.join(5_000);
+      assertFalse(swap.isAlive());
+      assertNull(swapFailure.get());
+      assertSame(fresh.get(), field.get(started.server()));
+    } finally {
+      releaseOpener.countDown();
+      swap.join(5_000);
+      started.root().close();
+    }
+    assertTrue(started.server().awaitClosed(0));
+    assertThrows(IllegalStateException.class, () -> fresh.get().taskLifetime().retain());
+    try (var competing = new IndexRootLock(tempDir.resolve("data/index"))) {
+      competing.acquire();
+    }
+  }
+
+  @Test
+  void incompleteRuntimeCloseRetainsServerAndIndexLockUntilRetry(@TempDir Path tempDir) throws Exception {
+    Started started = start(tempDir, ignored -> {});
+    var field = KnowledgeServer.class.getDeclaredField("ingestLifecycle");
+    field.setAccessible(true);
+    var runtime = (RunningRuntime) field.get(started.server());
+    Runnable release = runtime.taskLifetime().retain();
+    try {
+      var failure = assertThrows(IllegalStateException.class, started.root()::close);
+      assertTrue(failure.getCause().getCause().getMessage().contains("generation owners still active"),
+          "the held generation must be the reason shutdown remains incomplete");
+      assertFalse(started.server().awaitClosed(0), "an incomplete close must not publish completion");
+      try (var competing = new IndexRootLock(tempDir.resolve("data/index"))) {
+        assertThrows(IOException.class, competing::acquire, "the enclosing index lock must remain held");
+      }
+      assertThrows(IOException.class,
+          () -> started.root().start(new GpuSchedulingGauge(), IpcTelemetry.noop()),
+          "a new server cannot replace the retained close owner");
+    } finally {
+      release.run();
+      started.root().close();
+    }
+    assertTrue(started.server().awaitClosed(0), "retry must close the original server");
+    try (var competing = new IndexRootLock(tempDir.resolve("data/index"))) {
+      competing.acquire();
+    }
+    started.root().start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+    started.root().close();
+  }
 
   @Test
   void startedServerOwnsOneDedicatedTransientExit(@TempDir Path tempDir) throws Exception {

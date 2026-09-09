@@ -1,17 +1,17 @@
 {
-  "run": 252,
-  "testedHead": "f4ab8ceba4d12e4b0a337afe3209ac1b3fb44511",
+  "run": 271,
+  "testedHead": "6bf931408f1673af7d4c28ffddf508208b115a98",
   "dirtyOverlay": true,
   "result": "FAIL",
   "environment": "Windows 11, Temurin 25.0.2",
   "command": "./gradlew.bat build test :modules:system-tests:integrationTest :modules:ui:installDist -PincludeStress=true -PskipErrorProneTests=false",
   "representedReports": {
     "test": {
-      "tests": 8641,
-      "failures": 0,
+      "tests": 9738,
+      "failures": 1,
       "errors": 0,
-      "skipped": 24,
-      "suites": 1430
+      "skipped": 25,
+      "suites": 1600
     },
     "updateSchemas": {
       "tests": 50,
@@ -21,11 +21,11 @@
       "suites": 11
     },
     "integrationTest": {
-      "tests": 35,
+      "tests": 118,
       "failures": 0,
       "errors": 0,
-      "skipped": 10,
-      "suites": 11
+      "skipped": 52,
+      "suites": 30
     },
     "loadSensitiveTest": {
       "tests": 1,
@@ -42,12 +42,19 @@
       "suites": 1
     }
   },
-  "failures": [],
-  "buildFailures": [
-    "app-engine:pmdMain: unused scoped variable in queued-root trace wrapper",
-    "app-services:pmdTest: two unnecessary qualified EngineContext references in test helper"
+  "failures": [
+    {
+      "file": "modules/app-engine/build/test-results/test/TEST-io.justsearch.app.engine.EngineFanoutOwnershipTest.xml",
+      "sha256": "b0a1b681ebee6e2bc1b9750e6ba113d0b0763b32fa9853807da77a4b7182db59",
+      "timestamp": "2026-09-09T14:02:32.114Z",
+      "failures": [
+        "callerInterruptReturnsPromptlyButRetainsAdmissionAndPacingUntilChildExit()"
+      ]
+    }
   ],
-  "qualification": "Counts describe retained XML reports, not execution of every retained case. Full252 stopped on two PMD tasks; no test failure is represented, but the full verification request did not finish all requested gates. Its raw log and original manifest preserve the exact limits. Both mechanical source issues were corrected afterward; a successful focused/build rerun is not a full-suite pass.",
-  "manifest": "tmp/c1-review-integrated-results-252/manifest.json",
-  "manifestSha256": "3a9b59c8e141b0e820d6302c96ed6ca8092727ce9d59260d68a9ea90e8a76c76"
+  "qualification": "Counts describe represented XML reports; Gradle may reuse unchanged tasks. Read the complete log for executed/up-to-date tasks and skipped environments. This run includes the reload/close lock correction; a full local pass does not prove final live standard-model or current hosted acceptance.",
+  "manifest": "tmp/c1-runtime-final-integrated-results-271/manifest.json",
+  "manifestSha256": "a10c41a1e345fa6d92ccb3b7a0ab677882cda1920777bb0b9252b0f52b388a16",
+  "log": "tmp/c1-runtime-final-integrated-271.txt",
+  "logSha256": "5c02a8c788e70beebf9ef835a298755c76a7a1e44daea1661e29a5d33d21ffeb"
 }

@@ -358,6 +358,13 @@ class CommitOpsTest extends LuceneExecutorTestBase {
         ScheduledFuture<?> future = timerFuture(ops);
         ScheduledExecutorService executor = timerExecutor(ops);
 
+        assertThrows(IllegalStateException.class,
+            () -> ops.stopCommitTimerUntil(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100)));
+        assertSame(future, timerFuture(ops), "a timed-out callback must remain owned");
+        assertSame(executor, timerExecutor(ops));
+        assertFalse(executor.isTerminated());
+        assertTrue(writer.isOpen());
+
         AtomicBoolean stopCompleted = new AtomicBoolean();
         AtomicBoolean stopRestoredInterrupt = new AtomicBoolean();
         stopper =

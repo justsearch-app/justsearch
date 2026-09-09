@@ -22,14 +22,17 @@ class LuceneExecutorRegistrationsTest {
     RecordingRegistry registry = new RecordingRegistry();
     LuceneExecutorRegistrations bundle = new LuceneExecutorRegistrations(registry);
 
-    assertEquals(3, registry.specs.size());
+    assertEquals(4, registry.specs.size());
     assertEquals("head.lucene.commit-timer", registry.specs.get(0).name());
     assertEquals(EngineExecutorSpec.Mode.SCHEDULED, registry.specs.get(0).mode());
     assertEquals(1, registry.specs.get(0).threadCount());
     assertEquals(3, registry.specs.get(0).maxInstances());
-    assertEquals("head.lucene.search-fanout-foreground", registry.specs.get(1).name());
-    assertEquals("head.lucene.search-fanout-background", registry.specs.get(2).name());
-    assertEquals(7, registry.specs.get(1).maxInstances());
+    assertEquals("head.lucene.nrt-close", registry.specs.get(1).name());
+    assertEquals(EngineExecutorSpec.Mode.VIRTUAL, registry.specs.get(1).mode());
+    assertEquals(3, registry.specs.get(1).maxInstances());
+    assertEquals("head.lucene.search-fanout-foreground", registry.specs.get(2).name());
+    assertEquals("head.lucene.search-fanout-background", registry.specs.get(3).name());
+    assertEquals(7, registry.specs.get(2).maxInstances());
 
     try (ExecutorService foreground = bundle.openSearchFanout(EngineContext.Urgency.FOREGROUND);
         ExecutorService background = bundle.openSearchFanout(EngineContext.Urgency.BACKGROUND)) {
