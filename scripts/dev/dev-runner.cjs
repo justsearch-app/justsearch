@@ -125,7 +125,21 @@ async function writeJsonAtomic(filePath, obj) {
   await mkdirp(path.dirname(filePath));
   try {
     await fsp.writeFile(tmp, json, 'utf8');
-    await fsp.rename(tmp, filePath);
+    const renameDeadline = performance.now() + 1_000;
+    let lastRefusal;
+    for (;;) {
+      // Windows readers may omit delete sharing. Keep the complete candidate until the
+      // handle closes, but do not start another attempt after this publication's deadline.
+      if (lastRefusal && performance.now() >= renameDeadline) throw lastRefusal;
+      try {
+        await fsp.rename(tmp, filePath);
+        break;
+      } catch (error) {
+        if (process.platform !== 'win32' || !['EPERM', 'EBUSY'].includes(error?.code)) throw error;
+        lastRefusal = error;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
   } catch (err) {
     // Clean up temp file on failure
     await fsp.rm(tmp, { force: true }).catch(() => { });
@@ -3368,6 +3382,7 @@ if (require.main === module) {
       fetchJsonHttp,
       essentialStatusReady,
       buildSupervisorState,
+      writeJsonAtomic,
       writeSupervisorState,
       createSupervisorStateWriter,
       supervisorStatePath,

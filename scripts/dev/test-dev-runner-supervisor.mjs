@@ -20,6 +20,8 @@ import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { createInterface } from 'node:readline';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const {
   buildSupervisorState,
+  writeJsonAtomic,
   writeSupervisorState,
   createSupervisorStateWriter,
   supervisorStatePath,
@@ -104,6 +107,148 @@ async function testOverlappingStatePublicationsStayInTransitionOrder() {
     const resolved = path.resolve(root);
     assert.equal(path.dirname(resolved), path.resolve(os.tmpdir()));
     assert.ok(path.basename(resolved).startsWith('justsearch-supervisor-ordered-state-'));
+    fs.rmSync(resolved, { recursive: true, force: true });
+  }
+}
+
+async function withWindowsReadHandle(filePath, body) {
+  const script = `
+$ErrorActionPreference = 'Stop'
+$reader = [IO.File]::Open($env:JUSTSEARCH_TEST_READ_HANDLE, [IO.FileMode]::Open,
+    [IO.FileAccess]::Read, [IO.FileShare]::Read)
+try {
+    [Console]::WriteLine('held')
+    [Console]::Out.Flush()
+    [void][Console]::ReadLine()
+} finally { $reader.Dispose() }
+`;
+  const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+    Buffer.from(script, 'utf16le').toString('base64')], {
+    windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, JUSTSEARCH_TEST_READ_HANDLE: filePath },
+  });
+  const lines = createInterface({ input: child.stdout });
+  let stderr = '';
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  const exited = new Promise(resolve => {
+    child.once('exit', (code, signal) => resolve({ code, signal }));
+    child.once('error', error => resolve({ error }));
+  });
+  let released = false;
+  const release = async () => {
+    if (!released) { released = true; child.stdin.end('\n'); }
+    const result = await exited;
+    assert.equal(result.code, 0, `read-handle helper failed: ${stderr || result.error || result.signal}`);
+  };
+  try {
+    const [line] = await Promise.race([
+      once(lines, 'line', { signal: AbortSignal.timeout(10_000) }),
+      exited.then(result => { throw new Error(`reader exited before holding: ${stderr || JSON.stringify(result)}`); }),
+    ]);
+    assert.equal(line, 'held');
+    console.log(`test-dev-runner-supervisor: Windows reader holds destination, pid=${child.pid}`);
+    await body(release);
+  } finally {
+    lines.close();
+    // The fixture is our own hidden child, never a registered dev-stack helper.
+    const killTimer = setTimeout(() => child.kill(), 5_000);
+    try { await release(); } finally { clearTimeout(killTimer); }
+  }
+}
+
+async function testWindowsReadHandlePublication() {
+  if (process.platform !== 'win32') return;
+  const root = tempRoot('reader-rename');
+  const target = path.join(root, 'state.json');
+  const oldState = { state: 'running', incarnation: 1 };
+  const nextState = { state: 'restarting', incarnation: 2 };
+  await writeJsonAtomic(target, oldState);
+  try {
+    await withWindowsReadHandle(target, async release => {
+      const probe = path.join(root, 'rename-probe.json');
+      fs.writeFileSync(probe, '{}');
+      await assert.rejects(fs.promises.rename(probe, target),
+        error => {
+          console.log(`test-dev-runner-supervisor: held-reader rename probe returned ${error.code}`);
+          return error.code === 'EPERM' || error.code === 'EBUSY';
+        });
+      fs.unlinkSync(probe);
+      const observations = [];
+      const reader = setInterval(() => {
+        try { observations.push(JSON.parse(fs.readFileSync(target, 'utf8'))); }
+        catch (error) { observations.push(error); }
+      }, 25);
+      const publication = writeJsonAtomic(target, nextState).then(
+        () => ({ ok: true }), error => ({ error }));
+      try {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        assert.deepEqual(JSON.parse(fs.readFileSync(target, 'utf8')), oldState);
+        assert.ok(fs.existsSync(`${target}.tmp`), 'refused rename must retain its temporary file for retry');
+        await release();
+        const result = await publication;
+        assert.equal(result.error, undefined, `publication did not recover: ${result.error}`);
+        assert.deepEqual(JSON.parse(fs.readFileSync(target, 'utf8')), nextState);
+        assert.ok(observations.length > 0, 'the 25ms reader must actually observe the held interval');
+        for (const row of observations) {
+          assert.ok(!(row instanceof Error), `reader saw an unreadable or partial state: ${row}`);
+          assert.ok(row.incarnation === 1 || row.incarnation === 2);
+        }
+      } finally {
+        clearInterval(reader);
+        await release();
+        await publication;
+      }
+    });
+    await withWindowsReadHandle(target, async release => {
+      const started = performance.now();
+      const publication = writeJsonAtomic(target, { state: 'exhausted', incarnation: 3 }).then(
+        () => ({}), error => ({ error }));
+      let watchdog;
+      try {
+        const result = await Promise.race([publication, new Promise((_, reject) => {
+          watchdog = setTimeout(() => reject(new Error('held-reader publication exceeded five seconds')), 5_000);
+        })]);
+        assert.ok(['EPERM', 'EBUSY'].includes(result.error?.code), 'held-open exhaustion must preserve its refusal');
+        const elapsed = performance.now() - started;
+        assert.ok(elapsed >= 900 && elapsed < 5_000, `rename retry must be bounded near one second: ${elapsed}ms`);
+        assert.deepEqual(JSON.parse(fs.readFileSync(target, 'utf8')), nextState);
+        assert.equal(fs.existsSync(`${target}.tmp`), false, 'exhausted publication cleans only its temporary file');
+        console.log(`test-dev-runner-supervisor: held-reader retry exhausted after ${Math.round(elapsed)}ms`);
+      } finally {
+        clearTimeout(watchdog);
+        await release();
+        await publication;
+      }
+    });
+    console.log('test-dev-runner-supervisor: held Windows reader retries and expires without losing state — PASS');
+  } finally {
+    const resolved = path.resolve(root);
+    assert.equal(path.dirname(resolved), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(resolved).startsWith('justsearch-supervisor-reader-rename-'));
+    fs.rmSync(resolved, { recursive: true, force: true });
+  }
+}
+
+async function testPermanentRenameFailureIsNotRetried() {
+  const root = tempRoot('permanent-rename');
+  const target = path.join(root, 'state.json');
+  const original = { state: 'running' };
+  await writeJsonAtomic(target, original);
+  const rename = fs.promises.rename;
+  const failure = Object.assign(new Error('permanent rename failure'), { code: 'EIO' });
+  let attempts = 0;
+  try {
+    fs.promises.rename = async () => { attempts++; throw failure; };
+    await assert.rejects(writeJsonAtomic(target, { state: 'restarting' }), error => error === failure);
+    assert.equal(attempts, 1, 'non-retryable errors must fail immediately');
+    assert.deepEqual(JSON.parse(fs.readFileSync(target, 'utf8')), original);
+    assert.equal(fs.existsSync(`${target}.tmp`), false);
+    console.log('test-dev-runner-supervisor: permanent rename failure preserves error and destination — PASS');
+  } finally {
+    fs.promises.rename = rename;
+    const resolved = path.resolve(root);
+    assert.equal(path.dirname(resolved), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(resolved).startsWith('justsearch-supervisor-permanent-rename-'));
     fs.rmSync(resolved, { recursive: true, force: true });
   }
 }
@@ -389,6 +534,8 @@ async function main() {
   console.log('test-dev-runner-supervisor: bounded liveness and essential readiness — PASS');
   testStateRecordsWhichPolicyItRanUnder();
   await testOverlappingStatePublicationsStayInTransitionOrder();
+  await testWindowsReadHandlePublication();
+  await testPermanentRenameFailureIsNotRetried();
   await testTerminalStateIsMirroredAndNonTerminalIsNot();
   await testHostRequestWriterAndHandoffAdmission();
   await testHandleReleaseWaitsForALiveProcess();

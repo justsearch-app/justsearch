@@ -41,7 +41,9 @@ the complete17-seam efficacy gate366 and reviewed build370: routing registration
 See [governance sweep](evidence/C1/governance-sweep.md). The cancellation/shutdown and queued-root
 test debts now pass24 selected cases374 and full build375, with four adverse373 controls.
 The obsolete B cancellation limitation is removed. See [cancellation sweep](evidence/C1/cancellation-sweep.md).
-Next are Windows rename and final C1 proof.
+Windows rename now passes actual held-reader release/exhaustion, permanent-error and adverse
+deadline/filter tests381, supervisor conformance34/34 and build382. See
+[Windows publication](evidence/C1/windows-state-rename.md). Next is final C1 proof.
 Hosted34377820922 passes all13 jobs at4136d57e1, including both advisories and Windows-native;
 inspected system XML has88 cases, zero failures/errors,42 skips and no failed-retry entries.
 That checkpoint precedes the governance sweep. See [OCR correction](evidence/C1/ocr-component-close.md) and

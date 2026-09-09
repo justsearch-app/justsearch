@@ -94,9 +94,10 @@ including all five supervised recovery cases. Build273 is retained historical pr
 - The completed B cancellation row is removed. Two-work double-release, real shutdown freeze
   and queued-root trace/request/physical-bound regressions pass24 selected cases374 and build375.
   Four adverse373 controls fail for the intended reasons. See [cancellation sweep](cancellation-sweep.md).
-- Correct the remaining Windows supervisor rename under concurrent readers; hosted34356123502
-  still fails this production boundary after publisher serialization. Preserve both failed writer
-  attempts even though the advisory system job passes on its third attempt.
+- Windows supervisor rename now has bounded retry with actual held-reader release/exhaustion
+  proof, unchanged25ms polling, both adverse380 controls and build382. See
+  [Windows publication](windows-state-rename.md). Both earlier failed hosted writer attempts
+  remain preserved even though the advisory job passed on its third attempt.
 - Complete independent review of all fixes; run full stress-enabled verification and final live
   standard-model pacing/admission, then obtain and record current hosted green including the
   advisory system tier. A successful overall workflow does not excuse a failed advisory job.
