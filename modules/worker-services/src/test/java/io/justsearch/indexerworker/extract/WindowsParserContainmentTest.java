@@ -19,6 +19,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
+@org.junit.jupiter.api.Tag("windows")
 @EnabledOnOs(OS.WINDOWS)
 @Timeout(45)
 final class WindowsParserContainmentTest {

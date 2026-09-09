@@ -72,3 +72,13 @@ and PMD. Log: `tmp/c1-parser-build-306.txt`. Canonical index, skill embedding, l
 and runtime configuration checks pass307; neither generated skill copy needed content changes.
 Log: `tmp/c1-parser-docs-307.txt`. Existing fixture ballast warnings and protobuf/Mockito JVM
 warnings are advisory and remain visible in the raw logs; no validation is suppressed.
+
+## Hosted selection correction
+
+The dedicated Windows CI job previously omitted worker-services, so platform-conditional unit
+cases would only be skipped on the Linux shard. WindowsParserContainmentTest now carries the
+existing windows tag and that job includes worker-services:test. Local run318 executes all four
+cases through the exact `-PwindowsOnly=true` selection, with no skips/failures; build319 passes
+in6s. Logs: `tmp/c1-parser-windows-selection-318.txt`, `tmp/c1-parser-windows-build-319.txt`.
+Preserved reports: `tmp/c1-parser-windows-results-318/`. This is wiring and local selection proof;
+current hosted execution must still be inspected before final C1 acceptance.
