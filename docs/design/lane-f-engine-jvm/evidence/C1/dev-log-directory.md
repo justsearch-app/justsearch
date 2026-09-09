@@ -13,6 +13,8 @@ Space-containing paths use the same quoting convention as the existing heap-dump
 Adverse223 fails the new path assertion with original code. Restored225 passes the exact shared
 launch-flag test, including spaces and a conflicting inherited data-dir flag. Logs:
 `tmp/c1-dev-log-path-before-223.txt`, `tmp/c1-dev-log-path-restored-225.txt`.
-The next real installed run must confirm the application log exists in its owned data directory.
+Installed standard run226 at f4ab8ceba confirms the Engine log is created in the owned
+`tmp/c1-standard-primary-data/logs/` directory. Its logs and rotations were retained before stop
+in `tmp/c1-standard-primary-evidence-231/logs/`; the stop report confirms ports closed.
 This fixes the dev-run evidence path; it does not explain the hosted ledger failure because
 `IsolatedBackendFixture` already passed the property at JVM entry.

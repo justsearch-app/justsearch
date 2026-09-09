@@ -22,8 +22,8 @@ Local install171, deterministic generated-output check172, all7client tests173 a
 contents check174 PASS. The fresh report175 has zero runtime-client advisories; all targets
 are available and zero high/critical identities remain. Root/UI lower-severity advisories
 remain reported (6/5), outside the gate's existing high/critical threshold. Restored kernel180
-passes npm-audit and config-surface; raw logs tmp/c1-runtime-client-{install-171,regen-172,
-test-173,pack-174}.txt and tmp/c1-advisory-patched-175.txt. Before/after identity reports are
+passes npm-audit and config-surface; raw logs `tmp/c1-runtime-client-{install-171,regen-172,test-173,pack-174}.txt`
+and `tmp/c1-advisory-patched-175.txt`. Before/after identity reports are
 under tmp/c1-hosted-triage. No regenerated client source changed. Hosted rerun remains required.
 
 

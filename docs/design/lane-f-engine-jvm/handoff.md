@@ -5,7 +5,67 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Current C1 batch 4 checkpoint](#current-c1-batch-4-checkpoint-2026-09-09-1104-utc).
+Latest state: [Current C1 verification checkpoint](#current-c1-verification-checkpoint-2026-09-09-root-scan-race).
+
+## Current C1 verification checkpoint (2026-09-09 root-scan race)
+
+**Latest steering: the owner's independent review is mandatory and ordered.** Read
+[the complete review](evidence/C1/independent-review-2026-09-09.md) and
+[the correction ledger](evidence/C1/independent-review-fixes.md) before continuing below.
+The production observer and interrupted-handoff blockers reproduce and pass restored251.
+Next implementation is RuntimeSession close, then the remaining must-fixes in the supplied order.
+C2 cannot start until that review is closed. One implementer per worktree; read-only reviewers.
+Each subsequent item commit must be build-green and pushed immediately; earlier red WIP
+authorization is historical. Raw evidence hashes and the last full-run summary are now committed
+artifacts. Full252 stopped on two PMD tasks in pending root-scan edits; those are mechanically
+corrected and256 verifies the build. A full stress/hosted green remains required after all fixes.
+
+Continue autonomously in `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch
+`worktree-lane-F-A`. A/B are complete at their recorded tiers; C1 is open. C2/D1/D2/E/F remain
+required. F/PR1 remains the merge placement (draft718). All lane decisions and merges are
+authorized. Push every commit, commit WIP at least hourly, and cap worker follow-ups at three.
+Root owns current corrections. This checkpoint is not a pause or stage pass.
+
+Pushed through f4ab8ceba: native GPU waiter cancellation, broken-child Engine workflow, pacing
+observer corrections, synchronous indexing-stream opening retry, GPU broadcast on late index
+connection, jseval watcher readiness floor, and owned data directory at JVM logging startup.
+Integrated203 passed its configured tiers. Full integrated221 passed 9725 represented unit
+cases (25 skips), but its isolated system tier failed lock-boot. All XML remains in
+`tmp/c1-integrated-results-221/manifest.json`. Full jseval222 passed 3638 tests (16 skips,
+82 existing warnings). The integration failure remains recorded, not hidden by targeted reruns.
+
+Standard-active primary run229 at f4ab8ceba indexed 469 documents while serving 13500 continuous
+searches with zero errors. However, it exposed the initial root scan failing WORK_FINISHED before
+the periodic rescan masked the loss. Hosted34350223349 proves this exact cause in all three
+IndexingLedgerCoherenceTest attempts. Its preserved logs are in the uploaded
+integration-test-results artifact and locally `tmp/c1-hosted-artifacts-233/`. Root fixed ownership
+before queue submission using the existing owned asynchronous task; all four root-walk queues
+pass the retained context. Adverse232 fails on original code. Focused234 and expanded235 pass,
+including queued cancellation/rejection, shutdown/actual-exit ownership, isolated ledger and all
+five installed recovery cases. See [root scan evidence](evidence/C1/queued-root-ownership.md).
+
+Integrated221's lock-boot failure came from indefinite fault reinjection exhausting successor
+attempts after tragic Lucene writes. The harness now stops injection only after a counted exit
+at or after the binding that accepted all 100 documents, waits for JUnit's release acknowledgement,
+then proves recovery within the unchanged 180-second search bound. Healthy runs stay attacked.
+Review found and root fixed stale-lastExit and partial-acceptance holes; four Node tests and
+counterfactual237 prove those guards. Installed235 exercised fatal recovery in both lock arms.
+Final guarded installed239 is running; its result and XML must be preserved. See
+[lock phase evidence](evidence/C1/hostile-lock-phase.md) and design §16's explicit decision.
+
+Hosted34350223349 also failed one migration recovery attempt with a supervisor-state EPERM rename
+and timeout waiting for rollback restart. This is independently under diagnosis; local235's
+migration pass does not explain it. Overall hosted CI success is not a pass of its advisory
+system-tests job. The source failure logs and artifact are retained under233.
+
+Owned standard run d59d7ea8-5d5a-430b-93d7-70f69f4dd53c is stopped with closed ports. Its owned
+application logs were copied to `tmp/c1-standard-primary-evidence-231/logs/`; this confirms the
+dev log-directory fix. No ordinary dev stack is active;239 owns the only Gradle/isolated run.
+Next: finish reviews and per-item commits/pushes, resolve the supervisor-state publication defect,
+repeat standard-active primary indexing with a successful initial scan, then chat-offline full
+enrichment under continuous search, plus standard admission on the final candidate. Reconcile
+integrated/hosted evidence before opening C2. The separate native session close/quiescence defect
+remains mandatory D1 work; C1 waiter cancellation cannot establish safe session close.
 
 ## Current C1 batch 4 checkpoint (2026-09-09 11:04 UTC)
 

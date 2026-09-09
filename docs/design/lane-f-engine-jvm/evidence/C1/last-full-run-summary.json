@@ -1,0 +1,53 @@
+{
+  "run": 252,
+  "testedHead": "f4ab8ceba4d12e4b0a337afe3209ac1b3fb44511",
+  "dirtyOverlay": true,
+  "result": "FAIL",
+  "environment": "Windows 11, Temurin 25.0.2",
+  "command": "./gradlew.bat build test :modules:system-tests:integrationTest :modules:ui:installDist -PincludeStress=true -PskipErrorProneTests=false",
+  "representedReports": {
+    "test": {
+      "tests": 8641,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 24,
+      "suites": 1430
+    },
+    "updateSchemas": {
+      "tests": 50,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 11
+    },
+    "integrationTest": {
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 10,
+      "suites": 11
+    },
+    "loadSensitiveTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    "systemTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    }
+  },
+  "failures": [],
+  "buildFailures": [
+    "app-engine:pmdMain: unused scoped variable in queued-root trace wrapper",
+    "app-services:pmdTest: two unnecessary qualified EngineContext references in test helper"
+  ],
+  "qualification": "Counts describe retained XML reports, not execution of every retained case. Full252 stopped on two PMD tasks; no test failure is represented, but the full verification request did not finish all requested gates. Its raw log and original manifest preserve the exact limits. Both mechanical source issues were corrected afterward; a successful focused/build rerun is not a full-suite pass.",
+  "manifest": "tmp/c1-review-integrated-results-252/manifest.json",
+  "manifestSha256": "3a9b59c8e141b0e820d6302c96ed6ca8092727ce9d59260d68a9ea90e8a76c76"
+}

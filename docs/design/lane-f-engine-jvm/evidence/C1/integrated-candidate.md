@@ -23,10 +23,8 @@ C1 is not complete. Raw paths are relative to lane-F-A; retain through lane comp
 | 152 | docs-validate | PASS |
 | 153 | verify-canonical-doc-links | PASS156files |
 
-Logs: tmp/c1-batch4-{logic-seams-136,java-opts-137,lifetime-executed-138,build-140,build-143,
-ui-typecheck-141,ui-unit-142,ui-lint-148,engine-port-144,register-guards-145,
-store-recoverability-146,full-stress-147,ui-gates-149,regen-150,publish-preflight-151,
-docs-validate-152,doc-links-153}.txt. Proof scope is the combined candidate; cached outputs are
+Logs: `tmp/c1-batch4-{logic-seams-136,java-opts-137,lifetime-executed-138,build-140,build-143,ui-typecheck-141,ui-unit-142,ui-lint-148,engine-port-144,register-guards-145,store-recoverability-146,full-stress-147,ui-gates-149,regen-150,publish-preflight-151,docs-validate-152,doc-links-153}.txt`.
+Proof scope is the combined candidate; cached outputs are
 revalidation and are not labelled fresh execution. Final live, platform and hosted proof is pending.
 
 
@@ -180,3 +178,11 @@ checks. No threshold/suppression changed. The remaining manifest commands201 PAS
 Markdown. Together197 plus targeted200 and continuation201 reconcile the Public claims local
 subset. This does not replace the separate hosted ADR gate or hosted integration tier.
 Local npm reported the existing ini7 engine-range warning on Node24.12.0; it was not hidden.
+
+
+Restored integrated203 PASS at c7c1eb17e in7m39s (368tasks:6executed,362up-to-date).
+Snapshot `tmp/c1-integrated-restored-results-203/manifest.json`: 9722 unit tests in 1597 suites,
+zero failures/errors,25existing skips; configured integration36tests,zero failures/errors,10skips.
+The full app-engine suite executed after the observer/setup corrections. Native stress and other
+unchanged reports retain190's execution timestamps. Public claims also passes hosted34345647291
+at this revision; remaining hosted jobs were in progress at snapshot204. No final acceptance yet.

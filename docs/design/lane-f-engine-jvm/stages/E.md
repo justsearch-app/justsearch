@@ -29,10 +29,14 @@ recovery exercise (section 0, 2026-09-08).**
 
 - **E0.1 — Run length is bounded to fifty-five minutes** *(owner constraint, 2026-09-07: no
   benchmark, eval, soak or capture over one hour)*. 17.7's locked soak ("two hours of indexing, a
-  scripted agent and a reconfigure every fifteen minutes") is measured across **three forty-minute
+  scripted agent and a reconfigure every fifteen minutes") is satisfied by **two fifty-five-minute
   runs on separate occasions**, each a self-contained record; the zero-crash and no-heap-growth
-  requirements of the memory row hold across all three runs together. This is 120 minutes of
-  observed workload, not a continuous two-hour run; the record states the interruption boundaries.
+  requirements of the memory row hold across both runs together, and the record says so. This is
+  a constraint on continuous duration, not a relaxation of the row.
+  **2026-09-09 amendment:** preserve both 55-minute continuous windows and add a separate
+  10-minute run so the total is 120 measured minutes. The prior three-40-minute edit is withdrawn:
+  it shortened the window used to detect heap growth. Evaluate the slope after warmup in each
+  55-minute run, retain all interruption boundaries, and never label this a continuous two-hour soak.
 - **E0.2 — The split side is measured at E, not read from the baseline.** 16 says "paired runs on
   the same corpus and machine"; the PR 0 baseline (`evidence/baseline/`, 2026-09-07) was taken on
   the PR 0 branch head, at the split Head's `512m` heap, before PR 0b's pins. For every paired row
@@ -88,7 +92,7 @@ is a new run, not an amendment.
 | indexing-progress fraction | ninety percent of split | split side's docs/s and chunks/s at E under the same foreground load; baseline sanity: primary indexing 127.4 docs/s, embedding complete at 209.7 s on scifact | `evidence/baseline/scifact/summary.json` `ingest.pipeline_summary` |
 | warm-start budget | baseline index-ready plus five seconds | 7.6 s (`worker_ready_ms=7631` on warm restart) plus 5 s = **12.6 s** from the first cooldown's end to `index` ready | `evidence/pr0/after/restart-startup.txt` |
 | crash-to-API-restored | first cooldown plus the warm-start budget | 1 s (`cooldownIncrementMs`) plus 12.6 s = **13.6 s** to `api`; `index` within the same budget | `supervision-contract.v1.json:164` |
-| soak | two hours (17.7) → three forty-minute runs (E0.1) | indexing of the reference corpus, the scripted agent from `admission-loop.mjs` at a fixed rate, a reconfigure every fifteen minutes (two per run), under the chosen collector | E0.1 |
+| soak | two hours (17.7) → two 55-minute runs plus one 10-minute run (E0.1 amendment) | indexing of the reference corpus, the scripted agent from `admission-loop.mjs` at a fixed rate, a reconfigure every fifteen minutes (three per 55-minute run), under the chosen collector | E0.1 |
 | floor machine | lowest GPU class the lower-memory guidance names | the class named in `docs/` lower-memory guidance at E's start; simulated by device-memory cap if no machine (E0.4) | E0.4 |
 | corpus | the jseval reference corpus | `scifact` (5,183 documents, 300 queries) for the quality and indexing rows; the 91-document fixture corpus for the workflow fixture; the 100-document lock workload (B17) for the recovery rows | `evidence/baseline/README.md` |
 | semantic-availability bound | paired first, absolute second | the split's semantic outage for the same reindex on the same machine, measured at E; an absolute ceiling fixed by the orchestrator from the split reference before the candidate gate run, with its value and rationale recorded in `values.json`; both bounds are required | 17.7 |
@@ -352,10 +356,12 @@ the fix.
 
 - **Q1 — the floor machine.** Whether a machine of the lower-memory guidance's GPU class is
   available at E. If not, E0.4 applies and the report says so. (No decision needed now.)
-- **Q2 — the semantic-availability absolute ceiling.** Under delegated authority, the orchestrator
-  fixes the absolute ceiling from the measured split reference before the candidate gate run,
-  records the value and rationale in `values.json`, and requires both bounds. No owner decision
-  or null-valued ceiling is left pending. A missing split measurement is work for E to perform.
+- **Q2 — the semantic-availability absolute ceiling.** The owner names it once R6's paired
+  number exists; until then the row reports the paired verdict only.
+  **2026-09-09 amendment:** the owner's delegated authority assigns this decision to the
+  orchestrator. Fix the absolute ceiling from the measured split reference before the candidate
+  gate run, record the value/rationale in values.json, and require both bounds. This supersedes
+  the historical owner-wait clause above without rewriting it.
 
 ---
 
