@@ -18,6 +18,7 @@ plugins {
 // `app-api` and `core` are `api`: they hold the port contracts (IndexingService, SearchPort)
 // that EngineRoot's own signatures will carry outward at A6.
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   // Port contracts — part of this module's outward surface.
   api(project(":modules:app-api"))
   api(project(":modules:core"))
