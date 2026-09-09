@@ -90,8 +90,10 @@ including all five supervised recovery cases. Build273 is retained historical pr
 - Routing seam, executor consult region, current65/80 census floors and source-backed schema
   version pin are implemented. Complete efficacy366 passes17 measured seams; reviewed build370
   passes. The sweep also closes two existing property-test gaps and retires stale Stage-A Worker
-  mutation baselines. See [governance sweep](governance-sweep.md). Next remove the completed B row
-  and reconcile double-release, real shutdown admission and queued-root correlation tests.
+  mutation baselines. See [governance sweep](governance-sweep.md).
+- The completed B cancellation row is removed. Two-work double-release, real shutdown freeze
+  and queued-root trace/request/physical-bound regressions pass24 selected cases374 and build375.
+  Four adverse373 controls fail for the intended reasons. See [cancellation sweep](cancellation-sweep.md).
 - Correct the remaining Windows supervisor rename under concurrent readers; hosted34356123502
   still fails this production boundary after publisher serialization. Preserve both failed writer
   attempts even though the advisory system job passes on its third attempt.

@@ -32,12 +32,16 @@ final class EngineQueuedRootOwnershipTest {
     var releaseQueue = new CountDownLatch(1);
     var queueEntered = new CountDownLatch(1);
     var finished = new CountDownLatch(1);
-    var seen = new AtomicReference<EngineContext>();
+    var seen = new AtomicReference<CallContext>();
+    var seenTrace = new AtomicReference<String>();
+    var seenRequest = new AtomicReference<String>();
     var services = mock(WorkerAppServices.class);
     var ingest = mock(WorkerIngestService.class);
     when(services.ingestService()).thenReturn(ingest);
     doAnswer(call -> {
-      seen.set(((CallContext) call.getArgument(2)).engineContext());
+      seen.set(call.getArgument(2));
+      seenTrace.set(io.opentelemetry.api.trace.Span.current().getSpanContext().getTraceId());
+      seenRequest.set(org.slf4j.MDC.get("request_id"));
       java.util.function.Consumer<ScanRootProgress> progress = call.getArgument(1);
       progress.accept(ScanRootProgress.getDefaultInstance());
       return null;
@@ -61,15 +65,33 @@ final class EngineQueuedRootOwnershipTest {
       });
       assertTrue(queueEntered.await(2, TimeUnit.SECONDS));
       EngineContext entering;
-      try (var request = admission.admit(TestEngineContexts.FOREGROUND, false)) {
+      String traceId = "4234567890abcdef1234567890abcdef";
+      var span = io.opentelemetry.api.trace.Span.wrap(io.opentelemetry.api.trace.SpanContext.create(
+          traceId, "4234567890abcdef", io.opentelemetry.api.trace.TraceFlags.getSampled(),
+          io.opentelemetry.api.trace.TraceState.getDefault()));
+      String previousRequest = org.slf4j.MDC.get("request_id");
+      try (var _ = span.makeCurrent();
+          var request = admission.admit(TestEngineContexts.FOREGROUND, false)) {
+        org.slf4j.MDC.put("request_id", "queued-scan-request");
         entering = request.context();
         request.onCompletion(finished::countDown);
         client.addWatchedRoot("queued-root", directory, entering);
+      } finally {
+        if (previousRequest == null) org.slf4j.MDC.remove("request_id");
+        else org.slf4j.MDC.put("request_id", previousRequest);
       }
+      var physicalQueue = ((java.util.concurrent.ThreadPoolExecutor) queue).getQueue();
+      assertEquals(1, physicalQueue.size(), "the scan must really wait behind the occupied worker");
+      assertEquals(3, physicalQueue.remainingCapacity(), "the four-slot root queue is physically bounded");
       assertEquals(1, admission.activeWorkCount(), "the queued scan must own work after HTTP returns");
       releaseQueue.countDown();
       assertTrue(finished.await(5, TimeUnit.SECONDS));
-      assertEquals(entering, seen.get(), "the actual scan must retain all caller axes and exact work id");
+      assertEquals(entering, seen.get().engineContext(),
+          "the actual scan must retain all caller axes and exact work id");
+      assertEquals(traceId, seen.get().traceId());
+      assertEquals("queued-scan-request", seen.get().requestId());
+      assertEquals(traceId, seenTrace.get(), "the queued body must restore the entering OTel context");
+      assertEquals("queued-scan-request", seenRequest.get(), "the queued body must restore entering MDC");
       assertEquals(0, admission.activeWorkCount());
     } finally {
       releaseQueue.countDown();

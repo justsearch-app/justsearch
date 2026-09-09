@@ -101,20 +101,25 @@ final class ForegroundLoadGateTest {
       var worker = front.retain();
       gate.run(worker, () -> assertEquals(1, load.inFlight()));
       gate.run(worker, () -> assertEquals(1, load.inFlight()));
+      var other = admission.admit(context(EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.FOREGROUND), false);
+      gate.run(other, () -> assertEquals(2, load.inFlight()));
       front.close();
-      assertEquals(1, load.inFlight(), "the asynchronous owner still holds work");
+      assertEquals(2, load.inFlight(), "both distinct works still hold foreground load");
       if (detach) {
         worker.waitingClientGone();
         worker.waitingClientGone();
-        assertEquals(0, load.inFlight());
+        assertEquals(1, load.inFlight(), "detaching one work must preserve the other");
         assertEquals(EngineContext.Urgency.BACKGROUND, worker.context().urgency());
-        gate.run(worker, () -> assertEquals(0, load.inFlight()));
+        gate.run(worker, () -> assertEquals(1, load.inFlight()));
       }
       worker.close();
       worker.close();
+      assertEquals(1, load.inFlight(), "duplicate release must not consume the other work's hold");
+      other.close();
       assertEquals(0, load.inFlight());
     }
-    assertEquals(2, load.startedTotal());
+    assertEquals(4, load.startedTotal());
   }
 
   @Test

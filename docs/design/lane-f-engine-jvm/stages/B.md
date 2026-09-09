@@ -1015,19 +1015,15 @@ room, and B is additive, so the list is short.
    table (7.5). B's step 3 is "stop taking new work and checkpoint what exists". The 16
    `recovery, process` row's durable-operation clause is therefore **unmeasurable, not failing**;
    the evidence record must say unmeasurable, not passed. See §11.
-3. **Shutdown step 2 cannot cancel interactive turns yet.** C1 owns the interactive context and
-   admission front that can identify and cancel those turns with a reason code. B freezes all new
-   mutation admission first for every shutdown reason; the cancellation half remains unmeasurable
-   until that C1 contract exists.
-4. **Signed dead-Engine installer/user-store proof is assigned to stage E.** The owner's
+3. **Signed dead-Engine installer/user-store proof is assigned to stage E.** The owner's
    2026-09-08 deferral is recorded in design section 0 and registered as
    `upgrade-dead-engine-recovery`. B requires the host-level handoff/reconciliation proofs;
    signed installation remains an explicit final-validation obligation. If main-only signing
    prevents the stage-E run, F carries it to the first eligible installer after the final merge.
-5. **`core.restart-worker` still answers `restart_required`** rather than restarting anything
+4. **`core.restart-worker` still answers `restart_required`** rather than restarting anything
    (`RestartWorkerHandler.java:61,74`). D1 retires the operation; B only makes the *requested
    restart* that answers it real (B15).
-6. **The remaining component readiness re-cut belongs to D1.** B14 retired the Java
+5. **The remaining component readiness re-cut belongs to D1.** B14 retired the Java
    whole-Worker supervision veto, orphan enum/UI row and producer exemption. Host exhaustion
    is already projected as `engine.restart_exhausted` from the current host's state, with
    external code `ENGINE_RESTART_EXHAUSTED`. Other Worker-shaped component vocabulary and

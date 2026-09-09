@@ -145,7 +145,7 @@ final class HeadlessAppShutdownWiringTest {
   }
 
   @Test
-  @DisplayName("shutdown cancellation leaves durable admission work alive")
+  @DisplayName("shutdown freezes the real admission front and cancels only interactive work")
   void shutdownCancellationExcludesDurableWorkWithRealController() {
     var admission = new EngineAdmissionController(2, 2, 1);
     var durableContext =
@@ -172,7 +172,7 @@ final class HeadlessAppShutdownWiringTest {
                   null,
                   null,
                   null,
-                  OperationLeaseService.noOp(),
+                  admission,
                   admission,
                   mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
                   () -> null),
@@ -182,6 +182,9 @@ final class HeadlessAppShutdownWiringTest {
 
       assertEquals(java.util.Optional.of("restart"), interactive.cancellationReason());
       assertTrue(durable.cancellationReason().isEmpty());
+      var refusal = assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+          () -> admission.admit(io.justsearch.ui.api.TestRequestContexts.browser(), false));
+      assertEquals(io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN, refusal.reason());
     }
   }
 
