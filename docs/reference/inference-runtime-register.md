@@ -111,6 +111,12 @@ Settled empirical facts. Each was an open question that got answered.
 
 - **Answer:** When ORT CPU session exhausts memory, some models return NaN outputs silently rather than throwing an exception. `SessionHandle.reportCpuSessionFailure()` (impl: `NativeSessionHandle`, formerly `OrtSessionManager`) handles this case and BFC arena failures are detected via `NativeSessionHandle.isBfcArenaFailure()`.
 - **Evidence:** tempdoc 359 D9. Fixed in shared handle infrastructure (renamed in tempdoc 397 §14.23).
+- **Correction (2026-09-10, inference-host design audit 2 §5):** no live path today detects NaN
+  output and triggers recovery. The only `isNaN` check among the six encoders is
+  `SpladeEncoder.decodeSparseOutput` (`:1085` at `4229f1091`), which silently skips the weight;
+  `reportCpuSessionFailure` has exactly one production caller, `CrossEncoderReranker.java:344`,
+  fired from an `OrtException` catch. The mechanism exists; the NaN trigger does not. Recorded
+  here rather than rewritten so the 359 history stays legible.
 
 ### F-010: Cross-encoder latency baselines (GPU vs CPU)
 
@@ -415,6 +421,36 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   whose `n_ctx_train` is below 32768, which the ladder has no source for today. (The q8_0 tok/s
   trigger is retired: measured above, it does not fire.)
 
+### D-012: The inference host lane — one operation port, an in-process adapter, an unshared child, a device ledger — DESIGN FROZEN (2026-09-10)
+
+- **Choice:** the encoders move behind one operation-shaped port in `core`
+  (`embed`, `expand`, `rerank`, `score`, `tag`; text in, arrays out; every request names an
+  encoder set; every result carries a representation descriptor and an execution identity).
+  Two implementations in order: an in-process adapter over lane F's D1-12 encoder sets (H1),
+  then an Engine-owned unshared child JVM (H2, a decision gate on H0's measurements). The host
+  owns the device ledger: every GPU allocation, including llama-server's launches and
+  self-tests, reserves a ticket first; a persisted launch intent precedes any spawn; charges are
+  resident plus unmaterialised entitlement; observations tighten reservations and become bounds
+  only by re-applying `gpu_mem_limit`. A shared host for several Engines is a separate open
+  stage (H2b). Full contract: `docs/design/inference-host/design.md` (v4, frozen after three
+  independent review rounds, `docs/design/inference-host/reviews/`).
+- **Rationale and grounding:** four read-only audits at `4229f1091`
+  (`docs/design/inference-host/evidence/audits/`). Facts that reshaped it: no aggregate VRAM
+  budget exists (caps sum to 14 336 MB nominal on 12 GB; `ModelSessionPolicyResolver` never
+  reads its `HardwareProfile`); only embedding and the search reranker release VRAM on the LLM
+  claim; the gauge's falling edge fires before llama-server has exited; there is no query-time
+  NER; the one-permit semaphore is per role (five handles in the SPLADE configuration, four
+  with BGE-M3); nothing binds a query embedding to the index generation it searches.
+- **Corrections to this register and to lane F's design:** F-009's NaN-recovery path does not
+  exist (note above); the arena cap is a static per-role default, not "sized from GPU VRAM"
+  (lane F design 8, `verified-facts.md`); design.md section 5's "ArchUnit-pinned" holds only
+  after H1.
+- **Cross-lane:** lane F's D1 and D2 proceed with no type from this lane; H1 lands after D1
+  batch 4 and replaces D1-14's admission implementation while preserving its outward contract.
+- **Revisit when:** H0 records the encoder-warm milestone and co-resident VRAM (the H2 gate);
+  a measured need for N Engines on one device exists (H2b); a real encoder fault is observed in
+  the field; non-NVIDIA hardware arrives (H3, with Q-003).
+
 ### D-002: BGE-M3 VRAM budget — FP16+Flash at 3072 MB arena
 
 - **Choice:** FP16+Flash Attention with 3072 MB arena limit (`JUSTSEARCH_BGE_M3_GPU_MEM_MB=3072`).
@@ -538,6 +574,10 @@ picking up items here over inventing new experiments.
   `-Djustsearch.server.exe`; the WebGPU probe (903 Appendix A) on the fp16 embedder / reranker /
   NER; `llama-server --list-devices` total/free versus OS-reported memory (sizes the detection
   problem on UMA parts). Record the hardware inventory as the row key.
+- **Routed (2026-09-10):** the "WebGPU session lifecycle under the lease and co-residency with
+  llama-server" half of this question is stage H3 of the inference host lane (D-012): the EP
+  kind lands on the host's policy record and the host's ledger owns co-residency. The vendor
+  measurements stay here.
 - **Also open here:** whether `GPU_TOP_RUNG` (32768) needs a UMA/iGPU rung (prefill on an
   8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the
   `main_gpu_active` lease and co-residency with llama-server (F-010 budgets are CUDA-arena
