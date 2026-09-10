@@ -347,6 +347,9 @@ async function cmdRelease(flags) {
       return;
     }
   }
+  // Validate every argument BEFORE the first marker write: a rejected --keep-branch must not leave
+  // the resource RELEASED, which the reconciler would read as "retire the branch".
+  const holdTriple = flags['keep-branch'] ? requireHoldTriple(flags) : null;
   const clean = isClean(entry.path);
   if (flags['if-clean'] && clean !== true) {
     if (entry.branch) register.writeMarkers({ repoRoot: main, branch: entry.branch, markers: { released: nowIso() } });
@@ -369,7 +372,6 @@ async function cmdRelease(flags) {
     return;
   }
   fetchOrigin(flags);
-  const holdTriple = flags['keep-branch'] ? requireHoldTriple(flags) : null;
   const outcome = await finalize({ main, policy, entry, markers, sessionId, discardIgnored: flags['discard-ignored'], keepBranch: Boolean(holdTriple), holdTriple });
   if (flags.json) process.stdout.write(`${JSON.stringify(outcome)}\n`);
   if (outcome.quarantined) fail(`quarantined: ${outcome.reason}`, 3);
@@ -388,7 +390,11 @@ async function gatherStatus({ main, policy }) {
 }
 
 function formatRow(w, root) {
-  const hold = w.markers?.hold ? ` hold=${register.parseHold(w.markers.hold).reviewBy}` : '';
+  // census delivers `hold` already parsed ({reason, owner, reviewBy}); a raw string only reaches
+  // here from readMarkers callers, so accept both.
+  const holdValue = w.markers?.hold;
+  const holdObj = holdValue && typeof holdValue === 'object' ? holdValue : (holdValue ? register.parseHold(holdValue) : null);
+  const hold = holdObj ? ` hold=${holdObj.reviewBy ?? '?'}` : '';
   const rel = w.path.replace(/\\/g, '/').replace(`${root.replace(/\\/g, '/')}/`, '');
   return `${w.state.padEnd(11)} ${(w.branch || 'detached').padEnd(44)} ${String(w.ageDays == null ? '?' : `${w.ageDays.toFixed(0)}d`).padStart(4)} ${rel}${hold}${w.reasons.length ? `  (${w.reasons[0]})` : ''}`;
 }
