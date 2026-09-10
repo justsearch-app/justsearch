@@ -876,23 +876,26 @@ function printAdmission(admission, { dryRun, allowIgnored }) {
  * that names this target and still verifies against the live tree. Returns a blocker string or
  * null. Verification failure is a blocker, not a warning: the tree moved after archiving.
  */
-function inspectArchiveManifest({ mainRepoRoot, manifestArg, target }) {
+function inspectArchiveManifest({ mainRepoRoot, manifestArg, target, needed }) {
   if (!manifestArg) {
-    return 'ignored paths are present; they leave only through a verified archive — run '
-      + '`node scripts/dev/worktree-lifecycle.cjs release <path>` or pass --archive-manifest <manifest.json>';
+    return {
+      blocker: `${needed}; it leaves only through a verified archive — run `
+        + '`node scripts/dev/worktree-lifecycle.cjs release <path>` or pass --archive-manifest <manifest.json>',
+      covered: null,
+    };
   }
   const manifestPath = path.resolve(manifestArg);
   let manifest;
   try {
     manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   } catch (err) {
-    return `archive manifest unreadable: ${manifestPath} (${String(err && err.message ? err.message : err)})`;
+    return { blocker: `archive manifest unreadable: ${manifestPath} (${String(err && err.message ? err.message : err)})`, covered: null };
   }
   if (!manifest || typeof manifest !== 'object' || typeof manifest.worktreePath !== 'string') {
-    return `archive manifest ${manifestPath} has no worktreePath`;
+    return { blocker: `archive manifest ${manifestPath} has no worktreePath`, covered: null };
   }
   if (!samePath(manifest.worktreePath, target)) {
-    return `archive manifest ${manifestPath} is for ${manifest.worktreePath}, not ${target}`;
+    return { blocker: `archive manifest ${manifestPath} is for ${manifest.worktreePath}, not ${target}`, covered: null };
   }
   // Loaded lazily: the archive library requires the governance policy file, which a dry-run on a
   // repository without it must not need.
@@ -904,9 +907,37 @@ function inspectArchiveManifest({ mainRepoRoot, manifestArg, target }) {
       verify.mismatched.length ? `changed since archive: ${verify.mismatched.slice(0, 3).join(', ')}` : null,
       (verify.errors || []).length ? `errors: ${verify.errors.slice(0, 2).map((e) => (typeof e === 'string' ? e : e.reason || JSON.stringify(e))).join('; ')}` : null,
     ].filter(Boolean).join('; ');
-    return `archive manifest does not verify (${detail}); re-run release so the archive matches the tree`;
+    return { blocker: `archive manifest does not verify (${detail}); re-run release so the archive matches the tree`, covered: null };
   }
-  return null;
+  const covered = new Set((manifest.files || []).map((f) => String(f.path || '').replace(/\\/g, '/')));
+  return { blocker: null, covered };
+}
+
+/** The path of one `git status --porcelain=v1 -z` entry (`XY path`; a rename's old path is bare). */
+function statusEntryPath(entry) {
+  return (/^.. /.test(entry) ? entry.slice(3) : entry).replace(/\\/g, '/');
+}
+
+const CHANGES_BLOCKER_PREFIX = 'tracked, staged, or untracked changes: ';
+
+/**
+ * Tempdoc 952 §5.5: with a verified archive, tracked/untracked changes are no longer a blocker
+ * PROVIDED every changed path is in the archive (its blob hash was just re-verified against the
+ * tree). Anything not covered stays a blocker. Ignored paths are covered by the same manifest.
+ */
+function applyArchiveCoverage(admission, gate) {
+  if (gate.blocker) {
+    admission.blockers.push(gate.blocker);
+    return;
+  }
+  if (!admission.changes.length) return;
+  const uncovered = admission.changes.map(statusEntryPath).filter((p) => !gate.covered.has(p));
+  if (uncovered.length) {
+    admission.blockers.push(`changes not covered by the archive manifest: ${uncovered.join(', ')}`);
+    return;
+  }
+  admission.blockers = admission.blockers.filter((b) => !b.startsWith(CHANGES_BLOCKER_PREFIX));
+  admission.archiveCoveredChanges = admission.changes.length;
 }
 
 function assertStableAdmission(before, after) {
@@ -955,10 +986,13 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
   // Tempdoc 952 Amendment A: ignored files leave only through a verified archive. A bare
   // `--allow-ignored` used to delete them with the tree; it now needs the manifest that
   // worktree-lifecycle.cjs release wrote, and that manifest must still match the tree.
-  if (admission.ignored.length && options.allowIgnored) {
-    const blocker = inspectArchiveManifest({ mainRepoRoot, manifestArg: options.archiveManifestArg, target: admission.abs });
-    if (blocker) admission.blockers.push(blocker);
-  }
+  const archiveGate = (adm) => {
+    const wantsIgnored = adm.ignored.length && options.allowIgnored;
+    if (!wantsIgnored && !options.archiveManifestArg) return; // classic path: dirty state blocks
+    const needed = wantsIgnored ? 'ignored paths are present' : 'an archive manifest was given';
+    applyArchiveCoverage(adm, inspectArchiveManifest({ mainRepoRoot, manifestArg: options.archiveManifestArg, target: adm.abs, needed }));
+  };
+  archiveGate(admission);
   printAdmission(admission, options);
 
   const runtime = await inspectRuntimeProvenance({ mainRepoRoot, target: admission.abs });
@@ -1024,6 +1058,7 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
     allowIgnored: options.allowIgnored,
   });
   assertStableAdmission(admission, finalAdmission);
+  archiveGate(finalAdmission); // re-verifies the archive against the tree as it is NOW
   if (finalAdmission.blockers.length) fail(`refusing after final admission: ${finalAdmission.blockers.join('; ')}`);
 
   const capturedBranch = admission.entry.branchRef?.replace(/^refs\/heads\//, '') || null;

@@ -59,7 +59,7 @@ function requireGit(args, label, opts) {
 // ---------------------------------------------------------------------------------------------
 
 const FLAG_SPECS = {
-  create: { valued: ['harness', 'session-id'], boolean: ['prepare', 'no-dist'] },
+  create: { valued: ['harness', 'session-id'], boolean: ['prepare', 'no-dist', 'no-fetch'] },
   register: { valued: ['harness', 'session-id', 'fork', 'anchor'], boolean: [] },
   release: { valued: ['session-id', 'reason', 'owner', 'review-by', 'discard-ignored'], boolean: ['own', 'if-clean', 'record-only', 'keep-branch', 'no-fetch', 'json'] },
   hold: { valued: ['reason', 'owner', 'review-by'], boolean: [] },
@@ -246,7 +246,7 @@ async function finalize({ main, policy, entry, markers, sessionId, discardIgnore
   const archivePolicy = archive.loadPolicy(REPO_ROOT);
   const existingRecords = await register.readFinalizations({ mainRepoRoot: main });
   const existing = existingRecords.find((r) => r.ok && r.record.resource === resource)?.record || null;
-  const by = { sessionId: sessionId || 'unknown', ...ownPidIdentity() };
+  const by = { ...ownPidIdentity(), sessionId: sessionId || 'unknown' };
   const claim = register.claimFinalization({ existing, by, now: Date.now() });
   if (!claim.claim) return { done: false, quarantined: true, reason: `finalization already claimed: ${claim.reason}` };
 

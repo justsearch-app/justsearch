@@ -296,6 +296,27 @@ try {
     await fsp.writeFile(path.join(target, 'ignored', 'cache.txt'), 'ignored evidence', 'utf8');
   });
 
+  await check('a verified archive manifest lifts the dirty-state blocker only for the paths it covers (952 §5.5)', async () => {
+    const covered = addWorktree(primary, 'dirty archived', 'codex/936-dirty-archived');
+    await fsp.writeFile(path.join(covered, 'draft.txt'), 'uncommitted draft', 'utf8');
+    const archivedDirty = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: covered, resource: 'dirty-archived', policy: DEFAULT_ARCHIVE_POLICY });
+    assert.equal(archivedDirty.refused, undefined, JSON.stringify(archivedDirty));
+    const ok = runCli(primary, covered, ['--archive-manifest', archivedDirty.manifestPath]);
+    assert.equal(ok.status, 0, ok.output);
+    assert.equal(fs.existsSync(covered), false);
+    assert.equal(git(primary.repo, 'cat-file', '-t', archivedDirty.stateCommit).trim(), 'commit', 'the state commit outlives the tree');
+
+    const partial = addWorktree(primary, 'dirty partial', 'codex/936-dirty-partial');
+    await fsp.writeFile(path.join(partial, 'draft.txt'), 'archived draft', 'utf8');
+    const archivedPartial = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: partial, resource: 'dirty-partial', policy: DEFAULT_ARCHIVE_POLICY });
+    assert.equal(archivedPartial.refused, undefined, JSON.stringify(archivedPartial));
+    await fsp.writeFile(path.join(partial, 'after-archive.txt'), 'never archived', 'utf8');
+    const refused = runCli(primary, partial, ['--archive-manifest', archivedPartial.manifestPath]);
+    assert.equal(refused.status, 1, refused.output);
+    assert.match(refused.output, /not covered by the archive manifest: after-archive\.txt/);
+    assert.equal(fs.existsSync(partial), true);
+  });
+
   await check('an exact external path with spaces removes its captured codex branch, preserves guessed branch and junction target', () => {
     const result = runCli(primary, target, ['--allow-ignored', '--archive-manifest', archiveManifest, '--delete-branch']);
     assert.equal(result.status, 0, result.output);
