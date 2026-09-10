@@ -10,9 +10,9 @@ The main checkout (`F:\JustSearch`) stays on `main` and is never switched.
 ### Creating a worktree
 
 **Within a session** — `EnterWorktree { name: "feature-name" }` creates
-`.claude/worktrees/<name>/` on branch `worktree-<name>` based on local `HEAD`
-(`worktree.baseRef: "head"` — carries your unpushed/just-merged commits,
-tempdoc 618 §1). Make it dev-ready from inside:
+`.claude/worktrees/<name>/` on branch `worktree-<name>` based on a freshly
+fetched `origin/HEAD` (`worktree.baseRef: "fresh"`, tempdoc 940). Make it
+dev-ready from inside:
 `node scripts/dev/prepare-worktree.cjs` (`--no-dist` for FE-only) — it also
 seeds the gitignored `.mcp.json` / `settings.local.json` from their `.example`
 files. Shared models and the shared cuda12 llama-server resolve from the
@@ -71,14 +71,12 @@ the session continues (e.g., merging from main).
    agent's in-progress work. If they block your build, ask the user —
    do not remove them unless the user explicitly approves. <!-- rule:never-delete-untracked-in-main -->
 5. **Always verify a new worktree's base contains the work you expect**
-   before writing code. `worktree.baseRef:"head"` (in `.claude/settings.json`)
-   makes `EnterWorktree`/`--worktree`/subagent worktrees branch from local
-   `HEAD` by construction, but a manual `git worktree add` ignores it and the
-   setting has had harness-version bugs — so assert the base directly:
-   `git log -1 --oneline -- <a file your task depends on>` or grep a known
-   symbol. This converts the silent "building on a stale base" trap (tempdoc
-   618 §1 — local `main` can be dozens of commits ahead of `origin`) into an
-   immediate, legible failure. <!-- rule:verify-worktree-base -->
+   before writing code. `worktree.baseRef:"fresh"` (`.claude/settings.json`)
+   branches `EnterWorktree`/`--worktree`/subagent worktrees from `origin/HEAD`,
+   but a manual `git worktree add` ignores it and the fetch can be skipped — so
+   assert the base directly: `git log -1 --oneline -- <a file your task depends
+   on>` or grep a known symbol. The `worktree-base-hint` hook reports a worktree
+   behind `origin/main` and, loudly, a local `main` ahead of it (tempdoc 940). <!-- rule:verify-worktree-base -->
 
 ## Enforced by native `permissions.deny`
 
@@ -95,10 +93,10 @@ agents' work. Single-file `git checkout -- <path>` is fine. Check `pwd` first.
 
 **Allowed in the main worktree:** `git status`, `git log`, `git diff`,
 `git add`, `git commit`, `git push`, `git merge`, `git worktree`,
-`git fetch`, `git pull`, `git stash`. Branch protection can reject a direct
-`git push` to `main` (confirmed 2026-07, tempdoc 695) — route the change
-through a worktree + PR instead. `git commit` on `main` stays possible
-regardless, so a rejected push can strand local commits ahead of `origin`.
+`git fetch`, `git pull --ff-only`, `git stash`. **Never commit or merge onto local
+`main`** — branch protection rejects direct pushes (tempdoc 695), so such commits are
+stranded until a reset (tempdoc 940: 297 of them). Predictable evasion: "fold it into
+main locally, publish later" — publish from a branch. <!-- rule:never-commit-on-local-main -->
 
 **Warning — `git stash` with staged changes:** Never use `git stash` (especially
 `--keep-index`) to inspect the staging area. Use `git diff --cached --stat`

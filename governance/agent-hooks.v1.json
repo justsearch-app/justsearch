@@ -132,7 +132,7 @@
       "bite": {
         "kind": "unit",
         "test": "scripts/agent-analytics/hooks/worktree-base-hint.test.mjs",
-        "note": "mechanizes verify-worktree-base; tempdoc 727 F-3 extends it with the uncommitted-changes-on-main check, proven by its unit test"
+        "note": "mechanizes verify-worktree-base; tempdoc 727 F-3 adds the uncommitted-changes-on-main check; tempdoc 940 compares the worktree against origin/main (baseRef fresh) and flags a local main that is ahead of origin (stranded commits) — all proven by its unit test"
       }
     }
   },
