@@ -57,6 +57,10 @@ import {
 // dev-stack libs in via `createRequire`, exactly as `otlp-sink-ensure.mjs` already does.
 const require = createRequire(import.meta.url);
 const { gatherAgentSpawnOrientation, describeEntry, resolveCallerSessionId } = require('../dev/lib/agent-spawn-sweep.cjs');
+// Tempdoc 952: the lifecycle census joins the Worktrees table (OWNER/LIFECYCLE columns) instead
+// of adding a section, so session-start output does not grow (952 §5.7, A10).
+const worktreeRegister = require('../dev/lib/worktree-register.cjs');
+const worktreeArchive = require('../dev/lib/worktree-archive.cjs');
 
 const STALE_DAYS_THRESHOLD = 3;
 
@@ -131,6 +135,26 @@ function formatCount(v) {
   return v == null ? '?' : String(v);
 }
 
+/**
+ * Tempdoc 952 §5.7 / A8: the lifecycle detail block, printed only under `--lifecycle` (owner and
+ * metrics runs), never on an ordinary orientation. Pure.
+ */
+export function renderLifecycleDetail(lifecycle) {
+  const lines = ['## Worktree lifecycle (952)', ''];
+  const m = lifecycle.metrics;
+  lines.push(`ownership coverage: ${m.registered}/${m.registered + m.unregisteredUnderRoot} sanctioned worktrees registered (${m.unregisteredUnderRoot} pre-952 or unregistered), ${m.unmanagedOutsideRoot} outside the sanctioned root`);
+  lines.push(`termination latency: ${m.releasedOverGrace} released resource(s) older than ${m.graceHours} h still present of ${m.released} released; ${m.finalizing} finalizing, ${m.quarantined} quarantined`);
+  lines.push(`preservation: ${lifecycle.archives.length} archive(s), ${(lifecycle.archives.reduce((s, a) => s + (a.bytes || 0), 0) / 1048576).toFixed(1)} MB, oldest ${lifecycle.archives.length ? lifecycle.archives[lifecycle.archives.length - 1].createdAt : '-'}`);
+  const obligations = lifecycle.rows.filter((r) => r.state !== 'ACTIVE' && r.state !== 'UNMANAGED');
+  if (obligations.length) {
+    lines.push('', 'obligations:');
+    for (const r of obligations) lines.push(`  - ${r.state} ${r.branch ?? 'detached'} @ ${r.path}${r.reasons?.length ? ` — ${r.reasons[0]}` : ''}`);
+  }
+  for (const f of lifecycle.finalizing) lines.push(`  - FINALIZING ${f.resource}: ${f.readable ? `${f.phase} (lease ${f.lease})` : `unreadable: ${f.reason}`}`);
+  lines.push('');
+  return lines;
+}
+
 /** Render the full report as markdown. Pure — takes the already-gathered `data` object. */
 export function renderMarkdown(data) {
   const lines = [];
@@ -138,14 +162,20 @@ export function renderMarkdown(data) {
   lines.push(`_generated ${data.generatedAt}_`, '');
 
   lines.push('## Worktrees', '');
-  lines.push('| WORKTREE | BRANCH | DIRTY | AHEAD | BEHIND | PUSHED | AGE | VERDICT |');
-  lines.push('|---|---|---|---|---|---|---|---|');
+  lines.push('| WORKTREE | BRANCH | DIRTY | AHEAD | BEHIND | PUSHED | AGE | VERDICT | OWNER | LIFECYCLE |');
+  lines.push('|---|---|---|---|---|---|---|---|---|---|');
   for (const w of data.worktrees) {
     lines.push(
-      `| ${w.name}${w.isMain ? ' [main]' : ''} | ${w.branch} | ${formatCount(w.dirtyCount)} | ${formatCount(w.aheadCount)} | ${formatCount(w.behindCount)} | ${formatBool(w.pushed)} | ${formatAge(w.lastCommitAgeDays)} | ${w.verdict} |`,
+      `| ${w.name}${w.isMain ? ' [main]' : ''} | ${w.branch} | ${formatCount(w.dirtyCount)} | ${formatCount(w.aheadCount)} | ${formatCount(w.behindCount)} | ${formatBool(w.pushed)} | ${formatAge(w.lastCommitAgeDays)} | ${w.verdict} | ${w.owner ?? '-'} | ${w.lifecycle ?? '-'} |`,
     );
   }
   lines.push('');
+  if (data.lifecycle?.available && data.lifecycle.leftoverBranches.length) {
+    lines.push(`lifecycle: ${data.lifecycle.leftoverBranches.length} branch(es) with ownership markers but no worktree: ${data.lifecycle.leftoverBranches.map((b) => `${b.branch} (${b.state})`).join(', ')}`, '');
+  }
+  if (data.lifecycle?.detail) {
+    lines.push(...renderLifecycleDetail(data.lifecycle));
+  }
 
   lines.push('## Live sessions', '');
   if (data.sessions.available) {
@@ -456,10 +486,62 @@ async function gatherAgentSpawns() {
 // Report assembly + CLI.
 // ---------------------------------------------------------------------------------------------
 
-export async function buildReport() {
+/**
+ * Tempdoc 952: the lifecycle census (worktree-register.cjs). Read-only. Policy is read from
+ * SELF_ROOT (the tree this script lives in); the census runs against the shared repository. Any
+ * failure degrades to `{available:false, reason}` like every other gatherer.
+ */
+async function gatherLifecycle({ detail = false } = {}) {
+  try {
+    const mainRoot = mainCheckoutRoot();
+    if (!mainRoot) return { available: false, reason: 'main checkout root unknown' };
+    const policy = worktreeRegister.loadPolicy({ repoRoot: SELF_ROOT });
+    const census = await worktreeRegister.census({ mainRepoRoot: mainRoot, repoRoot: SELF_ROOT, policy });
+    const rows = [...census.worktrees, ...census.unmanaged];
+    const byPath = new Map(rows.map((r) => [path.resolve(r.path).toLowerCase(), r]));
+    const graceHours = policy.thresholds?.orphanGraceHours ?? 24;
+    const now = Date.now();
+    const releasedRows = census.worktrees.filter((r) => r.state === 'RELEASED');
+    const metrics = {
+      registered: census.worktrees.length,
+      unregisteredUnderRoot: census.unmanaged.filter((r) => (r.reasons || []).some((x) => /no branch ownership markers/.test(x))).length,
+      unmanagedOutsideRoot: census.unmanaged.filter((r) => (r.reasons || []).some((x) => /outside the sanctioned/.test(x))).length,
+      released: releasedRows.length,
+      releasedOverGrace: releasedRows.filter((r) => r.markers?.released && now - Date.parse(r.markers.released) > graceHours * 3600 * 1000).length,
+      graceHours,
+      finalizing: census.finalizing.length,
+      quarantined: census.worktrees.filter((r) => r.state === 'QUARANTINED').length,
+    };
+    let archives = [];
+    if (detail) {
+      try { archives = worktreeArchive.listArchives({ mainRepoRoot: mainRoot, policy: worktreeArchive.loadPolicy(SELF_ROOT) }); } catch { archives = []; }
+    }
+    return { available: true, detail, byPath, rows, leftoverBranches: census.leftoverBranches, finalizing: census.finalizing, metrics, archives };
+  } catch (err) {
+    return { available: false, reason: String(err?.message || err).slice(0, 200) };
+  }
+}
+
+function ownerLabel(row) {
+  if (!row?.markers) return null;
+  const session = row.markers.session ? String(row.markers.session).slice(0, 8) : '?';
+  return `${row.markers.harness || '?'}:${session}`;
+}
+
+export async function buildReport({ lifecycleDetail = false } = {}) {
+  const [worktrees, lifecycle] = await Promise.all([gatherWorktrees(), gatherLifecycle({ detail: lifecycleDetail })]);
+  if (lifecycle.available) {
+    for (const w of worktrees) {
+      const row = lifecycle.byPath.get(path.resolve(w.path).toLowerCase());
+      if (!row) continue;
+      w.owner = ownerLabel(row);
+      w.lifecycle = row.state;
+    }
+  }
   return {
     generatedAt: new Date().toISOString(),
-    worktrees: await gatherWorktrees(),
+    worktrees,
+    lifecycle: lifecycle.available ? { ...lifecycle, byPath: undefined } : lifecycle,
     sessions: gatherSessions(),
     tempdocNumbers: gatherTempdocNumbers(),
     stack: gatherStack(),
@@ -473,7 +555,7 @@ export async function buildReport() {
 
 async function main() {
   const jsonMode = process.argv.includes('--json');
-  const data = await buildReport();
+  const data = await buildReport({ lifecycleDetail: process.argv.includes('--lifecycle') });
   if (jsonMode) {
     console.log(JSON.stringify(data, null, 2));
   } else {
