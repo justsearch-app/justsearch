@@ -425,3 +425,71 @@ index-half invariant and do not restore the split-JVM instruction.
   integration/system source sets too. Final XML is tmp/c1-batch2-xml/full-suite-green; the final
   evidence map and live compact-model plumbing proof are in evidence/C1/batch-2.md. This does not
   establish standard-model quality or C1 admission/executor behavior, which later batches own.
+
+## D1 re-grounding (2026-09-10, at 4229f1091 plus the C2 design commit 90843f475)
+
+Every Stage D citation above, and every citation in the 2026-09-09 draft of `stages/D1.md`, was
+re-resolved by content in four read-only audits; the complete tables with file:line at
+`4229f1091` are in `evidence/D1/regrounding-2026-09-10.md` and `stages/D1.md` section 0 lists the
+findings that change an item. The facts that supersede entries in this file:
+
+- `KnowledgeServer.swapRuntime` is now `:1336-1366`, still close-then-open, under the C1
+  `runtimeSwapLock` (`:137`) with `closeStarted` refusals (`:1343`, `:1346`); `close()` takes the
+  lock with a five-second `tryLock` (`:2240-2247`) and retains the server on timeout. The
+  same-directory handle-leak comment is `:724-729`; the resumed Blue/Green open is `:731-741`.
+  `RunningRuntime.drainAndClose` no longer closes on timeout: it retains and throws
+  (`RunningRuntime.java:215-221`).
+- The cutover's restart is `KnowledgeServerMigrationOps.java:276` (promote `:267-268`, evidence
+  `:273`); the failed-unit gate `:203-214`; the unreadable-count swallow `:195-202`;
+  `abandonBuildingGeneration` is never called there.
+- `switch_buffer` DDL is `SqliteSchema.java:107-114`; `IngestSwitchBufferOps.isSwitching` is
+  `:62-75` and opens for `SWITCHING` only; payloads are versioned for UPSERT and SYNC_ROOT, raw
+  strings for DELETE; the primary key coalesces per path.
+- `IndexGenerationManager` protects three generations (`:1126-1131`); `abandonBuildingGeneration`
+  `:302-341` has one caller (`KnowledgeServer.java:875`); `pruneMarkedForDeletionBestEffort`
+  `:1004-1040` is reached only through `gcBestEffort` from `MigrationControlOps.java:211`.
+- `max_failed_jobs`: `ResolvedConfigBuilder.java:1503` (-1), `KnowledgeServer.java:210` (-1).
+- `InferenceLifecycleManager.applyConfig` is `:684-851`; the server stops at `:783-787`, `config`
+  is assigned at `:789` (restart) and `:750` (no restart) before the VRAM gate `:791-811` and the
+  health check `:817-818`; `applyConfigRollback` `:865-919`. `setStopServerOnClose` exists
+  (`:1462-1464`, driven from `HeadlessApp.java:1436`). `applyConfig` is reachable only from
+  `OnlineAiServiceImpl:100,163` (`core.reload-inference`, `AdminInferenceReloadHandlers`,
+  `RuntimeActivationService.java:1130`), never from the settings path.
+- `NativeSessionHandle.close()` `:552-577` takes no permit; `closed` `:135` is write-only;
+  `acquireCpu` `:511-514` releases nothing; `getCpuSession` `:596-616` closes a shared session at
+  `:606`; GPU acquisition is interruptible at `:289-308`.
+- `IndexFingerprint.Inputs` `:213-224` has eleven fields; `MODEL_INPUT_KEYS` `:118-119` has three
+  (no BGE-M3); the providers are statics installed at `KnowledgeServer.java:657-667`; chunking
+  is `ChunkSplitter` constants via `SsotCommitMetadataSource.java:191-195`.
+- `gpu-bridge` is on `app-engine`'s compile classpath through `app-services`' `api` edge
+  (`app-services/build.gradle.kts:31`, `app-engine/build.gradle.kts:9`); the worker and ort modules
+  cannot see it. There is no model-registry schema test; `ModelPackage.minVramBytes` is `:63`.
+- `ReadinessDimension` names one composite per dimension (`:14-22,29,36`); there is no `api`
+  dimension; the snapshot's `head` slot is hardcoded ready (`StatusLifecycleHandler.java:1289-1290`);
+  `computeLifecycleSnapshot` `:1285-1356` prefers the manifest lifecycle (`:1345-1350`), the third
+  representation, derived by `LifecycleProjection.derive` (`:31`).
+- `LifecycleReasonCode` has 55 members, 16 `WORKER_*` (`:19-63`); the gate honours
+  `noWordingExempt` (10 entries) besides `feDerived`; no MCP tool exposes the codes.
+- Essential-ready is `dev-runner.cjs:1373-1378` and `engine_probe.rs:61-77`, four fields each;
+  `engine-supervisor.cjs` has none. `EngineExit` constants `:41,58,66,78,81`; no code 5.
+- `KnowledgeServerHealthMonitor` is a registered single-timer owner (`:91`, `:81`, `:204-238`,
+  `:251-273`, rollback at `HeadlessApp.java:634-643`); the boot arm is `:356-613`.
+- `POST /api/worker/restart` (`InferenceHandlers.java:643-687`) routes to the recovery authority
+  (`:698-734`) when no client is bound; `structuredData.port` has no production consumer;
+  `core.restart-worker` is also declared at `CoreSurfaceCatalog.java:285`.
+- The `config-surface` gate ratchets three scalars from a gitignored JSON (`enforcer.mjs:113`,
+  `:110,248,56`); the matrix has 304 rows; `LifecycleStage` is `EnvRegistry.java:1458-1462`.
+- `operation-surfaces.v1.json` is a projection register over `IndexingJobLifecycle` and
+  `ActionEvent` (41 rows, lineage rule at `enforcer.mjs:99-116`); `OperationExecutorImpl.dispatch`
+  `:316-393` has no admission step; `OperationOutcome` is `SUCCESS, FAILURE, UNDONE`.
+- `EngineRoot` constructs `resources`, `admission`, `executors` at `:52-55` and hands `executors`
+  to both halves (`:224`, `:250`); `GpuSchedulingGauge` is created in
+  `KnowledgeServerBootstrap.java:102-103`. `RetainedStateBudget.tryAcquire` returns
+  `Optional<Permit>`; no production producer exists for any kind; `EngineResourcePolicyTest:25-38`
+  is the drift check. `EngineAdmissionController.cancelInteractive` filters `INTERACTIVE` only
+  (`:167-168`); `freezeAdmission` lives on `OperationLeaseService.java:70`.
+- `modules/system-tests` `integrationTest` is capped at 30 minutes (`build.gradle.kts:220-226`)
+  and lists the scenario modules as inputs (`:180-183`); `EngineLifecycleE2ETest` does not exist.
+- `LuceneRuntimeTypes.BuildState` is `{BUILDING, COMPLETE}` and is a commit marker set by
+  `CommitOps.commitWithBuildState` (`:152-155`), already used at cutover
+  (`KnowledgeServerMigrationOps.java:241-246`); no reopen is needed to make a generation active.
