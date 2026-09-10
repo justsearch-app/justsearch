@@ -1,6 +1,6 @@
 # Pinned dependency versions for model build scripts.
 # Install: pip install -r scripts/models/requirements.txt
-onnx==1.18.0
+onnx==1.22.0
 onnxruntime==1.22.0
 numpy>=1.26.0,<2.0
 transformers==4.57.6
