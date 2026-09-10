@@ -2,7 +2,10 @@
  * lib/ledger/codex-adapter.test.mjs — unit tests for the Codex CLI ledger
  * adapter (tempdoc 886 §12 PR 1, independent-review fix-up), run against the
  * synthetic fixture rollout at `scripts/agent-analytics/fixtures/codex/` (no
- * real prompts/paths).
+ * real prompts/paths). `fixtures/codex/native/` is a SECOND, separate
+ * `codexHome` holding the A8 `token_usage_record` rollouts (tempdoc 951); it
+ * sits outside `fixtures/codex/sessions/` so the legacy-only expectations
+ * above keep discovering exactly one session.
  *
  * Run with: `node scripts/agent-analytics/lib/ledger/codex-adapter.test.mjs`
  */
@@ -529,6 +532,180 @@ run('a genuine thrown error during entry processing PROPAGATES, is not swallowed
     },
   ];
   assert.throws(() => processCodexEntries(throwingEntries, { file: 'throwing.jsonl' }), /boom - simulated parse-time exception/);
+});
+
+// --- A8: native token_usage_record stream -----------------------------------
+
+const NATIVE_FIXTURE_HOME = path.join(FIXTURE_CODEX_HOME, 'native');
+const native = listCodexCalls({ codexHome: NATIVE_FIXTURE_HOME });
+const gapSession = native.sessions.find((s) => s.sessionId === 'fixture-codex-native-gap');
+const gapCalls = native.calls.filter((c) => c.sessionId === 'fixture-codex-native-gap');
+const dupeSession = native.sessions.find((s) => s.sessionId === 'fixture-codex-native-dupe');
+const dupeCalls = native.calls.filter((c) => c.sessionId === 'fixture-codex-native-dupe');
+
+run('the native fixture home yields two sessions, both on the native usage stream', () => {
+  assert.equal(native.sessions.length, 2);
+  assert.deepEqual(native.skipped, []);
+  assert.equal(gapSession.selfCheck.usageSource, 'native');
+  assert.equal(dupeSession.selfCheck.usageSource, 'native');
+});
+
+run('every native Call passes the neutral Call shape check', () => {
+  for (const c of native.calls) assert.ok(isCall(c), `not a valid Call: ${JSON.stringify(c)}`);
+});
+
+run('one Call per distinct token_usage_record, none from token_count', () => {
+  // 3 native records, but only 2 token_count events -- the legacy path would
+  // have produced 2 Calls here, so a count of 3 proves the native stream owns
+  // Call creation and that the streams are not summed (which would give 5).
+  assert.equal(gapCalls.length, 3);
+  assert.equal(gapSession.selfCheck.nativeRecords, 3);
+  assert.equal(gapSession.selfCheck.nativeDuplicatesDropped, 0);
+});
+
+run('native context total equals the sum of the distinct records input_tokens', () => {
+  const nativeInput = gapCalls.reduce((sum, c) => sum + c.contextTokens, 0);
+  assert.equal(nativeInput, 1000 + 2500 + 500);
+  // and fresh + cacheRead reconstructs it, per A1
+  const reconstructed = gapCalls.reduce((sum, c) => sum + c.tokens.fresh + c.tokens.cacheRead, 0);
+  assert.equal(reconstructed, nativeInput);
+});
+
+run('the compaction-gap record is exactly the native-vs-legacy input difference', () => {
+  // selfCheck.deltaInputSum still reports what the legacy token_count stream
+  // would have summed; the ONE response with no token_count notification (the
+  // compaction summarizer, input 2500) is the whole difference.
+  const nativeInput = gapCalls.reduce((sum, c) => sum + c.contextTokens, 0);
+  assert.equal(gapSession.selfCheck.deltaInputSum, 1000 + 500);
+  assert.equal(nativeInput - gapSession.selfCheck.deltaInputSum, 2500);
+});
+
+run('compactionBoundary lands on the first native record AFTER the compacted line', () => {
+  assert.equal(gapCalls[0].compactionBoundary, false);
+  // the summarizer response PRECEDES the compacted line, so it is not the boundary
+  assert.equal(gapCalls[1].compactionBoundary, false);
+  assert.equal(gapCalls[1].contextTokens, 2500);
+  assert.equal(gapCalls[2].compactionBoundary, true);
+  assert.equal(gapCalls[2].contextTokens, 500);
+  for (const c of gapCalls) assert.equal(c.synthetic, false, 'every native Call is real, not synthetic');
+});
+
+run('native Calls carry turn_context model/effort, sequential callIds, and a null cache-write axis', () => {
+  assert.equal(gapCalls[0].tokens.fresh, 1000 - 400);
+  assert.equal(gapCalls[0].tokens.cacheRead, 400);
+  assert.equal(gapCalls[0].tokens.output, 60);
+  assert.equal(gapCalls[0].tokens.reasoning, 10);
+  assert.equal(gapCalls[0].tokens.cacheWrite5m, null);
+  assert.equal(gapCalls[0].tokens.cacheWrite1h, null, 'cache_write_input_tokens is not a billable Codex axis');
+  assert.equal(gapCalls[0].model, 'gpt-5.5');
+  assert.equal(gapCalls[0].reasoningEffort, 'high');
+  assert.equal(gapCalls[0].provider, 'openai');
+  assert.equal(gapCalls[0].project, 'F:\\FixtureProject');
+  assert.deepEqual(gapCalls.map((c) => c.callId), [
+    'fixture-codex-native-gap:0', 'fixture-codex-native-gap:1', 'fixture-codex-native-gap:2',
+  ]);
+});
+
+run('a duplicate token_count notification does not double count on the native path', () => {
+  // two identical token_count events describe the SAME single native response
+  assert.equal(dupeCalls.length, 1);
+  assert.equal(dupeCalls[0].contextTokens, 700);
+  assert.equal(dupeCalls[0].tokens.fresh, 700 - 300);
+  assert.equal(dupeSession.selfCheck.nativeRecords, 1);
+  // the legacy A2 diagnostics still run on the native path
+  assert.equal(dupeSession.selfCheck.repeatsDropped, 1);
+  assert.equal(dupeSession.selfCheck.deltaInputSum, 700);
+});
+
+run('selfCheck keeps every legacy key and adds the A8 keys', () => {
+  assert.deepEqual(Object.keys(gapSession.selfCheck).sort(), [
+    'deltaInputSum', 'maxCumulativeInput', 'nativeDuplicatesDropped',
+    'nativeRecords', 'repeatsDropped', 'resets', 'usageSource',
+  ]);
+  assert.equal(gapSession.selfCheck.maxCumulativeInput, 1000);
+  assert.equal(gapSession.selfCheck.resets, 1, 'the post-compaction cumulative drop is still counted');
+});
+
+run('the legacy-only fixture stays on the legacy path with no native records', () => {
+  assert.equal(sessions[0].selfCheck.usageSource, 'legacy');
+  assert.equal(sessions[0].selfCheck.nativeRecords, 0);
+  assert.equal(sessions[0].selfCheck.nativeDuplicatesDropped, 0);
+  assert.equal(calls.length, 3, 'legacy Call construction is unchanged');
+});
+
+run('a "compacted" line last on the native path still emits the synthetic boundary call', () => {
+  const entries = [
+    { timestamp: '2026-09-09T01:00:00.000Z', type: 'session_meta', payload: { id: 'native-orphan-boundary', cwd: 'F:\\Orphan', model_provider: 'openai' } },
+    { timestamp: '2026-09-09T01:00:01.000Z', type: 'turn_context', payload: { model: 'gpt-5.5', effort: 'high' } },
+    {
+      timestamp: '2026-09-09T01:00:02.000Z', type: 'token_usage_record',
+      payload: { response_id: 'resp-orphan-1', usage: { input_tokens: 300, cached_input_tokens: 50, output_tokens: 20, reasoning_output_tokens: 0, total_tokens: 320 } },
+    },
+    { timestamp: '2026-09-09T01:00:03.000Z', type: 'compacted', payload: { message: '', replacement_history: [] } },
+  ];
+  const result = processCodexEntries(entries, { file: 'native-orphan.jsonl' });
+  assert.equal(result.calls.length, 2, 'the real native call plus one synthetic boundary call');
+  assert.equal(result.calls[0].synthetic, false);
+  assert.equal(result.calls[1].synthetic, true);
+  assert.equal(result.calls[1].compactionBoundary, true);
+  assert.equal(result.calls[1].contextTokens, 0);
+  assert.equal(result.calls[1].callId, 'native-orphan-boundary:1');
+  assert.equal(result.session.selfCheck.usageSource, 'native');
+});
+
+run('a duplicate response_id is dropped first-wins and counted', () => {
+  const record = (responseId, inputTokens) => ({
+    timestamp: '2026-09-09T02:00:00.000Z', type: 'token_usage_record',
+    payload: { response_id: responseId, usage: { input_tokens: inputTokens, cached_input_tokens: 0, output_tokens: 1, reasoning_output_tokens: 0, total_tokens: inputTokens + 1 } },
+  });
+  const entries = [
+    { timestamp: '2026-09-09T02:00:00.000Z', type: 'session_meta', payload: { id: 'native-dupe-id', cwd: 'F:\\Dupe', model_provider: 'openai' } },
+    record('resp-same', 100),
+    record('resp-same', 999),
+    record('resp-other', 40),
+  ];
+  const result = processCodexEntries(entries, { file: 'native-dupe-id.jsonl' });
+  assert.equal(result.calls.length, 2);
+  assert.equal(result.calls[0].contextTokens, 100, 'first record for a response_id wins');
+  assert.equal(result.calls[1].contextTokens, 40);
+  assert.equal(result.session.selfCheck.nativeRecords, 2);
+  assert.equal(result.session.selfCheck.nativeDuplicatesDropped, 1);
+});
+
+run('a token_usage_record missing usage or response_id is ignored and does not switch the path', () => {
+  const entries = [
+    { timestamp: '2026-09-09T03:00:00.000Z', type: 'session_meta', payload: { id: 'native-unusable', cwd: 'F:\\Unusable', model_provider: 'openai' } },
+    { timestamp: '2026-09-09T03:00:01.000Z', type: 'turn_context', payload: { model: 'gpt-5.5' } },
+    { timestamp: '2026-09-09T03:00:02.000Z', type: 'token_usage_record', payload: { response_id: 'resp-no-usage' } },
+    { timestamp: '2026-09-09T03:00:03.000Z', type: 'token_usage_record', payload: { usage: { input_tokens: 5000, cached_input_tokens: 0, output_tokens: 1, reasoning_output_tokens: 0, total_tokens: 5001 } } },
+    {
+      timestamp: '2026-09-09T03:00:04.000Z', type: 'event_msg',
+      payload: { type: 'token_count', info: {
+        last_token_usage: { input_tokens: 90, cached_input_tokens: 9, output_tokens: 4, reasoning_output_tokens: 1, total_tokens: 94 },
+        total_token_usage: { input_tokens: 90, cached_input_tokens: 9, output_tokens: 4, reasoning_output_tokens: 1, total_tokens: 94 },
+      } },
+    },
+  ];
+  const result = processCodexEntries(entries, { file: 'native-unusable.jsonl' });
+  assert.equal(result.session.selfCheck.usageSource, 'legacy');
+  assert.equal(result.session.selfCheck.nativeRecords, 0);
+  assert.equal(result.calls.length, 1, 'the legacy token_count still produces its Call');
+  assert.equal(result.calls[0].contextTokens, 90, 'the unusable record contributes nothing');
+});
+
+run('a native record with no token_count anywhere still produces Calls', () => {
+  const entries = [
+    { timestamp: '2026-09-09T04:00:00.000Z', type: 'session_meta', payload: { id: 'native-only', cwd: 'F:\\NativeOnly', model_provider: 'openai' } },
+    {
+      timestamp: '2026-09-09T04:00:01.000Z', type: 'token_usage_record',
+      payload: { response_id: 'resp-only-1', usage: { input_tokens: 120, cached_input_tokens: 20, output_tokens: 7, reasoning_output_tokens: 2, total_tokens: 129 } },
+    },
+  ];
+  const result = processCodexEntries(entries, { file: 'native-only.jsonl' });
+  assert.equal(result.calls.length, 1);
+  assert.equal(result.calls[0].tokens.fresh, 100);
+  assert.equal(result.session.selfCheck.deltaInputSum, 0, 'no token_count events to diagnose');
+  assert.equal(result.session.selfCheck.usageSource, 'native');
 });
 
 // --- report ------------------------------------------------------------------
