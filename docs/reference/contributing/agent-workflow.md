@@ -18,7 +18,11 @@ publishing a component, or answering a status question, continue the next
 authorized step. Use session-closeout when the requested scope is complete, the
 user pauses or requests a handoff, or every useful next action depends on an
 external decision or unavailable resource. An internal defect to investigate is
-remaining work, not automatically a reason to wait for the user.
+remaining work, not automatically a reason to wait for the user. A worktree is a
+registered resource with a termination obligation (tempdoc 952): when its scope
+is complete, release it (`node scripts/dev/worktree-lifecycle.cjs release`) or
+record a hold with an owner and review date; never leave it as an ownerless
+directory for a later session to judge.
 
 Record explicit user decisions once in the active work record, including their
 scope. Preserve them across compaction; do not re-request existing authorization.

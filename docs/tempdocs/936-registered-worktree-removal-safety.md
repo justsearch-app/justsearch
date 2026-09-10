@@ -1,6 +1,6 @@
 ---
 title: Registered worktree removal safety
-status: active
+status: CLOSED into 952 (2026-09-10) — remove-worktree.cjs remains the only deletion primitive with every refusal invariant below; tempdoc 952 gives it an owner (registration, receipts, archive-before-delete, reconciler) and supersedes the "no lifecycle database / verification is an operator responsibility" stance within 952's scope
 ---
 
 # 936: Registered worktree removal safety

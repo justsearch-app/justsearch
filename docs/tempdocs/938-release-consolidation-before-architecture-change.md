@@ -330,7 +330,7 @@ Ordered. AGENT = an agent can do it in a PR; OWNER = needs the owner's hands or 
    environment when the run pauses; watch the draft → publish sequence.
 10. **AGENT: post-publish** — README asset line/link/SHA (`README.md:35-47`), dispatch
     `update-preserves-models.yml` against v0.2.0 → candidate.
-11. **Consolidation hygiene, any time:** delete the landed/stale branches and worktrees listed
+11. **Consolidation hygiene — DONE 2026-09-10 (tempdoc 952 audit: 176→35 local branches, 53→24 worktrees, everything archived to a bundle; #622 closed; #404 left open pending the ResultsCard salvage decision):** delete the landed/stale branches and worktrees listed
     in §D; close #404; decide #644/#622/#653; publish or drop the local-only 908 tempdoc; the
     active Codex lanes (919, 888, 897) are in flight — leave them, they do not gate the release.
 
