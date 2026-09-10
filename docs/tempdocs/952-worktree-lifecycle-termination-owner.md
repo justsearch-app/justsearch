@@ -1,6 +1,6 @@
 ---
 title: Worktree and branch lifecycle — a durable termination owner
-status: DESIGNED (2026-09-10) — cause confirmed by audit and external research; backlog cleaned; decisions taken; design §5 settled on Git-native ownership markers + bounded finalization record; next /derisk, /plan
+status: IMPLEMENTING phase 1 (2026-09-10) — design §5 with amendments A-D from derisk §10 (confidence 7/10); plan §11 P1-P9; publication requires owner go-ahead and PR #699 first
 related:
   - 936-registered-worktree-removal-safety   # made remove-worktree.cjs usable; this tempdoc gives it an owner
   - 940-local-main-realignment               # lives only on branch worktree-940-worktree-base-fresh (PR #699, unmerged); baseRef head→fresh is a prerequisite
@@ -373,7 +373,47 @@ ORPHANED after the grace, archived, removed only in execute mode). Gates:
 `check-tempdoc-numbers`, `check-tempdoc-size`, `npm run lint:scripts`, hook-integrity,
 `check-codex-agent-parity`, `check-always-loaded-budget`, `regen-all --check`.
 
-## 9. Index (dated)
+## 10. Derisk (2026-09-10)
+
+Probes run in this worktree, read-only against the repository; scripts kept under `tmp/`
+(gitignored): `receipt-probe.mjs`, `archive-probe.mjs`, `ignored-size-probe.mjs`.
+
+| # | Uncertainty | Result | Design consequence |
+|---|---|---|---|
+| D1 | Receipt test on real history | `lane-F-0b` vs squash #717 → LANDED; `lane-F` vs squash #708 (main later edited the same jseval files) → LANDED; `hook-wiring-repair` vs `origin/main` → NOT-EQUAL (refused); `lane-F-0b` vs today's `origin/main` → REDUNDANT_NOW. `gh pr list --json headRefOid,mergeCommit` returns both fields for merged PRs whose remote branch is gone. | §5.3 stands unchanged |
+| D2 | Temporary-index archive on Windows | Modified tracked file, untracked file and an ignored file under `tmp/` archived into one commit at `refs/archive/<r>/state` with `node_modules/` excluded by pathspec; restored into a detached worktree; source tree untouched; conditional `update-ref -d` with expected value works | §5.5 mechanism stands |
+| D3 | Size of ignored, non-cache content | 15 of 24 worktrees have 0-4 MB; but `lane-F-A` 4.3 GB, `888-takeover` 473 MB, `lane-F` 230 MB, `lane-F-0b` 174 MB, all under `tmp/*` run and evidence data; `.mypy_cache` showed up as non-cache | **Amendment A**: ignored files are archived only up to a per-file cap (default 8 MB) or when matching declared-valuable globs; larger ignored paths are listed with sizes in the manifest and the release REFUSES unless `--discard-ignored` names them or they match declared-disposable globs (`tmp/**` run data). Declared caches gain `.mypy_cache/`, `__pycache__/`, `.pytest_cache/`. The researcher's "exclude only declared caches" is too strict for this repository's evidence habit |
+| D4 | Worktree lock as ownership marker | Only the two live Claude sessions hold locks; every kept worktree from an ended session is unlocked, so lock presence = "a harness session holds it". Observed reason `claude session <name> (pid N)` differs from the documented `session-<id>-<user>` grammar | **Amendment B**: lock presence and pid are liveness hints only; ownership identity comes from the repository's own markers (branch config, written at `WorktreeCreate`/`create`); the reconciler never rewrites a harness lock |
+| D5 | Harness worktree events | Official docs: `WorktreeCreate` and `WorktreeRemove` hook events exist with `worktree_path`, `worktree_lock_reason`, `git_repo_root`; SessionEnd fires **before** Claude's own worktree removal; SessionEnd input has `cwd` (the worktree) and `end_reason`; a hook removing the worktree before Claude does is undocumented | **Amendment C**: registration on `WorktreeCreate` (silent, exit 0) plus PostToolUse `EnterWorktree` for entering existing trees; on SessionEnd the Claude path runs `release --own --record-only` (marker + receipt, no removal) and lets Claude's exit path remove; `WorktreeRemove` records the removal; the Codex path (no such events, hooks via the adapter with `repoRoot` = the worktree the hook script lives in) runs the full `release --own --if-clean`. Anything left behind is the reconciler's |
+| D6 | Per-branch git config with hyphenated keys | set/get/regexp/unset work (`branch.<name>.justsearch-fork`) | §5.2 stands |
+| D7 | Substrate APIs | `process-record.cjs` exports `resolveRegisterDir(mainRepoRoot, dirName)`, `readRegister({dir, validateRecord})`, `writeRecordAtomic(path, record)`; `.codex/hooks.json` already carries SessionEnd; GNU tar 1.35 present but not needed (git objects suffice) | third scope `worktrees/` as planned |
+| D8 | Always-loaded budget | `branch-safety.md` is 12421 B against a 12431 B ceiling; the Cleanup subsection (450 B) and step 5 (592 B) are the only byte source: 1042 B for the release step plus the janitor clause | A10 is tight but feasible; measure before commit |
+| D9 | Overlap with PR #699 | #699 touches `branch-safety.md` hunks at lines 10, 53-66 (rules 1-5), 95, 205; 952 edits Cleanup (44-52, adjacent) and step 5 (~160) | **Amendment D**: merge `origin/worktree-940-worktree-base-fresh` into the 952 branch before editing rules; identical hunks merge clean when #699 lands first; the 952 PR body must say "#699 first" |
+| D10 | `remove-worktree.cjs` extension points | `main()` sequence is admission → runtime → helper inspection → dry-run exit → re-probe → consult → final admission → delete → registration → branch → merge link. The archive phase slots between final admission and delete; the receipt slots before branch deletion; `--allow-ignored` is read at admission | plan P5 |
+
+Not probed (accepted, with mitigation): a Codex non-interactive live run of create/release (mitigation: the Codex path is the same script with no harness-specific branch; unit-tested; live parity recorded as a deferred acceptance item until a Codex session is available); a real crash mid-finalization (mitigation: phase resume is unit-tested with a synthetic torn record).
+
+**Confidence for the remaining work: 7/10.** The three mechanisms with genuine novelty (receipt, archive, markers) are proven on this repository's real history and Windows filesystem. The residual risk is integration breadth: two harness trees, a ratcheted rule budget, hook-integrity bites for two new hooks, and the exact Claude exit interaction, which no doc pins down and which the record-only Claude path sidesteps rather than resolves.
+
+**Difficulty and model.** Medium-high in breadth, low-medium in depth. Library pieces (P2-P4) are bounded and test-driven: `opus` workers at medium effort, or `sonnet` for P2 whose fixtures are fully specified. CLI integration into `remove-worktree.cjs` (P5), hooks (P6) and the rule/skill/doc pass (P8) need the parent (this session) because they touch shared surfaces and the budget. Recommended: orchestrator on the current model; P2-P4 delegated to `opus`; P5-P9 in the main loop.
+
+## 11. Plan (phase 1; phase 2 is a config flip after two weeks of A8/A10 data)
+
+| Chunk | Deliverable | Acceptance check | Owner |
+|---|---|---|---|
+| P1 | `governance/worktree-lifecycle.v1.json`: sanctioned root, thresholds (§3.7), declared caches (+ D3 additions), ignored per-file cap, valuable/disposable globs, `executeOnSchedule: false`; `consult-register.v1.json` region `worktree-lifecycle` | JSON loads; region lists the files of P2-P8; `docs-validate` green | parent |
+| P2 | `scripts/dev/lib/landing-receipt.cjs` + `.test.mjs`: PR lookup (`gh pr list --head … --json number,headRefOid,mergeCommit` via `run-gh.mjs` pass-through), base selection, controlled `merge-tree`, verdict, NDJSON cache in `tmp/agent-telemetry/landing-receipts.ndjson` (`telemetry-io` constant), reachability check | six researcher experiments as synthetic-repo fixtures + a "moved head" case; all verdicts exact; `UNKNOWN` on any git failure | delegate (opus) |
+| P3 | `scripts/dev/lib/worktree-archive.cjs` + test: tip ref, temp-index state commit, ignored policy (cap, valuable, disposable), manifest with sizes and hashes, verify, restore into detached worktree, cleanup | archive-probe scenarios as fixtures; refusal on oversized ignored without `--discard-ignored`; verify detects a tampered blob | delegate (opus) |
+| P4 | `scripts/dev/lib/worktree-register.cjs` + test: branch-config markers, lock parsing as hints, finalization record scope `worktrees/` on `process-record.cjs`, state derivation from `git worktree list --porcelain`, refs, session ledger (`ownership-verdict.readSessionActivity`), `process-identity`; census of leftovers | state matrix fixtures incl. foreign lock, missing directory, unregistered root, stale ledger with live pid; reading never writes | delegate (opus) |
+| P5 | `scripts/dev/worktree-lifecycle.cjs` CLI (`create`, `register`, `release [--own] [--if-clean] [--record-only] [--discard-ignored …]`, `hold --reason --owner --review-by`, `status`, `reconcile [--execute]`); `remove-worktree.cjs`: archive phase before delete, receipt-gated branch deletion by default, `--keep-branch`, new `--allow-ignored` semantics, `--session-id` default from `resolveCallerSessionId` | `936-remove-worktree-cli.test.mjs` extended, all 23 existing cases still pass; new CLI test file; `npm run lint:scripts` | parent |
+| P6 | Hooks `worktree-register.mjs` (WorktreeCreate + PostToolUse EnterWorktree, telemetry role, unit bite) and `worktree-release.mjs` (SessionEnd, both harnesses, record-only under Claude, full under Codex); manifest entries; `regen-all --only agent-hooks-wiring,codex-hooks` | hook-integrity gate green; `check-codex-agent-parity`; bites run | parent |
+| P7 | `world-state.mjs`: lifecycle gatherer, `OWNER`/`LIFECYCLE` columns, verdict from lifecycle state, `--lifecycle` metrics block | existing world-state tests + new gatherer test; row count unchanged | parent |
+| P8 | Docs and prompt surfaces: merge #699 branch in; `branch-safety.md` (Cleanup + step 5 → release step + janitor clause, net bytes ≤ 1042); `common-workflows.md` §Worktree mechanics; `agent-workflow.md` release step; Codex how-to; skills takeover/publish/session-closeout in both trees; `skills-sync.mjs`; 936 status → closed into 952; 938 item 11 → done; 861 §6.4 note that worktree-teardown consults receipts | `check-always-loaded-budget`, `docs-validate`, `skills-sync --check`, parity check | parent |
+| P9 | Verification: `npm run lint:scripts`, `node scripts/agent-analytics/run-all-tests.mjs`, hook-integrity, `regen-all --check`, live create → release → reconcile in this Claude session on a throwaway worktree, crash simulation via a synthetic torn finalization record; Codex live parity recorded as deferred | acceptance table in §7 reconciled with evidence | parent |
+
+Ordering: P1 → (P2 ∥ P3 ∥ P4) → P5 → P6 → P7 → P8 → P9. Delegated chunks work in this worktree on disjoint new files and make no git writes; the parent reviews, runs tests, commits.
+
+## 12. Index (dated)
 
 - 2026-09-10 — Audit of 175 branches / 52 worktrees, root-cause investigation, external
   research brief and recommendation, backlog cleanup (176→35 branches, 53→24 worktrees,
