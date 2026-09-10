@@ -203,7 +203,7 @@ When verifying a client upgrade or suspected missing instructions:
 5. Re-run step 3 for one child role whenever the Codex client changes
    major/minor version, and record the result against that version. As of
    0.153.x a child's sandbox is the parent turn's regardless of the role file
-   (Codex #39299; 160 of 160 observed children, tempdoc 951 R2).
+   (Codex #39299; every sampled child agreed, tempdoc 951 R2 records the scan).
 
 Run the probe through the actual available client. A missing tool or inaccessible
 client is an explicit limit, never grounds for inventing a successful probe.

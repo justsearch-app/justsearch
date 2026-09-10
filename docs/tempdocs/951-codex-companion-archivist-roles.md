@@ -39,7 +39,7 @@ verification, publication, and shared-resource rules authoritative.
   guidance "up to 3-4 agent sessions run concurrently", which is about worktree
   sessions, not Codex child threads. It was an undefended default.
 - Roles and pins were made explicit by tempdoc 937 (2026-09-06).
-- An external assessment (I:\Downloads\run2, 2026-09-10) compared the
+- An external assessment supplied by the owner (2026-09-10) compared the
   `viettran-edgeAI/codex_workflow` Heavy route against this harness and against
   five real child/main rollouts. Its repo-specific claims were verified in this
   session; see "Research findings".
