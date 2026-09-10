@@ -96,11 +96,15 @@ correction rounds, reassess the brief, design, and owner. Never waive defects.
 Exploration, review, and separable implementation are suitable. Shared-state changes, migrations, destructive git, merge/release
 work, and unsupervised dev-stack ownership are not.
 
-Codex roles: `explorer`/`worker` (Luna/high),
-`complex_worker` (Sol/medium), and `reviewer` (Sol/high). Set `fork_turns` to
-`"none"` or a positive integer; omitted/`"all"` inherits the parent model and
-effort and bypasses role pins. Workers return escalation evidence to the parent.
-System or session restrictions on delegation override repository preferences.
+Codex roles: `explorer`/`worker` (Luna/high), `complex_worker` (Sol/medium),
+`reviewer` (Sol/high), `companion` (Luna/xhigh; one persistent read-only
+context helper per session), and `archivist` (Luna/high; docs-only closeout
+writer). Set `fork_turns` to `"none"` or a positive integer; omitted/`"all"`
+inherits the parent model and effort and bypasses role pins. Workers return
+escalation evidence to the parent. Children inherit the parent turn's sandbox;
+role-file `sandbox_mode` is declared intent only. The thread cap is an anomaly
+guard, not a concurrency budget. System or session restrictions on delegation
+override repository preferences.
 
 ## Shared development stack
 

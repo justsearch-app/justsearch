@@ -9,9 +9,9 @@
     ".claude/rules/context-efficiency.md": 1877,
     ".claude/rules/hooks-reference.md": 2822,
     ".claude/rules/slice-execution.md": 4562,
-    "AGENTS.md": 8296
+    "AGENTS.md": 8573
   },
-  "totalCeiling": 59908,
+  "totalCeiling": 60185,
   "bumps": [
     {
       "file": "CLAUDE.md",
@@ -187,6 +187,13 @@
       "to": 22676,
       "reason": "930 §22.2 follow-up 10: PMD now covers every Java source set, not just main. Two net-new always-loaded facts an agent needs before its first edit: the task name changed (pmdMain -> pmdAll, and a test-source violation now fails the build), and config/pmd/** gained a pre-merge check (check-pmd-ruleset-sync) because the three rulesets are inlined copies and a drifted or unresolvable ref makes PMD analyse zero files while Gradle reports success.",
       "ts": "2026-09-05T12:38:42.492Z"
+    },
+    {
+      "file": "AGENTS.md",
+      "from": 8296,
+      "to": 8573,
+      "reason": "951: name companion/archivist roles, state cap-as-anomaly-guard and child-sandbox-inheritance in the shared contract",
+      "ts": "2026-09-10T18:04:35.052Z"
     }
   ]
 }

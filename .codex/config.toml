@@ -12,6 +12,10 @@ tool_timeout_sec = 120
 
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 3
+# Anomaly guard only. Workflow concurrency is governed by the shared-resource
+# rules in AGENTS.md (one dev stack, one Gradle build, disjoint file ownership),
+# not by this number. Raise or lower it for runaway-spawn protection, never to
+# shape delegation. (tempdoc 951)
+max_concurrent_threads_per_session = 10
 default_subagent_model = "gpt-5.6-luna"
 default_subagent_reasoning_effort = "high"
