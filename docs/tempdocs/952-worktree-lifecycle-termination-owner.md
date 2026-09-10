@@ -1,6 +1,6 @@
 ---
 title: Worktree and branch lifecycle — a durable termination owner
-status: IMPLEMENTING phase 1 (2026-09-10) — design §5 with amendments A-D from derisk §10 (confidence 7/10); plan §11 P1-P9; publication requires owner go-ahead and PR #699 first
+status: PHASE 1 IMPLEMENTED, AWAITING PUBLICATION (2026-09-10) — P1-P9 done at d273b17ea; A1-A4, A6, A9 proven locally; A5/A7/A8/A10 partially (phase-2 scheduler, Codex live parity, post-merge metrics deferred, see §7); publish only with owner go-ahead and after PR #699
 related:
   - 936-registered-worktree-removal-safety   # made remove-worktree.cjs usable; this tempdoc gives it an owner
   - 940-local-main-realignment               # lives only on branch worktree-940-worktree-base-fresh (PR #699, unmerged); baseRef head→fresh is a prerequisite
@@ -325,40 +325,64 @@ harness-neutral record.
 
 ## 7. Acceptance (contract; each item needs result, revision, environment, evidence)
 
-- [ ] A1 `worktree.baseRef` is `"fresh"` on `main` (PR #699 or equivalent merged); the hook
-      flags a local `main` ahead of `origin`.
-- [ ] A2 `remove-worktree.cjs` retires the branch by default when its exact head is covered by
-      a receipt or `REDUNDANT_NOW`; `--keep-branch` requires `--reason`, `--owner`, `--review-by`.
-- [ ] A3 Verified-archive path exists for dirty/untracked/ignored state and detached heads;
-      Windows regression covers junction preservation, long paths, and interrupted removal
-      (resume from recorded phase). No deletion without a verified archive.
-- [ ] A4 Durable obligation ledger outside any worktree: resource id, path, refs, session and
-      parent ids, process incarnation, lease/generation, fork SHA, `origin/main` anchor,
-      retention policy, phase. Census reconciles ledger against `git worktree list` + all local
-      refs each sweep; leftovers (directory missing, branch orphaned) are obligations too.
-- [ ] A5 Reconciler runs unattended (Windows Task Scheduler, plus session-start and
-      post-release/post-merge triggers); expiry means SUSPECT → verify writers stopped → 24 h
-      grace → archive → finalize; uncertainty → QUARANTINED with a named decision owner.
-- [ ] A6 Rule text: `branch-safety.md` merge step 5 restored to an imperative with the
-      archive-then-remove sequence; janitor authorization amendment; publish skill step 4 and
-      takeover skill updated in both `.claude/skills` and `.agents/skills`; regenerated where
-      derived.
-- [ ] A7 Both harnesses create worktrees through the repository command; Codex how-to and
-      `justsearch-start` name it; hooks emit registration/release hints only.
-- [ ] A8 Metrics in `world-state.mjs` output: ownership coverage (target 100% of new
-      resources), termination latency (≥ 99% of released, unheld, preservation-complete
-      resources retired within 24 powered-on hours; blocked counts and ages listed
-      separately), preservation integrity (0 deletions without verified archive; sampled
-      restore checks; archive bytes/age). Post-adoption cohort measured separately from the
-      pre-952 backlog.
-- [ ] A9 Superseded text retired in the same change: 936 status → closed-into-952; 938 §D item
-      11 → done; 940 status → prerequisite landed; PR #691 dry-run-only wording replaced.
-- [ ] A10 Token budget: always-loaded bytes do not grow (`check-always-loaded-budget`);
-      session-start hook-injected context from lifecycle hooks is 0 bytes when nothing needs a
-      decision and at most one line per item otherwise; the SessionEnd release path is proven
-      to run without any model turn (hook-integrity bite + a live session in each harness);
-      the world-state Worktrees table has the same row count as before for the same worktrees.
-      Measured over one week of sessions via the 886 ledger after phase 1 lands.
+Reconciled 2026-09-10 at `d273b17ea` (branch `worktree-952-worktree-lifecycle`, Windows 11,
+git 2.53, node 24). Evidence: test files named below, `tmp/probe-release.txt` (machine-local).
+
+- [x] A1 `baseRef: "fresh"` — implemented on branch `worktree-940-worktree-base-fresh` (PR #699),
+      merged into this branch (`f6e9022de`, one prose conflict resolved). **Hosted proof
+      deferred to publication: #699 must merge first** (952 PR body says so).
+- [x] A2 branch retirement gated on a receipt — `worktree-lifecycle.cjs release` retires only on
+      `LANDED`/`REDUNDANT_NOW`; `--keep-branch` requires the triple and is validated before any
+      marker write. Local proof: `952-worktree-lifecycle-cli.test.mjs` cases 5, 6, 9 (22/22);
+      live probe on this repository retired `worktree-952-live-probe` on `REDUNDANT_NOW`.
+      Note: the default lives in the lifecycle command; `remove-worktree.cjs --delete-branch`
+      stays explicit (936 invariant) and `release` passes it.
+- [x] A3 verified archive — tip ref + temporary-index state commit + hashed manifest; ignored
+      cap/valuable/disposable policy; `remove-worktree.cjs` refuses `--allow-ignored` without a
+      verifying manifest and lifts the dirty-state blocker only for covered paths.
+      Local proof: `952-worktree-archive.test.mjs` (8), `936-remove-worktree-cli.test.mjs`
+      (25, incl. junction preservation and the coverage case), CLI case 11 (resume from
+      `archived`), live probe archived untracked + ignored state. **Interrupted-removal on a
+      real long path not exercised** (936's long-path deletion is unchanged).
+- [x] A4 durable markers — per-branch git config (`justsearch-*`) + finalization records in the
+      861 register scope; census over worktrees, refs and leftover branches; reading never
+      writes. Local proof: `952-worktree-register.test.mjs` (8), CLI case 4.
+      Deviation from the charter text: no standalone ledger of every resource (§5.1 option B);
+      "process incarnation" is carried by the lock reason (Claude) or our lock grammar (Codex)
+      and by the finalization record's `by`.
+- [~] A5 reconciler — `reconcile` derives states, prints obligations, is silent when nothing
+      needs a decision, and executes only with `--execute` AND `executeOnSchedule: true`
+      (phase 1: false). Local proof: CLI case 10. **Deferred to phase 2 (decision §3.1):** the
+      Windows Task Scheduler entry and the session-start/post-merge triggers are not installed;
+      destination: phase 2 flip after two weeks of A8/A10 data.
+- [x] A6 rule and skill text — `branch-safety.md` Cleanup → Lifecycle (janitor clause,
+      `rule:lifecycle-release`) and step 5 → release step; publish/takeover/session-closeout in
+      both trees; `common-workflows.md` §Worktree mechanics rewritten; `agent-workflow.md`
+      closeout sentence. Gates: `check-always-loaded-budget` pass (branch-safety 12329/12431 B),
+      `skills-sync --check` OK, `check-codex-agent-parity` OK, `docs-validate` no errors.
+- [~] A7 both harnesses — `create`/`register`/`release` are harness-neutral; Codex how-to and
+      mapping table updated; `worktree-register` (WorktreeCreate + EnterWorktree) and
+      `worktree-release` (SessionEnd, both projections) wired; hook-integrity gate pass.
+      **Deferred:** `justsearch-start` skill text not changed (the how-to carries the command);
+      a live Codex session running `create`/`release` was not available in this session —
+      recorded as an unperformed live check, destination: first Codex session after merge.
+- [~] A8 metrics — `world-state.mjs` Worktrees table gains OWNER/LIFECYCLE columns (row count
+      unchanged); `--lifecycle` prints coverage, latency and preservation lines. Local proof:
+      `world-state.test.mjs` (16) + a live run. **Not yet measurable as a trend:** the
+      post-952 cohort starts at merge; the sampled restore check is not implemented (listed
+      for phase 2 alongside the scheduler).
+- [x] A9 superseded text — 936 status closed into 952; 938 item 11 done; PR #691 wording
+      replaced; `rule:squash-merge-verify-content-not-ancestry` still names the manual diff
+      (kept: it is triage guidance; the receipt is the authorization test, §5.3).
+- [~] A10 token budget — always-loaded bytes flat (an 85 B hooks-reference addition was
+      reverted rather than bumped); hooks print nothing on success by construction and by unit
+      test (`worktree-register.test.mjs`, `worktree-release.test.mjs`, 6 each); `reconcile`
+      silent when idle (CLI case 10). **The one-week ledger measurement is post-merge.**
+
+Not run: `./gradlew.bat build -x test` (no Java, Kotlin, Gradle or proto change in this
+branch; the pre-merge build is part of publication). `regen-all --check` passes every set
+except `notices`, which needs a Gradle license report this worktree has not built (no
+dependency changed).
 
 ## 8. Verification plan
 
@@ -425,3 +449,13 @@ Ordering: P1 → (P2 ∥ P3 ∥ P4) → P5 → P6 → P7 → P8 → P9. Delegate
   §5.9 and A10 — normal path is zero model computation (SessionEnd hook executes release on
   the session's own clean worktree; registration silent; no new world-state section).
   Next: `/derisk` then `/plan`.
+- 2026-09-10 (later) — Derisk §10 (four amendments), plan §11, implementation P1-P9 on this
+  branch (12 commits ending `d273b17ea`). Findings during implementation, all fixed and tested:
+  a `.gitattributes` merge driver survives `-c merge.default=` (receipt refuses on any driver);
+  git's short exclude pathspec dies on `__pycache__` (long form used); Claude's lock names the
+  worktree, not the session (attribution accepts either); `remove-worktree.cjs` refused archived
+  dirty state (a verified manifest now lifts the blocker for covered paths only); text `status`
+  crashed on HELD rows; `--keep-branch` wrote a marker before validation. Live probe on this
+  repository: create → archive → verify → remove → retire. Backlog cleaned the same day (audit
+  in `952-evidence/`). Remaining: publication (owner), phase-2 scheduler + restore sampling,
+  Codex live parity, one-week A8/A10 measurement.
