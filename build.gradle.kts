@@ -13,7 +13,7 @@ plugins {
   id("conventions.coverage") apply false
   id("conventions.locking")
   id("conventions.build-attribution")
-  id("org.openrewrite.rewrite") version "7.37.0"
+  id("org.openrewrite.rewrite") version "7.39.0"
 }
 
 // Note: PMD toolVersion is configured in JvmBaseConventionsPlugin (currently 7.16.0).
