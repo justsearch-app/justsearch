@@ -41,15 +41,16 @@ preserved (with path/branch returned) if changes were made.
 checkout without ending the session. Useful when worktree work is done but
 the session continues (e.g., merging from main).
 
-### Cleanup
+### Lifecycle (tempdoc 952)
 
-- **`EnterWorktree` / `--worktree`**: On session exit, Claude prompts whether
-  to keep or remove the worktree.
-- **`ExitWorktree`**: Returns to main checkout; worktree is preserved for
-  later re-entry or manual cleanup.
-- **Subagent worktrees**: Auto-cleaned if unchanged; returned path if changed.
-- **After merge**: GitHub deletes merged source branches; delete local
-  branches only after verifying they were merged.
+Every worktree under `.claude/worktrees/` is registered on creation (hook or
+`node scripts/dev/worktree-lifecycle.cjs create <name>`) and ends through
+`node scripts/dev/worktree-lifecycle.cjs release <path>`: archive, then remove,
+and retire the branch only when its landing receipt proves the exact head landed.
+Keeping a branch needs `hold --reason --owner --review-by`. The registered
+reconciler (`reconcile`) may terminate released or verified-inactive managed
+resources after verified preservation; unregistered or foreign-locked trees are
+never touched. <!-- rule:lifecycle-release -->
 
 ## Hard Rules
 
@@ -152,15 +153,11 @@ an upstream "do X" as covering the whole downstream merge/publish chain.
    investigate before retrying. Keep checkpoint/retry commits off `main`;
    use the PR title/body.
 4. After merge, update local `main` and run `./gradlew.bat build -x test`.
-5. After verifying the merge, keep the shell outside the target and, from the
-   owning repository root, preview its exact registration:
-   `node scripts/dev/remove-worktree.cjs <registered-path> --dry-run`.
-   Ignored paths need `--allow-ignored`; local branch deletion needs
-   `--delete-branch`. The tool preserves junction targets and
-   removes only that exact Git registration. Merge attribution requires an
-   explicit known `--session-id`; omission or `unknown` skips the merged-PR
-   lookup and telemetry writer. Full mechanics:
-   `docs/reference/contributing/common-workflows.md`.
+5. After verifying the merge, from the repository root with the shell outside
+   the target: `node scripts/dev/worktree-lifecycle.cjs release <path>`. It
+   archives, removes, and retires the branch when the receipt says landed; an
+   `UNKNOWN` receipt keeps the branch for the reconciler. Mechanics:
+   `docs/reference/contributing/common-workflows.md` §Worktree mechanics.
 
 ### Publishing docs-only changes (history granularity) <!-- rule:docs-ride-along -->
 

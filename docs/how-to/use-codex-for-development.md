@@ -66,8 +66,21 @@ At session start, follow the automatically loaded `AGENTS.md` contract. Use
 `$justsearch-start` when you explicitly want repository orientation or a fresh
 world-state summary; it is not required for every session. Run the world-state
 command before changing files for a substantial task. Feature work belongs in a
-dedicated worktree. Keep one task per distinct outcome; resume an existing task
-when continuing the same outcome.
+dedicated worktree created through the repository command, which registers its
+owner (tempdoc 952):
+
+```powershell
+node scripts/dev/worktree-lifecycle.cjs create <name> --harness codex --prepare
+Set-Location .claude\worktrees\<name>
+codex
+```
+
+Keep one task per distinct outcome; resume an existing task when continuing the
+same outcome. When the task is done, from the repository root run
+`node scripts/dev/worktree-lifecycle.cjs release <path>`; the Codex SessionEnd
+hook releases a clean worktree automatically. Do not `git worktree add` into
+ad-hoc directories: trees outside `.claude/worktrees/` are unmanaged and are
+never cleaned up for you.
 
 ## Claude-to-Codex mapping
 
@@ -79,6 +92,7 @@ when continuing the same outcome.
 | `.claude/settings*.json` hooks | `.codex/hooks.json` | `governance/agent-hooks.v1.json` |
 | Claude agent types | `.codex/agents/{explorer,worker,complex_worker,reviewer}.toml` | Codex-native role files |
 | Claude transcript telemetry | Codex rollout and OTel adapters | neutral agent-analytics ledger |
+| `EnterWorktree` / exit-time worktree removal | `node scripts/dev/worktree-lifecycle.cjs create` / `release`; SessionEnd hook releases | `governance/worktree-lifecycle.v1.json` (tempdoc 952) |
 
 The mapping is behavioral rather than byte-for-byte. Unsupported Codex lifecycle
 events are omitted explicitly, and Claude-only model/task hooks are excluded

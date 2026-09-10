@@ -155,34 +155,60 @@ them at creation time — don't rely on it. `node scripts/dev/prepare-worktree.c
 missing one from its committed `.example` file (never overwriting an existing copy), so it is
 always safe to run. `--no-dist` skips the Java dists (FE-only prep). See `MAINTAINING.md`.
 
-**Removing a registered worktree.** Run the removal tool from the owning repository root, with
-the shell's current directory outside the target. Preview the exact registered target first:
+**Lifecycle (tempdoc 952).** A worktree is a resource with a registered owner and a durable
+termination obligation. `governance/worktree-lifecycle.v1.json` is the policy (sanctioned root
+`.claude/worktrees/`, thresholds, declared caches, archive rules, `executeOnSchedule`). The
+command is `node scripts/dev/worktree-lifecycle.cjs`, run from the repository root:
 
 ```powershell
-node scripts/dev/remove-worktree.cjs <registered-path> --dry-run
-node scripts/dev/remove-worktree.cjs <registered-path> --allow-ignored --delete-branch --session-id SESSION_ID
+node scripts/dev/worktree-lifecycle.cjs create <name> [--harness codex] [--prepare]
+node scripts/dev/worktree-lifecycle.cjs register [<path>]            # hooks call this; silent
+node scripts/dev/worktree-lifecycle.cjs release <path> [--keep-branch --reason .. --owner .. --review-by YYYY-MM-DD] [--discard-ignored <glob>]
+node scripts/dev/worktree-lifecycle.cjs hold <path|branch> --reason .. --owner .. --review-by YYYY-MM-DD
+node scripts/dev/worktree-lifecycle.cjs status [--lifecycle] [--json]
+node scripts/dev/worktree-lifecycle.cjs reconcile [--execute]         # advisory in phase 1
 ```
 
-Git registration is the authority, so linked worktrees may live under any parent directory and
-use arbitrary branch names; paths with spaces or Unicode and detached worktrees are supported.
-The tool refuses the main worktree, path aliases, nested registrations, locks, tracked/staged or
-untracked changes, and target-related runtime or helper state that is live or cannot be proven
-safe. Ignored paths are inventoried in the preview and require the explicit `--allow-ignored`
-option for removal. Preview performs no ref, telemetry, helper, register, or filesystem writes.
+Ownership markers live in Git: `git config branch.<name>.justsearch-*` (resource, session,
+harness, created, fork, anchor, released, hold) and the harness's worktree lock as a liveness
+hint. Registration happens on `WorktreeCreate` / `EnterWorktree` through the `worktree-register`
+hook, or by `create`/`register`. A worktree without markers, or outside the sanctioned root, is
+UNMANAGED and never acted on.
 
-Removal unlinks junctions link-only, deletes the validated tree, and then removes only that exact
-Git registration. `--delete-branch` deletes the captured local branch only when it still names the
-captured HEAD and no worktree uses it; detached HEAD skips branch deletion. The tool does not infer
-merge state or provide a general force bypass. Editor/task discovery is necessarily incomplete,
-and a process can start before its registration write becomes visible, so close target-scoped
-tools and tasks before removal; an observed in-progress registration write blocks teardown.
+`release` runs the finalization phases, each recorded under `tmp/dev-runner/worktrees/` so a
+crash resumes where it stopped: claim, archive (committed tip to `refs/archive/<resource>/<sha>`;
+tracked, untracked and small ignored working state to `refs/archive/<resource>/state-<ts>`
+through a temporary index; a manifest with blob hashes under `tmp/archive/worktrees/`), verify
+(re-hash), remove (through `remove-worktree.cjs`), retire the branch, done. Ignored files above
+the per-file cap block the release unless named by `--discard-ignored` or matched by a
+declared-disposable glob; archive failure quarantines the resource. The SessionEnd hook
+`worktree-release` releases the session's own worktree: record-only under Claude Code (the
+harness removes after SessionEnd), full `--if-clean` under Codex.
 
-Merge attribution is opt-in. A known explicit `--session-id` lets teardown use a supplied
-`--merge-commit` or query the branch's merged PR, then invoke `record-merge.mjs` with that exact
-session. Omit `--session-id`, or pass the supported `unknown` sentinel, for unattributed cleanup;
-both forms skip the merged-PR lookup and telemetry writer. Environment variables, the
-`current-session-id` pointer, and the worktree hash remain helper caller-identity fallbacks, but
-they never establish merge attribution during teardown.
+**Landing receipts.** A branch is retired only on a receipt for its exact head: the merged PR
+whose `headRefOid` equals the head, its squash commit `S`, and
+`git merge-tree --write-tree --merge-base=<fork> S <head>` returning exactly `S`'s tree under
+`merge.default=` / `merge.renormalize=false` (verdict `LANDED`); the same test against fetched
+`origin/main` gives `REDUNDANT_NOW`. Anything else is `UNKNOWN` and keeps the branch. Receipts
+are cached in `tmp/agent-telemetry/landing-receipts.ndjson` and are valid while `S` is reachable
+from `origin/main`. A repository with any configured merge driver gets `UNKNOWN` (a
+`.gitattributes` driver survives `-c merge.default=`).
+
+**Removing a registered worktree directly.** `remove-worktree.cjs` stays the only deletion
+primitive; `release` calls it. Run it from the owning repository root with the shell outside the
+target: `--dry-run` previews with no writes; `--allow-ignored` is admissible only together with
+`--archive-manifest <manifest.json>` written by the archive step and still verifying against the
+tree; `--delete-branch` deletes the captured branch only when it still names the captured HEAD and
+no worktree uses it. It refuses the main worktree, aliases, nested registrations, locks,
+tracked/staged/untracked changes, and live or unprovable runtime and helper state. Merge
+attribution stays opt-in through an explicit `--session-id`; `release` passes the caller's.
+
+**Reconciler.** `reconcile` derives each managed resource's state from Git and the session
+ledger: ACTIVE, RELEASED, SUSPECT (owner unverifiable or ledger stale for more than
+`suspectAfterMin`), ORPHANED (verified-dead owner past `orphanGraceHours`), HELD, QUARANTINED,
+FINALIZING. In phase 1 (`executeOnSchedule: false`) it prints obligations and removes nothing;
+`world-state.mjs` shows the same facts in its Worktrees table (OWNER, LIFECYCLE) and, under
+`--lifecycle`, the coverage, latency and preservation metrics (952 A8).
 
 **Shared models / runtime resolution.** The dev-runner resolves `JUSTSEARCH_MODELS_DIR` from the
 **main** checkout automatically (tempdoc 618 §2). Runtime resolution is **GPU-only by design as

@@ -801,7 +801,10 @@ things go wrong; the fix is several cheap, idempotent ones, each justified indep
 - **Worktree teardown** — `remove-worktree` consults the register before unlinking junctions, reaps
   what it is authorized to, and **refuses to proceed while an unreapable holder remains**. Refusing
   is the fix for §2-bis (c): today a held handle can leave a half-deleted, `.git`-less worktree
-  shell, which is worse than a clean refusal.
+  shell, which is worse than a clean refusal. *2026-09-10, tempdoc 952:* this occasion is now
+  reached through `worktree-lifecycle.cjs release`, which archives first and retires the branch
+  only on a landing receipt; the same occasion shape (session-start sweep, session-end own-release,
+  teardown execute, orientation read-only) was reused for worktrees rather than duplicated.
 - **Before a build** — **advisory only; it never kills [A4]**, in the `exec-substrate-hint` idiom
   (including its per-session marker de-dup). A registered spawn holding paths under the tree a
   `gradlew`/`npm` invocation is about to write turns a mystifying `EPERM`/`-4048` into a named cause

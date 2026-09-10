@@ -156,8 +156,12 @@ After the queue reports success:
 3. Update the tempdoc outcome and identify any genuine follow-up work. Do not
    create speculative follow-up tempdocs merely to empty a checklist.
 4. Report what was published, the verification evidence, the merge result, and
-   any remaining risk. Clean up only worktrees and branches owned by this task,
-   and only when the repository's safety rules permit it.
+   any remaining risk. Then release this task's worktree from the repository
+   root: `node scripts/dev/worktree-lifecycle.cjs release <path>` (tempdoc 952).
+   It archives, removes, and retires the branch on a landed receipt; a branch
+   that must survive needs `--keep-branch --reason --owner --review-by`. Publish
+   the implementation branch itself; do not open a separate publication-record
+   branch.
 
 The full GitHub and merge-queue quirk catalog remains in
 `docs/reference/contributing/agent-guide.md` §3.7.
