@@ -163,7 +163,11 @@ Three read-only audits; every citation below was re-read by the orchestrator.
   58 executor construction sites (`Executors.new*` / `new ThreadPoolExecutor`) with no registry
   and no queue bound (8).
 - `ModelSessionPolicy.java:104` sizes the ORT arena from GPU VRAM; it bounds device memory,
-  not commit charge (8). NVML is read only in `gpu-bridge` (`GpuCapabilitiesService`), which
+  not commit charge (8). *(Corrected 2026-09-10, inference-host audit 2: the cap is a static
+  per-role config default, `ResolvedConfigBuilder.java:1179,1201,1273,1293,1305` at `4229f1091`;
+  `ModelSessionPolicyResolver.java:61-64` never reads the `HardwareProfile`; the `Gpu` record is
+  `ModelSessionPolicy.java:111-112`. "From GPU VRAM" describes what the cap bounds, not where
+  its value comes from.)* NVML is read only in `gpu-bridge` (`GpuCapabilitiesService`), which
   `indexer-worker` does not depend on today (7.4).
 - `OperationInvocationRequest.idempotencyKey` (`OperationInvocationRequest.java:15-17`) is on
   the wire and read by nothing (7.5).
