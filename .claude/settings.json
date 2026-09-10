@@ -211,6 +211,28 @@
               "${CLAUDE_PROJECT_DIR}/scripts/agent-analytics/hooks/worktree-base-hint.mjs"
             ],
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/scripts/agent-analytics/hooks/worktree-register.mjs"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/scripts/agent-analytics/hooks/worktree-register.mjs"
+            ],
+            "timeout": 10
           }
         ]
       }
@@ -254,6 +276,18 @@
               "${CLAUDE_PROJECT_DIR}/scripts/agent-analytics/hooks/agent-spawn-session-end-reap.mjs"
             ],
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/scripts/agent-analytics/hooks/worktree-release.mjs"
+            ],
+            "timeout": 60
           }
         ]
       }
