@@ -329,8 +329,10 @@ Reconciled 2026-09-10 at `d273b17ea` (branch `worktree-952-worktree-lifecycle`, 
 git 2.53, node 24). Evidence: test files named below, `tmp/probe-release.txt` (machine-local).
 
 - [x] A1 `baseRef: "fresh"` — implemented on branch `worktree-940-worktree-base-fresh` (PR #699),
-      merged into this branch (`f6e9022de`, one prose conflict resolved). **Hosted proof
-      deferred to publication: #699 must merge first** (952 PR body says so).
+      merged into this branch (`f6e9022de`, one prose conflict resolved). Publication decision
+      (2026-09-10): #699 is conflicting against `main` and its branch is checked out in another
+      session's leftover worktree, so 952 lands the 940 change itself and #699 is closed as
+      superseded after the merge; the 940 tempdoc rides along.
 - [x] A2 branch retirement gated on a receipt — `worktree-lifecycle.cjs release` retires only on
       `LANDED`/`REDUNDANT_NOW`; `--keep-branch` requires the triple and is validated before any
       marker write. Local proof: `952-worktree-lifecycle-cli.test.mjs` cases 5, 6, 9 (22/22);
