@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "tempdoc": 952,
+  "note": "Worktree and branch lifecycle policy (tempdoc 952). Sessions own exclusive use of a worktree; the repository's reconciler owns its eventual termination. Ownership markers live in Git (branch config branch.<name>.justsearch-*, worktree lock presence as a liveness hint); a finalization record under tmp/dev-runner/worktrees/ exists only while a resource is being archived and removed. executeOnSchedule stays false in phase 1: the scheduled reconciler only reports and quarantines; explicit release by the owning session may remove. Flip to true only after the A8/A10 metrics have held for two consecutive weeks (952 §3 decision 1).",
+  "sanctionedRoot": ".claude/worktrees",
+  "executeOnSchedule": false,
+  "thresholds": {
+    "heartbeatRenewSec": 60,
+    "suspectAfterMin": 15,
+    "orphanGraceHours": 24,
+    "reconcileEveryMin": 60,
+    "finalizationLeaseSec": 900
+  },
+  "archive": {
+    "refPrefix": "refs/archive",
+    "localDir": "tmp/archive/worktrees",
+    "ignoredPerFileCapBytes": 8388608,
+    "declaredCaches": [
+      "node_modules/",
+      "build/",
+      ".gradle/",
+      "dist/",
+      "target/",
+      "tmp/dev-runner/",
+      ".mypy_cache/",
+      "__pycache__/",
+      ".pytest_cache/"
+    ],
+    "valuableIgnored": [
+      ".claude/settings.local.json",
+      ".mcp.json",
+      "tmp/*.patch",
+      "tmp/*.md",
+      "tmp/*.json",
+      "tmp/*.log"
+    ],
+    "disposableIgnored": [
+      "tmp/**/eval-results/**",
+      "scripts/jseval/tmp/**"
+    ]
+  },
+  "branchConfigKeys": [
+    "justsearch-resource",
+    "justsearch-session",
+    "justsearch-harness",
+    "justsearch-created",
+    "justsearch-fork",
+    "justsearch-anchor",
+    "justsearch-released",
+    "justsearch-hold"
+  ],
+  "receipts": {
+    "file": "tmp/agent-telemetry/landing-receipts.ndjson",
+    "target": "origin/main",
+    "mergeConfig": ["merge.default=", "merge.renormalize=false"]
+  }
+}
