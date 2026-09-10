@@ -357,7 +357,9 @@ function archiveWorktree({
   const indexFile = path.join(commonDir, `952-archive-index-${unique}`);
   const pathspecFile = path.join(commonDir, `952-archive-pathspec-${unique}`);
   const excluded = [
-    ...active.declaredCaches.map((c) => `:!${normalizeRelPath(c)}`),
+    // Long form: the short `:!` form parses any leading non-alphanumeric character as pathspec
+    // magic and dies on `__pycache__` ("Unimplemented pathspec magic '_'", git 2.53).
+    ...active.declaredCaches.map((c) => `:(exclude)${normalizeRelPath(c)}`),
     // `literal` so a path containing `*` or `[` is excluded as itself, not as a pattern.
     ...[...classified.disposable, ...discarded].map((e) => `:(exclude,literal)${e.path}`),
   ];

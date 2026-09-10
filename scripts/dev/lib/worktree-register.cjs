@@ -808,8 +808,14 @@ function deriveState({
       reasons.push(`lock reason ${JSON.stringify(String(lock).slice(0, 120))} matches no known grammar; foreign lock`);
       return done(STATES.QUARANTINED);
     }
-    if (isNonEmptyString(markers.session) && parsedLock.session !== markers.session) {
-      reasons.push(`lock names session ${parsedLock.session} but the branch markers name ${markers.session}; foreign lock`);
+    // Claude Code's observed grammar names the WORKTREE (`claude session <name> (pid N)`), not the
+    // session id, so for that harness the lock is attributable when it names this resource. Our
+    // own grammar (written by worktree-lifecycle.cjs) names the session id and is compared as such.
+    const namesResource = isNonEmptyString(markers.resource) && parsedLock.session === markers.resource;
+    const namesSession = isNonEmptyString(markers.session) && parsedLock.session === markers.session;
+    const nothingToCompare = !isNonEmptyString(markers.resource) && !isNonEmptyString(markers.session);
+    if (!namesResource && !namesSession && !nothingToCompare) {
+      reasons.push(`lock names ${parsedLock.harness} session ${parsedLock.session} but the branch markers name resource ${markers.resource} / session ${markers.session}; foreign lock`);
       return done(STATES.QUARANTINED);
     }
     reasons.push(`locked by ${parsedLock.harness} session ${parsedLock.session}${parsedLock.pid === null ? ' (no pid in the reason)' : ` (pid ${parsedLock.pid})`}`);
