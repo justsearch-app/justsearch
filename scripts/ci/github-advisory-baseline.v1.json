@@ -7,13 +7,23 @@
       "advisories": []
     },
     "runtime-client": {
-      "advisories": []
+      "advisories": [
+        {
+          "ghsa_id": "GHSA-2883-XCG3-V3HH",
+          "severity": "high"
+        }
+      ]
     },
     "shell": {
       "advisories": []
     },
     "ui-web": {
-      "advisories": []
+      "advisories": [
+        {
+          "ghsa_id": "GHSA-7W5X-HRQM-74C2",
+          "severity": "high"
+        }
+      ]
     },
     "wire-contract": {
       "advisories": []

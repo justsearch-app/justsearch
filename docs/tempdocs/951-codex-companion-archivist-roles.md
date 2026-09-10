@@ -429,3 +429,11 @@ Windows 11, Node 24.12, Codex CLI 0.153.4 installed (not exercised).
   source (#39299) plus 361-rollout scan; D5 downgraded to documentation plus a
   client-change re-probe trigger. Archivist commit authority decided: bounded
   yes. Implementation still not started (owner instruction).
+- 2026-09-10 (publish) — Implemented, verified, PR #721 opened. Hosted
+  "Public claims" failed on `npm-audit/silent-regression` for two advisories
+  published after the last green `main` (GHSA-2883-xcg3-v3hh `js-yaml` via
+  `orval` in runtime-client; GHSA-7w5x-hrqm-74c2 `smol-toml` via `knip` in
+  ui-web), both dev-only, no lockfile change on this branch. Declared as
+  regressions in `gates/npm-audit/.changesets/951-dev-tooling-dos-advisory-drift.md`
+  with both identities pinned in the advisory baseline. Follow-up: bump
+  `orval` and `knip` when patched releases exist; the kernel auto-rebalances.
