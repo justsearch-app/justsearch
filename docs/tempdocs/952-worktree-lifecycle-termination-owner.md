@@ -237,10 +237,13 @@ Windows Task Scheduler entry is installed by a documented operator command, neve
   session-closeout adds `release`, or `hold` with the triple, after the agent-spawn sweep.
   `skills-sync.mjs` regenerates the Claude generated blocks.
 - Hooks (`governance/agent-hooks.v1.json`, then `regen-all --only agent-hooks-wiring,codex-hooks`):
-  `worktree-register` on PostToolUse `EnterWorktree` (advisory, unit bite);
-  `worktree-release-hint` on SessionEnd for both harnesses (advisory: prints the release line
-  if the session's worktree is still locked). No hook deletes anything; Claude's
-  `WorktreeRemove` cannot veto and is not used as a gate.
+  `worktree-register` on PostToolUse `EnterWorktree` (telemetry role, silent on success, unit
+  bite); `worktree-release` on SessionEnd for both harnesses runs
+  `worktree-lifecycle.cjs release --own --if-clean`: the session's own, clean, receipt-covered
+  worktree is archived and removed with no model involved (SessionEnd is an execute occasion
+  in the 861 matrix; its output is never read by a model because the session is over). A dirty
+  or unlanded worktree is left RELEASED for the reconciler. No hook runs a kill or removal from
+  PreToolUse (861 [A4]); Claude's `WorktreeRemove` cannot veto and is not used as a gate.
 - The Codex how-to §Start a task gains the create and release lines and the mapping table
   gains a worktree row; `justsearch-start` names `create`.
 - `common-workflows.md` §Worktree mechanics is the canonical command reference;
@@ -251,11 +254,30 @@ Windows Task Scheduler entry is installed by a documented operator command, neve
 
 ### 5.7 World-state and metrics
 
-`world-state.mjs` gains a "Worktree lifecycle" gatherer and section (same
-`{available:false, reason}` convention): per resource state, owner, age, blocker and next
-command; archive count, bytes and age; and the three A8 indicators computed from branch-config
-timestamps, receipts and finalization records, with the pre-952 cohort (branches without
-`justsearch-created`) reported separately.
+`world-state.mjs` gains a lifecycle gatherer (same `{available:false, reason}` convention) but
+**no new section**: the existing Worktrees table gains `OWNER` and `LIFECYCLE` columns (state
+from 5.4, receipt verdict, hold) and the existing `VERDICT` column is computed from them, so
+session-start output does not grow. Archive count, bytes and age, and the three A8 indicators
+(computed from branch-config timestamps, receipts and finalization records, pre-952 cohort
+without `justsearch-created` reported separately) print only under `--lifecycle` and in the
+`status` subcommand; they are for the owner and the metrics run, not for every session.
+
+### 5.9 Token and model-computation budget
+
+The normal path involves no model computation and adds no context:
+
+| Step | Who executes | Model tokens |
+|---|---|---|
+| create / register | command or silent hook | 0 |
+| heartbeat | existing PreToolUse ledger stamp | 0 (already paid) |
+| release at session end | SessionEnd hook, own clean worktree | 0 (session over) |
+| receipts, archive, removal, reconcile, metrics | script, git, gh | 0 |
+| release from a skill (takeover, publish, closeout) | one command, one result line | tens |
+| a resource needing a human decision (quarantine, hold expiry) | one line in the Worktrees table | tens per item |
+
+Compared with today's documented path (a dry-run and a real run of `remove-worktree.cjs`, both
+read by the model), this is a reduction. Rule-text bytes are net-zero under the 949 ratchet.
+Measured via the 886 session ledger and `check-always-loaded-budget`: acceptance A10.
 
 ### 5.8 What this design orphans (retired in the same change)
 
@@ -331,6 +353,12 @@ harness-neutral record.
       pre-952 backlog.
 - [ ] A9 Superseded text retired in the same change: 936 status → closed-into-952; 938 §D item
       11 → done; 940 status → prerequisite landed; PR #691 dry-run-only wording replaced.
+- [ ] A10 Token budget: always-loaded bytes do not grow (`check-always-loaded-budget`);
+      session-start hook-injected context from lifecycle hooks is 0 bytes when nothing needs a
+      decision and at most one line per item otherwise; the SessionEnd release path is proven
+      to run without any model turn (hook-integrity bite + a live session in each harness);
+      the world-state Worktrees table has the same row count as before for the same worktrees.
+      Measured over one week of sessions via the 886 ledger after phase 1 lands.
 
 ## 8. Verification plan
 
@@ -353,4 +381,7 @@ ORPHANED after the grace, archived, removed only in execute mode). Gates:
   Charter written; decisions §3 taken by delegation; design §5 and reach §6 written after
   reading the substrate (remove-worktree.cjs phases, 861 registry grammar and occasions,
   session ledger writer, world-state gatherers, hooks manifest, 936/938/940/949/950 texts).
-  Alternatives considered in §5.1. Next: `/derisk` then `/plan`.
+  Alternatives considered in §5.1. Owner question the same day: token cost per agent. Answer:
+  §5.9 and A10 — normal path is zero model computation (SessionEnd hook executes release on
+  the session's own clean worktree; registration silent; no new world-state section).
+  Next: `/derisk` then `/plan`.
