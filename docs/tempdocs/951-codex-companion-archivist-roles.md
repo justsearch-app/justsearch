@@ -388,17 +388,22 @@ Windows 11, Node 24.12, Codex CLI 0.153.4 installed (not exercised).
       Implemented by a delegated opus worker; reviewed and re-verified by the
       parent (downstream readers `cache-efficiency`, `context-residency`,
       `spawn-economics` checked, no change needed).
-- [ ] Docs state the sandbox inheritance rule (R2) in the how-to and
-      `agent-workflow.md`; parity-check label reads "declared" not "explicitly
-      sandboxed"; client-change re-probe trigger recorded.
-- [ ] Archivist role text contains the explicit-path staging rule and the
-      publication prohibitions; parity gate asserts both phrases.
-- [ ] `node scripts/ci/check-codex-agent-parity.mjs`,
-      `node scripts/docs/prompt-surface-inventory.mjs`,
-      `node scripts/ci/check-always-loaded-budget.mjs`,
-      `node scripts/agent-analytics/run-all-tests.mjs`, `docs-validate`,
-      `check-tempdoc-size`, `check-tempdoc-numbers` all green at the tested
-      revision.
+- [x] Green at commit `36135f9fd` (worktree, base `da79f8d57`):
+      `check-codex-agent-parity: OK (8 checks)`; `prompt-surface-inventory`
+      ran clean; `check-always-loaded-budget` pass; `agent-analytics: 55/55`;
+      `docs-validate` no errors; `check-tempdoc-size` pass (426/800 lines);
+      `check-tempdoc-numbers` OK; `llmstxt-generate --check` and
+      `skills-sync --check` OK. Pre-merge compile gate
+      `./gradlew.bat build -x test -PskipWebBuild=true` exit 0 (no Java or
+      ui-web sources changed, so the web build was skipped; the full
+      `build -x test` remains the PR-ready requirement if a reviewer wants it).
+      `regen-all --check` fails only at `notices` because this fresh worktree
+      has no Gradle license report; no generated file in the regen set differs.
+- [x] Sandbox inheritance documented in the how-to and `agent-workflow.md`;
+      parity label reads "declared sandbox intent"; re-probe trigger is step 5
+      of the probe procedure.
+- [x] Archivist role text carries explicit-path staging and publication
+      prohibitions; parity gate asserts the phrases (wrap-tolerant).
 - [ ] D6 measurement plan recorded here with the first run's results, or an
       explicit deferral with owner decision. **Authorized deferral (owner,
       2026-09-10: "proceed with the remaining work end to end" covers the
