@@ -293,3 +293,63 @@ booleans are exempt, which is what lets `input_tokens`/`output_tokens` through. 
 the only identity attribute kept (it is what every reader joins on); `user.email`, `user.id`,
 `user.account_id`, `user.account_uuid` and `organization.id` are dropped. Read it with
 `readOtlpLedger(dir)` from `lib/telemetry-io.mjs`.
+
+## Efficiency trend + retention inversion (908)
+
+Every reader above — this one included, before now — answers *"where did the money go?"* over a
+single `--since/--until` window. Tempdoc 908 found that the question that actually tells you
+whether a lever worked is *"is this getting better or worse?"*, which needs a time axis no
+existing reader had. Adding one to the SAME ledger showed subagent cost share rising 36% → 74%
+over four weeks, concentrated in the `>=120-call` spawn tail (58% → 78% of subagent cost), while
+the main loop got cheaper — a fact invisible to a single-window snapshot.
+
+```
+node scripts/agent-analytics/efficiency-trend.mjs                      # trailing 60 days, weekly
+node scripts/agent-analytics/efficiency-trend.mjs --by day --since 2026-08-20
+node scripts/agent-analytics/efficiency-trend.mjs --harness claude-code --json
+node scripts/agent-analytics/trend-snapshot.mjs                        # run this one regularly
+```
+
+`efficiency-trend.mjs` prints four sections per bucket (week by default, Mon-start ISO-8601,
+UTC): **(a)** leading indicators — calls, cost, `ctx/out`, `$/M-output`, main/sub p50 context,
+subagent cost share; **(b)** delivery, off `git log --first-parent --numstat` (one first-parent
+commit is one shipped PR under ADR-0045, needing no session→merge attribution at all) — **both**
+`$/landed-PR` and `$/1k-code-lines` are printed side by side, never one alone. That's not a style
+choice: 908 §1.2b found the two denominators disagree, and disagree HARDEST on the weeks a
+cost-per-PR trend claim rests on — one window read "+34% cost per landed PR across three clean
+weeks" until a one-`git log --numstat`-join size control showed the same weeks were $75 → $47 →
+$87 per 1k code lines, a swing with no trend at all. Printing only the unfiltered denominator
+would have shipped a confident, wrong finding; **(c)** the spawn tail — spawn count, median
+calls/spawn, `$/spawn`, and the `>=120-call` long-spawn cost share (a spawn is bucketed by its
+FIRST call's timestamp, never smeared across the week boundary it might cross); **(d)** corpus
+honesty, always printed: the oldest surviving transcript's mtime (the rotation floor) and every
+bucket flagged `TRUNCATED` (starts before that floor) or `PARTIAL` (extends past now) — no trend
+statement in this reader's own output crosses a flagged bucket, and the flag is a boolean in
+`--json` too, not prose-only.
+
+**The rotation floor is the reason `trend-snapshot.mjs` exists and is the higher-priority half of
+908.** Claude Code deletes transcripts on a rolling ~30-day timer (`cleanupPeriodDays`, unset →
+default), and that is the ONLY store every reader in this directory reads. Every week that passes
+without a snapshot destroys a week of the only history that can judge whether a lever (model
+routing, spawn-length bounds, the `delegate-by-default` falsifier itself) worked. `trend-snapshot.mjs`
+appends the current window's bucket AGGREGATES — call counts, cost, percentiles, a spawn-length
+histogram, never prompt text or a file path — to `tmp/agent-telemetry/efficiency-trend.ndjson`,
+one line per `(bucket, harness)`, idempotently (a re-run for a bucket replaces that bucket's line,
+never duplicates it). `efficiency-trend.mjs` reads that file for a bucket its live ledger scan no
+longer has data for and merges it in, labelled `source: "snapshot"` next to the live rows'
+`source: "live"` — live always wins on a shared key, snapshot only ever fills a gap the rotation
+already opened.
+
+**These are proxies, stated as such** (908 §3.2): a week is "more efficient" than another only if
+it landed *comparable* work for *less* spend, and "comparable", "work", and "spend" each have an
+honest escape hatch (PR size/difficulty, rework, investigation that pays off later) this reader
+does not close. Read every figure here as **directionally useful and individually deniable**, not
+a verdict — and per 908 §7, don't expect a verdict on fewer than roughly 15 accumulated weekly
+buckets; five weeks is a demonstration that the instrument works, not enough power to resolve a
+30% real effect against a ~2x observed week-to-week swing.
+
+**Retention inversion (908 §4.3) — resolved by #651 before this landed.** When 908 was written,
+`RETENTION["traces"]` was `None` (never pruned; 972 MB / 49 files measured on the main checkout)
+while NO reader here consumed traces, and the transcript store every reader DOES depend on
+rotated in 30 days on a harness setting nobody in this repo set. #651 capped traces at 14 archives
+(table above); the transcript-side half of the inversion is what `trend-snapshot.mjs` closes.

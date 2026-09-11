@@ -266,6 +266,50 @@ run('--harness codex-cli prints a self-check line', () => {
   assert.match(res.stdout, /self-check: \d+\/\d+ sessions where \|deltaInputSum - maxCumulativeInput\| > 1%/);
 });
 
+// --- 908 §4.5: <synthetic> is known-non-billable, not a loud unknown-model alarm --
+
+/**
+ * Regression test for tempdoc 908 §4.5: `<synthetic>` (Claude Code's internal
+ * compaction-summary placeholder) previously tripped the SAME loud "!!"
+ * unknown-model warning as a genuinely missing pricing row, desensitising a
+ * load-bearing guard (it caught `claude-opus-5` hiding a third of all spend).
+ * Both branches are tested so the fix does not weaken the warning for a REAL
+ * unknown model while fixing the known-benign one.
+ */
+run('a `<synthetic>` turn is tracked as known-non-billable, NOT counted toward unpricedModels/unpricedTurns', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cache-eff-'));
+  const file = path.join(dir, 'session.jsonl');
+  const lines = [
+    { type: 'assistant', timestamp: '2026-08-18T00:00:00.000Z', requestId: 'r1',
+      message: { id: 'm1', model: '<synthetic>', usage: { cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 0 } } },
+  ];
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const report = emptyReport();
+  analyseTranscript(file, report);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  assert.equal(report.pricing.unpricedTurns, 0, '<synthetic> must not inflate the genuinely-unknown counter');
+  assert.equal(Object.keys(report.pricing.unpricedModels).length, 0, '<synthetic> must not appear in unpricedModels');
+  assert.equal(report.pricing.nonBillable['<synthetic>'].turns, 1);
+});
+
+run('a genuinely unknown model STILL trips the loud unpriced-model path (guard not weakened)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cache-eff-'));
+  const file = path.join(dir, 'session.jsonl');
+  const lines = [
+    { type: 'assistant', timestamp: '2026-08-18T00:00:00.000Z', requestId: 'r1',
+      message: { id: 'm1', model: 'gpt-99-totally-unknown', usage: { cache_read_input_tokens: 400_000, cache_creation_input_tokens: 0, output_tokens: 10 } } },
+  ];
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const report = emptyReport();
+  analyseTranscript(file, report);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  assert.equal(report.pricing.unpricedTurns, 1, 'a real unknown model must still count toward the loud alarm');
+  assert.equal(report.pricing.unpricedModels['gpt-99-totally-unknown'], 400_000);
+  assert.equal(Object.keys(report.pricing.nonBillable).length, 0, 'a real unknown model must not be misclassified as non-billable');
+});
+
 // --- report ------------------------------------------------------------------
 
 if (failures.length) {

@@ -197,6 +197,29 @@ export function isKnownModel(model) {
 }
 
 /**
+ * Known-non-billable model placeholders (tempdoc 908 §4.5). These are NOT
+ * genuinely unknown models — they are Claude Code harness internals that
+ * legitimately carry zero billable cost — so a caller must not raise the same
+ * loud "!!" alarm for them that a real missing pricing row deserves. The
+ * distinction matters because that alarm is load-bearing (it caught
+ * `claude-opus-5` hiding a third of all spend, README "Pricing coverage");
+ * firing it every run for a benign placeholder is how a maintainer learns to
+ * skim past the line that matters.
+ */
+export const NON_BILLABLE_MODELS = new Set([
+  // Claude Code's own internal placeholder on compaction-summary / orphan-
+  // boundary turns. Carries a real usage snapshot (turns, tokens) but bills
+  // nothing -- confirmed by corpus inspection (908 §4.5: 69 turns, 0.0M
+  // tokens, 0.0% of cache-read), not merely absent from PRICING.
+  '<synthetic>',
+]);
+
+/** True when `model` is a KNOWN non-billable placeholder, never a genuinely unknown one. */
+export function isNonBillableModel(model) {
+  return NON_BILLABLE_MODELS.has(model);
+}
+
+/**
  * Resolve `model` to its billing provider ('anthropic' for every row in
  * `PRICING` today — see the module-level comment above `OPUS_CURRENT`).
  * FAILS CLOSED like `findPricing`/`isKnownModel`: an unrecognized or absent

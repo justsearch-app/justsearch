@@ -11,7 +11,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { findPricing, providerOf, isKnownModel, PRICING } from './transcript-cost.mjs';
+import { findPricing, providerOf, isKnownModel, isNonBillableModel, PRICING } from './transcript-cost.mjs';
 
 let passed = 0;
 const failures = [];
@@ -80,6 +80,25 @@ run('providerOf and isKnownModel agree on the known/unknown boundary for every c
   assert.equal(providerOf('claude-opus-5') !== null, true);
   assert.equal(isKnownModel('gpt-4o'), false);
   assert.equal(providerOf('gpt-4o'), null);
+});
+
+// --- isNonBillableModel (tempdoc 908 §4.5) ------------------------------------
+
+run('isNonBillableModel: `<synthetic>` is known-non-billable', () => {
+  assert.equal(isNonBillableModel('<synthetic>'), true);
+});
+
+run('isNonBillableModel: a genuinely unknown model is NOT non-billable (still an alarm)', () => {
+  assert.equal(isNonBillableModel('gpt-99-totally-unknown'), false);
+});
+
+run('isNonBillableModel: a real priced model is not non-billable either', () => {
+  assert.equal(isNonBillableModel('claude-opus-5'), false);
+});
+
+run('isNonBillableModel(null/undefined) is false, not a Set-lookup throw', () => {
+  assert.equal(isNonBillableModel(null), false);
+  assert.equal(isNonBillableModel(undefined), false);
 });
 
 // --- report ------------------------------------------------------------------
