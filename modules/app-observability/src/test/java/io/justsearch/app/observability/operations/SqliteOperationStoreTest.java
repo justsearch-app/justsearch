@@ -166,6 +166,65 @@ class SqliteOperationStoreTest {
     Files.writeString(path, "corrupt main");
     Files.writeString(temp.resolve("operations.db-wal"), "original WAL");
     Files.writeString(temp.resolve("operations.db-shm"), "original SHM");
+    runCrashChild(path, crashStep, "unused");
+    try (var recovered = new SqliteOperationStore(path, CLOCK, step -> {});
+        Connection db = connect(path); Statement statement = db.createStatement()) {
+      var recovery = recovered.recovery().orElseThrow();
+      assertEquals(CLOCK.millis() + 300_001, recovery.historySinceMillis());
+      assertEquals(recovery.historySinceMillis(), scalar(statement,
+          "SELECT history_since_ms FROM operations_meta WHERE singleton = 1"));
+      assertEquals("corrupt main", Files.readString(recovery.preservedDirectory().resolve("operations.db")));
+      assertEquals("original WAL", Files.readString(recovery.preservedDirectory().resolve("operations.db-wal")));
+      assertEquals("original SHM", Files.readString(recovery.preservedDirectory().resolve("operations.db-shm")));
+    }
+  }
+
+  @Test
+  void haltAfterAcceptanceBeforeFirstEffectLeavesAcceptedRowAndEmptyEffectStore() throws Exception {
+    Path path = temp.resolve("operations.db");
+    Path effects = temp.resolve("effects.db");
+    try (var db = connect(effects); var statement = db.createStatement()) {
+      statement.execute("CREATE TABLE effects(operation_key TEXT PRIMARY KEY)");
+    }
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(CLOCK);
+    runCrashChild(path, "after-accept-before-effect", key);
+    assertAcceptedWithoutEffect(path, effects, key);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"before-accept", "after-first-effect"})
+  void acceptanceCrashWitnessRejectsBothWrongSidesOfTheBoundary(String point) throws Exception {
+    Path path = temp.resolve("operations.db");
+    Path effects = temp.resolve("effects.db");
+    try (var db = connect(effects); var statement = db.createStatement()) {
+      statement.execute("CREATE TABLE effects(operation_key TEXT PRIMARY KEY)");
+    }
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(CLOCK);
+    runCrashChild(path, point, key);
+    assertThrows(AssertionError.class, () -> assertAcceptedWithoutEffect(path, effects, key));
+    try (var db = connect(effects); var statement = db.createStatement()) {
+      assertEquals(point.equals("after-first-effect") ? 1 : 0,
+          scalar(statement, "SELECT count(*) FROM effects"));
+    }
+  }
+
+  private void assertAcceptedWithoutEffect(Path path, Path effects, String key) throws Exception {
+    try (var store = new SqliteOperationStore(path, CLOCK, step -> {});
+        var db = connect(effects); var statement = db.createStatement()) {
+      var row = store.find(key).orElseThrow(() -> new AssertionError("Accepted key is missing"));
+      assertEquals(io.justsearch.app.api.operations.OperationState.ACCEPTED, row.state());
+      assertEquals(key, row.key());
+      assertEquals(0, row.attempts());
+      assertNull(row.startedAt());
+      assertNull(row.receipt());
+      assertEquals(0, scalar(statement, "SELECT count(*) FROM effects"), "no first effect committed");
+      var retry = store.accept(key, row.descriptor(), row.context(), null);
+      assertFalse(retry.created());
+      assertEquals(row.id(), retry.record().id());
+    }
+  }
+
+  private void runCrashChild(Path path, String crashStep, String key) throws Exception {
     Set<String> classpath = new java.util.LinkedHashSet<>();
     for (Class<?> type : java.util.List.of(OperationStoreCrashChild.class, SqliteOperationStore.class,
         io.justsearch.app.api.operations.OperationStore.class,
@@ -181,7 +240,7 @@ class SqliteOperationStoreTest {
     Path output = temp.resolve("crash-child.txt");
     Process child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", executable).toString(),
         "-cp", String.join(java.io.File.pathSeparator, classpath), OperationStoreCrashChild.class.getName(),
-        path.toString(), crashStep, Long.toString(CLOCK.millis()))
+        path.toString(), crashStep, Long.toString(CLOCK.millis()), key)
         .redirectErrorStream(true).redirectOutput(output.toFile()).start();
     try {
       assertTrue(child.waitFor(20, java.util.concurrent.TimeUnit.SECONDS), "crash child timed out");
@@ -191,16 +250,6 @@ class SqliteOperationStoreTest {
         child.destroyForcibly();
         assertTrue(child.waitFor(5, java.util.concurrent.TimeUnit.SECONDS));
       }
-    }
-    try (var recovered = new SqliteOperationStore(path, CLOCK, step -> {});
-        Connection db = connect(path); Statement statement = db.createStatement()) {
-      var recovery = recovered.recovery().orElseThrow();
-      assertEquals(CLOCK.millis() + 300_001, recovery.historySinceMillis());
-      assertEquals(recovery.historySinceMillis(), scalar(statement,
-          "SELECT history_since_ms FROM operations_meta WHERE singleton = 1"));
-      assertEquals("corrupt main", Files.readString(recovery.preservedDirectory().resolve("operations.db")));
-      assertEquals("original WAL", Files.readString(recovery.preservedDirectory().resolve("operations.db-wal")));
-      assertEquals("original SHM", Files.readString(recovery.preservedDirectory().resolve("operations.db-shm")));
     }
   }
 

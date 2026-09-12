@@ -39,6 +39,8 @@ scope addition is recorded under the next item's section0.1, never silently expa
    terminal-publication races. Store/port gates pass; batch review pending.
 6. **R6 OPEN — named crash test.** Halt a child JVM after acceptance before its first
    effect, reopen: same key ACCEPTED and effect store empty.
+   [R6 proof](review-r6-acceptance-crash.md): final814 executes20 cases, including
+   two wrong-side crash witnesses; PMD and UI integration-test compilation pass.
 7. **R7 OPEN — installed proof/status.** C2-11 must inspect operations and fail on
    substrate reversion; correct batch1/handoff claims and execute its specified tier.
 8. **R8 OPEN — swallowed failures.** Background terminalization, failed root walks,
