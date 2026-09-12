@@ -36,10 +36,13 @@ final class VduOfflineTriggerSamplerTest {
     org.mockito.Mockito.doAnswer(
             inv -> {
               triggered.countDown();
-              return null;
+              return java.util.concurrent.CompletableFuture.completedFuture(
+                  new io.justsearch.app.api.OfflineProcessingOutcome(0, 0, 0,
+                      io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.NONE,
+                      io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff.NOT_NEEDED));
             })
         .when(coordinator)
-        .startOfflineProcessing();
+        .startOfflineProcessing(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
 
     var sampler =
         new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> ks, () -> false);
@@ -58,7 +61,7 @@ final class VduOfflineTriggerSamplerTest {
     var sampler = new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> null, () -> false);
     sampler.checkOnce();
 
-    verify(coordinator, never()).startOfflineProcessing();
+    verify(coordinator, never()).startOfflineProcessing(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -71,7 +74,7 @@ final class VduOfflineTriggerSamplerTest {
     sampler.checkOnce();
 
     verify(coordinator, never()).getPendingVduCount();
-    verify(coordinator, never()).startOfflineProcessing();
+    verify(coordinator, never()).startOfflineProcessing(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -84,7 +87,7 @@ final class VduOfflineTriggerSamplerTest {
     var sampler = new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> null, () -> true);
     sampler.checkOnce();
 
-    verify(coordinator, never()).startOfflineProcessing();
+    verify(coordinator, never()).startOfflineProcessing(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test

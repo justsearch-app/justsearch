@@ -657,6 +657,60 @@
       "guard": "test:AiPackOperationCompletionTest",
       "consumesProjection": "recorded-operation-dispatch",
       "note": "Projects actual completed/failed import status into shared-runner completion; installed is distinct from activated."
+    },
+    {
+      "id": "offline-procedure-owner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Shared manual/automatic actual-exit owner. Manual runs feed the recorded dispatch; automatic sampling carries explicit internal admission but does not itself accept a dispatch row."
+    },
+    {
+      "id": "offline-batch-outcome",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduBatchProcessor.java",
+      "guard": "test:VduBatchAcknowledgedOutcomeTest",
+      "consumesProjection": "offline-procedure-owner",
+      "note": "Projects only acknowledged document outcomes over one captured selection, preserving blocked remainder and write failures."
+    },
+    {
+      "id": "offline-pass-outcome-type",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/OfflineProcessingOutcome.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "offline-batch-outcome",
+      "note": "Intentional per-pass count/reason projection, not a global backlog or independent durable lifecycle authority."
+    },
+    {
+      "id": "offline-runtime-service-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImpl.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "offline-procedure-owner",
+      "note": "Carries exact admitted context and actual completion; no detached manual thread."
+    },
+    {
+      "id": "offline-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/TriggerOfflineProcessingHandler.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects acknowledged checkpoints and actual completion to the shared runner; never terminalizes at the started response."
+    },
+    {
+      "id": "offline-automatic-trigger",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduOfflineTriggerSampler.java",
+      "guard": "test:VduProcedureExecutorLifetimeTest",
+      "consumesProjection": "offline-procedure-owner",
+      "note": "Timer-only pacing producer; manual and automatic attempts share coordinator single-flight and its one procedure executor."
     }
   ]
 }

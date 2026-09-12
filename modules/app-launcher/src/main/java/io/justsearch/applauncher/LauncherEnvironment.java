@@ -2,7 +2,6 @@
 package io.justsearch.applauncher;
 
 import io.justsearch.configuration.SystemAccess;
-import io.justsearch.configuration.Faults;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -253,7 +252,9 @@ final class LauncherEnvironment implements AutoCloseable {
 
   @Override
   public void close() {
-    Faults.debugAndContinue(LOG, "shutdown", () -> HeadAssembly.close());
+    // A retained procedure can still write to operations and use telemetry/configuration.
+    // Propagate refusal and leave a later close able to finish after the body exits.
+    if (HeadAssembly != null) HeadAssembly.close();
     try { operations.close(); } catch (IOException failure) {
       LOG.warn("Failed to close operations store", failure);
     }

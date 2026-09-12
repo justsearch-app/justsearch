@@ -479,6 +479,7 @@ public final class HeadAssembly implements AutoCloseable {
             .orThrow();
     long t_service_1 = System.currentTimeMillis();
     this.serviceOut = serviceOut;
+    if (serviceOut.offlineCoordinator() != null) acquiredOwners.add(serviceOut.offlineCoordinator());
     // Tempdoc 541 §5.1 — project Brain composition root from the service phase window. ILM
     // is constructed earlier (just above, into `manager`); BrainAssembly wraps it as the
     // single Phase Output of process=brain.
@@ -1495,6 +1496,9 @@ public final class HeadAssembly implements AutoCloseable {
   /** §4 F4 LIFO teardown via the typed OrchestrationHandles record. */
   @Override
   public void close() {
+    // Repeatable termination barrier: an unfinished procedure must leave a later close able to
+    // finish dependency teardown. Never claim the one-shot closed state before this succeeds.
+    if (offlineCoordinator != null) offlineCoordinator.close();
     if (!closed.compareAndSet(false, true)) return;
     if (serviceOut != null) {
       try {

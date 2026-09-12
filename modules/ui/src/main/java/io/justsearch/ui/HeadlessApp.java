@@ -1319,16 +1319,18 @@ public class HeadlessApp {
       } catch (Exception ignored) {
         // best effort
       }
+      boolean headCleanupComplete = bootstrap == null;
       try {
-        if (bootstrap != null) {
-          bootstrap.close();
-        }
-      } catch (Exception ignored) {
-        // best effort
+        if (bootstrap != null) bootstrap.close();
+        headCleanupComplete = true;
+      } catch (Exception failure) {
+        log.warn("Head cleanup incomplete; retaining index and operation dependencies", failure);
       }
       boolean indexCleanupComplete = false;
       try {
-        if (knowledgeServer != null) {
+        if (!headCleanupComplete) {
+          log.warn("Index cleanup waits for Head procedure termination");
+        } else if (knowledgeServer != null) {
           indexCleanupComplete = knowledgeServer.closeForUpgrade() == io.justsearch.app.services.worker.ShutdownOutcome.GRACEFUL;
         } else if (processRoot != null) {
           // Never let an unfinished startup acquire a database after its close. If it cannot
@@ -1349,7 +1351,7 @@ public class HeadlessApp {
         log.warn("Failed to close operations store during cleanup", closeFailure);
       }
       try {
-        if (telemetry != null) {
+        if (telemetry != null && headCleanupComplete) {
           telemetry.close();
         }
       } catch (Exception ignored) {
@@ -1461,7 +1463,8 @@ public class HeadlessApp {
           java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
               shutdownRequestWatcher,
           io.justsearch.app.api.operations.OperationStore operations) {
-    var indexClosed = new java.util.concurrent.atomic.AtomicBoolean(knowledgeServer == null);
+    var indexClosed = new java.util.concurrent.atomic.AtomicBoolean();
+    var headClosed = new java.util.concurrent.atomic.AtomicBoolean();
     return List.of(
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "runtime-manifest",
@@ -1508,6 +1511,7 @@ public class HeadlessApp {
                 bootstrap.setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
                 bootstrap.close();
               }
+              headClosed.set(true);
               return null;
             }),
         // The one step whose outcome the receipt reports. Named INDEX_HALF_STEP in the sequence so
@@ -1515,6 +1519,8 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             io.justsearch.app.engine.EngineShutdownSequence.INDEX_HALF_STEP,
             reason -> {
+              if (!headClosed.get()) throw new IllegalStateException(
+                  "Index retained until Head procedure termination");
               String outcome = knowledgeServer == null ? "GRACEFUL" : knowledgeServer.closeForUpgrade().name();
               indexClosed.set("GRACEFUL".equals(outcome));
               return outcome;
@@ -1530,12 +1536,16 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "tracing",
             reason -> {
+              if (!headClosed.get()) throw new IllegalStateException(
+                  "Tracing retained until Head procedure termination");
               if (tracing != null) tracing.close();
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "telemetry",
             reason -> {
+              if (!headClosed.get()) throw new IllegalStateException(
+                  "Telemetry retained until Head procedure termination");
               if (telemetry != null) telemetry.close();
               return null;
             }),

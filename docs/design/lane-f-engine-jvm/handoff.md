@@ -7,12 +7,20 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
+Current work is [the shared offline owner](evidence/C2/offline-owner-proof.md):
+manual and automatic procedures share bounded admission/lifetime ownership;
+acknowledged per-pass progress feeds the recorded handler through actual cleanup.
+Final focused742 passes129 cases and affected PMD after mode-failure metadata and
+opt-in test-registry corrections. Full737 was red on the broad test-fixture close
+change, now corrected; full744 is running. Independent final reread found no
+remaining source defect. Hosted, actual-model/API and
+installed proof remain open. This is one C2-2 item, not stage completion or a pause.
+
 Latest integrated verification is [checkpoint724](evidence/C2/vdu-checkpoint-724.md):
 55b8aeb15 code passes full build/PMD with10,034 cases/1,643 suites, zero failures/errors
 and35 skips. Eight test tasks execute; the rest reuse unchanged inputs. Hosted
-CI34712074865 passes the same code and new real Engine fixture. The next active
-implementation is [shared offline ownership](evidence/C2/offline-owner-cut.md),
-with candidate work prepared separately during verification.
+CI34712074865 passes the same code and new real Engine fixture. The subsequent offline-owner code is governed by
+[the result/shutdown cut](evidence/C2/offline-owner-cut.md) and its proof record above.
 
 Prior integrated verification is [checkpoint694](evidence/C2/vdu-checkpoint-694.md)
 at41a74500b: full build/PMD9,993 cases/1,637 suites, zero failures/errors,35 skips;

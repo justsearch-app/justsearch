@@ -61,6 +61,8 @@ final class HeadlessAppShutdownWiringTest {
     var indexStep = steps.stream().filter(step -> EngineShutdownSequence.INDEX_HALF_STEP.equals(step.name())).findFirst().orElseThrow();
     var storeStep = steps.stream().filter(step -> "operations-store".equals(step.name())).findFirst().orElseThrow();
     var lockStep = steps.stream().filter(step -> "app-instance-lock".equals(step.name())).findFirst().orElseThrow();
+    steps.stream().filter(step -> "head-assembly".equals(step.name())).findFirst().orElseThrow()
+        .action().run(Reason.QUIT);
     assertEquals("FAILED", indexStep.action().run(Reason.QUIT));
     lockStep.action().run(Reason.QUIT);
     org.mockito.Mockito.verifyNoInteractions(instanceLock);
@@ -73,6 +75,29 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(index, org.mockito.Mockito.times(2)).closeForUpgrade();
     order.verify(operations).close();
     order.verify(instanceLock).close();
+  }
+
+  @Test
+  void failedHeadDrainRetainsDependenciesAndProducesUncleanExit(@TempDir Path tempDir) throws Exception {
+    var head = mock(HeadAssembly.class);
+    org.mockito.Mockito.doThrow(new IllegalStateException("procedure still running")).when(head).close();
+    var index = mock(KnowledgeServerBootstrap.class);
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var tracing = mock(io.justsearch.telemetry.TracingBootstrap.class);
+    var telemetry = mock(Telemetry.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    var exitCode = new AtomicInteger(-1);
+    var steps = HeadlessApp.orderedShutdownSteps(null, head, null, index, null, tracing, telemetry,
+        instanceLock, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+        mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null, operations);
+    var sequence = new EngineShutdownSequence(tempDir, steps, exitCode::set);
+    sequence.runAndExit(Reason.QUIT);
+    var result = sequence.run(Reason.QUIT);
+    assertFalse(result.clean());
+    assertEquals(1, exitCode.get());
+    assertTrue(result.errors().stream().anyMatch(error -> error.contains("head-assembly")));
+    assertTrue(result.errors().stream().anyMatch(error -> error.contains("operations-store")));
+    org.mockito.Mockito.verifyNoInteractions(index, operations, tracing, telemetry, instanceLock);
   }
 
   @Test

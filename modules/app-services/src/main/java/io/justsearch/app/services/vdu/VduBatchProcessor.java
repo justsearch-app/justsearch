@@ -2,6 +2,13 @@
 package io.justsearch.app.services.vdu;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
+import io.justsearch.app.api.OfflineProcessingOutcome;
+import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
+import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.function.Consumer;
 
 import io.justsearch.aibackend.backend.EngineCircuitBreaker;
 import io.justsearch.gpu.GpuCapabilitiesService;
@@ -24,12 +31,9 @@ import java.util.function.Supplier;
  * Runs with LLM loaded (Online Mode).
  *
  * <p><b>Architecture:</b> Main process runs VDU (vision completion via LLM),
- * then updates index via gRPC to Worker (which owns IndexWriter).
+ * then updates the index through the Engine port (the index half owns IndexWriter).
  */
 public class VduBatchProcessor {
-  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
-      "vdu-batch-processor", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
-
     private static final Logger LOG = LoggerFactory.getLogger(VduBatchProcessor.class);
 
     private final VduProcessor vduProcessor;
@@ -89,7 +93,7 @@ public class VduBatchProcessor {
 
     /**
      * Full constructor. Tempdoc 672 follow-up: {@code shouldInterruptBatch} is checked between
-     * documents in {@link #processPendingFiles()} so an in-progress batch stops early if the user
+     * documents in {@link #processPendingFiles} so an in-progress batch stops early if the user
      * becomes active mid-run, leaving remaining documents PENDING for the next idle window.
      *
      * @param shouldInterruptBatch cooperative-checkpoint interrupt signal; {@code () -> false}
@@ -126,9 +130,6 @@ public class VduBatchProcessor {
         catalog.outcomeTotal.increment(VduOutcomeTags.of(VduOutcome.FAILED));
     }
 
-    private void recordSkipped() {
-        catalog.outcomeTotal.increment(VduOutcomeTags.of(VduOutcome.SKIPPED));
-    }
 
     // Tempdoc 677: the abstention gate rejection is counted as a distinct FAILED-bucket outcome
     // (see VduOutcome — no dedicated REJECTED tag exists yet, and adding one is outside this
@@ -138,215 +139,171 @@ public class VduBatchProcessor {
         recordFailed();
     }
 
-    public int processPendingFiles() {
+    public OfflineProcessingOutcome processPendingFiles(
+            EngineContext engineContext, Consumer<OfflineProcessingOutcome> progress) {
+        Objects.requireNonNull(engineContext, "engineContext");
+        Objects.requireNonNull(progress, "progress");
+        checkInterrupted();
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         if (knowledgeClient == null) {
-            LOG.info("VDU batch processing skipped: Worker not connected yet");
-            return 0;
+            return report(progress, 0, 0, 0, BlockReason.WORKER_UNAVAILABLE);
         }
-        int pendingCount = knowledgeClient.countPendingVdu(ENGINE_CONTEXT);
-        if (pendingCount == 0) {
-            LOG.info("No pending VDU files");
+        // Capture the existing default bounded selection once. Later backlog is another pass.
+        List<String> pendingDocIds = List.copyOf(knowledgeClient.queryPendingVduDocIds(engineContext));
+        int selected = pendingDocIds.size();
+        LOG.info("VDU pass captured {} documents", selected);
+        report(progress, selected, 0, 0, BlockReason.NONE);
+        if (selected == 0) {
             vduCapabilityState.clearAll();
-            return 0;
+            return report(progress, 0, 0, 0, BlockReason.NONE);
         }
 
-        // Tempdoc 374 alpha.27: NVML-first probe via GpuCapabilitiesService. Pre-fix
-        // VramDetector.meetsVduRequirements() shelled out to nvidia-smi and returned
-        // false on cuda12 sandbox hosts where NVML works fine — VDU was silently
-        // disabled even though VRAM was 12 GB.
         Long vramBytes = gpuCapabilitiesService.snapshot().effective().totalVramBytes();
         if (!VramRequirements.meetsGgufRequirements(vramBytes)) {
-            LOG.warn("VDU batch processing skipped: insufficient VRAM ({})",
-                VramRequirements.describe(vramBytes));
             vduCapabilityState.block(VduCapabilityState.REASON_INSUFFICIENT_VRAM);
-            return 0;
+            return report(progress, selected, 0, 0, BlockReason.INSUFFICIENT_VRAM);
         }
         vduCapabilityState.clear(VduCapabilityState.REASON_INSUFFICIENT_VRAM);
-
         if (!vduProcessor.hasVisionCapability()) {
-            LOG.warn("VDU batch processing skipped: missing vision projector (mmproj)");
             vduCapabilityState.block(VduCapabilityState.REASON_MISSING_MMPROJ);
-            return 0;
+            return report(progress, selected, 0, 0, BlockReason.MISSING_VISION);
         }
         vduCapabilityState.clear(VduCapabilityState.REASON_MISSING_MMPROJ);
 
-        List<String> pendingDocIds = knowledgeClient.queryPendingVduDocIds(ENGINE_CONTEXT);
-        if (pendingDocIds.isEmpty()) {
-            LOG.info("No pending VDU doc IDs returned");
-            vduCapabilityState.clearAll();
-            return 0;
-        }
-
-        LOG.info("Processing {} pending VDU files", pendingDocIds.size());
-
-        // Tempdoc 672 follow-up: VDU mode is entered/exited once for the whole batch, not once
-        // per document — each transition is a full llama-server restart (~10-12s). A failure to
-        // enter also now fails the whole batch immediately instead of repeating the same failed
-        // restart for every remaining document.
         try {
             vduProcessor.enterVduMode();
-        } catch (VduProcessor.VduException e) {
-            LOG.error("Failed to enter VDU mode for batch; skipping {} pending files",
-                pendingDocIds.size(), e);
+        } catch (VduProcessor.VduException failure) {
             vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-            return 0;
+            var modeFailure = new IllegalStateException("Failed to enter VDU mode", failure);
+            try {
+                report(progress, selected, 0, 0, BlockReason.AI_OFFLINE);
+            } catch (RuntimeException checkpointFailure) {
+                modeFailure.addSuppressed(checkpointFailure);
+            } catch (Error fatal) {
+                fatal.addSuppressed(modeFailure);
+                throw fatal;
+            }
+            throw modeFailure;
         }
         vduCapabilityState.clear(VduCapabilityState.REASON_AI_OFFLINE);
 
         int processed = 0;
         int failed = 0;
-
+        BlockReason blocked = BlockReason.NONE;
+        Throwable primaryFailure = null;
         try {
-        for (String docId : pendingDocIds) {
-            // Tempdoc 672 follow-up: cooperative-checkpoint interrupt — mirrors
-            // EmbeddingBackfillOps.checkInterrupt() on the Worker side. Checked between
-            // documents so the user regaining activity (or the OS requesting reduced energy use)
-            // stops the batch early instead of grinding through the rest of the queue.
-            if (shouldInterruptBatch.getAsBoolean()) {
-                int remaining = pendingDocIds.size() - processed - failed;
-                LOG.info("VDU batch interrupted (user active or energy-reduced), leaving {} docs PENDING",
-                    remaining);
-                break;
-            }
+            for (String docId : pendingDocIds) {
+                checkInterrupted();
+                if (shouldInterruptBatch.getAsBoolean()) {
+                    blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                    break;
+                }
+                if (!circuitBreaker.isClosed()) {
+                    vduCapabilityState.block(VduCapabilityState.REASON_CIRCUIT_OPEN);
+                    blocked = BlockReason.CIRCUIT_OPEN;
+                    break;
+                }
+                vduCapabilityState.clear(VduCapabilityState.REASON_CIRCUIT_OPEN);
 
-            // Circuit breaker check - fast-fail if LLM is repeatedly failing
-            if (!circuitBreaker.isClosed()) {
-                int remaining = pendingDocIds.size() - processed - failed;
-                LOG.warn("VDU circuit breaker OPEN, skipping remaining {} docs (reason: {})",
-                    remaining, circuitBreaker.tripReason());
-                vduCapabilityState.block(VduCapabilityState.REASON_CIRCUIT_OPEN);
-                break;
-            }
-            vduCapabilityState.clear(VduCapabilityState.REASON_CIRCUIT_OPEN);
-
-            try {
-                // Mark as PROCESSING with retry count increment (poison pill protection)
-                int retryCount = knowledgeClient.markVduProcessing(docId, SchemaFields.VDU_MAX_RETRIES, ENGINE_CONTEXT);
+                int retryCount = knowledgeClient.markVduProcessing(
+                    docId, SchemaFields.VDU_MAX_RETRIES, engineContext);
                 if (retryCount < 0) {
-                    LOG.warn("VDU skipped (max retries exceeded or error): {}", docId);
-                    recordSkipped();
-                    failed++;
-                    continue;
+                    // The legacy scalar cannot distinguish a missing parent from retry exhaustion.
+                    // Do not invent a committed failed-unit acknowledgement from that ambiguity.
+                    blocked = BlockReason.PROCESSING_REFUSED;
+                    break;
                 }
 
-                LOG.debug("VDU processing attempt {}/{} for: {}",
-                    retryCount, SchemaFields.VDU_MAX_RETRIES, docId);
-
-                Path filePath = Path.of(docId);
-
-                if (!Files.exists(filePath)) {
-                    LOG.warn("VDU file no longer exists: {}", docId);
-                    markVduFailed(knowledgeClient, docId, "File no longer exists");
+                VduProcessor.VduResult result;
+                try {
+                    checkInterrupted();
+                    Path filePath = Path.of(docId);
+                    if (!Files.exists(filePath)) {
+                        throw new VduProcessor.VduException("File no longer exists", null);
+                    }
+                    result = vduProcessor.process(filePath, engineContext);
+                } catch (VduProcessor.VduException | RuntimeException failure) {
+                    EngineFutures.rethrowCancellation(failure);
+                    checkInterrupted();
+                    LOG.warn("VDU processing failed for {}", docId, failure);
+                    circuitBreaker.recordFailure(failure);
+                    // Control/write failures are outside the model catch: never recursively mark
+                    // an unacknowledged write as a successful FAILED document.
+                    try { markVduFailed(knowledgeClient, docId, failure.getMessage(), engineContext); }
+                    catch (RuntimeException | Error writeFailure) {
+                        if (writeFailure != failure) writeFailure.addSuppressed(failure);
+                        throw writeFailure;
+                    }
                     recordFailed();
                     failed++;
+                    report(progress, selected, processed, failed, BlockReason.NONE);
                     continue;
                 }
-
-                VduProcessor.VduResult result = vduProcessor.process(filePath, ENGINE_CONTEXT);
-                circuitBreaker.recordSuccess();  // LLM call succeeded
-
-                // P0.4: Use explicit VduUpdateOutcome to distinguish SUCCESS_TEXT vs SUCCESS_EMPTY vs FAILED.
-                // This avoids misleading "COMPLETED but empty" states where content was never updated.
+                checkInterrupted();
+                circuitBreaker.recordSuccess();
                 String extractedText = result.extractedText();
                 boolean hasText = extractedText != null && !extractedText.isBlank();
-                GateVerdict gateVerdict = result.gateVerdict();
-
+                GateVerdict verdict = result.gateVerdict();
                 io.justsearch.ipc.VduUpdateOutcome outcome;
                 String enrichment;
-                String contentForWire;
-                if (gateVerdict.rejected()) {
-                    // Tempdoc 677: the abstention gate judged this document's output untrustworthy
-                    // (Stage 0: no page carried any input-legibility signal, or Stage 1: the
-                    // model's own logprob/finish-reason signals were suspect). Checked BEFORE
-                    // hasText so a Stage 0 rejection (no model call, extractedText is blank) is
-                    // still reported as REJECTED_SUSPECT_TEXT rather than falling through to the
-                    // SUCCESS_EMPTY branch below.
+                String content;
+                if (verdict.rejected()) {
                     outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT;
-                    // Omit the model's suspect text from the wire entirely — the worker ignores
-                    // extracted_content for this outcome anyway (baseline is retained), and
-                    // omitting it keeps a possibly-fabricated string out of the payload.
-                    contentForWire = null;
-                    enrichment = buildGateRejectionEnrichment(gateVerdict, result.pageCount());
-                    LOG.info("VDU output rejected by abstention gate (stage={}) for: {}",
-                        gateVerdict.stage(), docId);
+                    content = null;
+                    enrichment = buildGateRejectionEnrichment(verdict, result.pageCount());
                 } else if (hasText) {
                     outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT;
-                    contentForWire = extractedText;
+                    content = extractedText;
                     enrichment = result.enrichment();
                 } else {
-                    // VDU succeeded but produced no text (e.g., blank image, handwriting)
                     outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                    contentForWire = null;
+                    content = null;
                     enrichment = buildNoTextEnrichment(result.pageCount(), result.enrichment());
-                    LOG.info("VDU produced no text for: {} (pageCount={})", docId, result.pageCount());
                 }
-
-                boolean updated = knowledgeClient.updateVduResult(
-                    docId,
-                    contentForWire,
-                    outcome,
-                    enrichment,
-                    result.pageCount()
-                , ENGINE_CONTEXT);
-
-                if (updated) {
-                    if (gateVerdict.rejected()) {
-                        recordRejected();
-                        failed++;
-                        LOG.info("VDU rejected ({}/{}): {}",
-                            failed, pendingDocIds.size(), filePath.getFileName());
-                    } else if (hasText) {
-                        recordCompleted();
-                        processed++;
-                        LOG.info("VDU completed ({}/{}): {}",
-                            processed, pendingDocIds.size(), filePath.getFileName());
-                    } else {
-                        // SUCCESS_EMPTY: VDU ran successfully but no usable text; count separately
-                        recordEmpty();
-                        failed++;
-                        LOG.info("VDU completed (no text) ({}/{}): {}",
-                            failed, pendingDocIds.size(), filePath.getFileName());
-                    }
-                } else {
-                    LOG.warn("VDU update failed for: {}", docId);
-                    recordFailed();
-                    failed++;
+                if (!knowledgeClient.updateVduResult(
+                        docId, content, outcome, enrichment, result.pageCount(), engineContext)) {
+                    throw new IllegalStateException("VDU result was not acknowledged by the index");
                 }
-
-            } catch (VduProcessor.VduException e) {
-                LOG.error("VDU processing failed for: {}", docId, e);
-                circuitBreaker.recordFailure(e);  // Track LLM failures
-                markVduFailed(knowledgeClient, docId, e.getMessage());
-                recordFailed();
-                failed++;
-            } catch (Exception e) {
-                LOG.error("Unexpected error processing: {}", docId, e);
-                circuitBreaker.recordFailure(e);  // Track LLM failures
-                markVduFailed(knowledgeClient, docId, "Unexpected error: " + e.getMessage());
-                recordFailed();
-                failed++;
+                if (verdict.rejected()) { recordRejected(); failed++; }
+                else if (hasText) { recordCompleted(); processed++; }
+                else { recordEmpty(); failed++; }
+                report(progress, selected, processed, failed, BlockReason.NONE);
             }
-        }
+            return report(progress, selected, processed, failed, blocked);
+        } catch (RuntimeException | Error failure) {
+            primaryFailure = failure;
+            throw failure;
         } finally {
-            vduProcessor.exitVduMode();
+            finishVduMode(primaryFailure);
         }
-
-        LOG.info("VDU batch complete: {} processed, {} failed", processed, failed);
-        return processed;
     }
 
-    private void markVduFailed(KnowledgeClient knowledgeClient, String docId, String reason) {
-        try {
-            knowledgeClient.updateVduResult(
-                docId,
-                null,
+    private void finishVduMode(Throwable primaryFailure) {
+        try { vduProcessor.exitVduMode(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primaryFailure == null) throw cleanup;
+            if (primaryFailure != cleanup) primaryFailure.addSuppressed(cleanup);
+        }
+    }
+
+    private static void checkInterrupted() {
+        if (Thread.currentThread().isInterrupted()) throw new CancellationException("VDU pass interrupted");
+    }
+
+    private static OfflineProcessingOutcome report(Consumer<OfflineProcessingOutcome> progress,
+            int selected, int processed, int failed, BlockReason blocked) {
+        var outcome = new OfflineProcessingOutcome(
+            selected, processed, failed, blocked, EmbeddingHandoff.NOT_EVALUATED);
+        progress.accept(outcome);
+        return outcome;
+    }
+
+    private void markVduFailed(KnowledgeClient knowledgeClient, String docId, String reason,
+            EngineContext engineContext) {
+        if (!knowledgeClient.updateVduResult(docId, null,
                 io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED,
-                buildErrorEnrichment(reason),
-                0
-            , ENGINE_CONTEXT);
-        } catch (Exception e) {
-            LOG.warn("Failed to mark VDU failed for: {}", docId, e);
+                buildErrorEnrichment(reason), 0, engineContext)) {
+            throw new IllegalStateException("VDU failure was not acknowledged by the index");
         }
     }
 

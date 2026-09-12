@@ -1,7 +1,8 @@
 # C2-2 offline procedure: result and shutdown details
 
 September12 at55b8aeb15. This refines the already-decided shared coordinator owner;
-implementation candidates are not yet applied or verified. No owner input is pending.
+The implementation and review corrections have [focused proof](offline-owner-proof.md);
+integrated, hosted and live acceptance remain tracked there. No owner input is pending.
 
 ## One result projection
 
@@ -26,6 +27,12 @@ blocks report the captured remainder. If the Engine cannot reach selection at al
 report zero selected plus the explicit blocking reason; do not invent selected IDs
 from a global count. A completed pass is not a promise to drain future/global work.
 Embedding completion here means the mode handoff, not autonomous backfill completion.
+
+A failed mode entry checkpoints AI_OFFLINE with zero selected before selection or
+the captured remainder afterward, then propagates its original operational failure.
+Ordinary checkpoint-delivery failure is suppressed on that failure; a checkpoint
+Error remains fatal with the mode failure suppressed. Mode exit and write failures
+also remain operational failures, not normal blocked returns.
 
 ## Actual completion and cancellation
 

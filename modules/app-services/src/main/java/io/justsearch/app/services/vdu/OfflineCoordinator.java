@@ -1,254 +1,292 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.vdu;
 
-import io.justsearch.core.context.EngineContext;
-
+import io.justsearch.app.api.EngineAdmissionService;
+import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.ModeTransitionException;
+import io.justsearch.app.api.OfflineProcessingOutcome;
+import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
+import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineFutures;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * Coordinates offline processing: VDU first (if needed), then embeddings.
- *
- * <p>Called when user goes idle or manually triggers "Process Now".
- * Ensures VDU runs with LLM before switching to SLM for embeddings.
- *
- * <p><b>Architecture:</b> Queries Worker (via gRPC) for pending work counts.
- * Does not access Lucene directly - Worker owns the index.
- *
- * <p><b>Tempdoc 737 (task 3):</b> this coordinator no longer drives inference modes directly.
- * The whole run is bracketed by {@link RuntimeReconciler#beginProcedure}/{@link
- * RuntimeReconciler#endProcedure}, and each engine-state need (Phase A "engine up", Phase B "park
- * to indexing") is a procedure-scoped request through {@link
- * RuntimeReconciler#procedureRequireEngine(boolean)}. When the procedure ends, the reconciler
- * returns the engine to spec — so the §3d never-switch-back bug is inexpressible: after Phase B
- * parks the engine, spec (not this class) decides whether it comes back online. The
- * {@link OnlineAiLifecycleControl} handle is retained for <b>read-only realized-state checks</b>
- * ({@code isOnline()}), never for transitions (R4).
- */
-public class OfflineCoordinator {
-  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
-      "offline-enrichment-coordinator", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+/** One bounded owner for manual and automatic enrichment through actual procedure cleanup. */
+public final class OfflineCoordinator implements AutoCloseable {
+  private static final EngineContext BACKLOG_CONTEXT =
+      io.justsearch.app.services.intent.EngineProvenance.internal(
+          "offline-enrichment-backlog", EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.BACKGROUND);
 
-    private static final Logger LOG = LoggerFactory.getLogger(OfflineCoordinator.class);
+  private final OnlineAiLifecycleControl inferenceManager;
+  private final RuntimeReconciler reconciler;
+  private final VduBatchProcessor vduBatchProcessor;
+  private final Supplier<KnowledgeClient> knowledgeClientSupplier;
+  private final VduCapabilityState vduCapabilityState;
+  private final EngineAdmissionService admission;
+  private final EngineExecutorRegistry.Registration procedureOwner;
+  private final ExecutorService procedureExecutor;
+  private final AtomicBoolean processing = new AtomicBoolean();
 
-    // Tempdoc 518 Appendix F W4.2 — role-typed interface; off the concrete ILM. Tempdoc 737 R4:
-    // used ONLY for realized-state reads (isOnline()), never to drive transitions.
-    private final OnlineAiLifecycleControl inferenceManager;
-    // Tempdoc 737: the single-writer authority. Procedure-scoped engine control routes here. May be
-    // null in minimal/test constructions that never exercise the engine phases.
-    private final RuntimeReconciler reconciler;
-    private final VduBatchProcessor vduBatchProcessor;
-    // Tempdoc 672: live supplier, not a captured value — the Worker client is null at Head
-    // bootstrap (async connect) and must be re-read at use-time, never frozen at construction.
-    private final Supplier<KnowledgeClient> knowledgeClientSupplier;
-    private final VduCapabilityState vduCapabilityState;
-    private final AtomicBoolean processing = new AtomicBoolean(false);
-
-    public OfflineCoordinator(OnlineAiLifecycleControl inferenceManager,
-                              VduBatchProcessor vduBatchProcessor,
-                              Supplier<KnowledgeClient> knowledgeClientSupplier) {
-        this(inferenceManager, null, vduBatchProcessor, knowledgeClientSupplier, new VduCapabilityState());
+  public OfflineCoordinator(EngineExecutorRegistry executors, EngineAdmissionService admission,
+      OnlineAiLifecycleControl inferenceManager, RuntimeReconciler reconciler,
+      VduBatchProcessor vduBatchProcessor, Supplier<KnowledgeClient> knowledgeClientSupplier,
+      VduCapabilityState vduCapabilityState) {
+    this.admission = Objects.requireNonNull(admission, "admission");
+    this.inferenceManager = Objects.requireNonNull(inferenceManager, "inferenceManager");
+    this.reconciler = reconciler;
+    this.vduBatchProcessor = Objects.requireNonNull(vduBatchProcessor, "vduBatchProcessor");
+    this.knowledgeClientSupplier = Objects.requireNonNull(knowledgeClientSupplier, "knowledgeClientSupplier");
+    this.vduCapabilityState = Objects.requireNonNull(vduCapabilityState, "vduCapabilityState");
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    procedureOwner = executors.register(new EngineExecutorSpec(
+        "head.offline-procedure", EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.PLATFORM, 1, limits.maxQueue(), 1));
+    try {
+      procedureExecutor = procedureOwner.open(
+          Thread.ofPlatform().daemon().name("offline-procedure").factory());
+    } catch (RuntimeException | Error failure) {
+      try { procedureOwner.close(); }
+      catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
+      throw failure;
     }
+  }
 
-    public OfflineCoordinator(OnlineAiLifecycleControl inferenceManager,
-                              VduBatchProcessor vduBatchProcessor,
-                              Supplier<KnowledgeClient> knowledgeClientSupplier,
-                              VduCapabilityState vduCapabilityState) {
-        this(inferenceManager, null, vduBatchProcessor, knowledgeClientSupplier, vduCapabilityState);
+  /** The returned stage finishes after mode cleanup, cancellation detachment and admission release. */
+  public CompletionStage<OfflineProcessingOutcome> startOfflineProcessing(
+      EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
+    Objects.requireNonNull(context, "context");
+    Objects.requireNonNull(progress, "progress");
+    if (!processing.compareAndSet(false, true)) {
+      throw new IllegalStateException("Enrichment is already running");
     }
+    EngineWorkHandle work;
+    try { work = admission.attach(context); }
+    catch (RuntimeException | Error failure) { processing.set(false); throw failure; }
 
-    public OfflineCoordinator(OnlineAiLifecycleControl inferenceManager,
-                              RuntimeReconciler reconciler,
-                              VduBatchProcessor vduBatchProcessor,
-                              Supplier<KnowledgeClient> knowledgeClientSupplier,
-                              VduCapabilityState vduCapabilityState) {
-        this.inferenceManager = inferenceManager;
-        this.reconciler = reconciler;
-        this.vduBatchProcessor = vduBatchProcessor;
-        this.knowledgeClientSupplier = knowledgeClientSupplier;
-        this.vduCapabilityState =
-            vduCapabilityState != null ? vduCapabilityState : new VduCapabilityState();
+    // FutureTask's cancel result precedes actual body exit and discards later body failures.
+    // Preserve the actual procedure outcome separately; the transport future only requests stop.
+    var body = new CompletableFuture<OfflineProcessingOutcome>();
+    var exited = new CompletableFuture<String>();
+    var submitted = new CompletableFuture<CompletableFuture<Void>>();
+    EngineWorkHandle.Registration cancellation;
+    try {
+      cancellation = work.onCancel(reason -> submitted.thenAccept(task -> task.cancel(true))
+          .exceptionally(failure -> { body.completeExceptionally(procedureFailure(failure)); return null; }));
+    } catch (RuntimeException | Error failure) {
+      try { work.close(); }
+      catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
+      finally { processing.set(false); }
+      throw failure;
     }
-
-    /**
-     * Start offline processing. Sequences VDU then Embeddings.
-     *
-     * <p>Flow:
-     * <ol>
-     *   <li>Query pending VDU/embedding counts via gRPC</li>
-     *   <li>If VDU pending: ensure LLM loaded, process VDU batch</li>
-     *   <li>Switch to Indexing Mode (SLM) for embeddings</li>
-     * </ol>
-     *
-     * <p>Thread-safe: only one processing run at a time.
-     */
-    public void startOfflineProcessing() {
-        if (!processing.compareAndSet(false, true)) {
-            LOG.info("Offline processing already in progress, skipping");
-            return;
-        }
-
-        // Tempdoc 737 (task 3): the entire run is a reconciler procedure. Engine states held during
-        // the run are the procedure's business; endProcedure returns the engine to spec.
-        boolean procedureBegun = false;
-        Throwable primaryFailure = null;
+    try {
+      CompletableFuture<Void> task = EngineFutures.supplyAsync(() -> {
         try {
-            if (reconciler != null) {
-                reconciler.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "offline-processing");
-                procedureBegun = true;
-            }
-            KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
-            if (knowledgeClient == null) {
-                LOG.info("Offline processing skipped: Worker not connected yet");
-                return;
-            }
-
-            LOG.info("Starting offline processing");
-
-            // Recover any documents stuck in PROCESSING state from previous crash
-            int recovered = knowledgeClient.recoverVduProcessing(ENGINE_CONTEXT);
-            if (recovered > 0) {
-                LOG.info("Recovered {} documents stuck in PROCESSING state", recovered);
-            }
-
-            int pendingVdu = knowledgeClient.countPendingVdu(ENGINE_CONTEXT);
-            int pendingEmbeddings = knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT);
-
-            LOG.info("Pending work: {} VDU files, {} embeddings", pendingVdu, pendingEmbeddings);
-
-            // Phase A: VDU Processing (requires LLM in Online Mode)
-            if (pendingVdu > 0) {
-                LOG.info("Phase A: Processing {} pending VDU files", pendingVdu);
-                processVduPhase();
-            } else {
-                vduCapabilityState.clearAll();
-            }
-
-            // Phase B: Embedding Processing (requires SLM in Indexing Mode)
-            // Re-query count - VDU sets embedding_status to PENDING for re-embedding
-            pendingEmbeddings = knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT);
-            if (pendingEmbeddings > 0) {
-                LOG.info("Phase B: Parking engine to Indexing Mode for {} pending embeddings",
-                    pendingEmbeddings);
-                processEmbeddingPhase();
-            } else {
-                LOG.info("No pending embeddings, staying in current mode");
-            }
-
-            LOG.info("Offline processing complete");
+          checkCancellation(work);
+          var outcome = runProcedure(work.context(), progress);
+          checkCancellation(work);
+          body.complete(outcome);
         } catch (RuntimeException | Error failure) {
-            primaryFailure = failure;
-            throw failure;
-        } finally {
-            // endProcedure BEFORE clearing the processing flag: the reconciler returns the engine to
-            // spec now, so chatEnabled=true → engine returns ONLINE even after Phase B parked it;
-            // chatEnabled=false → it stays down. THIS is what kills §3d.
-            finishProcedure(procedureBegun, primaryFailure);
+          body.completeExceptionally(procedureFailure(failure));
         }
+        return null;
+      }, procedureExecutor, () -> finishOwnership(work, cancellation, body, exited));
+      submitted.complete(task);
+    } catch (RuntimeException | Error refusal) {
+      // EngineFutures owns the once-only exit callback even when submission is refused.
+      submitted.completeExceptionally(refusal);
+      try { exited.getNow(null); }
+      catch (CompletionException cleanup) {
+        if (cleanup.getCause() != refusal) refusal.addSuppressed(cleanup.getCause());
+      }
+      throw refusal;
     }
+    return exited.handle((cancellationReason, cleanup) -> {
+      // Actual exit always records the body (including pre-entry cancellation) before this stage.
+      OfflineProcessingOutcome outcome = null;
+      Throwable failure = null;
+      try { outcome = body.join(); }
+      catch (CompletionException failed) { failure = failed.getCause(); }
+      catch (CancellationException cancelled) { failure = cancelled; }
+      if (failure != null) {
+        if (cleanup != null && cleanup != failure) failure.addSuppressed(cleanup);
+        throw new CompletionException(failure);
+      }
+      if (cleanup != null) throw new CompletionException(cleanup);
+      if (cancellationReason != null) throw new CancellationException(cancellationReason);
+      return outcome;
+    }).minimalCompletionStage();
+  }
 
-    private void finishProcedure(boolean procedureBegun, Throwable primaryFailure) {
+  private void finishOwnership(EngineWorkHandle work, EngineWorkHandle.Registration cancellation,
+      CompletableFuture<OfflineProcessingOutcome> body, CompletableFuture<String> exited) {
+    Throwable failure = null;
+    try { cancellation.close(); }
+    catch (RuntimeException | Error cleanup) { failure = cleanup; }
+    try { work.close(); }
+    catch (RuntimeException | Error cleanup) {
+      if (failure == null) failure = cleanup;
+      else if (cleanup != failure) failure.addSuppressed(cleanup);
+    }
+    String cancellationReason = null;
+    try { cancellationReason = work.cancellationReason().orElse(null); }
+    catch (RuntimeException | Error cleanup) {
+      if (failure == null) failure = cleanup;
+      else if (cleanup != failure) failure.addSuppressed(cleanup);
+    }
+    processing.set(false);
+    // This wins only for cancellation before supplier entry; a running body already recorded
+    // its result or failure before EngineFutures invokes the actual-exit callback.
+    body.completeExceptionally(new CancellationException("Enrichment cancelled before task entry"));
+    // Success linearizes at this actual-exit snapshot after releasing ownership. Cancellation
+    // already known here defeats a prior successful body; later requests cannot rewrite it.
+    if (failure == null) exited.complete(cancellationReason);
+    else exited.completeExceptionally(failure);
+  }
+
+  private static Throwable procedureFailure(Throwable failure) {
+    var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+    while (failure instanceof CompletionException && failure.getCause() != null && seen.add(failure)) {
+      Throwable cause = failure.getCause();
+      for (Throwable suppressed : failure.getSuppressed()) {
+        if (suppressed != cause) cause.addSuppressed(suppressed);
+      }
+      failure = cause;
+    }
+    if (failure instanceof InterruptedException) {
+      var cancelled = new CancellationException("Enrichment interrupted");
+      cancelled.initCause(failure);
+      return cancelled;
+    }
+    return failure;
+  }
+
+  private static void checkCancellation(EngineWorkHandle work) {
+    var reason = work.cancellationReason();
+    if (reason.isPresent()) throw new CancellationException(reason.orElseThrow());
+    if (Thread.currentThread().isInterrupted()) throw new CancellationException("Enrichment interrupted");
+  }
+
+  private OfflineProcessingOutcome runProcedure(
+      EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
+    boolean procedureBegun = false;
+    Throwable primaryFailure = null;
+    try {
+      if (reconciler != null) {
+        reconciler.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "offline-processing");
+        procedureBegun = true;
+      }
+      KnowledgeClient client = knowledgeClientSupplier.get();
+      if (client == null) {
+        return report(progress, new OfflineProcessingOutcome(
+            0, 0, 0, BlockReason.WORKER_UNAVAILABLE, EmbeddingHandoff.NOT_EVALUATED));
+      }
+      client.recoverVduProcessing(context);
+      OfflineProcessingOutcome outcome;
+      if (client.countPendingVdu(context) > 0) outcome = processVduPhase(context, progress);
+      else {
+        vduCapabilityState.clearAll();
+        outcome = new OfflineProcessingOutcome(0, 0, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED);
+      }
+      var handoff = client.countPendingEmbeddings(context) > 0
+          ? processEmbeddingPhase() : EmbeddingHandoff.NOT_NEEDED;
+      return report(progress, outcome.withEmbeddingHandoff(handoff));
+    } catch (RuntimeException | Error failure) {
+      primaryFailure = failure;
+      throw failure;
+    } finally {
+      finishProcedure(procedureBegun, primaryFailure);
+    }
+  }
+
+  private void finishProcedure(boolean begun, Throwable primaryFailure) {
+    try { if (begun) reconciler.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH); }
+    catch (RuntimeException | Error cleanup) {
+      if (primaryFailure == null) throw cleanup;
+      if (primaryFailure != cleanup) primaryFailure.addSuppressed(cleanup);
+    }
+  }
+
+  private OfflineProcessingOutcome processVduPhase(
+      EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
+    if (!inferenceManager.isOnline() && reconciler != null) {
+      try { reconciler.procedureRequireEngine(true); }
+      catch (ModeTransitionException failure) {
+        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
+        var modeFailure = new IllegalStateException("Failed to bring the engine online for enrichment", failure);
         try {
-            if (procedureBegun) reconciler.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
-        } catch (RuntimeException | Error cleanup) {
-            if (primaryFailure == null) throw cleanup;
-            if (primaryFailure != cleanup) primaryFailure.addSuppressed(cleanup);
-        } finally {
-            processing.set(false);
+          report(progress, new OfflineProcessingOutcome(
+              0, 0, 0, BlockReason.AI_OFFLINE, EmbeddingHandoff.NOT_EVALUATED));
+        } catch (RuntimeException checkpointFailure) {
+          modeFailure.addSuppressed(checkpointFailure);
+        } catch (Error fatal) {
+          fatal.addSuppressed(modeFailure);
+          throw fatal;
         }
+        throw modeFailure;
+      }
     }
-
-    private void processVduPhase() {
-        // R4: gate on REALIZED state (mode==ONLINE), never spec. inferenceManager.isOnline() reads
-        // the FSM phase, so a chat session or a prior procedure that already brought the engine up
-        // is honored and we don't restart it.
-        if (!inferenceManager.isOnline()) {
-            if (reconciler == null) {
-                LOG.warn("Skipping VDU phase: no reconciler to bring the engine up");
-                vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-                return;
-            }
-            try {
-                LOG.info("Requesting engine UP for VDU processing (procedure-scoped)");
-                reconciler.procedureRequireEngine(true);
-            } catch (ModeTransitionException e) {
-                LOG.error("Failed to bring engine up for VDU", e);
-                vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-                return;  // Skip VDU phase
-            }
-        }
-
-        // R4: re-read REALIZED state after the request.
-        if (inferenceManager.isOnline()) {
-            vduCapabilityState.clear(VduCapabilityState.REASON_AI_OFFLINE);
-            int processed = vduBatchProcessor.processPendingFiles();
-            LOG.info("VDU phase complete: {} files processed", processed);
-        } else {
-            LOG.warn("Skipping VDU phase: LLM not available");
-            vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-        }
+    if (!inferenceManager.isOnline()) {
+      vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
+      return report(progress, new OfflineProcessingOutcome(
+          0, 0, 0, BlockReason.AI_OFFLINE, EmbeddingHandoff.NOT_EVALUATED));
     }
+    vduCapabilityState.clear(VduCapabilityState.REASON_AI_OFFLINE);
+    return vduBatchProcessor.processPendingFiles(context, progress);
+  }
 
-    private void processEmbeddingPhase() {
-        if (reconciler == null) {
-            LOG.warn("Skipping embedding phase: no reconciler to park the engine");
-            return;
-        }
-        try {
-            // Procedure-scoped park to Indexing Mode. Worker will automatically process pending
-            // embeddings because isMainGpuActive() will return false.
-            reconciler.procedureRequireEngine(false);
-            LOG.info("Indexing Mode active, Worker will process embeddings");
-        } catch (ModeTransitionException e) {
-            LOG.error("Failed to park engine to Indexing Mode", e);
-        }
+  private EmbeddingHandoff processEmbeddingPhase() {
+    if (reconciler == null) return EmbeddingHandoff.NO_RECONCILER;
+    try { reconciler.procedureRequireEngine(false); }
+    catch (ModeTransitionException failure) {
+      throw new IllegalStateException("Failed to hand off embedding work", failure);
     }
+    return EmbeddingHandoff.HANDED_OFF;
+  }
 
-    /**
-     * Check if there is any pending offline work.
-     *
-     * @return true if VDU or embedding work is pending
-     */
-    public boolean hasPendingWork() {
-        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
-        if (knowledgeClient == null) {
-            return false;
-        }
-        return knowledgeClient.countPendingVdu(ENGINE_CONTEXT) > 0
-            || knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT) > 0;
-    }
+  private static OfflineProcessingOutcome report(
+      Consumer<OfflineProcessingOutcome> progress, OfflineProcessingOutcome outcome) {
+    progress.accept(outcome);
+    return outcome;
+  }
 
-    /**
-     * Get count of pending VDU files.
-     */
-    public int getPendingVduCount() {
-        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
-        return knowledgeClient == null ? 0 : knowledgeClient.countPendingVdu(ENGINE_CONTEXT);
-    }
+  public boolean hasPendingWork() {
+    KnowledgeClient client = knowledgeClientSupplier.get();
+    return client != null && (client.countPendingVdu(BACKLOG_CONTEXT) > 0
+        || client.countPendingEmbeddings(BACKLOG_CONTEXT) > 0);
+  }
 
-    /**
-     * Get count of pending embeddings.
-     */
-    public int getPendingEmbeddingCount() {
-        KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
-        return knowledgeClient == null ? 0 : knowledgeClient.countPendingEmbeddings(ENGINE_CONTEXT);
-    }
+  public int getPendingVduCount() {
+    KnowledgeClient client = knowledgeClientSupplier.get();
+    return client == null ? 0 : client.countPendingVdu(BACKLOG_CONTEXT);
+  }
 
-    /**
-     * Check if offline processing is currently running.
-     */
-    public boolean isProcessing() {
-        return processing.get();
-    }
+  public int getPendingEmbeddingCount() {
+    KnowledgeClient client = knowledgeClientSupplier.get();
+    return client == null ? 0 : client.countPendingEmbeddings(BACKLOG_CONTEXT);
+  }
 
-    public VduCapabilityState vduCapabilityState() {
-        return vduCapabilityState;
+  public boolean isProcessing() { return processing.get(); }
+  public VduCapabilityState vduCapabilityState() { return vduCapabilityState; }
+
+  @Override public void close() {
+    procedureOwner.close();
+    if (!procedureExecutor.isTerminated()) {
+      throw new IllegalStateException("Enrichment procedure did not terminate; dependencies must remain open");
     }
+  }
 }

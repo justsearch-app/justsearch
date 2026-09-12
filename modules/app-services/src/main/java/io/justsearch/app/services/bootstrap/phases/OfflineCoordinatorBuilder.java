@@ -36,6 +36,8 @@ public final class OfflineCoordinatorBuilder {
   private OfflineCoordinatorBuilder() {}
 
   public static OfflineCoordinator build(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      io.justsearch.app.api.EngineAdmissionService admission,
       InferenceLifecycleManager manager,
       io.justsearch.app.services.runtimestate.RuntimeReconciler reconciler,
       io.justsearch.app.api.OnlineAiService onlineAiService,
@@ -80,7 +82,7 @@ public final class OfflineCoordinatorBuilder {
               vduCapabilityState,
               shouldInterruptBatch);
       OfflineCoordinator coordinator =
-          new OfflineCoordinator(manager, reconciler, batchProcessor, clientSupplier, vduCapabilityState);
+          new OfflineCoordinator(executors, admission, manager, reconciler, batchProcessor, clientSupplier, vduCapabilityState);
       log.info("OfflineCoordinator created for VDU batch processing");
       return coordinator;
     } catch (Exception e) {

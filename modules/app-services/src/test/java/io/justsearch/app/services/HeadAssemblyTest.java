@@ -95,6 +95,31 @@ class HeadAssemblyTest {
   }
 
   @Test
+  void failedOfflineDrainKeepsDependencyOwnersOpenAndCloseRemainsRetryable() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var head = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), executors,
+            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+      var coordinator = org.mockito.Mockito.mock(io.justsearch.app.services.vdu.OfflineCoordinator.class);
+      var failure = new IllegalStateException("procedure still running");
+      org.mockito.Mockito.doThrow(failure).doNothing().when(coordinator).close();
+      var coordinatorField = HeadAssembly.class.getDeclaredField("offlineCoordinator");
+      coordinatorField.setAccessible(true);
+      coordinatorField.set(head, coordinator);
+      var inferenceClosed = new java.util.concurrent.atomic.AtomicBoolean();
+      var handlesField = HeadAssembly.class.getDeclaredField("orchestration");
+      handlesField.setAccessible(true);
+      handlesField.set(head, new io.justsearch.app.services.bootstrap.OrchestrationHandles(
+          null, null, null, null, null, null, () -> inferenceClosed.set(true),
+          null, null, null, null, null, null, null));
+      org.junit.jupiter.api.Assertions.assertSame(failure, assertThrows(IllegalStateException.class, head::close));
+      assertFalse(inferenceClosed.get());
+      head.close();
+      assertTrue(inferenceClosed.get());
+      org.mockito.Mockito.verify(coordinator, org.mockito.Mockito.times(2)).close();
+    }
+  }
+
+  @Test
   void finalInferenceTransitionDrainsAfterManagerCloseEvenWhenAnotherHandleFails() throws Exception {
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
         var head = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), executors,
@@ -284,8 +309,15 @@ class HeadAssemblyTest {
   void offlineCoordinatorBuildsAtBootstrapAndResolvesClientAfterConnect() throws Exception {
     Telemetry telemetry = new NoopTelemetry();
     var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
+    var context = TestEngineContexts.durableInternal();
+    var admission = org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class);
+    var work = org.mockito.Mockito.mock(io.justsearch.app.api.EngineWorkHandle.class);
+    org.mockito.Mockito.when(admission.attach(context)).thenReturn(work);
+    org.mockito.Mockito.when(work.context()).thenReturn(context);
+    org.mockito.Mockito.when(work.cancellationReason()).thenReturn(java.util.Optional.empty());
+    org.mockito.Mockito.when(work.onCancel(org.mockito.ArgumentMatchers.any())).thenReturn(() -> {});
     try (HeadAssembly bootstrap =
-        new HeadAssembly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(),
+        new HeadAssembly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), io.justsearch.core.execution.TestEngineExecutors.awaitingTermination(),
             telemetry,
             new ConfigManagerBootstrap(),
             null,
@@ -293,7 +325,7 @@ class HeadAssemblyTest {
                 io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
             cap, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
-        org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+        admission)) {
 
       // Core regression: the coordinator must be non-null at bootstrap, before any Worker
       // connects — it must not have value-captured the (null) client.
@@ -328,9 +360,9 @@ class HeadAssemblyTest {
           "connectKnowledgeServer must not replace the coordinator instance (no rebuild needed;"
               + " the live supplier resolves the client itself)");
 
-      // Drive synchronously (no virtual-thread indirection) — proves the supplier resolved the
-      // POST-connect client, not a value frozen at bootstrap.
-      coordinatorAfterConnect.startOfflineProcessing();
+      // Await the owned procedure: it must resolve the POST-connect client, not a frozen value.
+      coordinatorAfterConnect.startOfflineProcessing(context, outcome -> {}).toCompletableFuture()
+          .get(10, java.util.concurrent.TimeUnit.SECONDS);
       org.mockito.Mockito.verify(client).recoverVduProcessing(org.mockito.ArgumentMatchers.any());
       org.mockito.Mockito.verify(client).countPendingVdu(org.mockito.ArgumentMatchers.any());
     }

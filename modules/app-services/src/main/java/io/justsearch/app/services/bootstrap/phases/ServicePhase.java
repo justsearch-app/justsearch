@@ -179,6 +179,7 @@ public final class ServicePhase {
     OnlineAiService onlineAiService;
     io.justsearch.app.api.ModeChangeListener gpuListener = null;
     OfflineCoordinator offlineCoordinator = null;
+    try {
     RuntimeReconciler runtimeReconciler = null;
     RuntimeSpecStore runtimeSpecStore = null;
     // §31 Phase 1.A: EnterprisePolicyService impl in app-services. Tempdoc 737: constructed up-front
@@ -228,6 +229,7 @@ public final class ServicePhase {
 
       offlineCoordinator =
           OfflineCoordinatorBuilder.build(
+              in.executors(), in.engineAdmission(),
               in.inferenceManager(),
               runtimeReconciler,
               onlineAiService,
@@ -248,7 +250,7 @@ public final class ServicePhase {
     GpuCapabilitiesService gpuCapabilitiesService = new GpuCapabilitiesService();
 
     // §31 Phase 3: offlineProcessingTrigger derived from offlineCoordinator (computed above).
-    Runnable offlineProcessingTrigger =
+    java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger =
         offlineCoordinator != null ? offlineCoordinator::startOfflineProcessing : null;
 
     AgentToolFactory.Output agentTools =
@@ -398,5 +400,12 @@ public final class ServicePhase {
         packAllowlistService,
         gpuCapabilitiesService,
         operationLeaseService);
+    } catch (RuntimeException | Error failure) {
+      if (offlineCoordinator != null) {
+        try { offlineCoordinator.close(); }
+        catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      }
+      throw failure;
+    }
   }
 }

@@ -54,6 +54,35 @@ final class LauncherEnvironmentCloseTest {
   }
 
   @Test
+  void failedHeadDrainRetainsDependenciesAndASecondCloseRetries() throws Exception {
+    System.setProperty("justsearch.config", "active-config");
+    System.setProperty("egress.block_all", "true");
+    var telemetry = Mockito.mock(LocalTelemetry.class);
+    var environment = allocateEnvironment(telemetry, "previous-config", "false", tempDir.resolve("retry"));
+    var head = Mockito.mock(io.justsearch.app.services.HeadAssembly.class);
+    var operations = Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
+    var executors = Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    setField(environment, "HeadAssembly", head);
+    setField(environment, "operations", operations);
+    setField(environment, "executors", executors);
+    var failure = new IllegalStateException("procedure still running");
+    Mockito.doThrow(failure).doNothing().when(head).close();
+    org.junit.jupiter.api.Assertions.assertSame(failure,
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, environment::close));
+    Mockito.verifyNoInteractions(operations, telemetry, executors);
+    assertEquals("active-config", System.getProperty("justsearch.config"));
+    assertEquals("true", System.getProperty("egress.block_all"));
+    environment.close();
+    var order = Mockito.inOrder(head, operations, telemetry, executors);
+    order.verify(head, Mockito.times(2)).close();
+    order.verify(operations).close();
+    order.verify(telemetry).close();
+    order.verify(executors).close();
+    assertEquals("previous-config", System.getProperty("justsearch.config"));
+    assertEquals("false", System.getProperty("egress.block_all"));
+  }
+
+  @Test
   void closeClearsSystemPropertiesWhenUnsetPreviously() throws Exception {
     System.setProperty("justsearch.config", "temp-config");
     System.setProperty("egress.block_all", "true");
