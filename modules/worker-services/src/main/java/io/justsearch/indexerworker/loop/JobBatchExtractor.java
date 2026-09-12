@@ -130,7 +130,7 @@ public final class JobBatchExtractor {
     for (JobQueue.IndexJob job : jobs) {
       if (!running.get()) break;
 
-      ExtractedJob ex = extractJob(job.path(), job.collection(), job.provenance());
+      ExtractedJob ex = extractJob(job);
       if (ex != null) {
         extracted.add(ex);
       }
@@ -148,7 +148,10 @@ public final class JobBatchExtractor {
   }
 
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private ExtractedJob extractJob(Path filePath, String collection, JobQueue.EnqueueProvenance provenance) {
+  private ExtractedJob extractJob(JobQueue.IndexJob claim) {
+    Path filePath = claim.path();
+    String collection = claim.collection();
+    JobQueue.EnqueueProvenance provenance = claim.provenance();
     log.debug("Processing: {}", filePath);
 
     long startTime = System.currentTimeMillis();
@@ -162,7 +165,7 @@ public final class JobBatchExtractor {
         journal.recordOutcomeSafely(
             filePath,
             "STALE_DONE",
-            () -> jobQueue.markDone(filePath, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
+            () -> jobQueue.markClaimDone(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
         batchStats.recordSkipped();
         return null;
       }
@@ -172,7 +175,7 @@ public final class JobBatchExtractor {
         journal.recordOutcomeSafely(
             filePath,
             admission.outcome().outcomeClass().name(),
-            () -> jobQueue.markFailed(filePath, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
+            () -> jobQueue.markClaimFailed(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
         return null;
@@ -186,7 +189,7 @@ public final class JobBatchExtractor {
         journal.recordOutcomeSafely(
             filePath,
             admission.outcome().outcomeClass().name(),
-            () -> jobQueue.markDone(filePath, admission.outcome(), entry));
+            () -> jobQueue.markClaimDone(claim, admission.outcome(), entry));
         batchStats.recordSkipped();
         return null;
       }
@@ -209,8 +212,7 @@ public final class JobBatchExtractor {
             filePath,
             "WRITE_FAILED(document_identity)",
             () ->
-                jobQueue.markFailed(
-                    filePath,
+                jobQueue.markClaimFailed(claim,
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_FAILED,
                         IngestionReasonCodes.WRITE_FAILED,
@@ -233,8 +235,7 @@ public final class JobBatchExtractor {
                 filePath,
                 "UNCHANGED",
                 () ->
-                    jobQueue.markDone(
-                        filePath,
+                    jobQueue.markClaimDone(claim,
                         journal.skipped(IngestionReasonCodes.UNCHANGED),
                         ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
             batchStats.recordSkipped();
@@ -267,7 +268,7 @@ public final class JobBatchExtractor {
         sourceSha256AfterExtraction = SourceContentHash.sha256(filePath);
       } catch (IOException changedDuringExtraction) {
         if (staleResolver.tryHandleStale(
-            filePath, envelope, collection, artifact, "after extraction", provenance)) {
+            filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
           batchStats.recordSkipped();
           return null;
         }
@@ -275,7 +276,7 @@ public final class JobBatchExtractor {
       }
       if (!sourceSha256.equals(sourceSha256AfterExtraction)) {
         if (staleResolver.tryHandleStale(
-            filePath, envelope, collection, artifact, "after extraction", provenance)) {
+            filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
           batchStats.recordSkipped();
           return null;
         }
@@ -285,18 +286,18 @@ public final class JobBatchExtractor {
             collection,
             artifact,
             "during extraction",
-            FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, provenance);
+            FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, provenance, claim);
         batchStats.recordSkipped();
         return null;
       }
 
-      if (staleResolver.tryHandleStale(filePath, envelope, collection, artifact, "after extraction", provenance)) {
+      if (staleResolver.tryHandleStale(filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
         batchStats.recordSkipped();
         return null;
       }
 
       return new ExtractedJob(
-          filePath, collection, artifact, startTime, envelope, sourceSha256, docUid, provenance);
+          claim, artifact, startTime, envelope, sourceSha256, docUid);
 
     } catch (BudgetExceededException e) {
       log.warn("Extraction budget exceeded for: {} - {}", filePath, e.getMessage());
@@ -305,8 +306,7 @@ public final class JobBatchExtractor {
           filePath,
           "BUDGET_EXCEEDED",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.BUDGET_EXCEEDED,
                       e.reasonCode(),
@@ -323,8 +323,7 @@ public final class JobBatchExtractor {
           filePath,
           "PARSER_TIMEOUT",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.PARSER_TIMEOUT,
                       IngestionReasonCodes.PARSER_TIMEOUT,
@@ -341,8 +340,7 @@ public final class JobBatchExtractor {
           filePath,
           "SANDBOX_FAILED",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.SANDBOX_FAILED,
                       IngestionReasonCodes.SANDBOX_FAILED,
@@ -359,8 +357,7 @@ public final class JobBatchExtractor {
           filePath,
           "PARSER_FAILED(terminal)",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.PARSER_FAILED,
                       IngestionReasonCodes.PARSER_FAILED,
@@ -377,8 +374,7 @@ public final class JobBatchExtractor {
           filePath,
           "IO_FAILED",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.IO_FAILED,
                       IngestionReasonCodes.IO_ERROR,
@@ -395,8 +391,7 @@ public final class JobBatchExtractor {
           filePath,
           "PARSER_FAILED(retryable)",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.PARSER_FAILED,
                       IngestionReasonCodes.PARSER_FAILED,

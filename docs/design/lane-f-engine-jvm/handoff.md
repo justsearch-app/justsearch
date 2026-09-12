@@ -5,7 +5,13 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 is next.
+Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
+
+The C2-2 queue prerequisite now carries claim identity through extraction, commit
+and fallback; atomic replacement and truthful scan admission have negative and
+positive regressions. Independent review found and the root fixed identity-based
+retry cleanup. Run575 passes; [C2-2 plan](evidence/C2/C2-2-plan.md) preserves
+evidence and remaining runner/boot/committed-completion work. No C2-2 closure is claimed.
 
 C2-1's independent store, lifetime/recovery fence and jobs15/updater compatibility
 are implemented. C2-11's day-one installed PROCESSING replay plus fresh retry
@@ -30,9 +36,9 @@ snapshot/replay ordering, and one attempt runner with committed settings receipt
 D1 designa480ac6f6 binds each query to one leased runtime/encoder/service view, fixes
 previous-generation retirement and puts late model-manifest work in its actual batch.
 C2 entry grounding additionally corrects the pre-fork construction citation and requires
-interrupted-quarantine preservation to retain the expiry fence. The acceptance runner, keyed outcomes and D1 behavior remain design; C2-1 store
-implementation is underway. Finish C2-1 and its day-one C2-11 harness in batch1, then every
-remaining item in C2/D1/D2/E/F. No owner decisions are pending or deferred.
+interrupted-quarantine preservation to retain the expiry fence. The acceptance runner is the current C2-2 implementation; keyed outcomes and D1
+behavior remain ahead. Batch1 store and day-one replay proofs are complete as
+recorded above. Continue every remaining item in C2/D1/D2/E/F. No owner decisions are pending or deferred.
 
 The lane worktree is held through review date2026-10-12 for active work and mandatory
 raw evidence. Retain artifacts through lane acceptance plus30 days; export before any

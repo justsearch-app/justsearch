@@ -328,6 +328,24 @@ public interface JobQueue extends Closeable {
     markDone(path);
   }
 
+  /** Complete only the exact process-local claim returned by pollPending. */
+  default boolean markClaimDone(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry) {
+    markDone(claim.path(), outcome, entry);
+    return true;
+  }
+
+  /** Fail only the exact process-local claim returned by pollPending. */
+  default boolean markClaimFailed(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry) {
+    markFailed(claim.path(), outcome, entry);
+    return true;
+  }
+
+  /** Defer only the exact process-local claim returned by pollPending. */
+  default boolean deferClaim(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry) {
+    defer(claim.path(), outcome, entry);
+    return true;
+  }
+
   /**
    * Marks multiple jobs as successfully completed in a single batch operation.
    *
@@ -355,7 +373,8 @@ public interface JobQueue extends Closeable {
     if (transitions == null) return;
     for (IngestionLedgerTransition transition : transitions) {
       if (transition != null) {
-        markDone(transition.path(), outcome, transition.entry());
+        if (transition.claim() == null) markDone(transition.path(), outcome, transition.entry());
+        else markClaimDone(transition.claim(), outcome, transition.entry());
       }
     }
   }
@@ -565,7 +584,23 @@ public interface JobQueue extends Closeable {
   int LEDGER_ENTRY_MAX_FIELD_CHARS = 256;
 
   /** Path plus privacy-safe metadata for an outcome transition. */
-  record IngestionLedgerTransition(Path path, IngestionLedgerEntry entry) {}
+  record IngestionLedgerTransition(Path path, IngestionLedgerEntry entry, IndexJob claim) {
+    /** Administrative/fixture transition without a processing claim. */
+    public IngestionLedgerTransition(Path path, IngestionLedgerEntry entry) {
+      this(path, entry, null);
+    }
+
+    /** Retain the actual claimed object through the Lucene commit boundary. */
+    public IngestionLedgerTransition(IndexJob claim, IngestionLedgerEntry entry) {
+      this(claim.path(), entry, claim);
+    }
+
+    public IngestionLedgerTransition {
+      if (claim != null && !claim.path().equals(path)) {
+        throw new IllegalArgumentException("Transition path differs from its claim");
+      }
+    }
+  }
 
   /** Export-safe ingestion ledger row. Raw job paths are intentionally omitted. */
   record IngestionEventView(

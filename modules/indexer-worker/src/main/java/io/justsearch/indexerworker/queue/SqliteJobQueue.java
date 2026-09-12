@@ -16,6 +16,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
@@ -86,6 +88,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private final ReentrantLock lock = new ReentrantLock();
   private final int maxAttempts;
   private Connection connection;
+  // Only live processing capabilities: object identity prevents an older commit from finishing
+  // a replacement claim for the same path. Dead JVMs cannot deliver callbacks after restart.
+  private final Map<String, IndexJob> activeClaims = new HashMap<>();
   private boolean existedBeforeOpen;
   private boolean forceIntegrityCheck;
 
@@ -419,38 +424,44 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           """;
 
       long now = System.currentTimeMillis();
-      int count = 0;
       String col = (collection != null && !collection.isBlank()) ? collection : null;
       // Tempdoc 812 D2: the enqueueing scan's identity rides the row so the Head can group the
       // per-document terminal outcomes into one durable scan-completion audit record.
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-        for (JobQueue.EnqueueEntry entry : entries) {
-          if (entry == null || entry.path() == null) {
-            continue;
+      int count = inTransaction(() -> {
+        int accepted = 0;
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+          for (JobQueue.EnqueueEntry entry : entries) {
+            if (entry == null || entry.path() == null) {
+              continue;
+            }
+            String normalizedPath =
+                PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
+            stmt.setString(1, normalizedPath);
+            stmt.setLong(2, now);
+            stmt.setString(3, col);
+            stmt.setString(4, normalizedPath); // carry-forward lookup for collection
+            if (entry.sizeBytes() >= 0) {
+              stmt.setLong(5, entry.sizeBytes());
+            } else {
+              stmt.setNull(5, java.sql.Types.INTEGER);
+            }
+            stmt.setString(6, scan);
+            stmt.setString(7, normalizedPath); // carry-forward lookup for scan_id
+            stmt.setString(8, entry.provenance() == null ? null : entry.provenance().originator());
+            stmt.setString(9, normalizedPath);
+            stmt.setString(10, entry.provenance() == null ? null : entry.provenance().transport());
+            stmt.setString(11, normalizedPath);
+            stmt.addBatch();
+            accepted++;
           }
-          String normalizedPath =
-              PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
-          stmt.setString(1, normalizedPath);
-          stmt.setLong(2, now);
-          stmt.setString(3, col);
-          stmt.setString(4, normalizedPath); // carry-forward lookup for collection
-          if (entry.sizeBytes() >= 0) {
-            stmt.setLong(5, entry.sizeBytes());
-          } else {
-            stmt.setNull(5, java.sql.Types.INTEGER);
-          }
-          stmt.setString(6, scan);
-          stmt.setString(7, normalizedPath); // carry-forward lookup for scan_id
-          stmt.setString(8, entry.provenance() == null ? null : entry.provenance().originator());
-          stmt.setString(9, normalizedPath);
-          stmt.setString(10, entry.provenance() == null ? null : entry.provenance().transport());
-          stmt.setString(11, normalizedPath);
-          stmt.addBatch();
-          count++;
+          stmt.executeBatch();
         }
-        stmt.executeBatch();
+        return accepted;
+      });
+      for (JobQueue.EnqueueEntry entry : entries) {
+        if (entry != null && entry.path() != null) activeClaims.remove(normalizePath(entry.path()));
       }
 
       meters.recordEnqueued(count);
@@ -520,6 +531,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // After the commit, like enqueueEntries: a meter incremented inside the transaction would
       // still count a row a rollback threw away.
       if (result.accepted() > 0) {
+        activeClaims.remove(normalizedPath);
         meters.recordEnqueued(result.accepted());
       }
       log.debug(
@@ -619,6 +631,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 return claimed;
               });
 
+      for (IndexJob claim : result) activeClaims.put(normalizePath(claim.path()), claim);
       if (!result.isEmpty()) {
         meters.recordDequeued(result.size());
         log.debug("Claimed {} jobs for processing", result.size());
@@ -631,6 +644,56 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } finally {
       lock.unlock();
     }
+  }
+
+  private boolean ownsClaim(IndexJob claim) throws SQLException {
+    String path = normalizePath(claim.path());
+    if (activeClaims.get(path) != claim) return false;
+    try (PreparedStatement query = connection.prepareStatement(
+        "SELECT state FROM jobs WHERE path = ?")) {
+      query.setString(1, path);
+      try (ResultSet result = query.executeQuery()) {
+        return result.next() && STATE_PROCESSING.equals(result.getString(1));
+      }
+    }
+  }
+
+  private void releaseClaim(IndexJob claim) {
+    String path = normalizePath(claim.path());
+    if (activeClaims.get(path) == claim) activeClaims.remove(path);
+  }
+
+  private boolean finishClaim(IndexJob claim, Runnable update) {
+    lock.lock();
+    try {
+      ensureOpen();
+      if (!ownsClaim(claim)) {
+        releaseClaim(claim);
+        return false;
+      }
+      update.run();
+      releaseClaim(claim);
+      return true;
+    } catch (SQLException failure) {
+      throw new OutcomeWriteException("Could not verify processing claim", failure);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public boolean markClaimDone(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
+    return finishClaim(claim, () -> markDone(claim.path(), outcome, entry));
+  }
+
+  @Override
+  public boolean markClaimFailed(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
+    return finishClaim(claim, () -> markFailed(claim.path(), outcome, entry));
+  }
+
+  @Override
+  public boolean deferClaim(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
+    return finishClaim(claim, () -> defer(claim.path(), outcome, entry));
   }
 
   @Override
@@ -760,6 +823,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
+      List<JobQueue.IngestionLedgerTransition> eligible = new ArrayList<>();
+      java.util.Set<IndexJob> seenClaims = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+      for (JobQueue.IngestionLedgerTransition transition : transitions) {
+        if (transition == null) continue;
+        if (transition.claim() != null && !seenClaims.add(transition.claim())) continue;
+        if (transition.claim() == null || ownsClaim(transition.claim())) eligible.add(transition);
+        else releaseClaim(transition.claim());
+      }
       long now = System.currentTimeMillis();
       int[] updates =
           inTransaction(
@@ -771,9 +842,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                         last_diagnostic_summary = ?, last_outcome_at = ?
                     WHERE path = ?
                     """;
-                List<Integer> rowCounts = new ArrayList<>(transitions.size());
+                List<Integer> rowCounts = new ArrayList<>(eligible.size());
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-                  for (JobQueue.IngestionLedgerTransition transition : transitions) {
+                  for (JobQueue.IngestionLedgerTransition transition : eligible) {
                     if (transition == null) continue;
                     String normalizedPath = normalizePath(transition.path());
                     bindOutcomeUpdate(stmt, 1, now, outcome, normalizedPath);
@@ -790,6 +861,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 }
                 return result;
               });
+      for (JobQueue.IngestionLedgerTransition transition : eligible) {
+        if (transition.claim() != null) releaseClaim(transition.claim());
+      }
       logBatchMisses(updates, "markDoneTransitions(outcome)");
       log.debug("Marked {} jobs done with outcome {}", transitions.size(), outcomeClassName(outcome));
     } catch (SQLException e) {
@@ -1842,6 +1916,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String sql = "DELETE FROM jobs";
       try (Statement stmt = connection.createStatement()) {
         int deleted = stmt.executeUpdate(sql);
+        activeClaims.clear();
         if (deleted > 0) {
           log.info("Cleared all {} jobs (profiling reset)", deleted);
           checkAndVacuum();
@@ -1888,6 +1963,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.setString(1, normalized);
         stmt.setString(2, upper);
         int deleted = stmt.executeUpdate();
+        activeClaims.keySet().removeIf(path -> path.compareTo(normalized) >= 0 && path.compareTo(upper) < 0);
         if (deleted > 0) {
           log.info("deleteByPathPrefix: deleted {} jobs for prefix: {}", deleted, normalized);
         } else {
@@ -1991,6 +2067,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setString(1, path);
         int deleted = stmt.executeUpdate();
+        activeClaims.remove(path);
         if (deleted > 0) {
           log.debug("deleteByExactPath: deleted job for path: {}", path);
         }
@@ -2168,6 +2245,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           throw new IOException("Failed to close SqliteJobQueue", e);
         } finally {
           connection = null;
+          activeClaims.clear();
         }
       }
     } finally {

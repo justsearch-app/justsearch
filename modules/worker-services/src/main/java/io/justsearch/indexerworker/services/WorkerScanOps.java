@@ -234,13 +234,11 @@ final class WorkerScanOps {
               counters[2]++;
               return FileVisitResult.CONTINUE;
             }
-            counters[1]++;
-            bytes[0] += attrs.size();
             // 813 Slice B: the walk already holds the size — no extra stat.
             batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance()));
             if (batch.size() >= ENQUEUE_BATCH_SIZE) {
               awaitQueueBelowThreshold();
-              flushBatch(batch, collection, enqueueScanId, forceReindex);
+              flushBatch(batch, collection, enqueueScanId, forceReindex, counters, bytes);
               if (isCancelled.getAsBoolean()) {
                 cancelled[0] = true;
                 return FileVisitResult.TERMINATE;
@@ -266,7 +264,7 @@ final class WorkerScanOps {
 
     if (!batch.isEmpty()) {
       awaitQueueBelowThreshold();
-      flushBatch(batch, collection, enqueueScanId, forceReindex);
+      flushBatch(batch, collection, enqueueScanId, forceReindex, counters, bytes);
       if (isCancelled.getAsBoolean()) {
         cancelled[0] = true;
       }
@@ -280,10 +278,16 @@ final class WorkerScanOps {
   }
 
   private void flushBatch(
-      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, boolean forceReindex) {
+      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, boolean forceReindex,
+      long[] counters, long[] bytes) {
     String coll = collection == null || collection.isBlank() ? null : collection;
-    jobQueue.enqueueEntries(
+    int accepted = jobQueue.enqueueEntries(
         List.copyOf(batch), coll, scanId == null || scanId.isBlank() ? null : scanId);
+    if (accepted != batch.size()) {
+      throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
+    }
+    counters[1] += accepted;
+    for (JobQueue.EnqueueEntry entry : batch) bytes[0] += entry.sizeBytes();
     if (forceReindex && !batch.isEmpty()) {
       // Mark per batch rather than once at the end: a long walk's early batches are already
       // being extracted while later directories are still being visited, so a deferred mark

@@ -449,10 +449,9 @@ final class AdversarialCorpusIngestionTest {
     getExtractor.setAccessible(true);
     Object extractor = getExtractor.invoke(loop);
     Method extractJob =
-        extractor.getClass().getDeclaredMethod("extractJob", Path.class, String.class,
-            JobQueue.EnqueueProvenance.class);
+        extractor.getClass().getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
     extractJob.setAccessible(true);
-    return extractJob.invoke(extractor, file, null, null);
+    return extractJob.invoke(extractor, new JobQueue.IndexJob(file, null));
   }
 
   private void invokeExtractAndDrain(Path file) throws Exception {

@@ -105,7 +105,7 @@ public final class JobBatchWriter {
     writeSpan.setAttribute("embedding.source", embeddingSource);
     try {
       if (staleResolver.tryHandleStale(
-          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance())) {
+          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance(), ex.claim())) {
         batchStats.recordSkipped();
         return;
       }
@@ -158,7 +158,7 @@ public final class JobBatchWriter {
 
       journal.enqueueTransition(
           new JobQueue.IngestionLedgerTransition(
-              ex.filePath(),
+              ex.claim(),
               LedgerEntryFactory.forEnvelope(
                   ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance())));
 
@@ -175,8 +175,8 @@ public final class JobBatchWriter {
             ex.filePath(),
             "WRITE_UNAVAILABLE_DRAINING",
             () ->
-                jobQueue.defer(
-                    ex.filePath(),
+                jobQueue.deferClaim(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_UNAVAILABLE_DRAINING,
                         IngestionReasonCodes.WRITE_UNAVAILABLE_DRAINING,
@@ -192,8 +192,8 @@ public final class JobBatchWriter {
             ex.filePath(),
             "WRITE_FAILED",
             () ->
-                jobQueue.markFailed(
-                    ex.filePath(),
+                jobQueue.markClaimFailed(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_FAILED,
                         IngestionReasonCodes.WRITE_FAILED,

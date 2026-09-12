@@ -5,7 +5,9 @@ Status: DESIGN, amended 2026-09-12 at35d03f7c4 under the delegated lane authorit
 full mechanism for the two C2 questions the entry investigation left open
 ([c2-entry-investigation.md](../C1/c2-entry-investigation.md)); `design.md` section 0 carries
 the dated one-line rows, sections 7.6 and 16 carry the contract changes, and `stages/C2.md`
-carries the per-item amendments. Nothing here is implemented.
+carries the per-item amendments. Batch1 store lifetime/schema/recovery and installed replay
+are implemented and verified in [batch1.md](batch1.md); the runner and remaining
+behavior below are still implementation work.
 
 Coordinated with the stage D1 re-grounding (its record is `evidence/D1/regrounding-2026-09-10.md`
 on this worktree, written by the D1 agent). The D1 agent's inputs are marked *(D1)* where they
@@ -83,7 +85,7 @@ to that module directly is not available to scheduled runs.
 | `accepted_at`, `started_at`, `updated_at`, `completed_at INTEGER` | Engine clock, epoch ms |
 | `urgency_detached_at INTEGER` | C1-11's flip, recorded here |
 | `failure_reason TEXT`, `failure_detail TEXT` | reason code plus bounded detail |
-| `result_json TEXT` | bounded (4 KB) result summary so a same-key retry answers faithfully; `execution_id` inside it for undo linkage |
+| `result_json TEXT` | bounded (4 KB), non-content outcome receipt: safe code, execution id, counts and record identity; no arbitrary handler message, structured data, prompt or excerpt. Same-key retry returns this receipt without rerunning, not the original rich response. |
 | `accepted_settings_revision INTEGER` | `settings-apply` and `reconfigure`: the revision the call was issued against |
 | `building_generation_id TEXT`, `target_settings_json TEXT` | reindex: the journal identity and the generation-bound desired values *(D1)* |
 | `gaps_json TEXT`, `processing_history_json TEXT`, `processing_history_counts_json TEXT` | reindex: the full gap list; a capped sample (200) plus counts of failed and superseded units |
@@ -124,6 +126,20 @@ A failed write throws and the caller must not proceed
 never a field on `EngineContext`.
 
 ### 1.5 Which calls get a row
+
+September12 source grounding: the shared runner has an app-api contract and an
+app-observability implementation; its handler-facing restricted handle and actual-
+completion carrier belong in app-agent-api, where OperationHandler lives. The
+existing OperationResult stays the immediate response. Multi-root dispatches own
+one parent row and aggregate child ingest attempts. Parent acceptance persists the
+normalized root plan; child identity includes its parent key and root/generation.
+A store transaction finds-or-accepts each child, allowing recovery without duplicate
+children. Duplicate/ancestor roots are normalized, and overlapping recorded walks
+serialize through committed completion. Recorded scan ids are explicit
+Java method arguments beside the unchanged protobuf request. Generic argument
+identity stores a canonical digest, avoiding document or prompt bodies in
+operations.db; replay descriptors retain their required roots/generation/policy.
+See [C2-2 implementation plan](C2-2-plan.md) for the source evidence and checks.
 
 - **Dispatched catalog operations.** One shared `OperationAttemptRunner` owns acceptance and
   terminal writes; the executor delegates to it, never the handler. Direct settings and
@@ -168,7 +184,9 @@ whose owner is not ready stays exactly as it is and the outcome query reports it
 
 The store's one built-in rule: an open row with `survival = interactive` and no reconciler
 verdict is marked `FAILED` with reason `interrupted_by_restart` only when no owner
-claims its kind. Register kind ownership before the default sweep; an owned kind waits
+claims its kind. Declare all current kind ownership synchronously in the process root
+before the async index fork or the default sweep. Attaching/running an owner reconciler
+is a separate readiness action; an owned kind waits
 for its reconciler even when interactive. Durable rows are never touched by the default.
 
 Registered reconcilers *(D1, cited here for the row shapes they need)*: reindex (pointer equals
