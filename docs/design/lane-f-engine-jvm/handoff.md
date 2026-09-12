@@ -7,6 +7,13 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
+Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),
+adopted at429115fec. New ingestion work is paused. R1 async persistence observability passes its named
+regressions and focused790 (92 cases), UI integration-test compilation and PMD.
+Next is R2 launcher instance exclusion, followed by the ordered retention, acceptance,
+checklist and evidence findings. Root owns corrections; one final independent review per batch.
+The prior next-step ingestion notes below are superseded by that ordered batch.
+
 The [recorded ingest child primitive](evidence/C2/recorded-ingest-child.md) has complete
 local proof at fc679f92a plus this item: focused786 passes96 cases; broader787 executes
 741 cases/134 suites across app-api, app-observability and app-launcher, with zero

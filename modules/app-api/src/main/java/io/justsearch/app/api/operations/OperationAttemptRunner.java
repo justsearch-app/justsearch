@@ -13,6 +13,12 @@ import java.util.function.Function;
 
 /** Shared acceptance/effect/completion owner for dispatch, ingestion, settings and scheduled work. */
 public interface OperationAttemptRunner {
+  /** Bounded metadata for the first failed durable transition in this process. */
+  record PersistenceFailure(String operationKey, OperationState intendedState) {}
+
+  /** Sticky degradation signal; late Health subscribers still observe the first failure. */
+  CompletionStage<PersistenceFailure> persistenceFailure();
+
   record Request(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance) {}
 

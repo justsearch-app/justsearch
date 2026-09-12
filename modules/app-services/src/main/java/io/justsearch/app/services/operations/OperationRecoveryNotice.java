@@ -35,6 +35,35 @@ public final class OperationRecoveryNotice {
 
   private OperationRecoveryNotice() {}
 
+  /** One sticky signal covers failures before or after Health composition becomes available. */
+  public static void observePersistenceFailures(
+      io.justsearch.app.api.operations.OperationAttemptRunner runner,
+      ConditionStore conditionStore, HealthEventChangeRegistry changeRegistry,
+      Source source, Clock clock) {
+    var unused = runner.persistenceFailure().thenAccept(failure -> {
+      try {
+        String code = LifecycleReasonCode.OPERATIONS_PERSISTENCE_FAILED.code();
+        Instant now = Instant.now(clock);
+        var condition = new AssertedCondition(SUBJECT, ConditionStatus.TRUE,
+            "OperationPersistenceFailed", now,
+            Optional.of("The outcome of operation " + failure.operationKey()
+                + " could not be saved (intended state " + failure.intendedState()
+                + "). Its outcome is unresolved; inspect operation history before retrying."),
+            Optional.empty(), List.of());
+        var event = new HealthEvent(code, now, source, Severity.ERROR, Optional.of(code), condition);
+        var transition = conditionStore.upsert(event);
+        if (transition != ConditionStore.Transition.UNCHANGED) {
+          changeRegistry.broadcast(transition == ConditionStore.Transition.ADDED
+              ? HealthEventChangeRegistry.Kind.CONDITION_ADDED : HealthEventChangeRegistry.Kind.CONDITION_MODIFIED,
+              event);
+        }
+      } catch (RuntimeException publicationFailure) {
+        log.error("Failed to publish operations persistence degradation: key={} intendedState={}",
+            failure.operationKey(), failure.intendedState(), publicationFailure);
+      }
+    });
+  }
+
   /** Assert the condition. The message names the backup directory only, never its full path. */
   public static void publish(
       ConditionStore conditionStore,

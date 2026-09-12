@@ -30,11 +30,18 @@ import java.util.function.Function;
 
 /** One terminal writer. Live capabilities/futures are projections, never a second durable ledger. */
 public final class OperationAttemptRunnerImpl implements OperationAttemptRunner {
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(OperationAttemptRunnerImpl.class);
   private final OperationStore store;
   private final Clock clock;
   private final Set<OperationKind> ownedKinds;
   private final List<OperationRecord> interrupted;
   private final Map<Long, Control> active = new ConcurrentHashMap<>();
+  private final CompletableFuture<PersistenceFailure> persistenceFailure = new CompletableFuture<>();
+
+  @Override
+  public CompletionStage<PersistenceFailure> persistenceFailure() {
+    return persistenceFailure.minimalCompletionStage();
+  }
 
   /** Construct synchronously before the index fork; kind ownership is declared before the sweep. */
   public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds) {
@@ -93,7 +100,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     try {
       if (!(resume ? store.resume(control.id) : store.start(control.id))) return existingResult(control);
     } catch (RuntimeException failure) {
-      failObservation(control, failure);
+      persistenceFailed(control, OperationState.RUNNING, failure);
       throw failure;
     }
     OperationExecution execution;
@@ -102,7 +109,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     } catch (RuntimeException failure) {
       try { finish(control, failure instanceof CancellationException ? OperationState.CANCELLED : OperationState.FAILED,
           new OperationReceipt(failureCode(failure), null)); }
-      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); failObservation(control, storageFailure); }
+      catch (RuntimeException storageFailure) {
+        if (failure != storageFailure) failure.addSuppressed(storageFailure);
+        persistenceFailed(control, failure instanceof CancellationException ? OperationState.CANCELLED : OperationState.FAILED,
+            storageFailure);
+      }
       throw failure;
     }
     execution.completion().whenComplete((outcome, failure) -> {
@@ -112,6 +123,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         failObservation(control, cause);
         return;
       }
+      OperationState intendedState = cause instanceof CancellationException ? OperationState.CANCELLED
+          : cause != null || outcome == null || !outcome.success() ? OperationState.FAILED : OperationState.COMPLETE;
       try {
         if (cause != null) {
           finish(control, cause instanceof CancellationException ? OperationState.CANCELLED : OperationState.FAILED,
@@ -122,7 +135,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           finish(control, outcome.success() ? OperationState.COMPLETE : OperationState.FAILED, receipt(outcome));
         }
       } catch (RuntimeException storageFailure) {
-        failObservation(control, storageFailure);
+        if (cause != null && cause != storageFailure) storageFailure.addSuppressed(cause);
+        persistenceFailed(control, intendedState, storageFailure);
       }
     });
     // Synchronous adapters finish before start returns. Do not return their successful effect
@@ -182,6 +196,13 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   private void failObservation(Control control, Throwable failure) {
     control.done.completeExceptionally(failure);
     active.remove(control.id, control);
+  }
+
+  private void persistenceFailed(Control control, OperationState intendedState, Throwable failure) {
+    LOG.error("Operation durable transition failed: key={} intendedState={}; outcome remains unresolved",
+        control.key, intendedState, failure);
+    persistenceFailure.complete(new PersistenceFailure(control.key, intendedState));
+    failObservation(control, failure);
   }
 
   private OperationRecord current(Control control) { return store.find(control.key).orElseThrow(); }

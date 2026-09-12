@@ -395,6 +395,75 @@ final class OperationExecutorImplTest {
   }
 
   @Test
+  void asynchronousTerminalWriteFailureEmitsFailureHistoryAndHealth() throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.async-write-failure");
+    var actual = new java.util.concurrent.CompletableFuture<OperationResult>();
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext context) {
+        throw new AssertionError("Recorded dispatch required");
+      }
+      @Override public OperationExecution executeRecorded(String args, InvocationProvenance provenance,
+          EngineContext context, OperationRecordHandle handle) {
+        return new OperationExecution(OperationResult.success("Started"), actual);
+      }
+    });
+    var emitted = new ArrayList<OperationHistoryEntry>();
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
+    assertTrue(executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}",
+        io.justsearch.app.services.TestEngineContexts.internal()).success());
+    var accepted = operationStore.openRecords().getFirst();
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+        var statement = connection.createStatement()) {
+      statement.execute("CREATE TRIGGER refuse_complete BEFORE UPDATE ON operations WHEN NEW.state = 'COMPLETE' "
+          + "BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+    }
+    actual.complete(OperationResult.success("Effect committed"));
+    assertEquals(1, emitted.size());
+    assertEquals(OperationOutcome.FAILURE, emitted.getFirst().outcome());
+    assertEquals(Optional.of("STORAGE_FAILED"), emitted.getFirst().diagnosticsLink());
+    assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING,
+        operationStore.find(accepted.key()).orElseThrow().state());
+
+    // Health may attach after failure during composition; the degradation must not disappear.
+    var conditions = new io.justsearch.app.observability.health.ConditionStore();
+    io.justsearch.app.services.operations.OperationRecoveryNotice.observePersistenceFailures(
+        attempts, conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(),
+        new io.justsearch.app.observability.health.Source("head", "fixture", Optional.empty()), Clock.systemUTC());
+    var event = conditions.find("operations.persistence_failed", "operations").orElseThrow();
+    assertEquals(io.justsearch.app.observability.health.Severity.ERROR, event.severity());
+    var condition = (io.justsearch.app.observability.health.AssertedCondition) event.body();
+    assertTrue(condition.message().orElseThrow().contains(accepted.key()));
+    assertTrue(condition.message().orElseThrow().contains("COMPLETE"));
+  }
+
+  @Test
+  void unauditedAsyncFailureStillEmitsFailureAdvisory() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.async-unaudited-failure");
+    var actual = new java.util.concurrent.CompletableFuture<OperationResult>();
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext context) {
+        throw new AssertionError("Prepared execution required");
+      }
+      @Override public OperationExecution executePrepared(OperationPreparation prepared,
+          InvocationProvenance provenance, EngineContext context, OperationRecordHandle handle) {
+        return new OperationExecution(OperationResult.success("Started"), actual);
+      }
+    });
+    var history = new ArrayList<OperationHistoryEntry>();
+    var advisories = new ArrayList<OperationCompletionEvent>();
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, history::add,
+        Map.of(TEST_ADVISORY_CLASS, (Consumer<OperationCompletionEvent>) advisories::add), Clock.systemUTC());
+    assertTrue(executor.dispatch(makeOpWithAdvisoryClass(id, Optional.of(TEST_ADVISORY_CLASS), AuditPolicy.NONE),
+        "{}", io.justsearch.app.services.TestEngineContexts.internal()).success());
+    actual.completeExceptionally(new IllegalStateException("private detail"));
+    assertTrue(history.isEmpty());
+    assertEquals(1, advisories.size());
+    assertEquals(OperationOutcome.FAILURE, advisories.getFirst().outcome());
+  }
+
+  @Test
   void failedAcceptanceCannotReachDispatchHandler() throws Exception {
     var handlers = new HandlerRegistry();
     var id = new OperationRef("core.acceptance-test");
@@ -431,7 +500,9 @@ final class OperationExecutorImplTest {
         () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}",
             io.justsearch.app.services.TestEngineContexts.internal()));
     assertEquals(1, effects.get());
-    assertTrue(emitted.isEmpty(), "there is no durable terminal outcome to publish");
+    assertEquals(1, emitted.size(), "failed persistence must publish failure, never a success receipt");
+    assertEquals(OperationOutcome.FAILURE, emitted.getFirst().outcome());
+    assertEquals(Optional.of("STORAGE_FAILED"), emitted.getFirst().diagnosticsLink());
     assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING, operationStore.openRecords().getFirst().state());
   }
 

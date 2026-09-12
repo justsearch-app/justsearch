@@ -54,6 +54,10 @@
     {
       "code": "operations.history_reset",
       "why": "Head-owned ConditionStore condition (OperationRecoveryNotice); the Health surface renders its Java message, including preserved bytes and the bounded retry fence. It is not a readiness-envelope cause."
+    },
+    {
+      "code": "operations.persistence_failed",
+      "why": "Head-owned sticky ConditionStore degradation (OperationRecoveryNotice) for a failed durable attempt transition. Health names the operation key and intended state without exception text; not a readiness-envelope cause."
     }
   ],
   "feDerived": [

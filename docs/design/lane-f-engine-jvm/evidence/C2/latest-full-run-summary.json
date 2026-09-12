@@ -1,0 +1,394 @@
+{
+  "revision": "82e0e185d code/tests; configured before commit with unchanged inputs",
+  "command": "gradlew.bat build pmdAll -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 10047,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 35,
+    "suites": 1636
+  },
+  "tasks": [
+    {
+      "module": "ai-backend",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 62,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "api-contract-projection-java",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 229,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 39
+    },
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 202,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 41
+    },
+    {
+      "module": "app-config",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "adapters-lucene",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 724,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 102
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 672,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 49
+    },
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 214,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 45
+    },
+    {
+      "module": "app-inference",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 320,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 30
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 83,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 23
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 420,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 67
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2615,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "suites": 408
+    },
+    {
+      "module": "app-services",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "app-util",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "benchmarks",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 104,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "configuration",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 267,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 32
+    },
+    {
+      "module": "core",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 102,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 17
+    },
+    {
+      "module": "core-contracts",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "dead-code-audit",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "extension-substrate",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "gpu-bridge",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 77,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 464,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 12,
+      "suites": 80
+    },
+    {
+      "module": "indexing",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 84,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 19
+    },
+    {
+      "module": "indexing",
+      "task": "integrationTest",
+      "status": "UP-TO-DATE",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "infra-core",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "ipc-common",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "ort-common",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 170,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 35
+    },
+    {
+      "module": "prompt-support",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "reranker",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 68,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    {
+      "module": "reranker",
+      "task": "integrationTest",
+      "status": "UP-TO-DATE",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 9,
+      "suites": 2
+    },
+    {
+      "module": "ssot-tools",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "system-tests",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 96,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 29
+    },
+    {
+      "module": "telemetry",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 94,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 26
+    },
+    {
+      "module": "test-support",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 1133,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 177
+    },
+    {
+      "module": "ui",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 4
+    },
+    {
+      "module": "worker-core",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 342,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 6,
+      "suites": 84
+    },
+    {
+      "module": "worker-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 1347,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "suites": 256
+    }
+  ],
+  "evidenceScope": "Latest completed full build/PMD snapshot, predating the September13 review corrections; not proof of the current revision."
+}

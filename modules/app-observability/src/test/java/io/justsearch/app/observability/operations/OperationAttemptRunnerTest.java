@@ -140,6 +140,39 @@ final class OperationAttemptRunnerTest {
   }
 
   @Test
+  void asynchronousEffectAndTerminalWriteFailureRetainsBothCauses() throws Exception {
+    var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(OperationAttemptRunnerImpl.class);
+    var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    logs.start();
+    logger.addAppender(logs);
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      var actual = new CompletableFuture<OperationResult>();
+      var result = runner.start(attempt,
+          handle -> new OperationExecution(OperationResult.success("started"), actual));
+      execute("CREATE TRIGGER refuse_failed BEFORE UPDATE ON operations WHEN NEW.state = 'FAILED' "
+          + "BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+      var effectFailure = new IllegalStateException("private effect failure");
+      actual.completeExceptionally(effectFailure);
+      var observed = assertThrows(CompletionException.class,
+          () -> result.completion().toCompletableFuture().join());
+      assertInstanceOf(OperationStoreException.class, observed.getCause());
+      assertArrayEquals(new Throwable[] {effectFailure}, observed.getCause().getSuppressed());
+      assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+      var degradation = runner.persistenceFailure().toCompletableFuture().join();
+      assertEquals(attempt.accepted().key(), degradation.operationKey());
+      assertEquals(OperationState.FAILED, degradation.intendedState());
+      assertTrue(logs.list.stream().anyMatch(event -> event.getLevel() == ch.qos.logback.classic.Level.ERROR
+          && event.getFormattedMessage().contains(attempt.accepted().key())
+          && event.getFormattedMessage().contains("intendedState=FAILED")));
+    } finally {
+      logger.detachAppender(logs);
+      logs.stop();
+    }
+  }
+
+  @Test
   void bootOwnersWaitAndReconcileOriginalRowsWithoutTouchingNewWork() throws Exception {
     try (var store = store()) {
       var unowned = store.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE).key(),

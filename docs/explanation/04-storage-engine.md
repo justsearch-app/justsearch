@@ -361,3 +361,11 @@ normal start only executes newly accepted work. Store failures preserve their bo
 typed code in parent failure receipts. Production ingest and reindex owners still
 need their scan-key, generation and committed-unit completion integration before
 these primitives can establish recorded scan completion.
+
+A failed durable attempt transition logs an ERROR with its key and intended state.
+The runner retains the first persistence failure for the process; Health reports it
+through a sticky `operations.persistence_failed` condition even when Health attaches
+after the failure. Dispatcher history records FAILURE with a bounded error code;
+it never reports successful completion when the terminal write failed. The durable
+row remains unresolved. Exception details are retained in diagnostics, while the
+Health condition carries only operation metadata.

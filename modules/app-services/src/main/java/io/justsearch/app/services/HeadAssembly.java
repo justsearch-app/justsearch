@@ -782,6 +782,9 @@ public final class HeadAssembly implements AutoCloseable {
     this.gplSnapshotFile = orchestrationOut.gplSnapshotFile();
     this.lambdaMartModelFile = orchestrationOut.lambdaMartModelFile();
     this.substrateGraph = assembleSubstrateGraph();
+    io.justsearch.app.services.operations.OperationRecoveryNotice.observePersistenceFailures(
+        attempts, this.substrateGraph.health().conditionStore(), this.substrateGraph.health().changes(),
+        this.substrateGraph.health().headSource(), java.time.Clock.systemUTC());
     operations.recovery().ifPresent(recovery -> {
       var health = this.substrateGraph.health();
       io.justsearch.app.services.operations.OperationRecoveryNotice.publish(

@@ -371,7 +371,11 @@ public final class OperationExecutorImpl implements OperationDispatcher {
           throw new IllegalStateException("Existing acceptance must never execute");
         }).response();
       }
-      var unused = prepared.completion().thenAccept(row -> {
+      var unused = prepared.completion().whenComplete((row, failure) -> {
+        if (failure != null) {
+          emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
+          return;
+        }
         boolean success = row.state() == OperationState.COMPLETE;
         OperationOutcome outcome = success
             ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
@@ -395,7 +399,11 @@ public final class OperationExecutorImpl implements OperationDispatcher {
               handle -> invokeOwnedHandler(op, invocation, provenance, work, undoId, handle)).response();
         }
         OperationExecution execution = invokeOwnedHandler(op, invocation, provenance, work, undoId, null);
-        var unused = execution.completion().thenAccept(result -> {
+        var unused = execution.completion().whenComplete((result, failure) -> {
+          if (failure != null) {
+            emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
+            return;
+          }
           OperationOutcome outcome = result.success()
               ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
           emitHistory(op, startedAt, outcome, null, provenance,
@@ -416,6 +424,13 @@ public final class OperationExecutorImpl implements OperationDispatcher {
 
   private record PreparedInvocation(OperationHandler handler, OperationPreparation value,
       OperationDescriptor descriptor, OperationResult refusal, RuntimeException failure) {}
+
+  private static String completionFailureCode(Throwable failure) {
+    Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
+        ? failure.getCause() : failure;
+    return cause instanceof io.justsearch.app.api.operations.OperationStoreException storage
+        ? storage.code().name() : "UNCAUGHT_EXCEPTION";
+  }
 
   private PreparedInvocation prepareInvocation(Operation op, String argumentsJson,
       InvocationProvenance provenance, EngineContext context, boolean undo) {

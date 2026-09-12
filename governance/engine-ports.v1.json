@@ -136,6 +136,7 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInit.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java",
         "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
         "modules/ui/src/main/java/io/justsearch/ui/api/InteractionThreadController.java"
       ],
