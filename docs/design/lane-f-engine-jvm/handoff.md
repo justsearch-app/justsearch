@@ -14,7 +14,9 @@ at that same revision. Conditional switch-buffer removal is now implemented with
 [schema16 and replay-race proof](evidence/C2/switch-buffer-version.md):75 focused cases
 pass, the original whole-table clear fails3 race cases, and key-only removal fails both
 replacement cases plus reinsertion. Restored691 reuses the identical689 test cache.
-The plan settles shared offline procedure ownership; implementation follows the remaining
+[VDU client control errors](evidence/C2/vdu-control-errors.md) now propagate unchanged;
+693 executes70 focused cases, with8 old-source negative failures. Batch/coordinator
+propagation remains open. The plan settles shared offline procedure ownership; implementation follows the remaining
 VDU generation/acknowledgement correction. No dev stack or Gradle remains running.
 
 Prior coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626

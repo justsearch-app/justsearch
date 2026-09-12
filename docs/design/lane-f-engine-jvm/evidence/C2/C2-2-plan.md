@@ -864,3 +864,13 @@ through index/scan replay would block producers and couple queue/index ownership
 the existing queue lock and transaction for conditional removal, with jobs schema16's
 transactional legacy backfill. No new table, journal or asynchronous owner. D1's widened
 journal retains this rule. [Evidence and remaining limits](switch-buffer-version.md).
+
+
+### VDU control-error propagation prerequisite
+
+September12: VduOps update/mark now propagate typed transport, circuit, cancellation
+and executor refusal without converting them to false/-1. Explicit application failure
+responses retain those existing values (including max retries). Request fields, exact
+EngineContext and deadline categories are unchanged. [Focused and negative proof](vdu-control-errors.md).
+The batch's generic catches still need the already-planned cancellation/blocked-outcome
+correction; this item does not claim end-to-end cancellation or completion.

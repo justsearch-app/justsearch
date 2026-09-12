@@ -3,7 +3,6 @@ package io.justsearch.app.services.worker;
 
 import io.justsearch.core.context.EngineContext;
 
-import io.justsearch.ipc.CircuitBreakerOpenException;
 import io.justsearch.ipc.MarkVduProcessingRequest;
 import io.justsearch.ipc.QueryPendingVduRequest;
 import io.justsearch.ipc.RecoverVduProcessingRequest;
@@ -47,42 +46,34 @@ final class VduOps {
             VduUpdateOutcome outcome,
             String enrichment,
             int pageCount, EngineContext engineContext) {
-        try {
-            var builder =
-                    UpdateVduResultRequest.newBuilder()
-                            .setDocId(docId)
-                            .setOutcome(outcome)
-                            .setVduEnrichment(enrichment != null ? enrichment : "")
-                            .setPageCount(pageCount);
+        var builder =
+                UpdateVduResultRequest.newBuilder()
+                        .setDocId(docId)
+                        .setOutcome(outcome)
+                        .setVduEnrichment(enrichment != null ? enrichment : "")
+                        .setPageCount(pageCount);
 
-            // Only set extracted_content when present (proto3 optional allows presence detection)
-            if (extractedContent != null) {
-                builder.setExtractedContent(extractedContent);
-            }
+        // Only set extracted_content when present (proto3 optional allows presence detection)
+        if (extractedContent != null) {
+            builder.setExtractedContent(extractedContent);
+        }
 
-            var request = builder.build();
+        var request = builder.build();
 
-            var response =
-                    rpc.execute(
-                            "updateVduResult",
-                            KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
-                            stub -> stub.updateVduResult(request), engineContext);
+        var response =
+                rpc.execute(
+                        "updateVduResult",
+                        KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
+                        stub -> stub.updateVduResult(request), engineContext);
 
-            if (!response.getSuccess()) {
-                log.error("updateVduResult failed for {}: {}", docId, response.getError());
-                return false;
-            }
-
-            log.debug("updateVduResult success for: {} (outcome={})", docId, outcome);
-            return true;
-
-        } catch (CircuitBreakerOpenException e) {
-            log.debug("updateVduResult rejected by circuit breaker for {}", docId);
-            return false;
-        } catch (Exception e) {
-            log.error("updateVduResult RPC failed for: {}", docId, e);
+        if (!response.getSuccess()) {
+            log.error("updateVduResult failed for {}: {}", docId, response.getError());
             return false;
         }
+
+        log.debug("updateVduResult success for: {} (outcome={})", docId, outcome);
+        return true;
+
     }
 
     List<String> queryPendingVduDocIds(EngineContext engineContext) {
@@ -107,35 +98,27 @@ final class VduOps {
 
 
     int markVduProcessing(String docId, int maxRetries, EngineContext engineContext) {
-        try {
-            var request =
-                    MarkVduProcessingRequest.newBuilder()
-                            .setDocId(docId)
-                            .setMaxRetries(maxRetries)
-                            .build();
+        var request =
+                MarkVduProcessingRequest.newBuilder()
+                        .setDocId(docId)
+                        .setMaxRetries(maxRetries)
+                        .build();
 
-            var response =
-                    rpc.execute(
-                            "markVduProcessing",
-                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.markVduProcessing(request), engineContext);
+        var response =
+                rpc.execute(
+                        "markVduProcessing",
+                        KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                        stub -> stub.markVduProcessing(request), engineContext);
 
-            if (!response.getSuccess()) {
-                log.warn("markVduProcessing failed for {}: {}", docId, response.getError());
-                return -1;
-            }
-
-            log.debug(
-                    "markVduProcessing success for {}: retry {}", docId, response.getRetryCount());
-            return response.getRetryCount();
-
-        } catch (CircuitBreakerOpenException e) {
-            log.debug("markVduProcessing rejected by circuit breaker for {}", docId);
-            return -1;
-        } catch (Exception e) {
-            log.error("markVduProcessing RPC failed for: {}", docId, e);
+        if (!response.getSuccess()) {
+            log.warn("markVduProcessing failed for {}: {}", docId, response.getError());
             return -1;
         }
+
+        log.debug(
+                "markVduProcessing success for {}: retry {}", docId, response.getRetryCount());
+        return response.getRetryCount();
+
     }
 
     int recoverVduProcessing(EngineContext engineContext) {

@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /** Pins the Head-side mapping for the VDU and embedding backlog read operations. */
@@ -128,6 +130,73 @@ final class VduBacklogReadTest {
   @Test
   void readCancellationIsPropagatedAsTheSameObjectFromCountsAndQuery() {
     assertReadFailurePropagates(new EngineWorkCancelledException("user_stop"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"transport", "circuit", "cancelled", "refused"})
+  void updatePropagatesControlFailureWithoutTurningItIntoAnApplicationOutcome(String kind) {
+    RuntimeException failure = controlFailure(kind);
+    rpc.failWith(failure);
+    assertSame(failure, assertThrows(RuntimeException.class, this::update));
+    assertInvocation("updateVduResult", KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION, context);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"transport", "circuit", "cancelled", "refused"})
+  void markPropagatesControlFailureWithoutTurningItIntoRetryExhaustion(String kind) {
+    RuntimeException failure = controlFailure(kind);
+    rpc.failWith(failure);
+    assertSame(failure, assertThrows(RuntimeException.class,
+        () -> ops.markVduProcessing("document", 3, context)));
+    assertInvocation("markVduProcessing", KnowledgeClient.RpcDeadlineCategory.STANDARD, context);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void updatePreservesExplicitApplicationOutcomeAndRequest(boolean success) {
+    when(serviceCalls.updateVduResult(any())).thenReturn(io.justsearch.ipc.UpdateVduResultResponse
+        .newBuilder().setSuccess(success).setError(success ? "" : "document absent").build());
+    assertEquals(success, update());
+    var request = ArgumentCaptor.forClass(io.justsearch.ipc.UpdateVduResultRequest.class);
+    verify(serviceCalls).updateVduResult(request.capture());
+    assertEquals("document", request.getValue().getDocId());
+    assertEquals("content", request.getValue().getExtractedContent());
+    assertEquals(io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT,
+        request.getValue().getOutcome());
+    assertEquals("enrichment", request.getValue().getVduEnrichment());
+    assertEquals(2, request.getValue().getPageCount());
+    assertInvocation("updateVduResult", KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION, context);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void markPreservesExplicitApplicationOutcomeAndRequest(boolean success) {
+    when(serviceCalls.markVduProcessing(any())).thenReturn(io.justsearch.ipc.MarkVduProcessingResponse
+        .newBuilder().setSuccess(success).setRetryCount(2)
+        .setError(success ? "" : "Max retries exceeded").build());
+    assertEquals(success ? 2 : -1, ops.markVduProcessing("document", 3, context));
+    var request = ArgumentCaptor.forClass(io.justsearch.ipc.MarkVduProcessingRequest.class);
+    verify(serviceCalls).markVduProcessing(request.capture());
+    assertEquals("document", request.getValue().getDocId());
+    assertEquals(3, request.getValue().getMaxRetries());
+    assertInvocation("markVduProcessing", KnowledgeClient.RpcDeadlineCategory.STANDARD, context);
+  }
+
+  private boolean update() {
+    return ops.updateVduResult("document", "content",
+        io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT, "enrichment", 2, context);
+  }
+
+  private static RuntimeException controlFailure(String kind) {
+    return switch (kind) {
+      case "transport" -> new IllegalStateException("worker unavailable");
+      case "circuit" -> new io.justsearch.ipc.CircuitBreakerOpenException("worker unavailable");
+      case "cancelled" -> new EngineWorkCancelledException("user_stop");
+      case "refused" -> new io.justsearch.core.execution.EngineExecutorRejectedException(
+          io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+          "index.ingest", 1);
+      default -> throw new IllegalArgumentException(kind);
+    };
   }
 
   private void assertReadFailurePropagates(RuntimeException failure) {
