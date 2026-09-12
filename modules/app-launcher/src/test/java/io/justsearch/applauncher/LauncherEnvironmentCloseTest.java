@@ -35,6 +35,56 @@ final class LauncherEnvironmentCloseTest {
   }
 
   @Test
+  void secondLauncherCannotSweepTheFirstLaunchersLiveOperation() throws Exception {
+    System.setProperty("justsearch.data.dir", tempDir.toString());
+    var clock = java.time.Clock.systemUTC();
+    var key = io.justsearch.app.api.operations.OperationKeys.generate(clock);
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var liveStore = new java.util.concurrent.atomic.AtomicReference<io.justsearch.app.api.operations.OperationStore>();
+    LauncherEnvironment.installFactories(
+        () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+        (executors, dataDir, profile) -> new LocalTelemetry(executors, dataDir, 1_000, "launcher-test", profile,
+            "metrics.ndjson", java.util.List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
+        (executors, telemetry, config, operations) -> {
+          var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+              operations, clock, java.util.Set.of());
+          if (calls.incrementAndGet() == 1) {
+            var request = new io.justsearch.app.api.operations.OperationAttemptRunner.Request(key,
+                io.justsearch.app.api.operations.OperationDescriptor.invocation(
+                    io.justsearch.agent.api.registry.OperationKind.OPERATION, "core.lock-fixture", "{}", false),
+                new io.justsearch.core.context.EngineContext(
+                    io.justsearch.core.context.EngineContext.ClientKind.INTERNAL, "lock-fixture",
+                    java.util.Optional.empty(), java.util.Optional.empty(), "TRUSTED", "SYSTEM_INTERNAL",
+                    io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                    io.justsearch.core.context.EngineContext.Urgency.BACKGROUND), null);
+            var accepted = runner.accept(request);
+            runner.start(accepted, handle -> new io.justsearch.agent.api.registry.OperationExecution(
+                io.justsearch.agent.api.registry.OperationResult.success("running"),
+                new java.util.concurrent.CompletableFuture<>()));
+            liveStore.set(operations);
+          }
+          return Mockito.mock(io.justsearch.app.services.HeadAssembly.class);
+        });
+    try (var first = LauncherEnvironment.create("smoke")) {
+      org.junit.jupiter.api.Assertions.assertNotNull(first.HeadAssembly());
+      org.junit.jupiter.api.Assertions.assertThrows(
+          io.justsearch.app.util.AppInstanceLock.AppInstanceLockException.class, () -> {
+            try (var second = LauncherEnvironment.create("smoke")) {
+              org.junit.jupiter.api.Assertions.assertNotNull(second);
+            }
+          });
+      assertEquals(1, calls.get(), "the second launcher must not construct a runner");
+      assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING,
+          liveStore.get().find(key).orElseThrow().state());
+      org.junit.jupiter.api.Assertions.assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
+    }
+    try (var reacquired = new io.justsearch.app.util.AppInstanceLock(tempDir)) {
+      reacquired.acquire();
+      org.junit.jupiter.api.Assertions.assertTrue(reacquired.isHeld());
+    }
+  }
+
+  @Test
   void failingConfigConstructionRestoresPropertiesBeforeAnyOtherOwnerExists() throws Exception {
     System.setProperty("justsearch.config", "previous-config");
     System.setProperty("egress.block_all", "false");
@@ -51,6 +101,43 @@ final class LauncherEnvironmentCloseTest {
     } finally {
       LauncherEnvironment.resetFactories();
     }
+  }
+
+  @Test
+  void failedAssemblyConstructionReleasesItsInstanceLock() throws Exception {
+    System.setProperty("justsearch.data.dir", tempDir.toString());
+    var failure = new IllegalStateException("assembly failed");
+    LauncherEnvironment.installFactories(
+        () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+        (executors, dataDir, profile) -> new LocalTelemetry(executors, dataDir, 1_000, "launcher-test", profile,
+            "metrics.ndjson", java.util.List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
+        (executors, telemetry, config, operations) -> {
+          org.junit.jupiter.api.Assertions.assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
+          throw failure;
+        });
+    org.junit.jupiter.api.Assertions.assertSame(failure,
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> LauncherEnvironment.create("smoke")));
+    try (var reacquired = new io.justsearch.app.util.AppInstanceLock(tempDir)) {
+      reacquired.acquire();
+      org.junit.jupiter.api.Assertions.assertTrue(reacquired.isHeld());
+    }
+  }
+
+  @Test
+  void failedOperationsCloseRetainsInstanceLockUntilRetry() throws Exception {
+    var telemetry = Mockito.mock(LocalTelemetry.class);
+    var environment = allocateEnvironment(telemetry, null, null, tempDir.resolve("store-close-retry"));
+    var operations = Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
+    var lock = Mockito.mock(io.justsearch.app.util.AppInstanceLock.class);
+    setField(environment, "operations", operations);
+    setField(environment, "instanceLock", lock);
+    Mockito.doThrow(new java.io.IOException("close refused")).doNothing().when(operations).close();
+    org.junit.jupiter.api.Assertions.assertThrows(java.io.UncheckedIOException.class, environment::close);
+    Mockito.verifyNoInteractions(lock, telemetry);
+    environment.close();
+    var order = Mockito.inOrder(operations, lock);
+    order.verify(operations, Mockito.times(2)).close();
+    order.verify(lock).close();
   }
 
   @Test

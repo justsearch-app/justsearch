@@ -23,6 +23,7 @@ scope addition is recorded under the next item's section0.1, never silently expa
    publication contract; retain its thrown-error, one-effect and RUNNING-row assertions.
 2. **R2 OPEN — launcher exclusion.** Acquire AppInstanceLock before operations open;
    two-runner test proves no live sweep/quarantine. Preserve orderly lock release.
+   [R2 proof](review-r2-launcher-lock.md): final795 executes45 cases and passes the item gate.
 3. **R3 OPEN — transition refusal.** Re-read all ignored lifecycle booleans, reject
    unexpected terminal-write refusal and prove the failure is observable.
 4. **R4 OPEN — audit/admission.** Audit NONE cannot bypass durable mutation acceptance;

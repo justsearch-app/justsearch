@@ -15,8 +15,6 @@ import io.justsearch.telemetry.Telemetry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Shared launcher environment wiring that aligns with the configured profile and telemetry setup.
@@ -25,7 +23,6 @@ import org.slf4j.LoggerFactory;
  * handlers execute against the same wiring that the application will use in production.
  */
 final class LauncherEnvironment implements AutoCloseable {
-  private static final Logger LOG = LoggerFactory.getLogger(LauncherEnvironment.class);
 
   private final Path profilePath;
   private final String previousConfigProperty;
@@ -38,6 +35,7 @@ final class LauncherEnvironment implements AutoCloseable {
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final HeadAssembly HeadAssembly;
   private final io.justsearch.app.api.operations.OperationStore operations;
+  private final io.justsearch.app.util.AppInstanceLock instanceLock;
   private static final ConfigManagerFactory DEFAULT_CONFIG_MANAGER_FACTORY =
       ConfigManagerBootstrap::new;
   // Tempdoc 417 Phase 2 + F1 follow-up: register catalogs for every metric the Launcher process
@@ -150,6 +148,7 @@ final class LauncherEnvironment implements AutoCloseable {
     io.justsearch.core.execution.EngineExecutorRegistry createdExecutors = null;
     LocalTelemetry createdTelemetry = null;
     io.justsearch.app.api.operations.OperationStore createdOperations = null;
+    io.justsearch.app.util.AppInstanceLock createdInstanceLock = null;
     try {
       System.setProperty("justsearch.config", profilePath.toString());
       System.setProperty("egress.block_all", "true");
@@ -172,21 +171,27 @@ final class LauncherEnvironment implements AutoCloseable {
       createdTelemetry = telemetryFactory.create(
           createdExecutors, PlatformPaths.resolveDataDir(), profile);
       io.justsearch.telemetry.JvmRuntimeGauges.register(createdTelemetry, "launcher");
+      // Even another owner in this JVM is a distinct launcher, not permission to share its stores.
+      createdInstanceLock = new io.justsearch.app.util.AppInstanceLock(PlatformPaths.resolveDataDir());
+      createdInstanceLock.acquire();
       createdOperations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           PlatformPaths.resolveDataDir().resolve("operations.db"));
       this.HeadAssembly = appFacadeFactory.create(createdExecutors, createdTelemetry, createdConfig, createdOperations);
       this.operations = createdOperations;
+      this.instanceLock = createdInstanceLock;
       this.configManager = createdConfig;
       this.executors = createdExecutors;
       this.telemetry = createdTelemetry;
       this.previousConfigStore = previousStore;
       this.installedConfigStore = installedStore;
     } catch (Exception | Error failure) {
+      boolean operationsClosed = createdOperations == null;
       if (createdOperations != null) {
-        try { createdOperations.close(); } catch (IOException closeFailure) {
+        try { createdOperations.close(); operationsClosed = true; } catch (IOException closeFailure) {
           failure.addSuppressed(closeFailure);
         }
       }
+      if (operationsClosed && createdInstanceLock != null) createdInstanceLock.close();
       if (createdTelemetry != null) {
         try { createdTelemetry.close(); } catch (RuntimeException closeFailure) {
           failure.addSuppressed(closeFailure);
@@ -256,12 +261,14 @@ final class LauncherEnvironment implements AutoCloseable {
     // Propagate refusal and leave a later close able to finish after the body exits.
     if (HeadAssembly != null) HeadAssembly.close();
     try { operations.close(); } catch (IOException failure) {
-      LOG.warn("Failed to close operations store", failure);
+      throw new java.io.UncheckedIOException("Operations store did not close; retaining its instance lock", failure);
     }
     try {
       telemetry.close();
     } finally {
-      try { executors.close(); } finally { restoreProperties(); }
+      try { executors.close(); } finally {
+        try { if (instanceLock != null) instanceLock.close(); } finally { restoreProperties(); }
+      }
     }
   }
 

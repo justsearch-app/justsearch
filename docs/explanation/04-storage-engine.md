@@ -295,6 +295,10 @@ These defaults are optimized for desktop systems with sufficient RAM. The RAM bu
 ## Operation outcome storage
 
 `operations.db` is a separate SQLite store owned by the Engine composition. Its app-api port is
+opened only after the process acquires AppInstanceLock for its data directory, including
+LauncherEnvironment. A second launcher in the same JVM must acquire its own lock and
+is refused while the first remains active. Shutdown retains the lock until the operations
+store closes; failed setup releases it after safe store cleanup. The port is
 implemented in app-observability, and the same instance is injected into the application and index
 composition before asynchronous startup. It closes after the index half drains. The schema starts
 at version 1; `jobs.db` independently uses version 16, retaining nullable `jobs.content_hash`
