@@ -1934,6 +1934,12 @@ public final class WorkerIngestService {
     // conversion that monitor was the ServerCallStreamObserver itself — nothing else ever
     // synchronized on it, so a private lock is the same mutual exclusion without the transport.
     final Object emitLock = new Object();
+    // This brief handoff covers subscribe-return through snapshot emission. It is separate from
+    // the port's steady-state delivery queue and must never block the jobs-table writer.
+    final int pendingSnapshotLimit = 256;
+    java.util.ArrayDeque<IndexingJobChangeFeed.Delta> pendingSnapshot = new java.util.ArrayDeque<>();
+    java.util.concurrent.atomic.AtomicBoolean snapshotSent = new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean snapshotOverflow = new java.util.concurrent.atomic.AtomicBoolean();
     java.util.concurrent.atomic.AtomicReference<IndexingJobChangeFeed.Subscription> subRef =
         new java.util.concurrent.atomic.AtomicReference<>();
     java.util.concurrent.atomic.AtomicBoolean closeRequested = new java.util.concurrent.atomic.AtomicBoolean();
@@ -1945,9 +1951,9 @@ public final class WorkerIngestService {
     java.util.concurrent.atomic.AtomicLong frameSeq =
         new java.util.concurrent.atomic.AtomicLong(0L);
 
-    java.util.function.Consumer<IndexingJobChangeFeed.Delta> consumer =
+    java.util.function.Consumer<IndexingJobChangeFeed.Delta> emitDelta =
         delta -> {
-          if (ctx.cancelled()) return;
+          if (ctx.cancelled() || closeRequested.get()) return;
           io.justsearch.ipc.IndexingJobsDelta.Builder deltaBuilder =
               io.justsearch.ipc.IndexingJobsDelta.newBuilder();
           switch (delta) {
@@ -1972,11 +1978,29 @@ public final class WorkerIngestService {
           }
         };
 
+    java.util.function.Consumer<IndexingJobChangeFeed.Delta> consumer = delta -> {
+      synchronized (emitLock) {
+        if (ctx.cancelled() || closeRequested.get()) return;
+        if (snapshotSent.get()) {
+          emitDelta.accept(delta);
+        } else if (pendingSnapshot.size() < pendingSnapshotLimit) {
+          pendingSnapshot.addLast(delta);
+        } else {
+          snapshotOverflow.set(true);
+          pendingSnapshot.clear();
+          closeSubscription.run();
+        }
+      }
+    };
+
     ctx.onCancel(closeSubscription);
 
     try {
       var snap = feed.subscribeWithSnapshot(consumer);
       subRef.set(snap.subscription());
+      if (snapshotOverflow.get()) {
+        throw WorkerServiceException.unavailable("indexing-jobs snapshot handoff overflow; resubscribe");
+      }
       if (closeRequested.get() || ctx.cancelled()) {
         closeSubscription.run();
         return;
@@ -1988,11 +2012,27 @@ public final class WorkerIngestService {
         snapBuilder.addItems(toJobView(row));
       }
       synchronized (emitLock) {
+        if (snapshotOverflow.get()) {
+          throw WorkerServiceException.unavailable("indexing-jobs snapshot handoff overflow; resubscribe");
+        }
+        if (closeRequested.get() || ctx.cancelled()) {
+          closeSubscription.run();
+          return;
+        }
         sink.accept(
             io.justsearch.ipc.IndexingJobsFrame.newBuilder()
                 .setSnapshot(snapBuilder.build())
                 .setSeq(frameSeq.incrementAndGet())
                 .build());
+        // Reentrant sink writes also join this queue, behind already buffered deltas.
+        while (!pendingSnapshot.isEmpty() && !closeRequested.get() && !ctx.cancelled()) {
+          emitDelta.accept(pendingSnapshot.removeFirst());
+        }
+        pendingSnapshot.clear();
+        if (snapshotOverflow.get()) {
+          throw WorkerServiceException.unavailable("indexing-jobs snapshot handoff overflow; resubscribe");
+        }
+        snapshotSent.set(true);
       }
     } catch (java.sql.SQLException e) {
       closeSubscription.run();

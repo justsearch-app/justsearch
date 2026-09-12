@@ -671,3 +671,36 @@ plus main/test PMD (main unchanged-input reuse); artifacts are -642.txt, -642-xm
 -642-counts.json. Surface643, docs index/skill-sync checks, canonical links and diff
 whitespace pass. No weakening of validation or callback exception suppression was added.
 Integrated and named stress checks remain required at the next coherent boundary.
+
+
+### Snapshot-before-delta handoff correction
+
+September12: WorkerIngestService subscribes atomically to queue state but previously sent
+the snapshot after releasing that owner lock, allowing a writer's newer delta to arrive
+first and then be overwritten by the stale snapshot. Retain the existing emitter monitor
+and buffer at most256 deltas only until the snapshot and accumulated deltas are delivered.
+This bounded initial handoff is an intentional projection buffer, distinct from the port's
+steady-state BoundedHandoff. Blocking while holding the queue lock is rejected; taking
+the emitter lock before subscribeWithSnapshot would invert lock order. Overflow closes
+the subscription (including a handle returned after overflow) and fails with UNAVAILABLE
+so the existing bridge obtains a fresh snapshot. It never drops and continues a partial
+stream. Reentrant sink writes join the pending queue until that queue is drained.
+Cancellation and snapshot failure close the subscription and stop buffered delivery.
+
+Forced-interleaving fixture invokes post-snapshot deltas before subscribeWithSnapshot
+returns. Initial644 passes19 tests/5 suites plus worker-services main/test PMD. Original
+service negative645 fails the first-frame-is-snapshot assertion (1 test/1 failure).
+Evidence: tmp/c2-2-snapshot-order-{644,646}.txt, corresponding -xml and -counts.json;
+tmp/c2-2-snapshot-order-negative-645.txt and -645-xml. The intended service is restored
+before646; two additional cases cover cancellation before the late handle returns and
+from the snapshot sink. Hosted/integrated and named stress proof remains required at
+the next coherent boundary. The bounded buffer is not a durable operation completion
+source and does not change the C2-2 recorded-ingestion acceptance obligation.
+
+
+Restored646 passes21 tests/5 suites, zero failures/errors/skips plus PMD. Independent
+review found no material source defect and requested a buffered-delta sink-failure
+regression. Final648 adds that case and overflow during snapshot emission:23 tests/5
+suites pass, zero failures/errors/skips, with main/test PMD (main unchanged-input reuse).
+Evidence: tmp/c2-2-snapshot-order-648.txt, -648-xml and -648-counts.json. Surface647 and
+diff whitespace pass. Root independently inspected the failure and final result XML.

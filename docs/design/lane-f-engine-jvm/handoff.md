@@ -15,13 +15,14 @@ retry. Investigate and fix that witness before calling the new orphan proof clea
 The new producer and quota suites are unskipped and green on hosted Windows/Linux jobs.
 See [hosted evidence](evidence/C2/hosted-ci.md) and [next decisions](evidence/C2/C2-2-plan.md).
 
-Jobs post-commit projection prerequisite is implemented: restored642 passes153 queue
+Jobs post-commit projection prerequisite is committed/pushed at03c05f47e: restored642 passes153 queue
 tests/13 suites plus PMD, negative641 proves native-hook delivery is rejected, and
-independent review found no remaining queue defect. A discovered WorkerIngestService
-snapshot-before-delta race is the next separate correction; hosted/integrated proof
-of the new projection is still owed. See the C2-2 plan for retained evidence.
+independent review found no remaining queue defect. The discovered WorkerIngestService
+snapshot-before-delta race is corrected with a bounded initial handoff;648 passes23
+tests/5 suites plus PMD, negative645 reproduces the old ordering defect, and independent
+review passes. Hosted/integrated proof of the new projection is still owed. See the C2-2 plan for retained evidence.
 
-Next: snapshot handoff ordering, orphan proof correction, actual offline
+Next: orphan proof correction, actual offline
 procedure outcome/context propagation, then the remaining direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
