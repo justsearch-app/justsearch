@@ -73,8 +73,9 @@ production KnowledgeServer eligibility wiring through a resumed migration. The l
 [real Engine proof](engine-vdu-migration-replay.md) closes that composition gap with
 source replacement, promotion, eligible reopen and a production-guard negative.
 Hosted CI34711067677 passes b532a56ee; stress714 reuses unchanged passing inputs.
-Full integrated verification including the new Engine fixture and its hosted execution,
-actual-model/installed offline completion and later D1 carry-forward remain open.
+The later [checkpoint724](vdu-checkpoint-724.md) passes full integrated verification
+and hosted CI including the new Engine fixture. Actual-model/installed offline
+completion and later D1 carry-forward remain open.
 These limits are work in progress, not an owner-gated deferral.
 
 ## Evidence access

@@ -7,7 +7,14 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
-Latest integrated verification is [checkpoint694](evidence/C2/vdu-checkpoint-694.md)
+Latest integrated verification is [checkpoint724](evidence/C2/vdu-checkpoint-724.md):
+55b8aeb15 code passes full build/PMD with10,034 cases/1,643 suites, zero failures/errors
+and35 skips. Eight test tasks execute; the rest reuse unchanged inputs. Hosted
+CI34712074865 passes the same code and new real Engine fixture. The next active
+implementation is [shared offline ownership](evidence/C2/offline-owner-cut.md),
+with candidate work prepared separately during verification.
+
+Prior integrated verification is [checkpoint694](evidence/C2/vdu-checkpoint-694.md)
 at41a74500b: full build/PMD9,993 cases/1,637 suites, zero failures/errors,35 skips;
 11 test tasks execute and27 reuse unchanged results. Hosted CI34708670410 is green
 at e872a36d4 (subsequent skill projection corrections only). Named stress696 passes
@@ -31,8 +38,8 @@ review finds no remaining production blocker. The subsequent
 independent review strengthened source replacement assertions; the force-eligible
 production mutation720 fails exact row retention, and restored721 reuses719.
 Hosted CI34711067677 passes b532a56ee and stress714 reuses unchanged passing inputs.
-Full integrated verification and hosted execution including the new Engine fixture
-remain open before moving to the shared offline owner.
+Full724 and hosted CI34712074865 now cover the new Engine fixture and generation
+correction; proceed with the shared offline owner and its separate producer proofs.
 
 Prior coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626
 suites, zero failures/errors and35 skips; stress659 passes allthree selected cases
@@ -61,8 +68,7 @@ Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-wr
 invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
 are green; these prior runs do not establish hosted proof for the newer writer.
 
-Next: complete broader generation verification including the new Engine fixture;
-then actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
+Next: implement actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 

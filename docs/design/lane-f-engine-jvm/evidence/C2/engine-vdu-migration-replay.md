@@ -45,8 +45,9 @@ The production guard itself also has successful hosted CI
 [34711067677](https://github.com/justsearch-app/justsearch/actions/runs/34711067677)
 at b532a56ee. Named stress714 passes2 cases with both tasks UP-TO-DATE from the
 documented prior stress run; it is unchanged-input reuse, not new execution.
-Full integrated verification and hosted execution of the new fixture follow this
-checkpoint. Actual-model/installed offline completion remains open.
+The later [checkpoint724](vdu-checkpoint-724.md) passes full integrated verification
+and hosted CI34712074865 at55b8aeb15 including this fixture.
+Actual-model/installed offline completion remains open.
 
 Explicit fixture restarts do not prove automatic product restart or live service
 activation. The generation checks remain observations, not an atomic generation
