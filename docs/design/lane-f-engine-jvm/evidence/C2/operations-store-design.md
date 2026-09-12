@@ -114,18 +114,24 @@ prune(now)                             -> rows evicted; advances history_since
 
 `accept` is `INSERT ... ON CONFLICT(operation_key) DO NOTHING` followed by a read in one
 transaction, so two concurrent same-key calls produce one execution and the loser receives the
-in-progress outcome. A failed write throws and the caller must not proceed
+in-progress outcome only when the canonical request identity matches. Compare the
+stored operation reference and canonical argument/dependency identity before returning
+an existing row; reuse for another operation or different input refuses
+`OPERATION_KEY_REUSED` (CONFLICT), with no new execution and no unrelated result.
+Include invocation versus undo and the undo target execution id in that identity.
+A failed write throws and the caller must not proceed
 (`putSwitchBufferOrThrow` shape). The client key is an explicit parameter at every seam and
 never a field on `EngineContext`.
 
 ### 1.5 Which calls get a row
 
-- **Dispatched catalog operations.** The executor writes the row for every call, never the
-  handler. The row's kind is a declaration on the catalog `Operation`: a new `recordKind` policy
+- **Dispatched catalog operations.** One shared `OperationAttemptRunner` owns acceptance and
+  terminal writes; the executor delegates to it, never the handler. Direct settings and
+  background producers enter that same runner. The row's kind is a declaration on the catalog `Operation`: a new `recordKind` policy
   field with the closed vocabulary above, default `operation`. The kind fixes the row's survival
   (`reindex` durable; `reconfigure`, `accept-gaps`, `operation` interactive unless the context
   says durable for `operation` only). The handler receives an `OperationRecordHandle` (id,
-  checkpoint, result, complete, fail) through the dispatch context and never calls `accept` for
+  key and checkpoint only) through the dispatch context and never calls `accept` for
   its own row; it may accept child rows under fresh Engine-minted keys (the successor ingest row).
   A row is written for every keyed call, and for every unkeyed call whose `AuditPolicy` is not
   `NONE`, which reproduces today's history exactly; audit suppression never suppresses a keyed
@@ -143,6 +149,16 @@ never a field on `EngineContext`.
   C2 scheduled-outcome dependency).
 - **Settings apply.** `settings-apply` at C2 (the controller); `reconfigure` at D1 (the handler).
 
+The runner alone owns internal `AttemptControl`. Synchronous operation results normally
+finish the attempt when the handler returns; an asynchronous owner supplies its actual
+completion stage, so returning an accepted response does not complete an ingest, reindex
+or scheduled run. Owner adapters report progress/outcomes to the runner; they do not
+write terminal states themselves. The settings adapter supplies the committed receipt
+described below. Admission/validation refusal before effects is also terminalized here.
+This extracts the existing executor's history/outcome responsibility into a shared owner,
+not a second executor or persistent journal. A duplicate acceptance always returns the
+existing row and never starts another runner body.
+
 ### 1.6 Reconciliation at boot, owner-scoped
 
 The store owns no kind-specific logic. Each owner registers a reconciler for its kinds and runs
@@ -151,16 +167,18 @@ witness needs `state.json` and the index half may come up after the Head, or not
 whose owner is not ready stays exactly as it is and the outcome query reports it truthfully.
 
 The store's one built-in rule: an open row with `survival = interactive` and no reconciler
-verdict is marked `FAILED` with reason `interrupted_by_restart`. Durable rows are never touched
-by the default.
+verdict is marked `FAILED` with reason `interrupted_by_restart` only when no owner
+claims its kind. Register kind ownership before the default sweep; an owned kind waits
+for its reconciler even when interactive. Durable rows are never touched by the default.
 
 Registered reconcilers *(D1, cited here for the row shapes they need)*: reindex (pointer equals
 `building_generation_id` and a successor ingest row exists in `ACCEPTED` or `RUNNING` advances the
 row to `COMPLETE`; pointer equals building id with no successor row is `FAILED`
 `SUCCESSOR_ROW_MISSING`, reported, never fabricated; pointer still Blue resumes replay); ingest
 (a row whose generation is not the active pointer becomes `COMPLETE` with reason
-`superseded_by_generation`); reconfigure (a `RUNNING` row becomes `FAILED`
-`ENGINE_RESTARTED_DURING_APPLY`, overriding the default). Cancel or abandon of a reindex cancels
+`superseded_by_generation`); settings-apply and reconfigure use the committed-settings
+witness in section1.8. A reconfigure interrupted before that commit becomes `FAILED`
+`ENGINE_RESTARTED_DURING_APPLY`; one interrupted after commit completes by reconciliation. Cancel or abandon of a reindex cancels
 an `ACCEPTED` successor row on the path that abandons the generation.
 
 ### 1.7 Activation order *(D1)*
@@ -175,15 +193,72 @@ an `ACCEPTED` successor row on the path that abandons the generation.
 Nothing shares a transaction; the effect is an atomic file move. Acceptance precedes effect at
 step 1, and "pointer swapped, successor missing" is unreachable.
 
-### 1.8 The accepted-settings revision port *(D1)*
+### 1.8 The accepted-settings revision port (amended 2026-09-12)
 
-C2-6 is an `app-api` port with one atomic call: `apply(expectedRevision, settings)` returns the
-new revision or refuses `VERSION_CONFLICT`. The revision is a field in the settings document
-written in the same atomic file write as the settings, distinct from `UiSettings.version` (a
-schema-migration integer), and exposed on GET as well as on the POST success body. At C2 the
-controller calls it; at D1 the reconfigure handler calls it on the success path after the last
-component composes, and restart-required keys use the same call at their persist. The
-`settings-apply` row stores the expected revision; its result carries the new one.
+C2-6 is an app-api port owning the serialization of every production settings write,
+including install/import and runtime-spec writers. Its apply accepts expected revision,
+operation key and target UiSettings; D1 supplies already-prepared component installation.
+The implementation owns one apply mutex and a typed `SettingsCommitFence`: read current
+persisted revision, compare, prepare, arm the fence, commit and publish under the mutex.
+Release the physical mutex after publishing; the logical fence refuses further settings
+mutations until the runner durably records the result. Reject nested applies, including
+preparation callbacks that attempt to save settings. Holding only a controller lock
+cannot order the other production callers.
+
+All ordinary fallible work precedes persistence: copy settings, prepare serialized bytes
+and a non-null ResolvedConfig, and validate/compose each candidate. Split
+ConfigStoreRebuilder.rebuild into preparation and publication; remove its swallowed
+preparation failure. Retire the direct public save bypass once all writers use the owner.
+Install-time/internal calls enter the same runner with a server operation key; they
+cannot call the raw port with a fabricated attempt. Catalog reconfigure reuses its
+existing runner-owned attempt, never creates a second row.
+
+The existing PersistedSettings envelope gains additive acceptedRevision and
+lastCommittedOperationKey fields (not UiSettings.version, the schema integer). Atomically
+replace the settings file with both fields and the prepared settings in the same write.
+This replacement is the commitment point: only fully composed settings reach disk.
+After it, publish the prepared ConfigStore snapshot and prepared component handles;
+no validation or other ordinary fallible work belongs in publication. Recovery-cleared
+notifications currently called after UiSettingsStore.save must not turn a committed write
+into a reported failed apply. Fatal Error is not swallowed: restart reads the committed
+file and reconciles the row. D1 must prove its handle installation has this same property.
+
+Before file replacement, prepare an immutable receipt of key, next revision and result;
+mark it committed in runner-owned AttemptControl immediately after replacement succeeds.
+Only a committed receipt is an effect witness; arming the fence alone is not commitment.
+After the handler returns, the runner completes from that receipt and invokes the fixed
+settings coordinator's `releaseAfterTerminal(receipt)` outside every mutex. Even a later
+RuntimeException must complete from the committed receipt rather than report FAILED.
+Precommit failure has no committed receipt: the runner fails the attempt and clears its
+fence outside the mutex. Fatal process failure is reconciled from the file at boot.
+No handler-visible complete/fail method, arbitrary callback under the apply mutex, or
+second terminal writer is permitted.
+
+Complete the operations row before clearing the fence or accepting another settings
+mutation, so the single bounded witness cannot be overwritten while still needed. If
+that completion write fails after file replacement, retain RUNNING, refuse further
+settings mutation and request the existing ordered restart; never report FAILED or
+attempt a cross-file rollback of a committed apply. On boot the settings owner runs
+before the generic interactive-row rule: matching key and expectedRevision+1 completes
+the row; unchanged revision means interrupted before commitment and fails it; an advanced
+revision with another witness is an invariant violation and fails closed. A later
+settings commit may overwrite the witness only after the preceding outcome is durable.
+The witness is necessary because two stores cannot commit atomically; another journal,
+unbounded commit-key list and compensating file rollback are rejected. Holding the mutex
+through a handler return would transfer lock ownership across layers; allowing the
+handler to complete its own row would duplicate the executor's terminal authority.
+The bounded in-process fence preserves one terminal owner without either mechanism.
+
+GET and successful apply return acceptedRevision. Same-key retry checks canonical input
+identity and returns the stored outcome before comparing current revisions. A new key
+compares expectedRevision normally. The settings/reconfigure row records the expected
+revision and completion carries the committed revision.
+
+Primary sources at35d03f7c4: UiSettingsStore.java:222-245 (file replace plus a fallible
+post-write notification); ConfigStoreRebuilder.java:72-84 (build/update swallowed together);
+ConfigStore.java:124-127 (atomic snapshot replacement); ObservableNotifier.java:78-84
+(listener RuntimeExceptions isolated); RuntimeSpecStore, RuntimeActivationService,
+AiInstallService and AiPackImportService are additional direct settings writers.
 
 ## 2. The key, retention, and the outcome boundary
 
@@ -202,27 +277,33 @@ indistinguishable: never accepted, or accepted and evicted. Tombstones only move
   contract holds only for client-chosen keys. No production caller sends a key today
   (`OperationClient.ts:193` forwards an optional field; `KnowledgeIngestRequest` has only
   `paths`), so this is not a compatibility break.
-- **Lookup order.** Row first, always. Only a missing key consults `history_since`: `expired`
-  if the key's embedded time is earlier than `history_since + margin`, else `unknown`.
-- **Margin direction.** The margin errs toward `expired`. A client clock running ahead is the
-  only case that could turn an evicted key into `unknown` and license a duplicate; a false
-  `expired` claims nothing and the client mints a new key. Margin: 5 minutes. Clients are loopback
-  today; a paired-device ADR revisits the value.
-- **`history_since` is monotonic and advances to the newest evicted acceptance.** Retention
-  prunes terminal rows whose `completed_at` is older than 30 days. The row cap (100 000) evicts
-  the oldest terminal rows first. After either, `history_since := max(history_since,
-  max(accepted_at of the evicted rows) + 1 ms)`. Every evicted key was minted no later than it
-  was accepted, so it now answers `expired`, and every surviving row is still found by lookup.
-  The oldest-survivor rule is wrong and rejected: a long-running row can survive while newer
-  terminal rows between it and now are pruned, and a key in that gap would answer `unknown`.
-- **Restore transitions.** Corruption quarantine (the `handleCorruptDatabase` shape, minus a
-  backup copy: `operations.db` has none) sets `history_since := now`. The encrypted-backup
-  import of tempdoc 629 covers the AUTHORED catalog only, so it never touches this store. An
-  external file-level rollback is undetectable from the file alone and is declared outside the
-  contract; the register row says so.
-- **Invoke with an expired key** is refused `OPERATION_KEY_EXPIRED` (class `CONFLICT`). The
-  Engine cannot rule out a prior effect, so the client mints a new key and owns the duplication
-  risk, as 7.6 already states for new keys.
+- **Lookup order.** Row first, always. For a missing key, compare its embedded
+  timestamp with history_since: earlier means expired, otherwise unknown.
+- **Skew allowance.** Ingress permits a key at most five minutes ahead of the Engine
+  clock. This is input validation, not an extra five minutes added to every lookup.
+- **history_since is a monotonic key-time fence**, initially zero for a genuinely new store. Retention prunes terminal rows older
+  than30 days by completed_at; the100000-row cap evicts the oldest terminal rows first.
+  In the same transaction as deletion, advance the fence to max(existing fence,
+  newest embedded UUIDv7 timestamp among evicted keys +1ms). Comparing embedded key
+  times directly covers admitted ahead-of-clock keys without unnecessarily expiring
+  newly minted keys after ordinary eviction. Surviving rows always win lookup.
+  Evicting an admitted future-time key can move the fence ahead of now; report the
+  bounded remaining delay for fresh missing keys just as on quarantine below.
+  The oldest-survivor rule remains rejected because it hides pruned gaps. This
+  September12 correction supersedes the accepted_at-plus-margin formula, which could
+  refuse every current-time fresh key after a recent eviction.
+- **Restore transitions.** Corruption quarantine has no backup for operations.db and
+  cannot recover evicted identities. Set history_since to quarantine time + the5-minute
+  admitted-future allowance +1ms before accepting work. This conservative fence makes
+  the lost keys expired. During its bounded remaining interval, current-time missing
+  keys cannot safely be accepted: return the typed expiry/capacity explanation and
+  remaining retry delay rather than claiming that minting another current-time key
+  helps. Read-only operations remain available. Quarantine tests advance an injected
+  clock to prove acceptance resumes; do not wait five real minutes in unit tests.
+  An external valid-file rollback remains outside this file's detectable contract.
+- **Invoke with an expired key** refuses OPERATION_KEY_EXPIRED (CONFLICT). The Engine
+  cannot rule out a prior effect. A client choosing a distinct key after the recovery
+  fence owns duplication risk; never silently re-key or retry a write internally.
 - **Cap reached with only non-terminal rows.** Acceptance is refused with a typed capacity code
   rather than evicting resumable work. Attempts budget: 3.
 
@@ -241,8 +322,16 @@ reason?, result? }` with `state` in `accepted | running | complete | failed | un
 `COMPLETE_WITH_GAPS` projects as `running` with `phase: awaiting_acceptance` and the gap list in
 `result`; `CANCELLED` projects as `failed` with reason `cancelled`. The wire answer set does not
 grow. An MCP tool exposes the same query. The new route triggers the live re-capture obligation
-in `stages/C2.md` section 5. `GET /api/operation-history` and its SSE stay as the projection
-over terminal rows; the reconnect window becomes the retention window.
+in `stages/C2.md` section 5. `GET /api/operation-history` and its SSE remain projections over terminal rows. Durable query retention is30 days;
+SSE replay remains the existing bounded in-memory window. On a stream reset or restart,
+clients re-fetch the durable history snapshot and resume the existing channel protocol.
+No durable event journal or30-day frame-replay promise is introduced.
+For initial/reset subscription, capture the channel token before querying the durable
+snapshot, then atomically subscribe-and-replay from that token. If it expires during
+the snapshot query, repeat the reset/snapshot handoff with a fresh token; never silently
+subscribe after a missed replay. Deduplicate repeated operation ids on the client.
+SseEnvelopeWriter.attach currently snapshots before subscribing (:225-237 at35d03f7c4);
+its documented gap must be retired in C2-4, with a completion injected at that seam.
 
 ## 4. Corrections found by this pass (for `stages/C2.md` section 0.2)
 
@@ -260,7 +349,7 @@ over terminal rows; the reconnect window becomes the retention window.
 ## 5. Acceptance additions specific to these decisions
 
 - Key rule: v4 refused; future key refused; boundary `expired` versus `unknown` on both sides
-  of `history_since + margin`; a concurrent same-key pair yields exactly one execution.
+  of the key-time `history_since` fence; a concurrent same-key pair yields exactly one execution.
 - `history_since`: monotonic under retention, under cap eviction, and under quarantine; the
   long-running-survivor case (a row older than evicted rows) still answers `expired` for the
   evicted keys.
@@ -271,3 +360,37 @@ over terminal rows; the reconnect window becomes the retention window.
 - Module: only app-observability implements the port; worker-services, indexer-worker and
   app-agent reach it through app-api only (ArchUnit).
 - `recordKind`: a dispatched `core.bulk-reindex` produces exactly one row of kind `reindex`.
+
+## 6. September12 resumption amendments and required proof
+
+The independent review and parent source read found input-conflict, undo, SSE and
+settings-commit gaps. These amendments supersede the September10 wording where it
+conflicts; C1 still gates feature implementation.
+
+- Same key/different operation, changed arguments, or invoke-versus-undo must conflict;
+  same key/identical identity under concurrency executes exactly once.
+- Undo is a keyed mutation through the existing undo dispatcher and trust checks. Its
+  canonical identity contains the target execution id; a dropped response followed by
+  retry returns the prior UNDONE result without repeating the reversal. Preserve the
+  existing undo linkage; no new catalog recordKind is required.
+- history_since lives only in singleton operations_meta. The stray row-column listing
+  in C2-1 is removed, not implemented as a second authority.
+- Durable history survives process restart; a subscriber outside the frame window receives
+  reset and re-fetches retained outcomes. Test restart, overflow and an outcome committed
+  during reconnect using the existing bounded replay handoff. Never claim durable frames.
+- Settings faults: failed prepare leaves file/revision/config unchanged; same expected
+  revision has one winner; kill before replace leaves no effect; kills after replace
+  before publication and before row completion reconcile COMPLETE; injected completion
+  failure prevents a second mutation until recovery. Test direct install/import writers
+  through the same serialization owner and witness reuse only after durable completion.
+  Also prove postcommit RuntimeException cannot yield FAILED, nested applies are refused,
+  and no direct production writer can bypass runner-owned AttemptControl.
+
+September12 key-time refutation: admit a key300000ms ahead, evict it, and assert
+lookup still returns expired; evict an ordinary old key and assert a fresh key is
+accepted immediately. The old accepted_at-plus-margin formula falsely rejects
+fresh keys after recent eviction. Quarantine conservatively fences all formerly
+admissible lost keys and reports its temporary acceptance limit explicitly.
+The arithmetic counterexample is retained in `tmp/c2-expiry-design-501.json` in this
+held worktree. It validates the boundary calculation only; production store, clock,
+quarantine and concurrency tests remain required by C2-1/C2-5.
