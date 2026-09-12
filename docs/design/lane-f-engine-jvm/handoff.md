@@ -15,10 +15,14 @@ opt-in test-registry corrections. Full737 was red on the broad test-fixture clos
 change, now corrected. Full744 passes10,047 cases/1,636 suites with zero failures/errors,
 35 skips and passing PMD at82e0e185d (18 test tasks execute,20 reuse unchanged inputs).
 Hosted CI34715474339 passes that same revision. Independent final reread found no
-remaining source defect. Named stress745 passes2 cases; actual-model/API and
-installed proof remain open. This is one C2-2 item, not stage completion or a pause.
+remaining source defect. Named stress745 passes2 cases. [Live754](evidence/C2/offline-owner-live.md)
+passes actual-model/API and installed Gradle distribution proof in production-token
+mode: one selected/acknowledged unit, two successful model calls, and terminal row
+after mode cleanup. Instrument752 passes106 cases; negative753 fails six intended
+output-collision cases and independent reread clears the fixes. The owned stack is
+stopped. This is one C2-2 item, not stage completion or packaged installer acceptance.
 
-Latest integrated verification is [checkpoint724](evidence/C2/vdu-checkpoint-724.md):
+Prior integrated verification is [checkpoint724](evidence/C2/vdu-checkpoint-724.md):
 55b8aeb15 code passes full build/PMD with10,034 cases/1,643 suites, zero failures/errors
 and35 skips. Eight test tasks execute; the rest reuse unchanged inputs. Hosted
 CI34712074865 passes the same code and new real Engine fixture. The subsequent offline-owner code is governed by
@@ -78,8 +82,9 @@ Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-wr
 invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
 are green; these prior runs do not establish hosted proof for the newer writer.
 
-Next: finish offline procedure live/installed verification, followed by direct HTTP/keyed/ingestion
-work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
+Next: implement [recorded ingestion preparation](evidence/C2/recorded-root-preparation.md),
+committed-unit completion, direct HTTP/keyed work and every C2/D1/D2/E/F acceptance item.
+The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 
 C2-2 now has the queue claim prerequisite, shared durable attempt runner,
