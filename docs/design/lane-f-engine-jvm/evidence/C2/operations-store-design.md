@@ -73,7 +73,7 @@ to that module directly is not available to scheduled runs.
 |---|---|
 | `id INTEGER PRIMARY KEY AUTOINCREMENT` | the ordering stamp (Q1) |
 | `operation_key TEXT NOT NULL UNIQUE` | canonical lowercase UUIDv7 (section 2) |
-| `kind TEXT NOT NULL` | `operation`, `reconfigure`, `reindex`, `ingest`, `settings-apply`, `accept-gaps`, `scheduled-run` |
+| `kind TEXT NOT NULL` | `operation`, `reconfigure`, `reindex`, `ingest`, `settings-apply`, `accept-gaps`, `scheduled-run`, `memory`, `note` |
 | `survival`, `urgency TEXT NOT NULL` | 3.4's two axes, as admitted |
 | `state TEXT NOT NULL` | `ACCEPTED`, `RUNNING`, `COMPLETE_WITH_GAPS` (non-terminal, reindex only), `COMPLETE`, `FAILED`, `CANCELLED` |
 | `phase TEXT` | reindex only: `building`, `replaying`, `awaiting_acceptance`, `activating` *(D1)* |
@@ -144,9 +144,10 @@ See [C2-2 implementation plan](C2-2-plan.md) for the source evidence and checks.
 - **Dispatched catalog operations.** One shared `OperationAttemptRunner` owns acceptance and
   terminal writes; the executor delegates to it, never the handler. Direct settings and
   background producers enter that same runner. The row's kind is a declaration on the catalog `Operation`: a new `recordKind` policy
-  field with the closed vocabulary above, default `operation`. The kind fixes the row's survival
-  (`reindex` durable; `reconfigure`, `accept-gaps`, `operation` interactive unless the context
-  says durable for `operation` only). The handler receives an `OperationRecordHandle` (id,
+  field with the closed vocabulary above, default `operation`. The declaration fixes survival:
+  `reindex` durable; `memory` and ordinary `note` interactive; note un-designation explicitly
+  durable; generic `operation` uses the context. The955 amendment supersedes kind alone
+  determining survival for every special operation. The handler receives an `OperationRecordHandle` (id,
   key and checkpoint only) through the dispatch context and never calls `accept` for
   its own row; it may accept child rows under fresh Engine-minted keys (the successor ingest row).
   A row is written for every keyed call, and for every unkeyed call whose `AuditPolicy` is not
@@ -430,3 +431,25 @@ admissible lost keys and reports its temporary acceptance limit explicitly.
 The arithmetic counterexample is retained in `tmp/c2-expiry-design-501.json` in this
 held worktree. It validates the boundary calculation only; production store, clock,
 quarantine and concurrency tests remain required by C2-1/C2-5.
+
+
+## 7. September12 project-memory consumer amendments
+
+The first external consumer is955 v4 atb30d41fea, sections3.5,4,8. Its intent and
+ledger contracts are adopted in [project-memory-consumer.md](project-memory-consumer.md),
+with six dated design section0 entries and owning C1/C2/D1/D2 checklist additions.
+C2-2 proves non-dispatched sealed mutation admission through the same app-api runner;
+C2-3 adds memory/note declarations and optional sealed prepared invocations with a
+separate public-input digest. Key lookup/identity comparison precedes preparation;
+changed public input is always OPERATION_KEY_REUSED, while matching terminal input
+returns the stored receipt without preparing. Matching open work reuses its persisted
+preparation under the existing owner rules. No arbitrary handler result becomes
+persisted content or projection metadata.
+
+C2-4 adds durable terminal-row catch-up and completion hooks to the existing history
+swap; memory/note projections use row id as event identity, not as a monotonic
+completion cursor, and are admitted regardless of AGENT_LOOP transport.955 owns
+its ActionEvent.Memory product variant; lane F owns the generic hook/replay/fan-in
+and non-dispatched-consumer proof. D1 journals non-file upserts/deletes and treats a
+missing projection as a gap. D2-5 owns durable delete acknowledgement beside
+indexAndReturn. These are required lane items, not deferred owner decisions.
