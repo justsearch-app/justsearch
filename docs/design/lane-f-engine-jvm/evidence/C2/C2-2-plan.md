@@ -402,3 +402,30 @@ Runtime completion owner/adapter/handler projections are explicitly registered
 pass; llmstxt/skills-sync checks pass.609 totals11 tests in5 suites including the
 repository's automatically included guards. These successful checks do not replace
 the remaining C2 installed/live and integrated obligations.
+
+### Install/repair owner completion
+
+The next bounded producer uses the existing install status snapshot and owner thread,
+not status polling or an attempt registry. Return a frozen started snapshot and a
+stage completed after pause cleanup, resumable-byte refresh and lease cleanup; only
+then snapshot the terminal status and release the running guard. Repair uses the
+same owner. Cancellation remains a synchronous request; its install row cancels only
+when the owner actually exits. A completed install run may include its existing
+hardware/optional-file limitations; completion means that plan attempt terminated,
+not that every model is installed. The existing installedFully/package status remains
+the authority for that product distinction.
+
+The age-only reapIfStale at5f2285f63 clears running even if its owner thread remains
+alive. It could admit a second installer over the same partial files and let the
+first completion read the second attempt's status. The simpler correction uses the
+existing running ownership bit: only stale unowned status can be reaped. No thread
+registry, timeout-to-success, or new persistent liveness marker is needed. Section0
+records this supersession of the575 mechanism; the old unowned-status test remains.
+
+Reaper prerequisite: negative612 observes failed instead of running while the owner
+guard remains claimed. The correction preserves that guard and the duplicate-start
+refusal; the original stale-unowned and fresh-status tests pass unchanged.613 passes
+10 tests in6 suites, no failures/errors/skips, plus app-services PMD main/test.
+Evidence: tmp/c2-2-install-reaper-negative-612.txt/.xml,
+tmp/c2-2-install-reaper-613.txt, tmp/c2-2-install-reaper-613-xml and -counts.json.
+This prerequisite is committed separately before install completion wiring.

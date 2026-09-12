@@ -669,17 +669,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   /**
-   * Liveness backstop (tempdoc 575 §17 Face C). Install is a <em>polled-state</em> liveness model: the
-   * backend owns the state, the FE polls it. If the owner wedges in "running" (no {@code
-   * updatedAtEpochMs} progress past {@link #STALE_RUNNING_MS}), reclaim it to a terminal failed state
-   * on the next read — so the UI never polls a dead "running" forever (the gap this fixes: install/pack
-   * previously had no backstop, unlike the worker's recoverStuckJobs reaper). The owner certifies its
-   * own death; the FE's shorter staleness window surfaces a "stalled" badge earlier, while still running.
+   * Reclaim stale status only when no install owner holds the running guard. Progress age is
+   * diagnostic evidence, not proof that a live writer exited; revoking that guard would allow
+   * another installer over the same partial files. The owner releases it after actual cleanup.
+   * The existing unowned stale-status backstop remains (575; lane F C2-2 correction).
    */
   private void reapIfStale() {
-    if (io.justsearch.app.services.ai.PolledStateLiveness.isStaleRunning(
+    if (!running.get() && io.justsearch.app.services.ai.PolledStateLiveness.isStaleRunning(
         status.state, status.updatedAtEpochMs, System.currentTimeMillis(), STALE_RUNNING_MS)) {
-      running.set(false);
       fail(
           "STALLED",
           "Install stalled — no progress for over "
