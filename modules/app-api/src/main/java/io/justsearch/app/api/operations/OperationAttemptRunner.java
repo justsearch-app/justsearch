@@ -26,7 +26,14 @@ public interface OperationAttemptRunner {
   /** Must return before scheduling or any other effect; storage failure propagates. */
   PreparedAttempt accept(Request request);
 
-  /** Called after admission. An existing acceptance never executes the supplied body. */
+  /**
+   * Called after admission. An existing acceptance never executes the supplied body.
+   * Non-dispatched producers use this same port: commit their effect inside the body and return
+   * {@link OperationExecution#finished(OperationResult)} for synchronous work, or supply the
+   * actual owner completion stage. Success completes the row; failure fails it. The returned
+   * completion observes the durable row transition, not merely the effect's completion.
+   * Producers never need a catalog, dispatcher, or direct terminal-write access to the store.
+   */
   Result start(PreparedAttempt attempt, Function<OperationRecordHandle, OperationExecution> body);
 
   /** A scheduling, validation or admission refusal cannot overwrite work that already started. */

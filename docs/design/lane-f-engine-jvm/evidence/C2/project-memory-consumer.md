@@ -38,6 +38,9 @@ The fixture must fail acceptance before touching the store, persist an effect on
 after acceptance/start, terminalize failures truthfully and complete exactly that
 row.955 implements MemoryAdmission/the memory store; lane F owns this usable port
 and its generic regression. No memory-specific second intent journal is introduced.
+Implemented local port proof602: four sealed-mutation consumer cases plus six runner
+cases pass; see [C2-2 evidence](C2-2-plan.md#non-dispatched-sealed-mutation-consumer-september12).
+The fixture exercises admission, not955 product mutation semantics.
 
 The closed recordKind vocabulary gains memory and note in C2-3. Memory mutations
 are interactive. Ordinary note creation is interactive; core.undesignate-notes-root

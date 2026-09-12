@@ -324,3 +324,32 @@ qualification violations were corrected without rule changes. Surface negative59
 detects the new producer; registered597 and guard-resolution598 pass. C2-2 remains
 open for ingestion, async handler owners,955's sealed non-dispatched fixture and
 installed acceptance-before-effect proof.
+
+### Non-dispatched sealed-mutation consumer, September12
+
+The app-api runner's existing accept/start/OperationExecution contract exposes
+accept/complete/fail without catalog dispatch. Its Javadoc now explicitly describes
+this use. No second terminal writer or arbitrary-row completion API is needed.
+NonDispatchedMutationTest's producer holds only that port and the existing StoreCipher;
+a separate SQLite effect fixture uses AEAD-sealed values. Five mutation labels stand
+for955's admission granularity, not implementations of those product mutations.
+
+A second operations connection sees committed RUNNING before sealing/writing. Each
+successful effect produces exactly its one completed row; a keyed retry leaves one
+effect. Injected acceptance INSERT failure proves zero entries into the sealed store.
+Injected effect INSERT failure produces FAILED and a failed retry receipt without
+re-execution; a locked cipher produces no plaintext fallback or effect. Generic
+OPERATION kind is intentional until C2-3 adds memory/note declarations.
+
+602 passes10 tests in2 suites (new consumer4 plus existing runner6), no failures,
+errors or skips, and app-api main/app-observability test PMD. Command:
+
+```powershell
+./gradlew.bat :modules:app-observability:test --tests '*NonDispatchedMutationTest' --tests '*OperationAttemptRunnerTest' :modules:app-api:pmdMain :modules:app-observability:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain
+```
+
+Evidence: tmp/c2-2-nondispatched-602.txt, tmp/c2-2-nondispatched-602-xml,
+tmp/c2-2-nondispatched-602-counts.json. Root independently inspected the XML and
+failure injections. This is local port proof;955's actual MemoryAdmission/store and
+C2-3 prepared replay remain their owning checklist items. C2-2 still owes ingestion,
+async handler owners and installed acceptance-before-effect crash proof.
