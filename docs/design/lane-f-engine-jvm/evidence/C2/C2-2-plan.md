@@ -852,3 +852,15 @@ exercises bounded failure cleanup, and655 restores identical-source cached proof
 Independent review passes after identity-publication and cleanup findings were fixed.
 The [hosted record](hosted-ci.md#orphan-witness-correction-during-c2) owns detailed evidence,
 retention and the still-required fresh hosted first-attempt/integrated/stress proof.
+
+
+### Switch-buffer replacement identity prerequisite
+
+September12: replay's whole-table clear erased admissions arriving after its snapshot.
+Use one opaque per-put revision in the existing row, carried by the snapshot and matched
+with the key at removal after the covering commit. Content/time comparisons fail for
+identical replacements; SQLite rowid can be reused after removal. Holding the queue lock
+through index/scan replay would block producers and couple queue/index ownership. Reuse
+the existing queue lock and transaction for conditional removal, with jobs schema16's
+transactional legacy backfill. No new table, journal or asynchronous owner. D1's widened
+journal retains this rule. [Evidence and remaining limits](switch-buffer-version.md).

@@ -269,6 +269,15 @@ final class SqliteQueueMigrationOps {
         addColumnIfMissing(conn, "content_hash", SqliteSchema.MIGRATE_V14_TO_V15_CONTENT_HASH);
         log.info("V14 to V15: Ensured durable content hash for operation unit recovery");
       }
+      case 16 -> {
+        try (Statement stmt = conn.createStatement()) {
+          if (!columnExists(conn, "switch_buffer", "revision")) {
+            stmt.execute(SqliteSchema.MIGRATE_V15_TO_V16_SWITCH_REVISION);
+          }
+          stmt.execute(SqliteSchema.BACKFILL_SWITCH_REVISIONS);
+        }
+        log.info("V15 to V16: Identified durable switch-buffer replacements");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

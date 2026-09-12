@@ -925,9 +925,9 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(15, rs.getInt(1));
+        assertEquals(16, rs.getInt(1));
       }
-      assertEquals(15, SqliteSchema.TARGET_VERSION);
+      assertEquals(16, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -962,19 +962,19 @@ final class JobQueueMigrationTest {
       assertEquals(1L, store.identityCount());
     }
 
-    // A V16 database was written by a newer binary: refused, not silently downgraded.
-    Path futurePath = tempDir.resolve("v16.db");
+    // A future database is refused, not silently downgraded.
+    Path futurePath = tempDir.resolve("future.db");
     try (Connection conn =
             DriverManager.getConnection("jdbc:sqlite:" + futurePath.toAbsolutePath());
         Statement stmt = conn.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
-      stmt.execute("PRAGMA user_version = 16");
+      stmt.execute("PRAGMA user_version = " + (SqliteSchema.TARGET_VERSION + 1));
     }
     SqliteJobQueue future = new SqliteJobQueue(futurePath);
     try {
       SQLException refusal = assertThrows(SQLException.class, future::open);
       assertTrue(
-          refusal.getMessage().contains("16"),
+          refusal.getMessage().contains(Integer.toString(SqliteSchema.TARGET_VERSION + 1)),
           "the refusal must name the unsupported version: " + refusal.getMessage());
     } finally {
       future.close();
@@ -1040,7 +1040,7 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(15, rs.getInt(1));
+        assertEquals(16, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {
@@ -1109,7 +1109,7 @@ final class JobQueueMigrationTest {
   }
 
   @Test
-  void v14ToV15PreservesRowsAndMatchesFreshSchema() throws Exception {
+  void v14ToCurrentPreservesRowsAndMatchesFreshSchema() throws Exception {
     Path migrated = tempDir.resolve("migrated-v14.db");
     createV14Fixture(migrated);
     try (SqliteJobQueue queue = new SqliteJobQueue(migrated)) {
@@ -1119,7 +1119,7 @@ final class JobQueueMigrationTest {
         Statement statement = db.createStatement()) {
       try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(version.next());
-        assertEquals(15, version.getInt(1));
+        assertEquals(16, version.getInt(1));
       }
       assertTrue(hasColumn(statement, "content_hash"));
       try (ResultSet row = statement.executeQuery(
@@ -1162,7 +1162,7 @@ final class JobQueueMigrationTest {
         Statement statement = org.mockito.Mockito.mock(Statement.class,
             org.mockito.AdditionalAnswers.delegatesTo(real.createStatement()));
         org.mockito.Mockito.doThrow(new SQLException("fail version write")).when(statement)
-            .execute("PRAGMA user_version = 15");
+            .execute("PRAGMA user_version = " + SqliteSchema.TARGET_VERSION);
         return statement;
       }).when(intercepted).createStatement();
       assertThrows(SQLException.class, () -> SqliteQueueMigrationOps.runMigrations(
@@ -1191,13 +1191,13 @@ final class JobQueueMigrationTest {
       statement.execute("PRAGMA journal_mode = WAL");
       statement.execute("PRAGMA wal_autocheckpoint = 0");
       statement.execute("CREATE TABLE future_owned(value TEXT)");
-      statement.execute("PRAGMA user_version = 16");
+      statement.execute("PRAGMA user_version = " + (SqliteSchema.TARGET_VERSION + 1));
       byte[] mainBefore = Files.readAllBytes(path);
       Path wal = path.resolveSibling(path.getFileName() + "-wal");
       byte[] walBefore = Files.readAllBytes(wal);
       try (SqliteJobQueue queue = new SqliteJobQueue(path)) {
         SQLException failure = assertThrows(SQLException.class, queue::open);
-        assertTrue(failure.getMessage().contains("16"));
+        assertTrue(failure.getMessage().contains(Integer.toString(SqliteSchema.TARGET_VERSION + 1)));
         org.junit.jupiter.api.Assertions.assertArrayEquals(mainBefore, Files.readAllBytes(path));
         org.junit.jupiter.api.Assertions.assertArrayEquals(walBefore, Files.readAllBytes(wal));
       }

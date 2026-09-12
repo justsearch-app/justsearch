@@ -162,14 +162,15 @@ final class SqliteQueueSwitchBufferOps {
       Connection conn = connSupplier.get();
       String sql =
           """
-          INSERT OR REPLACE INTO switch_buffer (key, op, payload, last_updated)
-          VALUES (?, ?, ?, ?)
+          INSERT OR REPLACE INTO switch_buffer (key, op, payload, last_updated, revision)
+          VALUES (?, ?, ?, ?, ?)
           """;
       try (PreparedStatement stmt = conn.prepareStatement(sql)) {
         stmt.setString(1, key);
         stmt.setString(2, op);
         stmt.setString(3, payload);
         stmt.setLong(4, System.currentTimeMillis());
+        stmt.setString(5, java.util.UUID.randomUUID().toString());
         stmt.executeUpdate();
         return true;
       }
@@ -231,7 +232,7 @@ final class SqliteQueueSwitchBufferOps {
       Connection conn = connSupplier.get();
       String sql =
           """
-          SELECT key, op, payload, last_updated
+          SELECT key, op, payload, last_updated, revision
           FROM switch_buffer
           ORDER BY last_updated ASC
           """;
@@ -241,7 +242,7 @@ final class SqliteQueueSwitchBufferOps {
         while (rs.next()) {
           out.add(
               new SwitchBufferCapableQueue.SwitchBufferOp(
-                  rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4)));
+                  rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5)));
         }
       }
       return out;
@@ -254,20 +255,17 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
-  /** Clears all buffered ops. */
-  int clear() {
-    lock.lock();
-    try {
-      Connection conn = connSupplier.get();
-      try (Statement stmt = conn.createStatement()) {
-        return stmt.executeUpdate("DELETE FROM switch_buffer");
+  /** Caller holds the queue lock and its existing transaction through commit. */
+  int removeReplayedLocked(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) throws SQLException {
+    try (PreparedStatement stmt = connSupplier.get().prepareStatement(
+        "DELETE FROM switch_buffer WHERE key = ? AND revision = ?")) {
+      int removed = 0;
+      for (var entry : replayed) {
+        stmt.setString(1, entry.key());
+        stmt.setString(2, entry.revision());
+        removed += stmt.executeUpdate();
       }
-    } catch (SQLException e) {
-      errorRecorder.run();
-      log.error("Failed to clear switch buffer ops", e);
-      return 0;
-    } finally {
-      lock.unlock();
+      return removed;
     }
   }
 }

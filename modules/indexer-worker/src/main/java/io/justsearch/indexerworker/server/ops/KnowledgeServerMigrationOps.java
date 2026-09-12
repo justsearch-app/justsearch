@@ -753,8 +753,12 @@ public final class KnowledgeServerMigrationOps {
     }
 
     if (allApplied) {
-      int cleared = sbq.clearSwitchBuffer();
-      context.log().info("Cleared {} buffered ops from durable switch buffer", cleared);
+      try {
+        int cleared = sbq.removeReplayedSwitchBufferOps(ops);
+        context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
+      } catch (IllegalStateException failure) {
+        context.log().warn("Failed to remove committed buffer versions; retaining for retry", failure);
+      }
     } else {
       context.log().warn("Not clearing switch buffer because one or more buffered ops failed to replay");
     }

@@ -348,9 +348,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return switchBufferOps.listAll();
   }
 
-  /** Clears all buffered ops. */
   @Override
-  public int clearSwitchBuffer() { return switchBufferOps.clear(); }
+  public int removeReplayedSwitchBufferOps(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) {
+    var snapshot = List.copyOf(replayed);
+    for (var entry : snapshot) {
+      if (entry.revision() == null || entry.revision().isBlank()) {
+        throw new IllegalArgumentException("Replayed buffer entry has no replacement identity");
+      }
+    }
+    lock.lock();
+    try {
+      ensureOpen();
+      return inTransaction(() -> switchBufferOps.removeReplayedLocked(snapshot));
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Failed to remove replayed switch-buffer versions", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
 
 
   @Override

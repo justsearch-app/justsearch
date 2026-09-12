@@ -24,6 +24,7 @@ package io.justsearch.indexerworker.queue;
    *   <li>V13: Added nullable deleted_at column to document_identity (tempdoc 931 §C.6)</li>
  *   <li>V14: Added nullable admission originator/transport to jobs and ingestion_ledger (lane F C1)</li>
  *   <li>V15: Added nullable content_hash to jobs for idempotent unit recovery (lane F C2)</li>
+ *   <li>V16: Added switch-buffer replacement identity for conditional replay removal (lane F C2)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -36,7 +37,13 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 15;
+  public static final int TARGET_VERSION = 16;
+
+  /** An opaque identity for each accepted buffer replacement, independent of wall-clock time. */
+  public static final String MIGRATE_V15_TO_V16_SWITCH_REVISION =
+      "ALTER TABLE switch_buffer ADD COLUMN revision TEXT NOT NULL DEFAULT ''";
+  public static final String BACKFILL_SWITCH_REVISIONS =
+      "UPDATE switch_buffer SET revision = lower(hex(randomblob(16))) WHERE revision = ''";
 
   public static final String MIGRATE_V14_TO_V15_CONTENT_HASH =
       "ALTER TABLE jobs ADD COLUMN content_hash TEXT";
@@ -114,7 +121,8 @@ public final class SqliteSchema {
         key TEXT PRIMARY KEY,
         op TEXT NOT NULL,
         payload TEXT NOT NULL,
-        last_updated INTEGER NOT NULL
+        last_updated INTEGER NOT NULL,
+        revision TEXT NOT NULL DEFAULT ''
       )
       """;
 

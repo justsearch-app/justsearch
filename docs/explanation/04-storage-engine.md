@@ -297,8 +297,10 @@ These defaults are optimized for desktop systems with sufficient RAM. The RAM bu
 `operations.db` is a separate SQLite store owned by the Engine composition. Its app-api port is
 implemented in app-observability, and the same instance is injected into the application and index
 composition before asynchronous startup. It closes after the index half drains. The schema starts
-at version 1; `jobs.db` independently uses version 15, with a nullable `jobs.content_hash` column
-for legacy rows. Migration DDL and `user_version` commit together, and checked or unchecked failures
+at version 1; `jobs.db` independently uses version 16, retaining nullable `jobs.content_hash`
+for legacy rows and adding an opaque revision to each accepted switch-buffer replacement.
+Replay removes only the versions it applied and committed, preserving admissions that arrive
+during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
 roll back both.
 
 Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.

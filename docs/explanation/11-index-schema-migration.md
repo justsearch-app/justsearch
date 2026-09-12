@@ -482,7 +482,12 @@ The Worker uses a cutover fence:
 
 File UPSERT payloads are versioned and preserve collection plus the admitting caller's coarse
 originator and transport. Pre-C1 raw path payloads remain readable with unknown attribution.
-Replay retains the buffer if decoding or enqueueing fails.
+Replay retains the buffer if decoding or enqueueing fails. Every buffered put
+has an opaque revision (jobs schema16); after the covering commit, replay removes only
+the snapshot's matching key/revision pairs in one queue transaction. New arrivals and
+same-key replacements remain, even with identical payloads and timestamps. Removal
+failure rolls back that deletion transaction and retains those versions for retry.
+
 VDU replay also retains its buffered update when its parent is missing, chunk
 replacement fails, or the covering Lucene commit fails. Chunk replacement precedes
 the terminal parent update, so a failed replacement cannot make a newly completed
@@ -494,7 +499,7 @@ empty/failed/rejected fallback results close the extraction-dropout reason. Know
 legacy status inputs keep the live rules. Invalid text results and unknown typed
 outcomes fail before direct buffer acceptance; an invalid persisted result remains
 buffered for diagnosis. The direct caller commits each applied result, while replay
-commits before clearing its buffer.
+commits before removing its replayed buffer versions.
 Directory sync uses versioned root/force payloads with paired nullable originator/transport fields;
 legacy unversioned root/force payloads retain unknown attribution. Replay runs as internal work
 and restores the original descriptive attribution separately, without reconstructing caller authority.
