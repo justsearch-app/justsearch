@@ -8,7 +8,7 @@ package io.justsearch.app.api.operations;
  */
 public record OperationReceipt(String code, String executionId) {
   public OperationReceipt {
-    if (code == null || !code.matches("[A-Za-z][A-Za-z0-9_]{0,95}")) {
+    if (!io.justsearch.agent.api.registry.OperationResult.isDurableOutcomeCode(code)) {
       throw new IllegalArgumentException("Outcome code must be a bounded token");
     }
     if (executionId != null && !executionId.matches("[A-Za-z0-9_.:/-]{1,128}")) {

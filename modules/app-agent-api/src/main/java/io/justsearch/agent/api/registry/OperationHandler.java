@@ -2,6 +2,7 @@
 package io.justsearch.agent.api.registry;
 
 import io.justsearch.core.context.EngineContext;
+import java.util.Objects;
 
 /**
  * SPI for executing an Operation invocation.
@@ -44,6 +45,44 @@ public interface OperationHandler {
    */
   default OperationResult execute(String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
     return execute(argumentsJson, engineContext);
+  }
+
+  /**
+   * Prepare an invocation before its parent operation is accepted.
+   *
+   * <p>The default adapts existing handlers by carrying the raw arguments transiently. This hook
+   * is pure: it must not schedule work, register an operation, or perform another effect. An
+   * expected no-effect refusal should be reported with {@link OperationPreparationRefused} so the
+   * runner can retain the generic invocation identity and return its typed failure without
+   * scheduling or admitting work.
+   */
+  default OperationPreparation prepare(
+      String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
+    return OperationPreparation.passthrough(argumentsJson);
+  }
+
+  /**
+   * Execute a previously prepared invocation while preserving its frozen preparation.
+   *
+   * <p>The default supports only the transient passthrough preparation. A handler that returns a
+   * replay payload must override this method so that the payload cannot be silently ignored. When
+   * no record exists, the ordinary context-aware execute path is used; a record is forwarded to
+   * the existing recorded execution path unchanged.
+   */
+  default OperationExecution executePrepared(
+      OperationPreparation prepared,
+      InvocationProvenance provenance,
+      EngineContext engineContext,
+      OperationRecordHandle record) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.replaySchema() != null) {
+      throw new UnsupportedOperationException(
+          "Handler must override executePrepared for replay-capable preparation");
+    }
+    if (record != null) {
+      return executeRecorded(prepared.argumentsJson(), provenance, engineContext, record);
+    }
+    return OperationExecution.finished(execute(prepared.argumentsJson(), provenance, engineContext));
   }
 
   /** Synchronous default; asynchronous owners override and supply actual completion. */

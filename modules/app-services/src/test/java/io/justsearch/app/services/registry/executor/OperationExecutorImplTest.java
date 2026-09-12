@@ -86,6 +86,187 @@ final class OperationExecutorImplTest {
   }
 
   @Test
+  void preparedScopeIsAcceptedAndExecutedWithoutRereadingMutableInput() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.prepared-test");
+    var currentRoot = new java.util.concurrent.atomic.AtomicReference<>("original-root");
+    var frozen = new java.util.concurrent.atomic.AtomicReference<io.justsearch.agent.api.registry.OperationPreparation>();
+    var preparationCalls = new java.util.concurrent.atomic.AtomicInteger();
+    var key = new java.util.concurrent.atomic.AtomicReference<String>();
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    String publicInput = "{\"privateBody\":\"not-for-the-row\"}";
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("Must execute the frozen invocation");
+      }
+      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+          InvocationProvenance provenance, EngineContext ctx) {
+        org.junit.jupiter.api.Assertions.assertSame(context, ctx);
+        assertTrue(operationStore.openRecords().isEmpty(), "scope must be captured before acceptance");
+        preparationCalls.incrementAndGet();
+        var value = new io.justsearch.agent.api.registry.OperationPreparation(args, "root-plan.v1",
+            rootPlanPayload(currentRoot.get()));
+        frozen.set(value);
+        currentRoot.set("changed-after-preparation");
+        return value;
+      }
+      @Override public io.justsearch.agent.api.registry.OperationExecution executePrepared(
+          io.justsearch.agent.api.registry.OperationPreparation value, InvocationProvenance provenance,
+          EngineContext ctx, io.justsearch.agent.api.registry.OperationRecordHandle handle) {
+        org.junit.jupiter.api.Assertions.assertSame(frozen.get(), value);
+        org.junit.jupiter.api.Assertions.assertSame(context, ctx);
+        key.set(handle.key());
+        var row = operationStore.find(handle.key()).orElseThrow();
+        assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING, row.state());
+        String identity = row.descriptor().identityJson();
+        assertTrue(identity.contains("original-root"));
+        assertTrue(identity.contains("root-plan.v1"));
+        assertFalse(identity.contains("changed-after-preparation"));
+        assertFalse(identity.contains("privateBody"));
+        assertFalse(identity.contains("not-for-the-row"));
+        assertTrue(identity.contains(io.justsearch.app.api.operations.CanonicalOperationArguments.digest(publicInput)));
+        return io.justsearch.agent.api.registry.OperationExecution.finished(OperationResult.success("Committed"));
+      }
+    });
+    assertTrue(new OperationExecutorImpl(attempts, admission, handlers)
+        .dispatch(makeOp(id, TrustTier.CORE, false), publicInput, context).success());
+    assertEquals(1, preparationCalls.get());
+    assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
+        operationStore.find(key.get()).orElseThrow().state());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void preparationFailureIsRecordedBeforeRefusalWithoutEffects(boolean fatal) throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.preparation-failure");
+    Throwable expected = fatal ? new AssertionError("fatal preparation failure")
+        : new IllegalStateException("generation unavailable");
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("Failed preparation cannot have an effect");
+      }
+      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+          InvocationProvenance provenance, EngineContext ctx) {
+        if (expected instanceof Error error) throw error;
+        throw (RuntimeException) expected;
+      }
+    });
+    org.junit.jupiter.api.Assertions.assertSame(expected, assertThrows(expected.getClass(),
+        () -> new OperationExecutorImpl(attempts, admission, handlers).dispatch(
+            makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal())));
+    if (fatal) {
+      try (var connection = java.sql.DriverManager.getConnection(
+          "jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+          var statement = connection.createStatement();
+          var result = statement.executeQuery("SELECT COUNT(*) FROM operations")) {
+        assertTrue(result.next());
+        assertEquals(0, result.getInt(1), "fatal preparation cannot claim trustworthy acceptance or completion");
+      }
+    } else {
+      assertGenericFailedAttempt("UNCAUGHT_EXCEPTION");
+    }
+    org.mockito.Mockito.verifyNoInteractions(admission);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {
+      "changed-arguments", "malformed-payload", "null-preparation", "content-payload"})
+  void invalidPreparedIdentityIsRecordedGenericallyWithoutEffects(String invalid) throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.invalid-preparation");
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("Invalid preparation cannot have an effect");
+      }
+      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+          InvocationProvenance provenance, EngineContext ctx) {
+        if (invalid.equals("null-preparation")) return null;
+        return new io.justsearch.agent.api.registry.OperationPreparation(
+            invalid.equals("changed-arguments") ? "{\"changed\":true}" : args,
+            "root-plan.v1", invalid.equals("malformed-payload") ? "[]"
+                : rootPlanPayload("root").replace("\"roots\":", "\"prompt\":\"must-not-persist\",\"roots\":"));
+      }
+    });
+    assertThrows(RuntimeException.class, () -> new OperationExecutorImpl(attempts, admission, handlers)
+        .dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal()));
+    assertGenericFailedAttempt("UNCAUGHT_EXCEPTION");
+    org.mockito.Mockito.verifyNoInteractions(admission);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"[]", "not-json"})
+  void invalidPublicInputCannotEnterPreparation(String arguments) throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.invalid-input-preparation");
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("Invalid input cannot execute");
+      }
+      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+          InvocationProvenance provenance, EngineContext ctx) {
+        throw new AssertionError("Invalid input cannot prepare");
+      }
+    });
+    var base = makeOp(id, TrustTier.CORE, false);
+    // The existing no-argument schema is deliberately a passthrough sentinel. Use a
+    // constrained operation to prove a validation refusal happens before preparation.
+    var op = new Operation(base.id(), base.presentation(), Interface.of(
+        "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}",
+        base.intf().result()), base.policy(), base.availability(), base.lineage(), base.binding(),
+        base.provenance(), base.executors(), base.audience(), base.consumers());
+    var result = new OperationExecutorImpl(attempts, admission, handlers).dispatch(
+        op, arguments, io.justsearch.app.services.TestEngineContexts.internal());
+    assertEquals("BAD_REQUEST", result.errorCode().orElseThrow());
+    assertGenericFailedAttempt("BAD_REQUEST");
+    org.mockito.Mockito.verifyNoInteractions(admission);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void expectedPreparationRefusalPreservesTypedRetryableOutcome(boolean longestCode) throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.refused-preparation");
+    String code = longestCode ? "G".repeat(96) : "GENERATION_UNAVAILABLE";
+    var refusal = OperationResult.failure("Serving generation is unavailable", code, Map.of(), true);
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("Refused preparation cannot execute");
+      }
+      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+          InvocationProvenance provenance, EngineContext ctx) {
+        throw new io.justsearch.agent.api.registry.OperationPreparationRefused(refusal);
+      }
+    });
+    var response = new OperationExecutorImpl(attempts, admission, handlers).dispatch(
+        makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
+    org.junit.jupiter.api.Assertions.assertSame(refusal, response);
+    assertGenericFailedAttempt(code);
+    org.mockito.Mockito.verifyNoInteractions(admission);
+  }
+
+  private void assertGenericFailedAttempt(String reason) throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection(
+        "jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+        var statement = connection.createStatement();
+        var result = statement.executeQuery("SELECT state, identity_json, failure_reason FROM operations")) {
+      assertTrue(result.next());
+      assertEquals("FAILED", result.getString("state"));
+      assertFalse(result.getString("identity_json").contains("preparedInvocation"));
+      assertFalse(result.getString("identity_json").contains("must-not-persist"));
+      assertEquals(reason, result.getString("failure_reason"));
+      assertFalse(result.next());
+    }
+  }
+
+  private String rootPlanPayload(String root) {
+    return tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(Map.of(
+        "generation", "g1", "roots", List.of(Map.of(
+            "path", operationDirectory.resolve(root).toString(), "collection", "default",
+            "force", false, "singleFile", false, "excludePatterns", List.of(), "excludedSubtrees", List.of()))));
+  }
+
+  @Test
   void recordedAsyncDispatchPublishesOnlyAfterActualDurableCompletion() {
     var handlers = new HandlerRegistry();
     var id = new OperationRef("core.async-test");

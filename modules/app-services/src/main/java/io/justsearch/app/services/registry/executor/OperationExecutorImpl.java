@@ -4,6 +4,8 @@ package io.justsearch.app.services.registry.executor;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
@@ -353,15 +355,16 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     return executeAttempt(op, argumentsJson, provenance, engineContext, null);
   }
 
-  /** Acceptance precedes validation/effect; only durable completion produces history/advisories. */
+  /** Pure preparation freezes scope; acceptance still precedes all effects and refusals. */
   private OperationResult executeAttempt(Operation op, String argumentsJson,
       InvocationProvenance provenance, EngineContext context, String undoId) {
     Instant startedAt = clock.instant();
+    PreparedInvocation invocation = prepareInvocation(op, argumentsJson, provenance, context, undoId != null);
     // C2-3 adds keyed transport and the catalog's recordKind projection. The unkeyed audit
     // suppression is preserved here; keyed calls will always accept regardless of audit policy.
     OperationAttemptRunner.PreparedAttempt prepared = op.policy().audit() == AuditPolicy.NONE ? null
         : attempts.accept(new OperationAttemptRunner.Request(null,
-            OperationDescriptor.invocation(OperationKind.OPERATION, op.id().value(), argumentsJson, undoId != null),
+            invocation.descriptor(),
             context, provenance));
     if (prepared != null) {
       if (prepared.existing()) {
@@ -380,18 +383,19 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       });
     }
     try {
-      OperationResult refusal = preflight(op, argumentsJson, undoId != null);
+      OperationResult refusal = preflight(op, invocation.refusal());
       if (refusal != null) {
         if (prepared != null) attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
         else emitHistory(op, startedAt, OperationOutcome.FAILURE, refusal.message(), provenance, Optional.empty());
         return refusal;
       }
+      if (invocation.failure() != null) throw invocation.failure();
       try (var work = admission.attach(context)) {
         if (prepared != null) {
           return attempts.start(prepared,
-              handle -> invokeOwnedHandler(op, argumentsJson, provenance, work, undoId, handle)).response();
+              handle -> invokeOwnedHandler(op, invocation, provenance, work, undoId, handle)).response();
         }
-        OperationExecution execution = invokeOwnedHandler(op, argumentsJson, provenance, work, undoId, null);
+        OperationExecution execution = invokeOwnedHandler(op, invocation, provenance, work, undoId, null);
         var unused = execution.completion().thenAccept(result -> {
           OperationOutcome outcome = result.success()
               ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
@@ -411,12 +415,48 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     }
   }
 
+  private record PreparedInvocation(OperationHandler handler, OperationPreparation value,
+      OperationDescriptor descriptor, OperationResult refusal, RuntimeException failure) {}
+
+  private PreparedInvocation prepareInvocation(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext context, boolean undo) {
+    OperationDescriptor generic = OperationDescriptor.invocation(
+        OperationKind.OPERATION, op.id().value(), argumentsJson, undo);
+    if (undo) return new PreparedInvocation(null, null, generic, null, null);
+    try {
+      var invalid = inputValidator.validate(op, argumentsJson);
+      if (invalid.isPresent()) {
+        var refusal = invalid.get();
+        return new PreparedInvocation(null, null, generic,
+            OperationResult.failure(refusal.message(), "BAD_REQUEST", refusal.details(), false), null);
+      }
+      OperationHandler handler = resolveHandler(op);
+      OperationPreparation value = Objects.requireNonNull(
+          handler.prepare(argumentsJson, provenance, context), "handler preparation");
+      if (!argumentsJson.equals(value.argumentsJson())) {
+        throw new IllegalArgumentException("Preparation must retain the public arguments unchanged");
+      }
+      OperationDescriptor descriptor = value.replaySchema() == null ? generic
+          : OperationDescriptor.preparedInvocation(OperationKind.OPERATION, op.id().value(),
+              argumentsJson, value.replaySchema(), value.replayPayloadJson());
+      return new PreparedInvocation(handler, value, descriptor, null, null);
+    } catch (OperationPreparationRefused refusal) {
+      return new PreparedInvocation(null, null, generic, refusal.refusal(), null);
+    } catch (RuntimeException failure) {
+      // A failed pure preparation is still an attempted operation. Accept its generic
+      // identity, then publish a refusal without scheduling or invoking the handler.
+      return new PreparedInvocation(null, null, generic, null, failure);
+    }
+  }
+
   /** Retain exact admitted work before invoking a handler that may fork before returning. */
-  private OperationExecution invokeOwnedHandler(Operation op, String argumentsJson,
+  private OperationExecution invokeOwnedHandler(Operation op, PreparedInvocation invocation,
       InvocationProvenance provenance, EngineWorkHandle work, String undoId, OperationRecordHandle record) {
     var owner = work.retain();
     try {
-      OperationExecution execution = invokeHandler(op, argumentsJson, provenance, owner.context(), undoId, record);
+      OperationExecution execution = undoId == null
+          ? invocation.handler().executePrepared(invocation.value(), provenance, owner.context(), record)
+          : invokeUndo(op, owner.context(), undoId, record);
       return new OperationExecution(execution.response(),
           execution.completion().whenComplete((result, failure) -> owner.close()));
     } catch (RuntimeException | Error failure) {
@@ -425,29 +465,28 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     }
   }
 
-  private OperationResult preflight(Operation op, String argumentsJson, boolean undo) {
+  private OperationResult preflight(Operation op, OperationResult invalidInput) {
     if (capabilityResolver != null) {
       var missing = checkCapabilities(op);
       if (missing != null) return OperationResult.failure(capabilityUnavailableMessage(missing),
           "CAPABILITY_UNAVAILABLE", Map.of("capability", missing), true);
     }
-    if (undo) return null;
-    var invalid = inputValidator.validate(op, argumentsJson);
-    return invalid.map(value -> OperationResult.failure(value.message(), "BAD_REQUEST", value.details(), false))
-        .orElse(null);
+    return invalidInput;
   }
 
-  private OperationExecution invokeHandler(Operation op, String argumentsJson, InvocationProvenance provenance,
-      EngineContext context, String undoId, OperationRecordHandle handle) {
+  private OperationHandler resolveHandler(Operation op) {
     if (op.provenance().tier() == TrustTier.UNTRUSTED_PLUGIN) {
       throw new UnsupportedOperationException("Untrusted plugin operations require V1.5 sandbox infrastructure");
     }
-    OperationHandler handler = handlers.resolve(new OperationRef(op.binding().handlerId()))
+    return handlers.resolve(new OperationRef(op.binding().handlerId()))
         .orElseThrow(() -> new IllegalStateException("No handler registered for binding " + op.binding().handlerId()));
-    if (undoId != null) return handle == null ? OperationExecution.finished(handler.undo(undoId, context))
+  }
+
+  private OperationExecution invokeUndo(Operation op, EngineContext context, String undoId,
+      OperationRecordHandle handle) {
+    OperationHandler handler = resolveHandler(op);
+    return handle == null ? OperationExecution.finished(handler.undo(undoId, context))
         : handler.undoRecorded(undoId, context, handle);
-    return handle == null ? OperationExecution.finished(handler.execute(argumentsJson, provenance, context))
-        : handler.executeRecorded(argumentsJson, provenance, context, handle);
   }
 
   private void emitHistory(

@@ -1,7 +1,8 @@
 # C2-2 recorded root preparation
 
 September12 decision; source checked at82e0e185d. This refines C2-2 plan
-decisions1,3,5 and7. Implementation and all proof below remain owed.
+decisions1,3,5 and7. The common preparation seam is implemented in the current cut;
+typed root plans, child identity and committed ingestion remain owed below.
 
 ## Acceptance must contain the plan
 
@@ -32,6 +33,25 @@ Schema validation can be computed first; invalid input or preparation failure
 still accepts the generic digest attempt and terminally refuses without running
 children. Existing post-acceptance capability/admission refusal semantics remain.
 C2-3 owns the further alignment with frozen approval and keyed replay.
+
+September12 implementation refinement: the safe persistence boundary accepts only
+`root-plan.v1`, with exactly `generation` and `roots`. Each root contains exactly
+`path`, nullable `collection`, boolean `force` and `singleFile`, `excludePatterns`
+and `excludedSubtrees`. Paths are absolute and normalized; excluded subtrees must
+be strict descendants. Lists have at most1024 entries, generation128 characters,
+collection256, paths32768 and patterns4096; the whole payload remains capped at
+200000 characters. Unknown fields/schemas and content-shaped nested objects refuse.
+This grammar is the persisted projection of the upcoming typed root plan; the
+validator owns no mutable scope or second plan. Content-bearing C2-3 preparation
+must use its sealed path, never broaden this safe metadata slot.
+
+Expected no-effect refusals use `OperationPreparationRefused` carrying the original
+typed retryable `OperationResult`. The generic accepted row records that bounded
+failure code before returning it. Receipt and preparation refusal share the existing
+96-character outcome-token grammar via `OperationResult.isDurableOutcomeCode`.
+Unexpected runtime exceptions still receive generic failed attempts and propagate.
+Fatal preparation Error propagates without accepting or terminalizing a row; fatal
+errors after runner acceptance retain the runner's restart-reconciliation contract.
 
 The indexing port prepares a typed immutable root plan and accepts that plan for
 execution. The recorded handler must not call the old method that rereads roots.
@@ -106,4 +126,57 @@ Independent read-only review rejected checkpoint-later and full C2-3 reordering,
 and identified the nested-policy and generation-authority gaps resolved above.
 Its reread found no fatal contradiction, requiring strict witness derivation and
 generation revalidation per batch and covering commit, now explicit here.
-No executable acceptance is claimed by this design record.
+## Common seam verification
+
+The common dispatcher seam is a prerequisite only. The root producer, child lookup,
+recovery and committed-unit tests above remain owed. Existing handlers use transient
+passthrough; a replay-capable handler must implement executePrepared, so the default
+cannot silently ignore its frozen scope. The executor passes the same immutable
+value, validates that public arguments remain unchanged, and stores only their digest.
+
+Focused756 passes80 cases/8 suites plus affected PMD. Negative757 drops the prepared
+descriptor at acceptance: the frozen-root persisted-identity assertion fails; six
+conformance cases pass. The original source is restored. Independent review then
+finds unenforced safe-payload shape and missing typed refusal; both are corrected as
+specified above. Review also catches the receipt-code bound mismatch and rejects
+terminalizing fatal preparation errors, now corrected.
+
+758 fails compilation on an ignored Optional return in the new exception guard;
+759 passes compilation but two new invalid-input tests used the intentionally
+validation-skipped no-argument schema. The fixture now uses a constrained required-path
+schema; existing passthrough semantics are preserved. 760 catches the fixture's
+incorrect Interface accessor, corrected to result(). Final focused761 passes94 cases/
+8 suites, zero failures/errors/skips plus PMD. app-services executes77 cases; app-api's
+10 and app-agent-api's7 reuse unchanged successful759 inputs. Independent source
+reread finds no remaining substantive ordering, trust or lifetime issue.
+
+Command for focused756/758-761:
+
+```text
+gradlew.bat :modules:app-agent-api:test --tests *OperationPreparationTest
+  :modules:app-api:test --tests *OperationDescriptorPreparationTest
+  :modules:app-services:test --tests *OperationExecutorImplTest
+  :modules:app-agent-api:pmdMain :modules:app-agent-api:pmdTest
+  :modules:app-api:pmdMain :modules:app-api:pmdTest
+  :modules:app-services:pmdMain :modules:app-services:pmdTest
+  -PtestParallelism=1 --max-workers=4 --console=plain
+```
+
+Allowlist-negative762 removes the projection validator call: six intended failures
+in20 cases prove both shape rejection and refusal to persist content through actual
+dispatch. Original source bytes are restored. Final independent reread finds no
+remaining substantive source defect. Broad affected-module763 passes3491 cases/
+557 suites, zero failures/errors and3 skips; all four test tasks execute (236
+app-agent-api,209 app-api,420 app-observability,2626 app-services). Affected PMD passes.
+It uses the focused command without test filters and additionally
+`:modules:app-observability:test`. This is not a full repository or live producer proof.
+
+Base a0cf80c0b plus this preparation diff, Windows/Java25. Logs, XML and task-aware
+counts are accessible at worktree `tmp/c2-2-preparation-{756,759,761}` and
+`tmp/c2-2-preparation-negative-757` prefixes (`.txt`, `-counts.json`, `-xml/`).
+Compile-only failures758/760 have logs. Retain through lane acceptance plus30 days,
+and export before releasing the worktree. The same suffixes hold for
+`tmp/c2-2-preparation-negative-762` and `tmp/c2-2-preparation-modules-763`.
+Canonical storage documentation is updated; index regeneration, skill sync and
+canonical link checks pass. Full repository/hosted/live validation remains part of
+the next integrated producer checkpoint.

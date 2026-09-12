@@ -317,3 +317,13 @@ old preservation directories retain that fence if initialization itself is inter
 surface reports the history loss, the preservation directory and the fence time. Failure to preserve
 bytes refuses startup. An external rollback to a valid older database is outside this detection
 contract. Durable operation acceptance and replay are separate consumers of this store.
+
+Operation dispatch validates caller context and trust before pure handler preparation.
+`OperationPreparation` retains transient public arguments and optionally a bounded safe replay
+projection. The dispatcher persists that versioned projection beside the public-argument digest
+before invoking the same prepared value. Raw public arguments are not written to the row.
+Preparation may read scope but must not schedule work, register roots or enqueue writes.
+Ordinary preparation failures receive a generic accepted attempt and terminal refusal; capability
+and admission checks still gate execution after acceptance. Generic handlers use the passthrough
+default, and undo retains its existing target identity. This seam does not yet provide keyed
+ingress, recovery replay or sealed content-bearing preparation.

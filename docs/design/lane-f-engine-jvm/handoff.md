@@ -7,7 +7,14 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
-Current work is [the shared offline owner](evidence/C2/offline-owner-proof.md):
+Current work is [recorded ingestion preparation](evidence/C2/recorded-root-preparation.md).
+The common preparation/acceptance seam has focused761 proof and broad763 proof:
+3491 cases/557 suites, zero failures/errors,3 skips, all four affected test tasks
+executed and PMD passed. Negative762 causes six intended unsafe-payload failures;
+independent reread clears the corrected source. Root producer, child identity and
+committed-unit implementation follow. No Engine stack is running.
+
+Prior item is [the shared offline owner](evidence/C2/offline-owner-proof.md):
 manual and automatic procedures share bounded admission/lifetime ownership;
 acknowledged per-pass progress feeds the recorded handler through actual cleanup.
 Final focused742 passes129 cases and affected PMD after mode-failure metadata and
