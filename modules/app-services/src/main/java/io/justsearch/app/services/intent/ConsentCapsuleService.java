@@ -13,9 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.SerializationFeature;
-import tools.jackson.databind.json.JsonMapper;
+import io.justsearch.app.api.operations.CanonicalOperationArguments;
 
 /**
  * Mints and verifies <b>consent capsules</b> — tempdoc 550 Slice A1 (Authorize face), the
@@ -56,15 +54,6 @@ public final class ConsentCapsuleService
 
   private static final String HMAC_ALGO = "HmacSHA256";
   private static final Duration DEFAULT_TTL = Duration.ofMinutes(5);
-
-  /**
-   * Canonicalizes argsJson before hashing so the binding is independent of key ordering /
-   * whitespace between the mint-side and verify-side serializations (which come from two
-   * separately-parsed HTTP bodies). {@code ORDER_MAP_ENTRIES_BY_KEYS} recursively sorts
-   * object keys.
-   */
-  private static final ObjectMapper CANON =
-      JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
 
   private final byte[] sessionKey;
   private final Clock clock;
@@ -135,7 +124,7 @@ public final class ConsentCapsuleService
     Grant capsule =
         new Grant(
             grantId,
-            new Grant.BoundAction(operationId, sha256Hex(canonicalize(argsJson))),
+            new Grant.BoundAction(operationId, CanonicalOperationArguments.digest(argsJson)),
             expiry,
             true);
     // Evict expired ids here — an id is otherwise removed only when its capsule is verified (or
@@ -247,7 +236,7 @@ public final class ConsentCapsuleService
     // Binding: the scope must authorize this exact action + arguments (canonicalized, so key
     // order / whitespace differences between mint-side and verify-side serializations of the same
     // logical args do not break the match).
-    if (!capsule.scope().authorizes(operationId, sha256Hex(canonicalize(argsJson)))) {
+    if (!capsule.scope().authorizes(operationId, CanonicalOperationArguments.digest(argsJson))) {
       return false;
     }
     // Revocation (tempdoc 550 thesis IV): a revoked grant id fails closed, before expiry/consume.
@@ -290,20 +279,6 @@ public final class ConsentCapsuleService
         + grant.expiry().toEpochMilli();
   }
 
-  /**
-   * Canonical form of {@code argsJson} for hashing: parsed and re-serialized with object keys
-   * sorted, so logically-equal args produce an identical hash regardless of key order or
-   * whitespace. Fail-soft: returns the raw input if it is not parseable JSON (preserves the
-   * "never throws on malformed input" contract — a non-JSON token simply hashes verbatim).
-   */
-  private static String canonicalize(String argsJson) {
-    try {
-      return CANON.writeValueAsString(CANON.readValue(argsJson, Object.class));
-    } catch (RuntimeException notJson) {
-      return argsJson;
-    }
-  }
-
   private byte[] hmac(byte[] data) {
     try {
       Mac mac = Mac.getInstance(HMAC_ALGO);
@@ -312,19 +287,6 @@ public final class ConsentCapsuleService
     } catch (Exception e) {
       // HmacSHA256 is a JRE-guaranteed algorithm; failure is non-recoverable.
       throw new IllegalStateException("HMAC computation failed", e);
-    }
-  }
-
-  private static String sha256Hex(String s) {
-    try {
-      byte[] digest = MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
-      StringBuilder sb = new StringBuilder(digest.length * 2);
-      for (byte b : digest) {
-        sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
-      }
-      return sb.toString();
-    } catch (Exception e) {
-      throw new IllegalStateException("SHA-256 unavailable", e);
     }
   }
 

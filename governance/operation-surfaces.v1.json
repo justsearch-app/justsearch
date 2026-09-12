@@ -40,6 +40,13 @@
       "store": "modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java",
       "feProjection": "modules/ui-web/src/shell-v0/views/MemorySurface.ts (GET /api/memory whatItKnows)",
       "note": "Tempdoc 561 P-E: the ONE learned-memory record. Constructed once in HeadAssembly and shared by both producers (the core_remember agent tool + the MemoryExtractionConsumer) AND the /api/memory surface, so the gate now makes a SECOND memory authority that references MemoryStore fail the build unless declared (unrepresentability extended to the memory domain)."
+    },
+    {
+      "name": "OperationRecord",
+      "tempdoc": 936,
+      "definition": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
+      "store": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "note": "Lane F C2: operations.db is the sole acceptance/checkpoint/outcome authority. The shared attempt runner writes terminal transitions after actual completion; history and UI project these rows. Job lifecycle and ActionEvent remain sibling records, not alternate operation acceptance stores."
     }
   ],
   "forbiddenReintroduction": [
@@ -73,7 +80,9 @@
       "io.justsearch.app.observability.ledger.ActionEvent",
       "io.justsearch.agent.AgentRunStore",
       "io.justsearch.agent.api.interaction.InteractionEvent",
-      "io.justsearch.agent.api.memory.MemoryStore"
+      "io.justsearch.agent.api.memory.MemoryStore",
+      "io.justsearch.app.api.operations.OperationRecord",
+      "io.justsearch.app.api.operations.OperationAttemptRunner"
     ],
     "javaMainRoots": [
       "modules"
@@ -459,6 +468,60 @@
       "guard": "test:RetrospectivePanel.test.ts",
       "consumesProjection": "fe-event-row-projection",
       "note": "Tempdoc 558 §S1 — composes renderEventRow (the shared row projection) to render workspace activity + history; consumes UnifiedActionEntry via that projection only, no independent model."
+    },
+    {
+      "id": "operation-record-type",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
+      "guard": "test:OperationAcceptanceStoreTest",
+      "consumesProjection": "self",
+      "note": "Immutable internal projection of the operations.db row."
+    },
+    {
+      "id": "operation-store-port",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "guard": "test:OperationAcceptanceStoreTest",
+      "consumesProjection": "operation-record-type",
+      "note": "The one acceptance/checkpoint/outcome store port."
+    },
+    {
+      "id": "operation-attempt-runner-port",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "guard": "test:OperationAttemptRunnerTest",
+      "consumesProjection": "operation-store-port",
+      "note": "Shared runner contract; accepted capabilities and actual completion."
+    },
+    {
+      "id": "operation-record-handle",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationRecordHandle.java",
+      "guard": "test:OperationAttemptRunnerTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Restricted handler identity/checkpoint handle; no terminal or acceptance writes."
+    },
+    {
+      "id": "operation-record-store",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "guard": "test:OperationAcceptanceStoreTest",
+      "consumesProjection": "operation-store-port",
+      "note": "Sole SQLite implementation. Acceptance is transactional and terminal rows immutable."
+    },
+    {
+      "id": "operation-attempt-runner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "guard": "test:OperationAttemptRunnerTest",
+      "consumesProjection": "operation-record-store",
+      "note": "Sole terminal writer after actual work completion; owner-scoped restart reconciliation."
     }
   ]
 }

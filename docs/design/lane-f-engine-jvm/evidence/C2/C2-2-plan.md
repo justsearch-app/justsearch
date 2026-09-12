@@ -186,3 +186,51 @@ which precedes the completed COMMIT and must not execute SQL on its connection
 It is not C2's committed-unit authority. C2-2 will deliver operation completion
 only after the queue transaction returns successfully, and will reconcile against
 committed scan rows. The bounded UI/audit stream cannot substitute for this proof.
+
+### Shared core implementation checkpoint, September12
+
+Queue prerequisite b77b68e2f is pushed. The next diff implements the store port's
+accept/read/start/checkpoint/terminal guards, canonical UUIDv7 keys, digest-only
+invocation descriptors and typed receipts. CanonicalOperationArguments extracts
+the existing ConsentCapsuleService sort/hash behavior into app-api for reuse;
+consent semantics (including malformed-input fallback) remain unchanged. This
+retires the former private capsule implementation rather than creating two
+argument-binding authorities.
+
+The runner accepts an opaque prepared capability before scheduling, starts only
+a newly accepted body after admission, and keeps the immediate OperationResult
+separate from actual CompletionStage completion. Duplicate calls receive the
+receipt/progress snapshot and never steal execution. A refused scheduling/admission
+attempt can fail only while ACCEPTED. Failed completion persistence leaves RUNNING
+and fails the completion observation. Synchronous exceptions are recorded and
+rethrown; fatal errors remain observable and require restart reconciliation.
+
+Kind declarations precede the constructor's unowned interactive sweep. Reconciliation
+uses only the boot-interrupted set, excluding newly accepted work. Ready owners
+return wait/complete/fail/resume verdicts; only the runner writes terminal state.
+The C2-8/D1 owners still supply their four-condition eligibility/identity proofs.
+
+578 passes acceptance/key/consent and all six original Runtime.halt recovery
+points. 576's six child failures were missing Jackson in the explicit child
+classpath; 577 then caught the wrong JsonFactory package in that fixture, fixed
+using the existing JsonParser type's code source. These were not weakened crash
+assertions. Retained logs and XML: tmp/c2-2-operation-acceptance-576.txt through
+-578.txt, tmp/c2-2-operation-576-xml and tmp/c2-2-operation-578-xml.
+579 passes the runner/store/key tests and owner PMD checks (24s), with XML retained
+under tmp/c2-2-runner-579-xml and log tmp/c2-2-operation-runner-579.txt.
+
+Gate negative580 detects both new unregistered record writers. After adding their
+source/port/producer entries, operation-surface581 and register-guard-resolution582
+pass. Negative SARIF/log are retained as tmp/c2-2-operation-surface-negative-580.*;
+positive logs are tmp/c2-2-operation-surface-581.txt and tmp/c2-2-register-guards-582.txt.
+Producer wiring, installed acceptance-before-effect, keyed transport and all later
+C2 work remain required. This core checkpoint is not C2-2 acceptance or batch closure.
+
+Independent core review found no substantive defects after inspecting the dirty
+snapshot on b77b68e2f and the retained evidence: 578 has49 tests and579 has35,
+all without failures/errors/skips. Run583 passes OperationStoreArchitectureTest,
+including a negative fixture proving a producer cannot write terminal state.
+The bytecode rule also restricts acceptance/start/resume/refusal to the runner,
+including calls through the concrete implementation. Output/XML:
+tmp/c2-2-operation-architecture-583.txt and tmp/c2-2-architecture-583-xml.
+Producer wiring remains the next change within C2-2.

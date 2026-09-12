@@ -2,6 +2,18 @@
 package io.justsearch.app.observability.operations;
 
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.OperationDescriptor;
+import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.app.api.operations.OperationReceipt;
+import io.justsearch.app.api.operations.OperationRecord;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -25,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 /** One connection and one lock for the shared operations.db, including its final close. */
 public final class SqliteOperationStore implements OperationStore {
+  private static final ObjectMapper JSON = JsonMapper.builder()
+      .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
   private static final Logger LOG = LoggerFactory.getLogger(SqliteOperationStore.class);
   private static final long FUTURE_SKEW_MS = Duration.ofMinutes(5).toMillis();
   private final ReentrantLock lock = new ReentrantLock();
@@ -239,6 +253,241 @@ public final class SqliteOperationStore implements OperationStore {
       }
     }
     return latest;
+  }
+
+  @Override
+  public Acceptance accept(String key, OperationDescriptor descriptor, EngineContext context,
+      InvocationProvenance provenance) {
+    Objects.requireNonNull(context, "context");
+    Objects.requireNonNull(descriptor, "descriptor");
+    long keyTime;
+    try { keyTime = OperationKeys.timestampMillis(key); }
+    catch (IllegalArgumentException invalid) {
+      throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, invalid);
+    }
+    String identity = canonicalIdentity(descriptor.identityJson());
+    return locked(() -> transaction(() -> {
+      var existing = findRow(key);
+      if (existing.isPresent()) {
+        OperationDescriptor prior = existing.get().descriptor();
+        if (prior.kind() != descriptor.kind()
+            || !Objects.equals(prior.operationRef(), descriptor.operationRef())
+            || !prior.identityJson().equals(identity)) {
+          throw new OperationStoreException(OperationStoreException.Code.OPERATION_KEY_REUSED, null);
+        }
+        return new Acceptance(existing.get(), false);
+      }
+      long now = clock.millis();
+      if (keyTime > now + FUTURE_SKEW_MS) {
+        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+      }
+      if (keyTime < readHistorySince()) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null);
+      }
+      String sql = """
+          INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
+            identity_json, grant_ref, client_kind, client_id, session_id, source_tier, transport,
+            executor, initiator, correlation_id, accepted_at, updated_at)
+          VALUES (?, ?, ?, ?, 'ACCEPTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(operation_key) DO NOTHING
+          """;
+      try (var insert = connection.prepareStatement(sql)) {
+        Object[] values = {key, descriptor.kind().wireValue(),
+            context.survival().name(), context.urgency().name(), descriptor.operationRef(), identity,
+            context.grantReference().orElse(null), context.clientKind().name(), context.clientId(),
+            context.sessionId().orElse(null), context.sourceTier(), context.transport(),
+            provenance == null ? null : provenance.executor().name(),
+            provenance == null ? null : provenance.initiator().orElse(null),
+            provenance == null ? null : provenance.correlationId().orElse(null), now, now};
+        for (int i = 0; i < values.length; i++) insert.setObject(i + 1, values[i]);
+        if (insert.executeUpdate() != 1) throw new SQLException("Concurrent acceptance escaped queue ownership");
+      }
+      return new Acceptance(findRow(key).orElseThrow(() -> new SQLException("Accepted row is missing")), true);
+    }));
+  }
+
+  private static String canonicalIdentity(String json) {
+    var value = JSON.readTree(json);
+    if (value == null || !value.isObject()) throw new IllegalArgumentException("Operation identity must be an object");
+    return JSON.writeValueAsString(JSON.convertValue(value, java.util.Map.class));
+  }
+
+  @Override
+  public java.util.Optional<OperationRecord> find(String key) {
+    OperationKeys.timestampMillis(key);
+    return locked(() -> findRow(key));
+  }
+
+  private java.util.Optional<OperationRecord> findRow(String key) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT * FROM operations WHERE operation_key = ?")) {
+      query.setString(1, key);
+      try (ResultSet result = query.executeQuery()) {
+        return result.next() ? java.util.Optional.of(readRecord(result)) : java.util.Optional.empty();
+      }
+    }
+  }
+
+  @Override
+  public boolean start(long id) {
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET state = 'RUNNING', started_at = ?, updated_at = ?, attempts = attempts + 1
+          WHERE id = ? AND state = 'ACCEPTED'
+          """)) {
+        long now = clock.millis();
+        update.setLong(1, now); update.setLong(2, now); update.setLong(3, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
+  public boolean resume(long id) {
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET state = 'RUNNING', started_at = COALESCE(started_at, ?),
+            updated_at = ?, attempts = attempts + 1
+          WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING')
+          """)) {
+        long now = clock.millis();
+        update.setLong(1, now); update.setLong(2, now); update.setLong(3, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
+  public boolean rejectBeforeStart(long id, OperationReceipt receipt) {
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET state = 'FAILED', completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
+          WHERE id = ? AND state = 'ACCEPTED'
+          """)) {
+        long now = clock.millis();
+        update.setLong(1, now); update.setLong(2, now);
+        update.setString(3, JSON.writeValueAsString(receipt)); update.setString(4, receipt.code());
+        update.setLong(5, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
+  public boolean checkpoint(long id, String cursor, long unitsCompleted, long unitsFailed) {
+    if (unitsCompleted < 0 || unitsFailed < 0) throw new IllegalArgumentException("Negative checkpoint count");
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET checkpoint_cursor = ?, units_completed = ?, units_failed = ?, updated_at = ?
+          WHERE id = ? AND state IN ('RUNNING', 'COMPLETE_WITH_GAPS')
+            AND units_completed <= ? AND units_failed <= ?
+          """)) {
+        update.setString(1, cursor); update.setLong(2, unitsCompleted); update.setLong(3, unitsFailed);
+        update.setLong(4, clock.millis()); update.setLong(5, id);
+        update.setLong(6, unitsCompleted); update.setLong(7, unitsFailed);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
+  public boolean finish(long id, OperationState terminalState, OperationReceipt receipt) {
+    Objects.requireNonNull(receipt, "receipt");
+    if (!terminalState.terminal()) throw new IllegalArgumentException("Expected a terminal operation state");
+    String resultJson = JSON.writeValueAsString(receipt);
+    return locked(() -> {
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET state = ?, completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
+          WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING', 'COMPLETE_WITH_GAPS')
+          """)) {
+        long now = clock.millis();
+        update.setString(1, terminalState.name()); update.setLong(2, now); update.setLong(3, now);
+        update.setString(4, resultJson);
+        update.setString(5, terminalState == OperationState.COMPLETE ? null : receipt.code());
+        update.setLong(6, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
+  public List<OperationRecord> openRecords() {
+    return locked(() -> {
+      List<OperationRecord> records = new java.util.ArrayList<>();
+      try (Statement query = connection.createStatement(); ResultSet result = query.executeQuery(
+          "SELECT * FROM operations WHERE state IN ('ACCEPTED','RUNNING','COMPLETE_WITH_GAPS') ORDER BY id")) {
+        while (result.next()) records.add(readRecord(result));
+      }
+      return List.copyOf(records);
+    });
+  }
+
+  @Override
+  public long historySinceMillis() { return locked(this::readHistorySince); }
+
+  private long readHistorySince() throws SQLException {
+    try (Statement query = connection.createStatement(); ResultSet result = query.executeQuery(
+        "SELECT history_since_ms FROM operations_meta WHERE singleton = 1")) {
+      if (!result.next()) throw new SQLException("Operations metadata is missing");
+      return result.getLong(1);
+    }
+  }
+
+  private static OperationRecord readRecord(ResultSet result) throws SQLException {
+    EngineContext context = new EngineContext(
+        EngineContext.ClientKind.valueOf(result.getString("client_kind")), result.getString("client_id"),
+        java.util.Optional.ofNullable(result.getString("session_id")),
+        java.util.Optional.ofNullable(result.getString("grant_ref")), result.getString("source_tier"),
+        result.getString("transport"), EngineContext.Survival.valueOf(result.getString("survival")),
+        EngineContext.Urgency.valueOf(result.getString("urgency")));
+    String receiptJson = result.getString("result_json");
+    return new OperationRecord(result.getLong("id"), result.getString("operation_key"),
+        new OperationDescriptor(OperationKind.fromWire(result.getString("kind")),
+            result.getString("operation_ref"), result.getString("identity_json")),
+        context, result.getString("executor"), result.getString("initiator"), result.getString("correlation_id"),
+        OperationState.valueOf(result.getString("state")), result.getString("phase"),
+        result.getString("checkpoint_cursor"), result.getLong("units_completed"), result.getLong("units_failed"),
+        result.getInt("attempts"), result.getLong("accepted_at"), nullableLong(result, "started_at"),
+        result.getLong("updated_at"), nullableLong(result, "completed_at"), result.getString("failure_reason"),
+        receiptJson == null ? null : JSON.readValue(receiptJson, OperationReceipt.class));
+  }
+
+  private static Long nullableLong(ResultSet result, String column) throws SQLException {
+    long value = result.getLong(column);
+    return result.wasNull() ? null : value;
+  }
+
+  @FunctionalInterface
+  private interface SqlWork<T> { T run() throws SQLException; }
+
+  private <T> T locked(SqlWork<T> work) {
+    lock.lock();
+    try {
+      if (connection == null || connection.isClosed()) throw new SQLException("Operations store is closed");
+      return work.run();
+    } catch (SQLException failure) {
+      throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, failure);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private <T> T transaction(SqlWork<T> work) throws SQLException {
+    connection.setAutoCommit(false);
+    boolean ended = false;
+    try {
+      T result = work.run();
+      connection.commit();
+      ended = true;
+      return result;
+    } catch (SQLException | RuntimeException | Error failure) {
+      try { connection.rollback(); ended = true; }
+      catch (SQLException rollbackFailure) { failure.addSuppressed(rollbackFailure); }
+      throw failure;
+    } finally {
+      // Do not turn an uncertain rollback into an implicit commit by restoring auto-commit.
+      if (ended) connection.setAutoCommit(true);
+      else connection.close();
+    }
   }
 
   @Override

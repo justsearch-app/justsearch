@@ -46,6 +46,18 @@ public interface OperationHandler {
     return execute(argumentsJson, engineContext);
   }
 
+  /** Synchronous default; asynchronous owners override and supply actual completion. */
+  default OperationExecution executeRecorded(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext, OperationRecordHandle record) {
+    return OperationExecution.finished(execute(argumentsJson, provenance, engineContext));
+  }
+
+  /** Undo participates in the same runner-owned attempt and actual-completion contract. */
+  default OperationExecution undoRecorded(String executionId, EngineContext engineContext,
+      OperationRecordHandle record) {
+    return OperationExecution.finished(undo(executionId, engineContext));
+  }
+
   /**
    * Undo a previous execution identified by {@code executionId}. Default throws.
    *

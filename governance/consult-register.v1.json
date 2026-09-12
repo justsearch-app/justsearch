@@ -4,7 +4,9 @@
   "regions": [
     {
       "id": "shell-v0",
-      "pathIncludes": ["modules/ui-web/src/shell-v0/"],
+      "pathIncludes": [
+        "modules/ui-web/src/shell-v0/"
+      ],
       "region": "a shell-v0 frontend surface",
       "maintain": true,
       "docs": [
@@ -20,7 +22,9 @@
     },
     {
       "id": "surface-catalog-parity",
-      "pathIncludes": ["CoreSurfaceCatalog.java"],
+      "pathIncludes": [
+        "CoreSurfaceCatalog.java"
+      ],
       "region": "the Java surface catalog (FE↔Java parity)",
       "docs": [],
       "recipe": [
@@ -30,7 +34,9 @@
     },
     {
       "id": "ui-web-gates",
-      "pathIncludes": ["modules/ui-web/src/"],
+      "pathIncludes": [
+        "modules/ui-web/src/"
+      ],
       "region": "the ui-web frontend (pre-merge gate set)",
       "docs": [],
       "recipe": [
@@ -44,7 +50,10 @@
     },
     {
       "id": "ui-baseline-schemas",
-      "pathIncludes": ["governance/ui-a11y-baseline", "governance/ui-proportion-baseline"],
+      "pathIncludes": [
+        "governance/ui-a11y-baseline",
+        "governance/ui-proportion-baseline"
+      ],
       "region": "the UI measurement baselines (a11y known-rules / chrome proportion)",
       "docs": [],
       "recipe": [
@@ -54,7 +63,10 @@
     },
     {
       "id": "threat-model",
-      "pathIncludes": ["modules/shell/src-tauri/tauri.conf.json", "ApiSecurityFilters.java"],
+      "pathIncludes": [
+        "modules/shell/src-tauri/tauri.conf.json",
+        "ApiSecurityFilters.java"
+      ],
       "region": "the loopback egress / inbound-access security surface",
       "maintain": true,
       "docs": [
@@ -66,7 +78,10 @@
     },
     {
       "id": "app-agent",
-      "pathIncludes": ["modules/app-agent/", "modules/app-agent-api/"],
+      "pathIncludes": [
+        "modules/app-agent/",
+        "modules/app-agent-api/"
+      ],
       "region": "the in-product agent system",
       "docs": [
         {
@@ -77,7 +92,9 @@
     },
     {
       "id": "adapters-lucene",
-      "pathIncludes": ["modules/adapters-lucene/"],
+      "pathIncludes": [
+        "modules/adapters-lucene/"
+      ],
       "region": "the Lucene retrieval adapter",
       "docs": [
         {
@@ -88,7 +105,10 @@
     },
     {
       "id": "worker-inference",
-      "pathIncludes": ["modules/app-inference/", "modules/ort-common/"],
+      "pathIncludes": [
+        "modules/app-inference/",
+        "modules/ort-common/"
+      ],
       "region": "the Worker inference / ORT-session composition",
       "docs": [
         {
@@ -99,7 +119,9 @@
     },
     {
       "id": "workflow-proto-message",
-      "pathIncludes": ["modules/ipc-common/src/main/proto/"],
+      "pathIncludes": [
+        "modules/ipc-common/src/main/proto/"
+      ],
       "region": "the proto DTOs at the Engine's in-process ports",
       "docs": [],
       "recipe": [
@@ -113,7 +135,9 @@
     },
     {
       "id": "workflow-rest-endpoint",
-      "pathIncludes": ["modules/ui/src/main/java/io/justsearch/ui/api/"],
+      "pathIncludes": [
+        "modules/ui/src/main/java/io/justsearch/ui/api/"
+      ],
       "region": "the Engine's REST API (Javalin)",
       "docs": [],
       "recipe": [
@@ -127,7 +151,11 @@
     },
     {
       "id": "workflow-config-key",
-      "pathIncludes": ["EnvRegistry.java", "ConfigKey.java", "ResolvedConfigBuilder.java"],
+      "pathIncludes": [
+        "EnvRegistry.java",
+        "ConfigKey.java",
+        "ResolvedConfigBuilder.java"
+      ],
       "region": "the configuration resolution layer",
       "docs": [],
       "recipe": [
@@ -167,7 +195,9 @@
     },
     {
       "id": "model-blobs",
-      "pathIncludes": ["models/"],
+      "pathIncludes": [
+        "models/"
+      ],
       "region": "the models/ tree (weights are never tracked in this repo)",
       "docs": [],
       "recipe": [
@@ -178,7 +208,10 @@
     },
     {
       "id": "index-rebuild-after-field-change",
-      "pathIncludes": ["SSOT/catalogs/fields.v1.json", "IndexingDocumentOps"],
+      "pathIncludes": [
+        "SSOT/catalogs/fields.v1.json",
+        "IndexingDocumentOps"
+      ],
       "region": "the index field schema / document extraction path",
       "docs": [],
       "recipe": [
@@ -218,7 +251,10 @@
     },
     {
       "id": "architecture-decisions",
-      "pathIncludes": ["docs/decisions/", "docs/reference/architectural-risks.md"],
+      "pathIncludes": [
+        "docs/decisions/",
+        "docs/reference/architectural-risks.md"
+      ],
       "region": "an architecture decision record (ADR) or the architectural risk register",
       "maintain": true,
       "docs": [
@@ -277,7 +313,10 @@
     },
     {
       "id": "dev-stack-stale-jar",
-      "pathIncludes": ["modules/app-services/", "modules/app-agent-api/"],
+      "pathIncludes": [
+        "modules/app-services/",
+        "modules/app-agent-api/"
+      ],
       "region": "Java on the head-process classpath (dev-stack freshness)",
       "docs": [],
       "recipe": [
@@ -288,7 +327,16 @@
     },
     {
       "id": "worktree-lifecycle",
-      "pathIncludes": ["scripts/dev/worktree-lifecycle.cjs", "scripts/dev/remove-worktree.cjs", "scripts/dev/lib/landing-receipt.cjs", "scripts/dev/lib/worktree-archive.cjs", "scripts/dev/lib/worktree-register.cjs", "scripts/agent-analytics/hooks/worktree-register.mjs", "scripts/agent-analytics/hooks/worktree-release.mjs", "governance/worktree-lifecycle.v1.json"],
+      "pathIncludes": [
+        "scripts/dev/worktree-lifecycle.cjs",
+        "scripts/dev/remove-worktree.cjs",
+        "scripts/dev/lib/landing-receipt.cjs",
+        "scripts/dev/lib/worktree-archive.cjs",
+        "scripts/dev/lib/worktree-register.cjs",
+        "scripts/agent-analytics/hooks/worktree-register.mjs",
+        "scripts/agent-analytics/hooks/worktree-release.mjs",
+        "governance/worktree-lifecycle.v1.json"
+      ],
       "region": "the worktree and branch lifecycle (create, register, release, receipts, archive, reconcile, remove) — tempdoc 952",
       "maintain": true,
       "docs": [
@@ -306,6 +354,26 @@
         "Changing hook behaviour: edit governance/agent-hooks.v1.json, run `node scripts/ci/regen-all.mjs --only agent-hooks-wiring,codex-hooks`, then the hook-integrity gate (`node scripts/governance/run.mjs --gate hook-integrity --mode gate`).",
         "Changing rule or skill text: edit .claude/rules/branch-safety.md and BOTH skill trees (.claude/skills and .agents/skills are separately owned), then run `node scripts/docs/skills-sync.mjs`, `node scripts/ci/check-codex-agent-parity.mjs` and `node scripts/ci/check-always-loaded-budget.mjs`.",
         "Standing rules: the reconciler never executes a removal from a PreToolUse hook (861 [A4]); an UNKNOWN receipt never authorizes branch retirement; archive failure means quarantine, not removal; reading never writes."
+      ]
+    },
+    {
+      "id": "operation-attempts",
+      "pathIncludes": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/operations/",
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/",
+        "governance/operation-surfaces.v1.json"
+      ],
+      "region": "Durable operation acceptance and completion (lane F C2)",
+      "docs": [
+        "docs/design/lane-f-engine-jvm/stages/C2.md",
+        "docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+        "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java"
+      ],
+      "recipe": [
+        "Enter the shared OperationAttemptRunner before scheduling or effects. Reuse its issued attempt and original operation identity; never create a parallel acceptance/history store or let a handler accept its own dispatch row.",
+        "Return actual completion for asynchronous handlers. Started/accepted responses and SQLite commit hooks are not committed-effect proof. Report committed checkpoints through the restricted handle and let the runner write the terminal state.",
+        "CanonicalOperationArguments is the shared consent/idempotency digest authority. Persist generic argument digests and non-content outcome receipts; never serialize handler message, structuredData, prompt, excerpt or arbitrary failure details into operations.db.",
+        "Declare kind ownership synchronously before the index fork and default recovery sweep. Reconcile only interrupted rows when each owner is ready. Register each producer/projection in operation-surfaces and verify the ordering, duplicate, recovery and privacy regressions."
       ]
     }
   ]

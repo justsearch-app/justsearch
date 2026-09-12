@@ -170,7 +170,11 @@ class SqliteOperationStoreTest {
     for (Class<?> type : java.util.List.of(OperationStoreCrashChild.class, SqliteOperationStore.class,
         io.justsearch.app.api.operations.OperationStore.class,
         io.justsearch.configuration.persistence.SqliteStoreSnapshot.class,
-        org.slf4j.Logger.class, Class.forName("org.sqlite.JDBC"))) {
+        org.slf4j.Logger.class, Class.forName("org.sqlite.JDBC"),
+        tools.jackson.databind.ObjectMapper.class, tools.jackson.core.JsonParser.class,
+        com.fasterxml.jackson.annotation.JsonProperty.class,
+        io.justsearch.core.context.EngineContext.class,
+        io.justsearch.agent.api.registry.InvocationProvenance.class)) {
       classpath.add(Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI()).toString());
     }
     String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
