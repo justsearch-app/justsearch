@@ -532,3 +532,50 @@ completion, newly admitted library context and both composition paths. Root re-r
 the negative/positive XML. The quota reference closes on actual effect completion;
 terminal-row persistence follows and has its separate C2 failure semantics. HTTP quota
 proof does not claim live install/download success; hosted inclusion remains at C2.
+
+
+### Pack import actual owner completion
+
+The existing pack owner is the next C2-2 producer. Reuse AiPackImportService.Attempt
+(started DTO plus actual completion stage) across PackImportService; the dispatcher
+adapter never rereads mutable status after starting. The sole running guard stays
+held through lease cleanup, terminal snapshot capture and error handling. Registration
+or thread-start refusal clears it with PACK_IMPORT_START_FAILED. Unexpected runtime
+owner/cleanup failure completes exceptionally with PACK_IMPORT_OWNER_FAILED status;
+fatal Error remains exceptional, not a successful operation receipt. A domain failure
+that returns normally releases the lease with FAILURE, not the old unconditional
+SUCCESS-on-return. Completed pack install means files/settings were installed; existing
+restart/activation behavior is unchanged and must not be advertised as convergence.
+
+The same575 age-only reaper defect exists here: reading an old timestamp clears a live
+writer's guard. Section0 adopts the existing guard authority; only unowned stale status
+may be reclaimed. No additional registry, timeout-to-success, durable progress authority
+or cancellation mechanism is added. Row acceptance precedes handler effects, dispatcher
+retains C1 work through the returned completion, and direct pack HTTP/keyed recovery
+remain required C2 work. Boot resets this progress projection; installed-packs/staging
+and operations rows retain their existing separate recovery responsibilities.
+
+
+Pack628 and restored631 each pass84 tests in8 suites, zero failures/errors/skips,
+with app-api/services PMD and UI test compilation. Actual ZIP installation success
+is included in the existing pack fixture; the returned owner completion says completed
+while the initial snapshot remains running. New controlled tests hold lease cleanup
+while the row remains RUNNING and a duplicate is refused, then prove domain failure,
+registration refusal, cleanup failure, and stale-owned versus stale-unowned status.
+Negative630 restores finished(started) and fails the pending-completion assertion;
+the intended handler is restored before631. The temp path in631 is explicit and the
+fixture's descriptor matches its handler arguments.
+
+Evidence: tmp/c2-2-pack-completion-{628,631}.txt, tmp/c2-2-pack-{628,631}-xml and
+-counts.json; tmp/c2-2-pack-negative-630.txt and -630-xml. Surface629 and guard632 pass.
+Independent read-only review found no remaining source defect and independently read
+628 and the negative evidence. Root read631 and all counts. Thread.start refusal is
+source-reviewed, not deterministically injected; actual lease-registration refusal and
+cleanup exceptions are executed. The opposing initial running/terminal failed values
+prove the returned snapshots cannot alias; mutations also prove neither aliases owner
+status. No live installed distribution/crash or hosted proof is claimed by these tests.
+
+Hosted checks exposed a missed schema integration fixture constructor; separate
+commit3e6569a0d corrects it and633 passes integration compilation/PMD. See
+[hosted evidence](hosted-ci.md). The failure is not waived and fresh hosted success
+remains required. C2-2 and later stage obligations remain open.

@@ -2,6 +2,10 @@
 package io.justsearch.app.services.registry.operations.handlers;
 
 import io.justsearch.core.context.EngineContext;
+import static io.justsearch.agent.api.registry.OperationExecution.finished;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -36,6 +40,12 @@ public final class ImportAiPackHandler implements OperationHandler {
 
   @Override
   public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return executeRecorded(argumentsJson, null, engineContext, null).response();
+  }
+
+  @Override
+  public OperationExecution executeRecorded(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext, OperationRecordHandle record) {
     String path;
     boolean allowDowngrade;
     try {
@@ -44,13 +54,13 @@ public final class ImportAiPackHandler implements OperationHandler {
               argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson);
       JsonNode p = root.get("path");
       if (p == null || !p.isTextual() || p.asString().isBlank()) {
-        return OperationResult.failure("Missing required arg: path");
+        return finished(OperationResult.failure("Missing required arg: path"));
       }
       path = p.asString();
       JsonNode ad = root.get("allowDowngrade");
       allowDowngrade = ad != null && ad.isBoolean() && ad.asBoolean();
     } catch (Exception e) {
-      return HandlerJson.invalidArgs(e);
+      return finished(HandlerJson.invalidArgs(e));
     }
 
     PackImportService svc;
@@ -58,30 +68,44 @@ public final class ImportAiPackHandler implements OperationHandler {
       svc = supplier.get();
     } catch (RuntimeException e) {
       log.warn("ImportAiPackHandler: supplier threw", e);
-      return OperationResult.failure("Pack import service unavailable: " + e.getMessage());
+      return finished(OperationResult.failure("Pack import service unavailable: " + e.getMessage()));
     }
     if (svc == null) {
-      return OperationResult.failure("Pack import service unavailable");
+      return finished(OperationResult.failure("Pack import service unavailable"));
     }
 
     try {
-      Map<String, Object> status = svc.startImport(path, allowDowngrade);
-      return OperationResult.success("Pack import started", status);
+      var attempt = svc.startImport(path, allowDowngrade);
+      return new OperationExecution(OperationResult.success("Pack import started", statusMap(attempt.started())),
+          attempt.completion().thenApply(ImportAiPackHandler::outcome));
     } catch (IllegalArgumentException e) {
-      return OperationResult.failure(
-          e.getMessage(), "INVALID_REQUEST", Map.of("path", path), false);
+      return finished(OperationResult.failure(
+          e.getMessage(), "INVALID_REQUEST", Map.of("path", path), false));
     } catch (IllegalStateException e) {
       // AiPackImportService throws ISE when an import is already running.
-      return OperationResult.failure(
-          e.getMessage(), "PACK_IMPORT_RUNNING", Map.of("path", path), true);
+      return finished(OperationResult.failure(
+          e.getMessage(), "Pack import already running".equals(e.getMessage())
+              ? "PACK_IMPORT_RUNNING" : "PACK_IMPORT_START_FAILED", Map.of("path", path), true));
     } catch (Exception e) {
       log.error("ImportAiPackHandler: startImport threw", e);
-      return OperationResult.failure(
+      return finished(OperationResult.failure(
           "Pack import failed: "
               + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()),
           "PACK_IMPORT_START_FAILED",
           Map.of("path", path),
-          true);
+          true));
     }
   }
+
+  private static OperationResult outcome(io.justsearch.app.api.AiPackImportStatus status) {
+    if ("completed".equals(status.state)) return OperationResult.success("Pack import completed", statusMap(status));
+    String code = status.errorCode == null || status.errorCode.isBlank() ? "PACK_IMPORT_INCOMPLETE" : status.errorCode;
+    return OperationResult.failure(status.message, code, Map.of(), false);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> statusMap(io.justsearch.app.api.AiPackImportStatus status) {
+    return HandlerJson.MAPPER.convertValue(status, Map.class);
+  }
+
 }

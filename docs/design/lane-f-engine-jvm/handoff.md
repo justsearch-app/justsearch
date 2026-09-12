@@ -23,7 +23,13 @@ tests/13 suites with documented unchanged-input reuse; negative623 reproduces th
 early release over real HTTP. Independent source review and surface/guard gates pass.
 Hosted inclusion remains. Install/repair checkpointd86d5d40c is pushed.
 
-C2-2 remains OPEN for recorded ingestion/committed-unit completion, pack/offline and
+Pack import completion is implemented with the same actual owner/cleanup lifetime;
+631 passes84 tests/8 suites plus PMD, with negative630 and independent review.
+The hosted schema integration fixture missed the new runner dependency;3e6569a0d
+fixes it and633 passes integration compilation/PMD. Fresh hosted green is owed;
+[hosted evidence](evidence/C2/hosted-ci.md) records the red runs and exact cause.
+
+C2-2 remains OPEN for recorded ingestion/committed-unit completion, offline and
 other async owners, direct HTTP acceptance (the existing install/runtime controllers
 still bypass catalog dispatch), and installed acceptance-before-effect fault proof.
 C2-3 owns explicit client keys on those paths. Continue [the plan](evidence/C2/C2-2-plan.md)

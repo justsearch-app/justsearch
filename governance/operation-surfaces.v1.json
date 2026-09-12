@@ -630,6 +630,33 @@
       "guard": "test:AiInstallOperationCompletionTest",
       "consumesProjection": "recorded-operation-dispatch",
       "note": "Projects failed/completed/cancelled owner states into the runner; plan completion retains installedFully limitations semantics."
+    },
+    {
+      "id": "pack-import-owner-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/AiPackImportService.java",
+      "guard": "test:AiPackOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Existing pack owner reports actual terminal status after lease cleanup and retains its live single-flight guard."
+    },
+    {
+      "id": "pack-import-service-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/packimport/PackImportServiceImpl.java",
+      "guard": "test:AiPackOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Carries the exact owner attempt without a post-start status read."
+    },
+    {
+      "id": "pack-import-handler-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ImportAiPackHandler.java",
+      "guard": "test:AiPackOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects actual completed/failed import status into shared-runner completion; installed is distinct from activated."
     }
   ]
 }
