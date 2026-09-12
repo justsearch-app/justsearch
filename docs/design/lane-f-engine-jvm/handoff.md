@@ -7,7 +7,18 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: [Current C1 verification checkpoint](#current-c1-verification-checkpoint-2026-09-09-root-scan-race).
 
-## User-requested pause (2026-09-09)
+## Autonomous work resumed (2026-09-12)
+
+The user authorized merging current main and resuming the complete lane.
+Merge9762cf593 is pushed; full integrated478 and the advisory gate pass.
+The worktree has a retention hold for required raw evidence. Fresh C1 offline
+pipeline483 is running under continuous search; C1 remains OPEN until its final
+proof and acceptance reconciliation. See [resumption evidence](evidence/C1/resume-2026-09-12.md)
+for the owned run, revision, commands and remaining obligations. The September10
+C2/D1 design amendments are now present; the September12 review found bounded
+corrections named in that record. The implementation orchestrator owns them.
+
+## Historical user-requested pause (2026-09-09)
 
 Current implementation candidate8f8c7d775: full455 and Python456 pass, hosted34392044686
 is fully green; fresh fairness459, standard primary460 and aggregate467/468 pass.
