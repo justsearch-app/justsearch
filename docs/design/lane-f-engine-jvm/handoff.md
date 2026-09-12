@@ -7,6 +7,19 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
+Latest coherent producer code checkpoint: 70e9e577c, pushed. Full634 (`build pmdAll`)
+passes 9,901 cases/1,624 suites, zero failures/errors, 35 skips, with per-task unchanged
+result reuse recorded. Hosted CI34697406424 has all13 jobs successful; artifact audit
+finds an initial orphan-test PID-witness failure followed by a successful real kill/reap
+retry. Investigate and fix that witness before calling the new orphan proof clean.
+The new producer and quota suites are unskipped and green on hosted Windows/Linux jobs.
+See [hosted evidence](evidence/C2/hosted-ci.md) and [next decisions](evidence/C2/C2-2-plan.md).
+
+Next: orphan proof correction, jobs post-commit projection prerequisite, actual offline
+procedure outcome/context propagation, then the remaining direct HTTP/keyed/ingestion
+work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
+contract; do not replace it with an invented unbounded global semantic-drain owner.
+
 C2-2 now has the queue claim prerequisite, shared durable attempt runner,
 process-root/dispatch/undo wiring, synchronous completion-store failure propagation,
 and scheduled agent acceptance through actual durable run outcome. The non-dispatched

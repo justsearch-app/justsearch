@@ -579,3 +579,48 @@ Hosted checks exposed a missed schema integration fixture constructor; separate
 commit3e6569a0d corrects it and633 passes integration compilation/PMD. See
 [hosted evidence](hosted-ci.md). The failure is not waived and fresh hosted success
 remains required. C2-2 and later stage obligations remain open.
+
+
+### Integrated producer checkpoint 634
+
+At pushed code revision 70e9e577c, `gradlew.bat build pmdAll -PtestParallelism=1
+--max-workers=4 --console=plain` passes in 19m30s: 366 tasks (78 executed, 3 from
+cache, 285 up-to-date). Captured JUnit results for the 38 test tasks selected by the
+actual Gradle output total 9,901 cases/1,624 suites, zero failures/errors, 35 skips.
+Unchanged result reuse is explicit per task in the manifest; omitted/no-source tasks
+are not counted from stale XML. The source tree stayed clean at 70e9e577c throughout.
+
+Evidence: tmp/c2-2-producers-full-634.txt, -634-xml/ and -634-counts.json; the capture
+script is tmp/c2-2-capture-full-634.py. The diagnostic thread dump in
+ tmp/c2-2-full-634-test-threads.txt shows the real read-while-write test pacing/indexing
+while searches execute; no test was killed, bypassed or weakened. Hosted evidence at
+the same revision is [audited separately](hosted-ci.md), including its orphan retry.
+This is a coherent producer checkpoint, not C2-2 or stage C2 completion.
+
+### Next work decisions after the producer checkpoint
+
+1. Resolve the newly observed hosted orphan-test identity failure with a nonvacuous
+   process-instance witness and prove it, before describing the latest orphan run as
+   clean. Preserve the raw failed attempt and successful retry.
+2. Move jobs change-feed materialization out of the SQLite commit hook. The official
+   [commit-hook contract](https://www.sqlite.org/c3ref/commit_hook.html) forbids even
+   SELECT/prepare on that connection until sqlite3_step returns. Preserve current
+   statement/chunk transaction boundaries, finish claim bookkeeping before delivery,
+   serialize reentrant subscriber delivery and serialize snapshot SQL with the queue
+   connection owner. Use the existing queue owner and change stream; do not create a
+   second durable completion authority. The change feed remains a projection, not
+   proof of final Lucene commit. Recorded ingestion needs its separate committed-unit
+   port and scan ownership after this prerequisite.
+3. For core.trigger-offline-processing, record the actual bounded coordinator procedure
+   (VDU pass and embedding-mode handoff), not immediate virtual-thread dispatch or
+   claimed global semantic drain. The current catalog already declares a trigger, while
+   canonical UI wording overstates drain. Return explicit processed/pending/blocked
+   outcomes after procedure cleanup; unavailability or skipped required processing is
+   not success. Carry the caller's admitted EngineContext through the service,
+   coordinator and VDU processor; the autonomous sampler supplies its own explicit
+   internal context. Background embedding convergence remains its existing pipeline
+   responsibility and must be described separately. Use current owners rather than
+   inventing a new unbounded queue-drain state machine.
+
+These are autonomous implementation decisions inside C2; no owner input is pending,
+and no remaining required acceptance item is waived or transferred to an unspecified lane.
