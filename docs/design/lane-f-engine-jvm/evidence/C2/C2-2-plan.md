@@ -874,3 +874,17 @@ responses retain those existing values (including max retries). Request fields, 
 EngineContext and deadline categories are unchanged. [Focused and negative proof](vdu-control-errors.md).
 The batch's generic catches still need the already-planned cancellation/blocked-outcome
 correction; this item does not claim end-to-end cancellation or completion.
+
+
+### VDU generation gate and legacy replay correction
+
+September12: the deferred-completion proposal above is superseded by the
+[generation implementation cut](vdu-generation-boundary.md). New VDU calls refuse
+retryably when not targeting the active serving runtime; check a fresh strict state
+snapshot and target path before effect and after commit. Legacy VDU rows remain until
+eligible replay after restart. Filter deliberate deferrals from the snapshot and keep
+existing atomic removal within its eligible subset; no per-row effect ledger. D1 still
+owes carry-forward through later generations. This decision is ready for implementation,
+including strict state reads, retired VDU buffer writers, negative/recovery proof and
+required test fixture migration. The full694 build currently freezes production sources
+at41a74500b while these noncanonical decisions are recorded.
