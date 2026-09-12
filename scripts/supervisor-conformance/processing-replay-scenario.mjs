@@ -79,4 +79,5 @@ export async function exerciseProcessingReplay(c) {
   requireThat(/Recovered [1-9][0-9]* stuck jobs/.test(recoveredLog), 'startup must report actual PROCESSING recovery');
   console.log('PROCESSING_REPLAY_PASS', JSON.stringify({ afterDeath,
     successor: successor.supervisor, final: jobStateFor(path.basename(file)) }));
+  return { file, marker, successor, afterDeath };
 }

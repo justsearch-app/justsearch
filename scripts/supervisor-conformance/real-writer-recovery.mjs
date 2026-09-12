@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
 import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
+import { exerciseOperationResume } from './operation-resume-scenario.mjs';
 
 const repo = process.cwd();
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
@@ -51,7 +52,7 @@ const env = {
   CI: '',
 };
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
-if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
+if (['processing', 'operation'].includes(process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO)) {
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
@@ -126,7 +127,7 @@ function jobStateFor(filename) {
   const database = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
   try {
     return database
-      .prepare('SELECT path, state FROM jobs WHERE path LIKE ? ORDER BY last_updated DESC LIMIT 1')
+      .prepare('SELECT path, state, last_updated FROM jobs WHERE path LIKE ? ORDER BY last_updated DESC LIMIT 1')
       .get(`%${filename}`);
   } finally {
     database.close();
@@ -178,7 +179,10 @@ try {
       return response.status === 200 ? response : null;
     } catch { return null; }
   });
-  if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
+  if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'operation') {
+    await exerciseOperationResume({ work, data, first, manifest, apiPort, readJson, waitFor,
+      request, post, requireThat, acceptedCount, matchingHit, jobStateFor });
+  } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
     await exerciseProcessingReplay({ work, data, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, acceptedCount, matchingHit, jobStateFor });
   } else if (lockScenario) {

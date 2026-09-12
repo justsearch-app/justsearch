@@ -23,11 +23,16 @@ final class EngineSupervisedRecoveryE2ETest {
   @ParameterizedTest
   @ValueSource(strings = {"writer", "migration", "lock-boot", "lock-ingest", "processing"})
   void supervisedRecoveryUsesTheCorrectExitAndReopensDurableState(String scenario) throws Exception {
+    runScenario(scenario);
+  }
+
+  static void runScenario(String scenario) throws Exception {
+    boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     if ("lock-boot".equals(scenario)) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
     }
-    if ("processing".equals(scenario)) {
+    if (processingFamily) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "the repository's process identity collector currently supports Windows only");
     }
@@ -46,7 +51,7 @@ final class EngineSupervisedRecoveryE2ETest {
             .redirectOutput(outputFile.toFile());
     builder.environment().put("JUSTSEARCH_WRITER_RECOVERY_WORK", work.toString());
     builder.environment().put("JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario);
-    if ("processing".equals(scenario)) {
+    if (processingFamily) {
       Path childArgs = work.resolve("processing-child-args.txt");
       Files.writeString(childArgs, "-Xmx128m\n-Dfile.encoding=UTF-8\n-cp\n\""
           + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n"
@@ -118,9 +123,12 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("fatal_or_uncaught"), output);
     } else if ("migration".equals(scenario)) {
       assertTrue(output.contains("MIGRATION_PASS"), output);
-    } else if ("processing".equals(scenario)) {
+    } else if (processingFamily) {
       assertTrue(output.contains("PROCESSING_AFTER_DEATH"), output);
       assertTrue(output.contains("PROCESSING_REPLAY_PASS"), output);
+      if ("operation".equals(scenario)) {
+        assertTrue(output.contains("OPERATION_RETRY_NO_DUPLICATES_PASS"), output);
+      }
     } else {
       assertTrue(output.contains("LOCK_SURVIVAL_PASS"), output);
       assertTrue(intruder.acquiredLockCount() > 0, "the attack must acquire real filesystem locks");
