@@ -18,8 +18,17 @@ pass, the original whole-table clear fails3 race cases, and key-only removal fai
 replacement cases plus reinsertion. Restored691 reuses the identical689 test cache.
 [VDU client control errors](evidence/C2/vdu-control-errors.md) now propagate unchanged;
 693 executes70 focused cases, with8 old-source negative failures. Batch/coordinator
-propagation remains open. The plan settles shared offline procedure ownership; implementation follows the remaining
-VDU generation/acknowledgement correction. No dev stack or Gradle remains running.
+propagation remains open. The plan settles shared offline procedure ownership; implementation follows
+the remaining VDU generation verification. No dev stack or Gradle remains running.
+
+The VDU generation correction now has [focused and negative proof](evidence/C2/vdu-generation-proof.md):
+713 executes133 cases across four modules with zero failures/errors/skips and passing PMD.
+It includes strict read-only existing-target checks, typed absent-runtime refusal and
+incomplete selected-recovery retention found by independent review. New VDU buffering
+is retired; legacy rows wait for an eligible serving runtime. Independent correction
+review finds no remaining production blocker. Combined production
+KnowledgeServer migration/replay and full/stress/hosted proof remain
+in progress before moving to the shared offline owner.
 
 Prior coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626
 suites, zero failures/errors and35 skips; stress659 passes allthree selected cases
@@ -48,8 +57,8 @@ Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-wr
 invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
 are green; these prior runs do not establish hosted proof for the newer writer.
 
-Next: refuse new VDU effects on an ineligible generation and retain legacy buffered
-VDU until safe replay; then actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
+Next: complete combined production migration/replay and broader generation proof;
+then actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 

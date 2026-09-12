@@ -22,6 +22,7 @@ import io.justsearch.ipc.UpdateVduResultRequest;
 import io.justsearch.ipc.UpdateVduResultResponse;
 import io.justsearch.ipc.VduUpdateOutcome;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -62,15 +63,14 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     jobQueue.open();
 
     // Use chunk-aware testing catalog with explicit vdu_retry_count support for markVduProcessing tests.
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
+    var layout = new IndexGenerationManager(tempDir.resolve("indexBase")).initializeOrLoad();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0)).atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
 
     // Create service with the real lifecycle
     IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
-    Path indexBasePath = tempDir.resolve("indexBase");
-    Files.createDirectories(indexBasePath);
-    Path indexPath = tempDir.resolve("index");
-    Files.createDirectories(indexPath);
+    Path indexBasePath = layout.basePath();
+    Path indexPath = layout.activeGenerationPath();
     service = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
         lifecycle, lifecycle, null, 0L);
@@ -414,7 +414,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
               .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED)
               .build();
 
-      assertSwitchingUnavailable(
+      assertVduTargetUnavailable(
           assertThrows(
               WorkerServiceException.class,
               () -> switchingService.updateVduResult(request, CallContext.none())));
@@ -430,7 +430,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
       MarkVduProcessingRequest request =
           MarkVduProcessingRequest.newBuilder().setDocId(docId).setMaxRetries(3).build();
 
-      assertSwitchingUnavailable(
+      assertVduTargetUnavailable(
           assertThrows(
               WorkerServiceException.class,
               () -> switchingService.markVduProcessing(request, CallContext.none())));
@@ -490,7 +490,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
       WorkerIngestService switchingService =
           createSwitchingServiceWithQueue(new NoopJobQueue(), "nonsqlite-vdu-recover");
 
-      assertSwitchingUnavailable(
+      assertVduTargetUnavailable(
           assertThrows(
               WorkerServiceException.class,
               () ->
@@ -499,73 +499,50 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     }
 
     @Test
-    @DisplayName("updateVduResult buffers VDU_UPDATE op when SWITCHING and queue is SQLite")
-    void updateVduResultBuffersSwitchOpWhenSwitchingAndQueueIsSqlite() throws Exception {
+    @DisplayName("updateVduResult refuses SWITCHING without accepting a buffered mutation")
+    void updateVduResultRefusesSwitchingWithSqliteQueue() throws Exception {
       String docId = indexTestDocument("switching-buffer-vdu-update");
+      String original = lifecycle.documentFieldOps().getDocumentContent(docId);
       WorkerIngestService switchingService = createSwitchingServiceWithQueue(jobQueue, "sqlite-vdu-update");
 
-      UpdateVduResultResponse response =
-          switchingService.updateVduResult(
-              UpdateVduResultRequest.newBuilder()
-                  .setDocId(docId)
-                  .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY)
-                  .setPageCount(2)
-                  .build(),
-              CallContext.none());
+      assertVduTargetUnavailable(assertThrows(WorkerServiceException.class,
+          () -> switchingService.updateVduResult(UpdateVduResultRequest.newBuilder()
+              .setDocId(docId).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY)
+              .setPageCount(2).build(), CallContext.none())));
 
-      assertTrue(response.getSuccess(), "Expected buffered ACK while switching");
-
-      SqliteJobQueue.SwitchBufferOp op = requireSwitchOp("vdu_update:" + docId);
-      assertEquals("VDU_UPDATE", op.op());
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> payload = JSON.readValue(op.payload(), Map.class);
-      assertEquals(docId, payload.get("doc_id"));
-      assertEquals(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY.getNumber(), payload.get("outcome"));
-      assertEquals(2, payload.get("page_count"));
+      assertEquals(0, jobQueue.switchBufferDepth());
+      assertEquals(original, lifecycle.documentFieldOps().getDocumentContent(docId));
     }
 
     @Test
-    @DisplayName("markVduProcessing buffers PROCESSING op with incremented retry when SWITCHING")
-    void markVduProcessingBuffersProcessingOpWhenSwitchingAndQueueIsSqlite() throws Exception {
+    @DisplayName("markVduProcessing refuses SWITCHING without changing the retry count")
+    void markVduProcessingRefusesSwitchingWithSqliteQueue() throws Exception {
       String docId = indexTestDocument("switching-buffer-vdu-mark-processing");
+      String original = lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT);
       WorkerIngestService switchingService = createSwitchingServiceWithQueue(jobQueue, "sqlite-vdu-mark-processing");
 
-      MarkVduProcessingResponse response =
-          switchingService.markVduProcessing(
-              MarkVduProcessingRequest.newBuilder().setDocId(docId).setMaxRetries(3).build(),
-              CallContext.none());
+      assertVduTargetUnavailable(assertThrows(WorkerServiceException.class,
+          () -> switchingService.markVduProcessing(MarkVduProcessingRequest.newBuilder()
+              .setDocId(docId).setMaxRetries(3).build(), CallContext.none())));
 
-      assertTrue(response.getSuccess(), "Expected buffered processing ACK while switching");
-      assertEquals(1, response.getRetryCount());
-
-      SqliteJobQueue.SwitchBufferOp op = requireSwitchOp("vdu_mark:" + docId);
-      assertEquals("VDU_MARK_PROCESSING", op.op());
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> payload = JSON.readValue(op.payload(), Map.class);
-      assertEquals(docId, payload.get("doc_id"));
-      assertEquals(1, payload.get("retry_count"));
+      assertEquals(0, jobQueue.switchBufferDepth());
+      assertEquals(original, lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
     }
 
     @Test
-    @DisplayName("recoverVduProcessing buffers switch op when SWITCHING and queue is SQLite")
-    void recoverVduProcessingBuffersSwitchOpWhenSwitchingAndQueueIsSqlite() throws Exception {
-      indexTestDocument("switching-buffer-vdu-recover");
+    @DisplayName("recoverVduProcessing refuses SWITCHING without changing PROCESSING")
+    void recoverVduProcessingRefusesSwitchingWithSqliteQueue() throws Exception {
+      String docId = indexTestDocument("switching-buffer-vdu-recover");
+      setVduStatus(docId, SchemaFields.VDU_STATUS_PROCESSING);
       WorkerIngestService switchingService = createSwitchingServiceWithQueue(jobQueue, "sqlite-vdu-recover");
 
-      RecoverVduProcessingResponse response =
-          switchingService.recoverVduProcessing(
-              RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none());
+      assertVduTargetUnavailable(assertThrows(WorkerServiceException.class,
+          () -> switchingService.recoverVduProcessing(
+              RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none())));
 
-      assertEquals(0, response.getRecoveredCount());
-
-      SqliteJobQueue.SwitchBufferOp op = requireSwitchOp("vdu_recover_processing");
-      assertEquals("VDU_RECOVER_PROCESSING", op.op());
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> payload = JSON.readValue(op.payload(), Map.class);
-      assertTrue(payload.isEmpty(), "Expected empty payload for recovery switch op");
+      assertEquals(0, jobQueue.switchBufferDepth());
+      assertEquals(SchemaFields.VDU_STATUS_PROCESSING,
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
     }
 
     @Test
@@ -629,8 +606,8 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     }
 
     @Test
-    @DisplayName("markVduProcessing buffers FAILED op when retries already hit max in SWITCHING")
-    void markVduProcessingBuffersFailedOpWhenSwitchingAndRetriesExceeded() throws Exception {
+    @DisplayName("markVduProcessing refuses SWITCHING even when retries already hit max")
+    void markVduProcessingRefusesSwitchingWhenRetriesExceeded() throws Exception {
       String docId = indexTestDocument("switching-buffer-vdu-mark-failed");
       boolean updated =
           lifecycle.indexingCoordinator().updateDocument(docId, Map.of(SchemaFields.VDU_RETRY_COUNT, String.valueOf(3)));
@@ -641,22 +618,14 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
 
       WorkerIngestService switchingService = createSwitchingServiceWithQueue(jobQueue, "sqlite-vdu-mark-failed");
 
-      MarkVduProcessingResponse response =
-          switchingService.markVduProcessing(
+      String originalStatus = lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS);
+      assertVduTargetUnavailable(assertThrows(WorkerServiceException.class,
+          () -> switchingService.markVduProcessing(
               MarkVduProcessingRequest.newBuilder().setDocId(docId).setMaxRetries(3).build(),
-              CallContext.none());
-
-      assertTrue(!response.getSuccess(), "Expected max-retries error response while switching");
-      assertEquals("Max retries exceeded", response.getError());
-
-      SqliteJobQueue.SwitchBufferOp op = requireSwitchOp("vdu_mark:" + docId);
-      assertEquals("VDU_MARK_FAILED", op.op());
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> payload = JSON.readValue(op.payload(), Map.class);
-      assertEquals(docId, payload.get("doc_id"));
-      assertEquals(3, payload.get("retry_count"));
-      assertEquals("Max retries exceeded", payload.get("reason"));
+              CallContext.none())));
+      assertEquals(0, jobQueue.switchBufferDepth());
+      assertEquals("3", lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
+      assertEquals(originalStatus, lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
     }
 
   }
@@ -695,7 +664,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
       List<String> docIds = List.of("recover-a", "recover-b", "recover-c");
       List<String> attempts = new java.util.ArrayList<>();
 
-      int recovered =
+      var result =
           WorkerIngestService.recoverProcessingDocsWithResetOp(
               docIds,
               docId -> {
@@ -706,7 +675,9 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
                 return true;
               });
 
-      assertEquals(2, recovered, "Expected both non-failing documents to recover");
+      assertEquals(2, result.recovered(), "Expected both non-failing documents to recover");
+      assertNotNull(result.failure(), "The selected failure must prevent aggregate completion");
+      assertEquals("injected reset failure", result.failure().getMessage());
       assertEquals(docIds, attempts, "Expected recovery loop to continue after injected failure");
     }
   }
@@ -788,6 +759,11 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
         """
             .formatted(System.currentTimeMillis());
     Files.writeString(statePath, stateJson);
+  }
+
+  private static void assertVduTargetUnavailable(WorkerServiceException error) {
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE, error.status());
+    assertTrue(error.getMessage().contains("active serving generation"));
   }
 
   private static void assertSwitchingUnavailable(WorkerServiceException error) {

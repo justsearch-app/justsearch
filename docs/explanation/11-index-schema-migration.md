@@ -477,7 +477,7 @@ The hardest correctness window is "right around cutover" (pointer swap + restart
 The Worker uses a cutover fence:
 
 - It enters a short **`SWITCHING`** state near the end of migration.
-- While in `SWITCHING`, mutating ingest RPCs are **durably buffered** into `jobs.db.switch_buffer`.
+- While in `SWITCHING`, file ingest, deletion and reconciliation mutations are **durably buffered** into `jobs.db.switch_buffer`.
 - After restart on the new active generation, the Worker replays buffered ops before resuming normal processing.
 
 File UPSERT payloads are versioned and preserve collection plus the admitting caller's coarse
@@ -488,16 +488,30 @@ the snapshot's matching key/revision pairs in one queue transaction. New arrival
 same-key replacements remain, even with identical payloads and timestamps. Removal
 failure rolls back that deletion transaction and retains those versions for retry.
 
-VDU replay also retains its buffered update when its parent is missing, chunk
+New VDU update, mark and recovery calls refuse retryably with `UNAVAILABLE` unless
+the captured ingest runtime is the serving runtime and fresh authoritative state
+identifies its existing path as active, IDLE and without a building generation.
+The check does not create directories or recover missing state from cache/backup.
+It runs before VDU reads/effects and after the covering commit/refresh. VDU calls
+do not create new switch-buffer rows, including when the ingest runtime is absent.
+
+Legacy VDU rows remain readable. Replay filters them out until that same serving
+generation predicate allows replay, while other buffered kinds can drain. It checks
+again after the replay commit before removing versions. VDU replay retains its buffered update when its parent is missing, chunk
 replacement fails, or the covering Lucene commit fails. Chunk replacement precedes
 the terminal parent update, so a failed replacement cannot make a newly completed
 parent permanent through an unrelated commit. Buffer acceptance alone is not an
 acknowledgement of a committed index effect.
+Recovery attempts every selected PROCESSING document, commits and refreshes successful
+resets, then reports failure if any selected parent was missing or any reset threw.
+An incomplete selection retains the legacy recovery row, including when no reset
+succeeded. An empty selection is a valid zero-result outcome. The local aggregate
+does not claim an unbounded drain of all future VDU work.
 Direct VDU updates and replay share `VduResultWriter` for outcome validation and
 parent/chunk mutation. Explicit rejected text retains baseline content; terminal
 empty/failed/rejected fallback results close the extraction-dropout reason. Known
 legacy status inputs keep the live rules. Invalid text results and unknown typed
-outcomes fail before direct buffer acceptance; an invalid persisted result remains
+outcomes fail before a direct index effect; an invalid persisted result remains
 buffered for diagnosis. The direct caller commits each applied result, while replay
 commits before removing its replayed buffer versions.
 Directory sync uses versioned root/force payloads with paired nullable originator/transport fields;
@@ -513,8 +527,9 @@ Buffered operations include (current):
 - Watcher reconciliation:
   - `syncDirectory(force=true)` buffered as `SYNC_ROOT(root, force)`
   - `pruneMissing` buffered as `PRUNE_PREFIX(prefix)`
-- AI / VDU mutations:
-  - `updateVduResult`, `markVduProcessing`, `recoverVduProcessing`
+
+Older `VDU_UPDATE`, `VDU_MARK_PROCESSING`, `VDU_MARK_FAILED` and
+`VDU_RECOVER_PROCESSING` rows are replay-only compatibility records.
 
 ### Cutover policy for failed jobs
 

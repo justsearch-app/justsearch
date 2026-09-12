@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
-import tools.jackson.databind.ObjectMapper;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.DeleteByIdResponse;
@@ -10,21 +9,16 @@ import io.justsearch.ipc.MarkVduProcessingResponse;
 import io.justsearch.ipc.PruneResponse;
 import io.justsearch.ipc.RecoverVduProcessingResponse;
 import io.justsearch.ipc.SyncDirectoryResponse;
-import io.justsearch.ipc.UpdateVduResultRequest;
 import io.justsearch.ipc.UpdateVduResultResponse;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
- * Static response builders and switch-buffer payload helpers for {@link WorkerIngestService}.
+ * Static response builders and switch-buffer key helpers for {@link WorkerIngestService}.
  *
  * <p>All methods are pure static with no instance state. Extracted to reduce the size of the
  * service class while keeping response-construction logic centralized and auditable.
  */
 final class IngestResponses {
   private IngestResponses() {}
-
-  private static final ObjectMapper JSON = new ObjectMapper();
 
   // ==================== Switch-buffer key constants ====================
 
@@ -35,9 +29,6 @@ final class IngestResponses {
   static final String SWITCHBUF_KEY_PREFIX_PREFIX = "prefix:";
   static final String SWITCHBUF_KEY_SYNCROOT_PREFIX = "sync_root:";
   static final String SWITCHBUF_KEY_PRUNEPREFIX_PREFIX = "prune_prefix:";
-  static final String SWITCHBUF_KEY_VDU_UPDATE_PREFIX = "vdu_update:";
-  static final String SWITCHBUF_KEY_VDU_MARK_PREFIX = "vdu_mark:";
-  static final String SWITCHBUF_KEY_VDU_RECOVER_PROCESSING = "vdu_recover_processing";
 
   // ==================== Switch-buffer key builders ====================
 
@@ -57,14 +48,6 @@ final class IngestResponses {
     return SWITCHBUF_KEY_PRUNEPREFIX_PREFIX + normalizedPrefix;
   }
 
-  static String switchBufferVduUpdateKey(String normalizedDocId) {
-    return SWITCHBUF_KEY_VDU_UPDATE_PREFIX + normalizedDocId;
-  }
-
-  static String switchBufferVduMarkKey(String normalizedDocId) {
-    return SWITCHBUF_KEY_VDU_MARK_PREFIX + normalizedDocId;
-  }
-
   // ==================== Normalization helpers ====================
 
   static String normalizeDocIdForMutation(String rawDocId) {
@@ -78,32 +61,6 @@ final class IngestResponses {
   static String resolveNormalizedPathPrefix(String rawPathPrefix) {
     String normalized = PathNormalizer.normalizePathPrefix(rawPathPrefix);
     return normalized == null ? rawPathPrefix : normalized;
-  }
-
-  // ==================== Switch-buffer payload builders ====================
-
-  static String vduMarkFailedSwitchBufferPayload(String normalizedId, int retryCount)
-      throws Exception {
-    return JSON.writeValueAsString(
-        Map.of("doc_id", normalizedId, "retry_count", retryCount, "reason", "Max retries exceeded"));
-  }
-
-  static String vduMarkProcessingSwitchBufferPayload(String normalizedId, int retryCount)
-      throws Exception {
-    return JSON.writeValueAsString(Map.of("doc_id", normalizedId, "retry_count", retryCount));
-  }
-
-  static String updateVduSwitchBufferPayload(UpdateVduResultRequest request, String normalizedId)
-      throws Exception {
-    Map<String, Object> payloadMap = new HashMap<>();
-    payloadMap.put("doc_id", normalizedId);
-    payloadMap.put("extracted_content", request.hasExtractedContent() ? request.getExtractedContent() : null);
-    payloadMap.put("has_extracted_content", request.hasExtractedContent());
-    payloadMap.put("vdu_status", request.getVduStatus());
-    payloadMap.put("vdu_enrichment", request.getVduEnrichment());
-    payloadMap.put("page_count", request.getPageCount());
-    payloadMap.put("outcome", request.getOutcome().getNumber());
-    return JSON.writeValueAsString(payloadMap);
   }
 
   // ==================== Response builders ====================

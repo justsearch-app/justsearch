@@ -116,6 +116,8 @@ public final class WorkerIngestService {
   private final IndexingPacing indexingPacing;
   private final io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle;
   private final IndexGenerationManager indexGenerationManager;
+  private final boolean ingestIsServing;
+  private final Path capturedServingPath;
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
   private final IndexStatusOps statusOps;
   private final SyncDirectoryOps syncOps;
@@ -165,6 +167,8 @@ public final class WorkerIngestService {
     this.indexingPacing =
         java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.ingestLifecycle = ingestLifecycle;
+    this.ingestIsServing = ingestLifecycle != null && ingestLifecycle == searchLifecycle;
+    this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
@@ -669,6 +673,18 @@ public final class WorkerIngestService {
     }
   }
 
+  private void requireServingVduTarget() {
+    try {
+      if (ingestIsServing && (indexGenerationManager == null
+          || indexGenerationManager.isIdleActiveGeneration(capturedServingPath))) return;
+    } catch (java.io.IOException | RuntimeException failure) {
+      throw new WorkerServiceException(WorkerServiceException.Status.UNAVAILABLE,
+          "VDU target state is unavailable; retry after the index is ready", failure);
+    }
+    throw WorkerServiceException.unavailable(
+        "VDU requires the active serving generation; retry after the index transition");
+  }
+
   public UpdateVduResultResponse updateVduResult(
       UpdateVduResultRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {
@@ -678,20 +694,17 @@ public final class WorkerIngestService {
       } catch (IllegalArgumentException e) {
         return updateVduErrorResponse(e.getMessage());
       }
-      UpdateVduResultResponse unavailable = indexRuntimeUnavailableReply(
-          "updateVduResult", updateVduErrorResponse("Index runtime not available"));
-      if (unavailable != null) return unavailable;
-      if (switchBufferOps.isSwitching()) {
-        return switchBufferOps.bufferDuringSwitchingOrThrow("updateVduResult",
-            sbq -> switchBufferOps.bufferUpdateVduResultDuringSwitching(sbq, request, docId));
-      }
+      requireServingVduTarget();
       try {
         if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled())) {
           return updateVduErrorResponse("Document not found: " + docId);
         }
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
         ingestLifecycle.commitOps().maybeRefreshBlocking();
+        requireServingVduTarget();
         return updateVduSuccessResponse();
+      } catch (WorkerServiceException failure) {
+        throw failure;
       } catch (Exception e) {
         log.error("updateVduResult failed for doc: {}", docId, e);
         return updateVduErrorResponse(e.getMessage());
@@ -1085,28 +1098,14 @@ public final class WorkerIngestService {
       return blank;
     }
 
-    MarkVduProcessingResponse unavailable =
-        indexRuntimeUnavailableReply(
-            "markVduProcessing", markVduErrorResponse("Index runtime not available"));
-    if (unavailable != null) {
-      return unavailable;
-    }
-
-    if (switchBufferOps.isSwitching()) {
-      return switchBufferOps.bufferDuringSwitchingOrThrow(
-          "markVduProcessing",
-          sbq -> {
-            String normalizedId = normalizeDocIdForMutation(docId);
-            int currentCount = readVduRetryCount(normalizedId);
-            return switchBufferOps.bufferMarkVduDuringSwitching(
-                sbq, normalizedId, currentCount, maxRetries);
-          });
-    }
+    requireServingVduTarget();
 
     try {
       int currentCount = readVduRetryCount(docId);
       return applyMarkVduProcessing(docId, currentCount, maxRetries);
 
+    } catch (WorkerServiceException failure) {
+      throw failure;
     } catch (Exception e) {
       log.error("markVduProcessing failed for doc: {}", docId, e);
       return markVduErrorResponse(e.getMessage());
@@ -1140,6 +1139,7 @@ public final class WorkerIngestService {
       }
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
+      requireServingVduTarget();
       return markVduErrorResponse(VDU_MAX_RETRIES_EXCEEDED_ERROR);
     }
 
@@ -1152,6 +1152,7 @@ public final class WorkerIngestService {
     if (updated) {
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
+      requireServingVduTarget();
       log.debug(
           "markVduProcessing: doc {} marked PROCESSING, retry {}/{}",
           docId,
@@ -1178,7 +1179,9 @@ public final class WorkerIngestService {
     boolean resetToPending(String docId) throws Exception;
   }
 
-  static int recoverProcessingDocsWithResetOp(
+  record VduRecoveryResult(int recovered, Exception failure) {}
+
+  static VduRecoveryResult recoverProcessingDocsWithResetOp(
       List<String> processingDocIds, VduProcessingResetOp resetOp) {
     int recovered = 0;
     Exception firstFailure = null;
@@ -1187,19 +1190,18 @@ public final class WorkerIngestService {
         // Reset to PENDING (retry count already incremented, so won't loop forever).
         if (resetOp.resetToPending(docId)) {
           recovered++;
+        } else if (firstFailure == null) {
+          firstFailure = new IllegalStateException("Selected VDU document was not recovered: " + docId);
         }
       } catch (Exception e) {
         log.warn("Failed to recover doc: {}", docId, e);
         if (firstFailure == null) firstFailure = e;
       }
     }
-    if (recovered == 0 && firstFailure != null) {
-      throw new IllegalStateException("No selected VDU document could be recovered", firstFailure);
-    }
-    return recovered;
+    return new VduRecoveryResult(recovered, firstFailure);
   }
 
-  private int recoverProcessingDocs(List<String> processingDocIds) {
+  private VduRecoveryResult recoverProcessingDocs(List<String> processingDocIds) {
     return recoverProcessingDocsWithResetOp(processingDocIds, this::resetVduStatusToPending);
   }
 
@@ -1210,15 +1212,11 @@ public final class WorkerIngestService {
 
     requireEnrichmentReader(ctx);
 
-    if (switchBufferOps.isSwitching()) {
-      // During cutover, accept and durably buffer recovery so clients don't depend on retries.
-      return switchBufferOps.bufferDuringSwitchingOrThrow(
-          "recoverVduProcessing",
-          switchBufferOps::bufferRecoverVduProcessingDuringSwitching);
-    }
+    requireServingVduTarget();
 
     try {
       List<String> processingDocIds = processingDocIdsForRecovery();
+      requireServingVduTarget();
 
       if (processingDocIds.isEmpty()) {
         log.info("recoverVduProcessing: no stuck documents found");
@@ -1227,7 +1225,8 @@ public final class WorkerIngestService {
 
       log.info("recoverVduProcessing: found {} stuck documents", processingDocIds.size());
 
-      int recovered = recoverProcessingDocs(processingDocIds);
+      VduRecoveryResult result = recoverProcessingDocs(processingDocIds);
+      int recovered = result.recovered();
 
       if (recovered > 0) {
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
@@ -1236,8 +1235,14 @@ public final class WorkerIngestService {
 
       log.info("recoverVduProcessing: recovered {} of {} documents", recovered, processingDocIds.size());
 
+      requireServingVduTarget();
+      if (result.failure() != null) {
+        throw new IllegalStateException("Selected VDU recovery is incomplete", result.failure());
+      }
       return recoverVduCountResponse(recovered);
 
+    } catch (WorkerServiceException failure) {
+      throw failure;
     } catch (Exception e) {
       log.error("recoverVduProcessing failed", e);
       throw new WorkerServiceException(

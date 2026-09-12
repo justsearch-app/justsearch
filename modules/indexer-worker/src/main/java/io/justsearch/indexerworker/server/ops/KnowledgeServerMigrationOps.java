@@ -87,6 +87,7 @@ public final class KnowledgeServerMigrationOps {
       // Tempdoc 931 §E item 8: rag.chunk_splade.enabled, read from the LIVE resolved config each
       // time a buffered VDU_UPDATE regenerates chunks — a drain can span a config change.
       BooleanSupplier chunkSpladeEnabledSupplier,
+      BooleanSupplier vduReplayAllowed,
       Logger log) {}
 
   public record EnqueueContext(
@@ -427,7 +428,9 @@ public final class KnowledgeServerMigrationOps {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return;
     }
-    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = sbq.listSwitchBufferOps();
+    boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
+    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = sbq.listSwitchBufferOps().stream()
+        .filter(op -> allowVdu || !isVduBufferKind(op.op())).toList();
     if (ops.isEmpty()) {
       return;
     }
@@ -438,11 +441,16 @@ public final class KnowledgeServerMigrationOps {
     boolean allApplied = true;
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
-      if (op == null || op.op() == null || op.payload() == null) {
+      if (op.op() == null || op.payload() == null) {
+        allApplied = false;
         continue;
       }
       String kind = op.op().trim().toUpperCase(Locale.ROOT);
       String payload = op.payload();
+      if (payload.isBlank() || (!"UPSERT".equals(kind) && context.ingestLifecycle() == null)) {
+        allApplied = false;
+        continue;
+      }
       switch (kind) {
         case "UPSERT" -> {
           if (!payload.isBlank()) {
@@ -498,12 +506,18 @@ public final class KnowledgeServerMigrationOps {
             try {
               var node = context.json().readTree(payload);
               String docId = node.path("doc_id").asText();
-              int retryCount = node.path("retry_count").asInt();
+              if (docId.isBlank()) throw new IllegalArgumentException("Buffered VDU mark has no document id");
+              var retry = node.path("retry_count");
+              if (!retry.isIntegralNumber() || !retry.canConvertToInt() || retry.asInt() <= 0) {
+                throw new IllegalArgumentException("Buffered VDU mark has no positive retry count");
+              }
+              int retryCount = retry.asInt();
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
               updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(retryCount));
               boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
               if (!updated) {
+                allApplied = false;
                 context.log().warn("Buffered VDU_MARK_PROCESSING: document not found: {}", docId);
               }
               mutatedLucene = true;
@@ -523,11 +537,13 @@ public final class KnowledgeServerMigrationOps {
             try {
               var node = context.json().readTree(payload);
               String docId = node.path("doc_id").asText();
+              if (docId.isBlank()) throw new IllegalArgumentException("Buffered VDU mark has no document id");
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_FAILED);
               updates.put(SchemaFields.VDU_ENRICHMENT, "{\"error\": \"Max retries exceeded\"}");
               boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
               if (!updated) {
+                allApplied = false;
                 context.log().warn("Buffered VDU_MARK_FAILED: document not found: {}", docId);
               }
               mutatedLucene = true;
@@ -545,6 +561,9 @@ public final class KnowledgeServerMigrationOps {
         case "VDU_RECOVER_PROCESSING" -> {
           if (context.ingestLifecycle() != null) {
             try {
+              if (!context.json().readTree(payload).isObject()) {
+                throw new IllegalArgumentException("Buffered VDU recovery payload is not an object");
+              }
               WorkerIngestService tmp =
                   new WorkerIngestService(
                       context.jobQueue(),
@@ -554,7 +573,7 @@ public final class KnowledgeServerMigrationOps {
                       context.indexBasePath(),
                       context.activeIndexPath(),
                       context.ingestLifecycle(),
-                      null,
+                      context.ingestLifecycle(),
                       null,
                       0L);
               RecoverVduProcessingResponse resp;
@@ -572,7 +591,8 @@ public final class KnowledgeServerMigrationOps {
                         wse.getMessage());
                 break;
               }
-              int recovered = resp == null ? 0 : resp.getRecoveredCount();
+              if (resp == null) throw new IllegalStateException("Buffered VDU recovery has no outcome");
+              int recovered = resp.getRecoveredCount();
               if (recovered > 0) {
                 mutatedLucene = true;
               }
@@ -720,7 +740,10 @@ public final class KnowledgeServerMigrationOps {
             }
           }
         }
-        default -> context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
+        default -> {
+          allApplied = false;
+          context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
+        }
       }
     }
 
@@ -752,6 +775,11 @@ public final class KnowledgeServerMigrationOps {
       }
     }
 
+    if (allApplied && ops.stream().anyMatch(op -> isVduBufferKind(op.op()))
+        && !context.vduReplayAllowed().getAsBoolean()) {
+      allApplied = false;
+      context.log().warn("Serving generation changed during VDU replay; retaining snapshot for retry");
+    }
     if (allApplied) {
       try {
         int cleared = sbq.removeReplayedSwitchBufferOps(ops);
@@ -762,6 +790,10 @@ public final class KnowledgeServerMigrationOps {
     } else {
       context.log().warn("Not clearing switch buffer because one or more buffered ops failed to replay");
     }
+  }
+
+  private static boolean isVduBufferKind(String kind) {
+    return kind != null && kind.trim().toUpperCase(Locale.ROOT).startsWith("VDU_");
   }
 
   /** Loads watched roots from persisted file + config collections. */

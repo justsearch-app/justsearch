@@ -676,6 +676,26 @@ public final class IndexGenerationManager {
   }
 
   /**
+   * Fresh authoritative state check for a mutation targeting the captured serving generation.
+   * No cached state, backup recovery, normalization write or missing-state fallback is allowed.
+   * This is an observation, not a lease across a concurrent generation transition.
+   */
+  public boolean isIdleActiveGeneration(Path capturedTarget) throws IOException {
+    Objects.requireNonNull(capturedTarget, "capturedTarget");
+    State current = JSON.readValue(Files.readAllBytes(statePath), State.class);
+    if (current == null || (current.format_version() != 1
+        && current.format_version() != STATE_FORMAT_VERSION)) {
+      throw new IOException("Unsupported or empty authoritative index state");
+    }
+    String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
+    Path activePath = resolveGenerationPathReadOnly(active);
+    return MigrationState.IDLE.name().equals(current.migration_state())
+        && (current.building_generation() == null || current.building_generation().isBlank())
+        && activePath.equals(capturedTarget.toAbsolutePath().normalize())
+        && Files.isDirectory(activePath);
+  }
+
+  /**
    * Reads the current state pointer best-effort, without performing legacy imports or creating new
    * generations.
    *
@@ -954,6 +974,10 @@ public final class IndexGenerationManager {
 
   private Path resolveGenerationPath(String genId) throws IOException {
     Files.createDirectories(indicesDir);
+    return resolveGenerationPathReadOnly(genId);
+  }
+
+  private Path resolveGenerationPathReadOnly(String genId) throws IOException {
     Path p = indicesDir.resolve(genId).toAbsolutePath().normalize();
     if (!p.startsWith(indicesDir.toAbsolutePath().normalize())) {
       throw new IOException("Refusing generation path outside indicesDir. genId=" + genId + " path=" + p);

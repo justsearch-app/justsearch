@@ -243,7 +243,7 @@ final class VduReplayFailureRetentionTest {
             tempDir.resolve("index-base"),
             tempDir.resolve("active-index"),
             new ObjectMapper(),
-            () -> false,
+            () -> false, () -> true,
             LoggerFactory.getLogger(VduReplayFailureRetentionTest.class)));
   }
 

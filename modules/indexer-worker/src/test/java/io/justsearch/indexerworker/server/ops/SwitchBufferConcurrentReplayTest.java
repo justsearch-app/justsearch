@@ -62,7 +62,7 @@ final class SwitchBufferConcurrentReplayTest {
       KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
           new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
               queue, runtime, null, IndexingPacing.unthrottled(), tempDir, tempDir,
-              new ObjectMapper(), () -> false,
+              new ObjectMapper(), () -> false, () -> true,
               LoggerFactory.getLogger(SwitchBufferConcurrentReplayTest.class)));
       verify(indexing).deleteByIdAndChunks(originalPayload);
       verifyNoMoreInteractions(indexing);

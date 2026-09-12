@@ -195,8 +195,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // gRPC server it was registered in; callers reach this instance through appServices().
     // Works against DeferredRuntime (read ops only) or RunningRuntime.
     // W7.2: shares the encoderBindings instance with IndexingLoop.
+    var servingRuntime = ctx.searchLifecycleSupplier().get();
     this.searchService =
-        new WorkerSearchService(ctx.searchLifecycleSupplier().get(), null, encoderBindings);
+        new WorkerSearchService(servingRuntime, null, encoderBindings);
 
     // 3. Ingest service. WorkerIngestService is null-tolerant for
     // ingestLifecycle/indexingLoop — write methods report UNAVAILABLE when
@@ -212,7 +213,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             ctx.indexBasePath(),
             ctx.activeIndexPath(),
             ingestRunning,
-            ctx.searchLifecycleSupplier().get(),
+            servingRuntime,
             ctx.migrationProgressSupplier(),
             ctx.migrationSwitchingMaxDurationMs());
 

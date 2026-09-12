@@ -273,7 +273,7 @@ final class EngineContextPortPropagationTest {
       io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
           new io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.DrainSwitchBufferContext(
               queue, null, null, null, index, index.resolve("indices/g-building"),
-              tools.jackson.databind.json.JsonMapper.builder().build(), () -> false,
+              tools.jackson.databind.json.JsonMapper.builder().build(), () -> false, () -> false,
               org.slf4j.LoggerFactory.getLogger(getClass())));
       assertEquals(0, queue.switchBufferDepth());
       var claimed = queue.pollPending(1).getFirst();

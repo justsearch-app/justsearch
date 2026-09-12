@@ -108,6 +108,17 @@ executor refusal propagate to the caller. Count/query/recovery calls also propag
 control failures, so unavailable work cannot appear as an empty backlog. The batch
 coordinator owns how these failures affect the running procedure.
 
+VDU update, processing-mark and recovery mutations require the captured ingest runtime
+to be the serving runtime. For a managed index, a fresh authoritative `state.json`
+must identify its captured path as active, explicitly IDLE and without a building
+generation. The service checks before reading or changing VDU fields and after the
+covering commit/refresh; an observed transition returns retryable UNAVAILABLE.
+Missing or malformed state cannot use an observational cache or restored backup to
+authorize the mutation. New VDU calls do not enter the switch buffer. Legacy VDU
+rows remain there until an eligible serving generation can replay and commit them;
+independent file/delete entries can still drain. This proves a commit on the captured
+serving generation, not preservation of derived enrichment through a later rebuild.
+
 #### The context window (`-c`) is derived, not configured
 
 The packaged model trains at 262k tokens; the app used to run it at 4096 because that was the

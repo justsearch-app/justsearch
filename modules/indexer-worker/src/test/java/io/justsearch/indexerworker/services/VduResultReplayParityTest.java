@@ -74,9 +74,9 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
       try (SqliteJobQueue queue = openQueue(queueDb)) {
         assertTrue(
             queue.putSwitchBuffer(
-                IngestResponses.switchBufferVduUpdateKey(DOC_ID),
+                LegacyVduBufferFixture.switchBufferVduUpdateKey(DOC_ID),
                 "VDU_UPDATE",
-                IngestResponses.updateVduSwitchBufferPayload(request, DOC_ID)));
+                LegacyVduBufferFixture.updateVduSwitchBufferPayload(request, DOC_ID)));
       }
       try (SqliteJobQueue queue = openQueue(queueDb)) {
         drain(queue, replay);
@@ -119,7 +119,7 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
       try (SqliteJobQueue queue = openQueue(queueDb)) {
         assertTrue(
             queue.putSwitchBuffer(
-                IngestResponses.switchBufferVduUpdateKey(DOC_ID),
+                LegacyVduBufferFixture.switchBufferVduUpdateKey(DOC_ID),
                 "VDU_UPDATE",
                 invalidReplayPayload(request)));
       }
@@ -133,7 +133,7 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
 
   private static String invalidReplayPayload(UpdateVduResultRequest request) throws Exception {
     // Unknown outcomes can only be persisted by a newer producer; current admission refuses them.
-    String payload = IngestResponses.updateVduSwitchBufferPayload(
+    String payload = LegacyVduBufferFixture.updateVduSwitchBufferPayload(
         request.toBuilder().setOutcomeValue(0).build(), DOC_ID);
     var mapper = new ObjectMapper();
     var node = (tools.jackson.databind.node.ObjectNode) mapper.readTree(payload);
@@ -317,7 +317,7 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
             tempDir.resolve("index-base"),
             tempDir.resolve("active-index"),
             new ObjectMapper(),
-            () -> false,
+            () -> false, () -> true,
             LoggerFactory.getLogger(VduResultReplayParityTest.class)));
   }
 

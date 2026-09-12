@@ -11,12 +11,8 @@ import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.DeleteByIdResponse;
 import io.justsearch.ipc.DeleteByPathResponse;
-import io.justsearch.ipc.MarkVduProcessingResponse;
 import io.justsearch.ipc.PruneResponse;
-import io.justsearch.ipc.RecoverVduProcessingResponse;
 import io.justsearch.ipc.SyncDirectoryResponse;
-import io.justsearch.ipc.UpdateVduResultRequest;
-import io.justsearch.ipc.UpdateVduResultResponse;
 import java.nio.file.Path;
 import java.util.List;
 import org.slf4j.Logger;
@@ -39,12 +35,6 @@ final class IngestSwitchBufferOps {
   static final String SWITCHBUF_OP_DELETE = "DELETE";
   static final String SWITCHBUF_OP_DELETE_PREFIX = "DELETE_PREFIX";
   static final String SWITCHBUF_OP_PRUNE_PREFIX = "PRUNE_PREFIX";
-  static final String SWITCHBUF_OP_VDU_UPDATE = "VDU_UPDATE";
-  static final String SWITCHBUF_OP_VDU_MARK_FAILED = "VDU_MARK_FAILED";
-  static final String SWITCHBUF_OP_VDU_MARK_PROCESSING = "VDU_MARK_PROCESSING";
-  static final String SWITCHBUF_OP_VDU_RECOVER_PROCESSING = "VDU_RECOVER_PROCESSING";
-
-  private static final String VDU_MAX_RETRIES_EXCEEDED_ERROR = "Max retries exceeded";
 
   private final JobQueue jobQueue;
   private final IndexGenerationManager indexGenerationManager;
@@ -151,19 +141,6 @@ final class IngestSwitchBufferOps {
     return batchSuccessResponse(accepted);
   }
 
-  UpdateVduResultResponse bufferUpdateVduResultDuringSwitching(
-      SwitchBufferCapableQueue sbq, UpdateVduResultRequest request, String docId) throws Exception {
-    String normalizedId = normalizeDocIdForMutation(docId);
-    String payload = updateVduSwitchBufferPayload(request, normalizedId);
-    putSwitchBufferOrThrow(
-        sbq,
-        switchBufferVduUpdateKey(normalizedId),
-        SWITCHBUF_OP_VDU_UPDATE,
-        payload,
-        "updateVduResult");
-    return updateVduSuccessResponse();
-  }
-
   SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(
       SwitchBufferCapableQueue sbq, String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance) throws Exception {
@@ -207,41 +184,4 @@ final class IngestSwitchBufferOps {
         "pruneMissing");
     return deferredPruneResponse();
   }
-
-  MarkVduProcessingResponse bufferMarkVduDuringSwitching(
-      SwitchBufferCapableQueue sbq, String normalizedId, int currentCount, int maxRetries)
-      throws Exception {
-    MarkVduRetryDecision decision = decideMarkVduRetry(currentCount, maxRetries);
-    if (decision.maxRetriesExceeded()) {
-      String payload = vduMarkFailedSwitchBufferPayload(normalizedId, decision.retryCount());
-      putSwitchBufferOrThrow(
-          sbq,
-          switchBufferVduMarkKey(normalizedId),
-          SWITCHBUF_OP_VDU_MARK_FAILED,
-          payload,
-          "markVduProcessing (FAILED)");
-      return markVduErrorResponse(VDU_MAX_RETRIES_EXCEEDED_ERROR);
-    }
-
-    String payload = vduMarkProcessingSwitchBufferPayload(normalizedId, decision.retryCount());
-    putSwitchBufferOrThrow(
-        sbq,
-        switchBufferVduMarkKey(normalizedId),
-        SWITCHBUF_OP_VDU_MARK_PROCESSING,
-        payload,
-        "markVduProcessing (PROCESSING)");
-    return markVduSuccessResponse(decision.retryCount());
-  }
-
-  RecoverVduProcessingResponse bufferRecoverVduProcessingDuringSwitching(
-      SwitchBufferCapableQueue sbq) throws Exception {
-    putSwitchBufferOrThrow(
-        sbq,
-        SWITCHBUF_KEY_VDU_RECOVER_PROCESSING,
-        SWITCHBUF_OP_VDU_RECOVER_PROCESSING,
-        "{}",
-        "recoverVduProcessing");
-    return recoverVduCountResponse(0);
-  }
-
 }

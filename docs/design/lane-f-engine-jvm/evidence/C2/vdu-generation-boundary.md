@@ -1,6 +1,8 @@
 # C2-2 VDU generation boundary implementation cut
 
-September12, source investigated at41a74500b. Implementation remains owed.
+September12, source investigated at41a74500b. The bounded implementation and review
+corrections have [focused/negative proof](vdu-generation-proof.md); combined production
+replay and broader verification remain required.
 
 ## Decision and scope
 
@@ -40,7 +42,7 @@ including writes without files and deletes; do not close that acceptance with th
   serving/writing runtime. Tests claiming managed generations must construct a real layout.
 - IndexGenerationManager exposes a strict, fresh, read-only predicate for that target. It
   reads authoritative state.json once, validates supported format and safe generation id,
-  requires explicit IDLE/no building, and compares the resolved active path. Unreadable,
+  requires explicit IDLE/no building, and compares the resolved existing active path. Unreadable,
   absent, malformed or unsupported state refuses. No cache, backup restore, normalization
   write or optimistic fallback on this control path. readStateBestEffort (:687-727) is
   unsuitable: an unreadable stamp deliberately serves a prior cached state; load fallback
@@ -60,7 +62,13 @@ including writes without files and deletes; do not close that acceptance with th
   outcome/queue-versus-index tracking is unnecessary to isolate deliberate VDU deferral
   and would expand this item into partial effect accounting. Failed/malformed/unknown
   eligible rows retain the snapshot. Correct legacy mark/recovery missing-parent,
-  blank-payload or absent-runtime cases rather than treating them as applied.
+  blank-payload or absent-runtime cases rather than treating them as applied. A recovery
+  selection carries its recovered count and first failure in one local result: a missing
+  selected parent is incomplete, as is any thrown reset. Continue the selected attempts,
+  commit/refresh the successful subset, then refuse completion if any selected reset
+  failed. Legacy recovery therefore retains its row. This is a local aggregate from the
+  existing loop, not another persistent ledger or owner. Zero selected documents remains
+  a valid empty outcome; a nonempty selection with zero successful resets does not.
 - Retire IngestSwitchBufferOps VDU put helpers and now-unused encoding/key constants in
   the same item; keep only payload readers/fixtures needed for older buffer rows.
 
@@ -78,10 +86,20 @@ including writes without files and deletes; do not close that acceptance with th
    with a covering commit and its exact version is removed. Missing parent/failed commit
    still retains it. Include source re-enumeration overwriting a parent before deferred replay.
 5. Legacy processing/failed marks with missing parents or malformed payloads remain;
-   recovery with an unavailable runtime remains. Unknown kinds cannot be removed as success.
+   recovery with an unavailable runtime or incomplete selection remains. Include all-false,
+   partial-miss and partial-exception recovery with committed-subset/reopen assertions.
+   Unknown kinds cannot be removed as success. New update/mark with absent ingest runtime
+   must cross the real Engine port as UNAVAILABLE, not ordinary false/-1 responses.
 6. Negative mutations omit each identity/state/pointer/post-commit condition and allow
    premature replay. Require focused, full, stress and hosted proof at coherent boundaries.
 
 Primary-source lines are from the investigated revision and must be rechecked after edits.
 This is a decided mechanism within C2-2, with D1 carry-forward still an explicit later stage
 obligation. No owner input is pending.
+
+September12 independent review of snapshot702 found and the implementation corrects:
+the old ordinary-runtime-error shortcut before the guard; a path resolver's hidden
+parent-directory creation; and the old recovery count hiding selected failures. Pure
+path resolution and an existing-directory predicate replace that mutation on the strict
+read path. The old partial-loop test keeps its continue-after-failure assertion and gains
+an explicit incomplete outcome; it no longer authorizes a completed aggregate response.

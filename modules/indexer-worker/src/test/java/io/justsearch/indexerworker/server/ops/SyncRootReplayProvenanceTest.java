@@ -56,7 +56,7 @@ final class SyncRootReplayProvenanceTest {
       KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
           new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, mock(RunningRuntime.class),
               null, IndexingPacing.unthrottled(), tempDir.resolve("base"), tempDir.resolve("active"),
-              new ObjectMapper(), () -> false, LoggerFactory.getLogger(getClass())));
+              new ObjectMapper(), () -> false, () -> true, LoggerFactory.getLogger(getClass())));
       assertEquals(0, queue.switchBufferDepth());
       assertEquals(agent, queue.pollPending(1).getFirst().provenance());
       assertTrue(queue.putSyncRoot("sync_root:test",
@@ -138,7 +138,7 @@ final class SyncRootReplayProvenanceTest {
               tempDir.resolve("base"),
               tempDir.resolve("active"),
               new ObjectMapper(),
-              () -> false,
+              () -> false, () -> true,
               LoggerFactory.getLogger(getClass())));
       assertEquals(expectCleared ? 0 : 1, queue.switchBufferDepth());
       return expectCleared ? queue.pollPending(1).getFirst() : null;

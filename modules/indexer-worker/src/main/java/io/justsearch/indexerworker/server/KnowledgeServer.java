@@ -2657,6 +2657,8 @@ public final class KnowledgeServer implements Closeable {
           ingestLifecycle == null ? "null" : ingestLifecycle.getClass().getSimpleName());
       return;
     }
+    LuceneRuntime capturedServing = searchLifecycle;
+    Path capturedPath = activeIndexPath;
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
         new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
             jobQueue,
@@ -2664,10 +2666,21 @@ public final class KnowledgeServer implements Closeable {
             signalBus,
             indexingPacing,
             indexBasePath,
-            activeIndexPath,
+            capturedPath,
             JSON,
             KnowledgeServer::chunkSpladeEnabled,
+            () -> vduReplayAllowed(running, capturedServing, capturedPath),
             log));
+  }
+
+  private boolean vduReplayAllowed(RunningRuntime target, LuceneRuntime serving, Path targetPath) {
+    if (target != serving || indexGenerationManager == null) return false;
+    try {
+      return indexGenerationManager.isIdleActiveGeneration(targetPath);
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("VDU replay awaits readable active generation state: {}", unavailable.getMessage());
+      return false;
+    }
   }
 
   /**

@@ -124,7 +124,7 @@ final class IngestionProvenancePersistenceTest {
       io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
           new io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.DrainSwitchBufferContext(
               queue, null, null, null, directory, directory, tools.jackson.databind.json.JsonMapper.builder().build(),
-              () -> false, org.slf4j.LoggerFactory.getLogger(getClass())));
+              () -> false, () -> false, org.slf4j.LoggerFactory.getLogger(getClass())));
       assertEquals(0, queue.switchBufferDepth(), "successful production replay clears its durable buffer");
       assertEquals("research", queue.pollPending(1).getFirst().collection());
       queue.markDone(document, success(), null);
@@ -157,7 +157,7 @@ final class IngestionProvenancePersistenceTest {
         io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
             new io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 queue, null, null, null, directory, directory, mapper,
-                () -> false, org.slf4j.LoggerFactory.getLogger(getClass())));
+                () -> false, () -> false, org.slf4j.LoggerFactory.getLogger(getClass())));
         assertEquals(1, queue.switchBufferDepth(), "malformed " + field + " must remain durable");
         assertTrue(queue.pollPending(1).isEmpty(), "malformed " + field + " must not be admitted");
       }

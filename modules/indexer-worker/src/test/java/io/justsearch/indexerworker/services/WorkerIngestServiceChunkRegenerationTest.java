@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
@@ -50,14 +51,13 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
     jobQueue = new SqliteJobQueue(dbPath);
     jobQueue.open();
 
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
+    var layout = new IndexGenerationManager(tempDir.resolve("indexBase")).initializeOrLoad();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
 
     IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
-    Path indexBasePath = tempDir.resolve("indexBase");
-    Files.createDirectories(indexBasePath);
-    Path indexPath = tempDir.resolve("index");
-    Files.createDirectories(indexPath);
+    Path indexBasePath = layout.basePath();
+    Path indexPath = layout.activeGenerationPath();
     service = new WorkerIngestService(
         jobQueue, stubLoop, stubBus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
         lifecycle, lifecycle, null, 0L);
@@ -150,9 +150,9 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
     String normalizedId = IngestResponses.normalizeDocIdForMutation(docId);
     assertTrue(
         jobQueue.putSwitchBuffer(
-            IngestResponses.switchBufferVduUpdateKey(normalizedId),
+            LegacyVduBufferFixture.switchBufferVduUpdateKey(normalizedId),
             "VDU_UPDATE",
-            IngestResponses.updateVduSwitchBufferPayload(request, normalizedId)));
+            LegacyVduBufferFixture.updateVduSwitchBufferPayload(request, normalizedId)));
     assertEquals(1, jobQueue.listSwitchBufferOps().size());
 
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
@@ -164,7 +164,7 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
             tempDir.resolve("indexBase"),
             tempDir.resolve("index"),
             new tools.jackson.databind.ObjectMapper(),
-            () -> true,
+            () -> true, () -> true,
             LoggerFactory.getLogger(WorkerIngestServiceChunkRegenerationTest.class)));
     lifecycle.commitOps().maybeRefreshBlocking();
 

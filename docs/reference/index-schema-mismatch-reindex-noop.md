@@ -66,7 +66,7 @@ What happens next is **explicitly policy-controlled** via `index.schema_mismatch
 - `REBUILD_BACKUP_FIRST` (convenient in dev): rename the index directory to a `.bak-*` backup and rebuild a fresh empty index (backup-first, guarded).
 - `BLUE_GREEN_MIGRATE` (availability-first): start Blue (existing active generation) in **read-only** mode for search, build Green in a fresh generation directory, then cut over by swapping `state.json` and restarting the Worker.
 
-### Current `BLUE_GREEN_MIGRATE` behavior (MVP, as of 2025-12-15)
+### Current `BLUE_GREEN_MIGRATE` behavior (updated 2026-09-12)
 
 - **Build verification**:
   - The Worker stamps Lucene commit metadata key `build_state` (`BUILDING|COMPLETE`).
@@ -81,9 +81,13 @@ What happens next is **explicitly policy-controlled** via `index.schema_mismatch
     - Nuance: “file not found” jobs are treated as **deletes**, not FAILED, to avoid counting benign races as failures.
 - **What is buffered during `SWITCHING` (durable, Worker-side)**:
   - `submitBatch`, `deleteById`, `deleteByPath`
-  - VDU mutations: `updateVduResult`, `markVduProcessing`, `recoverVduProcessing` (buffered as `VDU_RECOVER_PROCESSING`)
   - `syncDirectory(force=true)` is buffered as `SYNC_ROOT(root, force)`
   - These are stored durably in `jobs.db` (`switch_buffer`) and replayed after the Worker restarts on the new active generation.
+- **VDU mutations**: new update, mark and recovery calls refuse retryably unless they target
+  the captured serving runtime and its existing IDLE active generation. They no longer
+  create buffered VDU rows. Legacy VDU records remain readable and wait for eligible
+  serving-generation replay; incomplete recovery retains its row after committing any
+  successful subset. See [the current replay contract](../explanation/11-index-schema-migration.md#cutover-fence-switching--durable-buffering).
 
 ## What is actually enforced today (2026-08, superseded 2026-09-03)
 
@@ -117,5 +121,4 @@ struck accordingly. Current state: `docs/explanation/11-index-schema-migration.m
   - ~~A production profile resolves `index.schema_mismatch.policy=FAIL_CLOSED` by default — but only the `FieldInfos` detector can reach it today (the fingerprint detector is warn-only, above).~~ A production profile now resolves `index.schema_mismatch.policy=BLUE_GREEN_MIGRATE` by default, and the fingerprint detector (`index_fingerprint`) enforces.
   - Dev/demo resolves `REBUILD_BACKUP_FIRST` by default (unchanged — a developer wants the fast rebuild).
   - `BLUE_GREEN_MIGRATE` is available everywhere as an explicit override for “no search downtime on mismatch”.
-
 
