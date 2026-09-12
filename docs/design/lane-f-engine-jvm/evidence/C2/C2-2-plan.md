@@ -134,6 +134,11 @@ existing coordinator, VDU mode/abstention, sampler, BrainRuntimeService and hand
 plus a real runner/store/admission fixture. Negative regressions restore early completion
 and raw detached work. Full suite, actual model/API and installed-path proof remain owed.
 
+The subsequent [result and shutdown refinement](offline-owner-cut.md) fixes the
+per-pass projection, acknowledgement-only counts, task-cancellation versus body-result
+composition, cancellation linearization and repeatable dependency-close barrier.
+It is the current implementation contract; its review is not executable proof.
+
 ## Decisions
 
 1. Keep indexing.proto unchanged as C2 requires. KnowledgeClient.scanRoot builds a
