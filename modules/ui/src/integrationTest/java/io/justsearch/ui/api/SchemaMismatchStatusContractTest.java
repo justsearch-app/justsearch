@@ -106,6 +106,7 @@ final class SchemaMismatchStatusContractTest {
             new io.justsearch.app.services.lifecycle.WorkerCapability(),
             new io.justsearch.app.engine.EngineRoot(
                 org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+                org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
                 config.deadlineMs(), config.batchSize()));
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
