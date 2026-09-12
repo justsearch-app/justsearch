@@ -711,6 +711,22 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     }
   }
 
+  @Test
+  void invalidVduResultsAreRejectedBeforeSwitchBufferAcceptance() throws Exception {
+    String docId = indexTestDocument("invalid-switching-result");
+    var switching = createSwitchingServiceWithQueue(jobQueue, "invalid-switching-result");
+    for (var request : List.of(
+        UpdateVduResultRequest.newBuilder().setDocId(docId)
+            .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT).build(),
+        UpdateVduResultRequest.newBuilder().setDocId(docId).setVduStatus("COMPLETED")
+            .setExtractedContent("  ").build(),
+        UpdateVduResultRequest.newBuilder().setDocId(docId).setOutcomeValue(999).build())) {
+      var response = switching.updateVduResult(request, CallContext.none());
+      org.junit.jupiter.api.Assertions.assertFalse(response.getSuccess());
+      assertEquals(0, jobQueue.switchBufferDepth(), "invalid input must not create accepted replay work");
+    }
+  }
+
   // ========== Test Helpers ==========
 
   /**

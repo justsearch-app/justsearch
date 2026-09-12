@@ -18,7 +18,6 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
-import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexerworker.services.WorkerServiceException;
@@ -605,92 +604,16 @@ public final class KnowledgeServerMigrationOps {
               int pageCount = node.path("page_count").asInt(0);
               int outcomeNum = node.path("outcome").asInt(0);
 
-              io.justsearch.ipc.VduUpdateOutcome outcome =
-                  io.justsearch.ipc.VduUpdateOutcome.forNumber(outcomeNum);
-              if (outcome == null
-                  || outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED) {
-                if ("FAILED".equalsIgnoreCase(vduStatus)) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED;
-                } else if ("COMPLETED_EMPTY".equalsIgnoreCase(vduStatus)) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                } else if (hasExtracted && extracted != null && !extracted.isBlank()) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT;
-                } else {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                }
-              }
-
-              Map<String, Object> updates = new HashMap<>();
-
-              switch (outcome) {
-                case VDU_UPDATE_OUTCOME_SUCCESS_TEXT -> {
-                  if (extracted != null && !extracted.isBlank()) {
-                    String preview =
-                        io.justsearch.indexerworker.services.LanguageUtils.contentPreview(extracted, 4096);
-                    updates.put(SchemaFields.CONTENT, extracted);
-                    // Tempdoc 931 §C.6: the content revision moves with the content it describes.
-                    updates.put(
-                        SchemaFields.CONTENT_SHA256,
-                        io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(extracted));
-                    updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-                    updates.put(
-                        SchemaFields.LANGUAGE,
-                        io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage(preview));
-                    updates.put(SchemaFields.VDU_PROCESSED, "true");
-                    updates.put(SchemaFields.VDU_STATUS, "COMPLETED");
-                    updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-                  } else {
-                    updates.put(SchemaFields.VDU_STATUS, "COMPLETED_EMPTY");
-                    updates.put(SchemaFields.VDU_PROCESSED, "true");
-                  }
-                }
-                case VDU_UPDATE_OUTCOME_SUCCESS_EMPTY -> {
-                  updates.put(SchemaFields.VDU_STATUS, "COMPLETED_EMPTY");
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-                case VDU_UPDATE_OUTCOME_FAILED -> {
-                  updates.put(SchemaFields.VDU_STATUS, "FAILED");
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-                default -> {
-                  if (!vduStatus.isBlank()) {
-                    updates.put(SchemaFields.VDU_STATUS, vduStatus);
-                  }
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-              }
-
-              if (!enrichment.isBlank()) {
-                updates.put(SchemaFields.VDU_ENRICHMENT, enrichment);
-              }
-              if (pageCount > 0) {
-                updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(pageCount));
-              }
-
-              // Preserve the recoverable parent if chunk replacement fails. The durable
-              // buffer remains the retry authority even if another writer commits partial chunks.
-              if (outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT
-                  && extracted != null
-                  && !extracted.isBlank()) {
-                int chunksRegenerated =
-                    ChunkDocumentWriter.regenerateChunksFromExistingParent(
-                        context.ingestLifecycle().documentFieldOps(),
-                        context.ingestLifecycle().indexingCoordinator(),
-                        docId, extracted,
-                        context.chunkSpladeEnabledSupplier().getAsBoolean());
-                if (chunksRegenerated > 0) {
-                  context
-                      .log()
-                      .debug(
-                          "Buffered VDU_UPDATE: regenerated {} chunks for {}",
-                          chunksRegenerated,
-                          docId);
-                }
-              }
-              boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
+              var request = io.justsearch.ipc.UpdateVduResultRequest.newBuilder()
+                  .setDocId(docId).setVduStatus(vduStatus).setVduEnrichment(enrichment)
+                  .setPageCount(pageCount).setOutcomeValue(outcomeNum);
+              if (hasExtracted && extracted != null) request.setExtractedContent(extracted);
+              boolean updated = io.justsearch.indexerworker.services.VduResultWriter.apply(
+                  context.ingestLifecycle(), request.build(),
+                  context.chunkSpladeEnabledSupplier().getAsBoolean());
               if (updated) {
                 mutatedLucene = true;
-                context.log().debug("Replayed buffered VDU_UPDATE: docId={} outcome={}", docId, outcome);
+                context.log().debug("Replayed buffered VDU_UPDATE: docId={}", docId);
               } else {
                 allApplied = false;
                 context.log().warn("Buffered VDU_UPDATE: document not found: {}", docId);

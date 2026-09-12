@@ -54,8 +54,6 @@ import io.justsearch.ipc.PruneRequest;
 import io.justsearch.ipc.PruneResponse;
 import io.justsearch.ipc.SyncDirectoryRequest;
 import io.justsearch.ipc.SyncDirectoryResponse;
-import io.justsearch.ipc.VduUpdateOutcome;
-import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.IndexingJobChangeFeed;
@@ -66,7 +64,6 @@ import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
-import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ort.OrtCudaStatus;
@@ -74,7 +71,6 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,10 +95,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class WorkerIngestService {
   private static final Logger log = LoggerFactory.getLogger(WorkerIngestService.class);
-  /** Maximum chars stored in `content_preview` (result list snippet field). */
-  private static final int CONTENT_PREVIEW_MAX_CHARS =
-      ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS;
-
   /** Maximum files allowed in a single batch request. */
   private static final int MAX_BATCH_SIZE = 10_000;
 
@@ -680,207 +672,31 @@ public final class WorkerIngestService {
   public UpdateVduResultResponse updateVduResult(
       UpdateVduResultRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {
-    String docId = request.getDocId();
-    log.info("updateVduResult RPC called for doc: {}", docId);
-
-    // Proto getters return empty string for unset values, not null
-    UpdateVduResultResponse blank =
-        blankReply(docId, updateVduErrorResponse("doc_id is required"));
-    if (blank != null) {
-      return blank;
-    }
-
-    UpdateVduResultResponse unavailable =
-        indexRuntimeUnavailableReply(
-            "updateVduResult", updateVduErrorResponse("Index runtime not available"));
-    if (unavailable != null) {
-      return unavailable;
-    }
-
-    if (switchBufferOps.isSwitching()) {
-      // During cutover, accept and durably buffer VDU updates so Main does not misclassify the event as a hard failure.
-      return switchBufferOps.bufferDuringSwitchingOrThrow(
-          "updateVduResult",
-          sbq -> switchBufferOps.bufferUpdateVduResultDuringSwitching(sbq, request, docId));
-    }
-
-    try {
-      // Build the update map
-      Map<String, Object> updates = new HashMap<>();
-
-      // Determine effective outcome: prefer new 'outcome' field, fall back to legacy 'vdu_status' parsing
-      VduUpdateOutcome outcome = request.getOutcome();
-      String legacyStatus = request.getVduStatus();
-      VduUpdateOutcome effectiveOutcome = computeEffectiveOutcome(outcome, legacyStatus);
-
-      // Get extracted content (proto3 optional: hasExtractedContent() for presence check)
-      boolean hasExtractedContent = request.hasExtractedContent();
-      String extractedContent = hasExtractedContent ? request.getExtractedContent() : "";
-
-      // Validate invariants based on outcome
-      if (effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT) {
-        if (!hasExtractedContent || extractedContent.isBlank()) {
-          log.warn("updateVduResult: SUCCESS_TEXT requires non-blank extracted_content, got blank for doc: {}", docId);
-          return updateVduErrorResponse("SUCCESS_TEXT requires non-blank extracted_content");
-        }
+      String docId = request.getDocId();
+      try {
+        VduResultWriter.validate(request);
+      } catch (IllegalArgumentException e) {
+        return updateVduErrorResponse(e.getMessage());
       }
-
-      // Apply updates based on effective outcome
-      switch (effectiveOutcome) {
-        case VDU_UPDATE_OUTCOME_SUCCESS_TEXT -> {
-          // Overwrite content, language, embedding status; regenerate chunks
-        String preview = contentPreview(extractedContent);
-        updates.put(SchemaFields.CONTENT, extractedContent);
-        // Tempdoc 931 §C.6: the content revision moves with the content it describes.
-        updates.put(
-            SchemaFields.CONTENT_SHA256,
-            io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(extractedContent));
-        updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-        updates.put(SchemaFields.LANGUAGE, resolveLanguage(preview));
-        updates.put(SchemaFields.VDU_PROCESSED, "true");
-          updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_COMPLETED);
-          updates.put(SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU);
-        // CRITICAL: Trigger re-embedding with new VDU-extracted content
-        updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+      UpdateVduResultResponse unavailable = indexRuntimeUnavailableReply(
+          "updateVduResult", updateVduErrorResponse("Index runtime not available"));
+      if (unavailable != null) return unavailable;
+      if (switchBufferOps.isSwitching()) {
+        return switchBufferOps.bufferDuringSwitchingOrThrow("updateVduResult",
+            sbq -> switchBufferOps.bufferUpdateVduResultDuringSwitching(sbq, request, docId));
       }
-        case VDU_UPDATE_OUTCOME_SUCCESS_EMPTY -> {
-          // VDU succeeded but extracted no text (e.g., blank image)
-          // Do NOT overwrite content/language, do NOT trigger re-embedding, do NOT regenerate chunks
-          updates.put(SchemaFields.VDU_PROCESSED, "true");
-          updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_COMPLETED_EMPTY);
-          markExtractionDropoutUnrecovered(docId, updates);
-          log.info("updateVduResult: VDU succeeded with no extractable text for doc: {}", docId);
+      try {
+        if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled())) {
+          return updateVduErrorResponse("Document not found: " + docId);
         }
-        case VDU_UPDATE_OUTCOME_FAILED -> {
-          // VDU processing failed
-          // Do NOT overwrite content/language, do NOT regenerate chunks
-          updates.put(SchemaFields.VDU_PROCESSED, "true");
-          updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_FAILED);
-          markExtractionDropoutUnrecovered(docId, updates);
-          log.info("updateVduResult: VDU failed for doc: {}", docId);
-        }
-        case VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT -> {
-          // Tempdoc 677: the abstention gate judged the extraction untrustworthy — either the
-          // model's non-empty output failed a post-call confidence check (suspected
-          // confabulation), or the input-legibility gate skipped the model call entirely (no
-          // page carried any textual signal). RETAIN the baseline content — no content/language
-          // overwrite, no re-embedding, no chunk regeneration — and record the honest terminal
-          // state (no re-queue) either way.
-          updates.put(SchemaFields.VDU_PROCESSED, "true");
-          updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_REJECTED);
-          markExtractionDropoutUnrecovered(docId, updates);
-          log.info(
-              "updateVduResult: VDU output rejected by abstention gate, baseline retained for doc: {}",
-              docId);
-        }
-        default -> {
-          // UNSPECIFIED with no legacy status - treat as no-op but mark processed
-          updates.put(SchemaFields.VDU_PROCESSED, "true");
-          if (!legacyStatus.isBlank()) {
-            updates.put(SchemaFields.VDU_STATUS, legacyStatus);
-          }
-          // Legacy behavior: overwrite content if non-blank
-          if (!extractedContent.isBlank()) {
-            String preview = contentPreview(extractedContent);
-            updates.put(SchemaFields.CONTENT, extractedContent);
-            // Tempdoc 931 §C.6: the content revision moves with the content it describes.
-            updates.put(
-                SchemaFields.CONTENT_SHA256,
-                io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(extractedContent));
-            updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-            updates.put(SchemaFields.LANGUAGE, resolveLanguage(preview));
-            updates.put(SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU);
-            updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-          }
-        }
-      }
-
-      // VDU enrichment (JSON) - always apply if present
-      String enrichment = request.getVduEnrichment();
-      if (!enrichment.isBlank()) {
-        updates.put(SchemaFields.VDU_ENRICHMENT, enrichment);
-      }
-
-      // Page count - always apply if positive
-      int pageCount = request.getPageCount();
-      if (pageCount > 0) {
-        updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(pageCount));
-      }
-
-      // Keep the parent recoverable until every chunk effect succeeds. A failed replacement
-      // may leave partial writer changes that a later unrelated commit will persist.
-      boolean shouldRegenerateChunks =
-          effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT ||
-          (effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED && !extractedContent.isBlank());
-      if (shouldRegenerateChunks) {
-        int chunksIndexed = regenerateChunks(docId, extractedContent);
-        if (chunksIndexed > 0) {
-          log.info("updateVduResult: regenerated {} chunks for doc: {}", chunksIndexed, docId);
-        }
-      }
-
-      boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
-      if (updated) {
-
-        // A direct acknowledgement covers parent and chunk effects durably. NRT visibility
-        // alone cannot support an operation checkpoint (lane F section 7.5).
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
         ingestLifecycle.commitOps().maybeRefreshBlocking();
-        log.info("updateVduResult success for doc: {} (outcome={})", docId, effectiveOutcome);
         return updateVduSuccessResponse();
+      } catch (Exception e) {
+        log.error("updateVduResult failed for doc: {}", docId, e);
+        return updateVduErrorResponse(e.getMessage());
       }
-      log.warn("updateVduResult: document not found: {}", docId);
-      return updateVduErrorResponse("Document not found: " + docId);
-
-    } catch (Exception e) {
-      log.error("updateVduResult failed for doc: {}", docId, e);
-      return updateVduErrorResponse(e.getMessage());
     }
-    }
-  }
-
-  /**
-   * Computes the effective VDU outcome from the explicit outcome field or legacy status string.
-   *
-   * <p>Compatibility rule: if {@code outcome != UNSPECIFIED}, use it directly.
-   * Otherwise, infer from the legacy {@code vdu_status} string.
-   */
-  // PERMANENT COMPAT - DO NOT REMOVE (bridges legacy vdu_status string to typed outcome enum)
-  private VduUpdateOutcome computeEffectiveOutcome(VduUpdateOutcome outcome, String legacyStatus) {
-    if (outcome != null && outcome != VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED) {
-      return outcome;
-    }
-    // Fall back to legacy status parsing
-    if (legacyStatus == null || legacyStatus.isBlank()) {
-      return VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED;
-    }
-    return switch (legacyStatus.toUpperCase(Locale.ROOT)) {
-      case "COMPLETED" -> VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT; // Assume text if legacy COMPLETED
-      case "COMPLETED_EMPTY" -> VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-      case "FAILED" -> VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED;
-      default -> VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED;
-    };
-  }
-
-  /**
-   * Regenerates chunk documents for a parent document after VDU processing.
-   *
-   * <p>Deletes existing chunks (using field-based deletion) and creates new ones
-   * from the VDU-extracted content. This ensures RAG retrieval uses the improved
-   * VDU text rather than stale Tika extraction.
-   *
-   * @param parentDocId the parent document ID (normalized path)
-   * @param content the VDU-extracted content to chunk
-   * @return number of chunks indexed
-   */
-  private int regenerateChunks(String parentDocId, String content) {
-    if (ingestLifecycle == null) {
-      log.warn("regenerateChunks: ingestLifecycle is null");
-      return 0;
-    }
-    return ChunkDocumentWriter.regenerateChunksFromExistingParent(
-        ingestLifecycle.documentFieldOps(), ingestLifecycle.indexingCoordinator(), parentDocId,
-        content, chunkSpladeEnabled());
   }
 
   public DeleteByPathResponse deleteByPath(DeleteByPathRequest request, CallContext ctx) {
@@ -984,16 +800,6 @@ public final class WorkerIngestService {
         return deleteByCollectionResponse(-1, e.getMessage());
       }
     }
-  }
-
-  // ==================== Canonical metadata helpers (UX-oriented) ====================
-
-  private static String contentPreview(String content) {
-    return LanguageUtils.contentPreview(content, CONTENT_PREVIEW_MAX_CHARS);
-  }
-
-  private static String resolveLanguage(String preview) {
-    return LanguageUtils.resolveLanguage(preview);
   }
 
   public DeleteByIdResponse deleteById(DeleteByIdRequest request, CallContext ctx) {
@@ -1310,24 +1116,6 @@ public final class WorkerIngestService {
 
   private static int resolveMaxRetries(int requestedMaxRetries) {
     return requestedMaxRetries <= 0 ? SchemaFields.VDU_MAX_RETRIES : requestedMaxRetries;
-  }
-
-  /**
-   * Tempdoc 790 item 3 — close the dropout fallback chain at its last tier. A document indexed with
-   * {@code EXTRACTION_DROPOUT_PENDING_FALLBACK} was queued for VDU precisely because no earlier
-   * tier produced usable text; when VDU terminates without text (empty, failed, or rejected by the
-   * abstention gate — none of which are re-queued: only PROCESSING is recovered to PENDING) the
-   * document's honest terminal state is "no tier could read this," not a silently empty success.
-   */
-  private void markExtractionDropoutUnrecovered(String docId, Map<String, Object> updates) {
-    String reasonCode =
-        ingestLifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.EXTRACTION_REASON_CODE);
-    if (!IngestionReasonCodes.EXTRACTION_DROPOUT_PENDING_FALLBACK.equals(reasonCode)) {
-      return;
-    }
-    updates.put(SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_NONE);
-    updates.put(
-        SchemaFields.EXTRACTION_REASON_CODE, IngestionReasonCodes.EXTRACTION_DROPOUT_UNRECOVERED);
   }
 
   private int readVduRetryCount(String docId) throws java.io.IOException {

@@ -29,7 +29,12 @@ this does not stand in for hosted verification of these newer changes.
 Failed buffered VDU replay now has [retention proof](evidence/C2/vdu-replay-retention.md):
 29 cases, five intended negative failures and a fresh restored-source execution.
 
-Next: share live/replay VDU mutation rules, then explicit deferred completion/generation
+Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-writer.md):
+78 focused cases, 13 intended negative failures, committed real-Lucene parity and
+invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
+are green; these prior runs do not establish hosted proof for the newer writer.
+
+Next: explicit deferred completion/generation
 boundaries and actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.

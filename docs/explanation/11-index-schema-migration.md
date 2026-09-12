@@ -488,6 +488,13 @@ replacement fails, or the covering Lucene commit fails. Chunk replacement preced
 the terminal parent update, so a failed replacement cannot make a newly completed
 parent permanent through an unrelated commit. Buffer acceptance alone is not an
 acknowledgement of a committed index effect.
+Direct VDU updates and replay share `VduResultWriter` for outcome validation and
+parent/chunk mutation. Explicit rejected text retains baseline content; terminal
+empty/failed/rejected fallback results close the extraction-dropout reason. Known
+legacy status inputs keep the live rules. Invalid text results and unknown typed
+outcomes fail before direct buffer acceptance; an invalid persisted result remains
+buffered for diagnosis. The direct caller commits each applied result, while replay
+commits before clearing its buffer.
 Directory sync uses versioned root/force payloads with paired nullable originator/transport fields;
 legacy unversioned root/force payloads retain unknown attribution. Replay runs as internal work
 and restores the original descriptive attribution separately, without reconstructing caller authority.

@@ -57,12 +57,14 @@ September12 source audit resolves the next implementation order:
    alone, so prove the current generation boundary rather than claiming D1 early.
    [Replay retention](vdu-replay-retention.md) now fixes the existing missing-document
    and swallowed chunk-failure paths so failed effects retain their durable buffer.
-   Then retire the duplicate live/replay VDU mutation projection through one index-half
-   writer using the existing UpdateVduResultRequest. Current replay omits REJECTED and
+   VduResultWriter now replaces the duplicate live/replay VDU mutation projection
+   using the existing UpdateVduResultRequest, with [focused and negative proof](vdu-writer.md).
+   Old replay omitted REJECTED and
    extraction/dropout fields, accepts invalid SUCCESS_TEXT as empty and infers legacy
    outcomes differently. Preserve the live compatibility rules, validate before buffer
    acceptance, and share parent/chunk mutation ordering. Keep each caller's existing
    covering-commit boundary: direct per result, replay before durable buffer removal.
+   Unknown typed outcomes refuse and strict dropout-reason read failure prevents mutation.
    A stateless writer is simpler than another task/receipt registry or a second payload
    representation; prove outcome parity and malformed-input refusal with real index data.
 3. Thread exact manual context through BrainRuntimeService, coordinator, batch and

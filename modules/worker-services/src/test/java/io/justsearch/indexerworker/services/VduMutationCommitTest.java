@@ -247,4 +247,21 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     assertEquals("retry count unreadable", result.getError());
     verifyNoInteractions(indexing);
   }
+
+  @Test
+  void dropoutReadFailureCannotPublishAnIncorrectTerminalReason() throws Exception {
+    var runtime = mock(RunningRuntime.class);
+    var fields = mock(DocumentFieldOps.class);
+    var indexing = mock(IndexingCoordinator.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(fields.getDocumentFieldOrThrow(DOC, SchemaFields.EXTRACTION_REASON_CODE))
+        .thenThrow(new IOException("dropout reason unreadable"));
+    var result = service(runtime).updateVduResult(UpdateVduResultRequest.newBuilder()
+        .setDocId(DOC).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),
+        CallContext.none());
+    assertFalse(result.getSuccess());
+    assertEquals("dropout reason unreadable", result.getError());
+    verifyNoInteractions(indexing);
+  }
 }
