@@ -55,6 +55,9 @@ public interface IngestServiceCalls {
   /** Strict control read; unavailable readers fail instead of reporting an empty backlog. */
   int countPendingEmbeddings();
 
+  /** Strict current serving-generation observation for a frozen ingestion plan; never a lease. */
+  String captureServingGeneration();
+
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);
 

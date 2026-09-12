@@ -685,6 +685,30 @@ public final class WorkerIngestService {
         "VDU requires the active serving generation; retry after the index transition");
   }
 
+  /** Strict read for recorded ingestion preparation; this observation is not a generation lease. */
+  public String captureServingGeneration(CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx)) {
+      if (ctx.cancelled()) {
+        throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
+      }
+      if (!ingestIsServing || ingestLifecycle == null || indexGenerationManager == null || capturedServingPath == null) {
+        throw WorkerServiceException.unavailable("Serving generation authority is unavailable");
+      }
+      java.util.Optional<String> generation;
+      try {
+        generation = indexGenerationManager.idleActiveGeneration(capturedServingPath);
+      } catch (java.io.IOException | RuntimeException failure) {
+        throw new WorkerServiceException(WorkerServiceException.Status.UNAVAILABLE,
+            "Serving generation state could not be established", failure);
+      }
+      if (ctx.cancelled()) {
+        throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
+      }
+      return generation.orElseThrow(() -> WorkerServiceException.unavailable(
+          "Recorded ingestion requires the current idle serving generation"));
+    }
+  }
+
   public UpdateVduResultResponse updateVduResult(
       UpdateVduResultRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {

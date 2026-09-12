@@ -525,6 +525,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return e;
   }
 
+  /** Resolve once per call; runtime replacement briefly publishes no composed services. */
+  private <T> T requireService(Function<WorkerAppServices, T> selector) {
+    WorkerAppServices current = services.get();
+    if (current == null) {
+      throw translate(WorkerServiceException.unavailable("Index services are being replaced"));
+    }
+    T service = selector.apply(current);
+    if (service == null) {
+      throw translate(WorkerServiceException.unavailable("Index service is unavailable"));
+    }
+    return service;
+  }
+
   private io.justsearch.app.api.EngineAdmissionException engineLimit() {
     return new io.justsearch.app.api.EngineAdmissionException(
         io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
@@ -674,7 +687,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         operation,
         deadline(category),
         engineContext,
-        budget -> rpc.apply(new WorkerSearchCalls(services.get().searchService(), budget.context())));
+        budget -> rpc.apply(new WorkerSearchCalls(requireService(WorkerAppServices::searchService), budget.context())));
   }
 
   @Override
@@ -685,7 +698,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         operation,
         deadline(category),
         engineContext,
-        budget -> rpc.apply(new WorkerIngestCalls(services.get().ingestService(), budget.context())));
+        budget -> rpc.apply(new WorkerIngestCalls(requireService(WorkerAppServices::ingestService), budget.context())));
   }
 
   @Override
@@ -699,7 +712,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         operation,
         callDeadlineMs,
         engineContext,
-        budget -> rpc.apply(new WorkerHealthCalls(services.get().healthService(), budget.context())));
+        budget -> rpc.apply(new WorkerHealthCalls(requireService(WorkerAppServices::healthService), budget.context())));
   }
 
   /**
@@ -952,9 +965,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         ScheduledFuture<?> alarm =
             scheduleDeadline(cancel::cancel, deadline(RpcDeadlineCategory.LONG_RUNNING));
         try {
-          services
-              .get()
-              .ingestService()
+          requireService(WorkerAppServices::ingestService)
               .scanRoot(
                   request,
                   event -> {
@@ -1061,9 +1072,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           flow,
           () -> {
             try {
-              services
-                  .get()
-                  .ingestService()
+              requireService(WorkerAppServices::ingestService)
                   .subscribeIndexingJobs(
                       SubscribeIndexingJobsRequest.newBuilder().build(),
                       frame -> {

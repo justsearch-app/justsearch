@@ -681,6 +681,11 @@ public final class IndexGenerationManager {
    * This is an observation, not a lease across a concurrent generation transition.
    */
   public boolean isIdleActiveGeneration(Path capturedTarget) throws IOException {
+    return idleActiveGeneration(capturedTarget).isPresent();
+  }
+
+  /** Return the identity from the same strict observation that validates the captured target. */
+  public java.util.Optional<String> idleActiveGeneration(Path capturedTarget) throws IOException {
     Objects.requireNonNull(capturedTarget, "capturedTarget");
     State current = JSON.readValue(Files.readAllBytes(statePath), State.class);
     if (current == null || (current.format_version() != 1
@@ -689,10 +694,11 @@ public final class IndexGenerationManager {
     }
     String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
     Path activePath = resolveGenerationPathReadOnly(active);
-    return MigrationState.IDLE.name().equals(current.migration_state())
+    boolean eligible = MigrationState.IDLE.name().equals(current.migration_state())
         && (current.building_generation() == null || current.building_generation().isBlank())
         && activePath.equals(capturedTarget.toAbsolutePath().normalize())
         && Files.isDirectory(activePath);
+    return eligible ? java.util.Optional.of(active) : java.util.Optional.empty();
   }
 
   /**

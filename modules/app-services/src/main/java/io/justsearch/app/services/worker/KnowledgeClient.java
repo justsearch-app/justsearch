@@ -988,6 +988,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public String captureServingGeneration(EngineContext engineContext) {
+        return executeIngestRpc("captureServingGeneration", RpcDeadlineCategory.STANDARD,
+            IngestServiceCalls::captureServingGeneration, engineContext);
+    }
+
+    @Override
     public boolean reconcileRoot(String pathHash, boolean force, EngineContext engineContext) {
         // Tempdoc 626 §Recency (Move C) — resolve the privacy-safe pathHash to the real root Head-side
         // (raw paths never cross the wire — ADR-0028), then run a per-root force reconcile. A force=true

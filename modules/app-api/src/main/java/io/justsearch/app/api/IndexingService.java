@@ -204,6 +204,14 @@ public interface IndexingService {
   }
 
   /**
+   * Capture the current idle serving generation for a recorded plan. Missing or unreadable
+   * authority refuses; callers must revalidate at admission and commit. This is not a lease.
+   */
+  default String captureServingGeneration(EngineContext engineContext) {
+    throw new UnsupportedOperationException("Serving generation capture unavailable");
+  }
+
+  /**
    * Tempdoc 626 §Recency (Move C) — verify/reconcile a SINGLE watched root identified by its {@code
    * pathHash} (the privacy-safe wire identifier — ADR-0028; raw paths never cross the wire). The
    * implementation resolves the hash to the real path Head-side and runs a {@code force} reconcile

@@ -31,6 +31,8 @@ final class IndexGenerationVduEligibilityTest {
     assertTrue(
         manager.isIdleActiveGeneration(capturedActive),
         "an unchanged IDLE state must accept its active generation");
+    org.junit.jupiter.api.Assertions.assertEquals(initial.activeGenerationId(),
+        manager.idleActiveGeneration(capturedActive).orElseThrow());
 
     IndexGenerationManager.State migrating = manager.startMigration("eligibility-test");
     assertNotNull(migrating.building_generation(), "migration creates a building generation");
@@ -45,6 +47,9 @@ final class IndexGenerationVduEligibilityTest {
     assertFalse(
         manager.isIdleActiveGeneration(capturedActive),
         "an IDLE state with a changed active pointer must refuse the old target");
+    assertTrue(manager.idleActiveGeneration(capturedActive).isEmpty());
+    org.junit.jupiter.api.Assertions.assertEquals(promoted.active_generation(),
+        manager.idleActiveGeneration(promotedPath).orElseThrow());
     assertTrue(
         manager.isIdleActiveGeneration(promotedPath),
         "the promoted active generation is eligible after the transition completes");

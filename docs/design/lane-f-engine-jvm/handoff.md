@@ -12,7 +12,11 @@ The common preparation/acceptance seam has focused761 proof and broad763 proof:
 3491 cases/557 suites, zero failures/errors,3 skips, all four affected test tasks
 executed and PMD passed. Negative762 causes six intended unsafe-payload failures;
 independent reread clears the corrected source. Root producer, child identity and
-committed-unit implementation follow. No Engine stack is running.
+committed-unit implementation follow. The subsequent [generation capture](evidence/C2/generation-capture.md)
+passes focused768 (55 cases, including the separately committed root-plan scope) and
+negative769 catches three intended service-absence failures. Independent review clears
+the strict observation and replacement-availability fix. Hosted preparation run34719066293
+is red and under investigation; it is not a passing checkpoint. No Engine stack is running.
 
 Prior item is [the shared offline owner](evidence/C2/offline-owner-proof.md):
 manual and automatic procedures share bounded admission/lifetime ownership;

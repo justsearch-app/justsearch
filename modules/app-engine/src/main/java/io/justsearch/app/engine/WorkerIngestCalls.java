@@ -74,6 +74,11 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public String captureServingGeneration() {
+    return service.captureServingGeneration(ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request) {
     return service.markVduProcessing(request, ctx);
   }
