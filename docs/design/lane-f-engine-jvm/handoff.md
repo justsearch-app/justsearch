@@ -5,14 +5,16 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: C1 COMPLETE; C2 batch1 implementation in progress.
+Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 is next.
 
-C2-1 now implements the independent store, process lifetime, recovery fence and
-notice, jobs15 migration, and baseline-compatible updater handoff.
-[Current C2-1 evidence](evidence/C2/C2-1.md) records the negative regressions, passing
-focused tests and remaining integrated checks. Next is the day-one C2-11 installed
-replay/no-duplication harness, then every remaining lane stage. No owner input is
-pending; preserve hourly WIP commits and push immediately after every commit.
+C2-1's independent store, lifetime/recovery fence and jobs15/updater compatibility
+are implemented. C2-11's day-one installed PROCESSING replay plus fresh retry
+passes with one document and clean owned shutdown. Full integrated565 passes;
+[batch1 reconciliation](evidence/C2/batch1.md) records exact commands, retained XML,
+unchanged-input reuse and the remaining acceptance/checkpoint producer boundary.
+Commits396d16e22 and6a4059352 are pushed. Continue C2-2's shared attempt runner,
+then all remaining C2/D1/D2/E/F items; merge placement stays F/PR1. No owner input
+is pending. Preserve hourly WIP commits and push immediately after every commit.
 
 ## Autonomous work resumed (2026-09-12)
 
