@@ -1,5 +1,10 @@
 # C2 hosted verification
 
+Current projection/orphan proof: [checkpoint656](projection-checkpoint-656.md).
+CI34700660160 at758aeb2eb has a clean first-attempt orphan case and unskipped queue/
+snapshot tests; its sole red job is a documentation encoding error fixed0bdf584bc.
+The older producer and orphan records below preserve their original tested limits.
+
 September12: CI34695294553 at3be553d89 passes12 jobs but Build (no model blobs)
 fails in the all-source-set static-analysis step: ui compileIntegrationTestJava,
 SchemaMismatchStatusContractTest.java:107 still calls EngineRoot without the now

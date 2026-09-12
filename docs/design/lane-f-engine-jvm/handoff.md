@@ -7,29 +7,16 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
-Latest coherent producer code checkpoint: 70e9e577c, pushed. Full634 (`build pmdAll`)
-passes 9,901 cases/1,624 suites, zero failures/errors, 35 skips, with per-task unchanged
-result reuse recorded. Hosted CI34697406424 has all13 jobs successful; artifact audit
-finds an initial orphan-test PID-witness failure followed by a successful real kill/reap
-retry. Investigate and fix that witness before calling the new orphan proof clean.
-The new producer and quota suites are unskipped and green on hosted Windows/Linux jobs.
-See [hosted evidence](evidence/C2/hosted-ci.md) and [next decisions](evidence/C2/C2-2-plan.md).
+Latest coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626
+suites, zero failures/errors and35 skips; stress659 passes allthree selected cases
+with documented unchanged-result reuse. Hosted CI34700660160 has clean first-attempt
+orphan containment (deliberate parser reuse, native descendant, real Engine kill/reap),
+plus unskipped queue/snapshot and producer tests. Its only red job is a malformed byte
+in a design link;0bdf584bc repairs it and successor Public claims passes.
+See [checkpoint656](evidence/C2/projection-checkpoint-656.md) for exact revisions,
+commands, task reuse, artifacts and remaining limits.
 
-Jobs post-commit projection prerequisite is committed/pushed at03c05f47e: restored642 passes153 queue
-tests/13 suites plus PMD, negative641 proves native-hook delivery is rejected, and
-independent review found no remaining queue defect. The discovered WorkerIngestService
-snapshot-before-delta race is corrected with a bounded initial handoff;648 passes23
-tests/5 suites plus PMD, negative645 reproduces the old ordering defect, and independent
-review passes. Hosted/integrated proof of the new projection is still owed. See the C2-2 plan for retained evidence.
-
-Orphan witness correction is implemented and locally proved: final653 checks deliberate
-pool reuse with creator-published exact identities, real native containment and forced
-Engine death; negative654 refutes the old freshness rule and655 reuses identical-source
-cached proof. Independent review passes. Fresh hosted first-attempt proof remains owed;
-see hosted evidence. Queue/snapshot commits03c05f47e,41eed16e6 andf5c2c2edc are pushed.
-
-Next: integrated/stress and corrected hosted proof, actual offline
-procedure outcome/context propagation, then the remaining direct HTTP/keyed/ingestion
+Next: actual offline procedure outcome/context propagation and durable index effects, then the remaining direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 

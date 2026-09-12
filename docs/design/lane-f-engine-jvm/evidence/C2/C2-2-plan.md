@@ -4,6 +4,11 @@ Status: source-grounded at6a4059352 on2026-09-12; batch1 closed at e60e2cb0d; C2
 The root owns all edits/builds. A read-only explorer mapped the seams; decisions
 below resolve its returned ambiguities without owner gates.
 
+Latest coherent projection/orphan proof is [checkpoint656](projection-checkpoint-656.md):
+full build/PMD9,917 cases, stress659 and clean hosted orphan/queue/snapshot results.
+Offline procedure guard cleanup is the next bounded correction; actual completion,
+context and index durability remain open as described below.
+
 ## Decisions
 
 1. Keep indexing.proto unchanged as C2 requires. KnowledgeClient.scanRoot builds a
