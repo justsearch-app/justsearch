@@ -141,3 +141,22 @@ installation on both attempts. CI34386342721 at41c575f21 repeats that exact Goog
 APT hash mismatch. These are failed hosted checkpoints, not successful accessibility proof.
 See [source preparation](playwright-apt.md) for raw attempts, the bounded correction and
 its still-required current hosted verification.
+
+## Resumption source35d03f7c4 — 2026-09-12
+
+[CI34683617524](https://github.com/justsearch-app/justsearch/actions/runs/34683617524)
+passes all13 jobs at35d03f7c41d417faf9e7d54de6417bca0f451c2d, including Windows-native,
+system integration, public claims/agent analytics and measured axe. The two preceding
+runs34683172273 and34683424602 were cancelled by later pushes, not successful proof.
+Downloaded system XML contains88 cases in20 files, zero failures/errors,42 skips and
+no failure/error/flaky/rerun elements. The indexing-ledger case and all five supervised
+recovery scenarios execute without skips; all five fixture outputs are retained.
+The Windows-native log records a successful build with105 executed tasks. Twenty axe
+measurement captures are retained; this is the advisory tier's successful run.
+
+Raw: `tmp/c1-resume-hosted-503.json`, `tmp/c1-resume-hosted-artifacts-504.json`,
+`tmp/c1-resume-hosted-download-504/`, `tmp/c1-resume-hosted-native-504.txt`,
+`tmp/c1-resume-hosted-inspection-507.json`, `tmp/c1-hosted-cases-508.txt`.
+Integration artifact10294668343 and axe artifact10295141367 expire2026-12-11T08:34:26Z.
+Local copies remain in this held worktree through lane acceptance plus30 days.
+The later1501ff0c4/a480ac6f6 commits change lane design Markdown only.

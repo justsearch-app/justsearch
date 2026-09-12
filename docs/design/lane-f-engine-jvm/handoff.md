@@ -5,18 +5,33 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: [Current C1 verification checkpoint](#current-c1-verification-checkpoint-2026-09-09-root-scan-race).
+Latest state: C1 COMPLETE; C2 implementation starts next.
 
 ## Autonomous work resumed (2026-09-12)
 
-The user authorized merging current main and resuming the complete lane.
-Merge9762cf593 is pushed; full integrated478 and the advisory gate pass.
-The worktree has a retention hold for required raw evidence. Fresh C1 offline
-pipeline483 is running under continuous search; C1 remains OPEN until its final
-proof and acceptance reconciliation. See [resumption evidence](evidence/C1/resume-2026-09-12.md)
-for the owned run, revision, commands and remaining obligations. The September10
-C2/D1 design amendments are now present; the September12 review found bounded
-corrections named in that record. The implementation orchestrator owns them.
+The user authorized integrating main and continuing the entire lane. Merge9762cf593
+incorporates #721/#722; the hook import correction35d03f7c4 is fully green in hosted
+CI34683617524. Full478 passes with documented unchanged-input reuse. Fresh offline483
+completes full enrichment of469 files under9720 successful continuous searches, zero
+errors. The stack is stopped clean:none, ports closed and evidence retained. C1 is
+complete under [acceptance reconciliation](evidence/C1/acceptance-reconciliation.md).
+
+C2 design1501ff0c4 settles canonical key conflicts, keyed undo, expiry fencing, SSE
+snapshot/replay ordering, and one attempt runner with committed settings receipts.
+D1 designa480ac6f6 binds each query to one leased runtime/encoder/service view, fixes
+previous-generation retirement and puts late model-manifest work in its actual batch.
+C2 entry grounding additionally corrects the pre-fork construction citation and requires
+interrupted-quarantine preservation to retain the expiry fence. These are design, not
+implemented features. Start C2-1 and its day-one C2-11 harness in batch1, then every
+remaining item in C2/D1/D2/E/F. No owner decisions are pending or deferred.
+
+The lane worktree is held through review date2026-10-12 for active work and mandatory
+raw evidence. Retain artifacts through lane acceptance plus30 days; export before any
+worktree release because the lifecycle tool treats evaluation directories as disposable.
+Main's worktree stays untouched. Fetch at this boundary finds origin/main already
+contained. Push after each commit; commit WIP at least hourly; at most three worker
+follow-ups. Stage closure does not end authorized work. Merge placement remains F/PR1.
+See [resumption evidence](evidence/C1/resume-2026-09-12.md) for commands and proof limits.
 
 ## Historical user-requested pause (2026-09-09)
 

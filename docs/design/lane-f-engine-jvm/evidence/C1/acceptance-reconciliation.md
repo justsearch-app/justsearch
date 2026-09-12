@@ -1,8 +1,9 @@
 # C1 acceptance reconciliation
 
-Status: OPEN, candidate8f8c7d775da4f4f69bc21c8399e3c69d0a90cd41,2026-09-09.
+Status: COMPLETE, 2026-09-12. Application candidate8f8c7d775 is unchanged through
+source checkpoint35d03f7c4 and documentation checkpointa480ac6f6.
 This table maps the current stage contract to evidence; implementation, local verification,
-hosted verification and live acceptance are separate. No pending row below is stage completion.
+hosted verification and live acceptance are separate. Every C1 item is reconciled below; later-stage obligations retain their named placement.
 
 Full455 invokes build, test, system integration and installDist with includeStress=true and
 skipErrorProneTests=false on the clean candidate. It passes in5s with2 executed and367
@@ -23,16 +24,34 @@ Raw: `tmp/c1-final-integrated-455.txt`, `tmp/c1-final-integrated-results-455/man
 | C1-7 | Finite queues, typed submitter refusals and separate urgency registrations; actual-exit resources retained across cancellation. [Batch4](batch-4.md), [correction ledger](independent-review-fixes.md). | None within this item; live aggregate proof is C1-9. |
 | C1-8 | Real filter-chain transport tests8, observer exclusions, CORS and explicit MCP retry safety pass. [CORS](cors-admission.md), [MCP](mcp-retry-safety.md). | Fresh default-limit fairness459 passes all wire probes and sixteen completed holders; [live proof](final-live.md). |
 | C1-9 | Aggregate controller7 cases and strict63-case capture oracle distinguish front admission from later executor refusal. [Oracle correction](admission-refusal-proof.md). | Fresh one/many paired capture467 and saved-file analysis468 pass; [live proof](final-live.md). Cursor clause belongs to D2 and is unmeasurable here. |
-| C1-10 | Foreground actual dispatch increments exactly once; background and observer polling do not. Root walk and handoff corrections retain actual work. [Corrections](independent-review-fixes.md), [final candidate](final-candidate.md). | Standard-active primary460 passes all469 files and308/308 searches; chat-offline full enrichment was paused before completion (NER404/469); [partial proof](final-live.md). |
+| C1-10 | Foreground actual dispatch increments exactly once; background and observer polling do not. Root walk and handoff corrections retain actual work. [Corrections](independent-review-fixes.md), [final candidate](final-candidate.md). | Standard-active primary460 passes all469 files and308/308 searches; fresh chat-offline483 completes full enrichment for469/469 and9720/9720 continuous searches, zero errors; [live proof](final-live.md). Historical470 remains interrupted. |
 | C1-11 | Durable work detaches urgency; interactive cancellation retains actual child lifetimes. Double-release and shutdown freeze are mutation-proven. [Cancellation sweep](cancellation-sweep.md). | Persisted operation-row urgency flip belongs to C2, as stage section9 specifies. |
 | C1-12 | Packaged retained policy equals authority, duplicate activation refuses, caps and stale-handle release are tested; resource-policy6 and retained-budget3 pass. [Batch1](batch-1.md). | All five accounting producers await D1/D2: cursors/readers in D2; generations, co-resident encoders and attempted configurations in D1. Current generations can retain three against target two; there is no live bound claim. |
 | C1-13 | Direct-memory launcher pins and [sourced memory budget](memory-budget.md) recorded with [batch1](batch-1.md); later launch verification unchanged. | Process memory/heap-growth measurements belong to E. |
 | C1-14 | Broken-child routed-family refusal preserves plain-text ingestion; extraction confinement and routing seam are mutation-proven. Windows native descendants are witnessed and terminated. [Parser containment](parser-containment.md), [governance](governance-sweep.md). | Named VDU exception, IN_PROCESS operator override and non-Windows proof limits remain explicit in the stage/design. |
 | C1-15 | Admission-aware clients honor Retry-After only with retrySafe; parity, abort and no error-toast behavior tested. Typecheck437 and6474 unit442 cases pass. [Batch3](batch-3.md), [dependency correction](dependency-advisory.md). | None within this item. |
-| C1-16 | Whole-program dead-code test passes, retired producer references are historical,17-seam gate and regeneration checks pass. [Governance sweep](governance-sweep.md). | Current hosted and Python pass; chat-offline full enrichment and closure record remain stage-wide obligations. |
+| C1-16 | Whole-program dead-code test passes, retired producer references are historical,17-seam gate and regeneration checks pass. [Governance sweep](governance-sweep.md). | Full478, Python456, hosted34683617524 and fresh offline483 pass; this record closes the stage-wide obligations. |
 
-Hosted34390502944 is green at preceding7ff787cf3. Current8f8 CI34392044686 is fully green; full Python456 passes3640 cases with16 skips and83 warnings. Prior failed448 and live423 remain recorded; no successful narrow rerun erases
-them. Merge placement stays F/PR1, and C2/D1/D2/E/F remain mandatory after C1 closure.
+Full478 at merge9762cf593 passes with3 executed/366 up-to-date tasks and the same
+represented counts as455. No modules changed since8f8; Java proof is reused only on
+that unchanged-input basis. Focused hook/tooling486-495 and all13 successful hosted
+jobs at35d03f7c4 cover the newly merged agent/lifecycle tooling and import correction.
+[Hosted evidence](hosted-ci.md) includes inspected XML, native logs and axe captures.
+Python456 remains3640 passed,16 skips,83 warnings; prior failures remain recorded.
 
-User-requested pause: evaluation470 is interrupted, not a pass. The stack is stopped and
-raw data retained. C2 implementation has not started. See [live proof](final-live.md).
+Fresh offline483 closes the remaining live arm: full readiness,469/469 materialized
+files and9720/9720 searches with zero errors. The owned evaluator exits0 and stack
+stops clean:none with portsClosed:true; its final artifacts are retained. SPLADE
+reset/backfill churn is explicit in [live proof](final-live.md), not hidden by the
+final pass. Optional index settling and E quality/latency claims are not inferred.
+
+A read-only independent reconciliation at35d03f7c4..a480ac6f6 found offline483 and
+this closure record as the only outstanding C1 obligations. Root verified the final
+summary/timeline, hosted XML and source explanation after it completed. No required
+C1 row is red or unperformed. The persisted urgency flip stays C2; live retained
+producers stay D1/D2; process-memory and cross-platform measurements stay E.
+
+C1 closure is a stage boundary, not a merge or pause. Fresh origin/main is already
+contained (fetch2026-09-12); C2 begins next with its re-grounded contract. C2/D1/D2/E/F
+remain mandatory, with merge placement F/PR1 (#718). Retain raw evidence through lane
+acceptance plus30 days and export it before releasing the held worktree.

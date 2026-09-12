@@ -69,3 +69,40 @@ Raw: `tmp/c1-final-offline-start-469.txt`, `tmp/c1-final-offline-pipeline-470.tx
 `tmp/c1-offline-first-walk-472.json`, `tmp/c1-offline-pipeline-evidence-474/`,
 `tmp/c1-pause-receipt-475.json`,
 `tmp/dev-runner/runs/08cbb26d-68f0-4292-a554-793306df06a4/stop-report.json`.
+
+## Fresh chat-offline full enrichment483 — PASS, 2026-09-12
+
+Fresh owned run3cfef22b-fcb2-438c-b721-987fd431f106, API52282, data481, launched
+Engine source9762cf593 with installed stamp061beab1388633ee. No modules changed
+since8f8c7d775. The evaluator's final git_sha a480ac6f6 identifies the checkout at
+report time after documentation commits, not a different running binary.
+
+All469 materialized files index from zero and full readiness passes with no failure
+reasons. The initial walk was captured before the60-second periodic rescan (484).
+Final timeline: dense/SPLADE/chunk100%, NER469/469; full enrichment1896.3s.
+Continuous hybrid search starts before root addition and completes9720/9720 requests
+with zero errors over1900.919s; p50=169.839ms, p95=335.994ms, max=1512.032ms.
+The final measured hybrid query applies the cross-encoder to its one eligible query
+with zero silent drops. This is C1 plumbing/pacing proof, not E latency or retrieval
+quality acceptance: the corpus is self-demo, metadata says468 while materialization
+verifies469, and the run did not request the optional settled-index experiment.
+The timeline contains13 SPLADE churn drops during enrichment; final coverage recovers
+to100%. This follows the existing catalog reset-status:splade_status policy (fields.v1.json:431):
+WritePathOps.java:627-654 deliberately resets omitted, non-rereadable SPLADE postings
+to PENDING so backfill re-derives them. It preserves FAILED status. Timeline.py:230-240
+counts these real coverage drops, not just counter noise; final readiness requires
+recovery. This run claims convergence, not absence of enrichment churn or an E budget pass.
+
+The evaluator exits0; the registered stack stops clean:none with portsClosed:true.
+No failed request was removed or retried away. Historical470 remains interrupted.
+Raw: `tmp/c1-resume-offline-pipeline-483.txt`, `tmp/c1-resume-first-walk-484.json`,
+`tmp/c1-resume-offline-summary-510.json`, `tmp/c1-resume-offline-evidence-510/`,
+`scripts/jseval/tmp/eval-results/lane-f-c1-resume-offline-483/`,
+`tmp/dev-runner/runs/3cfef22b-fcb2-438c-b721-987fd431f106/stop-report.json`.
+The preserved510 copy contains the final summary, identity, timeline, Engine log and
+stop receipt. Retain through lane acceptance plus30 days; export before worktree release.
+
+Engine-log review513 finds no ERROR and one WARN: the indexing stream receives
+EngineWorkCancelledException(quit) during the explicit ordered stop, after the evaluator
+completed. It follows the existing cancellation/retry bridge and the stack closes; it
+is not an excluded search failure. Raw: `tmp/c1-resume-log-review-513.json`.
