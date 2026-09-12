@@ -11,6 +11,8 @@ import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.core.context.EngineContext;
 import java.time.Clock;
 import java.util.List;
@@ -55,6 +57,16 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
   }
 
+  @Override
+  public PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root) {
+    if (!(parent instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
+        || control.done.isCompletedExceptionally()) {
+      throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
+    }
+    var accepted = store.acceptIngestChild(control.key, OperationKeys.generate(clock), root);
+    return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
+  }
+
   private Control controlFor(OperationRecord row) {
     if (row.state().terminal()) {
       Control completed = new Control(row);
@@ -89,7 +101,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       execution = Objects.requireNonNull(body.apply(control), "Operation execution");
     } catch (RuntimeException failure) {
       try { finish(control, failure instanceof CancellationException ? OperationState.CANCELLED : OperationState.FAILED,
-          new OperationReceipt(failure instanceof CancellationException ? "cancelled" : "UNCAUGHT_EXCEPTION", null)); }
+          new OperationReceipt(failureCode(failure), null)); }
       catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); failObservation(control, storageFailure); }
       throw failure;
     }
@@ -103,7 +115,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       try {
         if (cause != null) {
           finish(control, cause instanceof CancellationException ? OperationState.CANCELLED : OperationState.FAILED,
-              new OperationReceipt(cause instanceof CancellationException ? "cancelled" : "UNCAUGHT_EXCEPTION", null));
+              new OperationReceipt(failureCode(cause), null));
         } else if (outcome == null) {
           finish(control, OperationState.FAILED, new OperationReceipt("MISSING_OUTCOME", null));
         } else {
@@ -187,6 +199,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     return new OperationReceipt(code, execution);
   }
 
+  private static String failureCode(Throwable failure) {
+    if (failure instanceof CancellationException) return "cancelled";
+    if (failure instanceof OperationStoreException storeFailure) {
+      return storeFailure.code().name();
+    }
+    return "UNCAUGHT_EXCEPTION";
+  }
+
   private static OperationResult receiptResponse(OperationRecord row) {
     boolean failed = row.state() == OperationState.FAILED || row.state() == OperationState.CANCELLED;
     return new OperationResult(!failed, "Operation " + row.state().name(),
@@ -217,6 +237,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private final class Control implements OperationRecordHandle {
+    private final OperationAttemptRunnerImpl owner = OperationAttemptRunnerImpl.this;
     private final long id;
     private final String key;
     private final AtomicBoolean started = new AtomicBoolean();

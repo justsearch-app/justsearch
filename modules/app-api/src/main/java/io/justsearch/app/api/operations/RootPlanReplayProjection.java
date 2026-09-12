@@ -72,6 +72,49 @@ final class RootPlanReplayProjection {
     return parsePlan(parsePayload(schema, payloadJson));
   }
 
+  /** Decode only the two safe identity shapes that carry an admitted root plan. */
+  static RecordedRootPlan parseIdentity(String identityJson) {
+    final Object value;
+    try {
+      value = JSON.readValue(identityJson, Object.class);
+    } catch (RuntimeException failure) {
+      throw new IllegalArgumentException("Malformed recorded root identity", failure);
+    }
+    if (!(value instanceof Map<?, ?> identity)) {
+      throw new IllegalArgumentException("Recorded root identity must be an object");
+    }
+    String mode = requireText(identity.get("mode"), 32);
+    if (mode.equals("invoke")) {
+      requireFields(identity, Set.of("mode", "argumentsSha256", "preparedInvocation"));
+      if (!requireText(identity.get("argumentsSha256"), 64).matches("[a-f0-9]{64}")) {
+        throw new IllegalArgumentException("Invalid recorded argument digest");
+      }
+    } else if (mode.equals("ingest-child")) {
+      requireFields(identity, Set.of("mode", "parentOperationKey", "preparedInvocation"));
+      OperationKeys.timestampMillis(requireText(identity.get("parentOperationKey"), 36));
+    } else {
+      throw new IllegalArgumentException("Operation identity has no replayable root plan");
+    }
+    if (!(identity.get("preparedInvocation") instanceof Map<?, ?> prepared)) {
+      throw new IllegalArgumentException("Missing recorded root preparation");
+    }
+    requireFields(prepared, Set.of("schema", "payload"));
+    if (!(prepared.get("payload") instanceof Map<?, ?> plan)) {
+      throw new IllegalArgumentException("Recorded root plan must be an object");
+    }
+    if (!SCHEMA.equals(requireText(prepared.get("schema"), 128))) {
+      throw new IllegalArgumentException("Unsupported safe replay schema");
+    }
+    if (JSON.writeValueAsString(plan).length() > MAX_PAYLOAD_CHARS) {
+      throw new IllegalArgumentException("Replay projection is too large");
+    }
+    RecordedRootPlan result = parsePlan(plan);
+    if (mode.equals("ingest-child") && result.roots().size() != 1) {
+      throw new IllegalArgumentException("An ingest child requires one root");
+    }
+    return result;
+  }
+
   static RecordedRootPlan parsePlan(Map<?, ?> plan) {
     validate(SCHEMA, plan);
     List<RecordedRootPlan.Root> roots = new ArrayList<>();

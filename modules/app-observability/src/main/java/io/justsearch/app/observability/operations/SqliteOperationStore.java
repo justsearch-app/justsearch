@@ -9,6 +9,7 @@ import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import tools.jackson.databind.ObjectMapper;
@@ -41,6 +42,11 @@ public final class SqliteOperationStore implements OperationStore {
       .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
   private static final Logger LOG = LoggerFactory.getLogger(SqliteOperationStore.class);
   private static final long FUTURE_SKEW_MS = Duration.ofMinutes(5).toMillis();
+  private static final String INSERT_OPERATION = """
+      INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
+        identity_json, grant_ref, client_kind, client_id, session_id, source_tier, transport,
+        executor, initiator, correlation_id, accepted_at, updated_at)
+      """;
   private final ReentrantLock lock = new ReentrantLock();
   private final Path path;
   private final Clock clock;
@@ -284,10 +290,7 @@ public final class SqliteOperationStore implements OperationStore {
       if (keyTime < readHistorySince()) {
         throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null);
       }
-      String sql = """
-          INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
-            identity_json, grant_ref, client_kind, client_id, session_id, source_tier, transport,
-            executor, initiator, correlation_id, accepted_at, updated_at)
+      String sql = INSERT_OPERATION + """
           VALUES (?, ?, ?, ?, 'ACCEPTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(operation_key) DO NOTHING
           """;
@@ -304,6 +307,81 @@ public final class SqliteOperationStore implements OperationStore {
       }
       return new Acceptance(findRow(key).orElseThrow(() -> new SQLException("Accepted row is missing")), true);
     }));
+  }
+
+  @Override
+  public Acceptance acceptIngestChild(String parentKey, String childKey, RecordedRootPlan.Root root) {
+    return locked(() -> transaction(() -> {
+      OperationRecord parent = findRow(parentKey).orElseThrow(() -> childRefused(null));
+      final OperationDescriptor descriptor;
+      try {
+        RecordedRootPlan plan = parent.descriptor().recordedRootPlan();
+        var storedRoot = plan.roots().stream().filter(candidate -> candidate.equals(root))
+            .findFirst().orElseThrow(() -> new IllegalArgumentException("Root is outside recorded parent scope"));
+        descriptor = OperationDescriptor.ingestChild(parent.key(),
+            new RecordedRootPlan(plan.generation(), List.of(storedRoot)));
+      } catch (IllegalArgumentException failure) {
+        throw childRefused(failure);
+      }
+      String identity = canonicalIdentity(descriptor.identityJson());
+      var existing = findIngestChild(identity);
+      if (existing.isPresent()) {
+        OperationRecord child = existing.get();
+        if (!child.context().equals(parent.context())
+            || !Objects.equals(child.executor(), parent.executor())
+            || !Objects.equals(child.initiator(), parent.initiator())
+            || !Objects.equals(child.correlationId(), parent.correlationId())) {
+          throw childRefused(null);
+        }
+        return new Acceptance(child, false);
+      }
+      if (parent.state() != OperationState.RUNNING) throw childRefused(null);
+      long keyTime;
+      try { keyTime = OperationKeys.timestampMillis(childKey); }
+      catch (IllegalArgumentException failure) {
+        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, failure);
+      }
+      long now = clock.millis();
+      if (keyTime > now + FUTURE_SKEW_MS) {
+        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+      }
+      if (keyTime < readHistorySince()) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null);
+      }
+      // Copy the stored columns directly: InvocationProvenance has fields the row never retained.
+      String sql = INSERT_OPERATION + """
+          SELECT ?, ?, survival, urgency, 'ACCEPTED', NULL, ?, grant_ref,
+            client_kind, client_id, session_id, source_tier, transport,
+            executor, initiator, correlation_id, ?, ?
+          FROM operations WHERE id = ? AND state = 'RUNNING'
+          ON CONFLICT(operation_key) DO NOTHING
+          """;
+      try (var insert = connection.prepareStatement(sql)) {
+        insert.setString(1, childKey); insert.setString(2, descriptor.kind().wireValue());
+        insert.setString(3, identity); insert.setLong(4, now); insert.setLong(5, now);
+        insert.setLong(6, parent.id());
+        if (insert.executeUpdate() != 1) throw new SQLException("Child acceptance did not insert exactly one row");
+      }
+      return new Acceptance(findRow(childKey).orElseThrow(() -> new SQLException("Accepted child is missing")), true);
+    }));
+  }
+
+  private java.util.Optional<OperationRecord> findIngestChild(String identity) throws SQLException {
+    try (var query = connection.prepareStatement("""
+        SELECT * FROM operations WHERE kind = ? AND operation_ref IS NULL AND identity_json = ?
+        """)) {
+      query.setString(1, OperationKind.INGEST.wireValue()); query.setString(2, identity);
+      try (var rows = query.executeQuery()) {
+        if (!rows.next()) return java.util.Optional.empty();
+        OperationRecord child = readRecord(rows);
+        if (rows.next()) throw childRefused(null);
+        return java.util.Optional.of(child);
+      }
+    }
+  }
+
+  private static OperationStoreException childRefused(Throwable cause) {
+    return new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, cause);
   }
 
   private static String canonicalIdentity(String json) {

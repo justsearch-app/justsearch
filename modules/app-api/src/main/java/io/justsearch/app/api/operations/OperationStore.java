@@ -13,6 +13,13 @@ public interface OperationStore extends AutoCloseable {
       io.justsearch.core.context.EngineContext context,
       io.justsearch.agent.api.registry.InvocationProvenance provenance);
 
+  /**
+   * Atomically find or accept one frozen ingest child. The runner validates its parent capability;
+   * this transaction derives scope and attribution from the stored parent. Only a new child needs
+   * a RUNNING parent; an existing matching child is returned even after parent completion.
+   */
+  Acceptance acceptIngestChild(String parentKey, String childKey, RecordedRootPlan.Root root);
+
   record Acceptance(OperationRecord record, boolean created) {}
 
   /** Row-first lookup: callers compare a missing key's timestamp with historySinceMillis(). */

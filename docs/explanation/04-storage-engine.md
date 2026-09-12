@@ -341,3 +341,20 @@ and recovery owners are connected. Declaring a kind does not change admitted sur
 the work owner retains its original survival for cancellation and disconnect handling.
 Recorded producers must resolve their survival policy before admission, or admit a
 separately owned child, before activating a recovery classification.
+
+Recorded parent owners can accept an ingest child through
+`OperationAttemptRunner.acceptIngestChild`, using a handle issued by that runner and
+one exact root from the parent's persisted `RecordedRootPlan`. The store transaction
+copies the stored context and attribution, retaining the frozen generation, policy
+and partition exclusions. The child's identity includes the parent operation key and
+one-root prepared plan. Existing children are reused; creating one requires a running
+parent. A handle whose completion persistence failed cannot accept another child.
+The architecture gate forbids producers from calling the store's lifecycle methods
+directly, including child acceptance.
+
+Parent owners explicitly compose child durable completion into their returned
+completion stage. Existing interrupted children resume through kind reconciliation;
+normal start only executes newly accepted work. Store failures preserve their bounded
+typed code in parent failure receipts. Production ingest and reindex owners still
+need their scan-key, generation and committed-unit completion integration before
+these primitives can establish recorded scan completion.

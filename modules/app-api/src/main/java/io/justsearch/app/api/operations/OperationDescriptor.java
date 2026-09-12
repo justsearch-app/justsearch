@@ -38,6 +38,22 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
         "preparedInvocation", Map.of("schema", replaySchema, "payload", payload))));
   }
 
+  /** One recorded scan inherits an exact frozen root, including its partition exclusions. */
+  public static OperationDescriptor ingestChild(String parentKey, RecordedRootPlan plan) {
+    OperationKeys.timestampMillis(parentKey);
+    Objects.requireNonNull(plan, "plan");
+    if (plan.roots().size() != 1) throw new IllegalArgumentException("An ingest child requires one root");
+    var payload = RootPlanReplayProjection.parsePayload(RecordedRootPlan.SCHEMA, plan.toReplayPayload());
+    return new OperationDescriptor(OperationKind.INGEST, null, JSON.writeValueAsString(Map.of(
+        "mode", "ingest-child", "parentOperationKey", parentKey,
+        "preparedInvocation", Map.of("schema", RecordedRootPlan.SCHEMA, "payload", payload))));
+  }
+
+  /** Strictly decode recorded scope; an ordinary digest-only or malformed identity is not replayable. */
+  public RecordedRootPlan recordedRootPlan() {
+    return RootPlanReplayProjection.parseIdentity(identityJson);
+  }
+
   public OperationDescriptor {
     Objects.requireNonNull(kind, "kind");
     Objects.requireNonNull(identityJson, "identityJson");

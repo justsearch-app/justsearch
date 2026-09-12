@@ -7,6 +7,19 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
+The [recorded ingest child primitive](evidence/C2/recorded-ingest-child.md) has complete
+local proof at fc679f92a plus this item: focused786 passes96 cases; broader787 executes
+741 cases/134 suites across app-api, app-observability and app-launcher, with zero
+failures/errors/skips and selected PMD green. Independent review fixes cover direct
+store-call architecture bypass and typed storage failure receipts; negative785 catches
+both lost-code paths. Parent owners compose child durable completion explicitly.
+Next: update the stale operations entry in engine-ports.v1.json to its implemented
+ports, then connect recorded ingest/reindex owners, survival admission, accepted scan
+keys, generation checks and committed-unit completion. C2-2 remains open.
+Declared-kind hosted CI34722656207 failed only its stale policy-component fixture;
+[correction fc679f92a](evidence/C2/record-kind-policy-fixture.md) is pushed and both
+policy-axis checks pass locally. Successful successor hosted proof remains required.
+
 Current work is [recorded ingestion preparation](evidence/C2/recorded-root-preparation.md).
 The common preparation/acceptance seam has focused761 proof and broad763 proof:
 3491 cases/557 suites, zero failures/errors,3 skips, all four affected test tasks

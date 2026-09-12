@@ -115,6 +115,8 @@ must not claim that D1's transition guarantee is already implemented.
 
 ## Child identity and proof
 
+Current implementation and its tests are tracked in [recorded ingest child](recorded-ingest-child.md).
+
 The shared runner exposes a narrow find-or-accept child operation. Under the
 existing store lock/transaction, find the child relation by parentOperationKey and
 its frozen root/generation/collection/policy identity before inserting. Persist
