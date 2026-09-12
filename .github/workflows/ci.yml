@@ -1173,6 +1173,16 @@ jobs:
       - name: Windows-only tests (@Tag windows) for the Linux-migrated modules
         run: ./gradlew.bat :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test -PwindowsOnly=true --console=plain
 
+      - name: Preserve Windows-native test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-native-test-results
+          path: |
+            modules/**/build/test-results/test/TEST-*.xml
+            modules/**/build/reports/tests/test/**
+          retention-days: 30
+
       - name: Release signing contract tests
         shell: pwsh
         run: |

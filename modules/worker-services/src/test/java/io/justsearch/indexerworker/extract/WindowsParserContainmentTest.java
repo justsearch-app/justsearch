@@ -45,6 +45,10 @@ final class WindowsParserContainmentTest {
       while (!Files.exists(pidFile) && System.nanoTime() < deadline && !pending.isDone()) {
         Thread.sleep(20);
       }
+      if (!Files.exists(pidFile) && pending.isDone()) {
+        // Preserve timeout/bootstrap/protocol failure instead of hiding it behind the PID assertion.
+        var _ = pending.get();
+      }
       assertTrue(Files.exists(pidFile), "bootstrap and native spawn must actually execute");
       long pid = Long.parseLong(Files.readString(pidFile));
       nativeChild = ProcessHandle.of(pid).orElseThrow();
