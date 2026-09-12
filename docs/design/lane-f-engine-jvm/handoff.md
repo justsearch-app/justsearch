@@ -7,10 +7,12 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
-Latest integrated verification is [checkpoint685](evidence/C2/vdu-checkpoint-685.md)
-at9ca622e4e: full build/PMD9,974 cases/1,635 suites, zero failures/errors,35 skips;
-14 test tasks execute and24 reuse unchanged results. Hosted CI34705992674 is green
-at that same revision. Conditional switch-buffer removal is now implemented with
+Latest integrated verification is [checkpoint694](evidence/C2/vdu-checkpoint-694.md)
+at41a74500b: full build/PMD9,993 cases/1,637 suites, zero failures/errors,35 skips;
+11 test tasks execute and27 reuse unchanged results. Hosted CI34708670410 is green
+at e872a36d4 (subsequent skill projection corrections only). Named stress696 passes
+two cases with documented unchanged-input reuse after broad695's empty-module
+selection failure. Conditional switch-buffer removal is now implemented with
 [schema16 and replay-race proof](evidence/C2/switch-buffer-version.md):75 focused cases
 pass, the original whole-table clear fails3 race cases, and key-only removal fails both
 replacement cases plus reinsertion. Restored691 reuses the identical689 test cache.
@@ -46,8 +48,8 @@ Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-wr
 invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
 are green; these prior runs do not establish hosted proof for the newer writer.
 
-Next: explicit deferred completion/generation
-boundaries and actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
+Next: refuse new VDU effects on an ineligible generation and retain legacy buffered
+VDU until safe replay; then actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 
