@@ -48,11 +48,11 @@ September12 source audit resolves the next implementation order:
    effects, mark/retry exhaustion and recovery. Existing CommitOps is the owner;
    KnowledgeClient.flush is a no-op and settleIndex also forces merges. Do not use
    either as a fabricated pass barrier. Chunk deletion/regeneration failures must
-   prevent completion. SWITCHING's durable buffer acceptance is not a Lucene effect:
-   expose deferred versus committed outcome explicitly through the Java port and
-   carry replay completion to the operation before terminal publication. Preserve
-   the existing switch buffer and resolve its missing-document/chunk-failure gaps;
-   no new journal. Current cutover is restart-based; D1 still owns hot-swap leases
+   prevent completion. New VDU writes refuse when the captured runtime is not the
+   eligible serving generation; they never substitute switch-buffer acceptance for
+   a committed effect. Preserve existing legacy rows until eligible replay succeeds,
+   including missing-document/chunk-failure retention; no new journal. Current cutover
+   is restart-based; D1 still owns hot-swap leases
    and full accepted-write journalling. A state-check race is not covered by a commit
    alone, so prove the current generation boundary rather than claiming D1 early.
    [Replay retention](vdu-replay-retention.md) now fixes the existing missing-document
@@ -120,8 +120,10 @@ handoff. Missing client, required capability, circuit-open, activity/energy inte
 failed mode entry/exit, index failure and cancellation each need an explicit outcome.
 Mode cleanup failures currently swallowed by VduProcessor and pending-write refusals
 swallowed by VduOps must remain visible to this result. No VRAM, model-selection or
-abstention policy changes are intended. The current-generation/deferred-write choice
-above is still under source investigation before implementation; it is not an owner gate.
+abstention policy changes are intended. The current-generation choice is now implemented
+at b532a56ee: new VDU writes refuse while their captured runtime is not the eligible
+serving generation; only legacy rows wait for eligible replay. See the governing
+[generation cut](vdu-generation-boundary.md) and [real Engine proof](engine-vdu-migration-replay.md).
 
 Required proof: one shared manual/automatic single-flight owner; exact work identity
 through model/index calls; queued cancellation executes no body; running cancellation

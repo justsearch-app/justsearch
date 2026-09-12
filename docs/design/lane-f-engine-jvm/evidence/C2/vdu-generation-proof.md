@@ -69,10 +69,13 @@ production blocker. Canonical reference/handoff drift found in that pass is corr
 The real Lucene replay case proves replacement
 parent content and regenerated chunk revisions; the mixed SQLite case proves exact
 row retention across reopen and later eligible removal. Neither directly drives the
-production KnowledgeServer eligibility wiring through a resumed migration and actual
-activation. That combined proof remains required, along with full/stress/hosted checks
-for this corrected revision, actual-model/installed offline completion and later D1
-carry-forward. These limits are work in progress, not an owner-gated deferral.
+production KnowledgeServer eligibility wiring through a resumed migration. The later
+[real Engine proof](engine-vdu-migration-replay.md) closes that composition gap with
+source replacement, promotion, eligible reopen and a production-guard negative.
+Hosted CI34711067677 passes b532a56ee; stress714 reuses unchanged passing inputs.
+Full integrated verification including the new Engine fixture and its hosted execution,
+actual-model/installed offline completion and later D1 carry-forward remain open.
+These limits are work in progress, not an owner-gated deferral.
 
 ## Evidence access
 

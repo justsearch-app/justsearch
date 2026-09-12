@@ -26,9 +26,13 @@ The VDU generation correction now has [focused and negative proof](evidence/C2/v
 It includes strict read-only existing-target checks, typed absent-runtime refusal and
 incomplete selected-recovery retention found by independent review. New VDU buffering
 is retired; legacy rows wait for an eligible serving runtime. Independent correction
-review finds no remaining production blocker. Combined production
-KnowledgeServer migration/replay and full/stress/hosted proof remain
-in progress before moving to the shared offline owner.
+review finds no remaining production blocker. The subsequent
+[real Engine proof](evidence/C2/engine-vdu-migration-replay.md) passes719 after
+independent review strengthened source replacement assertions; the force-eligible
+production mutation720 fails exact row retention, and restored721 reuses719.
+Hosted CI34711067677 passes b532a56ee and stress714 reuses unchanged passing inputs.
+Full integrated verification and hosted execution including the new Engine fixture
+remain open before moving to the shared offline owner.
 
 Prior coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626
 suites, zero failures/errors and35 skips; stress659 passes allthree selected cases
@@ -57,7 +61,7 @@ Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-wr
 invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
 are green; these prior runs do not establish hosted proof for the newer writer.
 
-Next: complete combined production migration/replay and broader generation proof;
+Next: complete broader generation verification including the new Engine fixture;
 then actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
