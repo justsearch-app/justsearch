@@ -2,23 +2,32 @@
 package io.justsearch.app.api.operations;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /** The safe metadata grammar accepted by the operation row, not another mutable root plan. */
 final class RootPlanReplayProjection {
+  static final String SCHEMA = "root-plan.v1";
+  static final int MAX_PAYLOAD_CHARS = 200000;
+
+  private static final JsonMapper JSON = JsonMapper.builder()
+      .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+      .build();
+
   private RootPlanReplayProjection() {}
 
   static void validate(String schema, Map<?, ?> plan) {
-    if (!"root-plan.v1".equals(schema)) {
+    if (!SCHEMA.equals(schema)) {
       throw new IllegalArgumentException("Unsupported safe replay schema");
     }
+    Objects.requireNonNull(plan, "plan");
     requireFields(plan, Set.of("generation", "roots"));
-    String generation = requireText(plan.get("generation"), 128);
-    if (!generation.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
-      throw new IllegalArgumentException("Invalid replay generation identity");
-    }
+    validateGeneration(requireText(plan.get("generation"), 128));
     for (Object item : requireList(plan.get("roots"))) {
       if (!(item instanceof Map<?, ?> root)) {
         throw new IllegalArgumentException("Replay root must be an object");
@@ -40,6 +49,65 @@ final class RootPlanReplayProjection {
     }
   }
 
+  /** Parse and validate one complete safe replay payload at the persistence boundary. */
+  static Map<?, ?> parsePayload(String schema, String payloadJson) {
+    Objects.requireNonNull(payloadJson, "payloadJson");
+    if (payloadJson.length() > MAX_PAYLOAD_CHARS) {
+      throw new IllegalArgumentException("Replay projection is too large");
+    }
+    final Object payload;
+    try {
+      payload = JSON.readValue(payloadJson, Object.class);
+    } catch (RuntimeException e) {
+      throw new IllegalArgumentException("Malformed replay projection", e);
+    }
+    if (!(payload instanceof Map<?, ?> plan)) {
+      throw new IllegalArgumentException("Replay projection must be a JSON object");
+    }
+    validate(schema, plan);
+    return plan;
+  }
+
+  static RecordedRootPlan parsePlan(String schema, String payloadJson) {
+    return parsePlan(parsePayload(schema, payloadJson));
+  }
+
+  static RecordedRootPlan parsePlan(Map<?, ?> plan) {
+    validate(SCHEMA, plan);
+    List<RecordedRootPlan.Root> roots = new ArrayList<>();
+    for (Object item : requireList(plan.get("roots"))) {
+      Map<?, ?> root = (Map<?, ?>) item;
+      roots.add(new RecordedRootPlan.Root(
+          requirePath(root.get("path")),
+          root.get("collection") == null ? null : requireText(root.get("collection"), 256),
+          (Boolean) root.get("force"),
+          (Boolean) root.get("singleFile"),
+          textList(root.get("excludePatterns"), 4096),
+          pathList(root.get("excludedSubtrees"))));
+    }
+    return new RecordedRootPlan(
+        validateGeneration(requireText(plan.get("generation"), 128)), roots);
+  }
+
+  static String validateGeneration(String generation) {
+    if (!generation.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
+      throw new IllegalArgumentException("Invalid replay generation identity");
+    }
+    return generation;
+  }
+
+  private static List<String> textList(Object value, int limit) {
+    List<String> result = new ArrayList<>();
+    for (Object item : requireList(value)) result.add(requireText(item, limit));
+    return List.copyOf(result);
+  }
+
+  private static List<Path> pathList(Object value) {
+    List<Path> result = new ArrayList<>();
+    for (Object item : requireList(value)) result.add(requirePath(item));
+    return List.copyOf(result);
+  }
+
   private static void requireFields(Map<?, ?> value, Set<String> fields) {
     if (!value.keySet().equals(fields)) {
       throw new IllegalArgumentException("Replay projection has missing or unsupported fields");
@@ -54,7 +122,12 @@ final class RootPlanReplayProjection {
   }
 
   private static Path requirePath(Object value) {
-    Path path = Path.of(requireText(value, 32768));
+    final Path path;
+    try {
+      path = Path.of(requireText(value, 32768));
+    } catch (RuntimeException e) {
+      throw new IllegalArgumentException("Replay path is invalid", e);
+    }
     if (!path.isAbsolute() || !path.normalize().equals(path)) {
       throw new IllegalArgumentException("Replay path must be absolute and normalized");
     }

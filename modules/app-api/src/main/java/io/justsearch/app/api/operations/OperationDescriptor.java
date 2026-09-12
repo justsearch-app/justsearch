@@ -30,11 +30,7 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
     if (replaySchema.isBlank() || replaySchema.length() > 128 || replayPayloadJson.length() > 200000) {
       throw new IllegalArgumentException("Invalid replay projection bounds");
     }
-    Object payload = JSON.readValue(replayPayloadJson, Object.class);
-    if (!(payload instanceof Map<?, ?>)) {
-      throw new IllegalArgumentException("Replay projection must be a JSON object");
-    }
-    RootPlanReplayProjection.validate(replaySchema, (Map<?, ?>) payload);
+    Map<?, ?> payload = RootPlanReplayProjection.parsePayload(replaySchema, replayPayloadJson);
     return new OperationDescriptor(kind, operationRef, JSON.writeValueAsString(Map.of(
         "mode", "invoke", "argumentsSha256", CanonicalOperationArguments.digest(argumentsJson),
         "preparedInvocation", Map.of("schema", replaySchema, "payload", payload))));

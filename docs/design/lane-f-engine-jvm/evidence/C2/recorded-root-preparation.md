@@ -2,7 +2,8 @@
 
 September12 decision; source checked at82e0e185d. This refines C2-2 plan
 decisions1,3,5 and7. The common preparation seam is implemented in the current cut;
-typed root plans, child identity and committed ingestion remain owed below.
+the immutable root plan and strict generation observation are implemented. Root-state
+snapshot, producer integration, child identity and committed ingestion remain owed below.
 
 ## Acceptance must contain the plan
 
@@ -59,6 +60,17 @@ The same rule covers explicit HTTP/agent directory and single-file ingestion;
 single-file units also carry an accepted identity beside the Java request.
 Periodic maintenance remains explicitly unrecorded. Explicit reindex/reconcile
 must not escape through the old syncDirectory shortcut.
+
+September12 source follow-through: do not implement pure preparation by calling
+RootLifecycleOps.getWatchedRoots. Its availability projection may schedule a
+filesystem refresh. Snapshot only root membership and collection labels through
+WatchedRootsState, with the existing state owner synchronizing registration/removal
+and this snapshot. Register membership and label together; otherwise a concurrent
+snapshot can freeze a new labelled root as default. Copy the current exclusion
+patterns once. No second registry or persistent revision is needed for this snapshot;
+accepted scope is then the immutable plan. The generation observation remains
+separate and must be revalidated before effects. Implementation of this root-state
+snapshot is owed with the producer, not supplied by the common seam or generation read.
 
 ## Nested roots retain their policies
 
@@ -180,3 +192,37 @@ and export before releasing the worktree. The same suffixes hold for
 Canonical storage documentation is updated; index regeneration, skill sync and
 canonical link checks pass. Full repository/hosted/live validation remains part of
 the next integrated producer checkpoint.
+
+## Immutable root plan verification
+
+September12: RecordedRootPlan is the single typed immutable scope; its root-plan.v1
+JSON is the existing persistence projection. Serialization and decoding share the
+strict guard. Input paths normalize before planning; persisted paths must already be
+absolute and normalized. Partitioning bounds input at1024 before quadratic ancestor
+work. Exact duplicates collapse; conflicting policy or exact-path file/directory kind
+refuses. A same-policy file under a directory still collapses. Nearest retained ancestors
+preserve A(X)/B(Y)/C(X), with immediate retained children excluded from their parent.
+
+Parent review corrected cubic child lookup, a redundant parsed-plan representation,
+serialization-bound mismatch, conflicting duplicate kinds and malformed test fixtures.
+Independent final review found no substantive DTO defect. It also verified that the
+actual Jackson3.1.0 mapper rejects trailing tokens; a repository regression now pins it.
+Focused771 at154742d4a plus this DTO diff executes22 cases/3 suites, zero failures,
+errors or skips and passing app-api PMD. This includes12 root-plan,7 descriptor and3
+architecture cases. Negative772 chooses the outermost ancestor instead of the nearest:
+the alternating-policy regression fails, with one intended failure in15 cases/2 suites.
+Exact production bytes are restored. The separately documented generation768 proof
+and prior preparation763 proof remain scoped to their tested inputs.
+
+```text
+gradlew.bat :modules:app-api:test --tests *RecordedRootPlanTest
+  --tests *OperationDescriptorPreparationTest :modules:app-api:pmdMain
+  :modules:app-api:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain
+```
+
+Negative772 uses only RecordedRootPlanTest and omits PMD. Artifacts are worktree
+tmp/c2-2-root-plan-771 and tmp/c2-2-root-plan-negative-772 with .txt, -counts.json,
+-xml/ suffixes. The reused capture helper labels the earlier c4fbcb53f base; actual
+HEAD is154742d4a plus the unchanged DTO scope and added trailing-token test. Retain
+through lane acceptance plus30 days, exporting before worktree release. This proves
+the value and safe projection, not recorded producer execution or restart replay.
