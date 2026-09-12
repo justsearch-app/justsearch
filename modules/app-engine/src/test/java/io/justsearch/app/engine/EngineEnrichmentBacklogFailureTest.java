@@ -26,6 +26,7 @@ class EngineEnrichmentBacklogFailureTest {
     var failure = new WorkerServiceException(status, "backlog read failed");
     when(worker.queryPendingVdu(any(), any())).thenThrow(failure);
     when(worker.countPendingEmbeddings(any())).thenThrow(failure);
+    when(worker.recoverVduProcessing(any(), any())).thenThrow(failure);
     var admission = new EngineAdmissionController(8, 8, 1);
     try (var registry = new DefaultEngineExecutorRegistry();
         var client = new EngineKnowledgeClient(registry, () -> services,
@@ -33,7 +34,8 @@ class EngineEnrichmentBacklogFailureTest {
       for (Runnable read : java.util.List.<Runnable>of(
           () -> client.countPendingVdu(TestEngineContexts.FOREGROUND),
           () -> client.countPendingEmbeddings(TestEngineContexts.FOREGROUND),
-          () -> client.queryPendingVduDocIds(TestEngineContexts.FOREGROUND))) {
+          () -> client.queryPendingVduDocIds(TestEngineContexts.FOREGROUND),
+          () -> client.recoverVduProcessing(TestEngineContexts.FOREGROUND))) {
         var thrown = assertThrows(KnowledgeClientException.class, read::run);
         assertEquals(KnowledgeClientException.Status.valueOf(status.name()), thrown.status());
         assertSame(failure, thrown.getCause());
@@ -54,6 +56,7 @@ class EngineEnrichmentBacklogFailureTest {
         assertThrows(EngineWorkCancelledException.class, () -> client.countPendingVdu(work.context()));
         assertThrows(EngineWorkCancelledException.class, () -> client.countPendingEmbeddings(work.context()));
         assertThrows(EngineWorkCancelledException.class, () -> client.queryPendingVduDocIds(work.context()));
+        assertThrows(EngineWorkCancelledException.class, () -> client.recoverVduProcessing(work.context()));
         verifyNoInteractions(services);
       }
       assertEquals(0, admission.activeWorkCount());

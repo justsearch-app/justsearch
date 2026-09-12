@@ -58,6 +58,9 @@ class DocumentFieldOpsStrictQueryTest extends LuceneExecutorTestBase {
         // Existing observational callers retain their explicitly best-effort behavior.
         assertTrue(fields.queryDocIdsByField(
             SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING, 100).isEmpty());
+        assertSame(failure, assertThrows(IOException.class, () -> fields.getDocumentFieldOrThrow(
+            "pending", SchemaFields.VDU_RETRY_COUNT)));
+        assertNull(fields.getDocumentField("pending", SchemaFields.VDU_RETRY_COUNT));
       }
     }
   }

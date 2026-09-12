@@ -1,5 +1,13 @@
 # C2 hosted verification
 
+September12: [CI34702144423](https://github.com/justsearch-app/justsearch/actions/runs/34702144423)
+at3b425cebb (guard cleanup) and
+[CI34703161196](https://github.com/justsearch-app/justsearch/actions/runs/34703161196)
+at6b1d6db4f (strict backlog reads) finish successfully. Exact run metadata is retained
+in tmp/c2-hosted-{34702144423,34703161196}-status.json. These are overall workflow
+results; this note does not infer per-test execution or replace the detailed artifact
+audit below. Direct VDU commit/recovery corrections are later source and need fresh CI.
+
 Current projection/orphan proof: [checkpoint656](projection-checkpoint-656.md).
 CI34700660160 at758aeb2eb has a clean first-attempt orphan case and unskipped queue/
 snapshot tests; its sole red job is a documentation encoding error fixed0bdf584bc.

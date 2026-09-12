@@ -139,29 +139,12 @@ final class VduOps {
     }
 
     int recoverVduProcessing(EngineContext engineContext) {
-        try {
-            var request = RecoverVduProcessingRequest.newBuilder().build();
-
-            var response =
-                    rpc.execute(
-                            "recoverVduProcessing",
-                            KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
-                            stub -> stub.recoverVduProcessing(request), engineContext);
-
-            int recovered = response.getRecoveredCount();
-            if (recovered > 0) {
-                log.info("recoverVduProcessing: recovered {} stuck documents", recovered);
-            } else {
-                log.debug("recoverVduProcessing: no stuck documents found");
-            }
-            return recovered;
-
-        } catch (CircuitBreakerOpenException e) {
-            log.debug("recoverVduProcessing rejected by circuit breaker");
-            return 0;
-        } catch (Exception e) {
-            log.error("recoverVduProcessing RPC failed", e);
-            return 0;
-        }
+        var request = RecoverVduProcessingRequest.getDefaultInstance();
+        var response = rpc.execute("recoverVduProcessing",
+                KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
+                calls -> calls.recoverVduProcessing(request), engineContext);
+        int recovered = response.getRecoveredCount();
+        log.debug("recoverVduProcessing: recovered {} stuck documents", recovered);
+        return recovered;
     }
 }

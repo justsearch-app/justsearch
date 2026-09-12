@@ -43,7 +43,8 @@ September12 source audit resolves the next implementation order:
    query fallback. Do not tighten the unrelated status/health projection or change
    indexing.proto. Prove real empty/nonempty results, reader failure, unavailable
    runtime and exact cancellation propagation through the caller mapping.
-2. Direct VDU mutation acknowledgements need a covering commit after parent/chunk
+2. Direct VDU mutation covering commits are implemented and focused-tested in
+   [VDU commit proof](vdu-commits.md). Acknowledgements need a covering commit after parent/chunk
    effects, mark/retry exhaustion and recovery. Existing CommitOps is the owner;
    KnowledgeClient.flush is a no-op and settleIndex also forces merges. Do not use
    either as a fabricated pass barrier. Chunk deletion/regeneration failures must
@@ -54,6 +55,8 @@ September12 source audit resolves the next implementation order:
    no new journal. Current cutover is restart-based; D1 still owns hot-swap leases
    and full accepted-write journalling. A state-check race is not covered by a commit
    alone, so prove the current generation boundary rather than claiming D1 early.
+   The immediately following separate item fixes replay's existing missing-document
+   and swallowed chunk-failure paths so failed effects retain their durable buffer.
 3. Thread exact manual context through BrainRuntimeService, coordinator, batch and
    model/index calls. Reuse registered executor/admission ownership through actual
    cleanup, including cancellation before task entry; autonomous sampling supplies

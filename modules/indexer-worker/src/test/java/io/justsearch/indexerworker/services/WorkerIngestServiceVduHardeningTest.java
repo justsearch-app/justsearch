@@ -681,8 +681,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
               RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none());
 
       assertEquals(2, response.getRecoveredCount());
-      // Recovery no longer commits per-RPC (deferred to commit timer); refresh for NRT visibility.
-      lifecycle.commitOps().maybeRefreshBlocking();
+      // Direct recovery now returns only after its covering commit and reader refresh.
       assertEquals(SchemaFields.VDU_STATUS_PENDING, lifecycle.documentFieldOps().getDocumentField(doc1, SchemaFields.VDU_STATUS));
       assertEquals(SchemaFields.VDU_STATUS_PENDING, lifecycle.documentFieldOps().getDocumentField(doc2, SchemaFields.VDU_STATUS));
       assertEquals(

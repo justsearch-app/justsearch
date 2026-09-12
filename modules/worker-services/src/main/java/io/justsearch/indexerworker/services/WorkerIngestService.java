@@ -807,25 +807,24 @@ public final class WorkerIngestService {
         updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(pageCount));
       }
 
-      // Perform the update
-      boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
-
-      if (updated) {
-        // Regenerate chunk documents ONLY for SUCCESS_TEXT (or legacy non-blank content)
-        boolean shouldRegenerateChunks =
-            effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT ||
-            (effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED && !extractedContent.isBlank());
-
-        if (shouldRegenerateChunks) {
-          int chunksIndexed = regenerateChunks(docId, extractedContent);
-          if (chunksIndexed > 0) {
-            log.info("updateVduResult: regenerated {} chunks for doc: {}", chunksIndexed, docId);
-          }
+      // Keep the parent recoverable until every chunk effect succeeds. A failed replacement
+      // may leave partial writer changes that a later unrelated commit will persist.
+      boolean shouldRegenerateChunks =
+          effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT ||
+          (effectiveOutcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED && !extractedContent.isBlank());
+      if (shouldRegenerateChunks) {
+        int chunksIndexed = regenerateChunks(docId, extractedContent);
+        if (chunksIndexed > 0) {
+          log.info("updateVduResult: regenerated {} chunks for doc: {}", chunksIndexed, docId);
         }
+      }
 
-        // Ensure the updated doc is visible to immediate read-after-write callers
-        // without relying on the async NRT refresh thread timing.
-        // Commit is deferred to the periodic commit timer (DC7) / IndexingLoop cycle.
+      boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
+      if (updated) {
+
+        // A direct acknowledgement covers parent and chunk effects durably. NRT visibility
+        // alone cannot support an operation checkpoint (lane F section 7.5).
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
         ingestLifecycle.commitOps().maybeRefreshBlocking();
         log.info("updateVduResult success for doc: {} (outcome={})", docId, effectiveOutcome);
         return updateVduSuccessResponse();
@@ -1292,14 +1291,14 @@ public final class WorkerIngestService {
           "markVduProcessing",
           sbq -> {
             String normalizedId = normalizeDocIdForMutation(docId);
-            int currentCount = readVduRetryCountBestEffort(normalizedId);
+            int currentCount = readVduRetryCount(normalizedId);
             return switchBufferOps.bufferMarkVduDuringSwitching(
                 sbq, normalizedId, currentCount, maxRetries);
           });
     }
 
     try {
-      int currentCount = readVduRetryCountBestEffort(docId);
+      int currentCount = readVduRetryCount(docId);
       return applyMarkVduProcessing(docId, currentCount, maxRetries);
 
     } catch (Exception e) {
@@ -1331,8 +1330,8 @@ public final class WorkerIngestService {
         SchemaFields.EXTRACTION_REASON_CODE, IngestionReasonCodes.EXTRACTION_DROPOUT_UNRECOVERED);
   }
 
-  private int readVduRetryCountBestEffort(String docId) {
-    String currentCountStr = ingestLifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT);
+  private int readVduRetryCount(String docId) throws java.io.IOException {
+    String currentCountStr = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.VDU_RETRY_COUNT);
     return ParseUtils.parseIntSafe(currentCountStr, 0);
   }
 
@@ -1348,8 +1347,11 @@ public final class WorkerIngestService {
       Map<String, Object> updates = new HashMap<>();
       updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_FAILED);
       updates.put(SchemaFields.VDU_ENRICHMENT, VDU_MAX_RETRIES_EXCEEDED_ENRICHMENT);
-      ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
-      // Commit deferred to periodic commit timer (DC7) / IndexingLoop cycle.
+      if (!ingestLifecycle.indexingCoordinator().updateDocument(docId, updates)) {
+        return markVduErrorResponse("Document not found: " + docId);
+      }
+      ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
+      ingestLifecycle.commitOps().maybeRefreshBlocking();
       return markVduErrorResponse(VDU_MAX_RETRIES_EXCEEDED_ERROR);
     }
 
@@ -1360,7 +1362,8 @@ public final class WorkerIngestService {
 
     boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
     if (updated) {
-      // Commit deferred to periodic commit timer (DC7) / IndexingLoop cycle.
+      ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
+      ingestLifecycle.commitOps().maybeRefreshBlocking();
       log.debug(
           "markVduProcessing: doc {} marked PROCESSING, retry {}/{}",
           docId,
@@ -1371,8 +1374,8 @@ public final class WorkerIngestService {
     return markVduErrorResponse("Document not found: " + docId);
   }
 
-  private List<String> processingDocIdsForRecovery() {
-    return ingestLifecycle.documentFieldOps().queryDocIdsByField(
+  private List<String> processingDocIdsForRecovery() throws java.io.IOException {
+    return ingestLifecycle.documentFieldOps().queryDocIdsByFieldOrThrow(
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
   }
 
@@ -1390,6 +1393,7 @@ public final class WorkerIngestService {
   static int recoverProcessingDocsWithResetOp(
       List<String> processingDocIds, VduProcessingResetOp resetOp) {
     int recovered = 0;
+    Exception firstFailure = null;
     for (String docId : processingDocIds) {
       try {
         // Reset to PENDING (retry count already incremented, so won't loop forever).
@@ -1398,7 +1402,11 @@ public final class WorkerIngestService {
         }
       } catch (Exception e) {
         log.warn("Failed to recover doc: {}", docId, e);
+        if (firstFailure == null) firstFailure = e;
       }
+    }
+    if (recovered == 0 && firstFailure != null) {
+      throw new IllegalStateException("No selected VDU document could be recovered", firstFailure);
     }
     return recovered;
   }
@@ -1412,11 +1420,7 @@ public final class WorkerIngestService {
     try (var ignored = openRequestMdc(ctx)) {
     log.info("recoverVduProcessing RPC called");
 
-    RecoverVduProcessingResponse unavailable =
-        indexRuntimeUnavailableReply("recoverVduProcessing", recoverVduCountResponse(0));
-    if (unavailable != null) {
-      return unavailable;
-    }
+    requireEnrichmentReader(ctx);
 
     if (switchBufferOps.isSwitching()) {
       // During cutover, accept and durably buffer recovery so clients don't depend on retries.
@@ -1437,7 +1441,10 @@ public final class WorkerIngestService {
 
       int recovered = recoverProcessingDocs(processingDocIds);
 
-      // Commit deferred to periodic commit timer (DC7) / IndexingLoop cycle.
+      if (recovered > 0) {
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+        ingestLifecycle.commitOps().maybeRefreshBlocking();
+      }
 
       log.info("recoverVduProcessing: recovered {} of {} documents", recovered, processingDocIds.size());
 
@@ -1445,7 +1452,8 @@ public final class WorkerIngestService {
 
     } catch (Exception e) {
       log.error("recoverVduProcessing failed", e);
-      return recoverVduCountResponse(0);
+      throw new WorkerServiceException(
+          WorkerServiceException.Status.INTERNAL, "VDU recovery failed", e);
     }
     }
   }

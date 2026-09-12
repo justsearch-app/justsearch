@@ -21,7 +21,13 @@ reads. [Backlog proof](evidence/C2/backlog-reads.md) records 46 focused cases, f
 additional actual Engine error-translation cases, negative regressions and independent
 review. These establish control-read failures, not durable write acknowledgements.
 
-Next: durable VDU index effects, actual offline procedure outcome/context propagation, then the remaining direct HTTP/keyed/ingestion
+Direct VDU covering commits now have [focused proof](evidence/C2/vdu-commits.md):
+162 cases with explicit task reuse, negative regressions and recovery corrections.
+The prior guard checkpoint3b425cebb is fully green in hosted CI34702144423;
+this does not stand in for hosted verification of these newer changes.
+
+Next: preserve failed buffered VDU replay, then explicit deferred completion/generation
+boundaries and actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 

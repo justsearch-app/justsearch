@@ -47,7 +47,7 @@ public final class DocumentFieldOps {
 
   /**
    * Character slice in a stored parent document that reconstructs one chunk's text, together with
-   * the {@code chunk_parent_content_sha256} revision those offsets address (tempdoc 931 §E item 5).
+   * the {@code chunk_parent_content_sha256} revision those offsets address (tempdoc 931 Â§E item 5).
    * The revision is what lets {@link ChunkReadRevisionGuard} tell an in-sync parent from one that
    * has been rewritten but whose chunks have not been regenerated yet.
    */
@@ -96,7 +96,7 @@ public final class DocumentFieldOps {
    *
    * <p>Calls {@code refreshBeforeFetch} to ensure write-after-read visibility.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public String getDocumentContent(String docId) {
     if (docId == null) return null;
@@ -116,7 +116,7 @@ public final class DocumentFieldOps {
    *
    * <p>Calls {@code refreshBeforeFetch} to ensure write-after-read visibility.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public Map<String, String> getDocumentContentBatch(List<String> docIds) {
     if (docIds == null || docIds.isEmpty()) {
@@ -312,7 +312,7 @@ public final class DocumentFieldOps {
    * Resolves slices through an injectable loader so parent de-duplication is directly testable.
    *
    * <p>A chunk whose stored {@code chunk_parent_content_sha256} is not the revision the parent is
-   * at right now is OMITTED rather than sliced out of the newer text — see
+   * at right now is OMITTED rather than sliced out of the newer text â€” see
    * {@link ChunkReadRevisionGuard}. Every caller already handles a chunk missing from this map
    * (that is what a deleted parent looks like), so "not yet consistent" travels as an absence.
    */
@@ -355,47 +355,52 @@ public final class DocumentFieldOps {
    * <p>Prefers DocValues for DocValues-backed fields, falls back to stored fields.
    * Calls {@code refreshBeforeFetch} to ensure write-after-read visibility.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public String getDocumentField(String docId, String fieldName) {
-    if (docId == null || fieldName == null) {
-      return null;
-    }
     try {
-      maybeRefreshBlockingIfCommittedSinceRefresh();
-      return bridge.withSearcher(searcher -> {
-        Query query = new TermQuery(new Term(idField, docId));
-        var topDocs = searcher.search(query, 1);
-
-        if (topDocs.scoreDocs.length == 0) {
-          return null;
-        }
-
-        int docNum = topDocs.scoreDocs[0].doc;
-
-        // Prefer DocValues for DocValues-backed fields (e.g., mime/language/size_bytes).
-        FieldMapper.FieldDef def = session.fieldMapper.fieldDef(fieldName);
-        if (def != null && def.docValues) {
-          Map<String, String> projected = new HashMap<>();
-          readPathOps.projectDocValues(searcher, docNum, Set.of(def.id), projected);
-          String value = projected.get(def.id);
-          if (value != null) {
-            return value;
-          }
-        }
-
-        // Fallback to stored fields.
-        boolean includeContent = SchemaFields.CONTENT.equals(fieldName);
-        Set<String> allow = Set.of(fieldName);
-        Map<String, String> stored =
-            SearchResultFormatter.extractFromStoredFields(
-                searcher.storedFields(), docNum, includeContent, allow);
-        return stored.get(fieldName);
-      });
+      return getDocumentFieldOrThrow(docId, fieldName);
     } catch (IOException e) {
       log.debug("Failed to get field {} for {}: {}", fieldName, docId, e.getMessage());
       return null;
     }
+  }
+
+  /** Reads a control field without converting I/O failure into an absent/default value. */
+  public String getDocumentFieldOrThrow(String docId, String fieldName) throws IOException {
+    if (docId == null || fieldName == null) {
+      return null;
+    }
+    maybeRefreshBlockingIfCommittedSinceRefresh();
+    return bridge.withSearcher(searcher -> {
+      Query query = new TermQuery(new Term(idField, docId));
+      var topDocs = searcher.search(query, 1);
+
+      if (topDocs.scoreDocs.length == 0) {
+        return null;
+      }
+
+      int docNum = topDocs.scoreDocs[0].doc;
+
+      // Prefer DocValues for DocValues-backed fields (e.g., mime/language/size_bytes).
+      FieldMapper.FieldDef def = session.fieldMapper.fieldDef(fieldName);
+      if (def != null && def.docValues) {
+        Map<String, String> projected = new HashMap<>();
+        readPathOps.projectDocValues(searcher, docNum, Set.of(def.id), projected);
+        String value = projected.get(def.id);
+        if (value != null) {
+          return value;
+        }
+      }
+
+      // Fallback to stored fields.
+      boolean includeContent = SchemaFields.CONTENT.equals(fieldName);
+      Set<String> allow = Set.of(fieldName);
+      Map<String, String> stored =
+          SearchResultFormatter.extractFromStoredFields(
+              searcher.storedFields(), docNum, includeContent, allow);
+      return stored.get(fieldName);
+    });
   }
 
   /**
@@ -404,7 +409,7 @@ public final class DocumentFieldOps {
    * <p>Returns each value separately (no comma-join). Falls back to {@link #getDocumentField}
    * wrapped in a singleton list for non-multi-valued fields.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public List<String> getDocumentFieldValues(String docId, String fieldName) {
     if (docId == null || fieldName == null) {
@@ -457,10 +462,10 @@ public final class DocumentFieldOps {
   /**
    * Checks if a document exists and has the same lastModified timestamp.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public boolean isUnmodified(String docId, long currentLastModified) {
-    // No blocking refresh here — false negatives (re-indexing unmodified docs) are harmless.
+    // No blocking refresh here â€” false negatives (re-indexing unmodified docs) are harmless.
     // The CRTRT thread refreshes every 500ms, bounding staleness. Blocking refresh on every
     // point lookup causes "refresh storms" (the same anti-pattern Elasticsearch abandoned in 5.0).
     try {
@@ -499,7 +504,7 @@ public final class DocumentFieldOps {
   /**
    * Queries document IDs matching a specific field value.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public List<String> queryDocIdsByField(String field, String value, int limit) {
     return queryDocIdsByField(field, value, limit, false);
@@ -519,7 +524,7 @@ public final class DocumentFieldOps {
    * on it hands the backfill batch slots it can only rewrite, never advance. Chunks still reach the
    * combined pass through their own {@code chunk_embedding_status} selection.
    *
-   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public List<String> queryNonChunkDocIdsByField(String field, String value, int limit) {
     return queryDocIdsByField(field, value, limit, true);
@@ -579,13 +584,13 @@ public final class DocumentFieldOps {
    * <p>This deliberately has no corpus-size cap: omitting a tail of the active index during an
    * identity-store import would cause those documents to be re-minted on their next write. The
    * result is handed to {@code batchConsumer} in slices of {@code batchSize} instead of returned as
-   * one list, so the caller's peak heap is a batch rather than the corpus (tempdoc 931 §C.2).
+   * one list, so the caller's peak heap is a batch rather than the corpus (tempdoc 931 Â§C.2).
    *
    * <p>A live parent whose {@code doc_id}/{@code doc_uid} docvalues are missing or blank is counted
    * in {@code parentsSkipped} and omitted. That shape predates the identity store or comes from a
    * partially-written legacy index; it mints a fresh identity at its next admission, which is a
    * recoverable outcome, whereas failing the scan takes the whole Worker down. Genuine I/O failure
-   * is still surfaced — that is not a legacy shape, it is an unreadable index.
+   * is still surfaced â€” that is not a legacy shape, it is an unreadable index.
    */
   public ParentIdentityScanSummary scanParentDocumentIdentities(
       int batchSize, Consumer<List<StoredDocumentIdentity>> batchConsumer) {
