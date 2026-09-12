@@ -734,6 +734,58 @@ final class OperationExecutorImplTest {
   }
 
   @Test
+  void mediumRiskUnauditedMutationStillAcceptsBeforeEffect() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.unaudited-mutation");
+    var key = new java.util.concurrent.atomic.AtomicReference<String>();
+    handlers.register(id, (args, context) -> {
+      var rows = operationStore.openRecords();
+      assertEquals(1, rows.size(), "audit suppression cannot bypass durable acceptance");
+      assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING, rows.getFirst().state());
+      key.set(rows.getFirst().key());
+      return OperationResult.success("mutated");
+    });
+    var original = makeOp(id, TrustTier.CORE, false, AuditPolicy.NONE);
+    var op = new Operation(original.id(), original.presentation(), original.intf(),
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE, AuditPolicy.NONE,
+            RetryPolicy.noRetry(), Set.of(), false), original.availability(), original.lineage(),
+        original.binding(), original.provenance(), original.executors());
+    var history = new ArrayList<OperationHistoryEntry>();
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, history::add, Clock.systemUTC());
+    assertTrue(executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal()).success());
+    assertTrue(history.isEmpty());
+    assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
+        operationStore.find(key.get()).orElseThrow().state());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(io.justsearch.app.api.EngineAdmissionException.Reason.class)
+  void admissionRefusalRetainsItsReasonInDurableAttempt(io.justsearch.app.api.EngineAdmissionException.Reason reason)
+      throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.admission-reason");
+    handlers.register(id, (args, context) -> { throw new AssertionError("Refused admission cannot run"); });
+    var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 3);
+    org.mockito.Mockito.when(admission.attach(org.mockito.ArgumentMatchers.any())).thenThrow(refusal);
+    var history = new ArrayList<OperationHistoryEntry>();
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, history::add, Clock.systemUTC());
+    org.junit.jupiter.api.Assertions.assertSame(refusal,
+        assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+            () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}",
+                io.justsearch.app.services.TestEngineContexts.internal())));
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+        var statement = connection.createStatement();
+        var rows = statement.executeQuery("SELECT state, failure_reason FROM operations")) {
+      assertTrue(rows.next());
+      assertEquals("FAILED", rows.getString("state"));
+      assertEquals(reason.name(), rows.getString("failure_reason"));
+      assertFalse(rows.next());
+    }
+    assertEquals(1, history.size());
+    assertEquals(Optional.of(reason.name()), history.getFirst().diagnosticsLink());
+  }
+
+  @Test
   void noneAuditSuppressesHistoryEntry() {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.audit-axis");

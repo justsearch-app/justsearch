@@ -29,6 +29,8 @@ scope addition is recorded under the next item's section0.1, never silently expa
    [R3 proof](review-r3-transition-refusal.md): three intended negative failures; final797 passes.
 4. **R4 OPEN — audit/admission.** Audit NONE cannot bypass durable mutation acceptance;
    admission failures preserve their reason. Preserve deliberate audit suppression.
+   [R4 proof](review-r4-audit-admission.md): five intended negative failures; final800
+   passes88 cases, PMD and UI integration-test compilation. Batch review pending.
 5. **R5 OPEN — bounded history.** Add identity/checkpoint SQL bounds, inspect SQLite
    efficiently without violating snapshot ownership, bring C2-5 retention/cap/fence
    acceptance forward before any more producers.

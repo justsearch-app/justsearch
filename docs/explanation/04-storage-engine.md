@@ -333,6 +333,10 @@ default, and undo retains its existing target identity. This seam does not yet p
 ingress, recovery replay or sealed content-bearing preparation.
 
 `OperationPolicy.recordKind` classifies ordinary, prepared, refused and undo attempts.
+Every dispatched operation accepts a durable attempt, including operations with
+`AuditPolicy.NONE`; that policy suppresses history projection only. Admission
+refusals persist their specific reason (`CONTEXT_LIMIT`, `ENGINE_LIMIT`, `FROZEN`
+or `WORK_FINISHED`) without invoking the handler.
 The registry's `OperationKind` enum in app-agent-api is also the store's kind contract;
 its JSON and SQLite spelling is the same closed lowercase vocabulary, including `memory`
 and `note`. Existing policy constructors default to `operation`. The full declaration

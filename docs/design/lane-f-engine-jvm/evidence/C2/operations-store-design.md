@@ -150,9 +150,9 @@ See [C2-2 implementation plan](C2-2-plan.md) for the source evidence and checks.
   determining survival for every special operation. The handler receives an `OperationRecordHandle` (id,
   key and checkpoint only) through the dispatch context and never calls `accept` for
   its own row; it may accept child rows under fresh Engine-minted keys (the successor ingest row).
-  A row is written for every keyed call, and for every unkeyed call whose `AuditPolicy` is not
-  `NONE`, which reproduces today's history exactly; audit suppression never suppresses a keyed
-  acceptance. *(D1's "one row per dispatch" item.)*
+  A row is written for every dispatched call, keyed or unkeyed; `AuditPolicy.NONE`
+  suppresses history projection only. September13 R4 supersedes the unkeyed audit
+  exemption. *(D1's "one row per dispatch" item.)*
 - **Ingestion.** One row per walk: an ingest request, a forced rescan, or a boot recovery walk
   for a root with no open row. The 60-second periodic sync is maintenance and gets no row. On
   boot, a `RUNNING` ingest row for a root is resumed by the recovery walk, never re-minted. The

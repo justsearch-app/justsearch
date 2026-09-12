@@ -359,65 +359,45 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       InvocationProvenance provenance, EngineContext context, String undoId) {
     Instant startedAt = clock.instant();
     PreparedInvocation invocation = prepareInvocation(op, argumentsJson, provenance, context, undoId != null);
-    // C2-3 adds keyed transport. The unkeyed audit
-    // suppression is preserved here; keyed calls will always accept regardless of audit policy.
-    OperationAttemptRunner.PreparedAttempt prepared = op.policy().audit() == AuditPolicy.NONE ? null
-        : attempts.accept(new OperationAttemptRunner.Request(null,
-            invocation.descriptor(),
-            context, provenance));
-    if (prepared != null) {
-      if (prepared.existing()) {
-        return attempts.start(prepared, ignored -> {
-          throw new IllegalStateException("Existing acceptance must never execute");
-        }).response();
-      }
-      var unused = prepared.completion().whenComplete((row, failure) -> {
-        if (failure != null) {
-          emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
-          return;
-        }
-        boolean success = row.state() == OperationState.COMPLETE;
-        OperationOutcome outcome = success
-            ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
-        Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
-            ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
-            : Optional.empty();
-        emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution);
-      });
+    // Every declaration has a record kind. Audit only controls history projection.
+    OperationAttemptRunner.PreparedAttempt prepared = attempts.accept(new OperationAttemptRunner.Request(null,
+        invocation.descriptor(), context, provenance));
+    if (prepared.existing()) {
+      return attempts.start(prepared, ignored -> {
+        throw new IllegalStateException("Existing acceptance must never execute");
+      }).response();
     }
+    var _ = prepared.completion().whenComplete((row, failure) -> {
+      if (failure != null) {
+        emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
+        return;
+      }
+      boolean success = row.state() == OperationState.COMPLETE;
+      OperationOutcome outcome = success
+          ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
+      Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
+          ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
+          : Optional.empty();
+      emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution);
+    });
     try {
       OperationResult refusal = preflight(op, invocation.refusal());
       if (refusal != null) {
-        if (prepared != null) attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
-        else emitHistory(op, startedAt, OperationOutcome.FAILURE, refusal.message(), provenance, Optional.empty());
+        attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
         return refusal;
       }
       if (invocation.failure() != null) throw invocation.failure();
       try (var work = admission.attach(context)) {
-        if (prepared != null) {
-          return attempts.start(prepared,
-              handle -> invokeOwnedHandler(op, invocation, provenance, work, undoId, handle)).response();
-        }
-        OperationExecution execution = invokeOwnedHandler(op, invocation, provenance, work, undoId, null);
-        var unused = execution.completion().whenComplete((result, failure) -> {
-          if (failure != null) {
-            emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
-            return;
-          }
-          OperationOutcome outcome = result.success()
-              ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
-          emitHistory(op, startedAt, outcome, null, provenance,
-              result.success() && undoId == null && op.policy().undoSupported() ? result.executionId() : Optional.empty());
-        });
-        return execution.response();
+        return attempts.start(prepared,
+            handle -> invokeOwnedHandler(op, invocation, provenance, work, undoId, handle)).response();
       }
+    } catch (io.justsearch.app.api.EngineAdmissionException failure) {
+      try { attempts.rejectBeforeStart(prepared, failure.reason().name()); }
+      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
+      throw failure;
     } catch (RuntimeException failure) {
-      if (prepared == null) {
-        emitHistory(op, startedAt, OperationOutcome.FAILURE, failure.getMessage(), provenance, Optional.empty());
-      } else {
-        try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
-        catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
-      }
+      try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
+      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
       throw failure;
     }
   }
