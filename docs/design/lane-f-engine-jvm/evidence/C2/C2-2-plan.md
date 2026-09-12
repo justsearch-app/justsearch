@@ -9,6 +9,69 @@ full build/PMD9,917 cases, stress659 and clean hosted orphan/queue/snapshot resu
 Offline procedure guard cleanup is the next bounded correction; actual completion,
 context and index durability remain open as described below.
 
+### Offline guard cleanup prerequisite
+
+September12: OfflineCoordinator's existing single-flight guard now covers procedure
+setup and releases even if endProcedure fails. End only a successfully begun procedure;
+preserve a body RuntimeException/Error and suppress a distinct cleanup failure onto it.
+Use the existing guard and a local cleanup method; no additional lifecycle state or
+registration is needed. This is a prerequisite to actual outcome publication, not that
+publication itself. Caller context, VDU durable acknowledgements, explicit blocked/pending
+outcomes and asynchronous operation completion remain owed.
+
+Windows/Java25 focused660 executes29 cases/10 suites, zero failures/errors/skips plus
+app-services main/test PMD. Negative661 restores the original production coordinator:
+allfour new tests fail for the intended stuck-guard/primary-error-masking reasons.
+Restored662 reuses the identical660 result FROM-CACHE. Independent review found no
+defect but flagged a new Error Prone Finally warning; move the same suppression/release
+logic into finishProcedure, without suppression. Final663 executes29 cases/10 suites,
+zero failures/errors/skips plus PMD and no Finally warning. Evidence is retained in
+tmp/c2-2-offline-cleanup-{660,662,663}.txt with -xml/-counts.json, and negative-661.txt
+with -xml. Tests use the real coordinator and mocked procedure failures. Broader module,
+hosted and live owner-completion proof remains part of the upcoming producer boundary.
+Retain through lane acceptance plus30 days.
+
+### Offline backlog and durability: next bounded items
+
+September12 source audit resolves the next implementation order:
+
+1. Backlog reads must distinguish unavailable from empty. Reuse queryPendingVdu's
+   existing totalCount and bounded ID selection, with strict reader access; use the
+   existing countByFieldOrThrow for pending embeddings through one Java-only ingest
+   port method. Retire VduOps' dependency on best-effort status metrics and its empty
+   query fallback. Do not tighten the unrelated status/health projection or change
+   indexing.proto. Prove real empty/nonempty results, reader failure, unavailable
+   runtime and exact cancellation propagation through the caller mapping.
+2. Direct VDU mutation acknowledgements need a covering commit after parent/chunk
+   effects, mark/retry exhaustion and recovery. Existing CommitOps is the owner;
+   KnowledgeClient.flush is a no-op and settleIndex also forces merges. Do not use
+   either as a fabricated pass barrier. Chunk deletion/regeneration failures must
+   prevent completion. SWITCHING's durable buffer acceptance is not a Lucene effect:
+   expose deferred versus committed outcome explicitly through the Java port and
+   carry replay completion to the operation before terminal publication. Preserve
+   the existing switch buffer and resolve its missing-document/chunk-failure gaps;
+   no new journal. Current cutover is restart-based; D1 still owns hot-swap leases
+   and full accepted-write journalling. A state-check race is not covered by a commit
+   alone, so prove the current generation boundary rather than claiming D1 early.
+3. Thread exact manual context through BrainRuntimeService, coordinator, batch and
+   model/index calls. Reuse registered executor/admission ownership through actual
+   cleanup, including cancellation before task entry; autonomous sampling supplies
+   internal attribution. The exposed operation future must not complete from
+   EngineFutures.done before its actual-exit callback has released owner resources.
+4. Return the bounded pass's processed, failed, remaining and blocked outcome and
+   embedding handoff after cleanup. The captured default pass is at most100 IDs;
+   later global pending work is not a failed captured unit or a global-drain promise.
+   Preserve existing abstention/no-text behavior, but report it explicitly. Record
+   partial durable progress before terminal failure. Correct the UI drain wording
+   and prove actual owner completion over dispatch and the installed path.
+
+Primary sources: VduOps count/query catches; WorkerIngestService.queryPendingVdu,
+updateVduResult, markVduProcessing and recoverVduProcessing; IndexCountOps.countByFieldOrThrow;
+DocumentFieldOps.queryDocIdsByField; CommitOps.commitAndTrack; IngestSwitchBufferOps;
+KnowledgeServerMigrationOps replay; BrainRuntimeServiceImpl.triggerOfflineProcessing;
+EngineFutures.supplyAsync. These are C2-2 prerequisites/remaining work, not accepted
+deferrals or transferred implementation ownership.
+
 ## Decisions
 
 1. Keep indexing.proto unchanged as C2 requires. KnowledgeClient.scanRoot builds a

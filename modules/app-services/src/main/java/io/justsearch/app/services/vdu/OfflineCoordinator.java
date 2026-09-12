@@ -98,11 +98,12 @@ public class OfflineCoordinator {
         // Tempdoc 737 (task 3): the entire run is a reconciler procedure. Engine states held during
         // the run are the procedure's business; endProcedure returns the engine to spec.
         boolean procedureBegun = false;
-        if (reconciler != null) {
-            reconciler.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "offline-processing");
-            procedureBegun = true;
-        }
+        Throwable primaryFailure = null;
         try {
+            if (reconciler != null) {
+                reconciler.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "offline-processing");
+                procedureBegun = true;
+            }
             KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
             if (knowledgeClient == null) {
                 LOG.info("Offline processing skipped: Worker not connected yet");
@@ -142,13 +143,24 @@ public class OfflineCoordinator {
             }
 
             LOG.info("Offline processing complete");
+        } catch (RuntimeException | Error failure) {
+            primaryFailure = failure;
+            throw failure;
         } finally {
             // endProcedure BEFORE clearing the processing flag: the reconciler returns the engine to
             // spec now, so chatEnabled=true → engine returns ONLINE even after Phase B parked it;
             // chatEnabled=false → it stays down. THIS is what kills §3d.
-            if (procedureBegun) {
-                reconciler.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
-            }
+            finishProcedure(procedureBegun, primaryFailure);
+        }
+    }
+
+    private void finishProcedure(boolean procedureBegun, Throwable primaryFailure) {
+        try {
+            if (procedureBegun) reconciler.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
+        } catch (RuntimeException | Error cleanup) {
+            if (primaryFailure == null) throw cleanup;
+            if (primaryFailure != cleanup) primaryFailure.addSuppressed(cleanup);
+        } finally {
             processing.set(false);
         }
     }
