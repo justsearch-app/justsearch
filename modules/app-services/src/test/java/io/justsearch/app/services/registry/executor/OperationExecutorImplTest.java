@@ -130,6 +130,30 @@ final class OperationExecutorImplTest {
   }
 
   @Test
+  void synchronousCompletionWriteFailureCannotReturnSuccess() throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection(
+        "jdbc:sqlite:" + operationDirectory.resolve("operations.db")); var statement = connection.createStatement()) {
+      statement.execute("CREATE TRIGGER refuse_complete BEFORE UPDATE ON operations WHEN NEW.state = 'COMPLETE' "
+          + "BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+    }
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.completion-write-test");
+    var effects = new java.util.concurrent.atomic.AtomicInteger();
+    handlers.register(id, (args, context) -> {
+      effects.incrementAndGet();
+      return OperationResult.success("Effect committed");
+    });
+    var emitted = new ArrayList<OperationHistoryEntry>();
+    var executor = new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+    assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
+        () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}",
+            io.justsearch.app.services.TestEngineContexts.internal()));
+    assertEquals(1, effects.get());
+    assertTrue(emitted.isEmpty(), "there is no durable terminal outcome to publish");
+    assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING, operationStore.openRecords().getFirst().state());
+  }
+
+  @Test
   void undoReceivesItsOwnAcceptedIdentity() {
     var handlers = new HandlerRegistry();
     var id = new OperationRef("core.undo-record-test");

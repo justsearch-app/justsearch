@@ -113,6 +113,17 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         failObservation(control, storageFailure);
       }
     });
+    // Synchronous adapters finish before start returns. Do not return their successful effect
+    // response if terminal persistence already failed; an unfinished async attempt still returns
+    // its immediate response and exposes any later failure through the completion observation.
+    if (control.done.isCompletedExceptionally()) {
+      try { control.done.join(); }
+      catch (CompletionException failure) {
+        if (failure.getCause() instanceof RuntimeException runtime) throw runtime;
+        if (failure.getCause() instanceof Error fatal) throw fatal;
+        throw failure;
+      }
+    }
     return new Result(current(control), execution.response(), control.done.minimalCompletionStage());
   }
 

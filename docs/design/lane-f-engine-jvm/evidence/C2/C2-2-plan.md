@@ -264,6 +264,20 @@ This wiring is still WIP: catalog recordKind/keyed transport, actual async handl
 overrides, ingestion, scheduled producers and installed proofs remain required.
 No installed acceptance claim is made from synchronous handler adaptation.
 
+Independent review of8482492c0 found two defects. Negative592 proves synchronous
+terminal-write failure returned success (expected OperationStoreException, nothing
+thrown) using a real SQLite trigger refusing COMPLETE. The runner now propagates an
+already-observed completion persistence failure before returning the immediate
+response; later async failures remain exposed by the completion stage. The row
+stays RUNNING and no terminal history is published. Two systemTest EngineRoot
+constructors also needed the required shared runner; both now construct it over
+their existing store. 593 passes the executor/runner regression suites and
+:modules:system-tests:compileSystemTestJava. Negative log/XML:
+tmp/c2-2-dispatch-storage-negative-592.*; positive log/XML/counts:
+tmp/c2-2-scheduled-and-review-593.txt, tmp/c2-2-scheduled-593-xml and
+tmp/c2-2-scheduled-593-counts.json. 593 also includes the next scheduled-producer
+dirty diff; that producer is a separate C2-2 checkpoint, not part of this correction.
+
 ### Async completion decisions
 
 Source-only owner inspection (retained here rather than requiring agent transcripts)
