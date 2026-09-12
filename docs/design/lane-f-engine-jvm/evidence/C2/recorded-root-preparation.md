@@ -2,8 +2,8 @@
 
 September12 decision; source checked at82e0e185d. This refines C2-2 plan
 decisions1,3,5 and7. The common preparation seam is implemented in the current cut;
-the immutable root plan and strict generation observation are implemented. Root-state
-snapshot, producer integration, child identity and committed ingestion remain owed below.
+the immutable root plan, strict generation observation and atomic root-state preparation
+are implemented. Producer integration, child identity and committed ingestion remain owed below.
 
 ## Acceptance must contain the plan
 
@@ -70,7 +70,7 @@ snapshot can freeze a new labelled root as default. Copy the current exclusion
 patterns once. No second registry or persistent revision is needed for this snapshot;
 accepted scope is then the immutable plan. The generation observation remains
 separate and must be revalidated before effects. Implementation of this root-state
-snapshot is owed with the producer, not supplied by the common seam or generation read.
+snapshot is implemented below; the common seam and generation read alone did not supply it.
 
 ## Nested roots retain their policies
 
@@ -125,6 +125,38 @@ numeric id. It replaces the worker-minted UUID with an already-owned identity an
 avoids aliasing surviving jobs to a reused integer after operations.db recovery.
 Numeric row ids remain the local ordering/capability identity. Verify that database
 recovery cannot attach an old scan's committed units to a newly accepted child.
+
+September12 child-acceptance mechanism: the runner accepts an ingest child only from
+its own live parent handle and a root contained in that parent's persisted plan.
+The store transaction reads the parent, derives the generation from its plan and
+canonicalizes a one-root child descriptor containing parentOperationKey. It looks
+for the complete child identity before inserting under a fresh UUIDv7 key. A repeated
+lookup returns the existing row, including a terminal one. A new child requires a
+RUNNING parent; an absent/terminal parent or a root outside the plan refuses before
+effect. Child audit attribution and survival inherit the stored parent; live execution
+continues with the parent's admitted context, retaining work identity separately.
+No client-supplied relation or database-local parent id establishes ownership. The
+runner remains the only terminal writer. Reuse the store's existing transaction and
+insert primitive, rather than nesting transactions or introducing another child store.
+
+Independent child review identifies a prerequisite before connecting recorded handlers:
+OperationExecutorImpl currently stamps even prepared parents as generic OPERATION, but
+production deliberately owns REINDEX/INGEST and fails unowned interactive operations at
+boot. Bring forward the declared catalog recordKind portion of C2-3 for these parents;
+do not own every generic operation or infer kind from arbitrary replay JSON. The same
+closed vocabulary must serve the policy and durable row, without a duplicate kind enum.
+Keyed ingress, sealed content and approval freezing remain C2-3.
+
+The runner validates its private parent capability and owner, not public id/key values.
+Child identity has an exact typed grammar embedding the unchanged root-plan.v1 projection;
+lookup compares kind, operation reference and canonical identity. Use the exact stored
+matching root, preserving existing subtree exclusions without repartitioning. Copy raw
+parent context/audit columns inside the transaction and validate them on an existing match;
+do not fabricate InvocationProvenance fields the row never stored. Permanent parent/scope
+refusal is distinct from storage failure. The parent owner aggregates every child's durable
+completion; insertion alone cannot prevent an early parent finish. Existing open children
+resume only through C2-8's INGEST reconciler; normal start remains non-reexecuting. Prove
+parent-first and child-first recovery ordering, plus new children absent at runner boot.
 
 Required regressions: kill after parent acceptance before child creation; mutate
 watched roots after acceptance; refuse storage before any scan; restart without
@@ -226,3 +258,48 @@ tmp/c2-2-root-plan-771 and tmp/c2-2-root-plan-negative-772 with .txt, -counts.js
 HEAD is154742d4a plus the unchanged DTO scope and added trailing-token test. Retain
 through lane acceptance plus30 days, exporting before worktree release. This proves
 the value and safe projection, not recorded producer execution or restart replay.
+
+## Atomic root-state preparation verification
+
+September12: IndexingService.prepareReindexPlan reaches strict generation capture,
+then RootLifecycleOps snapshots membership/labels through WatchedRootsState. It copies
+exclusion policy once and resolves null/blank collection to default before partitioning.
+It does not call the availability projection or schedule scan/watch/delete/persist work.
+Watched roots retain directory intent without a filesystem probe; explicit file ingest
+is separate, and admission must reject a vanished or changed-kind target later.
+
+Registration, load, membership mutation, removal, clear and persist share the existing
+state monitor. Registration publishes membership and collection together. Completion
+checks membership and updates state under that same monitor so removal cannot land
+between the check and timestamp write. Independent source review found no production
+defect or inverse store/state lock order. Review's missing atomic-label and generation-port
+proof is then supplied by the final fixtures; parent takes the test diff after two worker
+correction rounds.
+
+773 executes40 cases/11 suites plus affected PMD, zero failures/errors/skips.
+The final atomic-label fixture waits for a blocked or completed snapshot at a paused
+membership insertion; the removal fixture pauses after observing membership true.
+Negative774 restores the old registration synchronization and removes the completion
+monitor. Three failures in13 cases show actual null collection, two duplicate walks,
+and removed-root resurrection. Original production bytes are restored. Final775 passes
+40 cases/11 suites with PMD:28 app-services cases execute,12 app-engine cases reuse the
+unchanged773 input. It also verifies KnowledgeClient preparation propagates all strict
+generation refusals and captures generation once for a successful empty-root plan.
+
+```text
+gradlew.bat :modules:app-services:test --tests *RecordedRootPreparationTest
+  --tests *RootCompletionMembershipTest --tests *WatchedRootsStateTest
+  --tests *RootLifecycleOpsIdempotencyTest --tests *WatchedRootScanCollectionTest
+  :modules:app-engine:test --tests *EngineGenerationCaptureTest
+  :modules:app-services:pmdMain :modules:app-services:pmdTest
+  :modules:app-api:pmdMain :modules:app-engine:pmdTest
+  -PtestParallelism=1 --max-workers=4 --console=plain
+```
+
+Negative774 selects only the two new app-services fixtures and omits PMD. Base04716d41e
+plus snapshot diff, Windows/Java25. Artifacts: worktree tmp/c2-2-root-snapshot-{773,775}
+and tmp/c2-2-root-snapshot-negative-774, each with .txt, -counts.json, -xml/ suffixes.
+Retain through lane acceptance plus30 days, exporting before worktree release.
+Hosted run34720523685 passes04716d41e, including the prior preparation/generation/DTO
+and Windows-native fixture. It precedes this snapshot; broader snapshot/producer proof
+remains required. C2-2 is open.

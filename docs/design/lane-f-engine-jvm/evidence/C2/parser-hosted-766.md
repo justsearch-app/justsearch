@@ -14,7 +14,9 @@ exists, and the Windows job now uploads JUnit XML/HTML even on failure, retained
 No timing, containment or live-child assertion is relaxed. Focused local770 at23974e424
 plus diagnostic diff passes4 cases/1 suite, zero failures/errors/skips and worker-services
 test PMD. Workflow YAML parses successfully. The new diagnostic path is not a claim
-that the hosted startup failure is fixed; the next hosted result must be checked.
+that the hosted startup failure is fixed. Successor run34720523685 passes04716d41e,
+including the original timing and live-child assertions; the precise earlier startup
+failure remains unclassified in its insufficient historical log.
 
 ```text
 gradlew.bat :modules:worker-services:test --tests *WindowsParserContainmentTest

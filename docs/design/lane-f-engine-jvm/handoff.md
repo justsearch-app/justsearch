@@ -14,14 +14,17 @@ executed and PMD passed. Negative762 causes six intended unsafe-payload failures
 independent reread clears the corrected source. Root producer, child identity and
 committed-unit implementation follow. The immutable root plan passes focused771
 (22 cases and PMD), and negative772 catches wrong-ancestor policy collapse; independent
-review clears the DTO. Atomic root-state snapshot and recorded producer integration are next.
+review clears the DTO. Atomic root-state preparation now passes775 (40 cases and PMD);
+negative774 exposes missing label, duplicate walk and removed-root resurrection. The
+recorded root producer, child acceptance and committed-unit completion are next.
 The subsequent [generation capture](evidence/C2/generation-capture.md)
 passes focused768 (55 cases, including the separately committed root-plan scope) and
 negative769 catches three intended service-absence failures. Independent review clears
 the strict observation and replacement-availability fix. Hosted preparation run34719066293
 is red on parser startup before the live-child witness. The [diagnostic correction](evidence/C2/parser-hosted-766.md)
 preserves the future failure and hosted XML without relaxing assertions; focused770 passes4 cases.
-The next hosted result remains required. No Engine stack is running.
+Hosted CI34720523685 passes04716d41e, including Windows-native tests; it precedes the
+root-state snapshot. Broader snapshot/producer validation remains required. No Engine stack is running.
 
 Prior item is [the shared offline owner](evidence/C2/offline-owner-proof.md):
 manual and automatic procedures share bounded admission/lifetime ownership;

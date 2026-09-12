@@ -125,6 +125,16 @@ final class RootLifecycleOps {
 
     // ========== Watched Root Accessors ==========
 
+    io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(String generation, boolean force) {
+        var bindings = watchedRootsState.snapshotBindings();
+        List<String> patterns = List.copyOf(excludeMatcherSupplier.get().patterns());
+        var roots = bindings.stream().map(binding -> new io.justsearch.app.api.operations.RecordedRootPlan.Root(
+                binding.path(), binding.collection() == null || binding.collection().isBlank()
+                    ? IngestCollectionPolicy.DEFAULT_COLLECTION : binding.collection(),
+                force, false, patterns, List.of())).toList();
+        return io.justsearch.app.api.operations.RecordedRootPlan.partition(generation, roots);
+    }
+
     List<Path> getWatchedPaths(EngineContext engineContext) {
         return List.copyOf(watchedRoots.keySet());
     }
@@ -199,12 +209,11 @@ final class RootLifecycleOps {
         }
         Path normalized = path.toAbsolutePath().normalize();
         // Register root so walkAndSubmit()'s cancellation check doesn't abort the walk.
-        watchedRootsState.markNeverIndexed(normalized);
         // No label reaches this entry point — the contract calls it "primary collection"
         // (IndexingService#addWatchedPath), which is DEFAULT_COLLECTION. One root must carry ONE
         // label across every arm and every restart, so this records the same literal the add path
         // normalizes to and the reindex paths now read back.
-        recordCollection(normalized, IngestCollectionPolicy.DEFAULT_COLLECTION);
+        watchedRootsState.register(normalized, null, false);
         submitWalk.accept(
                 ownedContext -> walkAndSubmit(
                         normalized,
@@ -244,34 +253,34 @@ final class RootLifecycleOps {
                             excludeGlobs,
                             progress -> admittedTotal[0] = progress.getFilesAdmitted(), engineContext);
 
-            if (!watchedRoots.containsKey(normalized)) {
-                log.debug(
-                        "Walk completed but root {} was removed mid-scan; skipping state update",
-                        normalized);
-                return;
-            }
-            String reason = terminal == null ? "EMPTY_STREAM" : terminal.getTerminalReasonCode();
-            if (reason == null || reason.isEmpty()) {
-                if (admittedTotal[0] > 0) {
-                    watchedRootsState.markIndexed(normalized);
-                } else {
-                    // Walk terminated cleanly but admitted zero files (empty / all-excluded).
-                    // Mark walk-completed so the wire can render "empty", not a perpetual
-                    // "scanning" (tempdoc 599 Fix 1).
-                    watchedRootsState.markWalkedEmpty(normalized);
+            synchronized (watchedRootsState) {
+                if (!watchedRoots.containsKey(normalized)) {
+                    log.debug("Walk completed but root {} was removed mid-scan; skipping state update", normalized);
+                    return;
                 }
-            } else {
-                watchedRootsState.markWalkFailed(normalized, reason);
+                String reason = terminal == null ? "EMPTY_STREAM" : terminal.getTerminalReasonCode();
+                if (reason == null || reason.isEmpty()) {
+                    if (admittedTotal[0] > 0) {
+                        watchedRootsState.markIndexed(normalized);
+                    } else {
+                        // Empty/all-excluded is completed, distinct from a walk still in progress.
+                        watchedRootsState.markWalkedEmpty(normalized);
+                    }
+                } else {
+                    watchedRootsState.markWalkFailed(normalized, reason);
+                }
+                watchedRootsState.persist();
             }
-            watchedRootsState.persist();
         } catch (RuntimeException e) {
             log.error("Walk aborted for root {} after submission failure", normalized, e);
-            if (!watchedRoots.containsKey(normalized)) {
-                return;
-            }
-            if (admittedTotal[0] == 0) {
-                watchedRootsState.markWalkFailed(normalized, e.getMessage());
-                watchedRootsState.persist();
+            synchronized (watchedRootsState) {
+                if (!watchedRoots.containsKey(normalized)) {
+                    return;
+                }
+                if (admittedTotal[0] == 0) {
+                    watchedRootsState.markWalkFailed(normalized, e.getMessage());
+                    watchedRootsState.persist();
+                }
             }
         }
     }
@@ -304,7 +313,8 @@ final class RootLifecycleOps {
         // "Scanning" and re-queuing a redundant full walk. This guards EVERY caller (UI op + agent tool),
         // including ones the FE busy-overlay guard can't reach. Reindex is unaffected: it takes a different
         // path (reindexWatchedRoots/markIndexed) and never reaches this method.
-        if (watchedRoots.containsKey(normalized)) {
+        if (!watchedRootsState.register(normalized,
+                IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collectionName) ? null : collectionName, true)) {
             log.debug("addWatchedRoot: {} already watched — no-op (idempotent re-add)", normalized);
             return;
         }
@@ -315,8 +325,6 @@ final class RootLifecycleOps {
         //    this the caller's collection was unreadable the moment this method returned —
         //    GET /api/indexing/roots reported "default" for a labelled root (885 §UL.6) and every
         //    re-walk after a restart re-tagged its documents as the default (821 §L.3).
-        watchedRootsState.markNeverIndexed(normalized);
-        recordCollection(normalized, collectionName);
         watchedRootsState.persist();
 
         // 2. Start file watcher (does not depend on walk completion)
@@ -463,7 +471,9 @@ final class RootLifecycleOps {
             if (!force && !hasExcludes) {
                 SyncDirectoryResponse r = syncOps.syncDirectory(root.toString(), true, engineContext);
                 if (r != null && r.getError().isEmpty()) {
-                    watchedRootsState.markIndexed(root);
+                    synchronized (watchedRootsState) {
+                        if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
+                    }
                 }
                 continue;
             }
@@ -520,23 +530,6 @@ final class RootLifecycleOps {
     }
 
     // ========== Helpers ==========
-
-    /**
-     * Records the label a root is watched under, storing NOTHING for the default bucket.
-     *
-     * <p>{@code "default"} is what an unlabeled root already normalizes to on both write arms, so a
-     * root that carries it is indistinguishable from one that carries no label — and NOT storing it
-     * keeps two pre-existing behaviours exactly as they were: {@code getWatchedRoots()} reports
-     * {@code null} for an unlabeled root (which every consumer already reads as "the index
-     * default", including {@code IngestCollectionPolicy.RootBinding}), and a root persisted before
-     * this field existed is treated identically to one added after it. Only a REAL label — the
-     * thing 885 §UL.6 saw dropped — is written down.
-     */
-    private void recordCollection(Path root, String collection) {
-        watchedRootsState.setCollection(
-                root,
-                IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection) ? null : collection);
-    }
 
     /**
      * The persisted collection label for {@code root}, or {@link IngestCollectionPolicy#DEFAULT_COLLECTION}
