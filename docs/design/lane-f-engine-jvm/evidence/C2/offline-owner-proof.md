@@ -2,8 +2,8 @@
 
 September12, Windows/Temurin Java25. The implementation is one item after
 1c419e91a, governed by [the result/shutdown cut](offline-owner-cut.md).
-This record separates focused proof from the still-required integrated, hosted,
-actual-model/API and installed-path checks. It does not close C2-2.
+Focused, full build/PMD and hosted proof now pass at82e0e185d. Actual-model/API
+and installed-path checks remain required. This item does not close C2-2.
 
 ## Implemented boundary
 
@@ -42,6 +42,8 @@ test implementations are retired in favour of calls to the real owners.
 | 741 | Negative before mode-metadata fix:33 cases/9 suites,6 intended failures (missing preselection cursor, postselection reason NONE, absent checkpoint-error preservation). The7 deadline cases reuse the narrowed-fixture pass. |
 | 742 | PASS129 cases/23 suites, all freshly executed: services91, UI31, Engine7. Zero failures/errors/skips; affected main/test and core test-fixture PMD pass. Covers the mode-metadata and opt-in registry corrections. |
 | 743 | Explicit offline producer/projection declarations pass operation-surface and register-guard-resolution. |
+| 744 | PASS full build and PMD at82e0e185d:10,047 cases/1,636 suites, zero failures/errors,35 skips. Production and test inputs remained unchanged between configuration and commit. Captured XML and task execution/reuse ledger are retained before any focused rerun. |
+| 745 | PASS named Lucene/ORT stress selection:2 cases/2 suites, zero failures/errors/skips. Lucene executes; ORT reuses its unchanged-input cache. This is the existing concurrency gate, not additional offline-owner coverage. |
 
 The root read the negative XML failure messages and verified exact source bytes
 were restored after each mutation. Each mutation is narrow; none modifies tests.
@@ -85,15 +87,16 @@ nonblocking close is restored; explicit awaitingTermination is used only in the
 exercised offline bootstrap and contention fixtures. No deadline test was weakened.
 The7 EngineWorkCancellationTest cases pass freshly in742. Final independent
 reread found no remaining source defect and independently inspected negative741,
-positive742 and gate743 evidence. Full744 is running against both corrections;
-no production/test inputs change while it runs. Hosted, actual-model/API and
-installed acceptance still remain open.
+positive742 and gate743 evidence. Full744 passes both corrections. Hosted
+[CI34715474339](https://github.com/justsearch-app/justsearch/actions/runs/34715474339)
+also passes at82e0e185d, including Windows-native and system integration jobs.
+Named stress745 also passes. Actual-model/API and installed acceptance remain open.
 
 ## Evidence access
 
 Retained worktree artifacts are `tmp/c2-2-offline-owner-*`: compile725/726,
 focused727–730/736/742, integration731/732, negative733–735, full737,
-mode-negative739–741 and surface/guard738/743. Completed
+mode-negative739–741, surface/guard738/743, full744 and stress745. Completed
 test runs have copied `-xml/` and `-counts.json` beside their `.txt` build log.
 Read the log with counts: passing test XML cannot excuse a compilation/PMD failure.
 `tmp/c2-2-offline-negative.py` records each mutation and restores source in finally;

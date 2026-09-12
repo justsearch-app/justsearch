@@ -12,8 +12,10 @@ manual and automatic procedures share bounded admission/lifetime ownership;
 acknowledged per-pass progress feeds the recorded handler through actual cleanup.
 Final focused742 passes129 cases and affected PMD after mode-failure metadata and
 opt-in test-registry corrections. Full737 was red on the broad test-fixture close
-change, now corrected; full744 is running. Independent final reread found no
-remaining source defect. Hosted, actual-model/API and
+change, now corrected. Full744 passes10,047 cases/1,636 suites with zero failures/errors,
+35 skips and passing PMD at82e0e185d (18 test tasks execute,20 reuse unchanged inputs).
+Hosted CI34715474339 passes that same revision. Independent final reread found no
+remaining source defect. Named stress745 passes2 cases; actual-model/API and
 installed proof remain open. This is one C2-2 item, not stage completion or a pause.
 
 Latest integrated verification is [checkpoint724](evidence/C2/vdu-checkpoint-724.md):
@@ -76,7 +78,7 @@ Shared live/replay VDU mutation rules now have [writer proof](evidence/C2/vdu-wr
 invalid payload retention. Hosted CI34704917379 (e225cbf4b) and34704211058 (e784a97f3)
 are green; these prior runs do not establish hosted proof for the newer writer.
 
-Next: implement actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
+Next: finish offline procedure live/installed verification, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 
