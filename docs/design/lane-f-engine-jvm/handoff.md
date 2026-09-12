@@ -9,18 +9,28 @@ Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progres
 
 C2-2 now has the queue claim prerequisite, shared durable attempt runner,
 process-root/dispatch/undo wiring, synchronous completion-store failure propagation,
-and scheduled agent acceptance through actual durable run outcome. These are pushed
-through871a021bb. C2-2 remains OPEN for recorded ingestion/committed-unit completion,
-async handler owners, the non-dispatched sealed-mutation fixture and installed
-acceptance-before-effect fault proof; [the plan](evidence/C2/C2-2-plan.md) owns details.
+and scheduled agent acceptance through actual durable run outcome. The non-dispatched
+sealed-mutation fixture is proved (aad9d1845). Runtime activation/deactivation records
+follow actual owner cleanup (5f2285f63); install/repair completion follows in this
+checkpoint, including live-owner reaper correction3be553d89.615 passes123 install/
+runtime tests, combined618 passes163 producer/admission tests, and621 adds actual
+pre-write cancellation, cleanup failure and named stress coverage. The plan preserves
+exact evidence and unchanged-input reuse; these are not installed/live-download proofs.
+
+C2-2 remains OPEN for recorded ingestion/committed-unit completion, pack/offline and
+other async owners, direct HTTP acceptance (the existing install/runtime controllers
+still bypass catalog dispatch), and installed acceptance-before-effect fault proof.
+C2-3 owns explicit client keys on those paths. Continue [the plan](evidence/C2/C2-2-plan.md)
+and every remaining C2/D1/D2/E/F item. Fresh fetchSeptember12 at13:00UTC found no
+origin/main work outside this branch. Merge placement remains F/PR1.
 
 Downstream project-memory v4 requirements955-1..955-6 are adopted in section0 and
 C1/C2/D1/D2 checklists (8d5c424f7). The first external row consumer is recorded in
 [its contract](evidence/C2/project-memory-consumer.md), including prepared payloads,
 completion projection, non-file reindex journal entries and durable delete receipts.
-The C1 MCP quota correction has focused negative599/positive601 proof (66 tests,
+The C1 MCP quota correction (fc67f6ed9) has focused negative599/positive601 proof (66 tests,
 PMD); [evidence](evidence/C1/mcp-session-quota.md) distinguishes this new correction
-from the older C1 hosted/live pass. Include it at the next integrated/hosted boundary.
+from the older C1 hosted/live pass. Included in combined618; hosted inclusion remains.
 
 C2-1's independent store, lifetime/recovery fence and jobs15/updater compatibility
 are implemented. C2-11's day-one installed PROCESSING replay plus fresh retry

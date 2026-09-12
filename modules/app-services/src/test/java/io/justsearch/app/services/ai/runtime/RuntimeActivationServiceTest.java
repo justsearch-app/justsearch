@@ -752,7 +752,7 @@ class RuntimeActivationServiceTest {
     }
 
     @Override
-    public void startInstall(boolean acceptTerms) {
+    public AiInstallService.Attempt startInstall(boolean acceptTerms) {
       throw new UnsupportedOperationException("not used by this test");
     }
 
@@ -762,7 +762,7 @@ class RuntimeActivationServiceTest {
     }
 
     @Override
-    public void repair(boolean acceptTerms) throws AiInstallException {
+    public AiInstallService.Attempt repair(boolean acceptTerms) throws AiInstallException {
       throw new UnsupportedOperationException("not used by this test");
     }
 

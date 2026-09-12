@@ -685,70 +685,92 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
   }
 
-  public void startInstall(boolean acceptTerms) {
+  public Attempt startInstall(boolean acceptTerms) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
     }
     checkPolicy();
-    if (!running.compareAndSet(false, true)) {
-      throw new AiInstallException(
-          409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
+    AiInstallStatus started;
+    synchronized (lock) {
+      if (!running.compareAndSet(false, true)) {
+        throw new AiInstallException(
+            409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
+      }
+      cancelFlag.set(false);
+      pause.resume();
+      status.cancelRequested = false;
+      status.startedAtEpochMs = System.currentTimeMillis();
+      updateState("running", "preflight", "Starting AI install...");
+      started = status.snapshot();
     }
-    cancelFlag.set(false);
-    pause.resume();
-    // Registered on the CALLING thread, before the virtual thread starts: registering inside it
-    // leaves a window where upgrade prepare sees no blocker while the download is about to begin.
-    // Same race-window closure as BulkReindexHandler. Tempdoc 840 Phase 3: the run now takes ONE
-    // LEASE PER STAGE instead of one blanket 7200 s lease, and this is the first stage's — the only
-    // one that cannot be sized from its bytes, because the plan does not exist yet on this thread.
-    // The staged loop releases it when the first stage ends and registers the next stage's itself.
-    StageLease lease =
-        new StageLease(
-            operationLeases.register(
-                InstallStage.first().leaseOpClass(),
-                OpCriticality.INTERRUPTIBLE_WITH_LOSS,
-                PRE_PLAN_STAGE_LEASE_SEC,
-                Map.of("source", "ai.model-install", "stage", InstallStage.first().id()),
-                // Cancellation callback: upgrade prepare drains every active lease, so without this
-                // a consented update would sit behind a multi-hour download instead of asking it to
-                // stop. Safe to honour because a cancelled download resumes from its .partial rather
-                // than restarting (tempdoc 798). The lease still blocks until this actually returns —
-                // the request is an ask, not a release.
-                this::cancel));
+    // The first stage's lease is acquired before starting the owner. Later stages keep their
+    // existing byte-sized leases and cancellation callback; no parallel lifetime registry.
+    StageLease lease;
     try {
-      Thread.ofVirtual()
-          .name("ai-install-v2")
-          .start(
-              () -> {
-                boolean ok = false;
-                try {
-                  runInstallInternal(lease);
-                  ok = true;
-                } finally {
-                  running.set(false);
-                  // The pause gate outlives the run (it is a service field). A run cancelled while
-                  // paused leaves the flag set on purpose, so clearing it belongs to whichever run
-                  // ends — otherwise the next status read reports a terminated run as paused.
-                  pause.clear();
-                  try {
-                    // Every exit — completed, failed, cancelled — changes what is staged on disk,
-                    // and a run that ends is exactly when a surface starts asking again. One
-                    // re-derivation here covers all three rather than one per terminal path.
-                    // Refresh BEFORE releasing the lease so a draining upgrade reads a truthful
-                    // resumable-bytes state, and inside its own try so a refresh failure can
-                    // never leak the lease.
-                    refreshResumableBytesFromDisk();
-                  } finally {
-                    lease.release(ok ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
-                  }
-                }
-              });
-    } catch (RuntimeException e) {
-      // The thread never ran, so its finally block will not release the lease.
-      running.set(false);
-      lease.release(OpLeaseOutcome.FAILURE);
-      throw e;
+      lease = new StageLease(operationLeases.register(
+          InstallStage.first().leaseOpClass(), OpCriticality.INTERRUPTIBLE_WITH_LOSS,
+          PRE_PLAN_STAGE_LEASE_SEC,
+          Map.of("source", "ai.model-install", "stage", InstallStage.first().id()), this::cancel));
+    } catch (RuntimeException | Error failure) {
+      installStartFailed(failure);
+      throw failure;
+    }
+    var completion = new CompletableFuture<AiInstallStatus>();
+    try {
+      Thread.ofVirtual().name("ai-install-v2").start(() -> {
+        Throwable failure = null;
+        try {
+          runInstallInternal(lease);
+        } catch (RuntimeException | Error thrown) { failure = thrown; }
+        try {
+          // These are still owner work: another attempt cannot start or reset their shared state.
+          pause.clear();
+          refreshResumableBytesFromDisk();
+        } catch (RuntimeException | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+        try {
+          lease.release(failure == null && "completed".equals(status.state)
+              ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
+        } catch (RuntimeException | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+        AiInstallStatus outcome;
+        synchronized (lock) {
+          try {
+            if (failure instanceof RuntimeException) {
+              fail("INSTALL_OWNER_FAILED", "AI install owner failed: " + failure.getMessage());
+            }
+            status.paused = pause.isPaused();
+            status.resumableBytes = resumableBytesOnDisk;
+            outcome = status.snapshot();
+          } finally { running.set(false); }
+        }
+        if (failure == null) completion.complete(outcome);
+        else {
+          completion.completeExceptionally(failure);
+          if (failure instanceof Error fatal) throw fatal;
+          log.warn("AI install owner failed", failure);
+        }
+      });
+    } catch (RuntimeException | Error failure) {
+      try { lease.release(OpLeaseOutcome.FAILURE); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      installStartFailed(failure);
+      throw failure;
+    }
+    return new Attempt(started, completion.minimalCompletionStage());
+  }
+
+  private void installStartFailed(Throwable failure) {
+    synchronized (lock) {
+      try {
+        pause.clear();
+        fail("INSTALL_START_FAILED", "AI install could not start: " + failure.getMessage());
+      } finally { running.set(false); }
     }
   }
 
@@ -764,9 +786,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   @Override
   public boolean isInstallRunning() {
-    synchronized (lock) {
-      return "running".equals(status.state);
-    }
+    return running.get();
   }
 
   public void cancel() {
@@ -892,8 +912,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return pause.isPaused();
   }
 
-  public void repair(boolean acceptTerms) {
-    startInstall(acceptTerms);
+  public Attempt repair(boolean acceptTerms) {
+    return startInstall(acceptTerms);
   }
 
   // ---------------------------------------------------------------------------
@@ -907,6 +927,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   private void runInstallInternal(StageLease firstStageLease) {
     updateState("running", "preflight", "Starting AI install...");
+    if (cancelFlag.get()) {
+      cancelled();
+      return;
+    }
     try {
       Files.createDirectories(homeDir);
       Files.createDirectories(modelsDir);

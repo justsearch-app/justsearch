@@ -585,6 +585,51 @@
       "guard": "test:RuntimeActivationCompletionTest",
       "consumesProjection": "recorded-operation-dispatch",
       "note": "Projects actual terminal status into shared-runner completion; failed/inconclusive self-test never claims activation."
+    },
+    {
+      "id": "ai-install-completion-owner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Existing install owner snapshots start and actual completion after cleanup; its guard cannot be revoked by stale progress."
+    },
+    {
+      "id": "ai-install-completion-adapter",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/braininstall/BrainInstallServiceImpl.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Carries the exact install/repair attempt through the service port without a post-start status read."
+    },
+    {
+      "id": "ai-install-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/StartAiInstallHandler.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded install projects owner completion, not its started response."
+    },
+    {
+      "id": "ai-repair-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RepairAiInstallHandler.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded repair uses the same actual install owner completion."
+    },
+    {
+      "id": "ai-install-outcome-projection",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/BrainInstallHandlerSupport.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects failed/completed/cancelled owner states into the runner; plan completion retains installedFully limitations semantics."
     }
   ]
 }

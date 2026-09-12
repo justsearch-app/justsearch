@@ -429,3 +429,61 @@ refusal; the original stale-unowned and fresh-status tests pass unchanged.613 pa
 Evidence: tmp/c2-2-install-reaper-negative-612.txt/.xml,
 tmp/c2-2-install-reaper-613.txt, tmp/c2-2-install-reaper-613-xml and -counts.json.
 This prerequisite is committed separately before install completion wiring.
+
+The install completion adapter now reuses AiInstallService.Attempt directly across
+BrainInstallService; unlike broad runtime status it needs no second map/stage carrier.
+The existing AiInstallStatus.snapshot() is the deep-copy authority for both initial
+and terminal values. The handler projects that frozen DTO without reading mutable
+status after starting. isInstallRunning now reads the same running guard used for
+admission, so it stays true during cleanup even when terminal domain status is set.
+
+615 passes123 tests in26 suites, no failures/errors/skips, plus app-services/API PMD
+and UI test compilation.614 exposed the stale status-based isInstallRunning query
+and one unnecessary qualification; both corrected. Negative616 restores the old
+finished-started adapter and fails the pending-completion assertion at held cleanup;
+restored immediately afterward. Evidence: tmp/c2-2-install-completion-{614,615}.txt,
+tmp/c2-2-install-{614,615}-xml, tmp/c2-2-install-615-counts.json,
+tmp/c2-2-install-negative-616.txt/.xml. Live download/model success is not claimed by
+these deterministic owner/runner fixtures; the existing install truth/limitation,
+smoke-cancel, duplicate-start and status suites are included.
+
+Additional required producer seam found at this checkpoint: AiRoutes.java:110-112
+and131 still mount direct AiInstallController start/repair and AiRuntimeController
+activation, bypassing catalog dispatch. The current checkpoint fixes catalog handler
+completion only; C2-2 remains open for acceptance on those direct HTTP producers,
+including runtime chatProfile compatibility. C2-3 owns their explicit client key
+carrier. The same row/runner must cover each path without nesting duplicate parent
+rows; choose the shared service/transport boundary before adapting them. This is
+required remaining C2 work, not an exempt legacy path or owner-gated decision.
+
+Independent install review found no surviving source defect and confirmed that the
+new owner snapshots cannot alias. Its proof audit requested explicit cleanup-error
+and actual-cancellation coverage. Root adds both: an early cancellation request is
+honoured before directory creation; the real owner/SQLite row remains RUNNING while
+lease cleanup is held, then cancels. Lease-release failure remains exceptional and
+cannot report success. This uses the existing cancellation flag and registered
+upgrade callback, not another cancellation registry.
+
+Combined local618 passes163 tests in17 suites (dispatch/undo, shared runner,
+non-dispatched sealed mutation, scheduled agent, runtime/install owner, MCP identity
+and HTTP admission). Evidence: tmp/c2-2-producers-integrated-618.txt,
+tmp/c2-2-producers-618-xml and -counts.json.617/619 surface and guard gates pass.
+The initial broad stress620 command fails because app-agent has no *Stress* tests;
+this is an invocation mismatch, not a failed stress case. Its log and available XML
+are retained (the XML directory includes earlier module results; not a fresh suite
+claim). Only adapters-lucene and ort-common contain named Stress test classes; select
+those actual subjects for the corrected invocation without changing test validation.
+
+621 passes the added real-owner cancellation and cleanup-error cases, existing
+smoke-cancel/reaper coverage, PMD and the actual named stress subjects. The Lucene
+stress result is reused unchanged from620; ORT stress executes in621. Module counts
+and skips are preserved in tmp/c2-2-install-stress-621-counts.json; raw evidence is
+tmp/c2-2-install-and-stress-621.txt and tmp/c2-2-install-stress-621-xml. These are
+unit/controlled concurrency proofs, not a live model download or installed crash.
+Root independently read the XML after the review; no required proof is waived.
+
+621 exact counts: app-services15 tests/7 suites, adapters-lucene1/1, ort-common1/1;
+all zero failures/errors/skips. Code revision is the install completion commit carrying
+this evidence; the earlier615/618 inputs differ only by the subsequently tested early
+cancel branch and its tests. Independent source review covered the intended handler
+before the negative injection, which is restored. No install item is marked closed.
