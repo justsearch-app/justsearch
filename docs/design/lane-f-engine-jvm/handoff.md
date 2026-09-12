@@ -7,7 +7,15 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
-Latest coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626
+Latest integrated verification is [checkpoint685](evidence/C2/vdu-checkpoint-685.md)
+at9ca622e4e: full build/PMD9,974 cases/1,635 suites, zero failures/errors,35 skips;
+14 test tasks execute and24 reuse unchanged results. Hosted CI34705992674 is green
+at that same revision. The next bounded fix is exact-version switch-buffer removal:
+the current replay snapshot followed by whole-table clear can lose a later admission.
+The plan also settles shared offline procedure ownership; implementation follows
+the buffer/generation corrections. No dev stack or Gradle remains running.
+
+Prior coherent code checkpoint: 758aeb2eb, pushed. Full656 passes9,917 cases/1,626
 suites, zero failures/errors and35 skips; stress659 passes allthree selected cases
 with documented unchanged-result reuse. Hosted CI34700660160 has clean first-attempt
 orphan containment (deliberate parser reuse, native descendant, real Engine kill/reap),

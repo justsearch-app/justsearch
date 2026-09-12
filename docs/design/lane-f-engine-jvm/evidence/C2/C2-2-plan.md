@@ -86,6 +86,52 @@ KnowledgeServerMigrationOps replay; BrainRuntimeServiceImpl.triggerOfflineProces
 EngineFutures.supplyAsync. These are C2-2 prerequisites/remaining work, not accepted
 deferrals or transferred implementation ownership.
 
+### Offline procedure ownership implementation cut
+
+September12 at9ca622e4e: the next owner change moves the existing bounded procedure
+executor from VduOfflineTriggerSampler into OfflineCoordinator. The sampler keeps
+only its timer/pacing role; manual and automatic submissions use that one procedure
+owner. Retire BrainRuntimeServiceImpl's raw virtual thread and the sampler's second
+pending flag. Reuse the coordinator's single-flight guard from submission through
+actual exit, including submission refusal and cancellation before task entry.
+Close this owner in HeadAssembly before inference and index dependencies. Constructor
+failure must close any acquired registration. This relocation is simpler than a
+second manual pool or a per-attempt registry, and does not add an executor budget.
+
+The service boundary carries the exact EngineContext and an actual completion stage.
+The runner keeps its existing accepted row and OperationRecordHandle; it remains the
+only terminal writer. The coordinator owns per-procedure progress, and the handler
+projects that progress to the row's existing checkpoint fields. Persist only counts
+and bounded phase/reason metadata. Do not use the request context's workId as an
+operation identity or replace the caller context with the old static internal one.
+Automatic sampling supplies its explicit internal context at submission.
+
+EngineFutures already owns queued cancellation and actual exit, but its task result
+publishes before its actual-exit callback. Compose the body result with an explicit
+cleanup-completion stage; expose only their joined result, after cancellation-listener
+cleanup and work-reference release. Preserve a body failure and attach cleanup failure;
+a cancelled future must not release the guard or terminalize while its body is alive.
+Avoid another hand-written FutureTask lifecycle unless this existing composition fails
+a concrete acceptance case. Never close a procedure executor from its own task.
+
+Keep the procedure's result separate from the global backlog snapshot: at most100
+captured VDU IDs, processed/failed/remaining/blocked counts and the embedding-mode
+handoff. Missing client, required capability, circuit-open, activity/energy interruption,
+failed mode entry/exit, index failure and cancellation each need an explicit outcome.
+Mode cleanup failures currently swallowed by VduProcessor and pending-write refusals
+swallowed by VduOps must remain visible to this result. No VRAM, model-selection or
+abstention policy changes are intended. The current-generation/deferred-write choice
+above is still under source investigation before implementation; it is not an owner gate.
+
+Required proof: one shared manual/automatic single-flight owner; exact work identity
+through model/index calls; queued cancellation executes no body; running cancellation
+keeps the row and admission alive through deliberately blocked cleanup; submission and
+cleanup failures release ownership once; HeadAssembly waits before dependency close;
+each blocked/failure/partial outcome matches durable index/checkpoint evidence. Use
+existing coordinator, VDU mode/abstention, sampler, BrainRuntimeService and handler tests,
+plus a real runner/store/admission fixture. Negative regressions restore early completion
+and raw detached work. Full suite, actual model/API and installed-path proof remain owed.
+
 ## Decisions
 
 1. Keep indexing.proto unchanged as C2 requires. KnowledgeClient.scanRoot builds a
