@@ -56,7 +56,7 @@ final class IngestionProvenancePersistenceTest {
         var statement = connection.createStatement();
         var row = statement.executeQuery("PRAGMA user_version")) {
       assertTrue(row.next());
-      assertEquals(14, row.getInt(1));
+      assertEquals(15, row.getInt(1));
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "base": "e247533bd",
-  "status": "WIP; integrated553 in progress with known OperationSchema dead-code failure",
+  "status": "C2-1 foundation; focused563 passes177 tests; full integrated rerun pending",
   "sourceFiles": [
     {
       "path": "governance/readiness-reason-codes.v1.json",
@@ -92,11 +92,11 @@
     },
     {
       "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
-      "sha256": "89f747081e69b9ea707130691dd6a6e4f43b3ce52d3246bd15c68f9e190db6a8"
+      "sha256": "b1637686ba56971d493b3eca982cd4fc9ffbd0426ba3b8989684673891956eaa"
     },
     {
       "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
-      "sha256": "fabe8379d869474f58985aee920a3ddd45161e0998eea21f009e21c4540100c0"
+      "sha256": "b8643e19375b367482426df1889c8c8d0f77ce67b5a0fcb34f03455f282e1447"
     },
     {
       "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationStoreCrashChild.java",
@@ -185,6 +185,10 @@
     {
       "path": "scripts/release/app-release-assets.test.mjs",
       "sha256": "34f00f73b316e286e59b24995ca8380c3cbb89bf4800015d6e5774d51a23ba5a"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IngestionProvenancePersistenceTest.java",
+      "sha256": "87ef20d05436395cdecf5d25bd53ab797a85c95ae6d7f114601baae31552b111"
     }
   ]
 }

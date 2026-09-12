@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.observability.operations;
 
+import java.sql.SQLException;
+import java.sql.Statement;
+
 /** The operations database's independent version ladder; jobs.db keeps its own identity. */
 final class OperationSchema {
   static final int VERSION = 1;
@@ -52,6 +55,14 @@ final class OperationSchema {
         schema_note TEXT
       )
       """;
+
+  static void createTables(Statement statement) throws SQLException {
+    statement.execute(CREATE_OPERATIONS);
+    statement.execute(CREATE_META);
+    statement.execute("CREATE INDEX operations_state ON operations(state)");
+    statement.execute("CREATE INDEX operations_completed ON operations(completed_at)");
+    statement.execute("CREATE INDEX operations_kind_state ON operations(kind, state)");
+  }
 
   private OperationSchema() {}
 }

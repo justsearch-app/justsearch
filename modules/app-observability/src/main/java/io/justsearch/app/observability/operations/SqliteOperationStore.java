@@ -139,11 +139,7 @@ public final class SqliteOperationStore implements OperationStore {
     boolean transactionEnded = false;
     try (Statement statement = connection.createStatement()) {
       if (version == 0) {
-        statement.execute(OperationSchema.CREATE_OPERATIONS);
-        statement.execute(OperationSchema.CREATE_META);
-        statement.execute("CREATE INDEX operations_state ON operations(state)");
-        statement.execute("CREATE INDEX operations_completed ON operations(completed_at)");
-        statement.execute("CREATE INDEX operations_kind_state ON operations(kind, state)");
+        OperationSchema.createTables(statement);
         try (var insert = connection.prepareStatement(
             "INSERT INTO operations_meta(singleton, history_since_ms, created_at_ms) VALUES (1, ?, ?)")) {
           insert.setLong(1, recoveryFloor);
