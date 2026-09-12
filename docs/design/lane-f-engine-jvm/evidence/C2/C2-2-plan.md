@@ -141,11 +141,15 @@ It is the current implementation contract; its review is not executable proof.
 
 ## Decisions
 
+The [recorded-root preparation refinement](recorded-root-preparation.md) governs
+the pre-acceptance plan, nested-policy normalization, authoritative generation
+capture and Java-only child identity. It does not pull all of C2-3 forward.
+
 1. Keep indexing.proto unchanged as C2 requires. KnowledgeClient.scanRoot builds a
    protobuf request with no inbound scan id (KnowledgeClient.java:1506-1530), but
    EngineKnowledgeClient.executeScanRoot/scanRootWork already calls the Java
    WorkerIngestService directly (EngineKnowledgeClient.java:900-967). Carry the
-   accepted operation record id explicitly beside the request through these Java
+   accepted operation key explicitly beside the request through these Java
    methods into WorkerIngestService.scanRoot. WorkerScanOps already persists scanId
    on queued units. Do not overload correlationId, add an operation key to
    EngineContext, mutate the wire schema, or use a thread-local. Maintenance calls
