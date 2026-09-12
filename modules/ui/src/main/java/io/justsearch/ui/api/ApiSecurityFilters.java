@@ -155,11 +155,15 @@ final class ApiSecurityFilters {
 
   /** Installs the Host-allowlist, CORS, session-token, and capability-gate before-filters on the app. */
   void install(Javalin app) {
+    install(app, ignored -> java.util.Optional.empty());
+  }
+
+  void install(Javalin app, java.util.function.Function<String, java.util.Optional<String>> mcpClientIdentity) {
     setupHostValidation(app);
     setupMcpOriginValidation(app);
     setupCors(app, prodMode);
     setupSessionTokenEnforcement(app);
-    app.before(ctx -> RequestEngineContext.get(ctx));
+    app.before(ctx -> RequestEngineContext.get(ctx, mcpClientIdentity));
     setupOperationAdmission(app);
     setupEngineAdmission(app);
     setupCapabilityGates(app);

@@ -80,8 +80,13 @@ public final class McpProtocolHandler {
     this(surface, resourceCatalogs, Clock.systemUTC());
   }
 
+  /** Server-issued session identity for admission; arbitrary headers never create client buckets. */
+  public java.util.Optional<String> clientIdentity(String sessionId) {
+    return sessionId != null && sessions.containsKey(sessionId) ? java.util.Optional.of(sessionId) : java.util.Optional.empty();
+  }
+
   public void handlePost(Context ctx) {
-    var engineContext = io.justsearch.ui.api.RequestEngineContext.get(ctx);
+    var engineContext = io.justsearch.ui.api.RequestEngineContext.get(ctx, this::clientIdentity);
     String sessionId = ctx.header("Mcp-Session-Id");
     String body = ctx.body();
     Object requestId = null;

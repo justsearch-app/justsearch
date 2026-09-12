@@ -1074,14 +1074,14 @@ class McpProtocolHandlerTest {
         "requestedBy must stay null (not a fabricated placeholder) when the session has no"
             + " captured clientInfo");
 
-    // Even without an initialize handshake, the protocol session header still determines the
-    // MCP attribution carried into the pending record; only the display name is absent.
-    assertEquals("s1", pending.get().engineContext().clientId());
+    // An unregistered session remains correlation metadata, but cannot create a quota identity.
+    // The missing display name and the shared anonymous identity are independent.
+    assertEquals("mcp-anonymous", pending.get().engineContext().clientId());
     assertEquals(java.util.Optional.of("s1"), pending.get().engineContext().sessionId());
     assertEquals("UNTRUSTED", pending.get().engineContext().sourceTier());
     assertEquals("MCP", pending.get().engineContext().transport());
     assertEquals(io.justsearch.agent.api.registry.TransportTag.MCP, pending.get().provenance().transport());
-    assertEquals(java.util.Optional.of("s1"), pending.get().provenance().initiator());
+    assertEquals(java.util.Optional.of("mcp-anonymous"), pending.get().provenance().initiator());
     assertEquals(java.util.Optional.of("s1"), pending.get().provenance().correlationId());
   }
 

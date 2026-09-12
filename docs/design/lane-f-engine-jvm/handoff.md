@@ -7,11 +7,20 @@ queue; no owner reply is needed for #708 or #717.
 
 Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
 
-The C2-2 queue prerequisite now carries claim identity through extraction, commit
-and fallback; atomic replacement and truthful scan admission have negative and
-positive regressions. Independent review found and the root fixed identity-based
-retry cleanup. Run575 passes; [C2-2 plan](evidence/C2/C2-2-plan.md) preserves
-evidence and remaining runner/boot/committed-completion work. No C2-2 closure is claimed.
+C2-2 now has the queue claim prerequisite, shared durable attempt runner,
+process-root/dispatch/undo wiring, synchronous completion-store failure propagation,
+and scheduled agent acceptance through actual durable run outcome. These are pushed
+through871a021bb. C2-2 remains OPEN for recorded ingestion/committed-unit completion,
+async handler owners, the non-dispatched sealed-mutation fixture and installed
+acceptance-before-effect fault proof; [the plan](evidence/C2/C2-2-plan.md) owns details.
+
+Downstream project-memory v4 requirements955-1..955-6 are adopted in section0 and
+C1/C2/D1/D2 checklists (8d5c424f7). The first external row consumer is recorded in
+[its contract](evidence/C2/project-memory-consumer.md), including prepared payloads,
+completion projection, non-file reindex journal entries and durable delete receipts.
+The C1 MCP quota correction has focused negative599/positive601 proof (66 tests,
+PMD); [evidence](evidence/C1/mcp-session-quota.md) distinguishes this new correction
+from the older C1 hosted/live pass. Include it at the next integrated/hosted boundary.
 
 C2-1's independent store, lifetime/recovery fence and jobs15/updater compatibility
 are implemented. C2-11's day-one installed PROCESSING replay plus fresh retry

@@ -38,12 +38,22 @@ final class RequestEngineContextTest {
     EngineContext context = RequestEngineContext.get(request("/mcp", Map.of(
         "X-JustSearch-Transport", "BUTTON",
         "X-JustSearch-Client-Kind", "INTERNAL",
-        "Mcp-Session-Id", "mcp-session")));
+        "X-JustSearch-Client-Id", "forged-client",
+        "Mcp-Session-Id", "mcp-session")), session -> Optional.of("mcp-session"));
     assertEquals(EngineContext.ClientKind.MCP_CLIENT, context.clientKind());
     assertEquals("mcp-session", context.clientId());
     assertEquals(Optional.of("mcp-session"), context.sessionId());
     assertEquals("MCP", context.transport());
     assertEquals("UNTRUSTED", context.sourceTier());
+  }
+
+  @Test
+  void unknownAndMissingMcpSessionsShareAnonymousIdentityDespiteRotatingHints() {
+    for (var headers : java.util.List.of(Map.<String, String>of(), Map.of(
+        "Mcp-Session-Id", "invented-a", "X-JustSearch-Client-Id", "client-a"), Map.of(
+        "Mcp-Session-Id", "invented-b", "X-JustSearch-Client-Id", "client-b"))) {
+      assertEquals("mcp-anonymous", RequestEngineContext.get(request("/mcp", headers)).clientId());
+    }
   }
 
   @Test

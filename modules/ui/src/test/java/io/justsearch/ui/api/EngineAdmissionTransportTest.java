@@ -29,6 +29,26 @@ import tools.jackson.databind.json.JsonMapper;
 @Timeout(30)
 final class EngineAdmissionTransportTest {
   @Test
+  void oneMcpSessionCannotPartitionItsQuotaByRotatingClientHeaders() throws Exception {
+    try (var fixture = new Fixture(2, 8)) {
+      var initialize = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + fixture.app.port() + "/mcp"))
+          .timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.ofString(
+              "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"quota-test\"}}}"))
+          .build();
+      var initialized = fixture.client.send(initialize, HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, initialized.statusCode(), initialized.body());
+      String session = initialized.headers().firstValue("Mcp-Session-Id").orElseThrow();
+      var first = fixture.sendMcp(session, "rotate-a", true);
+      var second = fixture.sendMcp(session, "rotate-b", true);
+      assertTrue(fixture.entered.await(5, TimeUnit.SECONDS));
+      assertRefusal(fixture.sendMcp(session, "rotate-c", false).get(5, TimeUnit.SECONDS),
+          "ADMISSION_CONTEXT_LIMIT", true);
+      fixture.release.countDown();
+      assertEquals(200, first.get(5, TimeUnit.SECONDS).statusCode());
+      assertEquals(200, second.get(5, TimeUnit.SECONDS).statusCode());
+    }
+  }
+  @Test
   void postSearchGetSuggestAndMcpReturnContextReasonAndHealthRemainsReachable() throws Exception {
     for (String route : List.of("/api/knowledge/search", "/api/knowledge/suggest", "/mcp")) {
       try (var fixture = new Fixture(2, 8)) {
@@ -302,8 +322,9 @@ final class EngineAdmissionTransportTest {
       app = Javalin.create(config -> config.showJavalinBanner = false);
       // Same body-preserving HTTP exception mapping as LocalApiServer's composition.
       app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> ctx.status(failure.getStatus()));
-      new ApiSecurityFilters(false, null, new EventBuffer(), events, null, admission, admission).install(app);
       var protocol = new McpProtocolHandler(surface, List.of());
+      new ApiSecurityFilters(false, null, new EventBuffer(), events, null, admission, admission)
+          .install(app, protocol::clientIdentity);
       app.before(ctx -> {
         if ("true".equals(ctx.queryParam("block")) && RequestEngineWork.get(ctx) != null) {
           entered.countDown();
@@ -337,6 +358,15 @@ final class EngineAdmissionTransportTest {
           .header("Access-Control-Request-Headers", "Content-Type")
           .method("OPTIONS", HttpRequest.BodyPublishers.noBody()).build();
       return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    java.util.concurrent.CompletableFuture<HttpResponse<String>> sendMcp(String session, String clientId, boolean block) {
+      var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + "/mcp?block=" + block))
+          .timeout(Duration.ofSeconds(15)).header("Mcp-Session-Id", session)
+          .header("X-JustSearch-Client-Id", clientId)
+          .POST(HttpRequest.BodyPublishers.ofString("{\"jsonrpc\":\"2.0\",\"id\":\"request-17\",\"method\":\"ping\"}"))
+          .build();
+      return client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
     }
 
     java.util.concurrent.CompletableFuture<HttpResponse<String>> send(

@@ -596,7 +596,8 @@ public class LocalApiServer {
       // best-effort
     }
 
-    securityFilters.install(this.app);
+    securityFilters.install(this.app, session -> convApi.mcpProtocolHandler() == null
+        ? java.util.Optional.empty() : convApi.mcpProtocolHandler().clientIdentity(session));
     RouteLifecycleHeaders.install(this.app);
     setupRoutes();
     RouteContractPolicy.validateLifecycleRoutes(

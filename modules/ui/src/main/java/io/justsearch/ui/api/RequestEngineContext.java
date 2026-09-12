@@ -17,6 +17,12 @@ public final class RequestEngineContext {
 
   /** Resolve once, including when a controller is mounted without the full API filter stack. */
   public static EngineContext get(Context request) {
+    return get(request, ignored -> Optional.empty());
+  }
+
+  /** The protocol owner resolves known server-issued sessions before the admission filters run. */
+  public static EngineContext get(Context request,
+      java.util.function.Function<String, Optional<String>> mcpClientIdentity) {
     EngineContext existing = request.attribute(ATTRIBUTE);
     if (existing != null) return existing;
     try {
@@ -26,8 +32,8 @@ public final class RequestEngineContext {
           : value(request, "X-JustSearch-Client-Kind", EngineContext.ClientKind.class,
               EngineContext.ClientKind.WEBVIEW);
       Optional<String> session = optional(request, mcp ? "Mcp-Session-Id" : "X-JustSearch-Session-Id");
-      String clientId = optional(request, "X-JustSearch-Client-Id")
-          .orElseGet(() -> mcp ? session.orElse("mcp-anonymous") : "local-webview");
+      String clientId = mcp ? session.flatMap(mcpClientIdentity).orElse("mcp-anonymous")
+          : optional(request, "X-JustSearch-Client-Id").orElse("local-webview");
       EngineContext resolved = EngineProvenance.context(kind, clientId, session,
           optional(request, "X-JustSearch-Grant-Reference"), transport,
           EngineContext.Survival.INTERACTIVE, urgency(request));
