@@ -351,6 +351,9 @@ one-root prepared plan. Existing children are reused; creating one requires a ru
 parent. A handle whose completion persistence failed cannot accept another child.
 The architecture gate forbids producers from calling the store's lifecycle methods
 directly, including child acceptance.
+`governance/engine-ports.v1.json` catalogs both existing interfaces and their distinct
+implementations, with the actual outer process binding sites and consumers. The
+operation-surface register separately governs sibling records and row cardinality.
 
 Parent owners explicitly compose child durable completion into their returned
 completion stage. Existing interrupted children resume through kind reconciliation;

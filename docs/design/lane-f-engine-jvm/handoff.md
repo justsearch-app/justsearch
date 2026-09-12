@@ -13,9 +13,10 @@ local proof at fc679f92a plus this item: focused786 passes96 cases; broader787 e
 failures/errors/skips and selected PMD green. Independent review fixes cover direct
 store-call architecture bypass and typed storage failure receipts; negative785 catches
 both lost-code paths. Parent owners compose child durable completion explicitly.
-Next: update the stale operations entry in engine-ports.v1.json to its implemented
-ports, then connect recorded ingest/reindex owners, survival admission, accepted scan
-keys, generation checks and committed-unit completion. C2-2 remains open.
+The [operations port catalog](evidence/C2/operations-port-catalog.md) now names both
+implemented ports and their actual outer bindings; its gate and negative omissions
+are verified. Next: connect recorded ingest/reindex owners, survival admission,
+accepted scan keys, generation checks and committed-unit completion. C2-2 remains open.
 Declared-kind hosted CI34722656207 failed only its stale policy-component fixture;
 [correction fc679f92a](evidence/C2/record-kind-policy-fixture.md) is pushed and both
 policy-axis checks pass locally. Successful successor hosted proof remains required.

@@ -13,8 +13,8 @@
     "comment": "The gate re-derives the implementation set from source rather than trusting this file: it scans javaMainRoots for classes whose `implements` clause names a registered port interface, and fails on any that is not declared below. That direction is the one that matters — the drift is a NEW binding appearing, not a declared one going missing.",
     "javaMainRoots": ["modules"],
     "javaInclude": "/src/main/java/",
-    "expectedMinImplementations": 3,
-    "expectedMinImplementationsNote": "Vacuous-pass guard (the 576 section 5 shape): if a renamed scan root made the scan find nothing, every completeness check would pass over an empty set. Live count is 3 (KnowledgeClient, EngineKnowledgeClient, NoopSearchPort); the floor is the same number because a DROP here means a port lost its binding, which is not normal churn — it is either this lane deleting one deliberately (lower the floor in the same change, and say why) or a scan that stopped working."
+    "expectedMinImplementations": 5,
+    "expectedMinImplementationsNote": "The source scan counts three direct existing port declarations (KnowledgeClient for SearchPort and IndexingService, plus NoopSearchPort), now plus OperationAttemptRunnerImpl and SqliteOperationStore: floor 5. EngineKnowledgeClient inherits the facade and is validated separately via extends. A lower count requires an explained binding retirement or scan repair."
   },
   "ports": [
     {
@@ -114,11 +114,61 @@
     },
     {
       "id": "operations",
-      "title": "Operations",
-      "kind": "register-governed",
+      "title": "Operations attempt lifecycle",
+      "kind": "interface",
+      "interface": "io.justsearch.app.api.operations.OperationAttemptRunner",
+      "interfaceFile": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "contractModule": "modules/app-api",
+      "owner": "Engine operation attempt lifecycle; app-observability owns the implementation",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.observability.operations.OperationAttemptRunnerImpl",
+          "file": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+          "boundBy": "io.justsearch.ui.HeadlessApp and io.justsearch.applauncher.LauncherEnvironment; shared through EngineRoot",
+          "note": "Constructed beside the store before asynchronous index startup. Both halves receive the same runner; only it writes attempt lifecycle transitions."
+        }
+      ],
+      "consumers": [
+        "modules/app-agent/src/main/java/io/justsearch/agent/BackgroundRunService.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInit.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+        "modules/ui/src/main/java/io/justsearch/ui/api/InteractionThreadController.java"
+      ],
       "authority": "governance/operation-surfaces.v1.json",
-      "note": "NOT an interface today, and recorded as such rather than invented. Design 3.3 lists operations as a day-one port, but what exists is the operation-surface register plus the OperationCatalog/OperationDispatcher pair — a declared set of operations, not a single Java interface a composition root binds. Cataloguing a phantom interface here would be worse than cataloguing none: the engine-port gate would then guard a type nobody implements while the real drift (a second operation lifecycle) went on being guarded only by its own register. The interactive-versus-durable split and reconfigure-as-an-operation are design section 7's work; when they produce an interface, it becomes a `kind: interface` entry here."
+      "note": "C2 separates the producer attempt port from its persistence port below. OperationStoreArchitectureTest pins lifecycle mutation to the shared runner, including child acceptance. The operation-surface register still governs sibling record scope and row cardinality. Record-kind declaration does not itself authorize recovery or alter admitted survival."
     },
+    {
+      "id": "operations-store",
+      "title": "Operations persistence and lifetime",
+      "kind": "interface",
+      "interface": "io.justsearch.app.api.operations.OperationStore",
+      "interfaceFile": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "contractModule": "modules/app-api",
+      "owner": "Engine durable operations store; app-observability owns SQLite",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.observability.operations.SqliteOperationStore",
+          "file": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+          "boundBy": "io.justsearch.ui.HeadlessApp and io.justsearch.applauncher.LauncherEnvironment; shared through EngineRoot",
+          "note": "Outer process composition opens operations.db before the asynchronous index fork and closes it after index drain. HeadAssembly does not construct or independently close this store."
+        }
+      ],
+      "consumers": [
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"
+      ],
+      "note": "This is the existing persistence interface, not a second producer lifecycle. Producers use OperationAttemptRunner; raw lifecycle writes are architecture-restricted. Read/recovery/lifetime consumers carry the store without acquiring terminal-write authority."
+    },
+
     {
       "id": "memory",
       "title": "Memory",
