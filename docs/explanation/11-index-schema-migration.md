@@ -483,6 +483,11 @@ The Worker uses a cutover fence:
 File UPSERT payloads are versioned and preserve collection plus the admitting caller's coarse
 originator and transport. Pre-C1 raw path payloads remain readable with unknown attribution.
 Replay retains the buffer if decoding or enqueueing fails.
+VDU replay also retains its buffered update when its parent is missing, chunk
+replacement fails, or the covering Lucene commit fails. Chunk replacement precedes
+the terminal parent update, so a failed replacement cannot make a newly completed
+parent permanent through an unrelated commit. Buffer acceptance alone is not an
+acknowledgement of a committed index effect.
 Directory sync uses versioned root/force payloads with paired nullable originator/transport fields;
 legacy unversioned root/force payloads retain unknown attribution. Replay runs as internal work
 and restores the original descriptive attribution separately, without reconstructing caller authority.

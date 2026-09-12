@@ -667,38 +667,34 @@ public final class KnowledgeServerMigrationOps {
                 updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(pageCount));
               }
 
-              boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
-              if (!updated) {
-                context.log().warn("Buffered VDU_UPDATE: document not found: {}", docId);
-              } else if (outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT
+              // Preserve the recoverable parent if chunk replacement fails. The durable
+              // buffer remains the retry authority even if another writer commits partial chunks.
+              if (outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT
                   && extracted != null
                   && !extracted.isBlank()) {
-                try {
-                  int chunksRegenerated =
-                      ChunkDocumentWriter.regenerateChunksFromExistingParent(
-                          context.ingestLifecycle().documentFieldOps(),
-                          context.ingestLifecycle().indexingCoordinator(),
-                          docId, extracted,
-                          context.chunkSpladeEnabledSupplier().getAsBoolean());
-                  if (chunksRegenerated > 0) {
-                    context
-                        .log()
-                        .debug(
-                            "Buffered VDU_UPDATE: regenerated {} chunks for {}",
-                            chunksRegenerated,
-                            docId);
-                  }
-                } catch (Exception ce) {
+                int chunksRegenerated =
+                    ChunkDocumentWriter.regenerateChunksFromExistingParent(
+                        context.ingestLifecycle().documentFieldOps(),
+                        context.ingestLifecycle().indexingCoordinator(),
+                        docId, extracted,
+                        context.chunkSpladeEnabledSupplier().getAsBoolean());
+                if (chunksRegenerated > 0) {
                   context
                       .log()
-                      .warn(
-                          "Buffered VDU_UPDATE: chunk regeneration failed for {}: {}",
-                          docId,
-                          ce.getMessage());
+                      .debug(
+                          "Buffered VDU_UPDATE: regenerated {} chunks for {}",
+                          chunksRegenerated,
+                          docId);
                 }
               }
-              mutatedLucene = true;
-              context.log().debug("Replayed buffered VDU_UPDATE: docId={} outcome={}", docId, outcome);
+              boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
+              if (updated) {
+                mutatedLucene = true;
+                context.log().debug("Replayed buffered VDU_UPDATE: docId={} outcome={}", docId, outcome);
+              } else {
+                allApplied = false;
+                context.log().warn("Buffered VDU_UPDATE: document not found: {}", docId);
+              }
             } catch (Exception e) {
               allApplied = false;
               context
@@ -708,6 +704,8 @@ public final class KnowledgeServerMigrationOps {
                       op.key(),
                       e.getMessage());
             }
+          } else {
+            allApplied = false;
           }
         }
         case "SYNC_ROOT" -> {

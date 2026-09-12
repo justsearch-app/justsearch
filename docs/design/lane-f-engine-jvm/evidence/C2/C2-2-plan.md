@@ -55,8 +55,16 @@ September12 source audit resolves the next implementation order:
    no new journal. Current cutover is restart-based; D1 still owns hot-swap leases
    and full accepted-write journalling. A state-check race is not covered by a commit
    alone, so prove the current generation boundary rather than claiming D1 early.
-   The immediately following separate item fixes replay's existing missing-document
+   [Replay retention](vdu-replay-retention.md) now fixes the existing missing-document
    and swallowed chunk-failure paths so failed effects retain their durable buffer.
+   Then retire the duplicate live/replay VDU mutation projection through one index-half
+   writer using the existing UpdateVduResultRequest. Current replay omits REJECTED and
+   extraction/dropout fields, accepts invalid SUCCESS_TEXT as empty and infers legacy
+   outcomes differently. Preserve the live compatibility rules, validate before buffer
+   acceptance, and share parent/chunk mutation ordering. Keep each caller's existing
+   covering-commit boundary: direct per result, replay before durable buffer removal.
+   A stateless writer is simpler than another task/receipt registry or a second payload
+   representation; prove outcome parity and malformed-input refusal with real index data.
 3. Thread exact manual context through BrainRuntimeService, coordinator, batch and
    model/index calls. Reuse registered executor/admission ownership through actual
    cleanup, including cancellation before task entry; autonomous sampling supplies

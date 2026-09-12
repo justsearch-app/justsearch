@@ -26,7 +26,10 @@ Direct VDU covering commits now have [focused proof](evidence/C2/vdu-commits.md)
 The prior guard checkpoint3b425cebb is fully green in hosted CI34702144423;
 this does not stand in for hosted verification of these newer changes.
 
-Next: preserve failed buffered VDU replay, then explicit deferred completion/generation
+Failed buffered VDU replay now has [retention proof](evidence/C2/vdu-replay-retention.md):
+29 cases, five intended negative failures and a fresh restored-source execution.
+
+Next: share live/replay VDU mutation rules, then explicit deferred completion/generation
 boundaries and actual offline procedure outcome/context propagation, followed by direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
