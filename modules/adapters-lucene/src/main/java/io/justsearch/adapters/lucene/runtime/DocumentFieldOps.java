@@ -505,6 +505,12 @@ public final class DocumentFieldOps {
     return queryDocIdsByField(field, value, limit, false);
   }
 
+  /** Control reads must distinguish an empty selection from an unreadable index. */
+  public List<String> queryDocIdsByFieldOrThrow(String field, String value, int limit)
+      throws IOException {
+    return queryDocIdsByFieldOrThrow(field, value, limit, false);
+  }
+
   /**
    * Queries document IDs matching a specific field value, omitting chunk documents.
    *
@@ -521,10 +527,19 @@ public final class DocumentFieldOps {
 
   private List<String> queryDocIdsByField(
       String field, String value, int limit, boolean excludeChunks) {
+    try {
+      return queryDocIdsByFieldOrThrow(field, value, limit, excludeChunks);
+    } catch (IOException e) {
+      log.debug("Failed to query {}={}: {}", field, value, e.getMessage());
+      return List.of();
+    }
+  }
+
+  private List<String> queryDocIdsByFieldOrThrow(
+      String field, String value, int limit, boolean excludeChunks) throws IOException {
     if (field == null || value == null || limit <= 0) {
       return List.of();
     }
-    try {
       return bridge.withSearcher(searcher -> {
         Query valueQuery = new TermQuery(new Term(field, value));
         Query query =
@@ -552,10 +567,6 @@ public final class DocumentFieldOps {
         }
         return docIds;
       });
-    } catch (IOException e) {
-      log.debug("Failed to query {}={}: {}", field, value, e.getMessage());
-      return List.of();
-    }
   }
 
   /** Accounting for one identity recovery scan. */

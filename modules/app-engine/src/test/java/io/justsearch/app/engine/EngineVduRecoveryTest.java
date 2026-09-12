@@ -118,6 +118,8 @@ final class EngineVduRecoveryTest {
   @Test
   @DisplayName("recovery returns 0 when no documents stuck")
   void recoveryReturnsZeroWhenNoneStuck() {
+    assertEquals(0, harness.client().countPendingVdu(TestEngineContexts.FOREGROUND));
+    assertEquals(0, harness.client().countPendingEmbeddings(TestEngineContexts.FOREGROUND));
     // Nothing indexed, so nothing can be stuck. The empty index is guaranteed by this test's own
     // @TempDir, not by a best-effort directory clean.
     assertEquals(

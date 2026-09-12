@@ -69,6 +69,11 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public int countPendingEmbeddings() {
+    return service.countPendingEmbeddings(ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request) {
     return service.markVduProcessing(request, ctx);
   }

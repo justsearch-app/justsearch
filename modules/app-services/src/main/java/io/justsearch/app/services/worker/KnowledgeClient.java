@@ -217,7 +217,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         this.searchRpcOps = new SearchRpcOps(this::executeSearchRpc);
         this.ingestRpcExecutor = this::executeIngestRpc;
         this.migrationOps = new MigrationOps(ingestRpcExecutor);
-        this.vduOps = new VduOps(ingestRpcExecutor, this::getStatus);
+        this.vduOps = new VduOps(ingestRpcExecutor);
 
         // Initialize roots persistence file + state before syncOps so the reconcile-verification
         // recorder callback (tempdoc 626 §Axis-C) can reference the assigned watchedRootsState field.

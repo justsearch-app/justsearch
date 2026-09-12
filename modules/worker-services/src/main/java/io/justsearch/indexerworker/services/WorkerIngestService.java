@@ -1211,38 +1211,58 @@ public final class WorkerIngestService {
 
     log.debug("queryPendingVdu RPC called with limit: {}", limit);
 
-    QueryPendingVduResponse unavailable =
-        indexRuntimeUnavailableReply(
-            "queryPendingVdu", QueryPendingVduResponse.newBuilder().setTotalCount(0).build());
-    if (unavailable != null) {
-      return unavailable;
-    }
+    requireEnrichmentReader(ctx);
 
     try {
       // Query documents with vdu_status=PENDING
-      List<String> docIds = ingestLifecycle.documentFieldOps().queryDocIdsByField(
+      List<String> docIds = ingestLifecycle.documentFieldOps().queryDocIdsByFieldOrThrow(
           SchemaFields.VDU_STATUS,
           SchemaFields.VDU_STATUS_PENDING,
           limit);
 
       // Get total count (may be more than returned)
-      int totalCount = ingestLifecycle.indexCountOps().countByField(
+      int totalCount = ingestLifecycle.indexCountOps().countByFieldOrThrow(
           SchemaFields.VDU_STATUS,
           SchemaFields.VDU_STATUS_PENDING);
 
       log.info("queryPendingVdu: returning {} of {} pending docs", docIds.size(), totalCount);
+      requireEnrichmentReader(ctx);
 
       return QueryPendingVduResponse.newBuilder()
           .addAllDocIds(docIds)
           .setTotalCount(totalCount)
           .build();
 
-    } catch (Exception e) {
-      log.error("queryPendingVdu failed", e);
-      return QueryPendingVduResponse.newBuilder()
-          .setTotalCount(0)
-          .build();
+    } catch (java.io.IOException e) {
+      throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL,
+          "Pending VDU could not be read", e);
     }
+    }
+  }
+
+  /** Strict procedure control read; status metrics remain a separate best-effort projection. */
+  public int countPendingEmbeddings(CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx)) {
+      requireEnrichmentReader(ctx);
+      try {
+        int count = ingestLifecycle.indexCountOps().countByFieldOrThrow(
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+        requireEnrichmentReader(ctx);
+        return count;
+      } catch (java.io.IOException e) {
+        throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL,
+            "Pending embeddings could not be read", e);
+      }
+    }
+  }
+
+  private void requireEnrichmentReader(CallContext ctx) {
+    if (ctx.cancelled()) {
+      throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED,
+          "Enrichment read cancelled");
+    }
+    if (ingestLifecycle == null) {
+      throw WorkerServiceException.unavailable("Index runtime not available");
     }
   }
 

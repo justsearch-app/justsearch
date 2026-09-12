@@ -16,7 +16,12 @@ in a design link;0bdf584bc repairs it and successor Public claims passes.
 See [checkpoint656](evidence/C2/projection-checkpoint-656.md) for exact revisions,
 commands, task reuse, artifacts and remaining limits.
 
-Next: actual offline procedure outcome/context propagation and durable index effects, then the remaining direct HTTP/keyed/ingestion
+Offline prerequisites now include guard cleanup (3b425cebb) and strict backlog
+reads. [Backlog proof](evidence/C2/backlog-reads.md) records 46 focused cases, four
+additional actual Engine error-translation cases, negative regressions and independent
+review. These establish control-read failures, not durable write acknowledgements.
+
+Next: durable VDU index effects, actual offline procedure outcome/context propagation, then the remaining direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.
 

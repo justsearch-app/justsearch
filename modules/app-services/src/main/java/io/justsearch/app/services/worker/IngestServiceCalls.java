@@ -4,7 +4,7 @@ package io.justsearch.app.services.worker;
 /**
  * The unary IngestService calls, as a plain Java interface (lane F stage A item A6).
  *
- * <p>Thirty-six unary calls: ingestion, migration, VDU, upgrade quiescence and queue inspection.
+ * <p>Unary calls for ingestion, migration, VDU, upgrade quiescence and queue inspection.
  *
  * <p><b>Why this interface exists.</b> Until A6 the executor seam
  * ({@link SearchRpcExecutor}, {@link IngestRpcExecutor}) was typed on the <em>generated gRPC
@@ -51,6 +51,9 @@ public interface IngestServiceCalls {
 
   /** {@code IngestService/QueryPendingVdu}. */
   io.justsearch.ipc.QueryPendingVduResponse queryPendingVdu(io.justsearch.ipc.QueryPendingVduRequest request);
+
+  /** Strict control read; unavailable readers fail instead of reporting an empty backlog. */
+  int countPendingEmbeddings();
 
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);

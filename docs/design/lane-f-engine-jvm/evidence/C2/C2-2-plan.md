@@ -6,8 +6,8 @@ below resolve its returned ambiguities without owner gates.
 
 Latest coherent projection/orphan proof is [checkpoint656](projection-checkpoint-656.md):
 full build/PMD9,917 cases, stress659 and clean hosted orphan/queue/snapshot results.
-Offline procedure guard cleanup is the next bounded correction; actual completion,
-context and index durability remain open as described below.
+Offline procedure guard cleanup (3b425cebb) and strict backlog reads are implemented;
+actual completion, context and index durability remain open as described below.
 
 ### Offline guard cleanup prerequisite
 
@@ -35,7 +35,8 @@ Retain through lane acceptance plus30 days.
 
 September12 source audit resolves the next implementation order:
 
-1. Backlog reads must distinguish unavailable from empty. Reuse queryPendingVdu's
+1. Implemented with [strict backlog proof](backlog-reads.md): reads distinguish
+   unavailable from empty. Reuse queryPendingVdu's
    existing totalCount and bounded ID selection, with strict reader access; use the
    existing countByFieldOrThrow for pending embeddings through one Java-only ingest
    port method. Retire VduOps' dependency on best-effort status metrics and its empty
