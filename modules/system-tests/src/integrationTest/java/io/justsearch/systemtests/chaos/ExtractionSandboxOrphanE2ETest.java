@@ -1,10 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.systemtests.chaos;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.fixtures.ChaosExtractionSandboxChild;
+import io.justsearch.app.api.runtime.ManagedChild;
+import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.systemtests.harness.IsolatedBackendFixture;
 import java.io.IOException;
 import java.net.URI;
@@ -15,11 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Lane F stage A item A12 closure — the surviving process-boundary half of the retired chaos-tier
@@ -60,8 +63,9 @@ import org.slf4j.LoggerFactory;
  * The heartbeat keeper and {@code MmfTestHarness.awaitPort} went with the memory-mapped bus at item
  * A10; the fixture's manifest/health/worker-ready poll replaces them.
  *
- * <p>The child-PID and live-native-PID witnesses prevent vacuous success if the startup probe
- * fails. Production preserves process isolation on probe failure; it never falls back to parsing
+ * <p>A harmless request prewarms the production pool, and the hanging request must reuse that
+ * exact parser instance. Exact target, direct-parent, manifest ownership and live-native witnesses
+ * prevent vacuous success if the startup probe fails. Production preserves process isolation on probe failure; it never falls back to parsing
  * these files in-process.
  */
 @DisplayName("Chaos: killing the Engine mid-parse leaves no orphaned extraction child")
@@ -81,12 +85,17 @@ class ExtractionSandboxOrphanE2ETest {
 
   private static Path scratchDir;
   private static Path corpusDir;
+  private static Path prewarmDir;
+  private static Path enteredFile;
 
   @BeforeAll
   static void setup() throws Exception {
     org.junit.jupiter.api.Assumptions.assumeTrue(isWindows(), "native containment is Windows-only");
     scratchDir = Files.createTempDirectory("extraction-orphan-");
     corpusDir = Files.createDirectories(scratchDir.resolve("corpus"));
+    prewarmDir = Files.createDirectories(scratchDir.resolve("prewarm"));
+    enteredFile = scratchDir.resolve("entered.txt");
+    Files.writeString(prewarmDir.resolve("orphan-prewarm.txt"), "warm the persistent parser");
     // The wedged file has to exist before the root is added: adding a root walks it immediately.
     Files.writeString(
         corpusDir.resolve("chaos-hang-native-descendant.txt"),
@@ -96,6 +105,8 @@ class ExtractionSandboxOrphanE2ETest {
     backend
         .withEnv("JUSTSEARCH_EXTRACTION_SANDBOX_MODE", "process")
         .withEnv("JUSTSEARCH_EXTRACTION_SANDBOX_POOL", "1")
+        .withEnv("JUSTSEARCH_EXTRACTION_SANDBOX_MAX_REQUESTS", "500")
+        .withEnv("JUSTSEARCH_PROCESSING_TEST_ENTERED", enteredFile.toString())
         .withEnv("JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND", chaosChildCommand())
         .start();
   }
@@ -108,63 +119,74 @@ class ExtractionSandboxOrphanE2ETest {
 
   @Test
   void killingTheEngineMidParseLeavesNoOrphanChild() throws Exception {
-    long enginePid = backend.pid();
-    Set<Long> before = descendantPids(enginePid);
-
-    assertTrue(addRoot(corpusDir.toAbsolutePath().toString()),
-        "the Engine must accept the chaos corpus as an indexing root");
-
-    Path nativePidFile = corpusDir.resolve("chaos-hang-native-descendant.txt.pid");
-    long nativeDeadline = System.nanoTime() + Duration.ofMillis(CHILD_SPAWN_TIMEOUT_MS).toNanos();
-    while (!Files.exists(nativePidFile) && System.nanoTime() < nativeDeadline) {
-      Thread.sleep(20);
-    }
-    assertTrue(Files.exists(nativePidFile), "the parser must start a real native descendant");
-    ProcessHandle nativeChild = ProcessHandle.of(Long.parseLong(Files.readString(nativePidFile)))
-        .orElseThrow();
-    long childPid = nativeChild.parent().orElseThrow().pid();
-    assertTrue(!before.contains(childPid) && childPid != enginePid,
-        "the native process must come from a newly spawned parser, not the Engine or boot probe");
-    Set<Long> witnessed = descendantPids(enginePid);
-    assertTrue(witnessed.contains(childPid) && witnessed.contains(nativeChild.pid()),
-        "both parser and native child must belong to the live Engine before its kill");
-    assertTrue(isAlive(childPid), "the parser must still be alive before Engine kill");
-    assertTrue(nativeChild.isAlive(), "native descendant must be alive BEFORE Engine kill");
-    System.err.println("[ExtractionSandboxOrphanE2ETest] extraction child " + childPid
-        + " is wedged under Engine " + enginePid);
-    System.err.println("[ExtractionSandboxOrphanE2ETest] native descendant " + nativeChild.pid()
-        + " is live before Engine kill");
+    ProcessInstance engine = ProcessInstance.capture(ProcessHandle.of(backend.pid()).orElseThrow());
+    ProcessInstance ownedParser = null;
+    ProcessInstance nativeInstance = null;
+    Throwable primaryFailure = null;
     try {
-      // Kill the Engine outright, so the assertion cannot pass on the graceful shutdown-hook path.
-      assertTrue(backend.kill(), "the Engine must terminate after destroyForcibly()");
-      assertFalse(isAlive(enginePid),
-          "the Engine process must be gone before the orphan window opens");
+      assertTrue(addRoot(prewarmDir.toAbsolutePath().toString()), "the prewarm root must be accepted");
+      Path prewarmWitness = prewarmDir.resolve("orphan-prewarm.txt.parser-identity");
+      awaitFile(prewarmWitness, "the harmless request must finish in the production parser pool");
+      ProcessInstance warmed = readIdentity(prewarmWitness);
+      assertTrue(warmed.isCurrentAndAlive(), "the response witness must name the same live parser instance");
+      assertEquals(engine, parentOf(warmed), "the warmed parser must be a direct Engine child");
+      awaitRegisteredExtraction(warmed);
+      ownedParser = warmed;
+      List<String> before = descendantDescriptions(engine.pid());
+      System.err.println("[ExtractionSandboxOrphanE2ETest] prewarm parser=" + warmed
+          + "; Engine=" + engine + "; before=" + before);
 
-      long deadline = System.currentTimeMillis() + ORPHAN_REAP_TIMEOUT_MS;
-      boolean gone = false;
-      while (System.currentTimeMillis() < deadline) {
-        if (!isAlive(childPid)) {
-          gone = true;
-          break;
-        }
-        Thread.sleep(250);
-      }
-      if (!gone) {
-        ProcessHandle.of(childPid).ifPresent(ProcessHandle::destroyForcibly);
-      }
-      System.err.println(
-          "[ExtractionSandboxOrphanE2ETest] child " + childPid + " reaped after "
-              + (ORPHAN_REAP_TIMEOUT_MS - (deadline - System.currentTimeMillis())) + "ms");
-      assertTrue(gone, "extraction child " + childPid
-          + " must halt itself once the Engine is gone (parent-PID gate)");
+      assertTrue(addRoot(corpusDir.toAbsolutePath().toString()),
+          "the Engine must accept the chaos corpus as an indexing root");
+      Path target = corpusDir.resolve("chaos-hang-native-descendant.txt");
+      Path nativePidFile = Path.of(target + ".pid");
+      awaitFile(nativePidFile, "the parser must start a real native descendant");
+      awaitFile(enteredFile, "the exact chaos request must enter the wedged parser");
+      assertEquals(target.toAbsolutePath().normalize(),
+          Path.of(Files.readString(enteredFile)).toAbsolutePath().normalize(),
+          "the fixture witness must belong to this exact target, not a probe or unrelated request");
+      ProcessHandle nativeChild = ProcessHandle.of(Long.parseLong(Files.readString(nativePidFile)))
+          .orElseThrow();
+      nativeInstance = readIdentity(Path.of(target + ".native-identity"));
+      assertTrue(nativeInstance.matches(nativeChild), "native PID must match the instance published by its creator");
+      ProcessInstance parser = parentOf(nativeInstance);
+      System.err.println("[ExtractionSandboxOrphanE2ETest] native=" + nativeInstance
+          + "; native parent=" + parser + "; parser parent=" + parentOf(parser)
+          + "; registered extraction=" + extractionChildren());
+      assertEquals(warmed, parser, "the hanging request must reuse the prewarmed process instance");
+      assertFalse(parser.pid() == engine.pid(), "the parser must be separate from the Engine");
+      assertEquals(engine, parentOf(parser), "the parser's direct parent must be this Engine instance");
+      awaitRegisteredExtraction(parser);
+      assertTrue(parser.isCurrentAndAlive(), "the parser must be alive before Engine kill");
+      assertTrue(nativeInstance.isCurrentAndAlive(), "native descendant must be alive before Engine kill");
+      var descendants = ProcessHandle.of(engine.pid()).orElseThrow().descendants().toList();
+      assertTrue(descendants.stream().anyMatch(parser::matches), "parser belongs to the live Engine");
+      ProcessInstance witnessedNative = nativeInstance;
+      assertTrue(descendants.stream().anyMatch(witnessedNative::matches), "native belongs to the live Engine");
+
+      // Forced death must exercise the parent-PID gate, not the graceful shutdown hook.
+      assertTrue(backend.kill(), "the Engine must terminate after destroyForcibly()");
+      assertFalse(engine.isCurrentAndAlive(), "the exact Engine instance must be gone first");
+      long started = System.nanoTime();
+      long deadline = started + Duration.ofMillis(ORPHAN_REAP_TIMEOUT_MS).toNanos();
+      while (parser.isCurrentAndAlive() && System.nanoTime() < deadline) Thread.sleep(250);
+      assertFalse(parser.isCurrentAndAlive(), "the exact parser must halt after Engine death: " + parser);
       nativeChild.onExit().get(10, TimeUnit.SECONDS);
-      assertFalse(nativeChild.isAlive(), "native descendant must die with its parser job");
-      System.err.println("[ExtractionSandboxOrphanE2ETest] native descendant " + nativeChild.pid()
-          + " reaped after Engine kill");
+      assertFalse(nativeInstance.isCurrentAndAlive(), "the exact native descendant must die with its parser job");
+      System.err.println("[ExtractionSandboxOrphanE2ETest] reused parser and native reaped after "
+          + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + "ms; parser=" + parser
+          + "; native=" + nativeInstance);
+    } catch (Exception | AssertionError failure) {
+      primaryFailure = failure;
+      backend.preserveLogOnFailure();
+      throw failure;
     } finally {
-      if (nativeChild.isAlive()) {
-        nativeChild.destroyForcibly();
-        nativeChild.onExit().get(10, TimeUnit.SECONDS);
+      try {
+        cleanupOwned(nativeInstance, ownedParser);
+      } catch (Exception | AssertionError cleanupFailure) {
+        backend.preserveLogOnFailure();
+        if (primaryFailure != null) primaryFailure.addSuppressed(cleanupFailure);
+        else throw cleanupFailure;
       }
     }
   }
@@ -207,15 +229,97 @@ class ExtractionSandboxOrphanE2ETest {
   // Process observation
   // =========================================================================
 
-  private static Set<Long> descendantPids(long pid) {
-    return ProcessHandle.of(pid)
-        .map(handle -> handle.descendants().map(ProcessHandle::pid)
-            .collect(java.util.stream.Collectors.toCollection(HashSet::new)))
-        .orElseGet(HashSet::new);
+  /** Strict identity: unknown start/executable data fails proof instead of claiming an exit. */
+  private record ProcessInstance(long pid, Instant startedAt, String executable) {
+    static ProcessInstance capture(ProcessHandle handle) {
+      var info = handle.info();
+      return new ProcessInstance(handle.pid(), info.startInstant().orElseThrow(),
+          ManagedChild.normalizePath(Path.of(info.command().orElseThrow())));
+    }
+
+    boolean matches(ProcessHandle handle) {
+      if (handle.pid() != pid) return false;
+      var info = handle.info();
+      if (info.startInstant().isEmpty() || info.command().isEmpty()) {
+        assertFalse(handle.isAlive(), "a live process with unavailable identity cannot prove an exit");
+        return false;
+      }
+      return info.startInstant().orElseThrow().equals(startedAt)
+          && ManagedChild.normalizePath(Path.of(info.command().orElseThrow())).equals(executable);
+    }
+
+    boolean isCurrentAndAlive() {
+      return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).map(this::matches).orElse(false);
+    }
+
+    void destroyIfCurrent() throws Exception {
+      var current = ProcessHandle.of(pid).filter(ProcessHandle::isAlive).filter(this::matches);
+      if (current.isEmpty()) return;
+      ProcessHandle handle = current.orElseThrow();
+      handle.destroyForcibly();
+      handle.onExit().get(10, TimeUnit.SECONDS);
+      assertFalse(isCurrentAndAlive(), "owned process must exit during bounded cleanup");
+    }
   }
 
-  private static boolean isAlive(long pid) {
-    return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+  private static ProcessInstance readIdentity(Path witness) throws IOException {
+    List<String> fields = Files.readAllLines(witness);
+    assertEquals(3, fields.size(), "identity witness must be complete");
+    return new ProcessInstance(Long.parseLong(fields.get(0)), Instant.parse(fields.get(1)), fields.get(2));
+  }
+
+  private static void cleanupOwned(ProcessInstance nativeChild, ProcessInstance parser) throws Exception {
+    Throwable failure = null;
+    for (ProcessInstance child : new ProcessInstance[] {nativeChild, parser}) {
+      if (child == null) continue;
+      try {
+        child.destroyIfCurrent();
+      } catch (Exception | AssertionError cleanupFailure) {
+        if (failure == null) failure = cleanupFailure;
+        else failure.addSuppressed(cleanupFailure);
+      }
+    }
+    if (failure instanceof Exception exception) throw exception;
+    if (failure instanceof AssertionError error) throw error;
+  }
+
+  private static ProcessInstance parentOf(ProcessInstance child) {
+    ProcessHandle handle = ProcessHandle.of(child.pid()).orElseThrow();
+    assertTrue(child.matches(handle), "child identity changed before its parent was observed");
+    return ProcessInstance.capture(handle.parent().orElseThrow());
+  }
+
+  private static List<String> descendantDescriptions(long pid) {
+    return ProcessHandle.of(pid).orElseThrow().descendants()
+        .map(handle -> handle.pid() + "@" + handle.info().startInstant()
+            + ":" + handle.info().command()).toList();
+  }
+
+  private static void awaitFile(Path path, String message) throws Exception {
+    long deadline = System.nanoTime() + Duration.ofMillis(CHILD_SPAWN_TIMEOUT_MS).toNanos();
+    while ((!Files.exists(path) || Files.size(path) == 0) && System.nanoTime() < deadline) Thread.sleep(20);
+    assertTrue(Files.exists(path) && Files.size(path) > 0, message);
+  }
+
+  private static List<ManagedChild> extractionChildren() throws IOException {
+    var manifest = JsonMapper.builder().build().readValue(
+        Files.readString(backend.dataDir().resolve("runtime/manifest.json")), RuntimeManifest.class);
+    return manifest.children() == null ? List.of() : manifest.children().stream()
+        .filter(child -> child.kind() == ManagedChild.Kind.EXTRACTION).toList();
+  }
+
+  private static void awaitRegisteredExtraction(ProcessInstance parser) throws Exception {
+    long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+    List<ManagedChild> children;
+    do {
+      children = extractionChildren();
+      if (children.stream().anyMatch(child -> child.pid() == parser.pid()
+          && Instant.parse(child.startedAt()).equals(parser.startedAt())
+          && child.executable().equals(parser.executable()))) return;
+      Thread.sleep(20);
+    } while (System.nanoTime() < deadline);
+    throw new AssertionError("Parser instance absent from private EXTRACTION manifest: "
+        + parser + "; children=" + children);
   }
 
   // =========================================================================

@@ -713,3 +713,14 @@ with zero failures/errors/skips and worker-services test PMD. The same command c
 and PMD-checks the in-progress orphan fixture separately; it is not an orphan runtime proof.
 Evidence: tmp/c2-2-orphan-compile-snapshot-649.txt, tmp/c2-2-snapshot-thread-649-xml and
 -counts.json. This test-only followup is committed separately from the orphan changes.
+
+
+### Orphan proof correction
+
+The inherited A12 Windows proof now prewarms and reuses an exact production parser
+instance and binds both parser/native witnesses to creator-published PID/start/executable.
+Final local653 passes actual kill/reap, negative654 refutes the old freshness rule and
+exercises bounded failure cleanup, and655 restores identical-source cached proof.
+Independent review passes after identity-publication and cleanup findings were fixed.
+The [hosted record](hosted-ci.md#orphan-witness-correction-during-c2) owns detailed evidence,
+retention and the still-required fresh hosted first-attempt/integrated/stress proof.

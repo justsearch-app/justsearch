@@ -22,7 +22,13 @@ snapshot-before-delta race is corrected with a bounded initial handoff;648 passe
 tests/5 suites plus PMD, negative645 reproduces the old ordering defect, and independent
 review passes. Hosted/integrated proof of the new projection is still owed. See the C2-2 plan for retained evidence.
 
-Next: orphan proof correction, actual offline
+Orphan witness correction is implemented and locally proved: final653 checks deliberate
+pool reuse with creator-published exact identities, real native containment and forced
+Engine death; negative654 refutes the old freshness rule and655 reuses identical-source
+cached proof. Independent review passes. Fresh hosted first-attempt proof remains owed;
+see hosted evidence. Queue/snapshot commits03c05f47e,41eed16e6 andf5c2c2edc are pushed.
+
+Next: integrated/stress and corrected hosted proof, actual offline
 procedure outcome/context propagation, then the remaining direct HTTP/keyed/ingestion
 work and every C2/D1/D2/E/F acceptance item. The plan records the bounded offline effect
 contract; do not replace it with an invented unbounded global semantic-drain owner.

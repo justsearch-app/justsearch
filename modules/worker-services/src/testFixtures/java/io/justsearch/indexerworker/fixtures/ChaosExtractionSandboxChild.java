@@ -84,14 +84,13 @@ public final class ChaosExtractionSandboxChild {
             .redirectOutput(ProcessBuilder.Redirect.DISCARD)
             .redirectError(ProcessBuilder.Redirect.DISCARD).start();
         if (!nativeChild.isAlive()) throw new IllegalStateException("native fixture did not start");
-        Path pidTemp = Path.of(request.path() + ".pid.tmp");
-        java.nio.file.Files.writeString(pidTemp, Long.toString(nativeChild.pid()));
-        java.nio.file.Files.move(pidTemp, Path.of(request.path() + ".pid"));
+        publishIdentity(Path.of(request.path() + ".native-identity"), nativeChild.toHandle());
+        publishWitness(Path.of(request.path() + ".pid"), Long.toString(nativeChild.pid()));
       }
       if (name.contains("chaos-hang")) {
         String entered = System.getenv("JUSTSEARCH_PROCESSING_TEST_ENTERED");
         if (entered != null && !entered.isBlank()) {
-          java.nio.file.Files.writeString(Path.of(entered), request.path());
+          publishWitness(Path.of(entered), request.path());
         }
         while (true) {
           LockSupport.parkNanos(1_000_000_000L);
@@ -125,7 +124,25 @@ public final class ChaosExtractionSandboxChild {
                 "PARSER_FAILED");
       }
       writeFrame(protocolOut, MAPPER.writeValueAsBytes(response));
+      if (name.equals("orphan-prewarm.txt")) {
+        // The orphan test deliberately reuses this production pool member for its next request.
+        publishIdentity(Path.of(request.path() + ".parser-identity"), ProcessHandle.current());
+      }
     }
+  }
+
+  private static void publishIdentity(Path witness, ProcessHandle process) throws IOException {
+    var info = process.info();
+    publishWitness(witness, String.join("\n", Long.toString(process.pid()),
+        info.startInstant().orElseThrow().toString(),
+        io.justsearch.app.api.runtime.ManagedChild.normalizePath(Path.of(info.command().orElseThrow()))));
+  }
+
+  private static void publishWitness(Path witness, String value) throws IOException {
+    Path temporary = Path.of(witness + ".tmp");
+    java.nio.file.Files.writeString(temporary, value, StandardCharsets.UTF_8);
+    java.nio.file.Files.move(temporary, witness, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
   }
 
   private static byte[] readFrame(DataInputStream in) throws IOException {

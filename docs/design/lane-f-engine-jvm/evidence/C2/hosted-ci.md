@@ -59,3 +59,45 @@ remain the execution authority. Local retained copies:
 
 Hosted artifact expiry is December 11, 2026; the local copies follow the lane's
 acceptance-plus-30-day retention and must be exported before worktree deletion.
+
+
+## Orphan witness correction during C2
+
+September12 source review establishes a valid persistent-pool reuse path. The separate
+boot probe is closed before the production pool is constructed; it is not reused.
+KnowledgeServerBootstrap publishes READY before ready initialization, which can submit
+bundled help documents, and PersistentExtractionSandbox deliberately reuses a live child
+within its request budget. Thus a valid production parser can predate the test's root-add
+snapshot. The original hosted artifact did not log identities, so its exact first-failure
+cause remains unknown; this is a proven invalid assertion, not a claimed historical PID
+reuse diagnosis.
+
+The test now explicitly prewarms the one-member production pool with a harmless request,
+then requires the hanging native-descendant request to reuse that exact instance. Fixture
+witnesses atomically publish PID, process start instant and normalized executable at
+creation/response; the exact target witness, live direct Engine/parser/native parent chain,
+current private EXTRACTION manifest registration and Engine descendant membership all
+must match before forced Engine death. Exit observations compare full identities; unknown
+live identity cannot prove death. Failure cleanup waits boundedly for both owned children,
+retains primary failures, and preserves backend logs. No production parser behavior or
+containment requirement was relaxed.
+
+Local Windows/Java25 proof:
+
+-650 passes first attempt in25s: Engine23364, reused parser35816, native11184; both
+reaped519ms. -652 passes in13s after the observation-race correction, reaped312ms.
+-653 is the final identity-publication/cleanup version: first attempt17s, Engine31408,
+parser31200, native37676; both reaped522ms. Each has1 test and zero failures/errors/skips.
+-651 and final-654 temporarily restore the old freshness assertion and fail exactly on
+it, because the deliberately reused parser exists in the pre-request list. Final-654
+preserves that primary assertion with no suppressed cleanup failure; bounded cleanup
+runs before fixture teardown. -655 restores the exact -653 code and reuses its test
+result FROM-CACHE; it is not another live execution. Compile and test-fixture/integration
+PMD pass. Independent source review and independent re-reading of -650/-653 pass after
+both review findings were fixed.
+
+Evidence: tmp/c2-2-orphan-reuse-{650,652,653,655}.txt, matching -xml/ and -counts.json;
+tmp/c2-2-orphan-reuse-negative-{651,654}.txt, matching -xml/ and -logs/ (backend/engine
+failure logs copied out before later runs). Retain through lane acceptance plus30 days.
+Corrected hosted first-attempt proof and integrated/named stress checks are still owed
+at this checkpoint; the earlier hosted retry is not retroactively converted to clean proof.

@@ -1393,6 +1393,15 @@ gate at A17**, not by this reasoning alone.
 
 ## 10. What is allowed to be red after stage A, and nothing else
 
+**September12 C2 inherited-proof correction:** the Windows orphan test deliberately
+prewarms and reuses the production parser pool, replacing an invalid newly-spawned-PID
+assumption with exact target, creator-published process identity, direct-parent, private
+manifest and live-native witnesses. Final local653 passes the real forced Engine kill
+and parser/native exit proof; negative654 reproduces the old assertion's rejection of a
+valid reused parser. Restored655 reuses the identical successful result from cache.
+Corrected hosted first-attempt proof remains owed. See [the evidence and limits](../evidence/C2/hosted-ci.md#orphan-witness-correction-during-c2).
+
+
 This section was written from 17.3's "branch state after" column **before the code existed**. The
 review pass re-read it against the landed branch and three of its five rows did not survive contact:
 rows 1 and 2 forecast losses that did not happen and row 4 has since closed. A forecast left
