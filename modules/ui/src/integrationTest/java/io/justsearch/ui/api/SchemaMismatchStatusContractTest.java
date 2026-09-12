@@ -104,7 +104,9 @@ final class SchemaMismatchStatusContractTest {
             config,
             null,
             new io.justsearch.app.services.lifecycle.WorkerCapability(),
-            new io.justsearch.app.engine.EngineRoot(config.deadlineMs(), config.batchSize()));
+            new io.justsearch.app.engine.EngineRoot(
+                org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+                config.deadlineMs(), config.batchSize()));
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
       // timeout must not read as a schema-contract failure. (This test never runs in CI — see the

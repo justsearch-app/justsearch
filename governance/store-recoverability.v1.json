@@ -616,8 +616,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v14",
-      "currentVersion": 14,
+      "format": "SQLite WAL schema v15",
+      "currentVersion": 15,
       "readableLegacyVersions": [
         0,
         1,
@@ -632,7 +632,8 @@
         10,
         11,
         12,
-        13
+        13,
+        14
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
@@ -843,7 +844,9 @@
       "upgradeHandling": "RESET",
       "format": "atomic current manifest plus append-only instance history",
       "currentVersion": 2,
-      "readableLegacyVersions": [1],
+      "readableLegacyVersions": [
+        1
+      ],
       "versionAuthority": "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java",
       "futureVersionRefusalTest": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
@@ -1492,6 +1495,45 @@
       ],
       "fixtures": [],
       "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
+    },
+    {
+      "id": "operations-db",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "HeadlessApp and LauncherEnvironment resolve operations.db under DATA_DIR; SqliteOperationStore composes SQLite sidecars and timestamped preservation directories.",
+      "encryption": "UNSEALED_GAP",
+      "encryptionNote": "Plaintext SQLite contains operation identity, root paths in identity_json, grant references, checkpoints, and bounded results; it does not contain document content.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "operations.db",
+        "operations.db-wal",
+        "operations.db-shm",
+        "operations.db.corrupt-*"
+      ],
+      "recoverability": "MIXED",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "SQLite WAL schema v1",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
+      "futureVersionRefusalTest": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+      "writeMode": "TRANSACTIONAL",
+      "atomicity": "TRANSACTIONAL",
+      "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
+      "corruptionNote": "Preserve the main file and WAL/SHM before recreating the store; report loss of outcome history through OperationRecoveryNotice. history_since_ms advances to recovery time plus five minutes admitted future skew plus one millisecond. The preservation directory witnesses interrupted recovery until that fence commits. Failed preservation refuses startup. External file-level rollback is outside this contract.",
+      "reconciliation": "RUN_OPERATIONS_SQLITE_MIGRATIONS_AND_RECONCILE_ACCEPTED_WORK",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java"
+      ],
+      "tests": [
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java"
+      ],
+      "fixtures": []
     }
   ],
   "nonDurableWriteSites": [
@@ -1614,6 +1656,10 @@
     {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PdfOcrEngine.java",
       "reason": "Per-document JVM temp dirs (justsearch-ocr-*) holding rendered page PNGs and tesseract output, swept by deleteRecursively in the same call's finally (:201, :326, :353)."
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/SqliteStoreSnapshot.java",
+      "reason": "Private JVM temp inspection copies of a quiescent SQLite main file and WAL. The original database remains the only authority; these copies are never resumed or read by product paths and are removed after inspection. They prevent SQLite read-only preflight from modifying original SHM bytes."
     }
   ],
   "constructionSites": [

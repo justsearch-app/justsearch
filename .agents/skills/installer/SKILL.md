@@ -21,6 +21,12 @@ across three build systems. Load this before working in any of these areas.
 - **AOT cache:** JEP 514, ONE cache for the Engine (`generateHeadAotCache`). Lane F stage A item A13 deleted `generateWorkerAotCache` / `worker.aot` with the second process.
 - **Version sync:** `scripts/ci/sync-version.ps1` propagates version across gradle.properties, tauri.conf.json, package.json, Cargo.toml
 
+The release descriptor can project the prior release's store set with
+`app-release-assets.mjs --compat-baseline <register.json>`. Validate unchanged store
+identity and readable formats. The installed shell expands inherited expectations
+against its own full register before exact Engine reconciliation, so added stores
+are checked even when an older installer required an exact compatibility row count.
+
 ## Known Pitfalls
 
 - **`isProd` gate:** Don't gate bundled path resolution on `isProd` — check prod layout unconditionally (G27)

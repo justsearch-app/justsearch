@@ -50,6 +50,10 @@
     {
       "code": "telemetry.disk_space_low",
       "why": "telemetry composite, not verdict-consumed"
+    },
+    {
+      "code": "operations.history_reset",
+      "why": "Head-owned ConditionStore condition (OperationRecoveryNotice); the Health surface renders its Java message, including preserved bytes and the bounded retry fence. It is not a readiness-envelope cause."
     }
   ],
   "feDerived": [

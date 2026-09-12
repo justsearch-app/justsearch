@@ -176,6 +176,7 @@ class SummarizationPipelineE2ETest {
   private static HttpClient httpClient;
 
   private EngineRoot engine;
+  private io.justsearch.app.api.operations.OperationStore operations;
   private KnowledgeClient client;
   private Path testDataDir;
 
@@ -204,11 +205,13 @@ class SummarizationPipelineE2ETest {
   }
 
   @AfterEach
-  void cleanup() {
+  void cleanup() throws java.io.IOException {
     // EngineRoot.close() closes the KnowledgeClient it handed out, so the client is released by
     // dropping the reference rather than by a second close.
     if (engine != null) {
       engine.close();
+      operations.close();
+      operations = null;
       engine = null;
     }
     client = null;
@@ -658,7 +661,8 @@ class SummarizationPipelineE2ETest {
         .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
         .build()));
 
-    engine = new EngineRoot(30_000L, 5_000);
+    operations = new io.justsearch.app.observability.operations.SqliteOperationStore(dataDir.resolve("operations.db"));
+    engine = new EngineRoot(operations, 30_000L, 5_000);
     client = engine.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
   }
 

@@ -925,9 +925,9 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(14, rs.getInt(1));
+        assertEquals(15, rs.getInt(1));
       }
-      assertEquals(14, SqliteSchema.TARGET_VERSION);
+      assertEquals(15, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -962,19 +962,19 @@ final class JobQueueMigrationTest {
       assertEquals(1L, store.identityCount());
     }
 
-    // A V15 database was written by a newer binary: refused, not silently downgraded.
-    Path futurePath = tempDir.resolve("v15.db");
+    // A V16 database was written by a newer binary: refused, not silently downgraded.
+    Path futurePath = tempDir.resolve("v16.db");
     try (Connection conn =
             DriverManager.getConnection("jdbc:sqlite:" + futurePath.toAbsolutePath());
         Statement stmt = conn.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
-      stmt.execute("PRAGMA user_version = 15");
+      stmt.execute("PRAGMA user_version = 16");
     }
     SqliteJobQueue future = new SqliteJobQueue(futurePath);
     try {
       SQLException refusal = assertThrows(SQLException.class, future::open);
       assertTrue(
-          refusal.getMessage().contains("15"),
+          refusal.getMessage().contains("16"),
           "the refusal must name the unsupported version: " + refusal.getMessage());
     } finally {
       future.close();
@@ -1040,7 +1040,7 @@ final class JobQueueMigrationTest {
         Statement stmt = conn.createStatement()) {
       try (ResultSet rs = stmt.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(14, rs.getInt(1));
+        assertEquals(15, rs.getInt(1));
       }
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity)")) {
@@ -1106,6 +1106,176 @@ final class JobQueueMigrationTest {
       }
       assertFalse(columns.contains("deleted_at"));
     }
+  }
+
+  @Test
+  void v14ToV15PreservesRowsAndMatchesFreshSchema() throws Exception {
+    Path migrated = tempDir.resolve("migrated-v14.db");
+    createV14Fixture(migrated);
+    try (SqliteJobQueue queue = new SqliteJobQueue(migrated)) {
+      queue.open();
+    }
+    try (Connection db = DriverManager.getConnection("jdbc:sqlite:" + migrated);
+        Statement statement = db.createStatement()) {
+      try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
+        assertTrue(version.next());
+        assertEquals(15, version.getInt(1));
+      }
+      assertTrue(hasColumn(statement, "content_hash"));
+      try (ResultSet row = statement.executeQuery(
+          "SELECT state, content_hash FROM jobs WHERE path = '/c2/preserved.txt'")) {
+        assertTrue(row.next());
+        assertEquals("DONE", row.getString(1));
+        assertNull(row.getString(2), "no pre-C2 content hash may be fabricated");
+      }
+      try (ResultSet row = statement.executeQuery(
+          "SELECT doc_uid FROM document_identity WHERE path_hash = 'c2-preserved-hash'")) {
+        assertTrue(row.next());
+        assertEquals("c2-preserved-uid", row.getString(1));
+      }
+    }
+    Path fresh = tempDir.resolve("fresh-v15.db");
+    try (SqliteJobQueue queue = new SqliteJobQueue(fresh)) { queue.open(); }
+    assertEquals(tableColumns(fresh), tableColumns(migrated));
+  }
+
+  @Test
+  void v14ToV15DdlFailureRollsBackColumnAndVersion() throws Exception {
+    Path path = tempDir.resolve("v14-rollback.db");
+    createV14Fixture(path);
+    try (SqliteJobQueue queue = new SqliteJobQueue(path, 3, null, version -> {
+      if (version == 15) throw new SQLException("fail after V15 DDL");
+    })) {
+      assertThrows(SQLException.class, queue::open);
+    }
+    assertV14WithoutContentHash(path);
+  }
+
+  @Test
+  void versionWriteFailureCannotCommitDdlWithoutItsVersion() throws Exception {
+    Path path = tempDir.resolve("v14-version-failure.db");
+    createV14Fixture(path);
+    try (Connection real = DriverManager.getConnection("jdbc:sqlite:" + path)) {
+      Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+          org.mockito.AdditionalAnswers.delegatesTo(real));
+      org.mockito.Mockito.doAnswer(invocation -> {
+        Statement statement = org.mockito.Mockito.mock(Statement.class,
+            org.mockito.AdditionalAnswers.delegatesTo(real.createStatement()));
+        org.mockito.Mockito.doThrow(new SQLException("fail version write")).when(statement)
+            .execute("PRAGMA user_version = 15");
+        return statement;
+      }).when(intercepted).createStatement();
+      assertThrows(SQLException.class, () -> SqliteQueueMigrationOps.runMigrations(
+          intercepted, () -> {}, null));
+    }
+    assertV14WithoutContentHash(path);
+  }
+
+  @Test
+  void uncheckedMigrationFailureAlsoRollsBackDdlAndVersion() throws Exception {
+    Path path = tempDir.resolve("v14-unchecked.db");
+    createV14Fixture(path);
+    try (SqliteJobQueue queue = new SqliteJobQueue(path, 3, null, version -> {
+      if (version == 15) throw new IllegalStateException("unchecked failure after V15 DDL");
+    })) {
+      assertThrows(IllegalStateException.class, queue::open);
+    }
+    assertV14WithoutContentHash(path);
+  }
+
+  @Test
+  void futureVersionInWalIsRefusedBeforeWritableOpen() throws Exception {
+    Path path = tempDir.resolve("future-wal.db");
+    try (Connection db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement statement = db.createStatement()) {
+      statement.execute("PRAGMA journal_mode = WAL");
+      statement.execute("PRAGMA wal_autocheckpoint = 0");
+      statement.execute("CREATE TABLE future_owned(value TEXT)");
+      statement.execute("PRAGMA user_version = 16");
+      byte[] mainBefore = Files.readAllBytes(path);
+      Path wal = path.resolveSibling(path.getFileName() + "-wal");
+      byte[] walBefore = Files.readAllBytes(wal);
+      try (SqliteJobQueue queue = new SqliteJobQueue(path)) {
+        SQLException failure = assertThrows(SQLException.class, queue::open);
+        assertTrue(failure.getMessage().contains("16"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(mainBefore, Files.readAllBytes(path));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(walBefore, Files.readAllBytes(wal));
+      }
+    }
+  }
+
+  @Test
+  void currentVersionPrivacyRepairClosesRatherThanCommittingAfterRollbackFailure() throws Exception {
+    Path path = tempDir.resolve("current-privacy-rollback.db");
+    try (SqliteJobQueue queue = new SqliteJobQueue(path)) { queue.open(); }
+    try (Connection real = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement setup = real.createStatement()) {
+      setup.execute("ALTER TABLE ingestion_ledger ADD COLUMN job_path TEXT");
+      Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+          org.mockito.AdditionalAnswers.delegatesTo(real));
+      org.mockito.Mockito.doThrow(new SQLException("rollback unavailable")).when(intercepted).rollback();
+      org.mockito.Mockito.doAnswer(invocation -> {
+        Statement statement = org.mockito.Mockito.mock(Statement.class,
+            org.mockito.AdditionalAnswers.delegatesTo(real.createStatement()));
+        org.mockito.Mockito.doThrow(new SQLException("fail after ledger rename")).when(statement)
+            .execute(SqliteSchema.CREATE_INGESTION_LEDGER_TABLE);
+        return statement;
+      }).when(intercepted).createStatement();
+      assertThrows(SQLException.class, () -> SqliteQueueMigrationOps.runMigrations(intercepted, () -> {}, null));
+      assertTrue(real.isClosed(), "uncertain transaction must close instead of enabling auto-commit");
+    }
+    try (Connection check = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement statement = check.createStatement();
+        ResultSet rows = statement.executeQuery("SELECT job_path FROM ingestion_ledger")) {
+      assertFalse(rows.next());
+    }
+  }
+
+  private void createV14Fixture(Path path) throws Exception {
+    try (SqliteJobQueue queue = new SqliteJobQueue(path)) { queue.open(); }
+    try (Connection db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement statement = db.createStatement()) {
+      if (hasColumn(statement, "content_hash")) {
+        statement.execute("ALTER TABLE jobs DROP COLUMN content_hash");
+      }
+      statement.execute("PRAGMA user_version = 14");
+      statement.execute("INSERT INTO jobs(path, state, attempts, last_updated)"
+          + " VALUES ('/c2/preserved.txt', 'DONE', 0, 123)");
+      statement.execute("INSERT INTO document_identity(path_hash, doc_uid, first_seen_at, last_seen_at)"
+          + " VALUES ('c2-preserved-hash', 'c2-preserved-uid', 1, 1)");
+    }
+  }
+
+  private void assertV14WithoutContentHash(Path path) throws Exception {
+    try (Connection db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement statement = db.createStatement()) {
+      try (ResultSet version = statement.executeQuery("PRAGMA user_version")) {
+        assertTrue(version.next());
+        assertEquals(14, version.getInt(1));
+      }
+      assertFalse(hasColumn(statement, "content_hash"));
+    }
+  }
+
+  private java.util.Set<String> tableColumns(Path path) throws Exception {
+    java.util.Set<String> schema = new java.util.TreeSet<>();
+    try (Connection db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        Statement statement = db.createStatement()) {
+      List<String> tables = new java.util.ArrayList<>();
+      try (ResultSet rows = statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table'")) {
+        while (rows.next()) tables.add(rows.getString(1));
+      }
+      for (String table : tables) {
+        try (ResultSet columns = statement.executeQuery("PRAGMA table_info(" + table + ")")) {
+          while (columns.next()) {
+            schema.add(table + ":" + columns.getString("name") + ":" + columns.getString("type")
+                + ":" + columns.getInt("notnull") + ":" + columns.getString("dflt_value")
+                + ":" + columns.getInt("pk"));
+          }
+        }
+      }
+    }
+    return schema;
   }
 
   private static boolean hasColumn(Statement stmt, String columnName) throws SQLException {

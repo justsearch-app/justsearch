@@ -1,0 +1,190 @@
+{
+  "base": "e247533bd",
+  "status": "WIP; integrated553 in progress with known OperationSchema dead-code failure",
+  "sourceFiles": [
+    {
+      "path": "governance/readiness-reason-codes.v1.json",
+      "sha256": "2b31594f92cfac55263d0c98f30c13f689cd14c9797b3ed195088b0beb21667b"
+    },
+    {
+      "path": "governance/store-recoverability.v1.json",
+      "sha256": "dff046cadde759dab469dc02b69a48893d22c9c3c43d4a61c2f7025845d31e1f"
+    },
+    {
+      "path": "modules/app-agent/gradle.lockfile",
+      "sha256": "c13d026325d5448aa5b48aa8b62bc10d412667ac835dd8570751130c2624fe34"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleReasonCode.java",
+      "sha256": "36dc22f0b958ba7d909ffd0613bdcd4d5adfba6415e3417025c9d62376d0acfd"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "sha256": "172bde8b9623a20f2658197a214626c3fb8d03597c79a7b8d9c75dad606155de"
+    },
+    {
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+      "sha256": "64bf6100461ee55bf59ace79f67f64f82ee7ecc0fda9fde9ecf19a9642b6bab1"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExecutorLifetimeTest.java",
+      "sha256": "7e0051e37347c935188c131afe48bcba11f6b5dff231f6673fd16e7f215b9348"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
+      "sha256": "fbbde84832ee9d93e744ca98b3a9c48962df6673673adf5179a64b62fcfd2eff"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexBasePathLockTest.java",
+      "sha256": "76883b885eebe70c36f9d8cc52da8c943a169ddbac42cbfe569735179418d452"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexingJobsFlowTest.java",
+      "sha256": "6ac0da47ee9c384ac1fc026c22e9483c3b299ca94113d5d0afe5be1c65c4e103"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineMigrationRestartDispatchTest.java",
+      "sha256": "232f28d88688fc449e3f47af34dbe5be2d1097b76bcdb44134dabfaac90120ba"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineReadWhileWriteTest.java",
+      "sha256": "d3045eb037db41b402d17f989074656e75e8d34c65c084724a98f43923fef542"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
+      "sha256": "16df1959552d289c21e6d511e402b7ec76b747a6318ffd80735b76e04b1673cf"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootTerminalWriterFailureTest.java",
+      "sha256": "31463b9c79f1179baa5595447bbf289a3d1fcf26da089d48f51ee827d56a9479"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineScanRootFlowTest.java",
+      "sha256": "51af4ab1912b8198e419c83e503e8380b5933127efefc15f636ea805e27d2760"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java",
+      "sha256": "9cad2052296f477b01aea93753c96f6c91dec9550f8af1d84772c7a0f20f784b"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/RichDocumentInProcessTest.java",
+      "sha256": "1ae4361bcdc707be312d0713620cbf74f9b8c6199b49d03add34e8351b878ebb"
+    },
+    {
+      "path": "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+      "sha256": "a8ffb7dd53f640d2dca6fd3dd8698d1f812e3193d45a2b3f230f89c525632c88"
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "sha256": "2eceb7577ceaeb896173d99e503c2b09bb2a9de616ed5d5fe58b0b65f0325cd4"
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherEnvironmentCloseTest.java",
+      "sha256": "27f13d60a48e5af53f7ed7f1df76d9e557ac2ff26ba51499dc38116be0cc175d"
+    },
+    {
+      "path": "modules/app-observability/build.gradle.kts",
+      "sha256": "96f0e319233d440444565222d38165404e4d9aa0b54edd1481110551eb8568e6"
+    },
+    {
+      "path": "modules/app-observability/gradle.lockfile",
+      "sha256": "d207d826ed48e74020269c24f8689e31b6802291217b546297d9caf8b12224e8"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
+      "sha256": "89f747081e69b9ea707130691dd6a6e4f43b3ce52d3246bd15c68f9e190db6a8"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "sha256": "fabe8379d869474f58985aee920a3ddd45161e0998eea21f009e21c4540100c0"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationStoreCrashChild.java",
+      "sha256": "bad214b386cac06dc9cfcbc6ddaa70c9a7ad213db24a862832428e57b82509cb"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+      "sha256": "ef1675fdf7df4c19aace11d237df065cb9485e0941dbd63758e96808ad85e8c9"
+    },
+    {
+      "path": "modules/app-services/gradle.lockfile",
+      "sha256": "46434f11936846239878339d34c1cc7f4e4546f3fc8b9c8359d7555498b0e09c"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "sha256": "213fbcaa3d33c8d0cddcff79cdbb991b850776450819caee8a520fc290f0a065"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java",
+      "sha256": "7500d3fe39c3b8c52a613f01a0d3335a933be5d8be6a1043b69758808e750832"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/DefaultAppFacadeTest.java",
+      "sha256": "46725fcec2d390a8268b78bbc1a40eaf098a433d079a14d4b99dc619bb0c92f8"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java",
+      "sha256": "1c8b2668aff3ae5c99a7e4994d417c85a670d18ceb250c2c76280bba7567621a"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/HeadExecutorConstructionTest.java",
+      "sha256": "55bd7a69d823123fcdf088aca8612bfb4440c221b076a62e73ba42be8acacd96"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/operations/OperationRecoveryNoticeTest.java",
+      "sha256": "a4769f9468a3c5300ef5d3cab313599137913341db0d3d21e7f404cc137e050a"
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/SqliteStoreSnapshot.java",
+      "sha256": "bec77e7f76b75f717e2a9619f15cfc2b676104cac90d1a0ff1c294eaa12b15c4"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueMigrationOps.java",
+      "sha256": "c8face8281fd158a70e026412baf7c53f7144aa129026dbd39a4e727144fe7cc"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
+      "sha256": "2e379378adecf83ba78eb66fda387e20a1b3947a847c95f078915cd96298eeb5"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+      "sha256": "cbf0c4e8f5e913b1031df3d7a04ed12fd72e8adb263a20b713de8af5be9eb349"
+    },
+    {
+      "path": "modules/shell/src-tauri/src/updater.rs",
+      "sha256": "7bb0982bfbd35d01607a2da09bfb8cbe54c01d6a63301c91d3ba424eb4c12039"
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
+      "sha256": "d90be03f8e574374c6fd6e7394ff704b1389774d13d43389113c9639e778f33a"
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
+      "sha256": "cca90f8a6aa9e02d35906433b06424965108f4d0eca4d4ded108b6b647627a75"
+    },
+    {
+      "path": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/SchemaMismatchStatusContractTest.java",
+      "sha256": "6e64c95ba0e52b4c20b74d25d1da0f7dfc5c30c02a7f8b3e65f03c58dfc12a48"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+      "sha256": "eef8b7097a2557cc45a9fd9746af038e90b9731cac6f6f6c8d981efac7d73598"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppShutdownWiringTest.java",
+      "sha256": "5bf7c4ce739ba6464e2590ac6a39aa4a4f4d240f7e5e644318f6a03cf1a54052"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/UpgradeLifecycleContractTest.java",
+      "sha256": "07b9b52b26ae0182e50583b4dfb73756eee22266de21bcf4e18244322fc29193"
+    },
+    {
+      "path": "scripts/release/app-release-assets.mjs",
+      "sha256": "6ee6631b407e63f7b5a8bfeeff9bfca8286b38b0dec5c077f8c664801d73f37a"
+    },
+    {
+      "path": "scripts/release/app-release-assets.test.mjs",
+      "sha256": "34f00f73b316e286e59b24995ca8380c3cbb89bf4800015d6e5774d51a23ba5a"
+    }
+  ]
+}

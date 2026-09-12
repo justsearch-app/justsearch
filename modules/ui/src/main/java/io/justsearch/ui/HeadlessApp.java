@@ -454,51 +454,91 @@ public class HeadlessApp {
 
     HeadAssembly bootstrap =
         new HeadAssembly(
+            engineRoot.operations(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
             childRegistry, engineRoot.operationLeases(), engineRoot.admission());
-    log.info("HeadAssembly started (degraded — Worker connecting in background).");
+    LocalApiServer constructedApi = null;
+    try {
+      log.info("HeadAssembly started (degraded — Worker connecting in background).");
 
-    var headInfra = bootstrap.headInfraRegistry();
-    GplStatusProvider gplCoordinator = headInfra.gplJobCoordinator();
-    tools.jackson.databind.JsonNode configRoot =
-        io.justsearch.configuration.JustSearchConfigurationLoader.loadYamlRoot().orElse(null);
-    Path indexBasePath = resolvedConfig.paths().indexBasePath();
+      var headInfra = bootstrap.headInfraRegistry();
+      GplStatusProvider gplCoordinator = headInfra.gplJobCoordinator();
+      tools.jackson.databind.JsonNode configRoot =
+          io.justsearch.configuration.JustSearchConfigurationLoader.loadYamlRoot().orElse(null);
+      Path indexBasePath = resolvedConfig.paths().indexBasePath();
 
-    BootContractRunner.validateAll();
+      BootContractRunner.validateAll();
 
-    boolean prodMode = configStore.get().policy().prodMode();
-    String sessionToken = prodMode ? LocalApiServer.generateSessionToken() : null;
+      boolean prodMode = configStore.get().policy().prodMode();
+      String sessionToken = prodMode ? LocalApiServer.generateSessionToken() : null;
 
-    Path userHome = Path.of(System.getProperty("user.home", ""));
-    LocalApiServer apiServer =
-        LocalApiServer.builder(engineRoot.executors(), settingsStore, indexBasePath)
-            .HeadAssembly(bootstrap)
-            .engineAdmission(engineRoot.admission())
-            .knowledgeServer(null)
-            .configRoot(configRoot)
-            .knowledgeServerStartError(null)
-            .telemetry(telemetry)
-            .sessionToken(sessionToken)
-            .userHome(userHome.toString().isEmpty() ? null : userHome)
-            .workerFeatureCache(bootstrap.workerFeatureCache())
-            .gplJobCoordinator(gplCoordinator)
-            .lambdaMartReranker(headInfra.lambdaMartReranker())
-            .gplEvalSnapshotSupplier(headInfra.gplEvalSnapshotSupplier())
-            .HeadAssembly(bootstrap)
-            .runtimeManifestPublisher(manifestPublisher)
-            .upgradeShutdownAction(upgradeShutdownBridge)
-            .lifecycleShutdownAction(lifecycleShutdownBridge)
-            .upgradeReconciliation(
-                resolvedConfig.paths().dataDir(),
-                () -> EnvRegistry.APP_VERSION.get().orElse(""),
-                () -> true,
-                null)
-            .build();
-    int port = apiServer.getPort();
+      Path userHome = Path.of(System.getProperty("user.home", ""));
+      LocalApiServer apiServer =
+          LocalApiServer.builder(engineRoot.executors(), settingsStore, indexBasePath)
+              .HeadAssembly(bootstrap)
+              .engineAdmission(engineRoot.admission())
+              .knowledgeServer(null)
+              .configRoot(configRoot)
+              .knowledgeServerStartError(null)
+              .telemetry(telemetry)
+              .sessionToken(sessionToken)
+              .userHome(userHome.toString().isEmpty() ? null : userHome)
+              .workerFeatureCache(bootstrap.workerFeatureCache())
+              .gplJobCoordinator(gplCoordinator)
+              .lambdaMartReranker(headInfra.lambdaMartReranker())
+              .gplEvalSnapshotSupplier(headInfra.gplEvalSnapshotSupplier())
+              .HeadAssembly(bootstrap)
+              .runtimeManifestPublisher(manifestPublisher)
+              .upgradeShutdownAction(upgradeShutdownBridge)
+              .lifecycleShutdownAction(lifecycleShutdownBridge)
+              .upgradeReconciliation(
+                  resolvedConfig.paths().dataDir(),
+                  () -> EnvRegistry.APP_VERSION.get().orElse(""),
+                  () -> true,
+                  null)
+              .build();
+      constructedApi = apiServer;
+      int port = apiServer.getPort();
 
-    emitPortSignals(port, sessionToken, prodMode);
+      emitPortSignals(port, sessionToken, prodMode);
 
-    return new ApiPhaseResult(bootstrap, apiServer, port, sessionToken);
+      return new ApiPhaseResult(bootstrap, apiServer, port, sessionToken);
+    } catch (Exception | Error failure) {
+      if (constructedApi != null) {
+        try { constructedApi.stop(); } catch (Exception closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      try { bootstrap.close(); } catch (Exception closeFailure) {
+        failure.addSuppressed(closeFailure);
+      }
+      throw failure;
+    }
+  }
+
+  static void closeInstanceLockAfterIndex(boolean indexClosed, AppInstanceLock lock) {
+    // A live or unproven producer still owns the directory; physical process exit releases it.
+    if (indexClosed && lock != null) lock.close();
+  }
+
+  static boolean awaitIndexStartupForCleanup(
+      java.util.concurrent.CompletableFuture<?> startup, java.time.Duration budget) {
+    if (startup == null) return true;
+    try {
+      startup.get(budget.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+      return true;
+    } catch (java.util.concurrent.ExecutionException failedStartup) {
+      return true; // the producer finished exceptionally; Root still owns its partial resources
+    } catch (java.util.concurrent.TimeoutException timedOut) {
+      startup.cancel(true);
+      log.warn("Index startup did not quiesce for cleanup; retaining operations store until process exit");
+      return false;
+    } catch (java.util.concurrent.CancellationException cancelled) {
+      return false; // CompletableFuture cancellation does not prove its producer stopped
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
   }
 
   @SuppressWarnings("PMD.SystemPrintln")
@@ -936,6 +976,10 @@ public class HeadlessApp {
     long tPrev;
     log.info("Starting JustSearch HeadlessApp...");
 
+    io.justsearch.app.api.operations.OperationStore operations = null;
+    io.justsearch.app.engine.EngineRoot processRoot = null;
+    java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> pendingIndexStartup = null;
+    boolean fatalStartup = false;
     Telemetry telemetry = null;
     io.justsearch.core.execution.EngineExecutorRegistry processExecutors = null;
     HeadAssembly bootstrap = null;
@@ -1032,9 +1076,12 @@ public class HeadlessApp {
 
       // Compose the work owner before either asynchronous Engine startup or API construction.
       var ksConfig = io.justsearch.app.services.worker.KnowledgeServerConfig.load();
-      var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(
+      operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
+          configPhase.dataDir().resolve("operations.db"));
+      var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
           childRegistry, requestedRestartAction);
+      processRoot = engineRoot;
       processExecutors = engineRoot.executors();
 
       // Phase 1: infrastructure (telemetry, policy)
@@ -1076,6 +1123,7 @@ public class HeadlessApp {
                       sharedWorkerCapability, ksConfig, engineRoot));
       // Graceful retirement from the completing task cannot interrupt its own completion path.
       // The process registry continues accounting the concrete instance until it actually exits.
+      pendingIndexStartup = workerFuture;
       workerFuture.whenComplete((result, failure) -> bootstrapExecutor.shutdown());
 
       // Phase 2: Build API server (degraded mode — no Worker yet)
@@ -1211,7 +1259,7 @@ public class HeadlessApp {
                   operationLeasesRef,
                   engineAdmissionRef,
                   engineRoot.executors(),
-                  shutdownRequestWatcherRef::get),
+                  shutdownRequestWatcherRef::get, engineRoot.operations()),
               System::exit,
               preliminary ->
                   manifestPublisherRef.completeShutdown(
@@ -1254,7 +1302,7 @@ public class HeadlessApp {
     } catch (Exception e) {
       terminalWriterShutdown.completeExceptionally(e);
       log.error("Fatal error in HeadlessApp", e);
-      System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+      fatalStartup = true;
     } finally {
       try {
         if (apiServer != null) {
@@ -1270,12 +1318,27 @@ public class HeadlessApp {
       } catch (Exception ignored) {
         // best effort
       }
+      boolean indexCleanupComplete = false;
       try {
         if (knowledgeServer != null) {
-          knowledgeServer.close();
+          indexCleanupComplete = knowledgeServer.closeForUpgrade() == io.justsearch.app.services.worker.ShutdownOutcome.GRACEFUL;
+        } else if (processRoot != null) {
+          // Never let an unfinished startup acquire a database after its close. If it cannot
+          // quiesce in five seconds, retain the store until the fatal process exit.
+          if (awaitIndexStartupForCleanup(pendingIndexStartup, java.time.Duration.ofSeconds(5))) {
+            processRoot.close();
+            indexCleanupComplete = true;
+          }
+        } else {
+          indexCleanupComplete = true;
         }
       } catch (Exception ignored) {
         // best effort
+      }
+      try {
+        if (operations != null && indexCleanupComplete) operations.close();
+      } catch (java.io.IOException closeFailure) {
+        log.warn("Failed to close operations store during cleanup", closeFailure);
       }
       try {
         if (telemetry != null) {
@@ -1301,15 +1364,14 @@ public class HeadlessApp {
       // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
       // (AppInstanceLock.close() returns silently if already closed).
       try {
-        if (appInstanceLock != null) {
-          appInstanceLock.close();
-        }
+        closeInstanceLockAfterIndex(indexCleanupComplete, appInstanceLock);
       } catch (Exception e) {
         log.debug("AppInstanceLock close failed in finally (non-fatal)", e);
       }
       // Tempdoc 501 Phase 18: api-port.txt is gone, the manifest publisher's
       // close() (above) handles its own file cleanup.
     }
+    if (fatalStartup) System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
   }
 
   /** The host file cannot authorize or forge a prepared upgrade receipt. */
@@ -1389,7 +1451,9 @@ public class HeadlessApp {
           io.justsearch.app.api.EngineAdmissionService engineAdmission,
           io.justsearch.core.execution.EngineExecutorRegistry executors,
           java.util.function.Supplier<io.justsearch.app.engine.ShutdownRequestWatcher>
-              shutdownRequestWatcher) {
+              shutdownRequestWatcher,
+          io.justsearch.app.api.operations.OperationStore operations) {
+    var indexClosed = new java.util.concurrent.atomic.AtomicBoolean(knowledgeServer == null);
     return List.of(
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "runtime-manifest",
@@ -1442,10 +1506,19 @@ public class HeadlessApp {
         // re-ordering cannot silently change which step the updater reads.
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             io.justsearch.app.engine.EngineShutdownSequence.INDEX_HALF_STEP,
-            reason ->
-                knowledgeServer == null
-                    ? "GRACEFUL"
-                    : knowledgeServer.closeForUpgrade().name()),
+            reason -> {
+              String outcome = knowledgeServer == null ? "GRACEFUL" : knowledgeServer.closeForUpgrade().name();
+              indexClosed.set("GRACEFUL".equals(outcome));
+              return outcome;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "operations-store",
+            reason -> {
+              if (!indexClosed.get()) throw new IllegalStateException(
+                  "Operations store retained until the index drain completes");
+              operations.close();
+              return null;
+            }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "tracing",
             reason -> {
@@ -1467,7 +1540,7 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "app-instance-lock",
             reason -> {
-              if (appInstanceLock != null) appInstanceLock.close();
+              closeInstanceLockAfterIndex(indexClosed.get(), appInstanceLock);
               return null;
             }));
   }

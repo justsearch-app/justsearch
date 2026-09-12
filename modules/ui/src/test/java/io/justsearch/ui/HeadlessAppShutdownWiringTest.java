@@ -36,11 +36,52 @@ import org.junit.jupiter.api.io.TempDir;
 final class HeadlessAppShutdownWiringTest {
 
   @Test
+  void stalledStartupCannotHoldFatalCleanupIndefinitelyOrClaimQuiescence() {
+    var stalled = new CompletableFuture<>();
+    var instanceLock = mock(AppInstanceLock.class);
+    boolean quiesced = HeadlessApp.awaitIndexStartupForCleanup(stalled, java.time.Duration.ZERO);
+    assertFalse(quiesced);
+    HeadlessApp.closeInstanceLockAfterIndex(quiesced, instanceLock);
+    org.mockito.Mockito.verifyNoInteractions(instanceLock);
+    assertTrue(stalled.isCancelled());
+    assertFalse(HeadlessApp.awaitIndexStartupForCleanup(stalled, java.time.Duration.ZERO));
+    assertTrue(HeadlessApp.awaitIndexStartupForCleanup(CompletableFuture.completedFuture(null), java.time.Duration.ZERO));
+    assertTrue(HeadlessApp.awaitIndexStartupForCleanup(CompletableFuture.failedFuture(new IllegalStateException("startup failed")), java.time.Duration.ZERO));
+  }
+
+  @Test
+  void failedIndexDrainRetainsOperationsUntilSuccessfulRetry() throws Exception {
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var index = mock(KnowledgeServerBootstrap.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED, ShutdownOutcome.GRACEFUL);
+    var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null, instanceLock,
+        mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+        mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null, operations);
+    var indexStep = steps.stream().filter(step -> EngineShutdownSequence.INDEX_HALF_STEP.equals(step.name())).findFirst().orElseThrow();
+    var storeStep = steps.stream().filter(step -> "operations-store".equals(step.name())).findFirst().orElseThrow();
+    var lockStep = steps.stream().filter(step -> "app-instance-lock".equals(step.name())).findFirst().orElseThrow();
+    assertEquals("FAILED", indexStep.action().run(Reason.QUIT));
+    lockStep.action().run(Reason.QUIT);
+    org.mockito.Mockito.verifyNoInteractions(instanceLock);
+    assertThrows(IllegalStateException.class, () -> storeStep.action().run(Reason.QUIT));
+    org.mockito.Mockito.verifyNoInteractions(operations);
+    assertEquals("GRACEFUL", indexStep.action().run(Reason.QUIT));
+    storeStep.action().run(Reason.QUIT);
+    lockStep.action().run(Reason.QUIT);
+    var order = inOrder(index, operations, instanceLock);
+    order.verify(index, org.mockito.Mockito.times(2)).closeForUpgrade();
+    order.verify(operations).close();
+    order.verify(instanceLock).close();
+  }
+
+  @Test
   @DisplayName("terminal writer waits for the complete ordered shutdown binding, then exits 1")
   void terminalWriterUsesLateBoundOrderedSequence(@TempDir Path tempDir) throws Exception {
     var binding = new CompletableFuture<EngineShutdownSequence>();
     var exitCode = new AtomicInteger(-1);
     var manifestCompleted = new java.util.concurrent.atomic.AtomicBoolean();
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
     OperationLeaseService leases = mock(OperationLeaseService.class);
     EngineAdmissionService admission = mock(EngineAdmissionService.class);
     var watcher = mock(io.justsearch.app.engine.ShutdownRequestWatcher.class);
@@ -74,7 +115,7 @@ final class HeadlessAppShutdownWiringTest {
                 leases,
                 admission,
                 executors,
-                () -> watcher),
+                () -> watcher, operations),
             code -> {
               assertTrue(manifestCompleted.get(), "manifest completion precedes process exit");
               exitCode.set(code);
@@ -98,6 +139,7 @@ final class HeadlessAppShutdownWiringTest {
             health,
             assembly,
             knowledge,
+            operations,
             tracing,
             telemetry,
             executors,
@@ -111,6 +153,7 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(assembly).setStopGenerativeBackendOnClose(false);
     order.verify(assembly).close();
     order.verify(knowledge).closeForUpgrade();
+    order.verify(operations).close();
     order.verify(tracing).close();
     order.verify(telemetry).close();
     order.verify(executors).close();
@@ -130,7 +173,7 @@ final class HeadlessAppShutdownWiringTest {
           new EngineShutdownSequence(
               Path.of("build", "shutdown-wiring", reason.wire()),
               HeadlessApp.orderedShutdownSteps(
-                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null),
+                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.core.execution.EngineExecutorRegistry.class), () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
               code -> {});
 
       sequence.run(reason);
@@ -175,7 +218,7 @@ final class HeadlessAppShutdownWiringTest {
                   admission,
                   admission,
                   mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
-                  () -> null),
+                  () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
               ignored -> {});
 
       sequence.run(Reason.RESTART);
@@ -206,7 +249,7 @@ final class HeadlessAppShutdownWiringTest {
                 OperationLeaseService.noOp(),
                 null,
                 mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
-                () -> null),
+                () -> null, mock(io.justsearch.app.api.operations.OperationStore.class)),
             ignored -> {});
 
     var result = sequence.run(Reason.QUIT);
@@ -317,7 +360,7 @@ final class HeadlessAppShutdownWiringTest {
                 OperationLeaseService.noOp(),
                 null,
                 mock(io.justsearch.core.execution.EngineExecutorRegistry.class),
-                watcherRef::get),
+                watcherRef::get, mock(io.justsearch.app.api.operations.OperationStore.class)),
             ignored -> {});
 
     try (var _ =

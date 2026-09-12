@@ -53,6 +53,11 @@ import org.slf4j.LoggerFactory;
  * {@link #close}. §31 Phase 3 dissolved the registerLateBoundHandlers hook.
  */
 public final class HeadAssembly implements AutoCloseable {
+  private final io.justsearch.app.api.operations.OperationStore operations;
+
+  /** Borrowed process-lifetime store; this assembly never closes it. */
+  public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
+
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
 
   // §10 endpoint: bootstrap holds typed phase records (capabilities/services/substrateGraph/
@@ -318,6 +323,7 @@ public final class HeadAssembly implements AutoCloseable {
    * the admission dependency explicit at the composition root.
    */
   public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       ConfigManagerBootstrap configManager,
@@ -327,6 +333,7 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this.operations = Objects.requireNonNull(operations, "operations");
     Objects.requireNonNull(telemetry, "telemetry");
     Objects.requireNonNull(engineAdmission, "engineAdmission");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
@@ -771,6 +778,12 @@ public final class HeadAssembly implements AutoCloseable {
     this.gplSnapshotFile = orchestrationOut.gplSnapshotFile();
     this.lambdaMartModelFile = orchestrationOut.lambdaMartModelFile();
     this.substrateGraph = assembleSubstrateGraph();
+    operations.recovery().ifPresent(recovery -> {
+      var health = this.substrateGraph.health();
+      io.justsearch.app.services.operations.OperationRecoveryNotice.publish(
+          health.conditionStore(), health.changes(), recovery, health.headSource(),
+          java.time.Clock.systemUTC());
+    });
     // Tempdoc 541 §5.2 + fix-pass A.1: wrap the agent-tool late-bind registration in a
     // Memoized<Boolean>. Body invokes AgentToolHandlers.registerLateBound at first resolve;
     // result is whether the prerequisites were met (true — including the case where every ref
@@ -948,17 +961,20 @@ public final class HeadAssembly implements AutoCloseable {
    * narrow search path) and keeps the surface symmetric with the primary boot path.
    */
   public static HeadAssembly bootForSearchPortOnly(
+      io.justsearch.app.api.operations.OperationStore operations,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       SearchPort searchPort, Telemetry telemetry) {
-    return new HeadAssembly(executors, searchPort, telemetry);
+    return new HeadAssembly(operations, executors, searchPort, telemetry);
   }
 
   /**
    * Internal constructor for {@link #bootForSearchPortOnly}. Not called directly outside this
    * class — the static factory is the public surface.
    */
-  private HeadAssembly(io.justsearch.core.execution.EngineExecutorRegistry executors,
+  private HeadAssembly(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       SearchPort searchPort, Telemetry telemetry) {
+    this.operations = Objects.requireNonNull(operations, "operations");
     Objects.requireNonNull(searchPort, "searchPort");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
     try {

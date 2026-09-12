@@ -160,6 +160,7 @@ public enum LifecycleReasonCode {
   // the preferences are already gone, and the only thing left to do is tell the user so they can
   // re-author them. Deliberately NOT emitted for a FUTURE schemaVersion, which stays fail-loud.
   SETTINGS_RESET_FROM_CORRUPT("settings.reset_from_corrupt"),
+  OPERATIONS_HISTORY_RESET("operations.history_reset"),
 
   // --- Local API (trust boundary) ---
   // Tempdoc 884 item 23: prod mode was configured but no session token was supplied, so the ONE
@@ -225,7 +226,7 @@ public enum LifecycleReasonCode {
       // Tempdoc 882 item 24: observed exactly once, at load, and never re-derived. The file that
       // proved it has already been moved aside. A later TRANSIENT write must not erase the only
       // notice the user gets that their preferences were reset.
-      case SETTINGS_RESET_FROM_CORRUPT -> RetentionClass.STICKY;
+      case SETTINGS_RESET_FROM_CORRUPT, OPERATIONS_HISTORY_RESET -> RetentionClass.STICKY;
 
       // Real causes. WORKER_SPAWN_FAILED is deliberately NOT generic even though
       // resolveWorkerReasonCode uses it as a consumer-side fallback: fallback-ness is a property of

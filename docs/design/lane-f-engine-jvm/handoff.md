@@ -5,7 +5,14 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: C1 COMPLETE; C2 implementation starts next.
+Latest state: C1 COMPLETE; C2 batch1 implementation in progress.
+
+C2-1 now implements the independent store, process lifetime, recovery fence and
+notice, jobs15 migration, and baseline-compatible updater handoff.
+[Current C2-1 evidence](evidence/C2/C2-1.md) records the negative regressions, passing
+focused tests and remaining integrated checks. Next is the day-one C2-11 installed
+replay/no-duplication harness, then every remaining lane stage. No owner input is
+pending; preserve hourly WIP commits and push immediately after every commit.
 
 ## Autonomous work resumed (2026-09-12)
 
@@ -21,8 +28,8 @@ snapshot/replay ordering, and one attempt runner with committed settings receipt
 D1 designa480ac6f6 binds each query to one leased runtime/encoder/service view, fixes
 previous-generation retirement and puts late model-manifest work in its actual batch.
 C2 entry grounding additionally corrects the pre-fork construction citation and requires
-interrupted-quarantine preservation to retain the expiry fence. These are design, not
-implemented features. Start C2-1 and its day-one C2-11 harness in batch1, then every
+interrupted-quarantine preservation to retain the expiry fence. The acceptance runner, keyed outcomes and D1 behavior remain design; C2-1 store
+implementation is underway. Finish C2-1 and its day-one C2-11 harness in batch1, then every
 remaining item in C2/D1/D2/E/F. No owner decisions are pending or deferred.
 
 The lane worktree is held through review date2026-10-12 for active work and mandatory

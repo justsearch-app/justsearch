@@ -291,3 +291,27 @@ JustSearch uses tuned Lucene defaults optimized for desktop workloads:
 | Commit interval | 10s / 1000 docs | Balance between durability and performance |
 
 These defaults are optimized for desktop systems with sufficient RAM. The RAM buffer setting can be overridden via `index.writer.ram_buffer_mb` in configuration YAML if needed.
+
+## Operation outcome storage
+
+`operations.db` is a separate SQLite store owned by the Engine composition. Its app-api port is
+implemented in app-observability, and the same instance is injected into the application and index
+composition before asynchronous startup. It closes after the index half drains. The schema starts
+at version 1; `jobs.db` independently uses version 15, with a nullable `jobs.content_hash` column
+for legacy rows. Migration DDL and `user_version` commit together, and checked or unchecked failures
+roll back both.
+
+Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.
+SQLite reads that copy, including uncheckpointed committed versions, so refusing a future format
+cannot change the original main file, WAL or SHM. The temporary copy is removed before startup
+continues. This costs temporary disk space proportional to one database plus its WAL; it avoids
+hand-written WAL parsing and SQLite's otherwise writable shared-memory side effects in read-only
+mode. Callers must exclude concurrent writers during inspection.
+
+An unreadable operations database is preserved with its WAL and SHM in one timestamped directory.
+An interrupted `.pending` directory is resumed before creating a replacement. The replacement's
+singleton metadata records a history fence at recovery time plus five minutes plus one millisecond;
+old preservation directories retain that fence if initialization itself is interrupted. The Health
+surface reports the history loss, the preservation directory and the fence time. Failure to preserve
+bytes refuses startup. An external rollback to a valid older database is outside this detection
+contract. Durable operation acceptance and replay are separate consumers of this store.

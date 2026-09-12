@@ -247,6 +247,15 @@ That evidence survives later phases; target reconciliation echoes its kind and
 attempt instead of a shutdown nonce. A failed installer launch resumes one child
 and one supervision loop. Other uncertain handoffs remain explicitly held.
 
+Store compatibility permits additional incoming stores while requiring every installed store to
+remain present with the same owner, recoverability role and reconciliation strategy, and a readable
+installed format. The release generator accepts `--compat-baseline <register.json>` to project the
+previous release's row set with current target formats. This allows older installers with an exact
+row-count check to consume the descriptor. After installation, the shell validates every inherited
+owner expectation against its embedded register and sends the complete installed owner set to the
+Engine. The Engine and shell still require exact reconciliation of that complete set; a new store
+cannot disappear merely because it was absent from the compatibility baseline.
+
 The frontend never authenticates releases. `appUpdateState.ts` projects
 shell-owned status into Settings and the global update banner. The background
 path checks only; install requires the user to activate Settings or the desktop

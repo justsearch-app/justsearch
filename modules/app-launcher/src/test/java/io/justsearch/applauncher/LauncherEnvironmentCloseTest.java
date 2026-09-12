@@ -41,7 +41,7 @@ final class LauncherEnvironmentCloseTest {
     var failure = new java.io.IOException("config failure");
     LauncherEnvironment.installFactories(() -> { throw failure; },
         (executors, dataDir, profile) -> { throw new AssertionError("telemetry must not start"); },
-        (executors, telemetry, config) -> { throw new AssertionError("assembly must not start"); });
+        (executors, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
     try {
       org.junit.jupiter.api.Assertions.assertSame(failure,
           org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
@@ -88,7 +88,7 @@ final class LauncherEnvironmentCloseTest {
                   io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
               throw failure;
             },
-            (executors, telemetry, config) -> { throw new AssertionError("assembly must not start"); });
+            (executors, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
         org.junit.jupiter.api.Assertions.assertSame(failure,
             org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
                 () -> LauncherEnvironment.create("smoke")));
@@ -144,6 +144,7 @@ final class LauncherEnvironmentCloseTest {
     LauncherEnvironment environment =
         allocateEnvironment(telemetry, null, null, profile);
     setField(environment, "HeadAssembly", null);
+    setField(environment, "operations", Mockito.mock(io.justsearch.app.api.operations.OperationStore.class));
     setField(environment, "configManager", null);
 
     assertEquals(profile, environment.profilePath());
@@ -167,6 +168,7 @@ final class LauncherEnvironmentCloseTest {
     setField(environment, "telemetry", telemetry);
     setField(environment, "executors", new io.justsearch.core.execution.TestEngineExecutors());
     setField(environment, "HeadAssembly", null);
+    setField(environment, "operations", Mockito.mock(io.justsearch.app.api.operations.OperationStore.class));
     return environment;
   }
 

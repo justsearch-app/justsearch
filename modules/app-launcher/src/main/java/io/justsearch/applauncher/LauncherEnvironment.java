@@ -38,6 +38,7 @@ final class LauncherEnvironment implements AutoCloseable {
   private final LocalTelemetry telemetry;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final HeadAssembly HeadAssembly;
+  private final io.justsearch.app.api.operations.OperationStore operations;
   private static final ConfigManagerFactory DEFAULT_CONFIG_MANAGER_FACTORY =
       ConfigManagerBootstrap::new;
   // Tempdoc 417 Phase 2 + F1 follow-up: register catalogs for every metric the Launcher process
@@ -91,13 +92,13 @@ final class LauncherEnvironment implements AutoCloseable {
                   // Worker — its memory/threads do not flow to either of those metric files).
                   io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher")));
   private static final AppFacadeFactory DEFAULT_APP_FACADE_FACTORY =
-      (executors, telemetry, configManager) -> {
+      (executors, telemetry, configManager, operations) -> {
         var admission = loadAdmission(java.util.ServiceLoader.load(
             io.justsearch.app.api.EngineAdmissionService.class).stream().toList());
         if (!(admission instanceof io.justsearch.app.api.OperationLeaseService leases)) {
           throw new IllegalStateException("Engine admission provider must also own operation leases");
         }
-        return new HeadAssembly(
+        return new HeadAssembly(operations,
             executors, telemetry, configManager, null,
             new io.justsearch.app.services.settings.UiSettingsStore(
                 io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
@@ -141,6 +142,7 @@ final class LauncherEnvironment implements AutoCloseable {
     ConfigStore installedStore = null;
     io.justsearch.core.execution.EngineExecutorRegistry createdExecutors = null;
     LocalTelemetry createdTelemetry = null;
+    io.justsearch.app.api.operations.OperationStore createdOperations = null;
     try {
       System.setProperty("justsearch.config", profilePath.toString());
       System.setProperty("egress.block_all", "true");
@@ -163,13 +165,21 @@ final class LauncherEnvironment implements AutoCloseable {
       createdTelemetry = telemetryFactory.create(
           createdExecutors, PlatformPaths.resolveDataDir(), profile);
       io.justsearch.telemetry.JvmRuntimeGauges.register(createdTelemetry, "launcher");
-      this.HeadAssembly = appFacadeFactory.create(createdExecutors, createdTelemetry, createdConfig);
+      createdOperations = new io.justsearch.app.observability.operations.SqliteOperationStore(
+          PlatformPaths.resolveDataDir().resolve("operations.db"));
+      this.HeadAssembly = appFacadeFactory.create(createdExecutors, createdTelemetry, createdConfig, createdOperations);
+      this.operations = createdOperations;
       this.configManager = createdConfig;
       this.executors = createdExecutors;
       this.telemetry = createdTelemetry;
       this.previousConfigStore = previousStore;
       this.installedConfigStore = installedStore;
     } catch (Exception | Error failure) {
+      if (createdOperations != null) {
+        try { createdOperations.close(); } catch (IOException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
       if (createdTelemetry != null) {
         try { createdTelemetry.close(); } catch (RuntimeException closeFailure) {
           failure.addSuppressed(closeFailure);
@@ -219,7 +229,8 @@ final class LauncherEnvironment implements AutoCloseable {
   @FunctionalInterface
   interface AppFacadeFactory {
     HeadAssembly create(io.justsearch.core.execution.EngineExecutorRegistry executors,
-        LocalTelemetry telemetry, ConfigManagerBootstrap configManager)
+        LocalTelemetry telemetry, ConfigManagerBootstrap configManager,
+        io.justsearch.app.api.operations.OperationStore operations)
         throws Exception;
   }
 
@@ -235,6 +246,9 @@ final class LauncherEnvironment implements AutoCloseable {
   @Override
   public void close() {
     Faults.debugAndContinue(LOG, "shutdown", () -> HeadAssembly.close());
+    try { operations.close(); } catch (IOException failure) {
+      LOG.warn("Failed to close operations store", failure);
+    }
     try {
       telemetry.close();
     } finally {

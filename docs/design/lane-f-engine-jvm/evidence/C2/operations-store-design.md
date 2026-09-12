@@ -1,6 +1,6 @@
 # C2 design record: the operations store and the outcome boundary
 
-Status: DESIGN, decided 2026-09-10 under the delegated lane authority (design section 0,
+Status: DESIGN, amended 2026-09-12 at35d03f7c4 under the delegated lane authority (design section 0,
 "Decision authority"). Grounded at `4229f1091` on `worktree-lane-F-A`. This file carries the
 full mechanism for the two C2 questions the entry investigation left open
 ([c2-entry-investigation.md](../C1/c2-entry-investigation.md)); `design.md` section 0 carries
@@ -43,7 +43,7 @@ to that module directly is not available to scheduled runs.
   or `indexer-worker`: invisible to app-services and app-agent, and the owner would read `WORKER`
   against the C2-1 decision. A new module: nothing app-observability lacks.
 - **Construction.** `HeadlessApp` opens the store at the point where the admission reference
-  exists (`HeadlessApp.java:1191`), before the asynchronous index fork, so a boot scan cannot
+  is constructed (`HeadlessApp.java:1035-1038` at35d03f7c4), before the asynchronous index fork at1063-1078, so a boot scan cannot
   outrun its own acceptance row. The store is handed to `HeadAssembly` and to `EngineRoot`; the
   index half receives the same instance. `LauncherEnvironment` opens it through the same factory
   (app-launcher sees app-observability through app-services' `api` dependency), so no ServiceLoader
@@ -301,6 +301,24 @@ indistinguishable: never accepted, or accepted and evicted. Tombstones only move
   helps. Read-only operations remain available. Quarantine tests advance an injected
   clock to prove acceptance resumes; do not wait five real minutes in unit tests.
   An external valid-file rollback remains outside this file's detectable contract.
+- **Interrupted quarantine.** Before moving any database or WAL sidecar, create the
+  timestamped preservation directory ending in `.pending` for this recovery. Resume any
+  pending directory before inspecting/opening the original; move each remaining artifact into
+  that same directory, then rename the directory without `.pending` once preservation is complete.
+  The rename distinguishes an interrupted set from old completed quarantines, without a second
+  marker file or journal. This is necessary because creating a second directory on restart splits
+  the main file from its WAL and makes the reported recovery path incomplete. Its name carries the recovery
+  instant and remains the witness if the process dies before the replacement metadata
+  commits. On open, fold recognized preservation-directory instants into history_since
+  (instant + admitted future skew +1ms) before exposing the port, including when the main
+  file is missing. Resume preservation of the remaining original sidecars before creating
+  the replacement; never apply an old WAL to the new database. The directory is already
+  required to preserve the corrupt store, so it also closes this gap without a separate
+  recovery journal. A plain rename followed by fresh-store initialization is rejected:
+  a kill between those steps would reset the fence to zero and license duplicate effects.
+  Fault tests kill after directory creation, between each sidecar move and before metadata
+  commit, then assert the same missing key remains expired. Do not automatically remove
+  this witness before its fence is durable in the replacement.
 - **Invoke with an expired key** refuses OPERATION_KEY_EXPIRED (CONFLICT). The Engine
   cannot rule out a prior effect. A client choosing a distinct key after the recovery
   fence owns duplication risk; never silently re-key or retry a write internally.

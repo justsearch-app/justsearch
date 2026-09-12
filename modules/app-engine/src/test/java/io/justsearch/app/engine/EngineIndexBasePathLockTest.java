@@ -76,7 +76,7 @@ final class EngineIndexBasePathLockTest {
 
     // A second owner, different data dir, SAME index base path. It must not get a writer.
     EngineTestHarness.publishConfig(dataB, sharedIndexBase, Map.of());
-    EngineRoot second = new EngineRoot(30_000L, 5_000);
+    EngineRoot second = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), 30_000L, 5_000);
     IOException refused =
         assertThrows(
             IOException.class,

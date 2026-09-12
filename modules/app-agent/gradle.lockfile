@@ -73,6 +73,7 @@ org.projectnessie.cel:cel-generated-pb:0.5.1=runtimeClasspath,testRuntimeClasspa
 org.rrd4j:rrd4j:3.10=runtimeClasspath,testRuntimeClasspath
 org.slf4j:slf4j-api:2.0.17=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 org.snakeyaml:snakeyaml-engine:3.0.1=runtimeClasspath,testRuntimeClasspath
+org.xerial:sqlite-jdbc:3.51.2.0=testRuntimeClasspath
 tools.jackson.core:jackson-core:3.1.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 tools.jackson.core:jackson-databind:3.1.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 tools.jackson.dataformat:jackson-dataformat-yaml:3.1.0=runtimeClasspath,testRuntimeClasspath

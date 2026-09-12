@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 
 class HeadExecutorConstructionTest {
-  @Test void partialRegistrationAndLaterBootFailureRollBackEveryDirectOwner() {
+  @Test void partialRegistrationAndLaterBootFailureRollBackEveryDirectOwner() throws Exception {
     for (int failureAt = 1; failureAt <= 5; failureAt++) {
       var registry = mock(EngineExecutorRegistry.class);
       when(registry.maxConcurrentWork()).thenReturn(4);
@@ -30,9 +30,11 @@ class HeadExecutorConstructionTest {
       });
       var config = mock(ConfigManagerBootstrap.class);
       when(config.currentSnapshot()).thenThrow(failure);
+      var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
       assertSame(failure, assertThrows(IllegalStateException.class, () ->
-          new HeadAssembly(registry, mock(Telemetry.class), config, null, null, null,
+          new HeadAssembly(operations, registry, mock(Telemetry.class), config, null, null, null,
               mock(ManagedChildRegistry.class), null, mock(EngineAdmissionService.class))));
+      verify(operations, never()).close();
       assertEquals(failureAt - 1, acquired.size());
       for (var registration : acquired) verify(registration).close();
     }

@@ -248,6 +248,29 @@ final class UpgradeLifecycleContractTest {
   }
 
   @Test
+  void reconciliationStillRequiresNewStoresAfterBaselineCompatibleUpgrade(@TempDir Path tmp) throws Exception {
+    writeReconcilingIntent(tmp);
+    var request = reconciliationRequest();
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> owners = (List<Map<String, Object>>) request.get("owners");
+    assertTrue(owners.removeIf(row -> "operations-db".equals(row.get("ownerId"))));
+    var server = reconciliationServer(tmp, true, true);
+    try (var client = HttpClient.newHttpClient()) {
+      var rejected = post(client, server, "/api/upgrade/reconcile", JSON.writeValueAsString(request));
+      assertEquals(409, rejected.statusCode());
+      var accepted = post(client, server, "/api/upgrade/reconcile",
+          JSON.writeValueAsString(reconciliationRequest()));
+      assertEquals(200, accepted.statusCode());
+      var body = JSON.readTree(accepted.body());
+      assertTrue(body.get("ready").asBoolean());
+      assertTrue(java.util.stream.StreamSupport.stream(body.get("owners").spliterator(), false)
+          .anyMatch(row -> "operations-db".equals(row.get("ownerId").asText()) && row.get("healthy").asBoolean()));
+    } finally {
+      server.stop();
+    }
+  }
+
+  @Test
   void reconciliationRejectsOwnerMismatch(@TempDir Path tmp) throws Exception {
     writeReconcilingIntent(tmp);
     LocalApiServer server = reconciliationServer(tmp, true, true);

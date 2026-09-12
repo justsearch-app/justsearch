@@ -311,7 +311,7 @@ impl UpdateCoordinator {
                 target_version: intent.target_version.clone(),
                 release_sequence: intent.release_sequence,
                 head_pid: u64::from(head_pid),
-                owners: intent.owner_expectations.clone(),
+                owners: target_reconciliation_owners(&intent, &app.package_info().version.to_string())?,
             };
             let response: ReconciliationResponse = post_head(
                 &backend,
@@ -1028,9 +1028,8 @@ fn validate_store_compatibility(descriptor: &ReleaseDescriptor) -> Result<(), St
             ));
         }
     }
-    if release_owners.len() != local.durable_stores.len() {
-        return Err("Release compatibility table is not a closed set".into());
-    }
+    // A successor may introduce stores this installed binary does not own yet. Every installed
+    // store still requires matching identity and readable format; additions cannot waive either.
     for store in local.durable_stores {
         let compatibility = release_owners.get(store.id.as_str()).ok_or_else(|| {
             format!(
@@ -1235,6 +1234,39 @@ async fn wait_for_backend_ready(backend: &BackendState) -> Result<u32, String> {
 }
 
 fn prepared_evidence_kind() -> String { "PREPARED".into() }
+
+// The old descriptor can contain only its compatibility baseline. The installed binary must
+// reconcile its complete register, after validating every inherited target-format expectation.
+fn target_reconciliation_owners(
+    intent: &UpgradeIntent,
+    running_version: &str,
+) -> Result<Vec<OwnerExpectation>, String> {
+    if intent.phase != UpgradePhase::Reconciling || intent.target_version != running_version {
+        return Err("Owner reconciliation requires the installed target identity".into());
+    }
+    if intent.owner_expectations.is_empty() {
+        return Err("Owner reconciliation requires a nonempty inherited baseline".into());
+    }
+    let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER)
+        .map_err(|error| format!("Installed store register is invalid: {error}"))?;
+    let mut owners = std::collections::BTreeMap::new();
+    for store in local.durable_stores {
+        if store.id.trim().is_empty()
+            || owners.insert(store.id.clone(), store.current_version).is_some() {
+            return Err(format!("Installed store register repeats or omits an owner id: {}", store.id));
+        }
+    }
+    let mut inherited = std::collections::HashSet::new();
+    for expected in &intent.owner_expectations {
+        if !inherited.insert(&expected.owner_id)
+            || owners.get(&expected.owner_id) != Some(&expected.format_version) {
+            return Err(format!("Inherited owner does not match installed target: {}", expected.owner_id));
+        }
+    }
+    Ok(owners.into_iter().map(|(owner_id, format_version)| OwnerExpectation {
+        owner_id, format_version,
+    }).collect())
+}
 
 fn validate_reconciliation_response(
     request: &ReconciliationRequest,
@@ -2277,10 +2309,9 @@ mod tests {
         .is_err());
     }
 
-    #[test]
-    fn strategy_aware_compatibility_rejects_role_change() {
+    fn current_store_compatibility() -> Vec<ReleaseStoreCompatibility> {
         let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
-        let compatibility = local
+        local
             .durable_stores
             .iter()
             .map(|store| ReleaseStoreCompatibility {
@@ -2291,8 +2322,64 @@ mod tests {
                 readable_source_versions: vec![store.current_version],
                 reconciliation_strategy: store.reconciliation.clone(),
             })
-            .collect();
-        let mut descriptor = test_descriptor(compatibility);
+            .collect()
+    }
+
+    #[test]
+    fn strategy_aware_compatibility_accepts_new_store_superset() {
+        let mut compatibility = current_store_compatibility();
+        compatibility.push(ReleaseStoreCompatibility {
+            owner_id: "test-new-operations-store".into(),
+            owner: "HEAD".into(),
+            role: "MIXED".into(),
+            format_version: 1,
+            readable_source_versions: vec![1],
+            reconciliation_strategy: "READ_IN_PLACE".into(),
+        });
+        validate_store_compatibility(&test_descriptor(compatibility)).unwrap();
+    }
+
+    #[test]
+    fn strategy_aware_compatibility_rejects_missing_installed_store() {
+        let mut compatibility = current_store_compatibility();
+        let removed = compatibility.remove(0).owner_id;
+        let error = validate_store_compatibility(&test_descriptor(compatibility)).unwrap_err();
+        assert!(error.contains("does not declare compatibility"), "{error}");
+        assert!(error.contains(&removed), "{error}");
+    }
+
+    #[test]
+    fn strategy_aware_compatibility_rejects_owner_change() {
+        let mut descriptor = test_descriptor(current_store_compatibility());
+        descriptor.compatibility[0].owner = "CHANGED".into();
+        assert!(validate_store_compatibility(&descriptor)
+            .unwrap_err()
+            .contains("ownership or recovery strategy"));
+    }
+
+    #[test]
+    fn strategy_aware_compatibility_rejects_reconciliation_change() {
+        let mut descriptor = test_descriptor(current_store_compatibility());
+        descriptor.compatibility[0].reconciliation_strategy = "CHANGED".into();
+        assert!(validate_store_compatibility(&descriptor)
+            .unwrap_err()
+            .contains("ownership or recovery strategy"));
+    }
+
+    #[test]
+    fn strategy_aware_compatibility_rejects_unreadable_installed_version() {
+        let mut descriptor = test_descriptor(current_store_compatibility());
+        descriptor.compatibility[0].format_version += 1;
+        descriptor.compatibility[0].readable_source_versions =
+            vec![descriptor.compatibility[0].format_version];
+        assert!(validate_store_compatibility(&descriptor)
+            .unwrap_err()
+            .contains("cannot read durable store"));
+    }
+
+    #[test]
+    fn strategy_aware_compatibility_rejects_role_change() {
+        let mut descriptor = test_descriptor(current_store_compatibility());
         descriptor.compatibility[0].role = "DERIVED".into();
         assert!(validate_store_compatibility(&descriptor)
             .unwrap_err()
@@ -2370,6 +2457,42 @@ mod tests {
             witness_path,
             staging_root,
         }
+    }
+
+    #[test]
+    fn target_reconciliation_expands_baseline_to_all_installed_owners() {
+        let mut intent = test_intent(UpgradePhase::Reconciling);
+        let all: Vec<OwnerExpectation> = current_store_compatibility().into_iter()
+            .map(|store| OwnerExpectation { owner_id: store.owner_id, format_version: store.format_version })
+            .collect();
+        intent.owner_expectations = all.iter().filter(|row| row.owner_id != "operations-db").cloned().collect();
+        let mut expected = all;
+        expected.sort_by(|a, b| a.owner_id.cmp(&b.owner_id));
+        assert_eq!(target_reconciliation_owners(&intent, "1.1.0").unwrap(), expected);
+    }
+
+    #[test]
+    fn target_reconciliation_rejects_changed_or_missing_inherited_owner() {
+        let mut intent = test_intent(UpgradePhase::Reconciling);
+        let first = current_store_compatibility().remove(0);
+        intent.owner_expectations = vec![OwnerExpectation {
+            owner_id: first.owner_id.clone(), format_version: first.format_version + 1,
+        }];
+        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err().contains(&first.owner_id));
+        intent.owner_expectations[0].owner_id = "removed-store".into();
+        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err().contains("removed-store"));
+    }
+
+    #[test]
+    fn target_reconciliation_requires_target_identity_and_unique_nonempty_baseline() {
+        let mut intent = test_intent(UpgradePhase::Reconciling);
+        assert!(target_reconciliation_owners(&intent, "1.0.0").is_err());
+        intent.owner_expectations.clear();
+        assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
+        let first = current_store_compatibility().remove(0);
+        let owner = OwnerExpectation { owner_id: first.owner_id, format_version: first.format_version };
+        intent.owner_expectations = vec![owner.clone(), owner];
+        assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
     }
 
     fn test_intent(phase: UpgradePhase) -> UpgradeIntent {

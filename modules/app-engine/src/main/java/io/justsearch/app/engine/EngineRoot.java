@@ -49,6 +49,10 @@ import org.slf4j.LoggerFactory;
  * Nothing else in the repo may construct an implementation of a port.
  */
 public final class EngineRoot implements WorkerHost {
+  private final io.justsearch.app.api.operations.OperationStore operations;
+
+  /** Externally owned, shared by both halves; closed after the index half. */
+  public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
   private final EngineResourcePolicy resources = EngineResourcePolicy.load();
   private final EngineAdmissionController admission = new EngineAdmissionController(resources);
   private final io.justsearch.core.execution.EngineExecutorRegistry executors =
@@ -105,54 +109,54 @@ public final class EngineRoot implements WorkerHost {
    *     — the same {@code KnowledgeServerConfig.deadlineMs()} the wire client used
    * @param batchSize the per-batch submission clamp
    */
-  public EngineRoot(long deadlineMs, int batchSize) {
-    this(deadlineMs, batchSize, EngineRoot::missingExitAction);
+  public EngineRoot(io.justsearch.app.api.operations.OperationStore operations, long deadlineMs, int batchSize) {
+    this(operations, deadlineMs, batchSize, EngineRoot::missingExitAction);
   }
 
   /** Process composition whose terminal-writer path is owned by the enclosing Head lifecycle. */
-  public static EngineRoot forProcess(
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
       long deadlineMs, int batchSize, IntConsumer terminalWriterFaultAction) {
-    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction,
+    return new EngineRoot(operations, deadlineMs, batchSize, terminalWriterFaultAction,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
-  public static EngineRoot forProcess(
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
-    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction, childRegistry);
+    return new EngineRoot(operations, deadlineMs, batchSize, terminalWriterFaultAction, childRegistry);
   }
 
-  public static EngineRoot forProcess(
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction) {
-    return new EngineRoot(deadlineMs, batchSize, terminalWriterFaultAction, childRegistry,
+    return new EngineRoot(operations, deadlineMs, batchSize, terminalWriterFaultAction, childRegistry,
         requestedRestartAction);
   }
 
-  private EngineRoot(long deadlineMs, int batchSize, IntConsumer exitAction) {
-    this(deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, long deadlineMs, int batchSize, IntConsumer exitAction) {
+    this(operations, deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
-  private EngineRoot(
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       long deadlineMs,
       int batchSize,
       IntConsumer exitAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
-    this(deadlineMs, batchSize, exitAction, childRegistry, EngineRoot::embeddedRestartRequired);
+    this(operations, deadlineMs, batchSize, exitAction, childRegistry, EngineRoot::embeddedRestartRequired);
   }
 
-  private EngineRoot(
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       long deadlineMs,
       int batchSize,
       IntConsumer exitAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction) {
-    this(
+    this(operations,
         (gauge, executorRegistry) -> {
           WorkerConfig workerConfig = WorkerConfig.load();
           // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
@@ -171,38 +175,39 @@ public final class EngineRoot implements WorkerHost {
   }
 
   /** Test seam: supply the index half rather than building it from the global config. */
-  EngineRoot(
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize) {
-    this(serverFactory, deadlineMs, batchSize, EngineRoot::missingExitAction);
+    this(operations, serverFactory, deadlineMs, batchSize, EngineRoot::missingExitAction);
   }
 
   /** Test seam: supply both the index half and the process exit action. */
-  EngineRoot(
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction) {
-    this(serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
+    this(operations, serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
         EngineRoot::embeddedRestartRequired);
   }
 
-  EngineRoot(
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       Runnable requestedRestartAction) {
-    this((gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
+    this(operations, (gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
         terminalWriterFaultAction, requestedRestartAction);
   }
 
-  private EngineRoot(
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
       java.util.function.BiFunction<GpuSchedulingGauge,
           io.justsearch.core.execution.EngineExecutorRegistry, KnowledgeServer> serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       Runnable requestedRestartAction) {
+    this.operations = Objects.requireNonNull(operations, "operations");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
     this.deadlineMs = deadlineMs;
