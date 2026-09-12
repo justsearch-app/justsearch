@@ -540,6 +540,51 @@
       "guard": "test:BackgroundWorkLifetimeTest",
       "consumesProjection": "operation-attempt-runner-port",
       "note": "Accepts before timer submission; runner starts after admission and completes from the durable agent run after runAgent returns. Owner boot reconciliation reads that same run."
+    },
+    {
+      "id": "runtime-activation-completion-owner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Existing owner returns frozen started status and actual terminal completion after lease cleanup; no row writes."
+    },
+    {
+      "id": "runtime-activation-completion-adapter",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimevariant/RuntimeVariantServiceImpl.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Reads broad status before effect start and carries the exact owner stage to recorded handlers."
+    },
+    {
+      "id": "runtime-activate-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ActivateRuntimeVariantHandler.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded activation returns owner completion instead of terminalizing its started response."
+    },
+    {
+      "id": "runtime-deactivate-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/DeactivateRuntimeVariantHandler.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded deactivation returns owner completion instead of terminalizing its started response."
+    },
+    {
+      "id": "runtime-activation-outcome-projection",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RuntimeActivationOutcome.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects actual terminal status into shared-runner completion; failed/inconclusive self-test never claims activation."
     }
   ]
 }

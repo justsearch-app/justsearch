@@ -4,6 +4,11 @@ package io.justsearch.app.services.registry.operations.handlers;
 import io.justsearch.core.context.EngineContext;
 
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+
+import static io.justsearch.agent.api.registry.OperationExecution.finished;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.RuntimeVariantService;
 import java.util.Map;
@@ -34,33 +39,40 @@ public final class DeactivateRuntimeVariantHandler implements OperationHandler {
 
   @Override
   public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return executeRecorded(argumentsJson, null, engineContext, null).response();
+  }
+
+  @Override
+  public OperationExecution executeRecorded(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext, OperationRecordHandle record) {
     RuntimeVariantService svc;
     try {
       svc = supplier.get();
     } catch (RuntimeException e) {
       log.warn("DeactivateRuntimeVariantHandler: supplier threw", e);
-      return OperationResult.failure("Runtime variant service unavailable: " + e.getMessage());
+      return finished(OperationResult.failure("Runtime variant service unavailable: " + e.getMessage()));
     }
     if (svc == null) {
-      return OperationResult.failure("Runtime variant service unavailable");
+      return finished(OperationResult.failure("Runtime variant service unavailable"));
     }
 
     try {
-      Map<String, Object> status = svc.deactivate();
-      return OperationResult.success("Runtime variant deactivation started", status);
+      var attempt = svc.deactivate();
+      return RuntimeActivationOutcome.execution("Runtime variant deactivation started", attempt);
     } catch (IllegalStateException e) {
       // RuntimeActivationService.startDeactivate throws ISE when an
       // activation/deactivation is already running.
-      return OperationResult.failure(
-          e.getMessage(), "RUNTIME_ACTIVATION_RUNNING", Map.of(), true);
+      return finished(OperationResult.failure(
+          e.getMessage(), "Runtime activation already running".equals(e.getMessage())
+              ? "RUNTIME_ACTIVATION_RUNNING" : "RUNTIME_DEACTIVATION_START_FAILED", Map.of(), true));
     } catch (Exception e) {
       log.error("DeactivateRuntimeVariantHandler: deactivate threw", e);
-      return OperationResult.failure(
+      return finished(OperationResult.failure(
           "Runtime variant deactivation failed: "
               + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()),
           "RUNTIME_DEACTIVATION_START_FAILED",
           Map.of(),
-          true);
+          true));
     }
   }
 }

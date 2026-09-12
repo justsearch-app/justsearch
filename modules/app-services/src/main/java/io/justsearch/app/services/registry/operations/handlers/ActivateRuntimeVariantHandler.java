@@ -4,6 +4,11 @@ package io.justsearch.app.services.registry.operations.handlers;
 import io.justsearch.core.context.EngineContext;
 
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+
+import static io.justsearch.agent.api.registry.OperationExecution.finished;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.RuntimeVariantService;
 import java.util.Map;
@@ -36,6 +41,12 @@ public final class ActivateRuntimeVariantHandler implements OperationHandler {
 
   @Override
   public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return executeRecorded(argumentsJson, null, engineContext, null).response();
+  }
+
+  @Override
+  public OperationExecution executeRecorded(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext, OperationRecordHandle record) {
     String variantId;
     try {
       JsonNode root =
@@ -43,11 +54,11 @@ public final class ActivateRuntimeVariantHandler implements OperationHandler {
               argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson);
       JsonNode v = root.get("variantId");
       if (v == null || !v.isTextual() || v.asString().isBlank()) {
-        return OperationResult.failure("Missing required arg: variantId");
+        return finished(OperationResult.failure("Missing required arg: variantId"));
       }
       variantId = v.asString();
     } catch (Exception e) {
-      return HandlerJson.invalidArgs(e);
+      return finished(HandlerJson.invalidArgs(e));
     }
 
     RuntimeVariantService svc;
@@ -55,18 +66,18 @@ public final class ActivateRuntimeVariantHandler implements OperationHandler {
       svc = supplier.get();
     } catch (RuntimeException e) {
       log.warn("ActivateRuntimeVariantHandler: supplier threw", e);
-      return OperationResult.failure("Runtime variant service unavailable: " + e.getMessage());
+      return finished(OperationResult.failure("Runtime variant service unavailable: " + e.getMessage()));
     }
     if (svc == null) {
-      return OperationResult.failure("Runtime variant service unavailable");
+      return finished(OperationResult.failure("Runtime variant service unavailable"));
     }
 
     try {
-      Map<String, Object> status = svc.activate(variantId);
-      return OperationResult.success("Runtime variant activation started: " + variantId, status);
+      var attempt = svc.activate(variantId);
+      return RuntimeActivationOutcome.execution("Runtime variant activation started: " + variantId, attempt);
     } catch (IllegalArgumentException e) {
-      return OperationResult.failure(
-          e.getMessage(), "INVALID_REQUEST", Map.of("variantId", variantId), false);
+      return finished(OperationResult.failure(
+          e.getMessage(), "INVALID_REQUEST", Map.of("variantId", variantId), false));
     } catch (IllegalStateException e) {
       // The AiRuntimeController's policy + already-running guards both throw
       // IllegalStateException. Distinguish by message — policy denials use the
@@ -83,18 +94,19 @@ public final class ActivateRuntimeVariantHandler implements OperationHandler {
       } else {
         // RuntimeActivationService.startActivate throws ISE when an
         // activation is already running.
-        code = "RUNTIME_ACTIVATION_RUNNING";
+        code = "Runtime activation already running".equals(msg)
+            ? "RUNTIME_ACTIVATION_RUNNING" : "RUNTIME_ACTIVATION_START_FAILED";
         retryable = true;
       }
-      return OperationResult.failure(e.getMessage(), code, Map.of("variantId", variantId), retryable);
+      return finished(OperationResult.failure(e.getMessage(), code, Map.of("variantId", variantId), retryable));
     } catch (Exception e) {
       log.error("ActivateRuntimeVariantHandler: activate threw", e);
-      return OperationResult.failure(
+      return finished(OperationResult.failure(
           "Runtime variant activation failed: "
               + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()),
           "RUNTIME_ACTIVATION_START_FAILED",
           Map.of("variantId", variantId),
-          true);
+          true));
     }
   }
 }

@@ -67,6 +67,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -263,31 +265,68 @@ public final class RuntimeActivationService
    * the thread leaves a window in which upgrade prepare observes no blocker while the work is about
    * to write. Same race-window closure as {@code BulkReindexHandler}.
    */
-  private void startLeasedThread(String opClass, String threadName, Runnable body) {
-    OperationLeaseHandle lease =
-        operationLeases.register(
-            opClass, OpCriticality.INTERRUPTIBLE_WITH_LOSS, 600L, Map.of("source", opClass));
-    Thread t =
-        new Thread(
-            () -> {
-              boolean ok = false;
-              try {
-                body.run();
-                ok = true;
-              } finally {
-                running.set(false);
-                lease.release(ok ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
-              }
-            },
-            threadName);
-    t.setDaemon(true);
+  private CompletionStage<AiRuntimeActivationStatus> startLeasedThread(
+      String opClass, String threadName, Runnable body) {
+    var completion = new CompletableFuture<AiRuntimeActivationStatus>();
+    OperationLeaseHandle lease;
     try {
-      t.start();
-    } catch (RuntimeException e) {
-      // The thread never ran, so its finally block will not release the lease.
-      running.set(false);
-      lease.release(OpLeaseOutcome.FAILURE);
-      throw e;
+      lease = operationLeases.register(
+          opClass, OpCriticality.INTERRUPTIBLE_WITH_LOSS, 600L, Map.of("source", opClass));
+    } catch (RuntimeException | Error failure) {
+      startFailed(failure);
+      throw failure;
+    }
+    try {
+      Thread thread = new Thread(() -> {
+        Throwable failure = null;
+        try {
+          body.run();
+        } catch (RuntimeException | Error thrown) {
+          failure = thrown;
+          if (thrown instanceof RuntimeException) {
+            updateState("failed", "done", "Runtime activation owner failed: " + safeMsg(thrown),
+                "RUNTIME_ACTIVATION_FAILED");
+          }
+        }
+        AiRuntimeActivationStatus outcome;
+        // Keep running true until cleanup is done, then freeze this attempt's status before
+        // allowing another caller to overwrite it. Completion callbacks run outside the lock.
+        try {
+          lease.release(failure == null && "completed".equals(getActivationStatus().state)
+              ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
+        } catch (RuntimeException | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+        synchronized (lock) {
+          outcome = copyStatus(status);
+          running.set(false);
+        }
+        if (failure != null) {
+          completion.completeExceptionally(failure);
+          if (failure instanceof Error fatal) throw fatal;
+          log.warn("Runtime activation owner failed", failure);
+        } else {
+          completion.complete(outcome);
+        }
+      }, threadName);
+      thread.setDaemon(true);
+      thread.start();
+    } catch (RuntimeException | Error failure) {
+      // No owner thread ran. Refusal must release the lease and the single-flight guard.
+      try { lease.release(OpLeaseOutcome.FAILURE); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      startFailed(failure);
+      throw failure;
+    }
+    return completion.minimalCompletionStage();
+  }
+  private void startFailed(Throwable failure) {
+    synchronized (lock) {
+      try {
+        updateState("failed", "done", "Runtime activation could not start: " + safeMsg(failure),
+            "RUNTIME_ACTIVATION_START_FAILED");
+      } finally { running.set(false); }
     }
   }
   private final AiRuntimeActivationStatus status = new AiRuntimeActivationStatus();
@@ -724,8 +763,8 @@ public final class RuntimeActivationService
   }
 
   @Override
-  public void startActivate(String variantId) {
-    startActivate(variantId, null);
+  public Attempt startActivate(String variantId) {
+    return startActivate(variantId, null);
   }
 
   /**
@@ -737,12 +776,13 @@ public final class RuntimeActivationService
    *     "compact"} | ...). A null/blank value means "do not touch the chat model" and the flow is
    *     byte-for-byte the pre-842 one — every existing caller keeps its exact behavior.
    */
-  public void startActivate(String variantId, String chatProfile) {
+  public Attempt startActivate(String variantId, String chatProfile) {
     String v = variantId == null ? "" : variantId.trim();
     if (v.isBlank()) {
       throw new IllegalArgumentException("variantId is required");
     }
     String profileRaw = chatProfile == null || chatProfile.isBlank() ? null : chatProfile.trim();
+    AiRuntimeActivationStatus started;
     synchronized (lock) {
       if (running.get()) {
         throw new IllegalStateException("Runtime activation already running");
@@ -757,12 +797,14 @@ public final class RuntimeActivationService
       status.vramUsedDeltaBytes = null;
       status.selfTestPort = null;
       touch();
+      started = copyStatus(status);
     }
-    startLeasedThread(
-        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw));
+    return new Attempt(started, startLeasedThread(
+        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw)));
   }
 
-  public void startDeactivate() {
+  public Attempt startDeactivate() {
+    AiRuntimeActivationStatus started;
     synchronized (lock) {
       if (running.get()) {
         throw new IllegalStateException("Runtime activation already running");
@@ -773,8 +815,10 @@ public final class RuntimeActivationService
       status.variantId = "";
       status.result = "";
       touch();
+      started = copyStatus(status);
     }
-    startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate", this::runDeactivate);
+    return new Attempt(started,
+        startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate", this::runDeactivate));
   }
 
   // -------------------- Implementation --------------------

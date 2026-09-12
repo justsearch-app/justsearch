@@ -341,7 +341,8 @@ Injected effect INSERT failure produces FAILED and a failed retry receipt withou
 re-execution; a locked cipher produces no plaintext fallback or effect. Generic
 OPERATION kind is intentional until C2-3 adds memory/note declarations.
 
-602 passes10 tests in2 suites (new consumer4 plus existing runner6), no failures,
+602 passes11 tests in3 suites (new consumer4, existing runner6 and the automatically
+included diagnostic architecture guard1), no failures,
 errors or skips, and app-api main/app-observability test PMD. Command:
 
 ```powershell
@@ -353,3 +354,51 @@ tmp/c2-2-nondispatched-602-counts.json. Root independently inspected the XML and
 failure injections. This is local port proof;955's actual MemoryAdmission/store and
 C2-3 prepared replay remain their owning checklist items. C2-2 still owes ingestion,
 async handler owners and installed acceptance-before-effect crash proof.
+
+### Runtime activation completion mechanism
+
+C2-2 uses the existing runtime owner thread and status, with one returned completion
+stage per accepted activation/deactivation. No status polling, global future lookup
+or durable payload is introduced. Snapshot terminal status before releasing the
+single-flight guard; complete the stage only after owner lease cleanup. A second
+attempt cannot overwrite the first outcome. Registration/start refusal must release
+the guard as well as any acquired lease. The service adapter carries the immediate
+status map alongside the stage; recorded handlers project the latter into receipts.
+A completed self-test with failed/inconclusive result did not activate the variant
+and must fail the operation rather than claim its requested effect completed.
+
+Independent review found phantom running status after start refusal and loss of the
+owner stage if the adapter's broader status read failed after starting. Root fixes
+both here: start refusal writes failed status and frees the guard; read the broader
+status before starting, then project only the owner's frozen started scalar DTO.
+This initial snapshot is a projection of existing status, not another lifecycle
+record. Exceptional owner exit also sets failed status before releasing its lease.
+The stage is observational and cannot cancel the owner; C2 does not invent a runtime
+cancel operation here. Existing operation-lease/Engine shutdown authority remains.
+
+Verification:607 passes79 tests in13 suites, no failures/errors/skips, plus affected
+app-services/API PMD. Includes existing activation/profile/baseline/executor tests,
+validator coverage and HTTP chat-profile compatibility. New tests use the real
+runtime owner, service adapter, recorded handler and SQLite runner; hold lease
+cleanup to prove the row stays RUNNING and another attempt is refused. Start lease
+refusal no longer leaves phantom running status; a broad status-read failure starts
+no effect. Failed/inconclusive self-test yields a failed receipt.609 additionally
+proves an unexpected owner exception releases its lease, sets failed status, allows
+a later attempt and cannot mutate the frozen started snapshot (all targeted tests
+and test PMD pass; exact counts in retained JSON).
+
+Negative606 temporarily restored the old finished-started adapter and fails the
+pending-completion assertion during held cleanup. The implementation was restored
+before607.603's test constructor access mistake was fixed using the store's public
+constructor;604's78-test pass predates the independent review corrections.
+Evidence: tmp/c2-2-runtime-completion-{603,604,607}.txt,
+tmp/c2-2-runtime-{604,607,609}-xml and corresponding -counts.json;
+tmp/c2-2-runtime-negative-606.txt/.xml; tmp/c2-2-runtime-failures-609.txt.
+These are local owner/transport proofs; integrated stress, installed crash and live
+model inclusion remain required at the coherent C2 boundary. No C2-2 closure.
+
+Runtime completion owner/adapter/handler projections are explicitly registered
+(import-invisible domain status paths). Operation-surface610 and guard-resolution611
+pass; llmstxt/skills-sync checks pass.609 totals11 tests in5 suites including the
+repository's automatically included guards. These successful checks do not replace
+the remaining C2 installed/live and integrated obligations.
