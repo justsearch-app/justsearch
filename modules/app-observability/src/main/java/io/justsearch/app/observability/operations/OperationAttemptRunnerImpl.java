@@ -52,7 +52,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     for (OperationRecord row : interrupted) {
       if (row.context().survival() == EngineContext.Survival.INTERACTIVE
           && !this.ownedKinds.contains(row.descriptor().kind())) {
-        store.finish(row.id(), OperationState.FAILED, new OperationReceipt("interrupted_by_restart", null));
+        finishObserved(new Control(row), OperationState.FAILED, new OperationReceipt("interrupted_by_restart", null));
       }
     }
   }
@@ -157,8 +157,17 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   public void rejectBeforeStart(PreparedAttempt attempt, String reason) {
     Prepared prepared = requirePrepared(attempt);
     if (prepared.existing) return;
-    store.rejectBeforeStart(prepared.control.id, new OperationReceipt(reason, null));
-    publishIfTerminal(prepared.control, current(prepared.control));
+    try {
+      boolean changed = store.rejectBeforeStart(prepared.control.id, new OperationReceipt(reason, null));
+      OperationRecord row = current(prepared.control);
+      if (!changed && row.state() == OperationState.ACCEPTED) {
+        throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+      }
+      publishIfTerminal(prepared.control, row);
+    } catch (RuntimeException failure) {
+      persistenceFailed(prepared.control, OperationState.FAILED, failure);
+      throw failure;
+    }
   }
 
   @Override
@@ -173,9 +182,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       Reconciliation decision = Objects.requireNonNull(reconciler.apply(row), "Reconciliation verdict");
       if (decision instanceof Reconciliation.Wait || !control.started.compareAndSet(false, true)) continue;
       switch (decision) {
-        case Reconciliation.Complete complete -> finish(control, OperationState.COMPLETE, complete.receipt());
-        case Reconciliation.Failed failed -> finish(control, OperationState.FAILED, failed.receipt());
-        case Reconciliation.Cancelled cancelled -> finish(control, OperationState.CANCELLED, cancelled.receipt());
+        case Reconciliation.Complete complete -> finishObserved(control, OperationState.COMPLETE, complete.receipt());
+        case Reconciliation.Failed failed -> finishObserved(control, OperationState.FAILED, failed.receipt());
+        case Reconciliation.Cancelled cancelled -> finishObserved(control, OperationState.CANCELLED, cancelled.receipt());
         case Reconciliation.Resume resume -> execute(control, resume.body(), true);
         case Reconciliation.Wait ignored -> throw new IllegalStateException("Wait was already handled");
       }
@@ -183,8 +192,18 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private void finish(Control control, OperationState state, OperationReceipt receipt) {
-    store.finish(control.id, state, receipt);
+    if (!store.finish(control.id, state, receipt)) {
+      throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+    }
     publishIfTerminal(control, current(control));
+  }
+
+  private void finishObserved(Control control, OperationState state, OperationReceipt receipt) {
+    try { finish(control, state, receipt); }
+    catch (RuntimeException failure) {
+      persistenceFailed(control, state, failure);
+      throw failure;
+    }
   }
 
   private void publishIfTerminal(Control control, OperationRecord row) {

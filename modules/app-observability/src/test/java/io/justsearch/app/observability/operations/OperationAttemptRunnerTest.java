@@ -173,6 +173,47 @@ final class OperationAttemptRunnerTest {
   }
 
   @Test
+  void ignoredTerminalWriteCannotLeaveCompletionPending() throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      var actual = new CompletableFuture<OperationResult>();
+      runner.start(attempt, handle -> new OperationExecution(OperationResult.success("started"), actual));
+      execute("CREATE TRIGGER ignore_complete BEFORE UPDATE ON operations WHEN NEW.state = 'COMPLETE' "
+          + "BEGIN SELECT RAISE(IGNORE); END");
+      actual.complete(OperationResult.success("effect committed"));
+      assertTrue(attempt.completion().toCompletableFuture().isCompletedExceptionally());
+      assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+      assertEquals(OperationState.COMPLETE, runner.persistenceFailure().toCompletableFuture().join().intendedState());
+    }
+  }
+
+  @Test
+  void ignoredBootSweepRefusesStartup() throws Exception {
+    try (var store = store()) {
+      var request = request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE);
+      store.accept(request.key(), request.descriptor(), request.context(), null);
+      execute("CREATE TRIGGER ignore_failed BEFORE UPDATE ON operations WHEN NEW.state = 'FAILED' "
+          + "BEGIN SELECT RAISE(IGNORE); END");
+      assertThrows(OperationStoreException.class, () -> new OperationAttemptRunnerImpl(store, CLOCK, Set.of()));
+      assertEquals(OperationState.ACCEPTED, store.find(request.key()).orElseThrow().state());
+    }
+  }
+
+  @Test
+  void ignoredPreStartRefusalIsNotMistakenForSuccessfulRefusal() throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      execute("CREATE TRIGGER ignore_failed BEFORE UPDATE ON operations WHEN NEW.state = 'FAILED' "
+          + "BEGIN SELECT RAISE(IGNORE); END");
+      assertThrows(OperationStoreException.class, () -> runner.rejectBeforeStart(attempt, "ADMISSION_REFUSED"));
+      assertTrue(attempt.completion().toCompletableFuture().isCompletedExceptionally());
+      assertEquals(OperationState.ACCEPTED, store.find(attempt.accepted().key()).orElseThrow().state());
+    }
+  }
+
+  @Test
   void bootOwnersWaitAndReconcileOriginalRowsWithoutTouchingNewWork() throws Exception {
     try (var store = store()) {
       var unowned = store.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE).key(),

@@ -26,6 +26,7 @@ scope addition is recorded under the next item's section0.1, never silently expa
    [R2 proof](review-r2-launcher-lock.md): final795 executes45 cases and passes the item gate.
 3. **R3 OPEN — transition refusal.** Re-read all ignored lifecycle booleans, reject
    unexpected terminal-write refusal and prove the failure is observable.
+   [R3 proof](review-r3-transition-refusal.md): three intended negative failures; final797 passes.
 4. **R4 OPEN — audit/admission.** Audit NONE cannot bypass durable mutation acceptance;
    admission failures preserve their reason. Preserve deliberate audit suppression.
 5. **R5 OPEN — bounded history.** Add identity/checkpoint SQL bounds, inspect SQLite

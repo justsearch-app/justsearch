@@ -10,8 +10,9 @@ Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progres
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),
 adopted at429115fec. New ingestion work is paused. R1 async persistence observability passes its named
 regressions and focused790 (92 cases), UI integration-test compilation and PMD.
-R2 launcher exclusion passes45 cases and its item gate at795. Next is R3 ignored
-transition results, followed by the ordered audit/admission, retention, acceptance,
+R2 launcher exclusion passes45 cases and its item gate at795. R3 checked
+transition results pass797 and three negative controls. Next is R4 audit/admission,
+followed by retention, acceptance,
 checklist and evidence findings. Root owns corrections; one final independent review per batch.
 The prior next-step ingestion notes below are superseded by that ordered batch.
 
