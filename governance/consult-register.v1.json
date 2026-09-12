@@ -285,6 +285,28 @@
         "After editing Java here (or in any module on the head-process classpath), run `./gradlew.bat :modules:ui:installDist` explicitly BEFORE dev_start / restart, so the jar in modules/ui/build/install/ui/lib/ is fresh.",
         "Symptom if skipped: the wire payload reflects the PREVIOUS build despite a successful `gradlew build`. Discovered tempdoc 511-followup Track E live-verify."
       ]
+    },
+    {
+      "id": "worktree-lifecycle",
+      "pathIncludes": ["scripts/dev/worktree-lifecycle.cjs", "scripts/dev/remove-worktree.cjs", "scripts/dev/lib/landing-receipt.cjs", "scripts/dev/lib/worktree-archive.cjs", "scripts/dev/lib/worktree-register.cjs", "scripts/agent-analytics/hooks/worktree-register.mjs", "scripts/agent-analytics/hooks/worktree-release.mjs", "governance/worktree-lifecycle.v1.json"],
+      "region": "the worktree and branch lifecycle (create, register, release, receipts, archive, reconcile, remove) — tempdoc 952",
+      "maintain": true,
+      "docs": [
+        {
+          "path": "docs/reference/contributing/common-workflows.md",
+          "why": "§Worktree mechanics is the canonical command reference for create/release/reconcile and the removal tool. Tempdoc 952 made the reconciler the termination owner, so the commands, the receipt test and the archive policy documented there must match the scripts in the same change."
+        },
+        {
+          "path": ".claude/rules/branch-safety.md",
+          "why": "the always-loaded release step and the janitor clause are the only prose an agent sees at merge time; they name the command and must not grow the ratcheted budget (scripts/ci/always-loaded-budget.v1.json)."
+        }
+      ],
+      "recipe": [
+        "Changing a state, phase, marker key, receipt verdict, or archive policy: update governance/worktree-lifecycle.v1.json and docs/tempdocs/952 §5 in the same change, then run `node scripts/agent-analytics/run-all-tests.mjs` (the 952-*.test.mjs files) and `npm run lint:scripts`.",
+        "Changing hook behaviour: edit governance/agent-hooks.v1.json, run `node scripts/ci/regen-all.mjs --only agent-hooks-wiring,codex-hooks`, then the hook-integrity gate (`node scripts/governance/run.mjs --gate hook-integrity --mode gate`).",
+        "Changing rule or skill text: edit .claude/rules/branch-safety.md and BOTH skill trees (.claude/skills and .agents/skills are separately owned), then run `node scripts/docs/skills-sync.mjs`, `node scripts/ci/check-codex-agent-parity.mjs` and `node scripts/ci/check-always-loaded-budget.mjs`.",
+        "Standing rules: the reconciler never executes a removal from a PreToolUse hook (861 [A4]); an UNKNOWN receipt never authorizes branch retirement; archive failure means quarantine, not removal; reading never writes."
+      ]
     }
   ]
 }

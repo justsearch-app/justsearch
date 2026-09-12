@@ -28,6 +28,7 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-spawn-reaper.cjs',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
+  'scripts/dev/lib/worktree-archive.cjs',
   'scripts/dev/justsearch-dev-mcp/observations.mjs',
   'scripts/dev/justsearch-dev-mcp/files.mjs',
   'scripts/dev/justsearch-dev-mcp/paths.mjs',
@@ -248,9 +249,22 @@ try {
   await fsp.symlink(junctionTarget, path.join(target, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   const stateRoot = path.join(primary.root, 'preview-state');
 
+  // Tempdoc 952 Amendment A: ignored files leave only through a verified archive, so
+  // `--allow-ignored` needs the manifest worktree-archive.cjs writes. The archive is taken BEFORE
+  // the effect-free snapshot so the dry-run below is still proven to change nothing.
+  const { archiveWorktree, DEFAULT_ARCHIVE_POLICY } = require('../dev/lib/worktree-archive.cjs');
+  const archived = archiveWorktree({
+    mainRepoRoot: primary.repo,
+    worktreePath: target,
+    resource: 'external-target-with-spaces',
+    policy: DEFAULT_ARCHIVE_POLICY,
+  });
+  assert.equal(archived.refused, undefined, `archive refused: ${JSON.stringify(archived)}`);
+  const archiveManifest = archived.manifestPath;
+
   await check('dry-run inventories ignored paths and has zero filesystem, ref, registry, state, or telemetry effects', async () => {
     const before = await snapshot(primary, target, stateRoot);
-    const result = runCli(primary, target, ['--dry-run', '--allow-ignored'], { stateRoot });
+    const result = runCli(primary, target, ['--dry-run', '--allow-ignored', '--archive-manifest', archiveManifest], { stateRoot });
     assert.equal(result.status, 0, result.output);
     assert.match(result.output, /preview:/i);
     assert.match(result.output, /codex\/936-safe/);
@@ -268,8 +282,43 @@ try {
     assert.equal(fs.existsSync(target), true);
   });
 
+  await check('--allow-ignored without a verified archive manifest is refused intact (952 Amendment A)', async () => {
+    const bare = runCli(primary, target, ['--allow-ignored']);
+    assert.equal(bare.status, 1, bare.output);
+    assert.match(bare.output, /verified archive/i);
+    assert.equal(fs.existsSync(target), true);
+    // A manifest that no longer matches the tree (the archived ignored file changed) is refused too.
+    await fsp.writeFile(path.join(target, 'ignored', 'cache.txt'), 'changed after archive', 'utf8');
+    const stale = runCli(primary, target, ['--allow-ignored', '--archive-manifest', archiveManifest]);
+    assert.equal(stale.status, 1, stale.output);
+    assert.match(stale.output, /does not verify/i);
+    assert.equal(fs.existsSync(target), true);
+    await fsp.writeFile(path.join(target, 'ignored', 'cache.txt'), 'ignored evidence', 'utf8');
+  });
+
+  await check('a verified archive manifest lifts the dirty-state blocker only for the paths it covers (952 §5.5)', async () => {
+    const covered = addWorktree(primary, 'dirty archived', 'codex/936-dirty-archived');
+    await fsp.writeFile(path.join(covered, 'draft.txt'), 'uncommitted draft', 'utf8');
+    const archivedDirty = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: covered, resource: 'dirty-archived', policy: DEFAULT_ARCHIVE_POLICY });
+    assert.equal(archivedDirty.refused, undefined, JSON.stringify(archivedDirty));
+    const ok = runCli(primary, covered, ['--archive-manifest', archivedDirty.manifestPath]);
+    assert.equal(ok.status, 0, ok.output);
+    assert.equal(fs.existsSync(covered), false);
+    assert.equal(git(primary.repo, 'cat-file', '-t', archivedDirty.stateCommit).trim(), 'commit', 'the state commit outlives the tree');
+
+    const partial = addWorktree(primary, 'dirty partial', 'codex/936-dirty-partial');
+    await fsp.writeFile(path.join(partial, 'draft.txt'), 'archived draft', 'utf8');
+    const archivedPartial = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: partial, resource: 'dirty-partial', policy: DEFAULT_ARCHIVE_POLICY });
+    assert.equal(archivedPartial.refused, undefined, JSON.stringify(archivedPartial));
+    await fsp.writeFile(path.join(partial, 'after-archive.txt'), 'never archived', 'utf8');
+    const refused = runCli(primary, partial, ['--archive-manifest', archivedPartial.manifestPath]);
+    assert.equal(refused.status, 1, refused.output);
+    assert.match(refused.output, /not covered by the archive manifest: after-archive\.txt/);
+    assert.equal(fs.existsSync(partial), true);
+  });
+
   await check('an exact external path with spaces removes its captured codex branch, preserves guessed branch and junction target', () => {
-    const result = runCli(primary, target, ['--allow-ignored', '--delete-branch']);
+    const result = runCli(primary, target, ['--allow-ignored', '--archive-manifest', archiveManifest, '--delete-branch']);
     assert.equal(result.status, 0, result.output);
     assert.match(result.output, /merge attribution requires an explicit known --session-id/i);
     assert.equal(fs.existsSync(target), false);

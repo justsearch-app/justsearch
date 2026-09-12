@@ -189,7 +189,10 @@ test('end-to-end adapter injects Codex session id into justsearch-dev calls', ()
   assert.equal(output.hookSpecificOutput.updatedInput.sessionId, sessionId);
 });
 
-for (const agentType of ['explorer', 'Plan', 'worker']) {
+// `companion` and `archivist` (tempdoc 951) sit outside the `Explore|Plan`
+// matcher like `worker`: their role files instruct them to read AGENTS.md
+// explicitly, so they must NOT receive the injected baseline.
+for (const agentType of ['explorer', 'Plan', 'worker', 'companion', 'archivist']) {
   test(`SubagentStart routes by agent_type: ${agentType}`, () => {
     const result = spawnSync(process.execPath, [ADAPTER], {
       cwd: REPO_ROOT, encoding: 'utf8', timeout: 15000, windowsHide: true,
@@ -203,7 +206,7 @@ for (const agentType of ['explorer', 'Plan', 'worker']) {
     assert.equal(result.status, 0, result.stderr);
     const output = result.stdout.trim() ? JSON.parse(result.stdout) : {};
     const context = output.hookSpecificOutput?.additionalContext ?? '';
-    if (agentType === 'worker') {
+    if (['worker', 'companion', 'archivist'].includes(agentType)) {
       assert.equal(context, '', 'a role outside the manifest matcher must not get the baseline');
     } else {
       assert.equal(output.hookSpecificOutput?.hookEventName, 'SubagentStart');

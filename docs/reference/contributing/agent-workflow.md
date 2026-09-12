@@ -18,7 +18,11 @@ publishing a component, or answering a status question, continue the next
 authorized step. Use session-closeout when the requested scope is complete, the
 user pauses or requests a handoff, or every useful next action depends on an
 external decision or unavailable resource. An internal defect to investigate is
-remaining work, not automatically a reason to wait for the user.
+remaining work, not automatically a reason to wait for the user. A worktree is a
+registered resource with a termination obligation (tempdoc 952): when its scope
+is complete, release it (`node scripts/dev/worktree-lifecycle.cjs release`) or
+record a hold with an owner and review date; never leave it as an ownerless
+directory for a later session to judge.
 
 Record explicit user decisions once in the active work record, including their
 scope. Preserve them across compaction; do not re-request existing authorization.
@@ -54,6 +58,15 @@ issue a newly bounded task. This threshold triggers reassessment; it neither
 waives review findings nor requires discarding useful context. Escalate earlier
 when the problem already exceeds the role. Report progress by acceptance items
 and unresolved causes, not message or commit counts.
+
+A persistent helper (the Codex `companion` role) is still a bounded child. It
+holds supporting context across several related questions and returns
+revision-stamped findings that separate stable facts from mutable state; it
+holds no authority over architecture, root cause, or acceptance, and the parent
+still reads the evidence behind any consequential decision. Open one only when
+repeated context exists, address it by a stable Task ID with delta-only
+follow-ups, and stop using it when the repetition ends. A Codex child inherits
+the parent turn's sandbox and approval policy; a role file cannot narrow them.
 
 ## Decide scope before adding mechanisms
 
@@ -191,6 +204,10 @@ When verifying a client upgrade or suspected missing instructions:
    deliberate deny-path result if testing enforcement.
 4. Repeat only the relevant roles/modes. Record observed results and unavailable
    cases; do not extrapolate one successful role to all roles or clients.
+5. Re-run step 3 for one child role whenever the Codex client changes
+   major/minor version, and record the result against that version. As of
+   0.153.x a child's sandbox is the parent turn's regardless of the role file
+   (Codex #39299; every sampled child agreed, tempdoc 951 R2 records the scan).
 
 Run the probe through the actual available client. A missing tool or inaccessible
 client is an explicit limit, never grounds for inventing a successful probe.

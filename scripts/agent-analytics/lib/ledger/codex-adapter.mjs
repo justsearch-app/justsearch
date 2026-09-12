@@ -33,6 +33,38 @@
  * A `rate_limits`-only `token_count` event (`info: null`) carries no usage at
  * all and is skipped outright, not counted as a repeat.
  *
+ *   A8  NATIVE PER-RESPONSE USAGE (tempdoc 951). Current Codex rollouts write a
+ *       `type: "token_usage_record"` line per model response, whose
+ *       `payload.usage` is that response's own usage and whose
+ *       `payload.response_id` is its identity. That stream is the better
+ *       source: `token_count` is a UI notification, so a response the CLI never
+ *       notified on is simply absent from it. Verified on a real explorer
+ *       rollout (38 native records vs 40 `token_count` events, 1 `compacted`):
+ *       the compaction-summarizer response (input 234,478 / cached 232,192)
+ *       has a native record and NO `token_count`, so the legacy input total
+ *       (5,235,254) understates the native total (5,469,732) by exactly that
+ *       one record.
+ *
+ *       Therefore: if a rollout has ANY usable native record, this adapter
+ *       builds every `Call` from the native stream and builds NONE from
+ *       `token_count`; a rollout with none falls back to the legacy A1/A2 path
+ *       unchanged. The two streams are NEVER summed: that would double-count
+ *       every response present in both. `token_count` is still read on the
+ *       native path, but only to keep the legacy `selfCheck` diagnostics
+ *       (`deltaInputSum`/`maxCumulativeInput`/`resets`/`repeatsDropped`)
+ *       comparable across both paths; `selfCheck.usageSource` names which
+ *       stream produced the Calls. `usage.input_tokens` follows the same A1
+ *       convention (it already includes `cached_input_tokens`).
+ *       `response_id` is deduplicated first-wins (the corpus has no duplicate
+ *       within a file; the drop count is reported rather than assumed zero),
+ *       and a record missing `usage` or `response_id` is ignored outright and
+ *       does not by itself select the native path.
+ *
+ *       The `compacted` semantics are unchanged and now ride the native
+ *       stream: the first call AFTER a `compacted` line carries
+ *       `compactionBoundary: true`, and the synthetic zero-token boundary Call
+ *       below is emitted only when nothing at all follows it.
+ *
  * LINEAGE: current Codex child rollouts carry an explicit parent edge in
  * `session_meta.payload.source.subagent.thread_spawn`, including
  * `parent_thread_id`, `agent_role`, and `agent_path`. Those sessions produce
@@ -298,6 +330,11 @@ export function processCodexEntries(entries, { file } = {}) {
   // of where in a single sequential pass it is encountered.
   const multiAgent = entries.some((e) => e.type === 'inter_agent_communication_metadata');
 
+  // A8: one pre-scan decides the usage stream for the WHOLE file, so a rollout
+  // whose first native record appears late still never mixes the two streams.
+  const hasNative = entries.some((e) => e.type === 'token_usage_record'
+    && e.payload?.usage && e.payload?.response_id);
+
   const calls = [];
   const toolEvents = [];
   const pendingByCallId = new Map();
@@ -317,6 +354,9 @@ export function processCodexEntries(entries, { file } = {}) {
   let maxCumulativeInput = 0;
   let resets = 0;
   let repeatsDropped = 0;
+  let nativeRecords = 0;
+  let nativeDuplicatesDropped = 0;
+  const seenResponseIds = new Set();
 
   const lineage = lineageFromSessionMetadata(sessionMetadata);
 
@@ -349,6 +389,49 @@ export function processCodexEntries(entries, { file } = {}) {
       continue;
     }
 
+    if (entry.type === 'token_usage_record') {
+      if (!hasNative) continue; // no usable record in this file at all
+      const usage = entry.payload?.usage;
+      const responseId = entry.payload?.response_id;
+      if (!usage || !responseId) continue; // A8: unusable record, ignored outright
+      if (seenResponseIds.has(responseId)) {
+        nativeDuplicatesDropped += 1;
+        continue; // A8: first record for a response_id wins
+      }
+      seenResponseIds.add(responseId);
+      nativeRecords += 1;
+
+      const boundary = compactionPending;
+      if (boundary) compactionPending = false;
+
+      calls.push(makeCall({
+        harness: 'codex-cli',
+        provider,
+        project,
+        sessionId,
+        callId: `${sessionId}:${index}`,
+        lineage,
+        ts,
+        model: currentModel,
+        reasoningEffort: currentReasoningEffort,
+        tokens: {
+          fresh: Math.max(0, (usage.input_tokens ?? 0) - (usage.cached_input_tokens ?? 0)),
+          cacheRead: usage.cached_input_tokens ?? 0,
+          // Codex still has no BILLABLE cache write, so this axis stays null
+          // even though the native record carries `cache_write_input_tokens`
+          // (record.mjs: an absent axis is null, never 0).
+          cacheWrite5m: null,
+          cacheWrite1h: null,
+          output: usage.output_tokens ?? 0,
+          reasoning: usage.reasoning_output_tokens ?? 0,
+        },
+        contextTokens: usage.input_tokens ?? 0, // A1: input_tokens already includes cached
+        compactionBoundary: boundary,
+      }));
+      index += 1;
+      continue;
+    }
+
     if (entry.type === 'event_msg') {
       const p = entry.payload;
 
@@ -370,6 +453,11 @@ export function processCodexEntries(entries, { file } = {}) {
         }
         prevCumulativeTotal = T.total_tokens;
         deltaInputSum += L.input_tokens ?? 0;
+
+        // A8: on the native path the diagnostics above still run (so both
+        // paths report comparable selfCheck numbers), but the native stream
+        // owns Call creation and `compactionPending`; never sum both.
+        if (hasNative) continue;
 
         const fresh = Math.max(0, (L.input_tokens ?? 0) - (L.cached_input_tokens ?? 0));
         const boundary = compactionPending;
@@ -440,8 +528,9 @@ export function processCodexEntries(entries, { file } = {}) {
     }
   }
 
-  // A `compacted` line with no following token_count call still marks a real
-  // boundary. Rather than drop it silently, emit a synthetic zero-token Call
+  // A `compacted` line with no following call on the ACTIVE usage stream (a
+  // `token_usage_record` under A8, else a `token_count` event) still marks a
+  // real boundary. Rather than drop it silently, emit a synthetic zero-token Call
   // carrying `compactionBoundary: true` AND `synthetic: true` — the
   // documented choice from the brief's either/or (886 §12 PR 1): a boundary
   // the ledger never saw a call for is still a boundary a reader
@@ -479,7 +568,15 @@ export function processCodexEntries(entries, { file } = {}) {
       calls: calls.length,
       multiAgent,
       lineage,
-      selfCheck: { deltaInputSum, maxCumulativeInput, resets, repeatsDropped },
+      selfCheck: {
+        deltaInputSum,
+        maxCumulativeInput,
+        resets,
+        repeatsDropped,
+        usageSource: hasNative ? 'native' : 'legacy',
+        nativeRecords,
+        nativeDuplicatesDropped,
+      },
     },
     skip: null,
   };

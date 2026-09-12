@@ -66,8 +66,21 @@ At session start, follow the automatically loaded `AGENTS.md` contract. Use
 `$justsearch-start` when you explicitly want repository orientation or a fresh
 world-state summary; it is not required for every session. Run the world-state
 command before changing files for a substantial task. Feature work belongs in a
-dedicated worktree. Keep one task per distinct outcome; resume an existing task
-when continuing the same outcome.
+dedicated worktree created through the repository command, which registers its
+owner (tempdoc 952):
+
+```powershell
+node scripts/dev/worktree-lifecycle.cjs create <name> --harness codex --prepare
+Set-Location .claude\worktrees\<name>
+codex
+```
+
+Keep one task per distinct outcome; resume an existing task when continuing the
+same outcome. When the task is done, from the repository root run
+`node scripts/dev/worktree-lifecycle.cjs release <path>`; the Codex SessionEnd
+hook releases a clean worktree automatically. Do not `git worktree add` into
+ad-hoc directories: trees outside `.claude/worktrees/` are unmanaged and are
+never cleaned up for you.
 
 ## Claude-to-Codex mapping
 
@@ -79,6 +92,7 @@ when continuing the same outcome.
 | `.claude/settings*.json` hooks | `.codex/hooks.json` | `governance/agent-hooks.v1.json` |
 | Claude agent types | `.codex/agents/{explorer,worker,complex_worker,reviewer}.toml` | Codex-native role files |
 | Claude transcript telemetry | Codex rollout and OTel adapters | neutral agent-analytics ledger |
+| `EnterWorktree` / exit-time worktree removal | `node scripts/dev/worktree-lifecycle.cjs create` / `release`; SessionEnd hook releases | `governance/worktree-lifecycle.v1.json` (tempdoc 952) |
 
 The mapping is behavioral rather than byte-for-byte. Unsupported Codex lifecycle
 events are omitted explicitly, and Claude-only model/task hooks are excluded
@@ -97,6 +111,8 @@ and reasoning effort. Do not select an ad hoc model for routine delegation.
 | `worker` | `gpt-5.6-luna`, `high` | Intended behavior, owning code, and acceptance checks are already settled |
 | `complex_worker` | `gpt-5.6-sol`, `medium` | Root cause is ambiguous; work crosses module contracts; concurrency, lifecycle, security, or migration reasoning is material; or a bounded worker fails verification |
 | `reviewer` | `gpt-5.6-sol`, `high` | Independent refute-first review of correctness, security, regressions, and test sufficiency |
+| `companion` | `gpt-5.6-luna`, `xhigh` | Persistent read-only supporting-context helper; at most one per session; see below |
+| `archivist` | `gpt-5.6-luna`, `high` | Docs-only closure and handoff writer at completion, pause, or handoff; see below |
 
 Project defaults route an unqualified or nested subagent to
 `gpt-5.6-luna` at `high` effort. Explicit role pins take precedence. A bounded
@@ -106,6 +122,54 @@ own model. Set `fork_turns` to `"none"` for a self-contained brief or to a
 positive integer when a small amount of recent conversation is necessary.
 Full-history forks that omit `fork_turns` or set it to `"all"` inherit the
 parent model and effort, so they do not exercise the role's model pin.
+
+### Sandbox and the thread cap
+
+A child always runs with the parent turn's sandbox and approval policy. Since
+Codex #39299 a role file may only set `developer_instructions`, `model`, and
+`model_reasoning_effort`, or disable features and skills; the `sandbox_mode`
+keys in `.codex/agents/*.toml` are declared intent that the client does not
+enforce. To sandbox children, run the parent turn stricter. Re-run the child
+write probe in `agent-workflow.md` when the Codex client changes version.
+
+`agents.max_concurrent_threads_per_session` in `.codex/config.toml` is an
+anomaly guard against runaway spawning, not a concurrency budget. Parallel work
+is bounded by the shared-resource rules (one dev stack, one Gradle build,
+disjoint file ownership), not by the cap.
+
+### Companion: one persistent read-only helper
+
+Open a `companion` when at least two related questions need the same
+supporting context (a module-contract map, a log corpus, a set of doc deltas)
+or during a multi-question lifecycle, gRPC, or contract investigation. Do not
+open one for a single lookup, a status check, or a task with no repeated
+context. Rules:
+
+- At most one per session. Spawn with `fork_turns = "none"` and a
+  self-contained capsule: stable Task ID, project context scope, the concrete
+  questions, and the decision they feed.
+- Continue with `followup_task` on the same Task ID, sending only changed
+  fields. Use `send_message` only to hand it new facts without asking for a
+  turn.
+- Its answers are revision-stamped and separate stable facts from mutable
+  state. Treat a Companion summary as a pointer: the parent still reads any
+  evidence that controls an architectural or acceptance decision.
+- The client has no close tool. Its retained history is re-billed on every
+  follow-up, so stop using it once the repeated-context benefit ends.
+
+### Archivist: docs-only closeout
+
+Spawn an `archivist` at actual completion, pause, or handoff, the same trigger
+as `session-closeout`, with a positive-integer `fork_turns` (40 is a sensible
+start) so it sees recent decisions while the Luna pin still applies; `"all"` is
+forbidden for this role. One Archivist owns closure; others may take
+non-overlapping canonical-doc assignments mid-task. It reconciles every
+acceptance item with an evidence pointer, updates the tempdoc and named
+canonical docs, runs the docs checks, and pastes the deterministic ledger's
+usage output rather than computing tokens itself. It may commit its own
+docs-only diff on the worktree branch with explicit-path staging. Publication,
+source edits, and the final completion claim stay with the parent
+(`no-merge-without-authorization`).
 
 ## Verify the integration
 

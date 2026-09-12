@@ -56,12 +56,22 @@ const checks = [
     assert.match(config, /^default_subagent_reasoning_effort\s*=\s*"high"/m);
     assert.doesNotMatch(config, /^cwd\s*=/m, 'project MCP must inherit Codex repository cwd; cwd=".." starts outside worktrees');
     assert.doesNotMatch(config, /(token|password|secret|pat)\s*=/i);
+    // tempdoc 951: the thread cap is an anomaly guard, not a workflow instrument.
+    // The value and the comment that says so are both part of the contract.
+    assert.match(config, /^max_concurrent_threads_per_session\s*=\s*10\s*$/m, 'thread cap must be the 951 anomaly-guard value');
+    assert.match(config, /Anomaly guard only/, 'thread cap must carry its anomaly-guard rationale comment');
   }],
-  ['native Codex agent roles are complete and explicitly sandboxed', () => {
+  // "declared sandbox intent", not "sandboxed": since Codex #39299 a role file
+  // cannot change the child's sandbox or approval policy (children inherit the
+  // parent turn's). The keys stay as declared intent; docs say they are not
+  // enforced (tempdoc 951 R2).
+  ['native Codex agent roles are complete with declared sandbox intent', () => {
     const dir = resolve(ROOT, '.codex', 'agents');
     const names = readdirSync(dir).filter((name) => name.endsWith('.toml')).sort();
-    assert.deepEqual(names, ['complex_worker.toml', 'explorer.toml', 'reviewer.toml', 'worker.toml']);
+    assert.deepEqual(names, ['archivist.toml', 'companion.toml', 'complex_worker.toml', 'explorer.toml', 'reviewer.toml', 'worker.toml']);
     const expectedRouting = {
+      'archivist.toml': { model: 'gpt-5.6-luna', effort: 'high', sandbox: 'workspace-write' },
+      'companion.toml': { model: 'gpt-5.6-luna', effort: 'xhigh', sandbox: 'read-only' },
       'complex_worker.toml': { model: 'gpt-5.6-sol', effort: 'medium', sandbox: 'workspace-write' },
       'explorer.toml': { model: 'gpt-5.6-luna', effort: 'high', sandbox: 'read-only' },
       'reviewer.toml': { model: 'gpt-5.6-sol', effort: 'high', sandbox: 'read-only' },
@@ -80,9 +90,26 @@ const checks = [
     for (const escalationSignal of ['ambiguous', 'cross-module', 'concurrency', 'lifecycle', 'security', 'migration', 'fails verification']) {
       assert.match(complexWorker, new RegExp(escalationSignal), `complex_worker must advertise the ${escalationSignal} escalation signal`);
     }
+    // tempdoc 951: Companion is a persistent read-only helper; its contract is
+    // carried by developer_instructions because the client ignores sandbox_mode.
+    const companion = read('.codex/agents/companion.toml');
+    for (const marker of ['Task ID', 'rev-parse', 'stable facts', 'mutable state', 'grep', 'never edit files', 'Not yours']) {
+      assert.match(companion, new RegExp(marker, 'i'), `companion must state the "${marker}" contract`);
+    }
+    // tempdoc 951: Archivist may commit its own docs-only diff, narrowly.
+    const archivist = read('.codex/agents/archivist.toml');
+    for (const marker of ['Write surface', 'unverified assumptions', 'cost-session.mjs', 'explicit paths', 'never `git add -A`', 'never push', 'never open or merge a PR', 'Not yours']) {
+      // \s+ so a wrapped phrase in the TOML string still matches.
+      const pattern = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+      assert.match(archivist, new RegExp(pattern, 'i'), `archivist must state the "${marker}" contract`);
+    }
     const sharedInstructions = read('AGENTS.md');
     assert.match(sharedInstructions, /set `fork_turns` to\s+`"none"` or a positive integer/i);
-    assert.match(sharedInstructions, /omitted\/`"all"` inherits the parent model and\s+effort and bypasses role pins/);
+    assert.match(sharedInstructions, /omitted\/`"all"`\s+inherits the parent model and\s+effort and bypasses role pins/);
+    assert.match(sharedInstructions, /`companion` \(Luna\/xhigh/, 'AGENTS.md must name the companion role and pin');
+    assert.match(sharedInstructions, /`archivist` \(Luna\/high/, 'AGENTS.md must name the archivist role and pin');
+    assert.match(sharedInstructions, /thread cap is an anomaly\s+guard, not a concurrency budget/, 'AGENTS.md must state the cap semantics');
+    assert.match(sharedInstructions, /role-file `sandbox_mode` is declared intent only/, 'AGENTS.md must state that role sandbox keys are not enforced');
   }],
   ['Codex hooks contain only events supported by the current hook API', () => {
     const hookConfig = JSON.parse(read('.codex/hooks.json'));
