@@ -624,3 +624,50 @@ This is a coherent producer checkpoint, not C2-2 or stage C2 completion.
 
 These are autonomous implementation decisions inside C2; no owner input is pending,
 and no remaining required acceptance item is waived or transferred to an unspecified lane.
+
+
+### Queue post-commit projection prerequisite
+
+September12: the existing SqliteJobQueue transaction owner confirms each commit after
+JDBC returns. IndexingJobsChangeStream native update/rollback callbacks only collect or
+discard provisional row identities; onCommit executes no SQL or subscriber. After commit,
+materialize immutable deltas before another committed chunk or reentrant callback can
+replace/delete their rows. Delivery waits for the outermost queue exit, after active-claim
+bookkeeping. Existing explicit transactions remain atomic; formerly autocommit statements
+get one explicit transaction each, preserving the 499-row batch chunk boundaries and
+keeping VACUUM outside transactions. This reuses the queue connection/lock and stream;
+a second job store, asynchronous dispatcher or completion authority is unnecessary.
+
+Snapshot reads and subscription registration now use the queue connection lock. Internal
+committed sequences filter changes already included in reentrant snapshots. The delivery
+guard drains nested subscriber writes after the entire earlier batch. A clear-all regression
+also exposed SQLite truncate optimization bypassing update hooks; DELETE with WHERE 1
+preserves real per-row notifications. The stream is still a projection of queue state;
+C2 committed-unit ingestion and D1/D2 durable effect acknowledgements remain separate.
+
+Focused636 passed153 tests/13 suites with zero failures/errors/skips plus main/test PMD.
+Initial635 exposed missing clear-all deletes (151/153 passed) and a PMD guard-shape issue;
+both fixed without suppressions or weakened assertions. Negative637 put delivery back
+inside the native hook but the independent-reader assertion still passed: visibility alone
+does not establish the callback boundary. Negative638 had a new-test generic-overload
+compile error. Negative639 detected the callback frame inside JNI, whose swallowed test
+assertion made the later observed-state assertion fail. The final regression records the
+callback frame and asserts outside JNI so the failure states the exact boundary violation.
+Evidence is tmp/c2-2-queue-projection-{635,636,640}.txt and corresponding -xml directories,
+plus tmp/c2-2-queue-projection-negative-{637,638,639,641}.txt and available -xml captures.
+
+Independent read-only review found no remaining source defect in the queue transaction,
+rollback, snapshot, reentrant delivery or claim lifetime diff. It found a separate caller
+race in WorkerIngestService.subscribeIndexingJobs: a delta may reach the sink after atomic
+subscription returns but before the snapshot frame is sent. Fix that next with a bounded,
+fail-closed initial handoff and forced-interleaving tests; never hold the emitter lock while
+acquiring the queue lock. This is required work, not a waiver. Hosted/integrated proof for
+the new projection changes remains due at the next coherent boundary.
+
+
+Final negative641 fails explicitly: expected callback-inside-native-hook [false,false],
+observed [true,true]. Restored642 passes153 tests/13 suites, zero failures/errors/skips,
+plus main/test PMD (main unchanged-input reuse); artifacts are -642.txt, -642-xml and
+-642-counts.json. Surface643, docs index/skill-sync checks, canonical links and diff
+whitespace pass. No weakening of validation or callback exception suppression was added.
+Integrated and named stress checks remain required at the next coherent boundary.

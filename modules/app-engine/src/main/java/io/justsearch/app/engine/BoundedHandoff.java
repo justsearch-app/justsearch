@@ -71,7 +71,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
      *
      * <p>For a producer that is holding a lock somebody else needs. The indexing-jobs feed is the
      * case, and it is not obvious from its call site: {@code IndexingJobsChangeStream} dispatches
-     * deltas from SQLite's <em>commit hook</em>, so the thread inside {@link #publish} is the
+     * deltas after JDBC commit and claim bookkeeping, so the thread inside {@link #publish} is the
      * thread that just mutated the jobs table, and it is holding {@code SqliteJobQueue}'s single
      * write lock. Blocking there for five seconds does not slow the stream — it stops the entire
      * job queue: no enqueue, no dequeue, no {@code markDone}, so the indexing loop stalls and every

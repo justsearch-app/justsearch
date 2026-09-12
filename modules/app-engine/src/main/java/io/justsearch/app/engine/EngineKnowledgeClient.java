@@ -1017,11 +1017,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     String traceId = currentTraceId();
     String requestId = currentRequestId();
     // Item A7: a bounded hand-off between the change feed's dispatch thread and the SSE fan-out.
-    // Without it the fan-out would run ON the SQLite update-hook thread, so a slow HTTP client
+    // Without it the fan-out would run on the queue writer's thread, so a slow HTTP client
     // would pace the indexing loop — the backpressure the Netty send buffer used to absorb.
     // FAIL_FAST, and this is the review's B4 finding rather than a tuning choice. The producer
     // that ends up inside publish() is not a thread of ours: IndexingJobsChangeStream dispatches
-    // deltas from SQLite's commit hook, so it is whichever thread just mutated the jobs table, and
+    // deltas after JDBC commit and claim bookkeeping, on the thread that mutated the jobs table, and
     // it is holding SqliteJobQueue's single write lock for the whole call. A blocking offer there
     // stops the job queue outright — no enqueue, no dequeue, no markDone — so one browser tab that
     // stopped reading its SSE stream would halt indexing for the entire machine for five seconds

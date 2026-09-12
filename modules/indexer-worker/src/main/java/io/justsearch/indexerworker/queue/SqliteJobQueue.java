@@ -267,11 +267,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // Slice 445: attach change-stream after schema is up so the rowId cache
       // sees the post-migration row set.
-      changeStream = new IndexingJobsChangeStream(connection);
+      changeStream = new IndexingJobsChangeStream(connection, lock);
 
       log.info("SqliteJobQueue opened: {}", dbPath);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -471,7 +471,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to enqueue jobs", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -524,7 +524,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               } else {
                 write.setNull(3, java.sql.Types.INTEGER);
               }
-              accepted = write.executeUpdate() > 0 ? 1 : 0;
+              accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
             return new JobQueue.ReenqueueResult(accepted, previousState);
           });
@@ -541,7 +541,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to re-enqueue {}", entry.path(), e);
       return new JobQueue.ReenqueueResult(0, null);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -621,7 +621,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   for (int i = 0; i < claimedRows.size(); i++) {
                     updateStmt.setString(i + 2, claimedRows.get(i).path());
                   }
-                  updateStmt.executeUpdate();
+                  executeMutation(updateStmt::executeUpdate);
                 }
 
                 List<IndexJob> claimed = new ArrayList<>(claimedRows.size());
@@ -642,7 +642,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to poll pending jobs", e);
       return List.of();
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -677,7 +677,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException failure) {
       throw new OutcomeWriteException("Could not verify processing claim", failure);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -710,14 +710,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setLong(1, System.currentTimeMillis());
         stmt.setString(2, PathNormalizer.normalizePath(path.toAbsolutePath().toString()));
-        stmt.executeUpdate();
+        executeMutation(stmt::executeUpdate);
       }
 
       log.debug("Marked job done: {}", path);
     } catch (SQLException e) {
       log.error("Failed to mark job done: {}", path, e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -745,7 +745,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                   long now = System.currentTimeMillis();
                   bindOutcomeUpdate(stmt, 1, now, outcome, normalizedPath);
-                  int rows = stmt.executeUpdate();
+                  int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
                     insertLedgerEvent(normalizedPath, outcome, entry);
                   }
@@ -758,7 +758,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new OutcomeWriteException(
           "Outcome-aware markDone failed for " + path + " (transaction rolled back)", e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -793,7 +793,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             stmt.setString(2 + i, PathNormalizer.normalizePath(
                 chunk.get(i).toAbsolutePath().toString()));
           }
-          stmt.executeUpdate();
+          executeMutation(stmt::executeUpdate);
         }
       }
 
@@ -801,7 +801,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException e) {
       log.error("Failed to mark {} jobs done (batch)", paths.size(), e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -848,7 +848,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     if (transition == null) continue;
                     String normalizedPath = normalizePath(transition.path());
                     bindOutcomeUpdate(stmt, 1, now, outcome, normalizedPath);
-                    int rows = stmt.executeUpdate();
+                    int rows = executeMutation(stmt::executeUpdate);
                     rowCounts.add(rows);
                     if (rows > 0) {
                       insertLedgerEvent(normalizedPath, outcome, transition.entry());
@@ -873,7 +873,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               + " path(s) (transaction rolled back)",
           e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -930,7 +930,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           stmt.setNull(5, java.sql.Types.INTEGER);
         }
         stmt.setString(6, normalizedPath);
-        stmt.executeUpdate();
+        executeMutation(stmt::executeUpdate);
       }
 
       if ("FAILED".equals(newState)) {
@@ -942,7 +942,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException e) {
       log.error("Failed to mark job failed: {}", path, e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -964,7 +964,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     """;
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                   bindOutcomeOnly(stmt, 1, outcome, normalizedPath);
-                  return stmt.executeUpdate();
+                  return executeMutation(stmt::executeUpdate);
                 }
               });
       logIfNoRows(updated, "recordOutcome", path);
@@ -972,7 +972,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new OutcomeWriteException(
           "recordOutcome failed for " + path + " (transaction rolled back)", e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1013,7 +1013,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   stmt.setLong(1, now);
                   stmt.setLong(2, now + 1000L);
                   bindOutcomeOnly(stmt, 3, outcome, normalizedPath);
-                  int rows = stmt.executeUpdate();
+                  int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
                     insertLedgerEvent(normalizedPath, outcome, entry);
                   }
@@ -1026,7 +1026,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new OutcomeWriteException(
           "defer failed for " + path + " (transaction rolled back)", e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1128,7 +1128,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   }
                   stmt.setLong(6, firstFailedAt);
                   bindOutcomeOnly(stmt, 7, outcome, normalizedPath);
-                  int rows = stmt.executeUpdate();
+                  int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
                     insertLedgerEvent(normalizedPath, outcome, entry);
                   }
@@ -1162,7 +1162,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new OutcomeWriteException(
           "markFailed failed for " + path + " (transaction rolled back)", e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1196,12 +1196,26 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     T run() throws SQLException;
   }
 
+  /** Preserve each former autocommit statement's boundary while confirming commit in Java. */
+  private int executeMutation(SqlWork<Integer> work) throws SQLException {
+    return connection.getAutoCommit() ? inTransaction(work) : work.run();
+  }
+
+  private void unlockAfterChanges() {
+    try {
+      if (lock.getHoldCount() == 1 && changeStream != null) changeStream.drainCommitted();
+    } finally {
+      lock.unlock();
+    }
+  }
+
   private <T> T inTransaction(SqlWork<T> work) throws SQLException {
     boolean wasAutoCommit = connection.getAutoCommit();
     connection.setAutoCommit(false);
     try {
       T result = work.run();
       connection.commit();
+      if (changeStream != null) changeStream.commitSucceeded();
       return result;
     } catch (SQLException | RuntimeException e) {
       connection.rollback();
@@ -1223,7 +1237,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new OutcomeWriteException(
           "recordIngestionEvent failed for " + path, e);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1264,7 +1278,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       stmt.setBoolean(17, entry != null);
       stmt.setString(18, normalizedEntry.transport());
       stmt.setString(19, normalizedPath);
-      stmt.executeUpdate();
+      executeMutation(stmt::executeUpdate);
     }
   }
 
@@ -1370,7 +1384,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setLong(1, System.currentTimeMillis());
-        int count = stmt.executeUpdate();
+        int count = executeMutation(stmt::executeUpdate);
         if (count > 0) {
           log.info("Recovered {} stuck jobs", count);
         }
@@ -1380,7 +1394,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to recover stuck jobs", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1403,7 +1417,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setLong(1, now);
         stmt.setLong(2, now - olderThanMs);
-        int count = stmt.executeUpdate();
+        int count = executeMutation(stmt::executeUpdate);
         if (count > 0) {
           log.info("Reaped {} stale PROCESSING jobs (older than {} ms) → PENDING", count, olderThanMs);
         }
@@ -1413,7 +1427,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to reap stale stuck jobs", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1430,13 +1444,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String sql = "UPDATE jobs SET last_updated = ? WHERE state = 'PROCESSING'";
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setLong(1, System.currentTimeMillis());
-        stmt.executeUpdate();
+        executeMutation(stmt::executeUpdate);
       }
     } catch (SQLException e) {
       // Best-effort: a missed beat at worst lets the reaper reclaim a live job (idempotent re-index).
       log.debug("Heartbeat of PROCESSING jobs failed (best-effort): {}", e.getMessage());
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1462,7 +1476,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to get queue depth", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1485,7 +1499,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to get completed count", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1510,7 +1524,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       int deleted;
       try (PreparedStatement stmt = connection.prepareStatement(jobsSql)) {
         stmt.setLong(1, cutoff);
-        deleted = stmt.executeUpdate();
+        deleted = executeMutation(stmt::executeUpdate);
       }
       if (deleted > 0) {
         log.info("Cleaned up {} old completed/failed jobs", deleted);
@@ -1521,7 +1535,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to cleanup old jobs", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1534,7 +1548,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (PreparedStatement stmt =
           connection.prepareStatement("DELETE FROM ingestion_ledger WHERE observed_at < ?")) {
         stmt.setLong(1, cutoff);
-        int deleted = stmt.executeUpdate();
+        int deleted = executeMutation(stmt::executeUpdate);
         if (deleted > 0) {
           log.info("Cleaned up {} old ingestion ledger events", deleted);
           checkAndVacuum();
@@ -1545,7 +1559,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to cleanup old ledger events", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1573,7 +1587,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.debug("hasRecentLedgerEvent probe failed (treating as 'no recent event'): {}", e.getMessage());
       return false;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1605,7 +1619,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to list ingestion ledger events", e);
       return List.of();
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1642,7 +1656,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to summarize ingestion ledger outcomes", e);
       return List.of();
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1770,7 +1784,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.debug("Failed to compute failure summary (best-effort): {}", e.getMessage());
       return new FailureSummary(0L, null, null, null, null);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1812,7 +1826,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to list failed jobs", e);
       return List.of();
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1878,7 +1892,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to list failed jobs by path prefix: {}", pathPrefix, e);
       return List.of();
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1890,7 +1904,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       String sql = "DELETE FROM jobs WHERE state IN ('FAILED', 'RETRY_EXHAUSTED')";
       try (Statement stmt = connection.createStatement()) {
-        int deleted = stmt.executeUpdate(sql);
+        int deleted = executeMutation(() -> stmt.executeUpdate(sql));
         if (deleted > 0) {
           log.info("Cleared {} failed jobs", deleted);
           checkAndVacuum();
@@ -1903,7 +1917,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to clear failed jobs", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1913,9 +1927,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
 
-      String sql = "DELETE FROM jobs";
+      // A WHERE clause disables SQLite truncate optimization, which bypasses row update hooks.
+      String sql = "DELETE FROM jobs WHERE 1";
       try (Statement stmt = connection.createStatement()) {
-        int deleted = stmt.executeUpdate(sql);
+        int deleted = executeMutation(() -> stmt.executeUpdate(sql));
         activeClaims.clear();
         if (deleted > 0) {
           log.info("Cleared all {} jobs (profiling reset)", deleted);
@@ -1929,7 +1944,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to clear all jobs", e);
       return 0;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -1962,7 +1977,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setString(1, normalized);
         stmt.setString(2, upper);
-        int deleted = stmt.executeUpdate();
+        int deleted = executeMutation(stmt::executeUpdate);
         activeClaims.keySet().removeIf(path -> path.compareTo(normalized) >= 0 && path.compareTo(upper) < 0);
         if (deleted > 0) {
           log.info("deleteByPathPrefix: deleted {} jobs for prefix: {}", deleted, normalized);
@@ -1975,7 +1990,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to delete jobs by path prefix: {}", pathPrefix, e);
       return -1;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -2040,7 +2055,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to count jobs by path prefix: {}", pathPrefix, e);
       return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -2066,7 +2081,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setString(1, path);
-        int deleted = stmt.executeUpdate();
+        int deleted = executeMutation(stmt::executeUpdate);
         activeClaims.remove(path);
         if (deleted > 0) {
           log.debug("deleteByExactPath: deleted job for path: {}", path);
@@ -2077,7 +2092,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.error("Failed to delete job by exact path: {}", path, e);
       return -1;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -2151,7 +2166,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       lastBackupAtMs = System.currentTimeMillis();
       log.info("Backup created successfully: {}", bak);
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -2216,7 +2231,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         return true;
       }
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -2249,7 +2264,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
       }
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 
@@ -2345,7 +2360,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.warn("WAL checkpoint failed: {}", e.getMessage());
       return false;
     } finally {
-      lock.unlock();
+      unlockAfterChanges();
     }
   }
 }

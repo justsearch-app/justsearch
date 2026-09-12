@@ -294,7 +294,7 @@ both parser and native child alive before forcibly killing an isolated Engine.
 
 **Category:** reliability | **Status:** Monitoring
 
-**Trade-off:** `SqliteJobQueue` holds one JDBC `Connection` guarded by one `ReentrantLock`, which makes correctness easy to reason about and makes the SQLite update/commit hooks (which back the live job stream) trivially consistent. In exchange, every enqueue and dequeue serializes through one lock on one connection.
+**Trade-off:** `SqliteJobQueue` holds one JDBC `Connection` guarded by one `ReentrantLock`. Queue writes, snapshot reads, and subscriptions share that lock. SQLite hooks collect provisional row identities; the queue materializes deltas only after JDBC commit returns and delivers them after claim bookkeeping. Rollback discards provisional changes, and subscriber-triggered writes are delivered after the current batch. This projects committed queue state; it does not prove a Lucene commit. Every enqueue, dequeue, and synchronous subscriber callback serializes through the same lock.
 
 **Impact:** Structural, not load-dependent: the single connection is a single point of failure and a hard serialization point. One slow statement blocks every other queue caller, and a connection-level fault takes the whole queue down rather than one caller's work.
 
