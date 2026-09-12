@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
  */
 public record OrchestrationHandles(
     AutoCloseable gplAutoTrigger,
+    AutoCloseable operationsRetention,
     AutoCloseable lambdaMartReranker,
     AutoCloseable jobQueueDepthProducer,
     AutoCloseable documentsIndexedRateProducer,
@@ -42,12 +43,13 @@ public record OrchestrationHandles(
   private static final Logger log = LoggerFactory.getLogger(OrchestrationHandles.class);
 
   /**
-   * Stops GPL first, then closes remaining handles in reverse construction order. Failures aggregate so a single bad handle
-   * does not block the remaining teardown or let ordered shutdown claim a clean receipt.
+   * Stops the Head-owned background producers first, then closes remaining handles in reverse
+   * construction order. Failures aggregate so a single bad handle does not block the remaining
+   * teardown or let ordered shutdown claim a clean receipt.
    */
   @Override
   public void close() {
-    List<AutoCloseable> ordered = new ArrayList<>(14);
+    List<AutoCloseable> ordered = new ArrayList<>(15);
     ordered.add(lambdaMartReranker);
     ordered.add(jobQueueDepthProducer);
     ordered.add(documentsIndexedRateProducer);
@@ -63,6 +65,8 @@ public record OrchestrationHandles(
     ordered.add(agentToolHandlers);
     // GPL can still call inference and the Worker; stop its producer before either dependency.
     ordered.add(gplAutoTrigger);
+    // Retention calls the borrowed operations store; stop it before any dependency teardown.
+    ordered.add(operationsRetention);
     Collections.reverse(ordered);
     IllegalStateException failure = null;
     for (AutoCloseable handle : ordered) {
@@ -83,6 +87,26 @@ public record OrchestrationHandles(
   /** Returns an empty handles record where all fields are {@code null}. */
   public static OrchestrationHandles empty() {
     return new OrchestrationHandles(
-        null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+  }
+
+  /** Returns this teardown bundle with the Head-owned operations retention timer installed. */
+  public OrchestrationHandles withOperationsRetention(AutoCloseable retention) {
+    return new OrchestrationHandles(
+        gplAutoTrigger,
+        retention,
+        lambdaMartReranker,
+        jobQueueDepthProducer,
+        documentsIndexedRateProducer,
+        gpuUtilizationProducer,
+        gpuMemoryUtilizationProducer,
+        inferenceManager,
+        indexingService,
+        documentService,
+        diagnosticChannelAppender,
+        indexingJobsBridgeRegistry,
+        agentSearchAdapterReranker,
+        indexingJobsBridge,
+        agentToolHandlers);
   }
 }

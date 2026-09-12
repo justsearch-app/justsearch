@@ -3,6 +3,7 @@ package io.justsearch.app.services;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -91,6 +92,13 @@ class HeadAssemblyTest {
     try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), searchPort, telemetry, org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       // Tempdoc 519 §5 / Step 4: bootstrap is itself the AppFacade (no separate accessor).
       assertNotNull(bootstrap);
+      var timerField = HeadAssembly.class.getDeclaredField("operationsRetentionTimer");
+      timerField.setAccessible(true);
+      var orchestrationField = HeadAssembly.class.getDeclaredField("orchestration");
+      orchestrationField.setAccessible(true);
+      var handles = (io.justsearch.app.services.bootstrap.OrchestrationHandles)
+          orchestrationField.get(bootstrap);
+      assertSame(timerField.get(bootstrap), handles.operationsRetention());
     }
   }
 
@@ -109,9 +117,9 @@ class HeadAssemblyTest {
       var handlesField = HeadAssembly.class.getDeclaredField("orchestration");
       handlesField.setAccessible(true);
       handlesField.set(head, new io.justsearch.app.services.bootstrap.OrchestrationHandles(
-          null, null, null, null, null, null, () -> inferenceClosed.set(true),
+          null, null, null, null, null, null, null, () -> inferenceClosed.set(true),
           null, null, null, null, null, null, null));
-      org.junit.jupiter.api.Assertions.assertSame(failure, assertThrows(IllegalStateException.class, head::close));
+      assertSame(failure, assertThrows(IllegalStateException.class, head::close));
       assertFalse(inferenceClosed.get());
       head.close();
       assertTrue(inferenceClosed.get());
@@ -131,7 +139,7 @@ class HeadAssemblyTest {
       logField.setAccessible(true);
       logField.set(head, transitionLog);
       var handles = new io.justsearch.app.services.bootstrap.OrchestrationHandles(
-          null, null, null, null, null, null,
+          null, null, null, null, null, null, null,
           () -> transitionLog.record(1, "ONLINE", "OFFLINE", "SHUTDOWN", true, 0, null, 1),
           null, null, null, null, null, null,
           () -> { throw new IllegalStateException("unrelated handle failure"); });
@@ -166,11 +174,11 @@ class HeadAssemblyTest {
       var handlesField = HeadAssembly.class.getDeclaredField("orchestration");
       handlesField.setAccessible(true);
       handlesField.set(head, new io.justsearch.app.services.bootstrap.OrchestrationHandles(
-          null, null, null, null, null, null,
+          null, null, null, null, null, null, null,
           () -> { order.add("inference"); throw new IllegalStateException("manager close failed"); },
           null, null, null, null, null, null, null));
       var failure = assertThrows(IllegalStateException.class, head::close);
-      org.junit.jupiter.api.Assertions.assertSame(scanFailure, failure);
+      assertSame(scanFailure, failure);
       assertEquals(List.of("first-scan", "second-scan", "inference"), order);
       assertEquals(1, failure.getSuppressed().length);
       assertEquals("manager close failed", failure.getSuppressed()[0].getSuppressed()[0].getMessage());
@@ -213,7 +221,7 @@ class HeadAssemblyTest {
     try (HeadAssembly bootstrap = new HeadAssembly(operations, org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), telemetry, new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
-      org.junit.jupiter.api.Assertions.assertSame(operations, bootstrap.operations());
+      assertSame(operations, bootstrap.operations());
       SearchRequest request = new SearchRequest(5, 0, true, null, List.of(), List.of(), null);
       SearchResponse response =
           bootstrap.workers().search().search(request, TestEngineContexts.internal());

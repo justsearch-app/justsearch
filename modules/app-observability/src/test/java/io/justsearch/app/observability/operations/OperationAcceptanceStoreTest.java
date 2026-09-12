@@ -100,8 +100,8 @@ final class OperationAcceptanceStoreTest {
       assertTrue(store.start(row.id()));
       assertTrue(store.checkpoint(row.id(), "unit-4", 4, 1));
       assertFalse(store.checkpoint(row.id(), "unit-3", 3, 1));
-      assertTrue(store.finish(row.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", "batch-42")));
-      assertFalse(store.finish(row.id(), OperationState.FAILED, new OperationReceipt("LATE_ERROR", null)));
+      assertTrue(store.finish(row.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", "batch-42")).isPresent());
+      assertFalse(store.finish(row.id(), OperationState.FAILED, new OperationReceipt("LATE_ERROR", null)).isPresent());
       assertFalse(store.checkpoint(row.id(), "unit-5", 5, 1));
       assertFalse(store.start(row.id()));
     }

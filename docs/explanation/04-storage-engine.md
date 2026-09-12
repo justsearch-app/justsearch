@@ -301,7 +301,9 @@ is refused while the first remains active. Shutdown retains the lock until the o
 store closes; failed setup releases it after safe store cleanup. The port is
 implemented in app-observability, and the same instance is injected into the application and index
 composition before asynchronous startup. It closes after the index half drains. The schema starts
-at version 1; `jobs.db` independently uses version 16, retaining nullable `jobs.content_hash`
+at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
+for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
+history fence; `jobs.db` independently uses version 16, retaining nullable `jobs.content_hash`
 for legacy rows and adding an opaque revision to each accepted switch-buffer replacement.
 Replay removes only the versions it applied and committed, preserving admissions that arrive
 during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
@@ -312,7 +314,23 @@ SQLite reads that copy, including uncheckpointed committed versions, so refusing
 cannot change the original main file, WAL or SHM. The temporary copy is removed before startup
 continues. This costs temporary disk space proportional to one database plus its WAL; it avoids
 hand-written WAL parsing and SQLite's otherwise writable shared-memory side effects in read-only
-mode. Callers must exclude concurrent writers during inspection.
+mode. Callers must exclude concurrent writers during inspection. The operations
+store uses SQLite `quick_check` for startup integrity inspection.
+
+Terminal operation rows expire after 30 days by completion time. A 100000-row cap
+evicts the oldest terminal rows first; open work and COMPLETE_WITH_GAPS are never
+evicted. If only open work fills the cap, acceptance refuses with OPERATIONS_CAPACITY.
+Pruning runs once at store open and hourly through the registered
+`head.operations-retention` timer; acceptance reserves capacity under the same store
+lock. Timer failures log ERROR and retry on the next tick. Its owner cancels and
+awaits the timer before releasing its executor registration.
+
+Each eviction transaction advances `history_since_ms` to at least the newest evicted
+key's UUIDv7 timestamp plus one millisecond. A present row wins over that fence;
+an absent older key is expired. A fence ahead of the clock includes its remaining
+retry delay in the store refusal. Terminal transitions return their committed row
+snapshot under the store lock, so eviction cannot erase an outcome before live
+completion publication. There is no extra retention window for those observers.
 
 An unreadable operations database is preserved with its WAL and SHM in one timestamped directory.
 An interrupted `.pending` directory is resumed before creating a replacement. The replacement's

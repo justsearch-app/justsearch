@@ -96,6 +96,7 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundDocumentOwner;
   private final java.util.concurrent.ExecutorService foregroundDocuments;
   private final java.util.concurrent.ExecutorService backgroundDocuments;
+  private final AutoCloseable operationsRetentionTimer;
 
 
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
@@ -354,6 +355,8 @@ public final class HeadAssembly implements AutoCloseable {
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
+    this.operationsRetentionTimer = startOperationsRetentionTimer(this.operations, this.executors);
+    acquiredOwners.add(this.operationsRetentionTimer);
     this.telemetry = telemetry;
     Objects.requireNonNull(managedChildRegistry, "managedChildRegistry");
     Objects.requireNonNull(configManager, "configManager");
@@ -776,7 +779,8 @@ public final class HeadAssembly implements AutoCloseable {
                         feedbackCipher)))
             .orThrow();
     this.services = orchestrationOut.initialServices();
-    this.orchestration = orchestrationOut.orchestrationHandles();
+    this.orchestration =
+        orchestrationOut.orchestrationHandles().withOperationsRetention(this.operationsRetentionTimer);
     this.gplJobCoordinator = orchestrationOut.gplJobCoordinator();
     this.gplAutoTrigger = orchestrationOut.gplAutoTrigger();
     this.gplSnapshotFile = orchestrationOut.gplSnapshotFile();
@@ -998,6 +1002,8 @@ public final class HeadAssembly implements AutoCloseable {
         Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
     this.backgroundDocuments = backgroundDocumentOwner.open(
         Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
+    this.operationsRetentionTimer = startOperationsRetentionTimer(this.operations, this.executors);
+    acquiredOwners.add(this.operationsRetentionTimer);
     this.telemetry = telemetry;
     this.searchPort = searchPort;
     this.knowledgeClient = null;
@@ -1077,6 +1083,9 @@ public final class HeadAssembly implements AutoCloseable {
     // surfaces "skipped: no worker" if any caller queries it.
     this.agentToolsRegistration =
         io.justsearch.app.services.bootstrap.Memoized.of(() -> Boolean.FALSE);
+    this.orchestration =
+        io.justsearch.app.services.bootstrap.OrchestrationHandles.empty()
+            .withOperationsRetention(this.operationsRetentionTimer);
     } catch (RuntimeException | Error failure) {
       closeFailedOwners(acquiredOwners, failure);
       throw failure;
@@ -1405,7 +1414,9 @@ public final class HeadAssembly implements AutoCloseable {
     var localCap = this.capabilities.worker();
     AutoCloseable bridgeHandle =
         this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
-    this.orchestration = buildOrchestrationHandles(bridgeHandle, null);
+    this.orchestration =
+        buildOrchestrationHandles(bridgeHandle, null)
+            .withOperationsRetention(this.operationsRetentionTimer);
     io.justsearch.app.api.SearchService newSearch =
         new io.justsearch.app.services.search.SearchServiceImpl(() -> this.searchPort);
     this.services =
@@ -1579,6 +1590,85 @@ public final class HeadAssembly implements AutoCloseable {
         "head.documents." + suffix, kind,
         io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
         limits.maxThreads(), limits.maxQueue(), 1));
+  }
+
+  static AutoCloseable startOperationsRetentionTimer(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.core.execution.EngineExecutorRegistry executors) {
+    Objects.requireNonNull(operations, "operations");
+    Objects.requireNonNull(executors, "executors");
+    var limits = executors.limits(
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    var registration = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.operations-retention",
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED,
+        1,
+        limits.maxQueue(),
+        1));
+    java.util.concurrent.ScheduledExecutorService scheduler;
+    try {
+      scheduler = registration.openScheduled(
+          Thread.ofPlatform().daemon().name("operations-retention-", 0).factory());
+      var task = scheduler.scheduleWithFixedDelay(
+          () -> pruneOperationsHistory(operations), 1, 1, java.util.concurrent.TimeUnit.HOURS);
+      return new OperationsRetentionHandle(registration, scheduler, task);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  static void pruneOperationsHistory(io.justsearch.app.api.operations.OperationStore operations) {
+    try {
+      operations.pruneHistory();
+    } catch (RuntimeException failure) {
+      log.error("Operations history retention failed; will retry on the next hourly tick", failure);
+    }
+  }
+
+  private static final class OperationsRetentionHandle implements AutoCloseable {
+    private final io.justsearch.core.execution.EngineExecutorRegistry.Registration registration;
+    private final java.util.concurrent.ScheduledExecutorService scheduler;
+    private final java.util.concurrent.ScheduledFuture<?> task;
+    private boolean closed;
+
+    private OperationsRetentionHandle(
+        io.justsearch.core.execution.EngineExecutorRegistry.Registration registration,
+        java.util.concurrent.ScheduledExecutorService scheduler,
+        java.util.concurrent.ScheduledFuture<?> task) {
+      this.registration = registration;
+      this.scheduler = scheduler;
+      this.task = task;
+    }
+
+    @Override
+    public synchronized void close() {
+      if (closed) {
+        return;
+      }
+      try {
+        task.cancel(true);
+        scheduler.shutdownNow();
+        if (!scheduler.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+          throw new IllegalStateException(
+              "Operations retention scheduler did not terminate within 5s");
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(
+            "Interrupted while waiting for operations retention scheduler termination",
+            interrupted);
+      }
+      // Keep the registration live after a failed termination wait so a later close can finish
+      // the same owner. It is released only after the scheduler has actually terminated.
+      registration.close();
+      closed = true;
+    }
   }
 
   /** Helper for resolving the JustSearch home directory. */

@@ -42,6 +42,9 @@ public final class SqliteOperationStore implements OperationStore {
       .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
   private static final Logger LOG = LoggerFactory.getLogger(SqliteOperationStore.class);
   private static final long FUTURE_SKEW_MS = Duration.ofMinutes(5).toMillis();
+  private static final long RETENTION_MS = Duration.ofDays(30).toMillis();
+  private static final int ROW_CAP = 100000;
+  private static final String TERMINAL = "state IN ('COMPLETE', 'FAILED', 'CANCELLED')";
   private static final String INSERT_OPERATION = """
       INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
         identity_json, grant_ref, client_kind, client_id, session_id, source_tier, transport,
@@ -94,6 +97,7 @@ public final class SqliteOperationStore implements OperationStore {
       }
       boolean recovered = initializeSchema(recoveryFloor);
       if (recovered) recovery = latestRecovery;
+      pruneHistory();
     } catch (IOException | SQLException | RuntimeException | Error failure) {
       if (connection != null) {
         try { connection.close(); } catch (SQLException closeFailure) {
@@ -111,15 +115,15 @@ public final class SqliteOperationStore implements OperationStore {
     try (var snapshot = io.justsearch.configuration.persistence.SqliteStoreSnapshot.open(path);
         Statement statement = snapshot.connection().createStatement()) {
       refuseFutureVersion(schemaVersion(snapshot.connection()));
-      try (ResultSet result = statement.executeQuery("PRAGMA integrity_check")) {
+      try (ResultSet result = statement.executeQuery("PRAGMA quick_check")) {
         boolean sawResult = false;
         while (result.next()) {
           sawResult = true;
           if (!"ok".equalsIgnoreCase(result.getString(1))) {
-            throw new SQLException("operations.db integrity check failed", "SQLITE_CORRUPT", 11);
+            throw new SQLException("operations.db quick check failed", "SQLITE_CORRUPT", 11);
           }
         }
-        if (!sawResult) throw new SQLException("operations.db integrity check returned no result");
+        if (!sawResult) throw new SQLException("operations.db quick check returned no result");
       }
     }
   }
@@ -168,6 +172,10 @@ public final class SqliteOperationStore implements OperationStore {
         }
         statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
       } else {
+        if (version == 1) {
+          OperationSchema.migrateV1(statement);
+          statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
+        }
         try (var update = connection.prepareStatement(
             "UPDATE operations_meta SET history_since_ms = MAX(history_since_ms, ?) WHERE singleton = 1")) {
           update.setLong(1, recoveryFloor);
@@ -288,7 +296,16 @@ public final class SqliteOperationStore implements OperationStore {
         throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
       }
       if (keyTime < readHistorySince()) {
-        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null);
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+            readHistorySince() - now);
+      }
+      pruneToLimit(ROW_CAP - 1);
+      if (rowCount() >= ROW_CAP) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATIONS_CAPACITY, null);
+      }
+      if (keyTime < readHistorySince()) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+            readHistorySince() - now);
       }
       String sql = INSERT_OPERATION + """
           VALUES (?, ?, ?, ?, 'ACCEPTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -346,7 +363,16 @@ public final class SqliteOperationStore implements OperationStore {
         throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
       }
       if (keyTime < readHistorySince()) {
-        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null);
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+            readHistorySince() - now);
+      }
+      pruneToLimit(ROW_CAP - 1);
+      if (rowCount() >= ROW_CAP) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATIONS_CAPACITY, null);
+      }
+      if (keyTime < readHistorySince()) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+            readHistorySince() - now);
       }
       // Copy the stored columns directly: InvocationProvenance has fields the row never retained.
       String sql = INSERT_OPERATION + """
@@ -435,7 +461,7 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
-  public boolean rejectBeforeStart(long id, OperationReceipt receipt) {
+  public OperationRecord rejectBeforeStart(long id, OperationReceipt receipt) {
     return locked(() -> {
       try (var update = connection.prepareStatement("""
           UPDATE operations SET state = 'FAILED', completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?
@@ -445,7 +471,8 @@ public final class SqliteOperationStore implements OperationStore {
         update.setLong(1, now); update.setLong(2, now);
         update.setString(3, JSON.writeValueAsString(receipt)); update.setString(4, receipt.code());
         update.setLong(5, id);
-        return update.executeUpdate() == 1;
+        update.executeUpdate();
+        return rowById(id);
       }
     });
   }
@@ -468,7 +495,7 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
-  public boolean finish(long id, OperationState terminalState, OperationReceipt receipt) {
+  public java.util.Optional<OperationRecord> finish(long id, OperationState terminalState, OperationReceipt receipt) {
     Objects.requireNonNull(receipt, "receipt");
     if (!terminalState.terminal()) throw new IllegalArgumentException("Expected a terminal operation state");
     String resultJson = JSON.writeValueAsString(receipt);
@@ -482,9 +509,19 @@ public final class SqliteOperationStore implements OperationStore {
         update.setString(4, resultJson);
         update.setString(5, terminalState == OperationState.COMPLETE ? null : receipt.code());
         update.setLong(6, id);
-        return update.executeUpdate() == 1;
+        return update.executeUpdate() == 1 ? java.util.Optional.of(rowById(id)) : java.util.Optional.empty();
       }
     });
+  }
+
+  private OperationRecord rowById(long id) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT * FROM operations WHERE id = ?")) {
+      query.setLong(1, id);
+      try (var row = query.executeQuery()) {
+        if (!row.next()) throw new SQLException("Operation row disappeared during transition");
+        return readRecord(row);
+      }
+    }
   }
 
   @Override
@@ -501,6 +538,50 @@ public final class SqliteOperationStore implements OperationStore {
 
   @Override
   public long historySinceMillis() { return locked(this::readHistorySince); }
+
+  @Override
+  public void pruneHistory() {
+    locked(() -> transaction(() -> { pruneToLimit(ROW_CAP); return null; }));
+  }
+
+  /** Called only inside the store lock and a transaction, including acceptance's reservation. */
+  private void pruneToLimit(int limit) throws SQLException {
+    long fence = readHistorySince();
+    try (var delete = connection.prepareStatement("DELETE FROM operations WHERE " + TERMINAL
+        + " AND completed_at < ? RETURNING operation_key")) {
+      delete.setLong(1, clock.millis() - RETENTION_MS);
+      try (var rows = delete.executeQuery()) { fence = evictedFence(rows, fence); }
+    }
+    long excess = rowCount() - limit;
+    if (excess > 0) {
+      try (var delete = connection.prepareStatement("DELETE FROM operations WHERE id IN "
+          + "(SELECT id FROM operations WHERE " + TERMINAL
+          + " ORDER BY completed_at, id LIMIT ?) RETURNING operation_key")) {
+        delete.setLong(1, excess);
+        try (var rows = delete.executeQuery()) { fence = evictedFence(rows, fence); }
+      }
+    }
+    if (fence > readHistorySince()) {
+      try (var update = connection.prepareStatement(
+          "UPDATE operations_meta SET history_since_ms = MAX(history_since_ms, ?) WHERE singleton = 1")) {
+        update.setLong(1, fence);
+        if (update.executeUpdate() != 1) throw new SQLException("History fence did not advance");
+      }
+    }
+  }
+
+  private static long evictedFence(ResultSet rows, long fence) throws SQLException {
+    while (rows.next()) fence = Math.max(fence, OperationKeys.timestampMillis(rows.getString(1)) + 1);
+    return fence;
+  }
+
+  private long rowCount() throws SQLException {
+    try (Statement query = connection.createStatement();
+        ResultSet result = query.executeQuery("SELECT count(*) FROM operations")) {
+      if (!result.next()) throw new SQLException("Operations count is missing");
+      return result.getLong(1);
+    }
+  }
 
   private long readHistorySince() throws SQLException {
     try (Statement query = connection.createStatement(); ResultSet result = query.executeQuery(

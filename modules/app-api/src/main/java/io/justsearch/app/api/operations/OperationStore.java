@@ -31,19 +31,22 @@ public interface OperationStore extends AutoCloseable {
   /** A reconciler has revalidated a recoverable open attempt before scheduling its next body. */
   boolean resume(long id);
 
-  /** Refusal before admission cannot terminalize an already-running effect. */
-  boolean rejectBeforeStart(long id, OperationReceipt receipt);
+  /** Refusal before admission cannot terminalize a running effect; returns its row under the write lock. */
+  OperationRecord rejectBeforeStart(long id, OperationReceipt receipt);
 
   /** A checkpoint describes already committed effects; counts cannot go backwards. */
   boolean checkpoint(long id, String cursor, long unitsCompleted, long unitsFailed);
 
-  /** Terminal rows are immutable. The runner is the sole producer of this transition. */
-  boolean finish(long id, OperationState terminalState, OperationReceipt receipt);
+  /** Terminal rows are immutable. Returns the committed row snapshot, or empty when the update was refused. */
+  java.util.Optional<OperationRecord> finish(long id, OperationState terminalState, OperationReceipt receipt);
 
   /** Open rows for owner-scoped reconciliation, in acceptance order. */
   java.util.List<OperationRecord> openRecords();
 
   long historySinceMillis();
+
+  /** Atomically evict aged/over-cap terminal rows and advance the missing-key history fence. */
+  void pruneHistory();
 
   /** Recovery performed by this open, including completion of an interrupted quarantine. */
   java.util.Optional<Recovery> recovery();

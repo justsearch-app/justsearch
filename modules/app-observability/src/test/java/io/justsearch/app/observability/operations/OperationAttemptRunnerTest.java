@@ -54,6 +54,35 @@ final class OperationAttemptRunnerTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void evictionAfterTerminalWriteCannotEraseLiveCompletion(boolean refusal) throws Exception {
+    var clock = new OperationTestClock(CLOCK.millis());
+    try (var store = new SqliteOperationStore(temp.resolve("eviction.db"), clock, step -> {})) {
+      var port = (io.justsearch.app.api.operations.OperationStore) java.lang.reflect.Proxy.newProxyInstance(
+          getClass().getClassLoader(), new Class<?>[] {io.justsearch.app.api.operations.OperationStore.class},
+          (proxy, method, args) -> {
+            final Object result;
+            try { result = method.invoke(store, args); }
+            catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+            if (method.getName().equals(refusal ? "rejectBeforeStart" : "finish")) {
+              clock.setMillis(CLOCK.millis() + java.time.Duration.ofDays(31).toMillis());
+              store.pruneHistory();
+            }
+            return result;
+          });
+      var runner = new OperationAttemptRunnerImpl(port, CLOCK, Set.of());
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      if (refusal) assertDoesNotThrow(() -> runner.rejectBeforeStart(attempt, "CONTEXT_LIMIT"));
+      else assertDoesNotThrow(() -> runner.start(attempt,
+          handle -> OperationExecution.finished(OperationResult.success("done"))));
+      var terminal = attempt.completion().toCompletableFuture().join();
+      assertEquals(refusal ? OperationState.FAILED : OperationState.COMPLETE, terminal.state());
+      assertTrue(store.find(terminal.key()).isEmpty(), "the negative witness really evicts the row");
+      assertDoesNotThrow(() -> runner.rejectBeforeStart(attempt, "LATE_REFUSAL"));
+    }
+  }
+
   @Test
   void duplicateNeverStartsBodyAndReturnsReceiptWithoutRichContent() throws Exception {
     try (var store = store()) {

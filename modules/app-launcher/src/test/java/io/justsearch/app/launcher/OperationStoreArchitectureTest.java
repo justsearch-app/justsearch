@@ -102,16 +102,17 @@ class OperationStoreArchitectureTest {
     }
     @Override public boolean start(long id) { return false; }
     @Override public boolean resume(long id) { return false; }
-    @Override public boolean rejectBeforeStart(long id, io.justsearch.app.api.operations.OperationReceipt receipt) {
-      return false;
+    @Override public io.justsearch.app.api.operations.OperationRecord rejectBeforeStart(long id, io.justsearch.app.api.operations.OperationReceipt receipt) {
+      throw new UnsupportedOperationException();
     }
     @Override public boolean checkpoint(long id, String cursor, long completed, long failed) { return false; }
-    @Override public boolean finish(long id, io.justsearch.app.api.operations.OperationState state,
-        io.justsearch.app.api.operations.OperationReceipt receipt) { return false; }
+    @Override public java.util.Optional<io.justsearch.app.api.operations.OperationRecord> finish(long id, io.justsearch.app.api.operations.OperationState state,
+        io.justsearch.app.api.operations.OperationReceipt receipt) { return java.util.Optional.empty(); }
     @Override public java.util.List<io.justsearch.app.api.operations.OperationRecord> openRecords() {
       return java.util.List.of();
     }
     @Override public long historySinceMillis() { return 0; }
+    @Override public void pruneHistory() {}
     @Override public java.util.Optional<Recovery> recovery() { return java.util.Optional.empty(); }
     @Override public void close() {}
   }

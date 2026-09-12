@@ -13,11 +13,12 @@ final class OrchestrationHandlesShutdownTest {
   void childCleanupFailureReachesOrderedShutdownAfterRemainingOwnersClose() {
     List<String> order = new ArrayList<>();
     var handles = new OrchestrationHandles(
-        () -> order.add("gpl"), () -> order.add("reranker"), null, null, null, null,
+        () -> order.add("gpl"), () -> order.add("retention"), () -> order.add("reranker"),
+        null, null, null, null,
         () -> { order.add("inference"); throw new IllegalStateException("child still alive"); },
         null, null, null, null, null, null, () -> order.add("agents"));
     var failure = assertThrows(IllegalStateException.class, handles::close);
-    assertEquals(List.of("gpl", "agents", "inference", "reranker"), order);
+    assertEquals(List.of("retention", "gpl", "agents", "inference", "reranker"), order);
     assertEquals("child still alive", failure.getSuppressed()[0].getMessage());
   }
 }

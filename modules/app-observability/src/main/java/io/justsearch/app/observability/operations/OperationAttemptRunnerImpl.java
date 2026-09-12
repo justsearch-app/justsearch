@@ -157,10 +157,13 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   public void rejectBeforeStart(PreparedAttempt attempt, String reason) {
     Prepared prepared = requirePrepared(attempt);
     if (prepared.existing) return;
+    if (prepared.control.done.isDone()) {
+      prepared.control.done.join();
+      return;
+    }
     try {
-      boolean changed = store.rejectBeforeStart(prepared.control.id, new OperationReceipt(reason, null));
-      OperationRecord row = current(prepared.control);
-      if (!changed && row.state() == OperationState.ACCEPTED) {
+      OperationRecord row = store.rejectBeforeStart(prepared.control.id, new OperationReceipt(reason, null));
+      if (row.state() == OperationState.ACCEPTED) {
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
       }
       publishIfTerminal(prepared.control, row);
@@ -175,7 +178,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (!ownedKinds.contains(kind)) throw new IllegalArgumentException("Kind has no declared owner");
     for (OperationRecord previous : interrupted) {
       if (previous.descriptor().kind() != kind) continue;
-      OperationRecord row = store.find(previous.key()).orElseThrow();
+      var retained = store.find(previous.key());
+      if (retained.isEmpty()) continue; // Only terminal rows can have been evicted since the boot snapshot.
+      OperationRecord row = retained.get();
       if (row.state().terminal()) continue;
       Control control = controlFor(row);
       if (control.started.get()) continue;
@@ -192,10 +197,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private void finish(Control control, OperationState state, OperationReceipt receipt) {
-    if (!store.finish(control.id, state, receipt)) {
-      throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
-    }
-    publishIfTerminal(control, current(control));
+    OperationRecord row = store.finish(control.id, state, receipt).orElseThrow(
+        () -> new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null));
+    publishIfTerminal(control, row);
   }
 
   private void finishObserved(Control control, OperationState state, OperationReceipt receipt) {
@@ -224,7 +228,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     failObservation(control, failure);
   }
 
-  private OperationRecord current(Control control) { return store.find(control.key).orElseThrow(); }
+  private OperationRecord current(Control control) {
+    OperationRecord completed = control.done.getNow(null);
+    return completed == null ? store.find(control.key).orElseThrow() : completed;
+  }
 
   private Result existingResult(Control control) {
     OperationRecord row = current(control);

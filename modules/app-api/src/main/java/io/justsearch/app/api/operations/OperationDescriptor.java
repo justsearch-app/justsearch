@@ -60,6 +60,8 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
     if (operationRef != null && (operationRef.isBlank() || operationRef.length() > 256)) {
       throw new IllegalArgumentException("Invalid operation reference");
     }
-    if (identityJson.length() > 262144) throw new IllegalArgumentException("Operation identity is too large");
+    if (identityJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 262144) {
+      throw new IllegalArgumentException("Operation identity is too large");
+    }
   }
 }

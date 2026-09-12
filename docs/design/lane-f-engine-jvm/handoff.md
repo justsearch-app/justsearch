@@ -12,8 +12,11 @@ adopted at429115fec. New ingestion work is paused. R1 async persistence observab
 regressions and focused790 (92 cases), UI integration-test compilation and PMD.
 R2 launcher exclusion passes45 cases and its item gate at795. R3 checked
 transition results pass797 and three negative controls. R4 mandatory acceptance and
-typed admission reasons pass88 cases and five negative controls. Next is R5 retention,
-followed by acceptance,
+typed admission reasons pass88 cases and five negative controls. R5 bounded history,
+schema v2 and the registered hourly timer pass228 cases and the item gate at810.
+The terminal write now returns its committed snapshot so retention cannot race
+completion publication. Next is R6's named acceptance-before-effect child-JVM kill,
+followed by installed proof,
 checklist and evidence findings. Root owns corrections; one final independent review per batch.
 The prior next-step ingestion notes below are superseded by that ordered batch.
 

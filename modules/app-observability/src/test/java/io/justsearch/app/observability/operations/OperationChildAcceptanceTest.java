@@ -207,7 +207,7 @@ final class OperationChildAcceptanceTest {
 
       String terminalKey = OperationKeys.generate(CLOCK);
       OperationRecord terminal = store.accept(terminalKey, parentDescriptor(plan()), CONTEXT, PROVENANCE).record();
-      assertTrue(store.finish(terminal.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null)));
+      assertTrue(store.finish(terminal.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null)).isPresent());
       assertChildRefused(() -> store.acceptIngestChild(terminal.key(), OperationKeys.generate(CLOCK), root));
 
       String runningKey = OperationKeys.generate(CLOCK);

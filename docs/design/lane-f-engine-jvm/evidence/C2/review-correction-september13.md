@@ -34,6 +34,9 @@ scope addition is recorded under the next item's section0.1, never silently expa
 5. **R5 OPEN — bounded history.** Add identity/checkpoint SQL bounds, inspect SQLite
    efficiently without violating snapshot ownership, bring C2-5 retention/cap/fence
    acceptance forward before any more producers.
+   [R5 proof](review-r5-bounded-history.md): final810 passes228 cases, PMD and UI
+   integration-test compilation; named negative controls expose retention and
+   terminal-publication races. Store/port gates pass; batch review pending.
 6. **R6 OPEN — named crash test.** Halt a child JVM after acceptance before its first
    effect, reopen: same key ACCEPTED and effect store empty.
 7. **R7 OPEN — installed proof/status.** C2-11 must inspect operations and fail on

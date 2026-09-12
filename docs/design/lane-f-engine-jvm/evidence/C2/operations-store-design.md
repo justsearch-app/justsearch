@@ -61,11 +61,15 @@ to that module directly is not available to scheduled runs.
 - **Verification profile.** D2's ephemeral store axis gains this store as its fifth SQLite file;
   C2 ships the path-taking constructor only.
 
-### 1.3 Schema v1
+### 1.3 Schema v2 (September13 R5; v1 is the readable legacy schema)
 
 `operations.db`, WAL, `synchronous = NORMAL` (process-crash durable, Q6), `busy_timeout`,
 `user_version` ladder with future-schema refusal leaving the bytes untouched
 (`EntityClusterStore.initSchema` shape). Single connection behind one lock.
+The v1-to-v2 transaction rebuilds the same columns with SQL UTF-8 byte CHECKs:
+identity_json 262144, checkpoint_cursor 4096. It preserves the AUTOINCREMENT
+sequence even after deletion of its highest id. Oversized legacy content refuses
+migration and remains intact; it is not classified as corruption or truncated.
 
 `operations`:
 
@@ -280,6 +284,12 @@ ConfigStore.java:124-127 (atomic snapshot replacement); ObservableNotifier.java:
 AiInstallService and AiPackImportService are additional direct settings writers.
 
 ## 2. The key, retention, and the outcome boundary
+
+September13 R5 implements the store boundary and hourly Head timer before more
+producers. Acceptance reserves room under the same lock as pruning. Completion
+and pre-start refusal return the SQL row snapshot under that lock, replacing the
+runner's eviction-racy follow-up SELECT. The outcome transport projection remains
+C2-4 work; [R5 evidence](review-r5-bounded-history.md) distinguishes that from store proof.
 
 ### 2.1 The gap
 

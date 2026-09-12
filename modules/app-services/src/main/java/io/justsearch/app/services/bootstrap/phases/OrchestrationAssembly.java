@@ -52,6 +52,7 @@ public final class OrchestrationAssembly {
       AutoCloseable agentToolHandlers) {
     return new OrchestrationHandles(
         gplWork,
+        null,
         reranker == null ? null : (AutoCloseable) reranker::close,
         jqdProducer == null ? null : (AutoCloseable) jqdProducer::stop,
         dirProducer == null ? null : (AutoCloseable) dirProducer::stop,

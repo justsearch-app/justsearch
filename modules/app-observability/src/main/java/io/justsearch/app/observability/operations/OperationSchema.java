@@ -6,7 +6,7 @@ import java.sql.Statement;
 
 /** The operations database's independent version ladder; jobs.db keeps its own identity. */
 final class OperationSchema {
-  static final int VERSION = 1;
+  static final int VERSION = 2;
 
   static final String CREATE_OPERATIONS = """
       CREATE TABLE operations (
@@ -18,11 +18,11 @@ final class OperationSchema {
         state TEXT NOT NULL,
         phase TEXT,
         operation_ref TEXT,
-        identity_json TEXT NOT NULL,
+        identity_json TEXT NOT NULL CHECK(length(CAST(identity_json AS BLOB)) <= 262144),
         grant_ref TEXT,
         client_kind TEXT, client_id TEXT, session_id TEXT, source_tier TEXT,
         transport TEXT, executor TEXT, initiator TEXT, correlation_id TEXT,
-        checkpoint_cursor TEXT,
+        checkpoint_cursor TEXT CHECK(length(CAST(checkpoint_cursor AS BLOB)) <= 4096),
         units_completed INTEGER NOT NULL DEFAULT 0,
         units_failed INTEGER NOT NULL DEFAULT 0,
         attempts INTEGER NOT NULL DEFAULT 0,
@@ -59,6 +59,23 @@ final class OperationSchema {
   static void createTables(Statement statement) throws SQLException {
     statement.execute(CREATE_OPERATIONS);
     statement.execute(CREATE_META);
+    createIndexes(statement);
+  }
+
+  /** Same columns, stricter payload bounds; copy and version update share the caller's transaction. */
+  static void migrateV1(Statement statement) throws SQLException {
+    statement.execute("ALTER TABLE operations RENAME TO operations_v1");
+    statement.execute(CREATE_OPERATIONS);
+    statement.execute("INSERT INTO operations SELECT * FROM operations_v1");
+    // AUTOINCREMENT must not reuse an evicted id, including an entirely empty old table.
+    statement.execute("UPDATE sqlite_sequence SET seq = MAX(seq, "
+        + "COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'operations_v1'), 0)) "
+        + "WHERE name = 'operations'");
+    statement.execute("DROP TABLE operations_v1");
+    createIndexes(statement);
+  }
+
+  private static void createIndexes(Statement statement) throws SQLException {
     statement.execute("CREATE INDEX operations_state ON operations(state)");
     statement.execute("CREATE INDEX operations_completed ON operations(completed_at)");
     statement.execute("CREATE INDEX operations_kind_state ON operations(kind, state)");

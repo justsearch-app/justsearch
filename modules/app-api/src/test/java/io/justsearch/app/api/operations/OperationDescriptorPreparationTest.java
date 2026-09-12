@@ -136,4 +136,12 @@ final class OperationDescriptorPreparationTest {
     assertThrows(IllegalArgumentException.class, () ->
         new OperationDescriptor(OperationKind.REINDEX, "core.parent-fixture", identity).recordedRootPlan());
   }
+
+  @Test
+  void identityBoundCountsUtf8BytesRatherThanJavaCharacters() {
+    String identity = "{\"metadata\":\"" + "é".repeat(131072) + "\"}";
+    org.junit.jupiter.api.Assertions.assertTrue(identity.length() < 262144);
+    assertThrows(IllegalArgumentException.class,
+        () -> new OperationDescriptor(OperationKind.OPERATION, "core.test", identity));
+  }
 }

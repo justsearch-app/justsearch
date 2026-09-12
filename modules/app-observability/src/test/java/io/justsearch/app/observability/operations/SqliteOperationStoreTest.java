@@ -37,7 +37,7 @@ class SqliteOperationStoreTest {
         Connection db = connect(path);
         Statement statement = db.createStatement()) {
       assertTrue(store.recovery().isEmpty());
-      assertEquals(1, scalar(statement, "PRAGMA user_version"));
+      assertEquals(2, scalar(statement, "PRAGMA user_version"));
       assertEquals(0, scalar(statement, "SELECT history_since_ms FROM operations_meta"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM operations_meta"));
       try (ResultSet result = statement.executeQuery("PRAGMA table_info(operations)")) {
@@ -66,7 +66,7 @@ class SqliteOperationStoreTest {
     try (Connection db = connect(path); Statement statement = db.createStatement()) {
       statement.execute("CREATE TABLE future_owned(value TEXT)");
       statement.execute("INSERT INTO future_owned VALUES ('preserve')");
-      statement.execute("PRAGMA user_version = 2");
+      statement.execute("PRAGMA user_version = 3");
     }
     byte[] before = Files.readAllBytes(path);
     assertThrows(UnsupportedStoreVersionException.class, () -> new SqliteOperationStore(path));
@@ -83,7 +83,7 @@ class SqliteOperationStoreTest {
       statement.execute("PRAGMA journal_mode = WAL");
       statement.execute("PRAGMA wal_autocheckpoint = 0");
       statement.execute("CREATE TABLE future_owned(value TEXT)");
-      statement.execute("PRAGMA user_version = 2");
+      statement.execute("PRAGMA user_version = 3");
       byte[] before = Files.readAllBytes(path);
       Path wal = path.resolveSibling(path.getFileName() + "-wal");
       byte[] beforeWal = Files.readAllBytes(wal);
@@ -112,7 +112,7 @@ class SqliteOperationStoreTest {
         Connection db = connect(path); Statement statement = db.createStatement()) {
       assertEquals(CLOCK.millis() + 300_001,
           scalar(statement, "SELECT history_since_ms FROM operations_meta"));
-      assertEquals(1, scalar(statement, "PRAGMA user_version"));
+      assertEquals(2, scalar(statement, "PRAGMA user_version"));
       Path preserved = reopened.recovery().orElseThrow().preservedDirectory();
       assertArrayEquals(corrupt, Files.readAllBytes(preserved.resolve("operations.db")));
       assertEquals("original WAL", Files.readString(preserved.resolve("operations.db-wal")));
