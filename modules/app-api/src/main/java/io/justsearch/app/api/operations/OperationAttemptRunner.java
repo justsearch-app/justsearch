@@ -39,6 +39,7 @@ public interface OperationAttemptRunner {
     record Wait() implements Reconciliation {}
     record Complete(OperationReceipt receipt) implements Reconciliation {}
     record Failed(OperationReceipt receipt) implements Reconciliation {}
+    record Cancelled(OperationReceipt receipt) implements Reconciliation {}
     /** Owner has revalidated dependencies/authority; C2-8 owns the resume eligibility policy. */
     record Resume(Function<OperationRecordHandle, OperationExecution> body) implements Reconciliation {}
   }

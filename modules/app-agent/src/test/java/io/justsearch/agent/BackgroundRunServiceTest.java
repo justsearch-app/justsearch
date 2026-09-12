@@ -29,6 +29,21 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class BackgroundRunServiceTest {
 
+  @TempDir Path operationDirectory;
+  private io.justsearch.app.observability.operations.SqliteOperationStore operationStore;
+  private io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+  @org.junit.jupiter.api.BeforeEach
+  void openOperationRunner() throws Exception {
+    operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(operationDirectory.resolve("operations.db"));
+    attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operationStore,
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+  }
+  @org.junit.jupiter.api.AfterEach
+  void closeOperationRunner() throws Exception {
+    if (operationStore != null) operationStore.close();
+  }
+
+
   /** A fake agent loop that persists + completes a run (as the real loop does) and emits its start. */
   private static final class FakeLoop implements AgentService {
     private final AgentRunStore runStore;
@@ -60,6 +75,9 @@ final class BackgroundRunServiceTest {
       runStore.updateCheckpoint(sid, "DONE", request.messages(), 1, 0, 120, "");
       eventConsumer.accept(new AgentEvent.SessionStarted(sid));
     }
+
+    @Override
+    public Map<String, Object> sessionSnapshot(String sessionId) { return runStore.readSnapshot(sessionId); }
 
     @Override
     public void approveToolCall(String sessionId, String callId) {}
@@ -101,7 +119,7 @@ final class BackgroundRunServiceTest {
     var runStore = new AgentRunStore(tmp.resolve("agent-runs"));
     var loop = new FakeLoop(runStore);
     var registry = new TestEngineExecutors();
-    var background = new BackgroundRunService(loop, registry);
+    var background = new BackgroundRunService(attempts, loop, registry);
     try {
       Instant before = Instant.now().minusSeconds(3600);
 

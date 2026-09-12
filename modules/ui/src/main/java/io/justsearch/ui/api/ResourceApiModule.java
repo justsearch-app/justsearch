@@ -321,7 +321,7 @@ final class ResourceApiModule implements ApiModule {
     // records that already exist — ConversationStore (chat) + AgentRunStore (agent, via
     // AgentService) — joined by conversationId. No new store.
     this.interactionThreadController =
-        new InteractionThreadController(
+        new InteractionThreadController(headAssembly.operationAttempts(),
             // Tempdoc 727 (fix): the live cipher — a projection of StoreCatalog.CONVERSATIONS's
             // recoverability class (AUTHORED), same as ConversationApiAssembly's build (:204-209),
             // NOT the single-arg ctor's disabled() default. The single-arg ctor permanently disables

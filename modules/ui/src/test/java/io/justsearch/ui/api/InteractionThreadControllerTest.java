@@ -50,7 +50,7 @@ final class InteractionThreadControllerTest {
 
   private InteractionThreadController newController(
       ConversationStore conversationStore, AgentService agentService) {
-    var controller = new InteractionThreadController(conversationStore, agentService, executors);
+    var controller = new InteractionThreadController(mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), conversationStore, agentService, executors);
     controllers.add(controller);
     return controller;
   }

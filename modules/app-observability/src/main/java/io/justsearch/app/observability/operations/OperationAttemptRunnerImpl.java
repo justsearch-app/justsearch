@@ -149,6 +149,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       switch (decision) {
         case Reconciliation.Complete complete -> finish(control, OperationState.COMPLETE, complete.receipt());
         case Reconciliation.Failed failed -> finish(control, OperationState.FAILED, failed.receipt());
+        case Reconciliation.Cancelled cancelled -> finish(control, OperationState.CANCELLED, cancelled.receipt());
         case Reconciliation.Resume resume -> execute(control, resume.body(), true);
         case Reconciliation.Wait ignored -> throw new IllegalStateException("Wait was already handled");
       }

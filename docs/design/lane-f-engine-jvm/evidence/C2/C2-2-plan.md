@@ -296,3 +296,31 @@ reconfigure owner. ReloadInferenceHandler already applies overrides synchronousl
 TriggerOfflineProcessingHandler must stop treating the coordinator's already-running
 or unavailable branches as completed work; use an explicit owner result and actual
 completion. These are implementation decisions, not owner-gated alternatives.
+
+### Scheduled producer checkpoint, September12
+
+BackgroundRunService now accepts through the required shared runner before timer
+submission and starts only after fire-time admission. Rejected submission/admission
+records its typed reason; shutdown terminalizes pending no-effect timers with
+ENGINE_SHUTDOWN. The bounded pending set holds only runner capabilities alongside the
+registered scheduler, not another durable authority. Exceptions are recorded and
+propagated on direct calls; scheduled calls also log failures instead of swallowing
+them as success.
+
+The actual agent run remains authoritative: capture its session id as the checkpoint,
+then after runAgent returns inspect the durable snapshot. DONE completes, ERROR
+fails, CANCELLED cancels, and missing/nonterminal outcome never claims completion.
+At boot the owner reads that same checkpoint's durable run before defaulting an
+unrecoverable interactive row to interrupted_by_restart. Durable resume eligibility
+remains a required C2-8 item. The generic reconciliation port now includes Cancelled.
+
+596 passes35 tests in7 suites without failures/errors/skips and app-agent/ui/
+app-observability owner PMD checks. Cases include acceptance failure/no timer, timer
+acceptance/shutdown, fire-time refusal/no agent effect, durable error versus return,
+three boot terminal states without rerunning, and C1's existing scheduler limits and
+actual work-lifetime tests. Retained evidence: tmp/c2-2-scheduled-verification-596.txt,
+tmp/c2-2-scheduled-596-xml, tmp/c2-2-scheduled-596-counts.json. 594's five fixture
+qualification violations were corrected without rule changes. Surface negative595
+detects the new producer; registered597 and guard-resolution598 pass. C2-2 remains
+open for ingestion, async handler owners,955's sealed non-dispatched fixture and
+installed acceptance-before-effect proof.

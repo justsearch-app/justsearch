@@ -27,7 +27,7 @@ class ResourceApiModuleShutdownTest {
       set(module, "conditionRecoveryIndexController", new ConditionRecoveryIndexController(
           executors, new ConditionStore(),
           new io.justsearch.app.observability.health.ConditionRecoveryIndexChangeRegistry()));
-      set(module, "interactionThreadController", new InteractionThreadController(
+      set(module, "interactionThreadController", new InteractionThreadController(mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
           mock(io.justsearch.agent.api.conversation.ConversationStore.class),
           mock(io.justsearch.agent.api.AgentService.class), executors));
       var broken = mock(CapabilitiesStreamController.class);

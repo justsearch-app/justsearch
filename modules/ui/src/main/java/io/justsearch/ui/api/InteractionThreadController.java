@@ -51,13 +51,15 @@ public final class InteractionThreadController {
   private final io.justsearch.agent.BackgroundRunService backgroundRunService;
 
   public InteractionThreadController(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       ConversationStore conversationStore,
       AgentService agentService,
       EngineExecutorRegistry processExecutors) {
-    this(conversationStore, agentService, processExecutors, null);
+    this(attempts, conversationStore, agentService, processExecutors, null);
   }
 
   public InteractionThreadController(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       ConversationStore conversationStore,
       AgentService agentService,
       EngineExecutorRegistry processExecutors,
@@ -67,7 +69,7 @@ public final class InteractionThreadController {
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
     this.backgroundRunService =
-        new io.justsearch.agent.BackgroundRunService(agentService, processExecutors, admission);
+        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission);
   }
 
   /** Stops the owned background-run scheduler and cancels pending work. */

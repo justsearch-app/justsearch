@@ -7,6 +7,20 @@ import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.AgentService;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.ExecutorTag;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationDescriptor;
+import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.app.api.operations.OperationReceipt;
+import java.time.Clock;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.RejectedExecutionException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,6 +44,11 @@ import org.slf4j.LoggerFactory;
  * single-thread {@link ScheduledExecutorService} — a real timer, not an FE-only banner).
  */
 public final class BackgroundRunService {
+  private static final tools.jackson.databind.ObjectMapper MAPPER = new tools.jackson.databind.ObjectMapper();
+  private final OperationAttemptRunner attempts;
+  private final Object timerLock = new Object();
+  // Bounded by the registered scheduler queue. Handles are live capabilities, not a second ledger.
+  private final java.util.Set<OperationAttemptRunner.PreparedAttempt> pending = new java.util.HashSet<>();
 
   private static final Logger LOG = LoggerFactory.getLogger(BackgroundRunService.class);
 
@@ -39,20 +58,43 @@ public final class BackgroundRunService {
   private final io.justsearch.app.api.EngineAdmissionService admission;
   private final AtomicBoolean closed = new AtomicBoolean();
 
-  public BackgroundRunService(AgentService agentService, EngineExecutorRegistry processExecutors) {
-    this(agentService, processExecutors, null);
+  public BackgroundRunService(OperationAttemptRunner attempts, AgentService agentService, EngineExecutorRegistry processExecutors) {
+    this(attempts, agentService, processExecutors, null);
   }
 
   public BackgroundRunService(
+      OperationAttemptRunner attempts,
       AgentService agentService,
       EngineExecutorRegistry processExecutors,
       io.justsearch.app.api.EngineAdmissionService admission) {
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.agentService = Objects.requireNonNull(agentService, "agentService");
+    attempts.reconcile(OperationKind.SCHEDULED_RUN, this::reconcileInterrupted);
     this.admission = admission;
     Objects.requireNonNull(processExecutors, "processExecutors");
     var resources = openScheduler(processExecutors);
     this.schedulerRegistration = resources.registration();
     this.scheduler = resources.scheduler();
+  }
+
+  private OperationAttemptRunner.Reconciliation reconcileInterrupted(io.justsearch.app.api.operations.OperationRecord row) {
+    String runId = row.checkpointCursor();
+    Map<String, Object> snapshot = runId == null ? null : agentService.sessionSnapshot(runId);
+    var state = io.justsearch.agent.api.lifecycle.LifecycleState.parse(snapshot == null ? null : snapshot.get("state"));
+    if (state == io.justsearch.agent.api.lifecycle.LifecycleState.DONE) {
+      return new OperationAttemptRunner.Reconciliation.Complete(new OperationReceipt("SUCCESS", runId));
+    }
+    if (state == io.justsearch.agent.api.lifecycle.LifecycleState.ERROR) {
+      return new OperationAttemptRunner.Reconciliation.Failed(new OperationReceipt("AGENT_RUN_FAILED", runId));
+    }
+    if (state == io.justsearch.agent.api.lifecycle.LifecycleState.CANCELLED) {
+      return new OperationAttemptRunner.Reconciliation.Cancelled(new OperationReceipt("cancelled", runId));
+    }
+    // Existing interactive producers cannot replay a private prompt from its identity digest.
+    // Durable resume eligibility/authority remains the required C2-8 owner policy.
+    return row.context().survival() == EngineContext.Survival.INTERACTIVE
+        ? new OperationAttemptRunner.Reconciliation.Failed(new OperationReceipt("interrupted_by_restart", runId))
+        : new OperationAttemptRunner.Reconciliation.Wait();
   }
 
   private static SchedulerResources openScheduler(EngineExecutorRegistry processExecutors) {
@@ -92,48 +134,121 @@ public final class BackgroundRunService {
    * be stamped {@code background=true}. Returns the sessionId (or null if the run never started).
    */
   public String runInBackground(AgentRequest request, EngineContext engineContext) {
+    EngineContext child = freshChild(engineContext);
+    var prepared = accept(request, Duration.ZERO, child);
+    return runAccepted(request, child, prepared).executionId().orElse(null);
+  }
+
+  private OperationAttemptRunner.PreparedAttempt accept(AgentRequest request, Duration delay, EngineContext child) {
     Objects.requireNonNull(request, "request");
-    AtomicReference<String> sessionId = new AtomicReference<>();
-    Consumer<AgentEvent> capture =
-        ev -> {
-          if (ev instanceof AgentEvent.SessionStarted started) {
+    String arguments = MAPPER.writeValueAsString(Map.of("request", request, "delayMillis", Math.max(0, delay.toMillis())));
+    return attempts.accept(new OperationAttemptRunner.Request(null,
+        OperationDescriptor.invocation(OperationKind.SCHEDULED_RUN, null, arguments, false), child,
+        InvocationProvenance.fromEngineContext(child, ExecutorTag.AGENT, Clock.systemUTC().instant(), Optional.empty())));
+  }
+
+  private static EngineContext freshChild(EngineContext context) {
+    Objects.requireNonNull(context, "context");
+    return new EngineContext(context.clientKind(), context.clientId(), context.sessionId(),
+        context.grantReference(), context.sourceTier(), context.transport(), context.survival(), context.urgency());
+  }
+
+  private OperationResult runAccepted(AgentRequest request, EngineContext child,
+      OperationAttemptRunner.PreparedAttempt prepared) {
+    try (var work = admission == null ? null : admission.admit(child, false)) {
+      return attempts.start(prepared, handle -> {
+        AtomicReference<String> sessionId = new AtomicReference<>();
+        Consumer<AgentEvent> capture = event -> {
+          if (event instanceof AgentEvent.SessionStarted started) {
             sessionId.set(started.sessionId());
+            // The existing durable agent run is the resume/outcome authority, not its event stream.
+            handle.checkpoint(started.sessionId(), 0, 0);
           }
         };
-    // A presence callback starts distinct work. Never retain a finished scheduling request's id.
-    var child = new EngineContext(engineContext.clientKind(), engineContext.clientId(),
-        engineContext.sessionId(), engineContext.grantReference(), engineContext.sourceTier(),
-        engineContext.transport(), engineContext.survival(), engineContext.urgency());
-    try (var work = admission == null ? null : admission.admit(child, false)) {
-      // Tempdoc 561 P-D: background=true makes the run safe-by-default (the safety gate rejects
-      // write/destructive tool calls — no watcher) AND marks the durable record background inside
-      // AgentLoopService, so the presence projection (presenceSince) surfaces it on the user's return.
-      agentService.runAgent(request, capture, true, work == null ? child : work.context());
-    } catch (RuntimeException e) {
-      LOG.warn("Background agent run failed", e);
+        agentService.runAgent(request, capture, true, work == null ? child : work.context());
+        String id = sessionId.get();
+        Map<String, Object> snapshot = id == null ? null : agentService.sessionSnapshot(id);
+        var state = io.justsearch.agent.api.lifecycle.LifecycleState.parse(snapshot == null ? null : snapshot.get("state"));
+        if (state == io.justsearch.agent.api.lifecycle.LifecycleState.CANCELLED) {
+          throw new CancellationException("Background agent run cancelled");
+        }
+        if (state != io.justsearch.agent.api.lifecycle.LifecycleState.DONE) {
+          return OperationExecution.finished(OperationResult.failure("Background agent run did not complete",
+              state == io.justsearch.agent.api.lifecycle.LifecycleState.ERROR ? "AGENT_RUN_FAILED" : "AGENT_OUTCOME_MISSING",
+              Map.of(), false));
+        }
+        handle.checkpoint(id, 1, 0);
+        return OperationExecution.finished(new OperationResult(true, "Background agent run completed",
+            Optional.of(id), Map.of(), Optional.empty(), Map.of(), Optional.empty()));
+      }).response();
+    } catch (RuntimeException failure) {
+      reject(prepared, failure);
+      throw failure;
     }
-    return sessionId.get();
   }
 
-  /**
-   * Schedule a background run to start after {@code delay} (the scheduled-producer flavor of the
-   * presence axis). Returns immediately; the run executes on the background scheduler thread.
-   */
-  public void schedule(AgentRequest request, Duration delay, EngineContext engineContext) {
-    Objects.requireNonNull(request, "request");
+  private void reject(OperationAttemptRunner.PreparedAttempt prepared, RuntimeException failure) {
+    String reason = switch (failure) {
+      case io.justsearch.app.api.EngineAdmissionException denied -> "ADMISSION_" + denied.reason().name();
+      case io.justsearch.core.execution.EngineExecutorRejectedException denied -> "EXECUTOR_" + denied.reason().name();
+      case RejectedExecutionException ignored -> "EXECUTOR_CLOSED";
+      default -> "UNCAUGHT_EXCEPTION";
+    };
+    try { attempts.rejectBeforeStart(prepared, reason); }
+    catch (RuntimeException persistenceFailure) { failure.addSuppressed(persistenceFailure); }
+  }
+
+  /** Acceptance is durable before the timer exists; the returned handle observes actual completion. */
+  public OperationAttemptRunner.PreparedAttempt schedule(AgentRequest request, Duration delay, EngineContext engineContext) {
     Objects.requireNonNull(delay, "delay");
-    scheduler.schedule(() -> runInBackground(request, engineContext), Math.max(0, delay.toMillis()),
-        java.util.concurrent.TimeUnit.MILLISECONDS);
+    EngineContext child = freshChild(engineContext);
+    var prepared = accept(request, delay, child);
+    try {
+      synchronized (timerLock) {
+        if (closed.get()) throw new RejectedExecutionException("Background scheduler is closed");
+        pending.add(prepared);
+        var unused = scheduler.schedule(() -> fire(request, child, prepared), Math.max(0, delay.toMillis()),
+            java.util.concurrent.TimeUnit.MILLISECONDS);
+      }
+    } catch (RuntimeException failure) {
+      synchronized (timerLock) { pending.remove(prepared); }
+      reject(prepared, failure);
+      throw failure;
+    }
+    return prepared;
   }
 
-  /** Stop the scheduler (lifecycle shutdown). */
-  public void shutdown() {
-    if (!closed.compareAndSet(false, true)) return;
-    try {
-      scheduler.shutdownNow();
-    } finally {
-      schedulerRegistration.close();
+  private void fire(AgentRequest request, EngineContext child, OperationAttemptRunner.PreparedAttempt prepared) {
+    synchronized (timerLock) {
+      if (!pending.remove(prepared)) return; // Shutdown already owns its no-effect refusal.
     }
+    try { runAccepted(request, child, prepared); }
+    catch (RuntimeException failure) {
+      // The runner owns its durable failed outcome; logging also exposes failed outcome persistence.
+      LOG.warn("Background agent run failed", failure);
+    }
+  }
+
+  /** Stop the scheduler and truthfully refuse each accepted timer that will never run. */
+  public void shutdown() {
+    List<OperationAttemptRunner.PreparedAttempt> cancelled;
+    synchronized (timerLock) {
+      if (!closed.compareAndSet(false, true)) return;
+      cancelled = List.copyOf(pending);
+      pending.clear();
+      scheduler.shutdownNow();
+    }
+    RuntimeException failure = null;
+    try {
+      for (var prepared : cancelled) {
+        try { attempts.rejectBeforeStart(prepared, "ENGINE_SHUTDOWN"); }
+        catch (RuntimeException persistenceFailure) {
+          if (failure == null) failure = persistenceFailure;
+          else failure.addSuppressed(persistenceFailure);
+        }
+      }
+    } finally { schedulerRegistration.close(); }
+    if (failure != null) throw failure;
   }
 
   private record SchedulerResources(

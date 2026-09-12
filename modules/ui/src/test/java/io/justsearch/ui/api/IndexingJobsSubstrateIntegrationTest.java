@@ -88,15 +88,15 @@ final class IndexingJobsSubstrateIntegrationTest {
   private io.justsearch.app.observability.operations.SqliteOperationStore operationStore;
   private io.justsearch.app.api.operations.OperationAttemptRunner attempts;
 
-  @org.junit.jupiter.api.BeforeEach
+  @BeforeEach
   void openOperationRunner() throws Exception {
     operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(
         operationDirectory.resolve("operations.db"));
     attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
-        operationStore, java.time.Clock.systemUTC(), java.util.Set.of());
+        operationStore, Clock.systemUTC(), java.util.Set.of());
   }
 
-  @org.junit.jupiter.api.AfterEach
+  @AfterEach
   void closeOperationRunner() throws Exception {
     if (operationStore != null) operationStore.close();
   }

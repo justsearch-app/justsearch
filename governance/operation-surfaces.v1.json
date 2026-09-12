@@ -531,6 +531,15 @@
       "guard": "test:OperationExecutorImplTest",
       "consumesProjection": "operation-attempt-runner-port",
       "note": "Accepts dispatch/undo through the shared runner; history and advisory projections follow durable actual completion."
+    },
+    {
+      "id": "recorded-background-agent-run",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/BackgroundRunService.java",
+      "guard": "test:BackgroundWorkLifetimeTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Accepts before timer submission; runner starts after admission and completes from the durable agent run after runAgent returns. Owner boot reconciliation reads that same run."
     }
   ]
 }
