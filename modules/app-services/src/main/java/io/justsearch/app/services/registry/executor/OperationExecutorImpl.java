@@ -2,6 +2,12 @@
 package io.justsearch.app.services.registry.executor;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationDescriptor;
+import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.services.intent.EngineProvenance;
 
 import io.justsearch.agent.api.registry.AuditPolicy;
@@ -52,6 +58,7 @@ import java.util.function.Consumer;
  * inherits the risk class of its forward form.
  */
 public final class OperationExecutorImpl implements OperationDispatcher {
+  private final OperationAttemptRunner attempts;
   private static void validateEngineContext(
       EngineContext engineContext, InvocationProvenance provenance) {
     var projected = EngineProvenance.invocation(engineContext, provenance.executor(),
@@ -149,14 +156,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   private final OperationInputSchemaValidator inputValidator =
       new OperationInputSchemaValidator();
 
-  public OperationExecutorImpl(HandlerRegistry handlers) {
-    this(handlers, null, Map.of(), Clock.systemUTC(), null, null);
+  public OperationExecutorImpl(OperationAttemptRunner attempts, HandlerRegistry handlers) {
+    this(attempts, handlers, null, Map.of(), Clock.systemUTC(), null, null);
   }
 
   /** Pre-slice-490 constructor — legacy callers compile unchanged with no advisory wiring. */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers, Consumer<OperationHistoryEntry> historyEmitter, Clock clock) {
-    this(handlers, historyEmitter, Map.of(), clock, null, null);
+    this(attempts, handlers, historyEmitter, Map.of(), clock, null, null);
   }
 
   /**
@@ -165,12 +172,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * {@code core.advisory-operation-completed}'s ResourceRef. New callers should
    * use the {@code Map} form directly.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Consumer<OperationCompletionEvent> advisoryEmitter,
       Clock clock) {
-    this(
+    this(attempts,
         handlers,
         historyEmitter,
         advisoryEmitter == null
@@ -186,12 +193,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * Slice 490 Group B2 constructor — multi-emitter routing form. Pre-slice-487 callers
    * (no trust lattice). Delegates to the slice-487 6-arg form with null lattice deps.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
       Clock clock) {
-    this(handlers, historyEmitter, advisoryEmitters, clock, null, null);
+    this(attempts, handlers, historyEmitter, advisoryEmitters, clock, null, null);
   }
 
   /**
@@ -202,14 +209,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * <p>When {@code trustEvaluator} or {@code intentSourceCatalog} is null, the lattice
    * is skipped (legacy/test compat). Both must be present for the lattice to enforce.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
       Clock clock,
       TrustEvaluator trustEvaluator,
       IntentSourceCatalog intentSourceCatalog) {
-    this(handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator, intentSourceCatalog, null);
+    this(attempts, handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator, intentSourceCatalog, null);
   }
 
   /**
@@ -219,7 +226,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * capability is unavailable, dispatch returns CAPABILITY_UNAVAILABLE without
    * reaching the handler.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -227,7 +234,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       TrustEvaluator trustEvaluator,
       IntentSourceCatalog intentSourceCatalog,
       java.util.function.Function<RequiredCapability, Boolean> capabilityResolver) {
-    this(
+    this(attempts,
         handlers,
         historyEmitter,
         advisoryEmitters,
@@ -244,7 +251,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * consent capsule satisfies a non-AUTO gate (additive to the legacy non-blank-token
    * path). Production wiring (HeadAssembly / OperationSubstrateInit) uses this form.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -253,7 +260,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       IntentSourceCatalog intentSourceCatalog,
       java.util.function.Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService) {
-    this(
+    this(attempts,
         handlers,
         historyEmitter,
         advisoryEmitters,
@@ -271,7 +278,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * is recorded so the action ledger / trust audit can read gate firings. Production wiring
    * (OperationSubstrateInit) uses this form.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -282,6 +289,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService,
       Consumer<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>
           authorizationOutcomeEmitter) {
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.handlers = Objects.requireNonNull(handlers, "handlers");
     this.historyEmitter = historyEmitter;
     this.advisoryEmitters =
@@ -338,60 +346,88 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, engineContext);
     }
 
-    // Tempdoc 502 §B1: check required capabilities before dispatch.
-    if (capabilityResolver != null) {
-      var missingCap = checkCapabilities(op);
-      if (missingCap != null) {
-        Instant t = clock.instant();
-        String msg = capabilityUnavailableMessage(missingCap);
-        OperationResult denied =
-            OperationResult.failure(msg, "CAPABILITY_UNAVAILABLE", Map.of("capability", missingCap), true);
-        emitHistory(op, t, OperationOutcome.FAILURE, msg, provenance, Optional.empty());
-        return denied;
+    return executeAttempt(op, argumentsJson, provenance, engineContext, null);
+  }
+
+  /** Acceptance precedes validation/effect; only durable completion produces history/advisories. */
+  private OperationResult executeAttempt(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext context, String undoId) {
+    Instant startedAt = clock.instant();
+    // C2-3 adds keyed transport and the catalog's recordKind projection. The unkeyed audit
+    // suppression is preserved here; keyed calls will always accept regardless of audit policy.
+    OperationAttemptRunner.PreparedAttempt prepared = op.policy().audit() == AuditPolicy.NONE ? null
+        : attempts.accept(new OperationAttemptRunner.Request(null,
+            OperationDescriptor.invocation(OperationKind.OPERATION, op.id().value(), argumentsJson, undoId != null),
+            context, provenance));
+    if (prepared != null) {
+      if (prepared.existing()) {
+        return attempts.start(prepared, ignored -> {
+          throw new IllegalStateException("Existing acceptance must never execute");
+        }).response();
       }
-    }
-
-    Instant startTime = clock.instant();
-
-    // Slice 3a-2-c Phase C: validate args against the declared input schema
-    // BEFORE invoking the handler. Catches "missing required arg" / "wrong
-    // type" centrally so per-handler ad-hoc parsing simplifies. On invalid
-    // args, return a typed BAD_REQUEST failure WITHOUT calling the handler;
-    // emit FAILURE history (consistent with uncaught-exception path).
-    var validationFailure = inputValidator.validate(op, argumentsJson);
-    if (validationFailure.isPresent()) {
-      OperationInputSchemaValidator.ValidationResult vr = validationFailure.get();
-      OperationResult invalid =
-          OperationResult.failure(vr.message(), "BAD_REQUEST", vr.details(), false);
-      emitHistory(op, startTime, OperationOutcome.FAILURE, vr.message(), provenance, Optional.empty());
-      return invalid;
-    }
-
-    OperationResult result;
-    try {
-      result =
-          switch (op.provenance().tier()) {
-            case CORE -> dispatchCore(op, argumentsJson, provenance, engineContext);
-            case TRUSTED_PLUGIN -> dispatchTrustedPlugin(op, argumentsJson, provenance, engineContext);
-            case UNTRUSTED_PLUGIN -> throw new UnsupportedOperationException(
-                "Untrusted plugin operations require V1.5 sandbox infrastructure. "
-                    + "See docs/tempdocs/421-frontend-destination-architecture/421-stack.md "
-                    + "§Plugin trust model — V1.5 tier.");
-          };
-    } catch (RuntimeException e) {
-      // Per slice 444b: still emit a FAILURE history entry on uncaught dispatch error
-      // before propagating. The thrown exception is the truthful result; the entry
-      // captures that the dispatch happened.
-      emitHistory(op, startTime, OperationOutcome.FAILURE, e.getMessage(), provenance, Optional.empty());
-      throw e;
-    }
-    OperationOutcome outcome = result.success() ? OperationOutcome.SUCCESS : OperationOutcome.FAILURE;
-    Optional<String> undoExecutionId =
-        (outcome == OperationOutcome.SUCCESS && op.policy().undoSupported())
-            ? result.executionId()
+      var unused = prepared.completion().thenAccept(row -> {
+        boolean success = row.state() == OperationState.COMPLETE;
+        OperationOutcome outcome = success
+            ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
+        Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
+            ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
             : Optional.empty();
-    emitHistory(op, startTime, outcome, null, provenance, undoExecutionId);
-    return result;
+        emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution);
+      });
+    }
+    try {
+      OperationResult refusal = preflight(op, argumentsJson, undoId != null);
+      if (refusal != null) {
+        if (prepared != null) attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
+        else emitHistory(op, startedAt, OperationOutcome.FAILURE, refusal.message(), provenance, Optional.empty());
+        return refusal;
+      }
+      if (prepared != null) {
+        return attempts.start(prepared,
+            handle -> invokeHandler(op, argumentsJson, provenance, context, undoId, handle)).response();
+      }
+      OperationExecution execution = invokeHandler(op, argumentsJson, provenance, context, undoId, null);
+      var unused = execution.completion().thenAccept(result -> {
+        OperationOutcome outcome = result.success()
+            ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
+        emitHistory(op, startedAt, outcome, null, provenance,
+            result.success() && undoId == null && op.policy().undoSupported() ? result.executionId() : Optional.empty());
+      });
+      return execution.response();
+    } catch (RuntimeException failure) {
+      if (prepared == null) {
+        emitHistory(op, startedAt, OperationOutcome.FAILURE, failure.getMessage(), provenance, Optional.empty());
+      } else {
+        try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
+        catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
+      }
+      throw failure;
+    }
+  }
+
+  private OperationResult preflight(Operation op, String argumentsJson, boolean undo) {
+    if (capabilityResolver != null) {
+      var missing = checkCapabilities(op);
+      if (missing != null) return OperationResult.failure(capabilityUnavailableMessage(missing),
+          "CAPABILITY_UNAVAILABLE", Map.of("capability", missing), true);
+    }
+    if (undo) return null;
+    var invalid = inputValidator.validate(op, argumentsJson);
+    return invalid.map(value -> OperationResult.failure(value.message(), "BAD_REQUEST", value.details(), false))
+        .orElse(null);
+  }
+
+  private OperationExecution invokeHandler(Operation op, String argumentsJson, InvocationProvenance provenance,
+      EngineContext context, String undoId, OperationRecordHandle handle) {
+    if (op.provenance().tier() == TrustTier.UNTRUSTED_PLUGIN) {
+      throw new UnsupportedOperationException("Untrusted plugin operations require V1.5 sandbox infrastructure");
+    }
+    OperationHandler handler = handlers.resolve(new OperationRef(op.binding().handlerId()))
+        .orElseThrow(() -> new IllegalStateException("No handler registered for binding " + op.binding().handlerId()));
+    if (undoId != null) return handle == null ? OperationExecution.finished(handler.undo(undoId, context))
+        : handler.undoRecorded(undoId, context, handle);
+    return handle == null ? OperationExecution.finished(handler.execute(argumentsJson, provenance, context))
+        : handler.executeRecorded(argumentsJson, provenance, context, handle);
   }
 
   private void emitHistory(
@@ -577,6 +613,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     Objects.requireNonNull(provenance, "provenance");
     Objects.requireNonNull(confirmationToken, "confirmationToken");
     validateEngineContext(engineContext, provenance);
+    // An unsupported action has no effect or existing outcome to expose. Preserve the
+    // immediate refusal rather than eliciting confirmation for an unavailable reversal.
     if (!op.policy().undoSupported()) {
       return OperationResult.failure("Undo not supported by " + op.id().value());
     }
@@ -586,62 +624,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       enforceTrustLattice(
           op, OperationDispatcher.undoArguments(executionId), provenance, confirmationToken, engineContext);
     }
-    if (capabilityResolver != null) {
-      var missingCap = checkCapabilities(op);
-      if (missingCap != null) {
-        return OperationResult.failure(
-            capabilityUnavailableMessage(missingCap) + " (undo)",
-            "CAPABILITY_UNAVAILABLE",
-            Map.of("capability", missingCap),
-            true);
-      }
-    }
-    OperationHandler handler =
-        handlers
-            .resolve(new OperationRef(op.binding().handlerId()))
-            .orElseThrow(
-                () -> new IllegalStateException(
-                    "No handler registered for binding " + op.binding().handlerId()));
-    Instant startTime = clock.instant();
-    OperationResult result;
-    try {
-      result = handler.undo(executionId, engineContext);
-    } catch (RuntimeException e) {
-      emitHistory(op, startTime, OperationOutcome.FAILURE, e.getMessage(), provenance, Optional.empty());
-      throw e;
-    }
-    OperationOutcome outcome = result.success() ? OperationOutcome.UNDONE : OperationOutcome.FAILURE;
-    emitHistory(op, startTime, outcome, null, provenance, Optional.empty());
-    return result;
-  }
-
-  private OperationResult dispatchCore(
-      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
-    OperationHandler handler =
-        handlers
-            .resolve(new OperationRef(op.binding().handlerId()))
-            .orElseThrow(
-                () -> new IllegalStateException(
-                    "No handler registered for binding " + op.binding().handlerId()));
-    // Slice 491 F6: dispatch with the context-aware overload so handlers that need
-    // transport / source-tier visibility (e.g., NavigateToSurfaceHandler) read it
-    // from provenance. Handlers that don't override the overload get the default
-    // delegation to execute(argumentsJson) — no behavior change.
-    return handler.execute(argumentsJson, provenance, engineContext);
-  }
-
-  private OperationResult dispatchTrustedPlugin(
-      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
-    // V1's trust model is "you wrote it, or you know who did" — TRUSTED_PLUGIN
-    // operations execute equivalently to CORE in V1. This is intentional, not dead
-    // code: V1 plugins (per slice 3a.7) DO produce TRUSTED_PLUGIN-marked operations
-    // and route through this branch. V1.5 will add a policy floor here (e.g., risk
-    // minimum lifted to MEDIUM regardless of declaration). Per §B.D the equivalence
-    // is a semantic statement about V1's trust model, not a code-smell stub.
-    if (op.provenance().tier() != TrustTier.TRUSTED_PLUGIN) {
-      throw new IllegalStateException("Expected TRUSTED_PLUGIN, got " + op.provenance().tier());
-    }
-    return dispatchCore(op, argumentsJson, provenance, engineContext);
+    return executeAttempt(op, OperationDispatcher.undoArguments(executionId), provenance, engineContext, executionId);
   }
 
   /**

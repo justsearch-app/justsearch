@@ -234,3 +234,51 @@ The bytecode rule also restricts acceptance/start/resume/refusal to the runner,
 including calls through the concrete implementation. Output/XML:
 tmp/c2-2-operation-architecture-583.txt and tmp/c2-2-architecture-583-xml.
 Producer wiring remains the next change within C2-2.
+
+### Dispatch/composition wiring checkpoint, September12
+
+Core530da0914 is pushed. Composition now requires the same runner in EngineRoot,
+HeadAssembly and the operation substrate, constructed before the async index fork.
+Both executable roots predeclare the six owned kinds; generic interactive operations
+retain the default interrupted failure. Dispatch and supported undo accept after
+context/provenance/trust checks, before capability/input checks and handler effects.
+Handlers receive the accepted handle. History/advisories follow the durable actual
+completion stage. Unkeyed AuditPolicy.NONE retains its existing suppression.
+
+584 found four constructor-fixture compile errors, corrected by supplying the
+required runner. 585 caught a production regression: an unsupported undo began
+eliciting confirmation. The original immediate refusal is restored; unavailable
+undo has no effect or stored outcome to expose, so it precedes trust/acceptance.
+Its regression test is unchanged. 586 passes93 tests in12 suites without failures,
+errors or skips, including real-store async completion, acceptance failure/no body,
+and separate undo identity. XML/log/counts: tmp/c2-2-dispatch-586-xml,
+tmp/c2-2-dispatch-wiring-586.txt, tmp/c2-2-dispatch-586-counts.json.
+Surface negative587 detects the new dispatch writer; registered projection588 passes.
+Retained negative SARIF: tmp/c2-2-dispatch-surfaces-587.sarif.
+Register guard589 passes. Owner checks590 caught12 unnecessary fully-qualified
+names introduced by fixture/constructor migration; after removing those qualifiers,
+591 passes the architecture test and app-services/app-engine PMD main/test checks.
+Output: tmp/c2-2-dispatch-owner-checks-590.txt and -591.txt.
+
+This wiring is still WIP: catalog recordKind/keyed transport, actual async handler
+overrides, ingestion, scheduled producers and installed proofs remain required.
+No installed acceptance claim is made from synchronous handler adaptation.
+
+### Async completion decisions
+
+Source-only owner inspection (retained here rather than requiring agent transcripts)
+finds these semantic groups. RuntimeActivationService.startActivate/startDeactivate,
+AiInstallService.startInstall/repair and AiPackImportService.startImport launch
+owner threads and return snapshots; their recorded handler overloads must complete
+from those same threads after terminal status and cleanup, with no parallel status
+map or polling projection. Their current already-running failures remain failures.
+Helper documentation claiming idempotence must be corrected with that wiring.
+
+CancelAiInstallHandler requests cancellation synchronously; its operation completes
+after recording/waking that request, while the install operation remains open until
+its own thread finishes. SetChatEnabledHandler and SwitchInferenceModeHandler write
+durable runtime intent; that write is their effect, and convergence belongs to D1's
+reconfigure owner. ReloadInferenceHandler already applies overrides synchronously.
+TriggerOfflineProcessingHandler must stop treating the coordinator's already-running
+or unavailable branches as completed work; use an explicit owner result and actual
+completion. These are implementation decisions, not owner-gated alternatives.

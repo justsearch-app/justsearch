@@ -280,7 +280,7 @@ final class EngineReadWhileWriteTest {
             "justsearch.backfill.max_docs_before_commit", "50"));
     KnowledgeServer[] built = new KnowledgeServer[1];
     root =
-        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
             g -> {
               built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];

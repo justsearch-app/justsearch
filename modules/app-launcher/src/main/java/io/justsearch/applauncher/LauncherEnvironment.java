@@ -98,7 +98,15 @@ final class LauncherEnvironment implements AutoCloseable {
         if (!(admission instanceof io.justsearch.app.api.OperationLeaseService leases)) {
           throw new IllegalStateException("Engine admission provider must also own operation leases");
         }
-        return new HeadAssembly(operations,
+        var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+            operations, java.time.Clock.systemUTC(), java.util.Set.of(
+                io.justsearch.app.api.operations.OperationKind.INGEST,
+                io.justsearch.app.api.operations.OperationKind.REINDEX,
+                io.justsearch.app.api.operations.OperationKind.RECONFIGURE,
+                io.justsearch.app.api.operations.OperationKind.SETTINGS_APPLY,
+                io.justsearch.app.api.operations.OperationKind.ACCEPT_GAPS,
+                io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+        return new HeadAssembly(operations, attempts,
             executors, telemetry, configManager, null,
             new io.justsearch.app.services.settings.UiSettingsStore(
                 io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),

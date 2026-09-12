@@ -54,6 +54,8 @@ import org.slf4j.LoggerFactory;
  */
 public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.api.operations.OperationStore operations;
+  private final io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+  public io.justsearch.app.api.operations.OperationAttemptRunner operationAttempts() { return attempts; }
 
   /** Borrowed process-lifetime store; this assembly never closes it. */
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
@@ -323,7 +325,7 @@ public final class HeadAssembly implements AutoCloseable {
    * the admission dependency explicit at the composition root.
    */
   public HeadAssembly(
-      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       ConfigManagerBootstrap configManager,
@@ -334,6 +336,7 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.api.OperationLeaseService operationLeases,
       io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     this.operations = Objects.requireNonNull(operations, "operations");
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     Objects.requireNonNull(telemetry, "telemetry");
     Objects.requireNonNull(engineAdmission, "engineAdmission");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
@@ -584,7 +587,7 @@ public final class HeadAssembly implements AutoCloseable {
                 "substrate",
                 () ->
                     io.justsearch.app.services.bootstrap.phases.SubstratePhase.runWithOutcome(
-                        executors,
+                        attempts, executors,
             telemetry,
             () -> this.knowledgeServerBootstrap,
             () -> this.knowledgeClient,
@@ -961,20 +964,21 @@ public final class HeadAssembly implements AutoCloseable {
    * narrow search path) and keeps the surface symmetric with the primary boot path.
    */
   public static HeadAssembly bootForSearchPortOnly(
-      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       SearchPort searchPort, Telemetry telemetry) {
-    return new HeadAssembly(operations, executors, searchPort, telemetry);
+    return new HeadAssembly(operations, attempts, executors, searchPort, telemetry);
   }
 
   /**
    * Internal constructor for {@link #bootForSearchPortOnly}. Not called directly outside this
    * class — the static factory is the public surface.
    */
-  private HeadAssembly(io.justsearch.app.api.operations.OperationStore operations,
+  private HeadAssembly(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       SearchPort searchPort, Telemetry telemetry) {
     this.operations = Objects.requireNonNull(operations, "operations");
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     Objects.requireNonNull(searchPort, "searchPort");
     List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
     try {
@@ -1020,7 +1024,7 @@ public final class HeadAssembly implements AutoCloseable {
             io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext());
     var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(executors, telemetry);
     var operationOut =
-        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(
+        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(attempts,
             executors,
             handlers,
             operationCatalog,

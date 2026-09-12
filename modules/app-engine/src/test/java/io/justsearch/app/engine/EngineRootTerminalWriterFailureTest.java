@@ -185,7 +185,7 @@ final class EngineRootTerminalWriterFailureTest {
     EngineTestHarness.publishConfig(dataDir, dataDir.resolve("index"), Map.of());
     KnowledgeServer[] server = new KnowledgeServer[1];
     EngineRoot root =
-        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
             gauge -> {
               server[0] =
                   new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),

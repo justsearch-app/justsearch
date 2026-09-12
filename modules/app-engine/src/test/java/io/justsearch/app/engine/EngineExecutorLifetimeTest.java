@@ -12,7 +12,7 @@ class EngineExecutorLifetimeTest {
   @Test
   void closingRestartableIndexHostDoesNotCloseProcessExecutors() throws Exception {
     var operations = org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
-    var root = new EngineRoot(operations, ignored -> { throw new AssertionError("No index startup expected"); },
+    var root = new EngineRoot(operations, org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), ignored -> { throw new AssertionError("No index startup expected"); },
         1_000, 16);
     try (var executors = root.executors()) {
       root.close();

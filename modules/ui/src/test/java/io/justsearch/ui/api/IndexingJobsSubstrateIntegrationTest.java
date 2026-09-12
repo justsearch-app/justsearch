@@ -84,6 +84,24 @@ import org.junit.jupiter.api.Test;
 @DisplayName("Slice 445 substrate integration")
 final class IndexingJobsSubstrateIntegrationTest {
 
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path operationDirectory;
+  private io.justsearch.app.observability.operations.SqliteOperationStore operationStore;
+  private io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+
+  @org.junit.jupiter.api.BeforeEach
+  void openOperationRunner() throws Exception {
+    operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(
+        operationDirectory.resolve("operations.db"));
+    attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+        operationStore, java.time.Clock.systemUTC(), java.util.Set.of());
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void closeOperationRunner() throws Exception {
+    if (operationStore != null) operationStore.close();
+  }
+
+
   private final TestEngineExecutors processExecutors = new TestEngineExecutors();
 
   @AfterEach
@@ -293,7 +311,7 @@ final class IndexingJobsSubstrateIntegrationTest {
     handlers.register(CoreOperationCatalog.RESOLVE_PATH_HASH, new ResolvePathHashHandler(() -> stub));
 
     OperationDispatcher dispatcher =
-        new OperationExecutorImpl(handlers, entry -> {}, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, handlers, entry -> {}, Clock.systemUTC());
 
     var catalog = new CoreOperationCatalog();
 

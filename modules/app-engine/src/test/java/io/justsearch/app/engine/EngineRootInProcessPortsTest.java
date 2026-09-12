@@ -96,7 +96,7 @@ final class EngineRootInProcessPortsTest {
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
     KnowledgeServer[] built = new KnowledgeServer[1];
     root =
-        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
             g -> {
               built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];
@@ -171,7 +171,7 @@ final class EngineRootInProcessPortsTest {
     // that no transport does.
     KnowledgeServer[] built = new KnowledgeServer[1];
     root =
-        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
             g -> {
               built[0] = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g));
               return built[0];

@@ -96,7 +96,7 @@ final class RichDocumentInProcessTest {
 
     // 2. Compose the index half in this JVM (was: spawn a Worker process and connect to its port)
     root =
-        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
             g -> new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerConfig.load(), new InProcessWorkerSignalBus(g)),
             30_000L,
             5_000);

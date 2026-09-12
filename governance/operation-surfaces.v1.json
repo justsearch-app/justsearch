@@ -522,6 +522,15 @@
       "guard": "test:OperationAttemptRunnerTest",
       "consumesProjection": "operation-record-store",
       "note": "Sole terminal writer after actual work completion; owner-scoped restart reconciliation."
+    },
+    {
+      "id": "recorded-operation-dispatch",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+      "guard": "test:OperationExecutorImplTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Accepts dispatch/undo through the shared runner; history and advisory projections follow durable actual completion."
     }
   ]
 }

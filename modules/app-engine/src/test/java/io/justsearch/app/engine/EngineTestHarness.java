@@ -100,7 +100,7 @@ final class EngineTestHarness implements AutoCloseable {
   private void open() throws Exception {
     publishConfig(dataDir, indexBase, extraConfig);
     gauge = new GpuSchedulingGauge();
-    root = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), DEADLINE_MS, BATCH_SIZE);
+    root = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), DEADLINE_MS, BATCH_SIZE);
     client = root.start(gauge, IpcTelemetry.noop());
   }
 

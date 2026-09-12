@@ -32,7 +32,7 @@ class HeadExecutorConstructionTest {
       when(config.currentSnapshot()).thenThrow(failure);
       var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
       assertSame(failure, assertThrows(IllegalStateException.class, () ->
-          new HeadAssembly(operations, registry, mock(Telemetry.class), config, null, null, null,
+          new HeadAssembly(operations, mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), registry, mock(Telemetry.class), config, null, null, null,
               mock(ManagedChildRegistry.class), null, mock(EngineAdmissionService.class))));
       verify(operations, never()).close();
       assertEquals(failureAt - 1, acquired.size());

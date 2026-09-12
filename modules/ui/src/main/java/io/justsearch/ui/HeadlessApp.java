@@ -454,7 +454,7 @@ public class HeadlessApp {
 
     HeadAssembly bootstrap =
         new HeadAssembly(
-            engineRoot.operations(),
+            engineRoot.operations(), engineRoot.operationAttempts(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore, sharedWorkerCapability,
             childRegistry, engineRoot.operationLeases(), engineRoot.admission());
     LocalApiServer constructedApi = null;
@@ -1078,7 +1078,15 @@ public class HeadlessApp {
       var ksConfig = io.justsearch.app.services.worker.KnowledgeServerConfig.load();
       operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           configPhase.dataDir().resolve("operations.db"));
-      var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations,
+      var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+          operations, java.time.Clock.systemUTC(), java.util.Set.of(
+              io.justsearch.app.api.operations.OperationKind.INGEST,
+              io.justsearch.app.api.operations.OperationKind.REINDEX,
+              io.justsearch.app.api.operations.OperationKind.RECONFIGURE,
+              io.justsearch.app.api.operations.OperationKind.SETTINGS_APPLY,
+              io.justsearch.app.api.operations.OperationKind.ACCEPT_GAPS,
+              io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+      var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
           childRegistry, requestedRestartAction);
       processRoot = engineRoot;

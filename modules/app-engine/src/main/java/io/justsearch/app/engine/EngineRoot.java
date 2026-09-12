@@ -50,6 +50,8 @@ import org.slf4j.LoggerFactory;
  */
 public final class EngineRoot implements WorkerHost {
   private final io.justsearch.app.api.operations.OperationStore operations;
+  private final io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+  public io.justsearch.app.api.operations.OperationAttemptRunner operationAttempts() { return attempts; }
 
   /** Externally owned, shared by both halves; closed after the index half. */
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
@@ -109,54 +111,54 @@ public final class EngineRoot implements WorkerHost {
    *     — the same {@code KnowledgeServerConfig.deadlineMs()} the wire client used
    * @param batchSize the per-batch submission clamp
    */
-  public EngineRoot(io.justsearch.app.api.operations.OperationStore operations, long deadlineMs, int batchSize) {
-    this(operations, deadlineMs, batchSize, EngineRoot::missingExitAction);
+  public EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize) {
+    this(operations, attempts, deadlineMs, batchSize, EngineRoot::missingExitAction);
   }
 
   /** Process composition whose terminal-writer path is owned by the enclosing Head lifecycle. */
-  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       long deadlineMs, int batchSize, IntConsumer terminalWriterFaultAction) {
-    return new EngineRoot(operations, deadlineMs, batchSize, terminalWriterFaultAction,
+    return new EngineRoot(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
-  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
-    return new EngineRoot(operations, deadlineMs, batchSize, terminalWriterFaultAction, childRegistry);
+    return new EngineRoot(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction, childRegistry);
   }
 
-  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction) {
-    return new EngineRoot(operations, deadlineMs, batchSize, terminalWriterFaultAction, childRegistry,
+    return new EngineRoot(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction, childRegistry,
         requestedRestartAction);
   }
 
-  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, long deadlineMs, int batchSize, IntConsumer exitAction) {
-    this(operations, deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize, IntConsumer exitAction) {
+    this(operations, attempts, deadlineMs, batchSize, exitAction, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
-  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       long deadlineMs,
       int batchSize,
       IntConsumer exitAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
-    this(operations, deadlineMs, batchSize, exitAction, childRegistry, EngineRoot::embeddedRestartRequired);
+    this(operations, attempts, deadlineMs, batchSize, exitAction, childRegistry, EngineRoot::embeddedRestartRequired);
   }
 
-  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       long deadlineMs,
       int batchSize,
       IntConsumer exitAction,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       Runnable requestedRestartAction) {
-    this(operations,
+    this(operations, attempts,
         (gauge, executorRegistry) -> {
           WorkerConfig workerConfig = WorkerConfig.load();
           // Review S2: the hot-reload trigger is a file under <dataDir>/runtime/, written by the
@@ -175,32 +177,32 @@ public final class EngineRoot implements WorkerHost {
   }
 
   /** Test seam: supply the index half rather than building it from the global config. */
-  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory, long deadlineMs, int batchSize) {
-    this(operations, serverFactory, deadlineMs, batchSize, EngineRoot::missingExitAction);
+    this(operations, attempts, serverFactory, deadlineMs, batchSize, EngineRoot::missingExitAction);
   }
 
   /** Test seam: supply both the index half and the process exit action. */
-  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction) {
-    this(operations, serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
+    this(operations, attempts, serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
         EngineRoot::embeddedRestartRequired);
   }
 
-  EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+  EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       Function<GpuSchedulingGauge, KnowledgeServer> serverFactory,
       long deadlineMs,
       int batchSize,
       IntConsumer terminalWriterFaultAction,
       Runnable requestedRestartAction) {
-    this(operations, (gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
+    this(operations, attempts, (gauge, ignored) -> serverFactory.apply(gauge), deadlineMs, batchSize,
         terminalWriterFaultAction, requestedRestartAction);
   }
 
-  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       java.util.function.BiFunction<GpuSchedulingGauge,
           io.justsearch.core.execution.EngineExecutorRegistry, KnowledgeServer> serverFactory,
       long deadlineMs,
@@ -208,6 +210,7 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer terminalWriterFaultAction,
       Runnable requestedRestartAction) {
     this.operations = Objects.requireNonNull(operations, "operations");
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
     this.deadlineMs = deadlineMs;
