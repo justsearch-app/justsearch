@@ -32,7 +32,7 @@ final class BackgroundWorkLifetimeTest {
   void openOperationRunner() throws Exception {
     operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(operationDirectory.resolve("operations.db"));
     attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operationStore,
-        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
   }
   @org.junit.jupiter.api.AfterEach
   void closeOperationRunner() throws Exception {
@@ -62,7 +62,7 @@ final class BackgroundWorkLifetimeTest {
     var context = TestRequestContexts.browser().withUrgency(EngineContext.Urgency.BACKGROUND);
     var prepared = attempts.accept(new io.justsearch.app.api.operations.OperationAttemptRunner.Request(null,
         io.justsearch.app.api.operations.OperationDescriptor.invocation(
-            io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN, null, "{}", false), context, null));
+            io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN, null, "{}", false), context, null));
     attempts.start(prepared, handle -> {
       handle.checkpoint("previous-agent-run", 0, 0);
       return new io.justsearch.agent.api.registry.OperationExecution(
@@ -71,7 +71,7 @@ final class BackgroundWorkLifetimeTest {
     operationStore.close();
     operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(operationDirectory.resolve("operations.db"));
     attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operationStore,
-        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
     var agent = mock(AgentService.class);
     when(agent.sessionSnapshot("previous-agent-run")).thenReturn(Map.of("state", agentState));
     try (var executors = new DefaultEngineExecutorRegistry()) {

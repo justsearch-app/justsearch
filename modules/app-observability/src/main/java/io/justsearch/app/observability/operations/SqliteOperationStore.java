@@ -4,7 +4,7 @@ package io.justsearch.app.observability.operations;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
-import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;

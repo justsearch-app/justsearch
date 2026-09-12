@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import io.justsearch.app.api.AiPackImportStatus;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;

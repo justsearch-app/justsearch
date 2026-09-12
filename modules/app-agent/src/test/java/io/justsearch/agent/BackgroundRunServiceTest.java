@@ -36,7 +36,7 @@ final class BackgroundRunServiceTest {
   void openOperationRunner() throws Exception {
     operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(operationDirectory.resolve("operations.db"));
     attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operationStore,
-        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
   }
   @org.junit.jupiter.api.AfterEach
   void closeOperationRunner() throws Exception {

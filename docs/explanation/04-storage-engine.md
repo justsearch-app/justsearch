@@ -323,7 +323,21 @@ Operation dispatch validates caller context and trust before pure handler prepar
 projection. The dispatcher persists that versioned projection beside the public-argument digest
 before invoking the same prepared value. Raw public arguments are not written to the row.
 Preparation may read scope but must not schedule work, register roots or enqueue writes.
-Ordinary preparation failures receive a generic accepted attempt and terminal refusal; capability
+Ordinary preparation failures receive an accepted attempt without a replay payload and a terminal refusal; capability
 and admission checks still gate execution after acceptance. Generic handlers use the passthrough
 default, and undo retains its existing target identity. This seam does not yet provide keyed
 ingress, recovery replay or sealed content-bearing preparation.
+
+`OperationPolicy.recordKind` classifies ordinary, prepared, refused and undo attempts.
+The registry's `OperationKind` enum in app-agent-api is also the store's kind contract;
+its JSON and SQLite spelling is the same closed lowercase vocabulary, including `memory`
+and `note`. Existing policy constructors default to `operation`. The full declaration
+schema includes this backend field; the selected policy axes in the live UI registry
+projection do not include it. Java consumers of the former app-api enum must update
+their import to `io.justsearch.agent.api.registry.OperationKind`.
+
+Production catalog entries still use the ordinary default until their recorded handlers
+and recovery owners are connected. Declaring a kind does not change admitted survival:
+the work owner retains its original survival for cancellation and disconnect handling.
+Recorded producers must resolve their survival policy before admission, or admit a
+separately owned child, before activating a recovery classification.

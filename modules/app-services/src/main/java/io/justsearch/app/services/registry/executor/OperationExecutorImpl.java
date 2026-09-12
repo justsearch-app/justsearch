@@ -10,7 +10,6 @@ import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.operations.OperationDescriptor;
-import io.justsearch.app.api.operations.OperationKind;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.services.intent.EngineProvenance;
 
@@ -360,7 +359,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       InvocationProvenance provenance, EngineContext context, String undoId) {
     Instant startedAt = clock.instant();
     PreparedInvocation invocation = prepareInvocation(op, argumentsJson, provenance, context, undoId != null);
-    // C2-3 adds keyed transport and the catalog's recordKind projection. The unkeyed audit
+    // C2-3 adds keyed transport. The unkeyed audit
     // suppression is preserved here; keyed calls will always accept regardless of audit policy.
     OperationAttemptRunner.PreparedAttempt prepared = op.policy().audit() == AuditPolicy.NONE ? null
         : attempts.accept(new OperationAttemptRunner.Request(null,
@@ -421,7 +420,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   private PreparedInvocation prepareInvocation(Operation op, String argumentsJson,
       InvocationProvenance provenance, EngineContext context, boolean undo) {
     OperationDescriptor generic = OperationDescriptor.invocation(
-        OperationKind.OPERATION, op.id().value(), argumentsJson, undo);
+        op.policy().recordKind(), op.id().value(), argumentsJson, undo);
     if (undo) return new PreparedInvocation(null, null, generic, null, null);
     try {
       var invalid = inputValidator.validate(op, argumentsJson);
@@ -437,7 +436,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         throw new IllegalArgumentException("Preparation must retain the public arguments unchanged");
       }
       OperationDescriptor descriptor = value.replaySchema() == null ? generic
-          : OperationDescriptor.preparedInvocation(OperationKind.OPERATION, op.id().value(),
+          : OperationDescriptor.preparedInvocation(op.policy().recordKind(), op.id().value(),
               argumentsJson, value.replaySchema(), value.replayPayloadJson());
       return new PreparedInvocation(handler, value, descriptor, null, null);
     } catch (OperationPreparationRefused refusal) {

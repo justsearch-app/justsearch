@@ -393,12 +393,12 @@ class VduBatchProcessorE2ETest {
     operations = new io.justsearch.app.observability.operations.SqliteOperationStore(dataDir.resolve("operations.db"));
     var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
         operations, java.time.Clock.systemUTC(), java.util.Set.of(
-            io.justsearch.app.api.operations.OperationKind.INGEST,
-            io.justsearch.app.api.operations.OperationKind.REINDEX,
-            io.justsearch.app.api.operations.OperationKind.RECONFIGURE,
-            io.justsearch.app.api.operations.OperationKind.SETTINGS_APPLY,
-            io.justsearch.app.api.operations.OperationKind.ACCEPT_GAPS,
-            io.justsearch.app.api.operations.OperationKind.SCHEDULED_RUN));
+            io.justsearch.agent.api.registry.OperationKind.INGEST,
+            io.justsearch.agent.api.registry.OperationKind.REINDEX,
+            io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
+            io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+            io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
+            io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
     engine = new EngineRoot(operations, attempts, 30_000L, 5_000);
     client = engine.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
   }

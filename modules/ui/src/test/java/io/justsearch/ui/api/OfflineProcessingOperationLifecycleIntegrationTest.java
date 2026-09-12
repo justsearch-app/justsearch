@@ -24,7 +24,7 @@ import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
-import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.engine.DefaultEngineExecutorRegistry;

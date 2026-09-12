@@ -17,6 +17,12 @@ committed-unit implementation follow. The immutable root plan passes focused771
 review clears the DTO. Atomic root-state preparation now passes775 (40 cases and PMD);
 negative774 exposes missing label, duplicate walk and removed-root resurrection. The
 recorded root producer, child acceptance and committed-unit completion are next.
+Broader snapshot776 passes5189 cases/906 suites with zero failures/errors,11 inherited
+skips and affected PMD. All six selected test tasks execute. Hosted CI34721364763 passes
+the same c6556fa02 snapshot. The declared-kind prerequisite passes focused781 (120 cases,
+PMD, documented unchanged-input reuse) and negative780 catches allfour intended defects:
+one app-agent-api enum serves OperationPolicy and the durable row, including memory/note;
+production catalog activation and survival admission remain coupled to recorded owners.
 The subsequent [generation capture](evidence/C2/generation-capture.md)
 passes focused768 (55 cases, including the separately committed root-plan scope) and
 negative769 catches three intended service-absence failures. Independent review clears
@@ -24,7 +30,8 @@ the strict observation and replacement-availability fix. Hosted preparation run3
 is red on parser startup before the live-child witness. The [diagnostic correction](evidence/C2/parser-hosted-766.md)
 preserves the future failure and hosted XML without relaxing assertions; focused770 passes4 cases.
 Hosted CI34720523685 passes04716d41e, including Windows-native tests; it precedes the
-root-state snapshot. Broader snapshot/producer validation remains required. No Engine stack is running.
+root-state snapshot. Snapshot776/CI34721364763 now provide the broader snapshot check;
+recorded producer validation remains required. No Engine stack is running.
 
 Prior item is [the shared offline owner](evidence/C2/offline-owner-proof.md):
 manual and automatic procedures share bounded admission/lifetime ownership;

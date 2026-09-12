@@ -140,7 +140,7 @@ runner remains the only terminal writer. Reuse the store's existing transaction 
 insert primitive, rather than nesting transactions or introducing another child store.
 
 Independent child review identifies a prerequisite before connecting recorded handlers:
-OperationExecutorImpl currently stamps even prepared parents as generic OPERATION, but
+At that review, OperationExecutorImpl stamps even prepared parents as generic OPERATION, but
 production deliberately owns REINDEX/INGEST and fails unowned interactive operations at
 boot. Bring forward the declared catalog recordKind portion of C2-3 for these parents;
 do not own every generic operation or infer kind from arbitrary replay JSON. The same
@@ -303,3 +303,91 @@ Retain through lane acceptance plus30 days, exporting before worktree release.
 Hosted run34720523685 passes04716d41e, including the prior preparation/generation/DTO
 and Windows-native fixture. It precedes this snapshot; broader snapshot/producer proof
 remains required. C2-2 is open.
+
+Broader776 at c6556fa02 passes5189 cases/906 suites, zero failures/errors and11 skips.
+All six selected test tasks execute: app-api221, app-services2633, app-engine226,
+app-observability420, worker-core342 and worker-services1347. The11 inherited skips
+are composition-root guardrails3, BgeM3 vocabulary1, late-chunking encoder5,
+adversarial corpus1 and SPLADE tokenizer crash harness1. Affected PMD passes, with
+unchanged inputs reused where Gradle reports UP-TO-DATE. Hosted CI34721364763 passes
+the same c6556fa02 revision, including Windows-native checks. This closes the broader
+snapshot check, not recorded ingestion or C2-2.
+
+776 command: `gradlew.bat :modules:app-api:test :modules:app-services:test
+:modules:app-engine:test :modules:app-observability:test :modules:worker-core:test
+:modules:worker-services:test`, plus pmdMain/pmdTest for app-api, app-services,
+app-engine, worker-core and worker-services, with `-PtestParallelism=1 --max-workers=4
+--console=plain`. Retained log, task-aware counts and XML are at worktree
+`tmp/c2-2-root-preparation-modules-776` with `.txt`, `-counts.json`, `-xml/` suffixes,
+under the same retention requirement above. An untracked app-agent-api policy test
+draft was added while776 ran; that test/source set was not an input to776. No production
+source or selected test source changed during the build.
+
+## Declared kind prerequisite
+
+September13: move the existing OperationKind contract from app-api into the
+app-agent-api registry package. OperationPolicy declares recordKind with OPERATION
+as its compatibility default; both ordinary and prepared dispatcher descriptors use
+that declaration, including preparation refusals and undo. The store and policy
+share the same enum and persisted wire spelling, extended with MEMORY and NOTE.
+Generate the Operation schema from Java and synchronize its packaged copy; no
+separate hand-maintained kind list is introduced. This prerequisite does not activate
+catalog entries whose recorded owners are still missing.
+The full declaration schema is operation.v1; the live UIOperationView/operation-wire
+projection remains unchanged. JsonValue/JsonCreator use the persisted lowercase
+spelling. The old app-api enum is deleted, so external Java consumers must update
+imports rather than relying on a second compatibility enum.
+
+Survival activation remains coupled to the recorded producer integration: the HTTP
+filter currently admits INTERACTIVE work before resolving the operation, and
+EngineAdmissionController cancels and reports using the admitted work's initial
+survival. Replacing only the row context or a dispatcher context view would therefore
+lie about actual cancellation. Resolve the declared survival before the producer's
+admission (including nested agent dispatch), preserve urgency and attribution, and
+prove cancellation/detachment against the real admission owner before activating
+reindex/ingest declarations. No mutable survival transition or duplicate work owner
+is justified by this classification prerequisite.
+
+The recovery owner must also validate operation identity and attribution before
+resuming effects. A contributed catalog can declare a kind; that classification alone
+does not authorize the built-in owner to replay an arbitrary operation's payload.
+Keep this check with the C2-8 dependency/authority gate when activating producers.
+
+Verification at c6556fa02 plus this prerequisite, Windows/Java25: schema generation777
+passes. Focused778 executes120 cases/13 suites without failures/errors/skips and compiles
+all moved-type consumers, but fails PMD on18 redundant test qualifiers after imports were
+added. Those qualifiers are removed without changing assertions or compiled behavior.
+779 passes affected PMD and reuses all120 unchanged tests. Negative780 restores both
+hardcoded OPERATION projections: allfour new dispatch cases fail (two persist operation
+instead of note; two run zero declared-kind recovery callbacks instead of one). The10-case,
+5-suite negative has exactly four failures, no errors/skips. Exact source bytes are restored.
+Final781 passes120 cases/13 suites and affected PMD; app-services tests reuse the identical
+passing compiled input from cache, the other three tasks are UP-TO-DATE from778.
+
+```text
+gradlew.bat :modules:app-agent-api:test --tests *OperationPolicyTest
+  :modules:app-api:test --tests *ValueClassWireFormatTest --tests *SubstrateSchemaGenTest
+  --tests *OperationDescriptorPreparationTest
+  :modules:app-observability:test --tests *NonDispatchedMutationTest --tests *OperationAttemptRunnerTest
+  :modules:app-services:test --tests *OperationExecutorImplTest
+  :modules:app-agent-api:pmdMain :modules:app-agent-api:pmdTest
+  :modules:app-api:pmdMain :modules:app-api:pmdTest
+  :modules:app-observability:pmdMain :modules:app-observability:pmdTest
+  :modules:app-services:pmdMain :modules:app-services:pmdTest
+  -PtestParallelism=1 --max-workers=4 --console=plain
+```
+
+778 additionally compiles app-agent/ui/app-launcher test Java and system-tests systemTest
+Java. 777 uses `:modules:app-api:updateSchemas`;780 selects only
+`:modules:app-services:test --tests *OperationExecutorImplTest.declaredKind*`, with the same
+parallelism flags. Both operation.v1 copies match; all eight `regen-all --check` sets pass,
+as do canonical-doc link, doc-index, skill-sync and module-dependency checks after regeneration.
+The storage doc is not embedded into a shared skill; existing links remain valid.
+Logs/counts/XML are `tmp/c2-2-kind-{778,779,781}` and `tmp/c2-2-kind-negative-780` with
+`.txt`, `-counts.json`, `-xml/` suffixes; schema log is `tmp/c2-2-kind-schema-777.txt`.
+Retention is through lane acceptance plus30 days, exporting before worktree release.
+This proves classification and its store/recovery connection, not production reindex
+activation, per-batch generation guards, committed-unit completion or C2-8 eligibility.
+Independent final source review finds no blocking defect in this bounded prerequisite.
+It confirms restored policy projection and identifies the operation-identity/attribution
+activation guard above. The final constructor-Javadoc correction changes no behavior.

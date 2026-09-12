@@ -22,6 +22,10 @@ import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationRef;
 import io.justsearch.agent.api.registry.OperationPolicy;
+import io.justsearch.agent.api.registry.OperationKind;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationAvailability;
 import io.justsearch.agent.api.registry.OperationLineage;
 import io.justsearch.agent.api.registry.ResourceRef;
@@ -90,7 +94,7 @@ final class OperationExecutorImplTest {
     var handlers = new HandlerRegistry();
     var id = new OperationRef("core.prepared-test");
     var currentRoot = new java.util.concurrent.atomic.AtomicReference<>("original-root");
-    var frozen = new java.util.concurrent.atomic.AtomicReference<io.justsearch.agent.api.registry.OperationPreparation>();
+    var frozen = new java.util.concurrent.atomic.AtomicReference<OperationPreparation>();
     var preparationCalls = new java.util.concurrent.atomic.AtomicInteger();
     var key = new java.util.concurrent.atomic.AtomicReference<String>();
     var context = io.justsearch.app.services.TestEngineContexts.internal();
@@ -99,20 +103,20 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext ctx) {
         throw new AssertionError("Must execute the frozen invocation");
       }
-      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+      @Override public OperationPreparation prepare(String args,
           InvocationProvenance provenance, EngineContext ctx) {
         org.junit.jupiter.api.Assertions.assertSame(context, ctx);
         assertTrue(operationStore.openRecords().isEmpty(), "scope must be captured before acceptance");
         preparationCalls.incrementAndGet();
-        var value = new io.justsearch.agent.api.registry.OperationPreparation(args, "root-plan.v1",
+        var value = new OperationPreparation(args, "root-plan.v1",
             rootPlanPayload(currentRoot.get()));
         frozen.set(value);
         currentRoot.set("changed-after-preparation");
         return value;
       }
-      @Override public io.justsearch.agent.api.registry.OperationExecution executePrepared(
-          io.justsearch.agent.api.registry.OperationPreparation value, InvocationProvenance provenance,
-          EngineContext ctx, io.justsearch.agent.api.registry.OperationRecordHandle handle) {
+      @Override public OperationExecution executePrepared(
+          OperationPreparation value, InvocationProvenance provenance,
+          EngineContext ctx, OperationRecordHandle handle) {
         org.junit.jupiter.api.Assertions.assertSame(frozen.get(), value);
         org.junit.jupiter.api.Assertions.assertSame(context, ctx);
         key.set(handle.key());
@@ -125,7 +129,7 @@ final class OperationExecutorImplTest {
         assertFalse(identity.contains("privateBody"));
         assertFalse(identity.contains("not-for-the-row"));
         assertTrue(identity.contains(io.justsearch.app.api.operations.CanonicalOperationArguments.digest(publicInput)));
-        return io.justsearch.agent.api.registry.OperationExecution.finished(OperationResult.success("Committed"));
+        return OperationExecution.finished(OperationResult.success("Committed"));
       }
     });
     assertTrue(new OperationExecutorImpl(attempts, admission, handlers)
@@ -133,6 +137,94 @@ final class OperationExecutorImplTest {
     assertEquals(1, preparationCalls.get());
     assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
         operationStore.find(key.get()).orElseThrow().state());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(boolean prepared) throws Exception {
+    var kind = prepared ? OperationKind.REINDEX : OperationKind.INGEST;
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.arbitrary-kind-fixture");
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var context = io.justsearch.app.services.TestEngineContexts.durableInternal();
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("The fixture owns asynchronous completion");
+      }
+      @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
+          EngineContext ctx) {
+        return prepared ? new OperationPreparation(args, "root-plan.v1", rootPlanPayload("frozen"))
+            : OperationPreparation.passthrough(args);
+      }
+      @Override public OperationExecution executePrepared(OperationPreparation value,
+          InvocationProvenance provenance, EngineContext ctx, OperationRecordHandle handle) {
+        calls.incrementAndGet();
+        return new OperationExecution(OperationResult.success("Accepted"),
+            new java.util.concurrent.CompletableFuture<>());
+      }
+    });
+    var op = makeOp(id, TrustTier.CORE, false, AuditPolicy.METADATA_ONLY, kind);
+    assertTrue(new OperationExecutorImpl(attempts, admission, handlers).dispatch(op, "{}", context).success());
+    var accepted = operationStore.openRecords();
+    assertEquals(1, accepted.size());
+    String key = accepted.getFirst().key();
+    operationStore.close();
+    operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(
+        operationDirectory.resolve("operations.db"));
+    var reopened = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+        operationStore, Clock.systemUTC(), Set.of(kind));
+    var reconciliations = new java.util.concurrent.atomic.AtomicInteger();
+    reopened.reconcile(kind, row -> {
+      reconciliations.incrementAndGet();
+      assertEquals(key, row.key());
+      assertEquals(kind, row.descriptor().kind());
+      assertEquals(id.value(), row.descriptor().operationRef());
+      assertEquals(context.survival(), row.context().survival());
+      assertEquals(prepared, row.descriptor().identityJson().contains("preparedInvocation"));
+      return new io.justsearch.app.api.operations.OperationAttemptRunner.Reconciliation.Complete(
+          new io.justsearch.app.api.operations.OperationReceipt("SUCCESS", null));
+    });
+    assertEquals(1, reconciliations.get(), "the declared kind, not the operation id, selects its owner");
+    assertEquals(1, calls.get(), "classifying recovery must not dispatch the handler again");
+    assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
+        operationStore.find(key).orElseThrow().state());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void declaredKindAlsoCoversPreparationRefusalAndUndo(boolean undo) throws Exception {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.kind-refusal-fixture");
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext ctx) {
+        throw new AssertionError("Refusal and undo must not invoke a forward effect");
+      }
+      @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
+          EngineContext ctx) {
+        throw new io.justsearch.agent.api.registry.OperationPreparationRefused(
+            OperationResult.failure("Unavailable", "GENERATION_UNAVAILABLE", Map.of(), true));
+      }
+      @Override public OperationResult undo(String executionId, EngineContext ctx) {
+        assertEquals("prior-execution", executionId);
+        return OperationResult.success("Reversed");
+      }
+    });
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
+    var op = makeOp(id, TrustTier.CORE, true, AuditPolicy.METADATA_ONLY, OperationKind.NOTE);
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    var response = undo ? executor.undo(op, "prior-execution", context) : executor.dispatch(op, "{}", context);
+    assertEquals(undo, response.success());
+    try (var connection = java.sql.DriverManager.getConnection(
+        "jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+        var statement = connection.createStatement();
+        var row = statement.executeQuery("SELECT kind, state, identity_json FROM operations")) {
+      assertTrue(row.next());
+      assertEquals("note", row.getString("kind"));
+      assertEquals(undo ? "COMPLETE" : "FAILED", row.getString("state"));
+      var identity = tools.jackson.databind.json.JsonMapper.builder().build().readTree(row.getString("identity_json"));
+      assertEquals(undo ? "undo" : "invoke", identity.path("mode").asText());
+      assertFalse(row.next(), "one attempted invocation has one durable row");
+    }
   }
 
   @org.junit.jupiter.params.ParameterizedTest
@@ -146,7 +238,7 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext ctx) {
         throw new AssertionError("Failed preparation cannot have an effect");
       }
-      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+      @Override public OperationPreparation prepare(String args,
           InvocationProvenance provenance, EngineContext ctx) {
         if (expected instanceof Error error) throw error;
         throw (RuntimeException) expected;
@@ -179,10 +271,10 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext ctx) {
         throw new AssertionError("Invalid preparation cannot have an effect");
       }
-      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+      @Override public OperationPreparation prepare(String args,
           InvocationProvenance provenance, EngineContext ctx) {
         if (invalid.equals("null-preparation")) return null;
-        return new io.justsearch.agent.api.registry.OperationPreparation(
+        return new OperationPreparation(
             invalid.equals("changed-arguments") ? "{\"changed\":true}" : args,
             "root-plan.v1", invalid.equals("malformed-payload") ? "[]"
                 : rootPlanPayload("root").replace("\"roots\":", "\"prompt\":\"must-not-persist\",\"roots\":"));
@@ -203,7 +295,7 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext ctx) {
         throw new AssertionError("Invalid input cannot execute");
       }
-      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+      @Override public OperationPreparation prepare(String args,
           InvocationProvenance provenance, EngineContext ctx) {
         throw new AssertionError("Invalid input cannot prepare");
       }
@@ -233,7 +325,7 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext ctx) {
         throw new AssertionError("Refused preparation cannot execute");
       }
-      @Override public io.justsearch.agent.api.registry.OperationPreparation prepare(String args,
+      @Override public OperationPreparation prepare(String args,
           InvocationProvenance provenance, EngineContext ctx) {
         throw new io.justsearch.agent.api.registry.OperationPreparationRefused(refusal);
       }
@@ -276,13 +368,13 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext context) {
         throw new AssertionError("Recorded dispatch must carry its accepted handle");
       }
-      @Override public io.justsearch.agent.api.registry.OperationExecution executeRecorded(
+      @Override public OperationExecution executeRecorded(
           String args, InvocationProvenance provenance, EngineContext context,
-          io.justsearch.agent.api.registry.OperationRecordHandle handle) {
+          OperationRecordHandle handle) {
         key.set(handle.key());
         assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING,
             operationStore.find(handle.key()).orElseThrow().state(), "durable acceptance/start precede the body");
-        return new io.justsearch.agent.api.registry.OperationExecution(OperationResult.success("Started"), actual);
+        return new OperationExecution(OperationResult.success("Started"), actual);
       }
     });
     var emitted = new ArrayList<OperationHistoryEntry>();
@@ -352,13 +444,13 @@ final class OperationExecutorImplTest {
       @Override public OperationResult execute(String args, EngineContext context) {
         throw new AssertionError("Only undo expected");
       }
-      @Override public io.justsearch.agent.api.registry.OperationExecution undoRecorded(String executionId,
-          EngineContext context, io.justsearch.agent.api.registry.OperationRecordHandle handle) {
+      @Override public OperationExecution undoRecorded(String executionId,
+          EngineContext context, OperationRecordHandle handle) {
         key.set(handle.key());
         var row = operationStore.find(handle.key()).orElseThrow();
         assertTrue(row.descriptor().identityJson().contains("undo"));
         assertEquals("original-execution", executionId);
-        return io.justsearch.agent.api.registry.OperationExecution.finished(OperationResult.success("Undone"));
+        return OperationExecution.finished(OperationResult.success("Undone"));
       }
     });
     var executor = new OperationExecutorImpl(attempts, admission, handlers);
@@ -1638,6 +1730,11 @@ final class OperationExecutorImplTest {
 
   private static Operation makeOp(
       OperationRef id, TrustTier tier, boolean undoSupported, AuditPolicy audit) {
+    return makeOp(id, tier, undoSupported, audit, OperationKind.OPERATION);
+  }
+
+  private static Operation makeOp(
+      OperationRef id, TrustTier tier, boolean undoSupported, AuditPolicy audit, OperationKind kind) {
     return new Operation(
         id,
         Presentation.of(
@@ -1649,7 +1746,7 @@ final class OperationExecutorImplTest {
             audit,
             RetryPolicy.noRetry(),
             Set.of(),
-            undoSupported),
+            undoSupported).withRecordKind(kind),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(id),

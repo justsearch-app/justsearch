@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.operations;
 
+import io.justsearch.agent.api.registry.OperationKind;
+
 import java.util.Objects;
 import java.util.Map;
 import tools.jackson.databind.json.JsonMapper;

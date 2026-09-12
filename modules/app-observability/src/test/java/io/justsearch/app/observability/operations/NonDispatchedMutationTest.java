@@ -11,7 +11,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
-import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.core.context.EngineContext;
@@ -38,6 +38,8 @@ final class NonDispatchedMutationTest {
         var result = producer.mutate(request, "private-memory-body");
         var row = result.completion().toCompletableFuture().join();
         assertEquals(OperationState.COMPLETE, row.state());
+        assertEquals(OperationKind.MEMORY, row.descriptor().kind());
+        assertEquals(EngineContext.Survival.INTERACTIVE, row.context().survival());
         assertEquals(request.key(), row.key());
         assertEquals(1, countEffects(request.key()));
         assertEquals("private-memory-body", cipher.open(effect(request.key())));
@@ -136,9 +138,8 @@ final class NonDispatchedMutationTest {
     var context = new EngineContext(EngineContext.ClientKind.INTERNAL, "memory-fixture",
         Optional.empty(), Optional.empty(), "system", "SYSTEM_INTERNAL",
         EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
-    // C2-3 owns the memory/note vocabulary; this fixture proves the generic non-dispatched seam.
     return new OperationAttemptRunner.Request(OperationKeys.generate(Clock.systemUTC()),
-        OperationDescriptor.invocation(OperationKind.OPERATION, "fixture." + mutation,
+        OperationDescriptor.invocation(OperationKind.MEMORY, "fixture." + mutation,
             "{\"value\":\"private-memory-body\"}", false), context, null);
   }
 

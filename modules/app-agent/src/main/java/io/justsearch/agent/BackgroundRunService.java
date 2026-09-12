@@ -13,7 +13,7 @@ import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
-import io.justsearch.app.api.operations.OperationKind;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
 import java.time.Clock;
 import java.util.List;
