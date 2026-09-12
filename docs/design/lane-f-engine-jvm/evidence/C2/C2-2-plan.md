@@ -704,3 +704,12 @@ regression. Final648 adds that case and overflow during snapshot emission:23 tes
 suites pass, zero failures/errors/skips, with main/test PMD (main unchanged-input reuse).
 Evidence: tmp/c2-2-snapshot-order-648.txt, -648-xml and -648-counts.json. Surface647 and
 diff whitespace pass. Root independently inspected the failure and final result XML.
+
+
+Followup649 adds the review's cross-thread witness: a latch-backed writer callback must
+finish between snapshot capture and subscribe return; taking the emitter monitor across
+subscribe would deadlock and fail the bounded assertion. The10 snapshot-order tests pass
+with zero failures/errors/skips and worker-services test PMD. The same command compiles
+and PMD-checks the in-progress orphan fixture separately; it is not an orphan runtime proof.
+Evidence: tmp/c2-2-orphan-compile-snapshot-649.txt, tmp/c2-2-snapshot-thread-649-xml and
+-counts.json. This test-only followup is committed separately from the orphan changes.

@@ -17,6 +17,9 @@ import io.justsearch.ipc.SubscribeIndexingJobsRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -38,6 +41,42 @@ final class IndexingJobsSnapshotOrderTest {
     fixture.emit("live");
     assertEquals("live", frames.getLast().getDelta().getUpdate().getState());
     assertFalse(fixture.closed.get());
+  }
+
+  @Test
+  void callbackThreadCanFinishBeforeSubscribeReturnsWithoutLockInversion() throws Exception {
+    Fixture fixture = new Fixture(0);
+    CountDownLatch snapshotCaptured = new CountDownLatch(1);
+    CountDownLatch callbackDone = new CountDownLatch(1);
+    try (var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      var writer = tasks.submit(() -> {
+        assertTrue(snapshotCaptured.await(5, TimeUnit.SECONDS));
+        try {
+          fixture.emit("concurrent");
+        } finally {
+          callbackDone.countDown();
+        }
+        return true;
+      });
+      fixture.beforeReturn = () -> {
+        snapshotCaptured.countDown();
+        try {
+          assertTrue(callbackDone.await(5, TimeUnit.SECONDS),
+              "callback thread must not wait on an emitter lock held across subscribe");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(e);
+        }
+      };
+      List<IndexingJobsFrame> frames = new ArrayList<>();
+      fixture.subscribe(frames::add);
+      assertTrue(writer.get(5, TimeUnit.SECONDS));
+      assertEquals(2, frames.size());
+      assertTrue(frames.getFirst().hasSnapshot());
+      assertEquals("concurrent", frames.getLast().getDelta().getUpdate().getState());
+      assertEquals(List.of(1L, 2L), frames.stream().map(IndexingJobsFrame::getSeq).toList());
+      assertFalse(fixture.closed.get());
+    }
   }
 
   @Test
