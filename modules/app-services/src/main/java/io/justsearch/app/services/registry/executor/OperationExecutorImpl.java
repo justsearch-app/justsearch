@@ -5,6 +5,8 @@ import io.justsearch.core.context.EngineContext;
 import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.EngineAdmissionService;
+import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKind;
 import io.justsearch.app.api.operations.OperationState;
@@ -59,6 +61,7 @@ import java.util.function.Consumer;
  */
 public final class OperationExecutorImpl implements OperationDispatcher {
   private final OperationAttemptRunner attempts;
+  private final EngineAdmissionService admission;
   private static void validateEngineContext(
       EngineContext engineContext, InvocationProvenance provenance) {
     var projected = EngineProvenance.invocation(engineContext, provenance.executor(),
@@ -156,14 +159,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   private final OperationInputSchemaValidator inputValidator =
       new OperationInputSchemaValidator();
 
-  public OperationExecutorImpl(OperationAttemptRunner attempts, HandlerRegistry handlers) {
-    this(attempts, handlers, null, Map.of(), Clock.systemUTC(), null, null);
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission, HandlerRegistry handlers) {
+    this(attempts, admission, handlers, null, Map.of(), Clock.systemUTC(), null, null);
   }
 
   /** Pre-slice-490 constructor — legacy callers compile unchanged with no advisory wiring. */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers, Consumer<OperationHistoryEntry> historyEmitter, Clock clock) {
-    this(attempts, handlers, historyEmitter, Map.of(), clock, null, null);
+    this(attempts, admission, handlers, historyEmitter, Map.of(), clock, null, null);
   }
 
   /**
@@ -172,12 +175,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * {@code core.advisory-operation-completed}'s ResourceRef. New callers should
    * use the {@code Map} form directly.
    */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Consumer<OperationCompletionEvent> advisoryEmitter,
       Clock clock) {
-    this(attempts,
+    this(attempts, admission,
         handlers,
         historyEmitter,
         advisoryEmitter == null
@@ -193,12 +196,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * Slice 490 Group B2 constructor — multi-emitter routing form. Pre-slice-487 callers
    * (no trust lattice). Delegates to the slice-487 6-arg form with null lattice deps.
    */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
       Clock clock) {
-    this(attempts, handlers, historyEmitter, advisoryEmitters, clock, null, null);
+    this(attempts, admission, handlers, historyEmitter, advisoryEmitters, clock, null, null);
   }
 
   /**
@@ -209,14 +212,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * <p>When {@code trustEvaluator} or {@code intentSourceCatalog} is null, the lattice
    * is skipped (legacy/test compat). Both must be present for the lattice to enforce.
    */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
       Clock clock,
       TrustEvaluator trustEvaluator,
       IntentSourceCatalog intentSourceCatalog) {
-    this(attempts, handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator, intentSourceCatalog, null);
+    this(attempts, admission, handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator, intentSourceCatalog, null);
   }
 
   /**
@@ -226,7 +229,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * capability is unavailable, dispatch returns CAPABILITY_UNAVAILABLE without
    * reaching the handler.
    */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -234,7 +237,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       TrustEvaluator trustEvaluator,
       IntentSourceCatalog intentSourceCatalog,
       java.util.function.Function<RequiredCapability, Boolean> capabilityResolver) {
-    this(attempts,
+    this(attempts, admission,
         handlers,
         historyEmitter,
         advisoryEmitters,
@@ -251,7 +254,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * consent capsule satisfies a non-AUTO gate (additive to the legacy non-blank-token
    * path). Production wiring (HeadAssembly / OperationSubstrateInit) uses this form.
    */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -260,7 +263,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       IntentSourceCatalog intentSourceCatalog,
       java.util.function.Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService) {
-    this(attempts,
+    this(attempts, admission,
         handlers,
         historyEmitter,
         advisoryEmitters,
@@ -278,7 +281,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * is recorded so the action ledger / trust audit can read gate firings. Production wiring
    * (OperationSubstrateInit) uses this form.
    */
-  public OperationExecutorImpl(OperationAttemptRunner attempts,
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -290,6 +293,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Consumer<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>
           authorizationOutcomeEmitter) {
     this.attempts = Objects.requireNonNull(attempts, "attempts");
+    this.admission = Objects.requireNonNull(admission, "admission");
     this.handlers = Objects.requireNonNull(handlers, "handlers");
     this.historyEmitter = historyEmitter;
     this.advisoryEmitters =
@@ -382,18 +386,20 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         else emitHistory(op, startedAt, OperationOutcome.FAILURE, refusal.message(), provenance, Optional.empty());
         return refusal;
       }
-      if (prepared != null) {
-        return attempts.start(prepared,
-            handle -> invokeHandler(op, argumentsJson, provenance, context, undoId, handle)).response();
+      try (var work = admission.attach(context)) {
+        if (prepared != null) {
+          return attempts.start(prepared,
+              handle -> invokeOwnedHandler(op, argumentsJson, provenance, work, undoId, handle)).response();
+        }
+        OperationExecution execution = invokeOwnedHandler(op, argumentsJson, provenance, work, undoId, null);
+        var unused = execution.completion().thenAccept(result -> {
+          OperationOutcome outcome = result.success()
+              ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
+          emitHistory(op, startedAt, outcome, null, provenance,
+              result.success() && undoId == null && op.policy().undoSupported() ? result.executionId() : Optional.empty());
+        });
+        return execution.response();
       }
-      OperationExecution execution = invokeHandler(op, argumentsJson, provenance, context, undoId, null);
-      var unused = execution.completion().thenAccept(result -> {
-        OperationOutcome outcome = result.success()
-            ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
-        emitHistory(op, startedAt, outcome, null, provenance,
-            result.success() && undoId == null && op.policy().undoSupported() ? result.executionId() : Optional.empty());
-      });
-      return execution.response();
     } catch (RuntimeException failure) {
       if (prepared == null) {
         emitHistory(op, startedAt, OperationOutcome.FAILURE, failure.getMessage(), provenance, Optional.empty());
@@ -401,6 +407,20 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
         catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
       }
+      throw failure;
+    }
+  }
+
+  /** Retain exact admitted work before invoking a handler that may fork before returning. */
+  private OperationExecution invokeOwnedHandler(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineWorkHandle work, String undoId, OperationRecordHandle record) {
+    var owner = work.retain();
+    try {
+      OperationExecution execution = invokeHandler(op, argumentsJson, provenance, owner.context(), undoId, record);
+      return new OperationExecution(execution.response(),
+          execution.completion().whenComplete((result, failure) -> owner.close()));
+    } catch (RuntimeException | Error failure) {
+      owner.close();
       throw failure;
     }
   }

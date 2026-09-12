@@ -17,6 +17,12 @@ runtime tests, combined618 passes163 producer/admission tests, and621 adds actua
 pre-write cancellation, cleanup failure and named stress coverage. The plan preserves
 exact evidence and unchanged-input reuse; these are not installed/live-download proofs.
 
+C1 asynchronous dispatch quota correction now retains exact Engine work through actual
+handler completion, including cancellation/error and synchronous throws.625 passes116
+tests/13 suites with documented unchanged-input reuse; negative623 reproduces the
+early release over real HTTP. Independent source review and surface/guard gates pass.
+Hosted inclusion remains. Install/repair checkpointd86d5d40c is pushed.
+
 C2-2 remains OPEN for recorded ingestion/committed-unit completion, pack/offline and
 other async owners, direct HTTP acceptance (the existing install/runtime controllers
 still bypass catalog dispatch), and installed acceptance-before-effect fault proof.

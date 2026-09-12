@@ -487,3 +487,48 @@ all zero failures/errors/skips. Code revision is the install completion commit c
 this evidence; the earlier615/618 inputs differ only by the subsequently tested early
 cancel branch and its tests. Independent source review covered the intended handler
 before the negative injection, which is restored. No install item is marked closed.
+
+
+### C1 admission lifetime at asynchronous catalog dispatch
+
+Independent source review ofd86d5d40c finds ApiSecurityFilters closes the only Engine
+work reference in the HTTP after-filter. The new install/runtime stages retain an
+upgrade lease but that is not C1 quota ownership. OperationExecutorImpl must require
+EngineAdmissionService through both HeadAssembly composition paths. After durable
+acceptance and preflight, attach the caller's exact work (or admit library work),
+retain before invoking the handler, pass the admitted context and release that retained
+reference from actual OperationExecution completion. The request scope can then close.
+Synchronous exceptions including Error release it; asynchronous fatal completion releases
+quota without making a successful row. Existing attempts do not execute or retain.
+
+The runner is deliberately not made a second admission owner: scheduled rows are accepted
+before fire-time admission, and recovered context has no live work identity. The existing
+producer admission contracts remain. C2-3 retries must look up their row before new effect
+admission; C2-2 direct HTTP producers still need their own shared runner boundary.
+No additional work state machine, persisted liveness marker or registry is introduced.
+
+622 compiles production wiring and passes existing dispatcher/composition tests but the
+new UI fixture did not compile because Javalin is not AutoCloseable. Corrected to explicit
+stop in finally. Negative623 removes only the retained reference: all four HTTP outcome
+arms fail while checking that work survives the response (expected1, actual0), before
+completion is supplied. The intended retained-reference implementation is restored.
+Logs and XML: tmp/c2-2-dispatch-admission-622.txt,
+tmp/c2-2-dispatch-admission-622-services-xml,
+tmp/c2-2-dispatch-admission-negative-623.txt and -623-xml.
+
+
+Restored625 passes116 tests in13 suites: app-services87/8 (unchanged results reused
+from622), UI29/5 executed, zero failures/errors/skips, plus PMD.624's four async HTTP
+arms passed; its separate refusal fixture accidentally used the validator's explicit
+unconstrained-schema sentinel. Replaced the fixture with a constrained schema so its
+array input exercises the intended preflight refusal; no validator or existing test
+expectation changed. Negative623 remains a valid counterexample to ownership.
+Evidence: tmp/c2-2-dispatch-admission-{624,625}.txt, -624-ui-xml,
+-625-xml and -625-counts.json. Operation-surface626 and guard-resolution627 pass.
+
+Independent read-only review of the restored diff found no remaining defect, including
+existing-attempt bypass, synchronous attach/retain/body failures, cancellation, fatal
+completion, newly admitted library context and both composition paths. Root re-read
+the negative/positive XML. The quota reference closes on actual effect completion;
+terminal-row persistence follows and has its separate C2 failure semantics. HTTP quota
+proof does not claim live install/download success; hosted inclusion remains at C2.

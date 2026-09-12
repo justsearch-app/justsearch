@@ -587,7 +587,7 @@ public final class HeadAssembly implements AutoCloseable {
                 "substrate",
                 () ->
                     io.justsearch.app.services.bootstrap.phases.SubstratePhase.runWithOutcome(
-                        attempts, executors,
+                        attempts, engineAdmission, executors,
             telemetry,
             () -> this.knowledgeServerBootstrap,
             () -> this.knowledgeClient,
@@ -966,8 +966,8 @@ public final class HeadAssembly implements AutoCloseable {
   public static HeadAssembly bootForSearchPortOnly(
       io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
-      SearchPort searchPort, Telemetry telemetry) {
-    return new HeadAssembly(operations, attempts, executors, searchPort, telemetry);
+      SearchPort searchPort, Telemetry telemetry, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    return new HeadAssembly(operations, attempts, executors, searchPort, telemetry, engineAdmission);
   }
 
   /**
@@ -976,7 +976,7 @@ public final class HeadAssembly implements AutoCloseable {
    */
   private HeadAssembly(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
-      SearchPort searchPort, Telemetry telemetry) {
+      SearchPort searchPort, Telemetry telemetry, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     Objects.requireNonNull(searchPort, "searchPort");
@@ -1024,7 +1024,7 @@ public final class HeadAssembly implements AutoCloseable {
             io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext());
     var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(executors, telemetry);
     var operationOut =
-        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(attempts,
+        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(attempts, engineAdmission,
             executors,
             handlers,
             operationCatalog,

@@ -111,7 +111,8 @@ public final class OperationSubstrateInit {
    *     reads from {@code WorkerCapability} + {@code InferenceCapability}.
    * @return bundled substrate values for the caller to assign into bootstrap state.
    */
-  public static Output run(io.justsearch.app.api.operations.OperationAttemptRunner attempts, io.justsearch.core.execution.EngineExecutorRegistry executors,
+  public static Output run(io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission, io.justsearch.core.execution.EngineExecutorRegistry executors,
       HandlerRegistry operationHandlers,
       OperationCatalog operationCatalog,
       OperationCatalog agentToolsCatalog,
@@ -241,7 +242,7 @@ public final class OperationSubstrateInit {
     navigationHistoryStore.addAppendListener(actionLedgerChangeRegistry::broadcastNavigation);
     authorizationOutcomeStore.addAppendListener(actionLedgerChangeRegistry::broadcastGate);
     OperationExecutorImpl operationExecutorImpl =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             operationHandlers,
             entry -> {
               // F5: append fans into the one log via the store's listener — no separate call here.

@@ -39,7 +39,7 @@ class DefaultAppFacadeTest {
           return coreResult;
         };
 
-    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry());
+    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class));
     SearchResponse response =
         facade.workers().search().search(request, TestEngineContexts.internal());
 
@@ -62,7 +62,7 @@ class DefaultAppFacadeTest {
           return coreResult;
         };
 
-    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry());
+    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class));
     SearchResponse response =
         facade.workers().search().search(request, TestEngineContexts.internal());
     assertNotNull(response);

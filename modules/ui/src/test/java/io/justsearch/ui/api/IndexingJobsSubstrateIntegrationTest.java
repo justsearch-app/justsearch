@@ -311,7 +311,7 @@ final class IndexingJobsSubstrateIntegrationTest {
     handlers.register(CoreOperationCatalog.RESOLVE_PATH_HASH, new ResolvePathHashHandler(() -> stub));
 
     OperationDispatcher dispatcher =
-        new OperationExecutorImpl(attempts, handlers, entry -> {}, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, new io.justsearch.app.engine.EngineAdmissionController(), handlers, entry -> {}, Clock.systemUTC());
 
     var catalog = new CoreOperationCatalog();
 

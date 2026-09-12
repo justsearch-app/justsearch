@@ -88,7 +88,7 @@ class HeadAssemblyTest {
         (intent, engineContext) -> new Result(List.of(), Map.of(), null, Map.of());
     Telemetry telemetry = new NoopTelemetry();
 
-    try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), searchPort, telemetry)) {
+    try (HeadAssembly bootstrap = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), searchPort, telemetry, org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       // Tempdoc 519 §5 / Step 4: bootstrap is itself the AppFacade (no separate accessor).
       assertNotNull(bootstrap);
     }
@@ -98,7 +98,7 @@ class HeadAssemblyTest {
   void finalInferenceTransitionDrainsAfterManagerCloseEvenWhenAnotherHandleFails() throws Exception {
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
         var head = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), executors,
-            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry())) {
+            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       var reasons = new java.util.concurrent.CopyOnWriteArrayList<String>();
       var transitionLog = new io.justsearch.app.inference.AsyncInferenceTransitionLog(executors,
           (timestamp, from, to, reason, success, duration, wireCode, generation) -> reasons.add(reason));
@@ -124,7 +124,7 @@ class HeadAssemblyTest {
   void failedUnlockScanCloseStillAttemptsEveryScanAndOrchestrationOwner() throws Exception {
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
         var head = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), executors,
-            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry())) {
+            (intent, context) -> new Result(List.of(), Map.of(), null, Map.of()), new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       var order = new java.util.ArrayList<String>();
       var first = org.mockito.Mockito.mock(io.justsearch.app.services.encryption.UnlockDeferredScan.class);
       var second = org.mockito.Mockito.mock(io.justsearch.app.services.encryption.UnlockDeferredScan.class);
@@ -163,7 +163,7 @@ class HeadAssemblyTest {
         (intent, engineContext) -> new Result(List.of(), Map.of(), null, Map.of());
 
     try (HeadAssembly bootstrap =
-        HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), searchPort, new NoopTelemetry())) {
+        HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), searchPort, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
       StoreDescriptor derived =
           new StoreDescriptor(StoreCatalog.INDEX, tempDir, List::of, entries -> 0);
       IllegalArgumentException thrown =

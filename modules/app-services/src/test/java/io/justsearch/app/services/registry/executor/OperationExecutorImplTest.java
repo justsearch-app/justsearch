@@ -63,8 +63,17 @@ final class OperationExecutorImplTest {
   private io.justsearch.app.observability.operations.SqliteOperationStore operationStore;
   private io.justsearch.app.api.operations.OperationAttemptRunner attempts;
 
+  private final io.justsearch.app.api.EngineAdmissionService admission =
+      org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class);
+
   @org.junit.jupiter.api.BeforeEach
   void openOperationRunner() throws Exception {
+    org.mockito.Mockito.when(admission.attach(org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
+      var work = org.mockito.Mockito.mock(io.justsearch.app.api.EngineWorkHandle.class);
+      org.mockito.Mockito.when(work.context()).thenReturn(call.getArgument(0));
+      org.mockito.Mockito.when(work.retain()).thenReturn(work);
+      return work;
+    });
     operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(
         operationDirectory.resolve("operations.db"));
     attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
@@ -96,7 +105,7 @@ final class OperationExecutorImplTest {
       }
     });
     var emitted = new ArrayList<OperationHistoryEntry>();
-    var executor = new OperationExecutorImpl(attempts, handlers, entry -> {
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, entry -> {
       assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
           operationStore.find(key.get()).orElseThrow().state(), "history follows durable completion");
       emitted.add(entry);
@@ -122,7 +131,7 @@ final class OperationExecutorImplTest {
       return OperationResult.success("Effect");
     });
     operationStore.close();
-    var executor = new OperationExecutorImpl(attempts, handlers);
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
     assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
         () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}",
             io.justsearch.app.services.TestEngineContexts.internal()));
@@ -144,7 +153,7 @@ final class OperationExecutorImplTest {
       return OperationResult.success("Effect committed");
     });
     var emitted = new ArrayList<OperationHistoryEntry>();
-    var executor = new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
     assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
         () -> executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}",
             io.justsearch.app.services.TestEngineContexts.internal()));
@@ -171,7 +180,7 @@ final class OperationExecutorImplTest {
         return io.justsearch.agent.api.registry.OperationExecution.finished(OperationResult.success("Undone"));
       }
     });
-    var executor = new OperationExecutorImpl(attempts, handlers);
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
     assertTrue(executor.undo(makeOp(id, TrustTier.CORE, true), "original-execution",
         io.justsearch.app.services.TestEngineContexts.internal()).success());
     assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
@@ -184,7 +193,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test");
     handlers.register(id, (args, engineContext) -> OperationResult.success("invoked"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, false);
     OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
@@ -198,7 +207,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.plugin");
     handlers.register(id, (args, engineContext) -> OperationResult.success("plugin-invoked"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
     OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
@@ -212,7 +221,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.untrusted");
     handlers.register(id, (args, engineContext) -> OperationResult.success("should-not-execute"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.UNTRUSTED_PLUGIN, false);
     UnsupportedOperationException ex =
@@ -241,7 +250,7 @@ final class OperationExecutorImplTest {
             return OperationResult.success("should-not-be-called");
           }
         });
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, false); // undoSupported = false
     OperationResult result = executor.undo(op, "exec-123", io.justsearch.app.services.TestEngineContexts.internal());
@@ -270,7 +279,7 @@ final class OperationExecutorImplTest {
             return OperationResult.success("undone " + executionId);
           }
         });
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, true); // undoSupported = true
     OperationResult result = executor.undo(op, "exec-456", io.justsearch.app.services.TestEngineContexts.internal());
@@ -286,7 +295,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
@@ -307,7 +316,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.failure("nope"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
@@ -327,7 +336,7 @@ final class OperationExecutorImplTest {
         });
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     assertThrows(
         RuntimeException.class,
@@ -342,7 +351,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.history-emit-throws");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             entry -> {
               throw new RuntimeException("emitter broke");
@@ -369,7 +378,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result =
         executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.METADATA_ONLY), "{}", io.justsearch.app.services.TestEngineContexts.internal());
@@ -387,7 +396,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result =
         executor.dispatch(makeOp(id, TrustTier.CORE, false, AuditPolicy.NONE), "{}", io.justsearch.app.services.TestEngineContexts.internal());
@@ -405,7 +414,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("unreached"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     Operation op =
         new Operation(
@@ -447,7 +456,7 @@ final class OperationExecutorImplTest {
         });
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     assertThrows(
         RuntimeException.class,
@@ -476,7 +485,7 @@ final class OperationExecutorImplTest {
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             emitted::add,
             Map.of(TEST_ADVISORY_CLASS, (Consumer<OperationCompletionEvent>) advisories::add),
@@ -515,7 +524,7 @@ final class OperationExecutorImplTest {
           handlerInvoked[0] = true;
           return OperationResult.success("should not reach here");
         });
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op =
         new Operation(
@@ -561,7 +570,7 @@ final class OperationExecutorImplTest {
           handlerInvoked[0] = true;
           return OperationResult.success("got args: " + args);
         });
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op =
         new Operation(
@@ -598,7 +607,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.wrong-type");
     handlers.register(id, (args, engineContext) -> OperationResult.success("should not reach"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op =
         new Operation(
@@ -636,7 +645,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.empty-schema");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     OperationResult result =
         executor.dispatch(makeOp(id, TrustTier.CORE, false), "{\"anything\":\"goes\"}", io.justsearch.app.services.TestEngineContexts.internal());
@@ -656,7 +665,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("unreached"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     Operation op =
         new Operation(
@@ -699,7 +708,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     InvocationProvenance provenance =
         new InvocationProvenance(
@@ -729,7 +738,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     OperationResult result = executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
 
@@ -752,7 +761,7 @@ final class OperationExecutorImplTest {
         });
     List<OperationHistoryEntry> emitted = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, emitted::add, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, emitted::add, Clock.systemUTC());
 
     InvocationProvenance provenance =
         new InvocationProvenance(
@@ -776,7 +785,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-core");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.CORE, false);
     InvocationProvenance provenance =
@@ -792,7 +801,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-plugin");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
     InvocationProvenance spoofed =
@@ -814,7 +823,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-plugin-ok");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
     InvocationProvenance ok =
@@ -833,7 +842,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.provenance-validation-plugin-mixed");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ok"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOp(id, TrustTier.TRUSTED_PLUGIN, false);
     for (TransportTag forbidden :
@@ -871,7 +880,7 @@ final class OperationExecutorImplTest {
     List<OperationHistoryEntry> history = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             history::add,
             Map.of(TEST_ADVISORY_CLASS, (Consumer<OperationCompletionEvent>) advisories::add),
@@ -905,7 +914,7 @@ final class OperationExecutorImplTest {
     List<OperationHistoryEntry> history = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             history::add,
             Map.of(TEST_ADVISORY_CLASS, (Consumer<OperationCompletionEvent>) advisories::add),
@@ -928,7 +937,7 @@ final class OperationExecutorImplTest {
     List<OperationHistoryEntry> history = new ArrayList<>();
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts, handlers, history::add, Map.of(), Clock.systemUTC());
+        new OperationExecutorImpl(attempts, admission, handlers, history::add, Map.of(), Clock.systemUTC());
 
     Operation op =
         makeOpWithAdvisoryClass(
@@ -948,7 +957,7 @@ final class OperationExecutorImplTest {
     handlers.register(id, (args, engineContext) -> OperationResult.failure("nope"));
     List<OperationCompletionEvent> advisories = new ArrayList<>();
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             entry -> {},
             Map.of(TEST_ADVISORY_CLASS, (Consumer<OperationCompletionEvent>) advisories::add),
@@ -996,7 +1005,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.test-gated");
     handlers.register(id, (args, engineContext) -> OperationResult.success("should-not-run"));
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> false);
 
     Operation op = makeOpWithCapability(id, RequiredCapability.WorkerOnline.INSTANCE);
@@ -1013,7 +1022,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.test-gated");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> true);
 
     Operation op = makeOpWithCapability(id, RequiredCapability.WorkerOnline.INSTANCE);
@@ -1028,7 +1037,7 @@ final class OperationExecutorImplTest {
     HandlerRegistry handlers = new HandlerRegistry();
     OperationRef id = new OperationRef("core.test-gated");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ran-without-resolver"));
-    OperationDispatcher executor = new OperationExecutorImpl(attempts, handlers);
+    OperationDispatcher executor = new OperationExecutorImpl(attempts, admission, handlers);
 
     Operation op = makeOpWithCapability(id, RequiredCapability.WorkerOnline.INSTANCE);
     OperationResult result = executor.dispatch(op, "{}", io.justsearch.app.services.TestEngineContexts.internal());
@@ -1042,7 +1051,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.test-no-cap");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> false);
 
     Operation op = makeOp(id, TrustTier.CORE, false);
@@ -1069,7 +1078,7 @@ final class OperationExecutorImplTest {
           }
         });
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers, null, Map.of(), Clock.systemUTC(), null, null, req -> false);
 
     Operation op =
@@ -1124,7 +1133,7 @@ final class OperationExecutorImplTest {
       HandlerRegistry handlers, ConsentCapsuleService capsule) {
     TrustEvaluator trust = new CoreTrustEvaluator();
     IntentSourceCatalog sources = CoreIntentSourceCatalog.catalog();
-    return new OperationExecutorImpl(attempts,
+    return new OperationExecutorImpl(attempts, admission,
         handlers, null, Map.of(), Clock.systemUTC(), trust, sources, null, capsule);
   }
 
@@ -1132,7 +1141,7 @@ final class OperationExecutorImplTest {
       HandlerRegistry handlers,
       ConsentCapsuleService capsule,
       List<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry> sink) {
-    return new OperationExecutorImpl(attempts,
+    return new OperationExecutorImpl(attempts, admission,
         handlers,
         null,
         Map.of(),
@@ -1156,7 +1165,7 @@ final class OperationExecutorImplTest {
     var sink =
         new ArrayList<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>();
     var executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             null,
             Map.of(),
@@ -1262,7 +1271,7 @@ final class OperationExecutorImplTest {
     OperationRef id = new OperationRef("core.test-medium");
     handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
     OperationDispatcher executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             null,
             Map.of(),
@@ -1482,7 +1491,7 @@ final class OperationExecutorImplTest {
       io.justsearch.app.services.intent.DurableGrantStore grants,
       io.justsearch.app.services.intent.DurableGrantScope scope) {
     OperationExecutorImpl executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             null,
             Map.of(),
@@ -1843,7 +1852,7 @@ final class OperationExecutorImplTest {
     boolean[] undoReached = {false};
     registerUndoProbe(handlers, id, undoReached);
     var executor =
-        new OperationExecutorImpl(attempts,
+        new OperationExecutorImpl(attempts, admission,
             handlers,
             null,
             Map.of(),
