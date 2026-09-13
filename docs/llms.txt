@@ -60,6 +60,7 @@ halves share objects.
 - [Capture UI Evidence](how-to/capture-ui-evidence.md): Screenshot capture for UI verification and agent visual feedback.
 - [Developing the UI](how-to/develop-ui.md): Demo mode (no backend), real backend mode, and frontend verification.
 - [Interpret `jseval bisect` Output (LR5-d)](how-to/interpret-bisect-output.md): Reading the manifest-hash bisection report — single-axis, multi-axis, MULTI_AXIS_INTERACTION, no-cached-run, and identical-cohort paths.
+- [Prevent public credential and email exposure](how-to/prevent-public-credential-and-email-exposure.md): Signing diagnostics, secret-scan coverage, commit identity checks, and historical cleanup limits.
 - [Spawn an Isolated Test Backend](how-to/spawn-isolated-test-backend.md): Lite mode env flag (JUSTSEARCH_LITE_MODE) and the per-class IsolatedBackendFixture pattern for integration tests that need a clean backend per test class without paying the 3-8s cost of loading the AI stack.
 - [Test GPU Inference Locally](how-to/test-gpu-locally.md): How to run llama-server with GPU offload for local development and testing.
 - [Use Codex for JustSearch Development](how-to/use-codex-for-development.md): Install, authenticate, launch, and verify Codex CLI, the Codex IDE extension, or the ChatGPT desktop app against JustSearch's shared instructions, skills, hooks, MCP server, and agent roles.

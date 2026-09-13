@@ -35,7 +35,8 @@ successor-bootstrap proof remain required; this is not C2-6 completion.
 
 Origin main b4d972b6b adds the identity gate that now rejects365 historical lane commits.
 Current effective identity and latest commits already comply. The original per-item checkpoint
-history/evidence is retained; root is repairing publication without force-push or gate exceptions.
+history/evidence is retained; root is creating a successor PR1 lineage without force-push or gate exceptions.
+[Decision and exact remaining candidate protocol](evidence/C2/publication-lineage.md).
 
 The fixed reset reservation/clear/restart mechanism passed independent review: preserve
 quarantine block through precommit failure, clear only after durable COMPLETE, then use the

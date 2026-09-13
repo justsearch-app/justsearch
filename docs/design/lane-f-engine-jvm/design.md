@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, R1-R10 corrections accepted at b713307ea with full905 and hosted34734430973; C2-3 active; D1-F remain. Merge placement stays F/PR1 on draft PR718."
+status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, R1-R10 corrections accepted at b713307ea with full905 and hosted34734430973; C2-3 active; D1-F remain. Merge placement stays F/PR1; a privacy-compliant successor draft is being prepared to replace PR718 as the active publication candidate, with PR718 retained as checkpoint history."
 created: 2026-09-06
 updated: 2026-09-13
 lane: F (decision re-examination programme, wave 4)
@@ -26,6 +26,8 @@ document is the lane's contract: the design and the considerations that shaped i
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-13: Main PR726 applies the owner identity guard to the entire introduced PR range;365 historical lane commits predate that policy. Preserve the original branch/PR718 checkpoints and create a successor PR1 candidate from current main with the reviewed lane snapshot, then resume per-item commits there. No force-push, historical rewrite or gate exception; final merge remains F. [Owning placement and proof](#173-pr-1-the-engine-one-branch-seven-checkpoints), [candidate protocol](evidence/C2/publication-lineage.md). Authorized lane decision, independently investigated.
 
 - 2026-09-13: C2 accepted-preparation binding compares canonical identity rather than raw JSON member order, matching the SQLite keyed-retry contract. The real accepted reset roundtrip exposed the mismatch; no persisted envelope format changes. [Correction, independent review and proof](evidence/C2/settings-reset-identity.md). Mechanism detail; stage and merge placement unchanged.
 
@@ -2140,6 +2142,15 @@ is the split side of every paired row in 16 and is stored under
 PR 1 is opened as draft at the B checkpoint (PR #718, 2026-09-08), so hosted CI runs before C1.
 This changes PR creation timing, not stage order, readiness for merge, or the single final merge.
 B9's hosted step and all other jobs passed on draft PR 718 at `84b8c0b6f` (run 34274192421); the Stage B hosted acceptance correction is closed and C1 can start.
+
+**Publication-lineage correction, 2026-09-13.** Main's new privacy guard blocks the old branch's
+introduced historical identities. Integrate current main, verify the resulting tree, and place
+that exact tree on a fresh branch rooted at main with an approved-identity checkpoint commit.
+The original branch/PR718 remain available as per-item evidence; the successor stays draft and
+resumes per-item checkpoint commits. This is a PR1 lineage replacement, not another stage merge.
+Its identity/tree/full/hosted checks must pass independently; earlier green runs cannot waive
+new policy. Keep the successor PR reference in handoff after creation and preserve all old
+artifact locations. Final readiness and the only Engine merge remain at F.
 
 Stage order is risk-first: the spine is the change most likely to surface an unknown, so it
 precedes the compensation work that assumes one process. (Sequencing stages are lettered A to

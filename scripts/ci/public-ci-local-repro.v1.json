@@ -76,7 +76,12 @@
     {
       "check": "Secret scan",
       "mode": "local-subset",
-      "commands": ["gitleaks git . --config .gitleaks.toml --redact --log-opts=HEAD"]
+      "commands": [
+        "node scripts/ci/test-check-commit-identity-privacy.mjs",
+        "node scripts/ci/check-commit-identity-privacy.mjs --range origin/main..HEAD",
+        "node scripts/ci/test-gitleaks-config.mjs",
+        "gitleaks git . --config .gitleaks.toml --redact --log-opts=HEAD --gitleaks-ignore-path scripts/ci/gitleaks-history.ignore"
+      ]
     },
     {
       "check": "jseval Python suite",
