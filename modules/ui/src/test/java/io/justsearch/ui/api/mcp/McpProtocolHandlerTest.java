@@ -386,7 +386,7 @@ class McpProtocolHandlerTest {
     Map<String, Object> ingestProps =
         (Map<String, Object>) ingestInputSchema.get("properties");
     assertEquals(
-        List.of("paths", "collection"),
+        List.of("paths", "collection", "operationKey"),
         List.copyOf(ingestProps.keySet()),
         "ingest inputSchema properties must serialize in declared source order");
     assertEquals(
@@ -467,7 +467,7 @@ class McpProtocolHandlerTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> browseProps = (Map<String, Object>) browseInputSchema.get("properties");
     assertEquals(
-        List.of("parent_path", "list_files"),
+        List.of("parent_path", "list_files", "operationKey"),
         List.copyOf(browseProps.keySet()),
         "browse inputSchema properties must serialize in declared source order");
 
@@ -884,6 +884,26 @@ class McpProtocolHandlerTest {
     when(ctx.contentType(anyString())).thenReturn(ctx);
     h.handlePost(ctx);
     return resultCaptor.getValue();
+  }
+
+  @Test
+  void toolsCall_keyCrossesJsonRpcBoundaryOutsidePublicArguments() throws Exception {
+    String key = "019940e2-3400-7000-8000-000000000001";
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key)))
+        .thenReturn(OperationResult.success("recorded", Map.of("operationKey", key)));
+    var surface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+        () -> null, () -> null, FIXED_CLOCK);
+    var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
+    String raw = callTool(protocol, 51, "justsearch_ingest",
+        "{\"paths\":[\"C:/notes\"],\"operationKey\":\"" + key + "\"}");
+    var wire = MAPPER.readTree(raw);
+    assertEquals(51, wire.path("id").asInt());
+    assertFalse(wire.path("result").path("isError").asBoolean());
+    assertTrue(raw.contains(key));
+    var publicJson = ArgumentCaptor.forClass(String.class);
+    verify(dispatcher).dispatch(any(), publicJson.capture(), any(), eq(java.util.Optional.empty()),
+        any(), eq(key));
+    assertEquals(MAPPER.readTree("{\"paths\":[\"C:/notes\"]}"), MAPPER.readTree(publicJson.getValue()));
   }
 
   @Test

@@ -2,6 +2,8 @@
 package io.justsearch.ui.api.mcp;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.app.api.registry.OperationInvocationResponse;
 
 import io.justsearch.agent.api.registry.ConfirmationRequiredException;
 import io.justsearch.agent.api.registry.InvocationProvenance;
@@ -371,6 +373,11 @@ public final class McpToolSurface {
               "response_format", RESPONSE_FORMAT_SCHEMA),
           List.of("query"));
 
+  // Transport metadata is removed before validating the Operation-owned public input schema.
+  private static final Map<String, Object> OPERATION_KEY_SCHEMA =
+      prop("string", "Optional UUIDv7 operation key. Reuse with identical input to obtain the"
+          + " recorded receipt; changed input conflicts. Omit for a server-minted key.");
+
   private static final Map<String, Object> STATUS_SCHEMA = schema(Map.of(), List.of());
 
   private static final Map<String, Object> RUNTIME_MANIFEST_SCHEMA = schema(Map.of(), List.of());
@@ -390,7 +397,8 @@ public final class McpToolSurface {
                   orderedMap(
                       "parent_path",
                           prop("string", "Folder path to browse (empty for top-level roots)"),
-                      "list_files", prop("boolean", "List individual files instead of subfolders")),
+                      "list_files", prop("boolean", "List individual files instead of subfolders"),
+                      "operationKey", OPERATION_KEY_SCHEMA),
                   List.of()),
               Map.of("readOnlyHint", true)),
           new ToolDefinition(
@@ -408,7 +416,8 @@ public final class McpToolSurface {
                                   + " the containing indexed root's collection, or 'mcp-ingest'"
                                   + " for paths outside every indexed root. The app-internal"
                                   + " collections 'justsearch-help' and 'agent-history' are"
-                                  + " rejected.")),
+                                  + " rejected."),
+                      "operationKey", OPERATION_KEY_SCHEMA),
                   List.of("paths")),
               orderedMap("readOnlyHint", false, "idempotentHint", true)),
           new ToolDefinition(
@@ -1462,7 +1471,13 @@ public final class McpToolSurface {
     try {
       Operation op = resolveOperation(opIdValue);
       if (op == null) return errorContent("Operation not available: " + opIdValue);
-      String argsJson = MAPPER.writeValueAsString(arguments);
+      var publicArguments = new LinkedHashMap<String, Object>(arguments == null ? Map.of() : arguments);
+      Object rawKey = publicArguments.remove("operationKey");
+      if (arguments != null && arguments.containsKey("operationKey") && !(rawKey instanceof String)) {
+        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+      }
+      String operationKey = (String) rawKey;
+      String argsJson = MAPPER.writeValueAsString(publicArguments);
       // Tempdoc 655: validate against the Operation's OWN declared schema — the real enforcement
       // schema, not a second MCP-authored literal — before dispatch, so a malformed call gets a
       // clean MCP error here instead of surfacing however the executor happens to fail later.
@@ -1482,9 +1497,11 @@ public final class McpToolSurface {
               io.justsearch.agent.api.registry.ExecutorTag.UI, clock.instant(), Optional.empty());
       OperationResult opResult;
       try {
-        opResult = dispatcher.dispatch(op, argsJson, provenance, engineContext);
+        opResult = operationKey == null
+            ? dispatcher.dispatch(op, argsJson, provenance, engineContext)
+            : dispatcher.dispatch(op, argsJson, provenance, Optional.empty(), engineContext, operationKey);
       } catch (ConfirmationRequiredException e) {
-        return handleConfirmationRequired(op, argsJson, e, requestedBy, engineContext, provenance);
+        return handleConfirmationRequired(op, argsJson, e, requestedBy, engineContext, provenance, operationKey);
       }
       if (opResult.success()) {
         var content = new ArrayList<Map<String, Object>>();
@@ -1499,10 +1516,18 @@ public final class McpToolSurface {
         failure.put("error", ApiErrorHandler.sanitizeMessage(opResult.message()));
         opResult.errorCode().ifPresent(code -> failure.put("errorCode", code));
         opResult.retryable().ifPresent(retryable -> failure.put("retryable", retryable));
+        for (String field : List.of("operationKey", "operationRecordId")) {
+          Object value = opResult.structuredData().get(field);
+          if (value instanceof String) failure.put(field, value);
+        }
         // OperationResult carries no API error class. Preserve its optional facts without
         // guessing a classification for a handler-specific or absent code.
         return errorContent(failure);
       }
+    } catch (OperationStoreException e) {
+      var failure = OperationInvocationResponse.fromStoreFailure(e);
+      return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
+          "errorClass", failure.errorClass(), "retryable", failure.retryable()));
     } catch (Exception e) {
       log.warn("MCP operation dispatch error for {}", opIdValue, e);
       return toolFailureContent("Operation " + opIdValue, e);
@@ -1522,7 +1547,7 @@ public final class McpToolSurface {
    * human approval, sidestepping MCP hosts' inconsistent/short tool-call timeouts entirely.
    */
   private Map<String, Object> handleConfirmationRequired(
-      Operation op, String argsJson, ConfirmationRequiredException e, String requestedBy, EngineContext engineContext, InvocationProvenance provenance) {
+      Operation op, String argsJson, ConfirmationRequiredException e, String requestedBy, EngineContext engineContext, InvocationProvenance provenance, String operationKey) {
     String message;
     if (pendingAuthorizationStore == null) {
       // Legacy/test wiring with no store — fail closed, but say so plainly rather than
@@ -1539,7 +1564,7 @@ public final class McpToolSurface {
           pendingAuthorizationStore.create(
               op.id().value(), argsJson, e.sourceTier(), op.policy().risk(), e.gateBehavior(),
               e.getMessage(), requestedBy,
-              io.justsearch.agent.api.registry.TransportTag.MCP, engineContext, provenance);
+              io.justsearch.agent.api.registry.TransportTag.MCP, engineContext, provenance, operationKey, false);
       if (pendingAuthorizationChanges != null) {
         // Tempdoc 655 fix pass: routing info only — no argsSummary/rationale on the broadcast
         // (see PendingAuthorizationEvent's doc comment for why). A subscriber fetches the
@@ -2061,6 +2086,9 @@ public final class McpToolSurface {
       if (Boolean.FALSE.equals(failure.get("retryable"))) {
         text.append(" Automatic retry is not recommended.");
       }
+    }
+    for (String field : List.of("operationKey", "operationRecordId")) {
+      if (failure.containsKey(field)) text.append("\n").append(field).append(": ").append(failure.get(field));
     }
     return Map.of(
         "content", List.of(Map.of("type", "text", "text", text.toString())),

@@ -3,15 +3,14 @@
 Status: active implementation plan, 2026-09-13, grounded at11254a1e0.
 The validated lookup prerequisite passes final909; keyed dispatcher SPI and receipt
 access pass final913. HTTP invoke/undo, approval key/mode and approved-result projection pass923.
-MCP ingress and persisted preparation remain open. R1–R10 are accepted; this record owns the next C2 item. No prepared
+MCP key delivery and failure receipts pass936; persisted preparation remains open. R1–R10 are accepted; this record owns the next C2 item. No prepared
 producer is active and no C2-3 completion is claimed.
 
 ## Current seams and intended behavior
 
-The HTTP invocation parser already reads idempotencyKey, but OperationsController
-still dispatches without it. OperationDispatcher's invoke and undo overloads lack
-a key. OperationExecutorImpl prepares before accepting a runner request with a null
-key. SqliteOperationStore already compares kind, operation reference and canonical
+HTTP invoke/undo and MCP operation tools now carry optional keys through the
+keyed dispatcher overloads. Existing keys are looked up before preparation; HTTP
+and MCP pending approval preserve their key and invoke/undo mode. SqliteOperationStore already compares kind, operation reference and canonical
 public identity before returning an existing row; that comparison must become the
 same read used before preparation. OperationDescriptor.invocation already stores a
 canonical public-input digest and separates invoke from undo. Undo arguments already

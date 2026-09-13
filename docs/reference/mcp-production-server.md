@@ -185,7 +185,7 @@ Protocol version: `2025-11-25`. Capabilities: tools, resources,
 prompts. Curated tool-surface version (single-sourced from
 `McpContractVersions.TOOL_SURFACE_VERSION`, reported as
 `serverInfo._meta["io.justsearch/toolSurfaceVersion"]` and as the runtime
-manifest's `mcpToolSurfaceVersion`): `0.7.0`. MCP `serverInfo.version` is the
+manifest's `mcpToolSurfaceVersion`): `0.8.0`. MCP `serverInfo.version` is the
 **build** version (bound to `EnvRegistry.APP_VERSION`) — a host that logs or
 gates on server version must see this build's number, not the tool surface's.
 
@@ -199,6 +199,18 @@ gates on server version must see this build's number, not the tool surface's.
 | 4 | `justsearch_ingest` | `core.ingest-files` Operation | File indexing. The only mutating tool — see Trust Model below. |
 | 5 | `justsearch_status` | `KnowledgeHttpApiAdapter.status()` | Index health + enrichment coverage. |
 | 6 | `justsearch_runtime_manifest` | `RuntimeManifestPublisher` | Redacted runtime manifest (identity, lifecycle, AI runtime state) for identity-aware caching. |
+
+`justsearch_browse` and `justsearch_ingest` accept an optional `operationKey`
+(UUIDv7). It is transport metadata, removed before the Operation validates its
+public input. An identical keyed retry returns the recorded receipt without another
+preparation or effect; changed public input returns `OPERATION_KEY_REUSED`. An
+omitted key is minted by the dispatcher and returned with the operation row id.
+Approval retains the supplied key. Receipt access still checks current provenance
+and hard-stop policy. Invalid/expired keys and storage failures have typed error
+codes in both MCP text and `structuredContent`; native causes and stored payloads
+are excluded. The HTTP operation endpoint names the same optional field
+`idempotencyKey` in its request envelope.
+
 
 All 6 tools validate their arguments against a declared JSON Schema at the MCP boundary before
 dispatch (tempdoc 655) — a malformed call gets a clean tool error rather than an internal cast
@@ -216,7 +228,7 @@ When a tool is deprecated, `tools/list` adds only namespaced top-level `_meta` k
 `io.justsearch/sunsetAt`, and `io.justsearch/replacement`. The standard `annotations` object is left
 unchanged. A short deprecation sentence is also prepended to the description for clients that ignore
 extensions. The production catalog is currently empty, so no shipped tool emits this metadata and
-the curated tool-surface version is `0.7.0` after the additive failure metadata below.
+the curated tool-surface version is `0.8.0` after the optional operation key addition.
 
 ## Response shape (tempdoc 725)
 

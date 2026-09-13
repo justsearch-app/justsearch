@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, correction full869 and hosted c56e1 proof pass, final independent review pending; D1-F remain. Merge placement stays F/PR1 on draft PR718."
+status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, R1-R10 corrections accepted at b713307ea with full905 and hosted34734430973; C2-3 active; D1-F remain. Merge placement stays F/PR1 on draft PR718."
 created: 2026-09-06
 updated: 2026-09-13
 lane: F (decision re-examination programme, wave 4)
@@ -421,6 +421,7 @@ it is history, not a second current contract. Evidence records retain the experi
 | 2026-09-13 | **C2-3 receipt access versus another mutation.** After existing ingress authentication, validate provenance and the current lattice DENY/hard-stop verdict before keyed lookup. Matching row metadata can be read without consuming another single-use capsule, decrypting preparation or checking target existence. Client/session ids and grantReference remain attribution, not credentials. Open-row lookup may observe but never execute; owner replay retains mutation authorization. Reuse the current metadata-read boundary and evaluator rather than inventing a receipt-policy registry or making spent capsules reusable. | C2-3; ADR-0046; [key/preparation plan](evidence/C2/C2-3-plan.md); source map at11254a1e0: EngineContext, DurableGrantStore, ConsentCapsuleService and operation-history ingress |
 
 | 2026-09-13 | **C2-3 HTTP approval preserves operation identity.** Thread the existing idempotencyKey through invoke and the actual `/api/undo/{id}` route. Store the key and explicit invoke/undo mode with the existing pending authorization and reuse both on approval; inferring reversal from a JSON field or redispatching undo as a forward operation is rejected. New effects still pass the existing gate. This is the key-only prerequisite; frozen prepared-payload persistence remains the following C2-3 mechanism. | C2-3; ResourceApiModule registration; negative914 ingress, negative917 approval; focused918 |
+| 2026-09-13 | **C2-3 MCP key projection.** Curated operation tools use optional `operationKey`, separately delivered to the dispatcher and excluded from public argument identity; HTTP keeps its existing `idempotencyKey` envelope. Approval retains that key. Failed-attempt receipts carry key and row id through both MCP delivery tiers, without private payload projection. | C2-3a; negative925/929; final936; [MCP proof](evidence/C2/mcp-key.md) |
 
 **2026-09-10 corrections from the inference-host design audits** (four read-only audits at
 `4229f1091`, `docs/design/inference-host/evidence/audits/`), inside decided lines: (a) sections

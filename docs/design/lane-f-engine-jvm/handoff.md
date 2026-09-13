@@ -8,7 +8,7 @@ queue; no owner reply is needed for #708 or #717.
 Latest state: C1 complete including the later MCP quota correction, verified at
 the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
-next; the six keyed C2-11 recovery scenarios and later producers remain required.
+in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
 Final independent correction verification is clear at **b713307ea**. Full905 passes
 in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;
@@ -26,7 +26,9 @@ C2-3 is now in progress: validated lookup is committed at382b19a5c with294 passi
 represented cases at909. The keyed dispatcher SPI/receipt branch passes333 cases
 at913 after negative910/912. HTTP invoke/undo key delivery, typed failures and approval key/mode carry-through
 and approved-result key/error projection now pass265 represented cases at923.
-Next: MCP key delivery, then prepared persistence and frozen approval payloads.
+MCP key delivery, pending approval and failure receipt projection pass278 represented cases at936;
+see [MCP key proof](evidence/C2/mcp-key.md). Next: prepared persistence and frozen
+approval payloads, then remaining ingress and integrated acceptance.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
 The following paragraphs retain the pre-review correction checkpoints; current
