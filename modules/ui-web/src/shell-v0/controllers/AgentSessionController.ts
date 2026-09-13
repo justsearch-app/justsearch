@@ -413,6 +413,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * `onDone`'s duplicate-answer guard; per-run, cleared with the rest of the run state.
    */
   private lastStreamedAnswer = '';
+  /** Invalidates private approval reads when this controller concludes a run. */
+  private approvalLookupRevision = 0;
   isStreaming = false;
   // Tempdoc 565 §33 — WHICH kind of run is live (null = idle). Only an `agent` run is steerable (§30
   // interject) — a `workflow` run goes through WorkflowShapeRunner (no drain) and a `background` run is
@@ -762,6 +764,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   destroy(): void {
+    this.approvalLookupRevision++;
     this.stopPolling();
     this.abortController?.abort();
     this.reasoning.destroy();
@@ -1017,59 +1020,55 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.pendingAutoApprovals.push(callId);
       }
     } else if (status === 'pending') {
-      // Tempdoc 550 C3 (producer migration): a tool call needing a human decision routes through the
-      // ONE unified ceremony host (jf-authorization-host via the broker). The ceremony's gate is the
-      // BACKEND verdict (INLINE_CONFIRM / TYPED_CONFIRM here), not a risk-derived guess.
-      const toolName = data.toolName as string;
-      const argsSummary = typeof data.arguments === 'string' ? data.arguments : undefined;
-      // Tempdoc 561 P-D: the risk tier for the ceremony's fallback + context (the backend verdict is
-      // the primary signal; risk only seeds the legacy/absent-verdict heuristic below).
-      const risk = data.risk as ToolRisk;
-      // Tempdoc 605 Move 1 — the ceremony is owned by the run that issued the call (the event's
-      // sessionId, else the current run). The owner lets a run conclusion drain its own ceremonies
-      // (Move 2) and routes approve/reject to THIS run, never a later run's stale sessionId (M2).
       const owningRunId = (data.sessionId as string | undefined) ?? this.sessionId ?? undefined;
-      void requestAuthorization({
-        pendingId: callId,
-        operationId: toolName,
-        ...(owningRunId ? { owningRunId } : {}),
-        // Tempdoc 561 P-D1: the ceremony's confirmation mechanism is the BACKEND verdict when the
-        // loop supplied it (collapsing the FE re-derivation); fall back to the risk heuristic only
-        // when absent (legacy/test wiring).
-        gateBehavior: backendGate
-          ? (backendGate.toUpperCase() as 'AUTO' | 'INLINE_CONFIRM' | 'TYPED_CONFIRM' | 'DENY')
-          : risk === 'HIGH'
-            ? 'TYPED_CONFIRM'
-            : 'INLINE_CONFIRM',
-        // Tempdoc 550 P1: give the ceremony the decision context it already has from the event.
-        riskTier: risk,
-        // Tempdoc 875 — this route posts the verdict to /api/chat/approve, which carries no
-        // `allowAlways` field, so an "always allow" tick here would be silently dropped. Declare
-        // that rather than render a control that does nothing. Making agent-loop approvals able to
-        // mint a durable grant is a product decision, tracked in 875 §C.9.
-        allowAlwaysSupported: false,
-        ...(argsSummary ? { argsSummary } : {}),
-      }).then((decision) => {
-        // Tempdoc 605 — the ceremony was drained because its run concluded (not a human deny):
-        // the run is gone, so do NOT POST a reject (concludeRunCeremonies already surfaced the one
-        // legible notice).
-        if (decision.superseded) return;
-        if (!decision.approved) {
-          void this.rejectCall(callId, 'Denied in authorization ceremony', owningRunId);
-          return;
-        }
-        // Route the approval to the run that OWNED the ceremony (Move 1, M2 fix), not whatever
-        // this.sessionId happens to be when the decision resolves. If neither is known yet, queue
-        // it (replayed on session start) — mirrors the auto-approve pendingAutoApprovals path.
-        const runId = owningRunId ?? this.sessionId ?? undefined;
-        if (runId) {
-          void this.approveCall(callId, runId);
-        } else {
-          this.pendingAutoApprovals.push(callId);
-        }
-      });
+      void this.requestLiveToolAuthorization(callId, owningRunId);
     }
     this.notify();
+  }
+
+  /** Frozen display stays on the live server gate; replay frames only identify the call to read. */
+  private async requestLiveToolAuthorization(callId: string, owningRunId: string | undefined): Promise<void> {
+    const pendingCall = this.toolCalls[callId];
+    const revision = this.approvalLookupRevision;
+    const isCurrent = (): boolean => revision === this.approvalLookupRevision
+      && this.toolCalls[callId] === pendingCall && pendingCall?.status === 'pending'
+      && (this.sessionId ?? undefined) === owningRunId && !this.replayMode;
+    try {
+      if (!owningRunId) throw new Error('Approval has no live run identity');
+      const query = new URLSearchParams({ sessionId: owningRunId, callId });
+      const response = await authorizedFetch(`${this.apiBase}/api/chat/approval?${query}`, { cache: 'no-store' });
+      if (!isCurrent()) return;
+      if (!response.ok) throw new Error('Live approval lookup failed');
+      const detail = await response.json() as Record<string, unknown>;
+      if (!isCurrent()) return;
+      if (detail.callId !== callId || typeof detail.operationId !== 'string' || !detail.operationId
+          || typeof detail.argsSummary !== 'string'
+          || typeof detail.riskTier !== 'string' || !['LOW', 'MEDIUM', 'HIGH'].includes(detail.riskTier)
+          || (detail.gateBehavior !== null && (typeof detail.gateBehavior !== 'string'
+            || !['AUTO', 'INLINE_CONFIRM', 'TYPED_CONFIRM', 'DENY'].includes(detail.gateBehavior)))) {
+        throw new Error('Live approval response is incomplete');
+      }
+      const decision = await requestAuthorization({
+        pendingId: callId,
+        operationId: detail.operationId,
+        owningRunId,
+        gateBehavior: detail.gateBehavior as string | null
+          ?? (detail.riskTier === 'HIGH' ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM'),
+        riskTier: detail.riskTier,
+        argsSummary: detail.argsSummary,
+        allowAlwaysSupported: false,
+      });
+      if (!isCurrent() || decision.superseded) return;
+      if (decision.approved) await this.approveCall(callId, owningRunId);
+      else await this.rejectCall(callId, 'Denied in authorization ceremony', owningRunId);
+    } catch {
+      if (!isCurrent()) return;
+      emitEphemeralToast({
+        message: 'Approval details are unavailable. The action was not approved.',
+        severity: 'warning',
+      });
+      await this.rejectCall(callId, 'Live approval details unavailable', owningRunId);
+    }
   }
 
   onToolCallApproved(payload: CoreAgentRunToolCallApprovedPayload): void {
@@ -2067,6 +2066,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * was auto-denied — never silent. Other runs' ceremonies and plugin consent requests are untouched.
    */
   private concludeRunCeremonies(runId: string | null | undefined): void {
+    this.approvalLookupRevision++;
     if (!runId) return;
     const denied = cancelAuthorizationsForRun(runId);
     if (denied > 0) {

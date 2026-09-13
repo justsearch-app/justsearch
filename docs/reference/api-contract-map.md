@@ -47,6 +47,12 @@ absent from pending-call events and snapshots. The private lookup reads no durab
 run history and cannot recreate a gate. Replies use `POST /api/chat/approve` or
 `POST /api/chat/reject` with the same session/call ids.
 
+The live run controller reads this projection before a human ceremony and uses its
+complete summary and server gate/risk fields. A failed, missing or malformed lookup
+refuses the pending action with a notice; replayed raw arguments cannot replace the
+private display. Run conclusion, replacement and call completion invalidate an
+in-flight lookup. Explicit backend AUTO approvals keep their existing path.
+
 ### Engine admission and cancellation
 
 `EngineAdmissionController` is the shared owner for HTTP/MCP admission and upgrade freezing.
