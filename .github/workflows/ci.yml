@@ -1123,6 +1123,7 @@ jobs:
           ./scripts/ci/test-install-codesign-tool.ps1
           ./scripts/ci/test-resolve-release-signing.ps1
           ./scripts/ci/test-sign-windows.ps1
+          ./scripts/ci/test-sign-windows-diagnostics.ps1
           ./scripts/ci/test-verify-pe-signatures.ps1
           ./scripts/release/test-sign-vendored-payload.ps1
 
@@ -1285,10 +1286,40 @@ jobs:
           tar -xzf "${RUNNER_TEMP}/${asset}" -C "${RUNNER_TEMP}" gitleaks
           "${RUNNER_TEMP}/gitleaks" version
 
+      - name: Set up Node for privacy guards
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test secret and commit-identity guards
+        env:
+          GITLEAKS_PATH: ${{ runner.temp }}/gitleaks
+        run: |
+          node scripts/ci/test-gitleaks-config.mjs
+          node scripts/ci/test-check-commit-identity-privacy.mjs
+
+      - name: Check introduced commit identities
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          case "$EVENT_NAME" in
+            pull_request) range="${PR_BASE}..${PR_HEAD}" ;;
+            merge_group) range="${GROUP_BASE}..${GROUP_HEAD}" ;;
+            push) range="${PUSH_BASE}..${GITHUB_SHA}" ;;
+            *) range="origin/main..HEAD" ;;
+          esac
+          node scripts/ci/check-commit-identity-privacy.mjs --range "$range"
+
       # `dir` scans the checked-out tree rather than a commit range. Every PR lands on
       # main as a single squashed commit (ADR-0045), so the tree that this job scans is
-      # exactly the content that would land — and main's history stays clean by
-      # induction. The binary and its archive live in RUNNER_TEMP so they are not
+      # exactly the content that would land. This does not clear historical files
+      # or identity metadata; introduced identities are checked separately above.
+      # The binary and its archive live in RUNNER_TEMP so they are not
       # themselves scanned. Any finding exits non-zero and fails this required check.
       - name: Gitleaks
         run: |

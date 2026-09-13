@@ -15,6 +15,14 @@
     "requiredApprovingReviewCount": 0,
     "enforceAdmins": true
   },
+  "ownerPrivacy": {
+    "kind": "owner-identity-privacy.v1",
+    "ownerAliases": [
+      "eliasjustus",
+      "Elias Justus"
+    ],
+    "approvedEmail": "250838377+eliasjustus@users.noreply.github.com"
+  },
   "notes": [
     "Public main is a projected history surface: ordinary PRs land as curated squash commits.",
     "The complete PR title/body are the commit-safe public title/body source; mutable review evidence lives in one managed PR comment.",

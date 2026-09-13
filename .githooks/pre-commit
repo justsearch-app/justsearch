@@ -7,6 +7,11 @@
 #   (2) secret-scan the staged change with gitleaks (warn-skip if gitleaks is absent).
 set -euo pipefail
 
+# (0) Owner metadata privacy guard. Check the effective identities Git will put
+# on the commit before running the staged-content checks below.
+repo_root="$(git rev-parse --show-toplevel)"
+node "$repo_root/scripts/ci/check-commit-identity-privacy.mjs" --pre-commit
+
 # (1) Sidecar-path guard. These trees live in the PRIVATE sidecar, never the public repo.
 BLOCKED='^(docs/business/|docs/market-analysis/)'
 staged="$(git diff --cached --name-only)"
