@@ -28,10 +28,7 @@ Licenses of third-party components redistributed with JustSearch.
   com.github.jknack:handlebars 4.5.0 — Apache License, Version 2.0
   com.github.oshi:oshi-core 6.10.0 — MIT License
   com.github.virtuald:curvesapi 1.08 — The 3-Clause BSD License
-  com.google.android:annotations 4.1.1.4 — Apache License, Version 2.0
-  com.google.api.grpc:proto-google-common-protos 2.63.2 — Apache License, Version 2.0
   com.google.auto.value:auto-value-annotations 1.11.0 — Apache License, Version 2.0
-  com.google.code.findbugs:jsr305 3.0.2 — Apache License, Version 2.0
   com.google.code.gson:gson 2.13.2 — Apache License, Version 2.0
   com.google.errorprone:error_prone_annotations 2.47.0 — Apache License, Version 2.0
   com.google.guava:failureaccess 1.0.3 — Apache License, Version 2.0
@@ -64,14 +61,6 @@ Licenses of third-party components redistributed with JustSearch.
   dev.cel:runtime 0.12.0 — Apache License, Version 2.0
   info.picocli:picocli 4.7.6 — Apache License, Version 2.0
   io.github.metarank:lightgbm4j 4.6.0-2 — Apache License, Version 2.0
-  io.grpc:grpc-api 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-context 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-core 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-netty-shaded 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-protobuf 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-protobuf-lite 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-stub 1.79.0 — Apache License, Version 2.0
-  io.grpc:grpc-util 1.79.0 — Apache License, Version 2.0
   io.javalin:javalin 6.7.0 — Apache License, Version 2.0
   io.methvin:directory-watcher 0.19.1 — Apache License, Version 2.0
   io.opentelemetry:opentelemetry-api 1.60.1 — Apache License, Version 2.0
@@ -92,7 +81,6 @@ Licenses of third-party components redistributed with JustSearch.
   io.opentelemetry.instrumentation:opentelemetry-instrumentation-api-incubator 2.26.0-alpha — Apache License, Version 2.0
   io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0 2.26.0-alpha — Apache License, Version 2.0
   io.opentelemetry.semconv:opentelemetry-semconv 1.40.0 — Apache License, Version 2.0
-  io.perfmark:perfmark-api 0.27.0 — Apache License, Version 2.0
   jakarta.activation:jakarta.activation-api 2.1.3 — The 3-Clause BSD License
   jakarta.xml.bind:jakarta.xml.bind-api 4.0.2 — The 3-Clause BSD License
   net.java.dev.jna:jna 5.18.1 — Apache-2.0
@@ -162,7 +150,6 @@ Licenses of third-party components redistributed with JustSearch.
   org.bouncycastle:bcprov-jdk18on 1.81.1 — MIT License
   org.bouncycastle:bcutil-jdk18on 1.81.1 — MIT License
   org.brotli:dec 0.1.2 — MIT License
-  org.codehaus.mojo:animal-sniffer-annotations 1.26 — MIT License
   org.codelibs:jhighlight 1.1.0 — CDDL-1.0
   org.commonmark:commonmark 0.27.1 — The 2-Clause BSD License
   org.commonmark:commonmark-ext-gfm-tables 0.27.1 — The 2-Clause BSD License

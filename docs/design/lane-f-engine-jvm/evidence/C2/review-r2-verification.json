@@ -1,0 +1,23 @@
+{
+  "revision": "5a10b9dc9 + R2 launcher instance exclusion",
+  "command": "gradlew.bat :modules:app-launcher:test --tests *LauncherEnvironmentCloseTest --tests *LauncherEnvironmentResolveTest :modules:ui:compileIntegrationTestJava :modules:app-launcher:pmdMain :modules:app-launcher:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 45,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 17
+  },
+  "tasks": [
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 17
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Utility methods for vector operations.
  *
- * <p>Extracted from GrpcSearchService for reusability and testability.
+ * <p>Extracted from WorkerSearchService for reusability and testability.
  */
 public final class VectorUtils {
 

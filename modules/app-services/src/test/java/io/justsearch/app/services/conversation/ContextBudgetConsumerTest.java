@@ -176,7 +176,7 @@ class ContextBudgetConsumerTest {
     List<SseEvent> events = new ArrayList<>();
     Supplier<OnlineAiService> aiSupplier = () -> ai.withWindow(window);
     new HierarchicalShapeRunner(aiSupplier, () -> null)
-        .run(Map.of("docId", "doc-1", "content", content), Audience.USER, events::add);
+        .run(Map.of("docId", "doc-1", "content", content), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
     return events;
   }
 
@@ -306,6 +306,11 @@ class ContextBudgetConsumerTest {
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attributes = new HashMap<>();
       private final Map<String, Object> requestBody = new LinkedHashMap<>(body);
 

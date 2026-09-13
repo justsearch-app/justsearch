@@ -29,12 +29,16 @@ plugins {
 }
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   implementation(project(":modules:core"))
   implementation(project(":modules:configuration"))
   implementation(project(":modules:ort-common"))  // 347: GpuAutoDetection for startup probe
   implementation(project(":modules:app-api"))
   implementation(project(":modules:app-inference"))
   implementation(project(":modules:app-services"))
+  // Lane F stage A item A6: HeadlessApp composes the Engine through EngineRoot, the only module
+  // allowed to bind both halves. `implementation`, so worker internals stay off this classpath.
+  implementation(project(":modules:app-engine"))
   implementation(project(":modules:app-agent-api"))
   // Validation finding (2026-04-26): HeadlessApp's LocalTelemetry must register
   // catalog DEFINITIONS for every emit path HeadAssembly touches. Adding
@@ -50,7 +54,6 @@ dependencies {
   // Runtime-scope: HeadlessApp.main calls BootContractRunner.validateAll() (tempdoc 402 P3),
   // so core-contracts classes must be on the installed-distribution runtime classpath.
   implementation(project(":modules:core-contracts"))
-  implementation("io.grpc:grpc-api:1.79.0")  // Provides io.grpc.Status / StatusRuntimeException APIs
   implementation("org.eclipse.jetty.toolchain:jetty-jakarta-servlet-api:5.0.2")
   implementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
   implementation(libs.jackson.databind)
@@ -74,7 +77,6 @@ dependencies {
 // Must live in a top-level dependencies block (these configurations do not
 // exist inside a JvmTestSuite dependencies {} block).
 dependencies {
-  testImplementation(libs.grpc.stub)
 }
 
 configurations.configureEach {
@@ -92,6 +94,9 @@ testing {
       useJUnitJupiter()
       dependencies {
         implementation(project())
+        // C1 real HTTP disconnect proof reads the Engine's actual pacing gauge. Test-only:
+        // the frontend production layer still cannot depend on Worker service internals.
+        implementation(project(":modules:worker-services"))
         implementation(testFixtures(project(":modules:configuration")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
@@ -99,9 +104,6 @@ testing {
         implementation(libs.archunit.junit5)
         implementation(libs.mockito.core)
         implementation(libs.assertj.core)
-        // Slice 445: integration test for the indexing-jobs SSE substrate uses
-        // an in-process gRPC server (no live worker dep). Scoped to test only.
-        implementation(libs.grpc.inprocess)
         // Tempdoc 911 (885 UL.9): the failed-jobs wire-contract test validates the ACTUAL endpoint
         // body against SSOT/schemas/failed-indexing-jobs-response.v1.json. The record→schema link is
         // pinned in app-api; this pins the other end — that the handler emits what the schema says.
@@ -179,12 +181,10 @@ tasks.named<Test>("integrationTest").configure {
 
   environment("PROGRAMDATA", layout.buildDirectory.dir("it-programdata").get().asFile.absolutePath)
 
-  // Tempdoc 415 N10: SchemaMismatchStatusContractTest (and other UI integration tests that
-  // start a real Worker via KnowledgeServerBootstrap) require :modules:indexer-worker:installDist
-  // to have run. Without this dependsOn, fresh worktrees fail with "Worker lib directory not
-  // found" until installDist runs. Adding it here makes integrationTest hermetic to fresh
-  // checkouts; the cost is a few seconds of installDist on first run.
-  dependsOn(":modules:indexer-worker:installDist")
+  // Tempdoc 415 N10 wired a :modules:indexer-worker:installDist dependency here so UI
+  // integration tests that boot a real Knowledge Server would not fail with "Worker lib directory
+  // not found" on a fresh worktree. Lane F stage A item A13 deleted that distribution: these tests
+  // boot the index half in-process off the test runtimeClasspath, so there is nothing to install.
 }
 
 val lintStyles by tasks.registering(conventions.StylelintTask::class) {
@@ -252,15 +252,15 @@ tasks.named<ProcessResources>("processResources") {
   }
 }
 
-// Slice 3a.1.9 §A.6a: SchemaController serves classpath copies of SSOT/schemas/*.v1.json.
+// Slice 3a.1.9 §A.6a: SchemaController serves versioned classpath copies of SSOT/schemas.
 // Mirror the repo-root SSOT/schemas/ into modules/ui/src/main/resources/SSOT/schemas/ at
 // build time so the schemas are on the head's classpath. Same convention as
 // adapters-lucene's syncSsotCatalogs (catalogs dual-copy, tempdoc 393 §3.6).
 val syncSsotSchemas by tasks.registering(Sync::class) {
   group = "build"
-  description = "Mirror SSOT/schemas/*.v1.json from the repo root into ui resources."
+  description = "Mirror SSOT/schemas/*.vN.json from the repo root into ui resources."
   from(rootProject.file("SSOT/schemas")) {
-    include("*.v1.json")
+    include("*.v*.json")
   }
   into(layout.projectDirectory.dir("src/main/resources/SSOT/schemas"))
 }
@@ -317,11 +317,13 @@ val headlessDistDir = layout.buildDirectory.dir("headless-dist")
 // G19/G20 / Tempdoc 374 alpha.19 Bug K: headlessDist is `Copy::class` (not
 // `Sync::class`) for configuration-cache compatibility — naive Sync wipes
 // neighboring outputs like `normalizeHeadlessJar`'s stable-name jar at the
-// same root and breaks the configuration cache because
-// `generateWorkerAotCache` holds a task-typed reference (Sync subtypes don't
-// serialize). To get Sync-like purge semantics for the lib/ subdir without
-// the side effects, alpha.19 adds a `doFirst` that deletes only `lib/*.jar`
-// before the Copy populates them with the current version's set.
+// same root. (Until lane F stage A item A13 it also broke the configuration
+// cache, because `generateWorkerAotCache` held a task-typed `Sync` reference
+// and Sync subtypes don't serialize; that task is deleted, but the
+// wipes-neighbouring-outputs reason stands on its own.) To get Sync-like
+// purge semantics for the lib/ subdir without the side effects, alpha.19
+// adds a `doFirst` that deletes only `lib/*.jar` before the Copy populates
+// them with the current version's set.
 //
 // Before alpha.19, the destination accumulated stale module jars across
 // version bumps (alpha.16 + alpha.17 + alpha.18 in lib/ at the same time).
@@ -1082,60 +1084,20 @@ val generateHeadAotCache by tasks.registering {
   }
 }
 
-val generateWorkerAotCache by tasks.registering {
-  group = "distribution"
-  description = "Generate JDK 25 AOT cache for the Worker (Knowledge Server) process"
-  notCompatibleWithConfigurationCache("Spawns external JVM processes for AOT training")
-  val workerInstallDist =
-      project(":modules:indexer-worker").tasks.named("installDist", Sync::class)
-  dependsOn(workerInstallDist, createHeadlessRuntime, copyJavawToRuntime)
-  val runtimeDir = headlessRuntimeImageDir.map { it.asFile }
-  val aotDir = aotCacheDir.map { it.dir("worker").asFile }
-  outputs.dir(aotDir)
-
-  doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
-    val java = runtimeDir.get().resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
-    val aot = aotDir.get()
-    aot.mkdirs()
-    val confFile = aot.resolve("worker.aotconf")
-    val cacheFile = aot.resolve("worker.aot")
-
-    // Build explicit classpath from Worker's installDist output
-    val sep = System.getProperty("path.separator")
-    val workerLibDir = workerInstallDist.get().destinationDir.resolve("lib")
-    val jars = workerLibDir.listFiles()?.filter { it.extension == "jar" }?.sorted() ?: emptyList()
-    val cp = jars.joinToString(sep) { it.absolutePath }
-
-    // Step 1: Training run
-    logger.lifecycle("AOT training (Worker): recording class loading...")
-    val r1 = ProcessBuilder(java,
-        "-XX:AOTMode=record", "-XX:AOTConfiguration=${confFile.absolutePath}",
-        "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
-        "io.justsearch.indexerworker.AotTraining")
-        .inheritIO().start().waitFor()
-    if (r1 != 0) throw GradleException("AOT training (Worker) failed with exit code $r1")
-
-    // Step 2: Assembly
-    logger.lifecycle("AOT assembly (Worker): creating cache...")
-    val r2 = ProcessBuilder(java,
-        "-XX:AOTMode=create", "-XX:AOTConfiguration=${confFile.absolutePath}",
-        "-XX:AOTCache=${cacheFile.absolutePath}",
-        "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
-        "io.justsearch.indexerworker.AotTraining")
-        .inheritIO().start().waitFor()
-    if (r2 != 0) throw GradleException("AOT assembly (Worker) failed with exit code $r2")
-
-    logger.lifecycle("AOT cache (Worker): ${cacheFile.absolutePath} (${cacheFile.length() / 1024}KB)")
-  }
-}
+// Lane F stage A item A13 deleted `generateWorkerAotCache` and the `worker.aot` it produced.
+// One JVM gets one cache: the index half runs inside the Engine since item A6, so the touches
+// that used to warm the Worker cache folded into io.justsearch.ui.AotTraining (Lucene, Tika,
+// SQLite, ORT, KnowledgeServer) and `generateHeadAotCache` above trains them on the Engine
+// classpath. Training them anywhere else would warm classes no process loads.
 
 // Dev-mode AOT Cache Generation (S1 from tempdoc 275)
 // ============================================================================
 // Same two-step workflow as production but uses the system JDK instead of the
-// bundled JLink runtime. Caches are stored under build/aot-dev/ and used by
-// dev-runner's direct-launch path and WorkerSpawner in dev mode.
-// Caches are UP-TO-DATE as long as the installDist JARs haven't changed.
+// bundled JLink runtime. The cache is stored under build/aot-dev/head and used by
+// dev-runner's direct-launch path (scripts/dev/dev-runner.cjs). There is one cache because
+// lane F stage A item A13 left one JVM: item A11 deleted the WorkerSpawner that consumed the
+// dev worker cache, and A13 deleted the cache itself.
+// The cache is UP-TO-DATE as long as the installDist JARs haven't changed.
 
 val devAotCacheDir = layout.buildDirectory.dir("aot-dev")
 
@@ -1184,50 +1146,56 @@ val generateDevHeadAotCache by tasks.registering {
   }
 }
 
-val generateDevWorkerAotCache by tasks.registering {
-  group = "development"
-  description = "Generate dev-mode AOT cache for the Worker process (system JDK)"
-  notCompatibleWithConfigurationCache("Spawns external JVM processes for AOT training")
-  val workerInstallDist =
-      project(":modules:indexer-worker").tasks.named("installDist", Sync::class)
-  dependsOn(workerInstallDist)
-  inputs.dir(workerInstallDist.map { it.destinationDir.resolve("lib") })
-  val aotDir = devAotCacheDir.map { it.asFile }
-  outputs.dir(aotDir.map { it.resolve("worker") })
+// Item A13: `generateDevWorkerAotCache` went with its production twin — one dist, one dev cache.
+
+// 371 / ADR-0021: content-hash build stamp for stale-JVM detection. The stamp changes iff the
+// distribution contents change; external tools (jseval, the MCP reload tool) read this file to
+// decide whether a running JVM matches the on-disk distribution.
+//
+// Lane F stage A item A13 re-homed this task from `modules/indexer-worker` (where it stamped
+// `build/install/indexer-worker/build-stamp.txt`) onto the one surviving distribution. The
+// mechanism is unchanged — same SHA-256 over the lib jars, same 16-hex-char prefix, same
+// SNAPSHOT-content / third-party-name+size split — only the tree it describes is now the Engine's.
+val generateBuildStamp by tasks.registering {
+  dependsOn(tasks.named("installDist"))
+  val libDir = layout.buildDirectory.dir("install/ui/lib")
+  inputs.dir(libDir)
+  val stampFile = layout.buildDirectory.file("install/ui/build-stamp.txt")
+  outputs.file(stampFile)
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
-    val java = org.gradle.internal.jvm.Jvm.current().javaHome
-        .resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
-    val aot = aotDir.get().resolve("worker")
-    aot.mkdirs()
-    val confFile = aot.resolve("worker.aotconf")
-    val cacheFile = aot.resolve("worker.aot")
-
-    val sep = System.getProperty("path.separator")
-    val workerLibDir = workerInstallDist.get().destinationDir.resolve("lib")
-    val jars = workerLibDir.listFiles()?.filter { it.extension == "jar" }?.sorted() ?: emptyList()
-    val cp = jars.joinToString(sep) { it.absolutePath }
-
-    logger.lifecycle("Dev AOT training (Worker): recording class loading...")
-    val r1 = ProcessBuilder(java,
-        "-XX:AOTMode=record", "-XX:AOTConfiguration=${confFile.absolutePath}",
-        "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
-        "io.justsearch.indexerworker.AotTraining")
-        .inheritIO().start().waitFor()
-    if (r1 != 0) throw GradleException("Dev AOT training (Worker) failed with exit code $r1")
-
-    logger.lifecycle("Dev AOT assembly (Worker): creating cache...")
-    val r2 = ProcessBuilder(java,
-        "-XX:AOTMode=create", "-XX:AOTConfiguration=${confFile.absolutePath}",
-        "-XX:AOTCache=${cacheFile.absolutePath}",
-        "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
-        "io.justsearch.indexerworker.AotTraining")
-        .inheritIO().start().waitFor()
-    if (r2 != 0) throw GradleException("Dev AOT assembly (Worker) failed with exit code $r2")
-
-    logger.lifecycle("Dev AOT cache (Worker): ${cacheFile.absolutePath} (${cacheFile.length() / 1024}KB)")
+    val dir = libDir.get().asFile
+    val md = MessageDigest.getInstance("SHA-256")
+    val buf = ByteArray(8192)
+    dir.listFiles()
+        ?.filter { it.isFile }
+        ?.sortedBy { it.name }
+        ?.forEach { f ->
+          md.update(f.name.toByteArray(Charsets.UTF_8))
+          md.update("\n".toByteArray())
+          // Content-hash project JARs (SNAPSHOT) for exact change detection.
+          // Third-party JARs are immutable — name+size is sufficient and avoids
+          // reading 371MB onnxruntime_gpu on every stamp.
+          if (f.name.contains("SNAPSHOT")) {
+            f.inputStream().use { stream ->
+              var n: Int
+              while (stream.read(buf).also { n = it } != -1) {
+                md.update(buf, 0, n)
+              }
+            }
+          } else {
+            md.update(f.length().toString().toByteArray(Charsets.UTF_8))
+          }
+        }
+    val hash = md.digest().joinToString("") { byte: Byte -> "%02x".format(byte) }.take(16)
+    stampFile.get().asFile.writeText(hash + "\n")
   }
+}
+
+// Ensure the stamp is generated whenever installDist runs — covers runHeadless, the dev-runner's
+// launch path, and any other task that triggers installDist directly.
+tasks.named("installDist") {
+  finalizedBy(generateBuildStamp)
 }
 
 val tesseractRuntimeManifestFile =
@@ -1485,7 +1453,7 @@ val verifyTesseractRuntime by tasks.registering {
   }
 }
 
-// Tempdoc 772 §G + §J item 2 — Trim two classes of dead/relocatable native from the worker's
+// Tempdoc 772 §G + §J item 2 — Trim two classes of dead/relocatable native from the
 // onnxruntime_gpu jar before it is staged into the shipped Windows installer. The upstream Maven
 // artifact `com.microsoft.onnxruntime:onnxruntime_gpu` is published as a single fat jar that bundles
 // native libraries for EVERY platform (win-x64 AND linux-x64) — no per-OS classifier exists.
@@ -1502,9 +1470,9 @@ val verifyTesseractRuntime by tasks.registering {
 //      pack. Rather than ship it to every user (36% of the download) it is relocated INTO that
 //      pack: the `cuda-runtime` package's new `ort-native-cuda12-v1.24.3.zip` supporting file
 //      carries the complete ORT native set (this EP DLL + the core trio) into the pack's cuda12
-//      dir, and the worker points ORT at that dir via the `onnxruntime.native.path` system
+//      dir, and the Engine points ORT at that dir via the `onnxruntime.native.path` system
 //      property when the set is present (see `OrtCudaHelper.applyOrtNativePackProperty` +
-//      `IndexerWorker.main`). Probe-validated (tempdoc 772 §J): with this DLL absent from the jar
+//      `HeadlessApp.main`). Probe-validated (tempdoc 772 §J): with this DLL absent from the jar
 //      and no property set, `addCUDA` fails with the legible `ORT_EP_FAIL "Failed to find CUDA
 //      shared provider"` and CPU inference still works from the retained core natives; with the
 //      property pointed at a complete external set, real CUDA sessions succeed.
@@ -1514,31 +1482,37 @@ val verifyTesseractRuntime by tasks.registering {
 // extracts them from the jar to %TEMP% as before). Only the CUDA EP DLL is removed.
 //
 // Same shape as stageLlamaCudaVariant's `exclude("**/ggml-rpc.dll")`: repackage a jar with
-// `exclude`s during staging. Windows-only packaging path — indexer-worker's own installDist jar
-// (used by the ubuntu-latest search-worker CI test lane) is untouched.
+// `exclude`s during staging. Windows-only packaging path — the jar on the module classpath (used
+// by the ubuntu-latest CI test lanes) is untouched.
+//
+// Lane F stage A item A13 moved the SOURCE of this jar. It used to be read out of the Worker's
+// own `installDist` output, because the shipped bundle carried a whole second copy of the index
+// half under `lib/worker/`. There is one distribution now: `onnxruntime_gpu` reaches the Engine's
+// `headlessDist` lib/ through `ui -> app-engine -> indexer-worker` (verify with
+// `./gradlew :modules:ui:dependencies --configuration runtimeClasspath`), so the trim reads and
+// replaces THAT copy. Before A13 the untrimmed 371 MB jar was in `lib/` as well as `lib/worker/`,
+// and only the `lib/worker/` copy was trimmed.
 val trimmedOnnxRuntimeGpuDir = layout.buildDirectory.dir("onnxruntime-gpu-trimmed")
 val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
   group = "distribution"
-  description = "Repackage the worker onnxruntime_gpu jar without its Linux natives or win-x64 CUDA EP DLL (Windows-only installer). Tempdoc 772 §G + §J item 2."
-  val workerInstallDist =
-      project(":modules:indexer-worker").tasks.named("installDist", Sync::class)
-  dependsOn(workerInstallDist)
-  // The worker's installDist copies runtimeClasspath jars into lib/ under their original Maven
-  // names, so the untrimmed jar lands at a path we can derive statically from the single source of
-  // truth for the version — the version catalog (libs.versions.onnxruntime), NOT a hardcoded
-  // string — so a future onnxruntime bump needs no change here. A static file path (rather than a
-  // glob resolved at configuration time) is also what keeps the enclosing `zipTree(...)` off the
+  description = "Repackage the onnxruntime_gpu jar without its Linux natives or win-x64 CUDA EP DLL (Windows-only installer). Tempdoc 772 §G + §J item 2."
+  dependsOn(headlessDist)
+  // headlessDist copies the runtimeClasspath jars into lib/ under their original Maven names, so
+  // the untrimmed jar lands at a path we can derive statically from the single source of truth for
+  // the version — the version catalog (libs.versions.onnxruntime), NOT a hardcoded string — so a
+  // future onnxruntime bump needs no change here. A static file path (rather than a glob resolved
+  // at configuration time) is also what keeps the enclosing `zipTree(...)` off the
   // config-cache-hostile path, mirroring stageLlamaCudaVariant's `zipTree(cudaZipFile)`.
   val onnxGpuJarName = "onnxruntime_gpu-${libs.versions.onnxruntime.get()}.jar"
   val originalJar =
-      workerInstallDist.get().destinationDir.resolve("lib").resolve(onnxGpuJarName)
+      headlessDistDir.get().asFile.resolve("lib").resolve(onnxGpuJarName)
   from(zipTree(originalJar)) {
     exclude("ai/onnxruntime/native/linux-x64/**")
     // §J item 2: the win-x64 CUDA EP DLL moves to the cuda-runtime pack (see comment above).
     exclude("ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll")
   }
   destinationDirectory.set(trimmedOnnxRuntimeGpuDir)
-  // Fixed output name (not the version-stamped original): the worker loads it via `-cp lib/*`, so
+  // Fixed output name (not the version-stamped original): the Engine loads it via `-cp lib/*`, so
   // the exact jar filename is immaterial.
   archiveFileName.set("onnxruntime_gpu-trimmed.jar")
 }
@@ -1546,38 +1520,37 @@ val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
 val bundleSidecarResources by tasks.registering(Sync::class) {
   group = "distribution"
   description = "Stage headless jar, libs, and custom runtime into the Tauri shell resources"
-  val workerInstallDist =
-      project(":modules:indexer-worker").tasks.named("installDist", Sync::class)
-  dependsOn(headlessDist, createHeadlessRuntime, copyJavawToRuntime, workerInstallDist,
-      generateHeadAotCache, generateWorkerAotCache, stageLlamaServer, stageOnnxModels,
+  dependsOn(headlessDist, createHeadlessRuntime, copyJavawToRuntime,
+      generateHeadAotCache, stageLlamaServer, stageOnnxModels,
       stageOrtCudaVariant, verifyTesseractRuntime, stageTrimmedOnnxRuntimeGpu)
   includeEmptyDirs = false
   into(tauriHeadlessResourcesDir)
+  // Lane F stage A item A13: ONE classpath. The bundle used to carry the Engine's `lib/` plus a
+  // second, near-identical copy of the index half under `lib/worker/` — the Worker distribution
+  // the deleted WorkerSpawner launched. Since item A6 the index half is composed in this JVM and
+  // `ui`'s own runtimeClasspath already contains indexer-worker, Lucene, Tika, SQLite and
+  // onnxruntime_gpu, so `lib/worker/` was a duplicate the shipped installer paid for twice.
+  // The untrimmed onnxruntime_gpu jar is excluded here and replaced (below) by the
+  // Linux-natives-stripped variant from stageTrimmedOnnxRuntimeGpu — Tempdoc 772 §G.
   from(headlessDistDir) {
     include("ui-headless.jar")
     include("lib/**")
+    exclude("lib/onnxruntime_gpu-*.jar")
   }
   // Tempdoc 657 — the Headless Runtime launcher: runs the co-located ui-headless.jar as a local,
   // loopback-only service (no desktop shell) in a chosen mode. See docs/how-to/headless-runtime.md.
   from(rootProject.layout.projectDirectory.dir("packaging/headless")) {
     include("justsearch-headless.cmd", "justsearch-headless.ps1")
   }
-  // Worker distribution lib/ directory — staged under lib/worker/ so Head's -cp lib/* does not pick it up.
-  // The untrimmed onnxruntime_gpu jar is excluded here and replaced (below) by the Linux-natives-stripped
-  // variant from stageTrimmedOnnxRuntimeGpu — Tempdoc 772 §G.
-  from(workerInstallDist.map { it.destinationDir.resolve("lib") }) {
-    into("lib/worker")
-    exclude("onnxruntime_gpu-*.jar")
-  }
-  // Tempdoc 772 §G — the trimmed onnxruntime_gpu jar (Linux natives removed) lands at the same
-  // lib/worker/ path the original occupied.
+  // Tempdoc 772 §G — the trimmed onnxruntime_gpu jar (Linux natives + CUDA EP DLL removed) lands
+  // in lib/ where the untrimmed original was excluded above.
   from(stageTrimmedOnnxRuntimeGpu.map { it.archiveFile }) {
-    into("lib/worker")
+    into("lib")
   }
-  // AOT cache files for Head and Worker (JEP 514).
+  // AOT cache file for the Engine (JEP 514). Item A13: one JVM, one cache — `worker/worker.aot`
+  // was deleted with the task that produced it.
   from(aotCacheDir) {
     include("head/head.aot")
-    include("worker/worker.aot")
     eachFile { relativePath = org.gradle.api.file.RelativePath(true, name) }
     into("aot")
   }
@@ -1698,8 +1671,27 @@ tasks.register("smokeSidecarBundle") {
         )
       }
     }
-    if (!headlessDir.resolve("lib").resolve("worker").isDirectory) {
-      throw GradleException("Missing worker distribution dir in bundle: ${headlessDir.resolve("lib/worker").absolutePath}")
+    // Lane F stage A item A13 replaced the "lib/worker/ exists" check. There is no second
+    // distribution to look for; the property that matters now is that the index half and its
+    // trimmed ORT jar are on the ONE classpath the Engine launches with (`-cp ui-headless.jar;lib/*`).
+    // Checking for the directory's absence would assert nothing; checking for these two jars
+    // catches the real failure mode — a `lib/` that boots the API and then cannot open an index.
+    run {
+      val libDir = headlessDir.resolve("lib")
+      val libJars = libDir.listFiles()?.filter { it.isFile && it.extension == "jar" } ?: emptyList()
+      val indexHalf = libJars.filter { it.name.startsWith("indexer-worker-") || it.name.startsWith("worker-services-") }
+      if (indexHalf.size < 2) {
+        throw GradleException(
+            "Bundled lib/ is missing the index half of the Engine (expected indexer-worker-*.jar AND "
+              + "worker-services-*.jar in ${libDir.absolutePath}; found: "
+              + "${indexHalf.joinToString(", ") { it.name }.ifEmpty { "none" }})")
+      }
+      val onnx = libJars.filter { it.name.startsWith("onnxruntime_gpu") }
+      if (onnx.size != 1 || onnx[0].name != "onnxruntime_gpu-trimmed.jar") {
+        throw GradleException(
+            "Bundled lib/ must carry exactly the trimmed onnxruntime_gpu jar (tempdoc 772 §G/§J); found: "
+              + "${onnx.joinToString(", ") { it.name }.ifEmpty { "none" }} in ${libDir.absolutePath}")
+      }
     }
     if (!headlessDir.resolve("SSOT").isDirectory) {
       throw GradleException("Missing SSOT/ in bundle: ${headlessDir.resolve("SSOT").absolutePath}")
@@ -2252,9 +2244,8 @@ fun JavaExec.applyHeadlessEvalContract() {
 tasks.register<JavaExec>("runHeadless") {
   group = "application"
   description = "Run the headless UI backend (LocalApiServer) for dev"
-  // Ensure the Worker distribution exists and is up to date; the headless app spawns it as a separate process.
-  // Without this, dev runs can accidentally spawn a stale distribution missing newer gRPC methods (e.g. FetchDocumentSlice).
-  dependsOn(":modules:indexer-worker:installDist")
+  // Item A13: no Worker distribution to keep up to date — the headless app IS the Engine and runs
+  // the index half in-process off this task's own runtimeClasspath.
   mainClass.set("io.justsearch.ui.HeadlessApp")
   classpath = sourceSets["main"].runtimeClasspath
   // 347: Use providers.environmentVariable() for config-cache compatibility.
@@ -2309,7 +2300,6 @@ tasks.register<JavaExec>("runHeadless") {
 tasks.register<JavaExec>("runHeadlessEval") {
   group = "application"
   description = "Run the headless UI backend with isolated worktree/eval settings"
-  dependsOn(":modules:indexer-worker:installDist")
   mainClass.set("io.justsearch.ui.HeadlessApp")
   classpath = sourceSets["main"].runtimeClasspath
   applyHeadlessEvalContract()
@@ -2320,7 +2310,6 @@ tasks.register<JavaExec>("runHeadlessEval") {
 tasks.register<JavaExec>("runHeadlessWithProfiling") {
   group = "application"
   description = "Run headless with JFR profiling enabled (see docs/tempdocs/59-profiling-guide.md)"
-  dependsOn(":modules:indexer-worker:installDist")
   mainClass.set("io.justsearch.ui.HeadlessApp")
   classpath = sourceSets["main"].runtimeClasspath
 

@@ -2,7 +2,7 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient.RpcDeadlineCategory;
+import io.justsearch.app.services.worker.KnowledgeClient.RpcDeadlineCategory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

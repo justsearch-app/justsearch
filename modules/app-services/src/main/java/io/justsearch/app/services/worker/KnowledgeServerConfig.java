@@ -23,12 +23,9 @@ public record KnowledgeServerConfig(
         Path dataDir,
         Path libDir,
         Path workingDirectory,
-        Path workerLibDir,
-        Path signalFilePath,
         long deadlineMs,
         long portDiscoveryTimeoutMs,
         int maxRetries,
-        String workerHeapSize,
         long workerShutdownTimeoutMs,
         long pidValidationTimeoutMs,
         long stabilityWindowMs,
@@ -66,30 +63,6 @@ public record KnowledgeServerConfig(
     private static final long DEFAULT_DEADLINE_MS = 15_000;
     private static final long DEFAULT_PORT_DISCOVERY_TIMEOUT_MS = 15_000;
     private static final int DEFAULT_MAX_RETRIES = 3;
-    /**
-     * Tempdoc 682 item 1: raised from the Nov-2025 "512m" (which had no recorded derivation)
-     * after a measured 2026-07-06 indexing run showed 512m has no safety margin. Evidence
-     * (GC log, {@code -Xms512m -Xmx512m}, mixed/desktop-mixed-v1, 2286 docs, full enrichment):
-     * after-GC live-set peak 348M (68% of heap), heap at 499-512M before collections, and
-     * 5 G1 evacuation failures (2 humongous-allocation-triggered) within 543s — one step from
-     * OOM, measured at only ~74% enrichment completion and WITHOUT live Tika-PDF/office parse
-     * pressure (no PDF corpus exercised), so the observed pressure is a lower bound. 1g puts
-     * the observed live-set peak at ~34% occupancy. Override via JUSTSEARCH_WORKER_HEAP for
-     * constrained devices; the spawner pins -Xms=-Xmx, so this is fully resident from boot.
-     *
-     * <p>Tempdoc 686 follow-up (2026-07-10), closing 682's "no PDF corpus exercised" caveat:
-     * first run WITH real parse pressure (mixed/realdocs-v1 — 620 real PDF/office files incl.
-     * multi-page scans; run stopped early at 31min/120 docs, so per-doc coverage is partial but
-     * the pressure pattern was already stable). At 1g: no Full GC and no OOM, live set after
-     * mixed collections only ~500M (~50%) — but 72 GC events with evacuation failures and 179
-     * humongous-allocation-triggered GCs in 31 minutes. The pressure is transient humongous
-     * allocation churn from large-document parse buffers (Tika/PDFBox/POI), not live-set
-     * growth, so raising the heap further mostly buys headroom for a churn problem; bounding
-     * extraction buffer sizes (or G1 region-size tuning) is the structural lever. Verdict:
-     * 1g survives real parse pressure but with no safety margin during large-document parse;
-     * the raise-vs-bound decision is recorded in tempdoc 686.
-     */
-    private static final String DEFAULT_WORKER_HEAP = "1g";
     private static final long DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS = 5000;
     private static final long DEFAULT_PID_VALIDATION_TIMEOUT_MS = 5000;
     /** Default stability window: 5 minutes. Worker must run this long to reset restart counter. */
@@ -112,8 +85,6 @@ public record KnowledgeServerConfig(
         Path dataDir = resolveDataDir();
         Path libDir = resolveLibDir();
         Path workingDir = resolveWorkingDirectory();
-        Path workerLibDir = resolveWorkerLibDir(libDir, workingDir);
-        Path signalFile = dataDir.resolve("worker_signal.lock");
 
         long deadline = parseLong(
                 envOrProperty("JUSTSEARCH_WORKER_DEADLINE_MS", "justsearch.worker.deadline_ms"),
@@ -124,10 +95,6 @@ public record KnowledgeServerConfig(
         int maxRetries = parseInt(
                 envOrProperty("JUSTSEARCH_WORKER_MAX_RETRIES", "justsearch.worker.max_retries"),
                 DEFAULT_MAX_RETRIES);
-        String workerHeap = envOrProperty("JUSTSEARCH_WORKER_HEAP", "justsearch.worker.heap");
-        if (workerHeap == null || workerHeap.isBlank()) {
-            workerHeap = DEFAULT_WORKER_HEAP;
-        }
         long shutdownTimeout = parseLong(
                 envOrProperty("JUSTSEARCH_WORKER_SHUTDOWN_TIMEOUT_MS", "justsearch.worker.shutdown_timeout_ms"),
                 DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS);
@@ -156,12 +123,9 @@ public record KnowledgeServerConfig(
                 dataDir,
                 libDir,
                 workingDir,
-                workerLibDir,
-                signalFile,
                 deadline,
                 portTimeout,
                 maxRetries,
-                workerHeap,
                 shutdownTimeout,
                 pidValidationTimeout,
                 stabilityWindow,
@@ -169,8 +133,7 @@ public record KnowledgeServerConfig(
                 healthCheckRetryBudget,
                 bootFaultInjectAttempts);
 
-        log.info("Loaded KnowledgeServerConfig: production={}, dataDir={}, workerLibDir={}",
-                isProd, dataDir, workerLibDir);
+        log.info("Loaded KnowledgeServerConfig: production={}, dataDir={}", isProd, dataDir);
 
         return config;
     }
@@ -250,41 +213,11 @@ public record KnowledgeServerConfig(
         }
     }
 
-    private static Path resolveWorkerLibDir(Path libDir, Path workingDir) {
-        // 1. Explicit override via env/sysprop (value is a directory path)
-        String configured = envOrProperty("JUSTSEARCH_WORKER_LIB_DIR", "justsearch.worker.lib.dir");
-        if (configured != null && !configured.isBlank()) {
-            Path configuredPath = Path.of(configured);
-            if (Files.isDirectory(configuredPath)) {
-                return configuredPath.toAbsolutePath();
-            }
-        }
-
-        // 2. Production/bundled layout: lib/worker/ subdirectory alongside Head's lib/
-        // Always checked — the bundled layout may exist even when prod=false (e.g.,
-        // alpha builds with CORS relaxed for browser testing), so the `isProd` flag
-        // that callers used to pass in never changed behaviour.
-        Path prodWorkerLib = libDir.resolve("worker");
-        if (Files.isDirectory(prodWorkerLib)) {
-            return prodWorkerLib.toAbsolutePath();
-        }
-
-        // 3. Development: installDist output
-        Path devWorkerLib = workingDir
-                .resolve("modules")
-                .resolve("indexer-worker")
-                .resolve("build")
-                .resolve("install")
-                .resolve("indexer-worker")
-                .resolve("lib");
-
-        if (Files.isDirectory(devWorkerLib)) {
-            return devWorkerLib.toAbsolutePath();
-        }
-
-        throw new IllegalStateException(
-                "Worker lib directory not found. Build with: ./gradlew :modules:indexer-worker:installDist");
-    }
+    // Lane F stage A item A13 deleted resolveWorkerLibDir and the workerLibDir record component.
+    // It answered "where are the Worker distribution jars" for the deleted WorkerSpawner (item
+    // A11), resolving JUSTSEARCH_WORKER_LIB_DIR / justsearch.worker.lib.dir, then the bundled
+    // lib/worker/ layout, then modules/indexer-worker/build/install/indexer-worker/lib. All three
+    // are gone: one JVM has one classpath, and the index half is on it.
 
     /**
      * Resolves the repository root using the centralized configuration loader.

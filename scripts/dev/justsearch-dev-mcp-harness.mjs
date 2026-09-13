@@ -190,7 +190,9 @@ async function main() {
       );
     }
     const preflightChecks = preflightRes.result?.structuredContent?.checks;
-    if (!preflightChecks || typeof preflightChecks.workerDist !== 'boolean') {
+    // Lane F stage A item A13: was `workerDist` — that check is retired with the Worker
+    // distribution it probed; `headDist` is the dist check the preflight result now carries.
+    if (!preflightChecks || typeof preflightChecks.headDist !== 'boolean') {
       throw new Error(`preflight returned malformed checks. result=${JSON.stringify(preflightRes.result)?.slice(0, 1200)}`);
     }
     process.stderr.write(`[mcp-harness] preflight: ready=${preflightRes.result?.structuredContent?.ready} checks=${JSON.stringify(preflightChecks)}\n`);

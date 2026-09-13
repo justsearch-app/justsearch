@@ -615,6 +615,6 @@ Five markdown help files ship in `SSOT/docs/help/` and are auto-ingested on star
 
 **Auto-ingestion:** `KnowledgeServerBootstrap.tryIngestHelpFiles()` runs after `reindexPersistedRoots()`. Uses a version-stamped marker file (`.help-ingested-version`) in the data directory for idempotency — only re-ingests when `HELP_FILES_VERSION` changes. Current version: `v2`.
 
-**Collection threading:** `target_collection` field flows through: proto `BatchRequest` → `GrpcIngestService` → `SqliteJobQueue` (V4 schema migration adds `collection` column) → `IndexingLoop.buildDocument()` → `SchemaFields.COLLECTION` → Lucene field catalog (`fields.v1.json`).
+**Collection threading:** `target_collection` field flows through: proto `BatchRequest` → `WorkerIngestService` → `SqliteJobQueue` (V4 schema migration adds `collection` column) → `IndexingLoop.buildDocument()` → `SchemaFields.COLLECTION` → Lucene field catalog (`fields.v1.json`).
 
 **Frontend badge:** Results with `collection === 'justsearch-help'` display a teal "Help" pill in the result-row renderer (`shell-v0/renderers/`).

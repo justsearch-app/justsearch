@@ -13,10 +13,12 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.gpl.GplEvalData;
 import io.justsearch.app.api.gpl.GplStatusProvider;
 import io.justsearch.app.api.gpl.RerankerService;
+import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.observability.HeadApiMetricCatalog;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.routes.AiRoutes;
 import io.justsearch.ui.api.routes.DebugRoutes;
@@ -31,7 +33,6 @@ import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -118,8 +119,7 @@ public class LocalApiServer {
   private volatile KnowledgeSearchController knowledgeSearchController;
   // Tempdoc 419 / T4: shared scan-progress registry (adapter producer -> ScanProgressController),
   // one per process, closed on shutdown.
-  private final io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry =
-      new io.justsearch.app.services.worker.ScanProgressRegistry();
+  private final io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry;
   private volatile ScanProgressController scanProgressController;
   // Tempdoc 374 alpha.27: the single GPU/VRAM access point (owns its nvidia-smi-fallback VramDetector).
   private final GpuCapabilitiesService gpuCapabilitiesService;
@@ -129,7 +129,7 @@ public class LocalApiServer {
   private final AtomicInteger inflightRequests = new AtomicInteger(0);
   private final String sessionToken;
   private final boolean prodMode;
-  private final ExecutorService slowRequestExecutor;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
   // Tempdoc 583 Stage 4: the request-filter security plumbing collaborator.
   private final ApiSecurityFilters securityFilters;
   /** H4: Cache TTL for GPU snapshot to avoid excessive NVML probes. */
@@ -140,14 +140,17 @@ public class LocalApiServer {
   private final HeadApiMetricCatalog apiCatalog;
 
   /** Creates a new builder. Required: settingsStore, indexBasePath. The bootstrap and per-service
-   * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.). */
+   * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.).
+   * A Knowledge Server also requires the Head search owner or explicit perSourceSearch. */
   public static Builder builder(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
       Path indexBasePath) {
-    return new Builder(settingsStore, indexBasePath);
+    return new Builder(executors, settingsStore, indexBasePath);
   }
 
   private LocalApiServer(Builder b) {
+    this.scanProgressRegistry = new io.justsearch.app.services.worker.ScanProgressRegistry(b.executors);
     this.telemetry = b.telemetry;
     this.lambdaMartReranker = b.lambdaMartReranker;
     // §31 Phase 4: read helpers/infra from the bootstrap's ServicePhase output rather than
@@ -200,8 +203,7 @@ public class LocalApiServer {
         b.HeadAssembly != null && b.HeadAssembly.workers().excludes() != null
             ? b.HeadAssembly.workers().excludes()
             : new io.justsearch.app.services.excludes.ExcludesServiceImpl(indexingSvcSupplier);
-    // Tempdoc 542 Phase 3: op-lease SPI from ServicePhase output (no-op when not running
-    // under dev-runner — env var absent).
+    // Real process-local lease admission; only the dev-runner file projection is optional.
     io.justsearch.app.api.OperationLeaseService leaseSvc =
         b.operationLeaseService != null
             ? b.operationLeaseService
@@ -226,7 +228,7 @@ public class LocalApiServer {
     ResourceApiModule resourceApiModule =
         b.HeadAssembly != null
             ? new ResourceApiModule(
-                b.HeadAssembly, this.telemetry, b.runtimeManifestPublisher, b.indexBasePath)
+                b.HeadAssembly, this.telemetry, b.runtimeManifestPublisher, b.indexBasePath, b.engineAdmission)
             : null;
     MetaApiModule metaApiModule = new MetaApiModule(() -> this.app, () -> this.apiModules);
     UpgradeApiModule upgradeApiModule =
@@ -318,8 +320,14 @@ public class LocalApiServer {
     ConfigStore cs = ConfigStore.globalOrNull();
     this.prodMode = cs != null && cs.get().policy().prodMode();
     this.sessionToken = b.sessionToken;
-    this.slowRequestExecutor =
-        Executors.newSingleThreadExecutor(
+    var backgroundLimits = b.executors.limits(
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    this.slowRequestOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.slow-request-dump", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+        1, backgroundLimits.maxQueue(), 1));
+    ExecutorService slowRequestExecutor =
+        slowRequestOwner.open(
             r -> {
               Thread t = new Thread(r, "slow-request-dump");
               t.setDaemon(true);
@@ -330,8 +338,8 @@ public class LocalApiServer {
     // install() binds them inside buildAndStartApp, keeping the loopback bind policy single-authority.
     this.securityFilters =
         new ApiSecurityFilters(
-            this.prodMode, this.sessionToken, this.eventBuffer, this.slowRequestExecutor,
-            this.HeadAssemblyRef, leaseSvc);
+            this.prodMode, this.sessionToken, this.eventBuffer, slowRequestExecutor,
+            this.HeadAssemblyRef, leaseSvc, b.engineAdmission);
 
     // Bind to explicit port when provided (dev/prod), otherwise pick a free port.
     int bindPort = configuredPort == null ? 0 : configuredPort;
@@ -488,9 +496,13 @@ public class LocalApiServer {
                         "errorCode",
                         ApiErrorCode.STORE_LOCKED.name())));
 
+    app.exception(io.justsearch.core.execution.EngineExecutorRejectedException.class,
+        (failure, ctx) -> ApiErrorHandler.writeExecutorRefusal(ctx, failure, telemetry));
+
     // Global fallback: catch any unhandled exception that slips past per-controller try-catch blocks.
     // This ensures all error responses use the standardized ApiErrorHandler shape instead of Javalin's default.
     app.exception(Exception.class, (e, ctx) -> {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Unhandled exception on {} {}", ctx.method(), ctx.path(), e);
       // Tempdoc 518 Appendix G Wave A.2: stamp the per-request HTTP span (started by the
       // global before hook) with the exception. The after hook still runs and ends the span;
@@ -511,7 +523,8 @@ public class LocalApiServer {
     // inflight gauges and slow-request timing also start/end an OTel span around the handler,
     // and the response gets an `X-Trace-Id` header (no-op trace ID when tracing is off, so the
     // header shape is stable). Spans named "http.<METHOD>.<route>" carry http.method,
-    // http.route, http.status_code attributes (all on the NdjsonSpanExporter allowlist).
+    // http.route, http.status_code attributes plus coarse engine.originator/engine.transport
+    // from the cached request context (all on the NdjsonSpanExporter allowlist).
     // The exception handler above sets ERROR status + records the exception on the active span.
     final io.opentelemetry.api.trace.Tracer httpTracer =
         io.opentelemetry.api.GlobalOpenTelemetry.getTracer("io.justsearch.ui.http");
@@ -565,6 +578,7 @@ public class LocalApiServer {
                 if (matched != null && !matched.isBlank() && !"*".equals(matched)) {
                   span.setAttribute("http.route", matched);
                 }
+                recordEngineProvenance(ctx, span);
                 if (status >= 500) {
                   span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR);
                 }
@@ -582,13 +596,30 @@ public class LocalApiServer {
       // best-effort
     }
 
-    securityFilters.install(this.app);
+    securityFilters.install(this.app, session -> convApi.mcpProtocolHandler() == null
+        ? java.util.Optional.empty() : convApi.mcpProtocolHandler().clientIdentity(session));
     RouteLifecycleHeaders.install(this.app);
     setupRoutes();
     RouteContractPolicy.validateLifecycleRoutes(
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 
     this.app.start("127.0.0.1", bindPort);
+  }
+
+  /**
+   * Adds the request's coarse, low-cardinality engine attribution to its completion span.
+   *
+   * <p>The request context is resolved by the owning route/filter and cached on the Javalin
+   * request. Completion must consume that immutable value: resolving headers again here could
+   * produce a different attribution after a handler or middleware has changed the request.
+   */
+  static void recordEngineProvenance(Context request, io.opentelemetry.api.trace.Span span) {
+    Object value = request.attribute(RequestEngineContext.ATTRIBUTE);
+    if (!(value instanceof EngineContext context)) {
+      return;
+    }
+    span.setAttribute("engine.originator", EngineProvenance.originator(context));
+    span.setAttribute("engine.transport", context.transport());
   }
 
   /** H4: Returns a cached GPU capabilities snapshot (5s TTL) to avoid excessive NVML probes. */
@@ -756,12 +787,12 @@ public class LocalApiServer {
       return;
     }
     try {
-      boolean success = HeadAssemblyRef.workers().indexing().resetIndex();
+      boolean success = HeadAssemblyRef.workers().indexing().resetIndex(RequestEngineContext.get(ctx));
       if (!success) {
         ctx.status(500).json(Map.of("error", "Worker reset failed"));
         return;
       }
-      HeadAssemblyRef.workers().indexing().clearAllRoots();
+      HeadAssemblyRef.workers().indexing().clearAllRoots(RequestEngineContext.get(ctx));
       log.info("Index reset completed via /api/debug/reset-index");
       ctx.status(200).json(Map.of("reset", true));
     } catch (Exception e) {
@@ -796,7 +827,7 @@ public class LocalApiServer {
         return;
       }
       log.info("admin runtime reload triggered (reason={})", reason);
-      long swapDurationMs = HeadAssemblyRef.workers().indexing().reloadRuntime(reason);
+      long swapDurationMs = HeadAssemblyRef.workers().indexing().reloadRuntime(reason, RequestEngineContext.get(ctx));
       log.info("admin runtime reload complete in {}ms", swapDurationMs);
       ctx.status(200).json(Map.of("swapDurationMs", swapDurationMs));
     } catch (Exception e) {
@@ -869,7 +900,7 @@ public class LocalApiServer {
     core.debugStateController().setKnowledgeServer(ks);
     core.inferenceHandlers().setKnowledgeServer(ks);
     core.statusLifecycleHandler().setKnowledgeServer(ks, startError);
-    // Tempdoc 400 Phase 2.1 (LR1-c): wire the RemoteKnowledgeClient late so
+    // Tempdoc 400 Phase 2.1 (LR1-c): wire the KnowledgeClient late so
     // /api/debug/session-policies returns the authoritative PolicySnapshot in
     // eval mode. Pre-fix this controller stayed wired with null forever.
     core.sessionPoliciesController().setClient(ks != null ? ks.client() : null);
@@ -889,6 +920,7 @@ public class LocalApiServer {
     if (ks != null && this.knowledgeSearchController == null) {
       KnowledgeSearchController ctrl = new KnowledgeSearchController(
           ks,
+          core.perSourceSearch(),
           this.telemetry,
           this.HeadAssemblyRef != null ? this.HeadAssemblyRef.inference().onlineAi() : OnlineAiService.unavailable(),
           this.lambdaMartReranker,
@@ -954,7 +986,7 @@ public class LocalApiServer {
   }
 
   public void stop() {
-    slowRequestExecutor.shutdownNow();
+    slowRequestOwner.close();
     // Tempdoc 419 / T4: stop the periodic prune thread on shutdown.
     try {
       scanProgressRegistry.close();
@@ -1024,7 +1056,9 @@ public class LocalApiServer {
         }
       }
     }
-    app.stop();
+    try { app.stop(); } finally {
+      try { core.openAiCompatController().close(); } finally { core.aiRuntimeController().close(); }
+    }
   }
 
   private static boolean isBindFailure(Throwable t) {
@@ -1042,8 +1076,9 @@ public class LocalApiServer {
     return port > 0 ? port : null;
   }
 
-  /** Builder for {@link LocalApiServer}. Required: settingsStore, indexBasePath. */
+  /** Builder for {@link LocalApiServer}; a Knowledge Server requires an explicit search owner. */
   public static final class Builder {
+    final io.justsearch.core.execution.EngineExecutorRegistry executors;
     final io.justsearch.app.services.settings.UiSettingsStore settingsStore;
     // Tempdoc 583 Stage 2: package-private so ConversationApiAssembly (same package) can read
     // the inputs it needs for the extracted ConversationEngine/agent/chat/MCP wiring.
@@ -1080,13 +1115,23 @@ public class LocalApiServer {
     /** Tempdoc 805 G.1: the normal-quit ordered shutdown (POST /api/lifecycle/shutdown). */
     Runnable lifecycleShutdownAction = () -> {};
     io.justsearch.app.api.OperationLeaseService operationLeaseService;
+    io.justsearch.app.api.EngineAdmissionService engineAdmission;
+    io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
+
+    /** Explicit dependency for fixtures without a HeadAssembly; the supplying owner closes it. */
+    public Builder perSourceSearch(io.justsearch.app.services.worker.SearchPerSourceExecutor value) {
+      this.perSourceSearch = java.util.Objects.requireNonNull(value);
+      return this;
+    }
     Path upgradeDataDir;
     Supplier<String> upgradeRunningVersion =
         () -> EnvRegistry.APP_VERSION.get().orElse("");
     java.util.function.BooleanSupplier upgradeHeadReady;
     java.util.function.BooleanSupplier upgradeWorkerReady;
 
-    Builder(io.justsearch.app.services.settings.UiSettingsStore settingsStore, Path indexBasePath) {
+    Builder(io.justsearch.core.execution.EngineExecutorRegistry executors,
+        io.justsearch.app.services.settings.UiSettingsStore settingsStore, Path indexBasePath) {
+      this.executors = java.util.Objects.requireNonNull(executors, "executors");
       this.settingsStore = settingsStore;
       this.indexBasePath = indexBasePath;
     }
@@ -1177,6 +1222,11 @@ public class LocalApiServer {
       return this;
     }
 
+    public Builder engineAdmission(io.justsearch.app.api.EngineAdmissionService service) {
+      this.engineAdmission = java.util.Objects.requireNonNull(service);
+      return this;
+    }
+
     public Builder inferenceCapability(io.justsearch.app.services.lifecycle.InferenceCapability cap) {
       this.inferenceCapability = cap;
       return this;
@@ -1233,6 +1283,11 @@ public class LocalApiServer {
     }
 
     public LocalApiServer build() {
+      if (knowledgeServer != null && perSourceSearch == null
+          && (HeadAssembly == null || HeadAssembly.perSourceSearch() == null)) {
+        throw new IllegalStateException("Knowledge Server requires the Head per-source search owner"
+            + " or an explicitly supplied perSourceSearch owner");
+      }
       return new LocalApiServer(this);
     }
   }

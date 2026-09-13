@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  * chunk-sourced hits, so the CE snippet source and the delivered preview are evidence-coherent
  * (§F.1-5). Each case here sets the flag explicitly, so the assertions are default-independent.
  */
-final class SearchResponseBuilderEvidencePreviewTest {
+final class SearchResponseBuilderEvidencePreviewTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final FieldCatalogDef CATALOG = FieldCatalogDef.forChunkTesting(0);
   private static final int CAP = 4096;
@@ -54,7 +54,7 @@ final class SearchResponseBuilderEvidencePreviewTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().open();
+    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

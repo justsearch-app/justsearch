@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.applauncher;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.app.api.SearchRequest;
@@ -30,7 +32,7 @@ final class LauncherCommands implements Launcher.CommandRunner {
       if (indexing == null) {
         return CommandResult.success(List.of("REINDEX/SKIP reason=UNSUPPORTED"));
       }
-      indexing.reindex();
+      indexing.reindex(io.justsearch.app.services.intent.EngineProvenance.context(EngineContext.ClientKind.CLI, "launcher", java.util.Optional.empty(), java.util.Optional.empty(), io.justsearch.agent.api.registry.TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND));
       return CommandResult.success(List.of("REINDEX/TRIGGERED"));
     } catch (UnsupportedOperationException e) {
       // In Knowledge Server mode (or other headless configurations), indexing may be intentionally unavailable.
@@ -62,7 +64,7 @@ final class LauncherCommands implements Launcher.CommandRunner {
         markers.add("VERIFY/SKIP reason=SEARCH_UNAVAILABLE");
         return CommandResult.success(markers);
       }
-      SearchResponse response = search.search(request);
+      SearchResponse response = search.search(request, io.justsearch.app.services.intent.EngineProvenance.context(EngineContext.ClientKind.CLI, "launcher", java.util.Optional.empty(), java.util.Optional.empty(), io.justsearch.agent.api.registry.TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND));
       markers.add("VERIFY/OK hits=" + response.hits().size());
       markers.add("VERIFY/PIPELINE profile=" + io.justsearch.configuration.resolved.ConfigStore.global().get().search().profile());
       return CommandResult.success(markers);

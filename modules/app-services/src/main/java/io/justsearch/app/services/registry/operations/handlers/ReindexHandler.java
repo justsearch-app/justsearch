@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -36,7 +38,7 @@ public final class ReindexHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     boolean force = parseForce(argumentsJson);
     IndexingService indexing;
     try {
@@ -49,8 +51,8 @@ public final class ReindexHandler implements OperationHandler {
       return OperationResult.failure("Indexing service unavailable");
     }
     try {
-      indexing.reindexWatchedRoots(force);
-      indexing.flush();
+      indexing.reindexWatchedRoots(force, engineContext);
+      indexing.flush(engineContext);
       // Tempdoc 821 §3-C3 — this sentence became TRUE here. The scan now goes out as
       // SCAN_MODE_FORCE_REINDEX, the Worker marks the admitted paths forced, and JobBatchExtractor
       // skips its unchanged-check for them. Until then the force flag never left the Head and the

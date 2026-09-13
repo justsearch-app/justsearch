@@ -70,19 +70,19 @@ final class InferenceLifecycleManagerIdentityTest {
 
   @Test
   void initialIdentityIsEmpty() {
-    manager = new InferenceLifecycleManager(fakeConfig());
+    manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
     assertTrue(manager.identity().isEmpty());
   }
 
   @Test
   void initialLastFailureIsEmpty() {
-    manager = new InferenceLifecycleManager(fakeConfig());
+    manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
     assertTrue(manager.lastFailure().isEmpty());
   }
 
   @Test
   void lastFailureIsEmptyWhenNoTransitionHasFailed() {
-    manager = new InferenceLifecycleManager(fakeConfig());
+    manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
     // Tempdoc 412 Phase 2: the recordFailure hook was removed because the holder rewrite that
     // would feed it is deferred. The accessor surface stays so the snapshot view can be
     // future-typed without churning call sites; the value is always empty until then.
@@ -93,7 +93,7 @@ final class InferenceLifecycleManagerIdentityTest {
   void defaultEventsIsNoopSingleton() {
     // The single-arg ctor delegates to the two-arg ctor with NoopInferenceTelemetryEvents; verify
     // construction does not throw, and that accessors work without a real telemetry sink.
-    manager = new InferenceLifecycleManager(fakeConfig());
+    manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
     assertNotNull(manager);
     // No assertion needed beyond construction succeeding — the contract is that noop fires
     // silently without exceptions.
@@ -102,7 +102,7 @@ final class InferenceLifecycleManagerIdentityTest {
   @Test
   void twoArgConstructorAcceptsCustomEvents() {
     var counter = new RecordingEvents();
-    manager = new InferenceLifecycleManager(fakeConfig(), counter);
+    manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig(), counter);
     assertNotNull(manager);
     assertEquals(0, counter.transitionCount.get());
   }
@@ -110,7 +110,7 @@ final class InferenceLifecycleManagerIdentityTest {
   @Test
   void rejectsNullEvents() {
     assertThrows(NullPointerException.class,
-        () -> new InferenceLifecycleManager(fakeConfig(), null));
+        () -> new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig(), null));
   }
 
   // ==================== Tempdoc 412 follow-up regression tests ====================
@@ -119,7 +119,7 @@ final class InferenceLifecycleManagerIdentityTest {
   @DisplayName("Bug D: applyConfig(null) emits onConfigApplyFailure with ConfigFailure(CONFIG_REQUIRED)")
   void bugD_nullConfigEmitsConfigApplyFailure() {
     var counter = new RecordingEvents();
-    manager = new InferenceLifecycleManager(fakeConfig(), counter);
+    manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig(), counter);
     try {
       manager.applyConfig(null, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
       org.junit.jupiter.api.Assertions.fail("expected ModeTransitionException");

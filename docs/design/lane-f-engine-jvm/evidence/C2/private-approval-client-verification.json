@@ -1,0 +1,114 @@
+{
+  "revision": "1de0750ff + final private approval client",
+  "summary": {
+    "numTotalTests": 6490,
+    "numPassedTests": 6490,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "success": true
+  },
+  "files": 483,
+  "commands": [
+    "npm run test:unit:run -- --reporter=default --reporter=json --outputFile=../../tmp/c2-3-private-approval-client1036-vitest.json",
+    "npm run typecheck",
+    "npm run lint"
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-private-approval-client1030",
+    "c2-3-private-approval-client1031",
+    "c2-3-private-approval-client1032",
+    "c2-3-private-approval-client1033",
+    "c2-3-private-approval-client-negative1034",
+    "c2-3-private-approval-client-negative1035",
+    "c2-3-private-approval-client1036",
+    "c2-3-private-approval-client1037"
+  ],
+  "sources": [
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "sha256": "49cc98d64f17f5eb51b4fe0bc3c4b548635d98477c4a4d0f34fd445e6275a7a9"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts",
+      "sha256": "74f429400b076b712adf325f70db56af3f86b75c86e5ad9c01d3ff63b7983791"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-3-private-approval-client-negative1034.txt",
+      "bytes": 2577,
+      "sha256": "2d402aa04d1af80b09f18b8cd35639fc9f5533a4386ec8f3c355ef37ad5c5d2a"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client-negative1035.txt",
+      "bytes": 1806,
+      "sha256": "984f4fcf318c525bb1a76f37047a41892d471698ee4795e631a8c0e19ffc9b4f"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1030-typecheck.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1030.txt",
+      "bytes": 6578,
+      "sha256": "829b4c69ba3084dff72fcd47abfff06b8fefd90bfa667599cbc3e59bf424707e"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1031.txt",
+      "bytes": 366,
+      "sha256": "14f6ad5a97e8ae42f379ee67c76fa7f1acf1b21625687d7d81e448b35185668e"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1032.txt",
+      "bytes": 366,
+      "sha256": "de5db7e62d58ce87bef0b8629e7581ebc96569bb713e6729fd7235f2adc571f4"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1033.txt",
+      "bytes": 366,
+      "sha256": "5e752f89717310b65f8f21c6972ffa5ff30f15a1858f4bc6174cdb813ed8b51e"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1036-affected.txt",
+      "bytes": 605,
+      "sha256": "216e92ad429df44abc9fa44f8c85ece5589faeae48b4acb32d1ba2c662b1ec44"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1036-lint.txt",
+      "bytes": 54,
+      "sha256": "3149ac7befc4811974b69632c28064ab3d8f1160b3f889c1071a9fe40ec62284"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1036-typecheck.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1036-vitest.json",
+      "bytes": 2463129,
+      "sha256": "417a7f3f51c7037a5c56d2084b6a92970ba23ef1ee357da03518ddcc8a5a9862"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1036.txt",
+      "bytes": 928429,
+      "sha256": "6d51e752e6e050d6a88867dd763e3d1c6e711d66b5846131c4969e9ee3e62058"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1037-affected.txt",
+      "bytes": 179,
+      "sha256": "347e16b45cc30cb0b46e35af485a398892ee5ff494fa2554bcb4ce4bf6804e5e"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1037-coverage.txt",
+      "bytes": 430,
+      "sha256": "37ab0713d91bbaeef27c95a93fdd6ab89781859fac214352447faba36a5c239c"
+    },
+    {
+      "path": "tmp/c2-3-private-approval-client1037-docs.txt",
+      "bytes": 312,
+      "sha256": "c12de90aa23901a096af7ad3b3f4a075e8603e44e4820e7d63b5f4cdb4bf3834"
+    }
+  ]
+}

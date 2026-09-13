@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Static utility methods for computing match spans and excerpt regions.
  *
- * <p>Extracted from {@link GrpcSearchService} — all methods are pure functions
+ * <p>Extracted from {@link WorkerSearchService} — all methods are pure functions
  * operating on Lucene Analyzer/Query primitives with no runtime state.
  */
 public final class HighlightingOps {

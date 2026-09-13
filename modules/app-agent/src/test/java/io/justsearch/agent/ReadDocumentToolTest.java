@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -44,7 +46,7 @@ final class ReadDocumentToolTest {
 
     @Override
     public CompletionStage<DocumentService.DocumentSlice> fetchSlice(
-        String docId, int offsetChars, int maxChars) {
+        String docId, int offsetChars, int maxChars, EngineContext engineContext) {
       this.lastOffset = offsetChars;
       this.lastMaxChars = maxChars;
       return CompletableFuture.completedFuture(slice);
@@ -102,7 +104,7 @@ final class ReadDocumentToolTest {
         new FakeFetch(slice(longPath, page(ReadDocumentTool.readPageChars(AgentContextBudgets.forCall(null))), true, 3000));
     OperationResult result =
         new ReadDocumentTool(fetch)
-            .execute("{\"path\":\"" + longPath.replace("\\", "\\\\") + "\"}");
+            .execute("{\"path\":\"" + longPath.replace("\\", "\\\\") + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     // THE point of readPageChars: header + carrier framing + a maximal page must still fit under
@@ -125,7 +127,7 @@ final class ReadDocumentToolTest {
   void headerNamesTheSpanAndThePagingOffset() {
     var fetch = new FakeFetch(slice(page(500), true, 500));
     OperationResult result =
-        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}");
+        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}", EngineContextTestFixtures.AGENT_LOOP);
 
     String firstLine = result.message().lines().findFirst().orElseThrow();
     // Pinned verbatim, dashes included: the header is non-ASCII, so a source-encoding regression
@@ -147,7 +149,7 @@ final class ReadDocumentToolTest {
     // document, so it pages to exhaustion. The Worker already knew the total and threw it away.
     var fetch = new FakeFetch(slice(PATH, page(3000), true, 3000, 27431));
     OperationResult result =
-        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}");
+        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}", EngineContextTestFixtures.AGENT_LOOP);
 
     String firstLine = result.message().lines().findFirst().orElseThrow();
     assertTrue(
@@ -168,7 +170,7 @@ final class ReadDocumentToolTest {
     // than omitting it, so this path must stay identical to the pre-878 header.
     var fetch = new FakeFetch(slice(PATH, page(500), true, 500, 0));
     OperationResult result =
-        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}");
+        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}", EngineContextTestFixtures.AGENT_LOOP);
 
     String firstLine = result.message().lines().findFirst().orElseThrow();
     assertEquals(
@@ -189,7 +191,7 @@ final class ReadDocumentToolTest {
             slice(longPath, page(ReadDocumentTool.readPageChars(AgentContextBudgets.forCall(null))), true, 3000, 987_654_321));
     OperationResult result =
         new ReadDocumentTool(fetch)
-            .execute("{\"path\":\"" + longPath.replace("\\", "\\\\") + "\"}");
+            .execute("{\"path\":\"" + longPath.replace("\\", "\\\\") + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     String message = result.message();
@@ -211,7 +213,7 @@ final class ReadDocumentToolTest {
     var fetch = new FakeFetch(slice(page(120), false, 3120));
     OperationResult result =
         new ReadDocumentTool(fetch)
-            .execute("{\"path\":\"" + PATH + "\",\"offset_chars\":\"3000\"}");
+            .execute("{\"path\":\"" + PATH + "\",\"offset_chars\":\"3000\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertEquals(3000, fetch.lastOffset, "the stringified offset must reach the fetcher as 3000");
@@ -222,7 +224,7 @@ final class ReadDocumentToolTest {
   void stringifiedMaxCharsIsCoercedAndCapped() {
     var fetch = new FakeFetch(slice(page(10), false, 10));
     new ReadDocumentTool(fetch)
-        .execute("{\"path\":\"" + PATH + "\",\"max_chars\":\"100000\",\"offset_chars\":\"7\"}");
+        .execute("{\"path\":\"" + PATH + "\",\"max_chars\":\"100000\",\"offset_chars\":\"7\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(ReadDocumentTool.readPageChars(AgentContextBudgets.forCall(null)), fetch.lastMaxChars);
     assertEquals(7, fetch.lastOffset);
   }
@@ -235,7 +237,7 @@ final class ReadDocumentToolTest {
     var fetch = new FakeFetch(slice(page(120), false, 120));
     OperationResult result =
         new ReadDocumentTool(fetch)
-            .execute("{\"path\":\"" + PATH + "\",\"offset_chars\":\"abc\"}");
+            .execute("{\"path\":\"" + PATH + "\",\"offset_chars\":\"abc\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "a garbage offset must not read page 1: " + result.message());
     assertTrue(result.message().contains("offset_chars"), result.message());
@@ -249,7 +251,7 @@ final class ReadDocumentToolTest {
     var fetch = new FakeFetch(slice(page(120), false, 120));
     OperationResult result =
         new ReadDocumentTool(fetch)
-            .execute("{\"path\":\"" + PATH + "\",\"max_chars\":{\"value\":10}}");
+            .execute("{\"path\":\"" + PATH + "\",\"max_chars\":{\"value\":10}}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), result.message());
     assertTrue(result.message().contains("max_chars"), result.message());
@@ -260,7 +262,7 @@ final class ReadDocumentToolTest {
   @DisplayName("a complete page carries no More: line — the loop has a termination signal")
   void completePageHasNoMoreLine() {
     var fetch = new FakeFetch(slice(page(120), false, 120));
-    OperationResult result = new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\"}");
+    OperationResult result = new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(
         result.message().contains("More:"),
         "signalling 'more' on a complete document is what makes agents re-read forever");
@@ -271,7 +273,7 @@ final class ReadDocumentToolTest {
   void oversizedMaxCharsIsCappedBeforeTheFetch() {
     var fetch = new FakeFetch(slice(page(10), false, 10));
     new ReadDocumentTool(fetch)
-        .execute("{\"path\":\"" + PATH + "\",\"max_chars\":100000,\"offset_chars\":42}");
+        .execute("{\"path\":\"" + PATH + "\",\"max_chars\":100000,\"offset_chars\":42}", EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(
         ReadDocumentTool.readPageChars(AgentContextBudgets.forCall(null)),
         fetch.lastMaxChars,
@@ -284,7 +286,7 @@ final class ReadDocumentToolTest {
   void structuredDataIsReadResultsOnly() {
     var fetch = new FakeFetch(slice("the page body", true, 13));
     OperationResult result =
-        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}");
+        new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\",\"offset_chars\":0}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(
         result.structuredData().containsKey("searchResults"),
@@ -307,7 +309,7 @@ final class ReadDocumentToolTest {
     var untitled =
         new DocumentService.DocumentSlice(PATH, "body", Map.of(), true, false, 4, 4, null);
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(untitled)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(untitled)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
     Map<?, ?> item = (Map<?, ?>) ((List<?>) result.structuredData().get("readResults")).get(0);
     assertEquals("report.md", item.get("title"));
   }
@@ -323,7 +325,7 @@ final class ReadDocumentToolTest {
         new DocumentService.DocumentSlice(
             PATH, "", Map.of(), false, false, 0, 0, "Document not found in index");
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(failed)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(failed)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success());
     assertTrue(
@@ -342,7 +344,7 @@ final class ReadDocumentToolTest {
     var missing =
         new DocumentService.DocumentSlice(PATH, "", Map.of(), false, false, 0, 0, null);
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(missing)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(missing)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success());
     assertTrue(
@@ -362,7 +364,7 @@ final class ReadDocumentToolTest {
         new DocumentService.DocumentSlice(
             PATH, "", Map.of(), false, false, 0, 0, "index segment unreadable: rebuild in progress");
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(workerFailure)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(workerFailure)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success());
     assertTrue(
@@ -391,7 +393,7 @@ final class ReadDocumentToolTest {
       var slice =
           new DocumentService.DocumentSlice(PATH, "", Map.of(), false, false, 0, 0, reason);
       OperationResult result =
-          new ReadDocumentTool(new FakeFetch(slice)).execute("{\"path\":\"" + PATH + "\"}");
+          new ReadDocumentTool(new FakeFetch(slice)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertFalse(result.success(), "reason=" + reason);
       assertTrue(
@@ -423,7 +425,7 @@ final class ReadDocumentToolTest {
             0,
             null);
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(dropout)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(dropout)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "an unreadable document is a failure, not an empty success");
     assertTrue(result.message().contains(PATH), "the path is named: " + result.message());
@@ -440,7 +442,7 @@ final class ReadDocumentToolTest {
         new DocumentService.DocumentSlice(
             PATH, "", Map.of("extraction_method", "NONE"), true, false, 0, 0, null);
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(dropout)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(dropout)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("NONE"), result.message());
   }
@@ -454,7 +456,7 @@ final class ReadDocumentToolTest {
     var atEnd = slice("", false, 3000);
     OperationResult result =
         new ReadDocumentTool(new FakeFetch(atEnd))
-            .execute("{\"path\":\"" + PATH + "\",\"offset_chars\":3000}");
+            .execute("{\"path\":\"" + PATH + "\",\"offset_chars\":3000}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), "reaching the end of a document is not an error");
     assertTrue(result.message().contains("end of document"), result.message());
@@ -473,7 +475,7 @@ final class ReadDocumentToolTest {
     // one result for both.
     var multiline = slice("line one\r\nline \"two\"\nline three", false, 31);
     OperationResult result =
-        new ReadDocumentTool(new FakeFetch(multiline)).execute("{\"path\":\"" + PATH + "\"}");
+        new ReadDocumentTool(new FakeFetch(multiline)).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     Map<?, ?> item = (Map<?, ?>) ((List<?>) result.structuredData().get("readResults")).get(0);
     String excerpt = (String) item.get("excerpt");
@@ -493,7 +495,7 @@ final class ReadDocumentToolTest {
   @DisplayName("a missing path is refused before any fetch")
   void missingPathIsRefused() {
     var fetch = new FakeFetch(slice("body", false, 4));
-    OperationResult result = new ReadDocumentTool(fetch).execute("{}");
+    OperationResult result = new ReadDocumentTool(fetch).execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertEquals(-1, fetch.lastOffset, "no fetch is attempted without a path");
   }
@@ -508,7 +510,7 @@ final class ReadDocumentToolTest {
     // Without a carrier label a read result would match NEITHER pattern, so the receipt would put it
     // in neither set — inclusion-mute, exactly the silence 865 §7.5 built ToolResultCarrier to end.
     var fetch = new FakeFetch(slice(page(1200), false, 1200));
-    OperationResult read = new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\"}");
+    OperationResult read = new ReadDocumentTool(fetch).execute("{\"path\":\"" + PATH + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     var messages = new ArrayList<Map<String, Object>>();
     messages.add(toolMessage("call-read", read.message()));

@@ -42,6 +42,7 @@ def test_summarize_first_search_percentiles():
     assert block["probes_ok"] == 20
     assert block["batches_fired"] == 20
     assert block["min_new_files"] == 50
+    assert block["request_timeout_sec"] == cadence.search_load.REQUEST_TIMEOUT_SEC
     assert block["errors"] == 0
     assert block["latency_ms"] == {"p50": 10.0, "p95": 19.0, "max": 20.0}
 
@@ -299,6 +300,7 @@ def test_probe_never_started_reports_an_empty_block():
     probe = cadence.FirstSearchProbe("http://127.0.0.1:1", ["alpha"], spec)
     block = probe.stop()
     assert block == {
+        "request_timeout_sec": cadence.search_load.REQUEST_TIMEOUT_SEC,
         "min_new_files": 50,
         "batches_fired": 0,
         "probes_ok": 0,

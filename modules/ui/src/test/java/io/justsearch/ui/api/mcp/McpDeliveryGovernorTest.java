@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -293,7 +295,7 @@ final class McpDeliveryGovernorTest {
             30L, 30L, 12L, hits, null, null, null, null, null, null, null, null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -306,7 +308,7 @@ final class McpDeliveryGovernorTest {
 
     Map<String, Object> result =
         surface.callTool(
-            "justsearch_search", Map.of("query", "diagnostic", "limit", 30, "detail", true), "s1");
+            "justsearch_search", Map.of("query", "diagnostic", "limit", 30, "detail", true), "s1", TestRequestContexts.mcp("s1"));
 
     // The governed quantity is the WHOLE tool result — it must be under the 45 KB default budget.
     assertTrue(

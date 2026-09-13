@@ -8,7 +8,7 @@
  * real network connection.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { EnvelopeStream } from './EnvelopeStream.js';
 import type { SseEnvelope } from './envelope-types.js';
 import {
@@ -263,7 +263,7 @@ describe('EnvelopeStream frame processing', () => {
     stream.stop();
   });
 
-  it('catches reducer errors and preserves prior payload while still advancing seq', () => {
+  it('catches reducer errors and preserves payload while clearing the checkpoint', () => {
     const fake = new FakeEventSource('http://test/api/x/stream');
     const stream = new EnvelopeStream<CounterState>({
       url: 'http://test/api/x/stream',
@@ -284,9 +284,95 @@ describe('EnvelopeStream frame processing', () => {
     });
     const snap = stream.getSnapshot();
     expect(snap.seq).toBe(7);
-    expect(snap.resumeToken).toBe('tok-7');
+    expect(snap.resumeToken).toBeNull();
+    expect(snap.isConnected).toBe(false);
+    expect(fake.closed).toBe(true);
     expect(snap.payload).toBe(COUNTER_INITIAL); // unchanged
     stream.stop();
+  });
+
+  it('reducer failure detaches a reentrantly reopened source even with a reconnect pending', async () => {
+    vi.useFakeTimers();
+    const sources: FakeEventSource[] = [];
+    const frame = (seq: number): SseEnvelope => ({
+      streamId: 'surface:test', frameKind: 'UPDATE', seq, ts: '2026-09-13T00:00:00Z',
+      payload: {}, resumeToken: `tok-${seq}`,
+    });
+    const stream = new EnvelopeStream<number>({
+      url: 'http://test/api/x/stream', initialState: 0,
+      reducer: (state, envelope) => {
+        if (envelope.seq < 3) throw new Error('cannot apply row');
+        return state + 1;
+      },
+      reconnectBaseMs: 10, reconnectCapMs: 10, watchdogStaleMs: 0,
+      eventSourceFactory: (url) => {
+        const source = new FakeEventSource(url);
+        sources.push(source);
+        return source as unknown as EventSource;
+      },
+    });
+    stream.subscribe((snapshot) => {
+      if (snapshot.seq === 1) stream.start();
+    });
+    try {
+      stream.start();
+      sources[0]!.emitFrame(frame(1));
+      expect(sources).toHaveLength(2);
+      sources[1]!.emitFrame(frame(2));
+      expect(sources[1]!.closed).toBe(true);
+      sources[1]!.emitFrame(frame(3));
+      expect(stream.getSnapshot()).toMatchObject({ payload: 0, seq: 2, resumeToken: null });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(sources).toHaveLength(3);
+      expect(sources[2]!.url).toBe('http://test/api/x/stream');
+      sources[2]!.emitFrame(frame(4));
+      expect(stream.getSnapshot()).toMatchObject({ payload: 1, resumeToken: 'tok-4' });
+    } finally {
+      stream.stop();
+      vi.useRealTimers();
+    }
+  });
+
+  it('reducer failure detaches late frames and reconnects to a fresh snapshot', async () => {
+    vi.useFakeTimers();
+    const sources: FakeEventSource[] = [];
+    const frame = (seq: number, frameKind: SseEnvelope['frameKind'] = 'UPDATE'): SseEnvelope => ({
+      streamId: 'surface:test', frameKind, seq, ts: '2026-09-13T00:00:00Z',
+      payload: { kind: 'snapshot', count: 7 }, resumeToken: `tok-${seq}`,
+    });
+    const stream = new EnvelopeStream<number>({
+      url: 'http://test/api/x/stream', initialState: 0,
+      reducer: (state, envelope) => {
+        if (envelope.seq === 2) throw new Error('cannot apply row');
+        return envelope.frameKind === 'LIFECYCLE'
+          ? (envelope.payload as { count: number }).count : state + 1;
+      },
+      reconnectBaseMs: 10, reconnectCapMs: 10, watchdogStaleMs: 0,
+      eventSourceFactory: (url) => {
+        const source = new FakeEventSource(url);
+        sources.push(source);
+        return source as unknown as EventSource;
+      },
+    });
+    try {
+      stream.start();
+      sources[0]!.emitFrame(frame(1));
+      sources[0]!.emitFrame(frame(2));
+      expect(stream.getSnapshot()).toMatchObject({ payload: 1, seq: 2, resumeToken: null, isConnected: false });
+      expect(sources[0]!.closed).toBe(true);
+      sources[0]!.emitFrame(frame(3));
+      expect(stream.getSnapshot().seq).toBe(2);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(sources).toHaveLength(2);
+      expect(sources[1]!.url).toBe('http://test/api/x/stream');
+      sources[1]!.emitFrame(frame(10, 'LIFECYCLE'));
+      expect(stream.getSnapshot()).toMatchObject({ payload: 7, resumeToken: 'tok-10', isConnected: true });
+      sources[1]!.emitFrame(frame(11));
+      expect(stream.getSnapshot().payload).toBe(8);
+    } finally {
+      stream.stop();
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -480,13 +566,23 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
   });
 
   it('reconnects when the heartbeat-absence watchdog expires (silent wedge, no error fired)', async () => {
+    vi.useFakeTimers();
     const { stream, sources } = reconnectingStream();
-    stream.start();
-    sources[0]!.emitOpen();
-    // No frames at all — the channel is silently dead. The watchdog (40ms) must force a reconnect.
-    await wait(70);
-    expect(sources.length).toBeGreaterThanOrEqual(2);
-    stream.stop();
+    try {
+      stream.start();
+      sources[0]!.emitOpen();
+      // No frames at all: expire the watchdog, then its bounded reconnect backoff.
+      await vi.advanceTimersByTimeAsync(39);
+      expect(sources[0]!.closed).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sources[0]!.closed).toBe(true);
+      expect(sources).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(sources).toHaveLength(2);
+    } finally {
+      stream.stop();
+      vi.useRealTimers();
+    }
   });
 
   it('a frame resets the watchdog, so a steadily-beating stream never reconnects', async () => {

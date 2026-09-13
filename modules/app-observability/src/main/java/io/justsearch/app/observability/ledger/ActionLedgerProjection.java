@@ -36,12 +36,9 @@ public final class ActionLedgerProjection {
   /** A completed operation invocation (tempdoc 550 thesis I — typed {@link ActionEvent}). */
   public static ActionEvent projectOperation(OperationHistoryEntry op) {
     return new ActionEvent.Operation(
-        deterministicId(
-            "operation",
-            op.endTime(),
-            op.operationId().value(),
-            op.outcome().name(),
-            op.executionId().orElse("")),
+        op.operationKey().map(key -> "operation:" + key).orElseGet(() -> deterministicId(
+            "operation", op.endTime(), op.operationId().value(), op.outcome().name(),
+            op.executionId().orElse(""))),
         op.endTime(),
         originatorOf(op.provenance()),
         op.provenance().transport().name(),
@@ -402,7 +399,7 @@ public final class ActionLedgerProjection {
   /** Coarse originator attribution derived from the source transport. */
   public static String originatorOf(TransportTag transport) {
     return switch (transport) {
-      case LLM_EMISSION, AGENT_LOOP, MCP -> "agent";
+      case LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP -> "agent";
       case SYSTEM_INTERNAL, SCHEDULED, RULE_ENGINE -> "system";
       default -> "user";
     };

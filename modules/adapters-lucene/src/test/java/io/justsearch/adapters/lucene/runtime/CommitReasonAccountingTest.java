@@ -24,7 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
  * attribution evidence: each reason accrues to its own slot, and the total is exactly their sum —
  * so a reader can never be shown a breakdown that fails to account for every commit.
  */
-class CommitReasonAccountingTest {
+class CommitReasonAccountingTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -37,7 +37,7 @@ class CommitReasonAccountingTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open();
     for (int i = 0; i < docs; i++) {
       runtime

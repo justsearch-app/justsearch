@@ -11,7 +11,7 @@ import {
 } from '../dist/index.js';
 
 const compatibleManifest = {
-  runtimeContract: { version: '0.2.0' },
+  runtimeContract: { version: '0.3.0' },
 };
 
 test('generated readiness operation preserves the typed lifecycle 503 response', async () => {
@@ -157,12 +157,12 @@ test('runtime contract compatibility is explicit and fail-closed', () => {
     openapi['x-justsearch-runtime-contract'].supportedVersions,
   );
   assert.doesNotThrow(() =>
-    assertRuntimeContractCompatible({ runtimeContract: { version: '0.2.0' } }),
+    assertRuntimeContractCompatible({ runtimeContract: { version: '0.3.0' } }),
   );
   assert.throws(() => assertRuntimeContractCompatible({}), /missing/);
   assert.throws(
-    () => assertRuntimeContractCompatible({ runtimeContract: { version: '0.3.0' } }),
-    /version: 0.3.0/,
+    () => assertRuntimeContractCompatible({ runtimeContract: { version: '0.4.0' } }),
+    /version: 0.4.0/,
   );
 });
 

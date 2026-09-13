@@ -9,9 +9,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 519 §7 / Step 7: GPU-status broadcast wiring + Online Mode auto-start helpers
- * extracted from {@code HeadAssembly}. Bridges InferenceLifecycleManager mode changes
- * to the Worker's MainSignalBus so the Worker can pause/resume GPU-accelerated embeddings
- * when the LLM activates/deactivates.
+ * extracted from {@code HeadAssembly}. Bridges InferenceLifecycleManager mode changes to the
+ * in-process {@code GpuSchedulingGauge} so the index half can pause/resume GPU-accelerated
+ * embeddings when the LLM activates/deactivates. (Before lane F item A5 the bridge wrote a
+ * memory-mapped byte through {@code MainSignalBus}; item A10 deleted that bus.)
  */
 public final class InferenceWiring {
 
@@ -20,43 +21,41 @@ public final class InferenceWiring {
   private InferenceWiring() {}
 
   /**
-   * Wires GPU status broadcast from {@link InferenceLifecycleManager} to Worker via MMF. Returns
-   * the registered listener (so the caller can remove it on shutdown), or null when there's no
-   * KnowledgeServerBootstrap or no signal bus.
+   * Wires the GPU-claimed signal from {@link InferenceLifecycleManager} to the index half. Returns
+   * the registered listener so the caller can remove it on shutdown. The supplier follows async
+   * index startup and reconnects; an absent index service must not disable future publication.
+   *
+   * <p>Lane F item A5: the authority is the in-process {@code GpuSchedulingGauge}
+   * ({@code KnowledgeServerBootstrap.gpuScheduling()}), which is where the merged Engine reads
+   * {@code main_gpu_active} from. Item A11 removed the second publication — a memory-mapped byte
+   * written for a Worker process that no longer exists — so the gauge write below is now the whole
+   * broadcast, and there is one writer and one reader in one address space.
    */
   public static io.justsearch.app.api.ModeChangeListener wireGpuStatusBroadcast(
-      InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
-    if (knowledgeServer == null) {
-      log.debug("No KnowledgeServerBootstrap; GPU status broadcast disabled");
-      return null;
-    }
-    var signalBus = knowledgeServer.signalBus();
-    if (signalBus == null) {
-      log.debug("No MainSignalBus available; GPU status broadcast disabled");
-      return null;
-    }
+      InferenceLifecycleManager manager,
+      java.util.function.Supplier<KnowledgeServerBootstrap> knowledgeServer) {
     io.justsearch.app.api.ModeChangeListener listener =
         (from, to) -> {
-          boolean gpuActive = (to == io.justsearch.app.api.Mode.ONLINE);
-          try {
-            signalBus.writeGpuActive(gpuActive);
-            log.info(
-                "GPU status broadcast: {} (mode: {} -> {})",
-                gpuActive ? "ACTIVE" : "FREE", from, to);
-          } catch (Exception e) {
-            log.warn("Failed to broadcast GPU status to Worker", e);
-          }
+          refreshGpuStatus(manager, knowledgeServer.get());
         };
     manager.addModeChangeListener(listener);
-    boolean initialGpuActive = manager.isOnline();
-    try {
-      signalBus.writeGpuActive(initialGpuActive);
-      log.debug("Initial GPU status set: {}", initialGpuActive ? "ACTIVE" : "FREE");
-    } catch (Exception e) {
-      log.warn("Failed to set initial GPU status", e);
-    }
-    log.info("GPU status broadcast wired to Worker signal bus");
+    refreshGpuStatus(manager, knowledgeServer.get());
+    log.info("GPU status broadcast wired to the current index service");
     return listener;
+  }
+
+  /** Seeds a newly connected index service, including when inference became online before it. */
+  public static void refreshGpuStatus(
+      InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
+    if (manager == null || knowledgeServer == null) return;
+    var gauge = knowledgeServer.gpuScheduling();
+    // Read the current authority under the same lock as publication. A delayed mode callback or
+    // connect-time seed must not overwrite a newer mode with the event's historical value.
+    synchronized (gauge) {
+      boolean gpuActive = manager.isOnline();
+      gauge.setMainGpuActive(gpuActive);
+      log.debug("GPU status broadcast: {}", gpuActive ? "ACTIVE" : "FREE");
+    }
   }
 
   /**

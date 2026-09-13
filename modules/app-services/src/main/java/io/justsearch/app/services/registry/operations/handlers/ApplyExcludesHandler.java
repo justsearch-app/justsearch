@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ExcludesService;
@@ -17,7 +19,7 @@ import org.slf4j.LoggerFactory;
  * documents whose paths match the configured exclude globs (Worker-delegated;
  * Head never touches Lucene).
  *
- * <p>Delegates to {@link ExcludesService#applyExcludes(boolean) applyExcludes(false)}
+ * <p>Delegates to {@link ExcludesService#applyExcludes(boolean, EngineContext) applyExcludes(false)}
  * via a lazy supplier. HIGH-risk + Typed-confirm policy is enforced by the FE
  * ActionButton; the handler itself runs once dispatched (typed-confirm is FE
  * trust per slice 3a-1-2 §A.7; backend defense-in-depth is a follow-up).
@@ -33,7 +35,7 @@ public final class ApplyExcludesHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
-    return ExcludesHandlerSupport.run(excludesSupplier, false, log, "ApplyExcludesHandler");
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return ExcludesHandlerSupport.run(excludesSupplier, false, log, "ApplyExcludesHandler", engineContext);
   }
 }

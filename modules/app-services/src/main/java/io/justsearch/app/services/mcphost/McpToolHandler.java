@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.mcphost;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -37,7 +39,7 @@ public final class McpToolHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     JsonNode args;
     try {
       args =
@@ -85,8 +87,8 @@ public final class McpToolHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson, InvocationProvenance provenance) {
+  public OperationResult execute(String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
     // Provenance is consumed by the lattice before dispatch; the MCP call itself is provenance-agnostic.
-    return execute(argumentsJson);
+    return execute(argumentsJson, engineContext);
   }
 }

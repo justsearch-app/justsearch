@@ -16,6 +16,26 @@ import org.junit.jupiter.api.Test;
 @DisplayName("BoundedDocumentFetch")
 final class BoundedDocumentFetchTest {
 
+  /**
+   * Review S8. Every other assertion in this class is <em>relative</em> — the worst case fits the
+   * budget, the budget fits the ceiling — so all of them survive the budget changing, including
+   * changing to something far too small or far too large. The per-call result-size bound is one of
+   * the four operation contracts design §6 requires to survive the collapse of the transport, and
+   * after item A10 the constant it is derived from ({@code GrpcMessageLimits}) has no transport
+   * behind it at all: it becomes a number in a class named after something that no longer exists,
+   * which is exactly the kind of value that gets "tidied" later. So the value itself is pinned
+   * absolutely here. Changing it should require editing this line and saying why.
+   */
+  @Test
+  @DisplayName("the default byte budget is 8 MiB")
+  void theDefaultBudgetIsPinnedAbsolutely() {
+    assertEquals(
+        8L * 1024 * 1024,
+        BoundedDocumentFetch.DEFAULT_BYTE_BUDGET,
+        "the per-call result-size bound must not drift with a constant borrowed from the deleted"
+            + " transport");
+  }
+
   @Test
   @DisplayName("the default page size keeps the worst case well under the transport ceiling")
   void defaultPageSizeStaysUnderTheCeiling() {

@@ -32,12 +32,12 @@ public final class RuntimeApiRoutes {
   private final RuntimeInstancesController instancesController;
   private final RuntimeProbeController probeController;
 
-  public RuntimeApiRoutes(RuntimeManifestPublisher publisher) {
+  public RuntimeApiRoutes(io.justsearch.core.execution.EngineExecutorRegistry executors, RuntimeManifestPublisher publisher) {
     if (publisher == null) {
       throw new IllegalArgumentException("publisher must be non-null");
     }
     this.manifestController = new RuntimeManifestController(publisher);
-    this.streamController = new RuntimeManifestStreamController(publisher);
+    this.streamController = new RuntimeManifestStreamController(executors, publisher);
     this.instancesController = new RuntimeInstancesController(publisher);
     this.probeController = new RuntimeProbeController(publisher);
 

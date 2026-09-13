@@ -314,7 +314,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
    * response.
    */
   public static final OperationRef RESET_SETTINGS =
-      new OperationRef("core.reset-settings");
+      new OperationRef(io.justsearch.app.services.settings.SettingsResetPreparation.OPERATION_ID);
 
   /**
    * Slice 491 §9.D Phase E (C4 / E3) — agent navigation tool. Gives the agent loop a

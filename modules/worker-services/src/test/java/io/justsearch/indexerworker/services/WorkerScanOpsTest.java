@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -327,7 +328,7 @@ final class WorkerScanOpsTest {
     CloudPlaceholderRecorder stubRecorder =
         new CloudPlaceholderRecorder(queue) {
           @Override
-          void record(Path file) {
+          void record(Path file, String collection, JobQueue.EnqueueProvenance provenance) {
             recordCalls.incrementAndGet();
             recordedFiles.add(file);
           }
@@ -352,7 +353,7 @@ final class WorkerScanOpsTest {
   /**
    * Tempdoc 419 / T2 — every emitted {@link ScanRootProgress} carries the same {@code scan_id}
    * value supplied via the {@link WorkerScanOps.ScanRequest}. The gRPC entry point
-   * ({@code GrpcIngestService.scanRoot}) allocates a UUID per RPC; this test pins the
+   * ({@code WorkerIngestService.scanRoot}) allocates a UUID per RPC; this test pins the
    * propagation contract end-to-end at the WorkerScanOps level.
    */
   @Test
@@ -515,6 +516,21 @@ final class WorkerScanOpsTest {
       assertEquals(1L, terminal.getFilesAdmitted(), mode + " must still admit the file");
       assertTrue(forced.isEmpty(), mode + " must not mark anything forced");
     }
+  }
+
+  @Test
+  void refusedAdmissionCannotProduceCleanCompletionOrAdmittedProgress() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("refused"));
+    for (int i = 0; i < 101; i++) Files.writeString(root.resolve(i + ".txt"), "data");
+    JobQueue refused = org.mockito.Mockito.mock(JobQueue.class);
+    List<ScanRootProgress> progress = new ArrayList<>();
+    var failure = assertThrows(WorkerServiceException.class, () -> new WorkerScanOps(refused).scan(
+        new WorkerScanOps.ScanRequest(root, null, WorkerScanOps.ScanMode.INITIAL, List.of()),
+        progress::add));
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+    assertTrue(progress.stream().noneMatch(ScanRootProgress::getComplete));
+    assertTrue(progress.stream().allMatch(frame -> frame.getFilesAdmitted() == 0));
+    assertFalse(progress.isEmpty(), "exercise the progress-before-flush branch too");
   }
 
   private static String normalizedKey(Path p) {

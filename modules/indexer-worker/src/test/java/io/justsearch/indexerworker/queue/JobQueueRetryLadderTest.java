@@ -188,7 +188,7 @@ final class JobQueueRetryLadderTest {
   @Test
   @DisplayName("a retry reports the state it actually replaced, not a hardcoded FAILED")
   void reenqueueReportsTheStateItReplaced() throws Exception {
-    // 885 §UD open item 1: GrpcIngestService.retryIndexingJob stated setPreviousState("FAILED")
+    // 885 §UD open item 1: WorkerIngestService.retryIndexingJob stated setPreviousState("FAILED")
     // without ever reading the row — wrong for a PENDING-in-backoff job before this item, and wrong
     // for RETRY_EXHAUSTED after it. Every case below is a state that literal misreported.
 

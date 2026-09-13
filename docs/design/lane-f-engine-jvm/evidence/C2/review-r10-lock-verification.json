@@ -1,0 +1,47 @@
+{
+  "revision": "6b109c27c + final R10 lock correction",
+  "command": "gradlew.bat :modules:app-util:test --tests '*AppInstanceLockExclusionTest' :modules:indexer-worker:test --tests '*IndexRootLock*' :modules:app-launcher:test --tests '*LauncherEnvironmentCloseTest' :modules:ui:compileIntegrationTestJava :modules:app-util:pmdMain :modules:app-util:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:ui:pmdMain -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 63,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 20
+  },
+  "tasks": [
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "app-util",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 44,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 16
+    }
+  ],
+  "raw": "tmp/c2-review-r10-locks848.txt and tmp/c2-review-r10-locks848-xml/",
+  "environment": "Windows 11, Temurin 25.0.2; no shared stack",
+  "result": "63 tests/20 suites all three test tasks executed; PMD and UI integration-test compilation pass",
+  "remaining": "Full batch, Linux hosted verification, final independent review"
+}

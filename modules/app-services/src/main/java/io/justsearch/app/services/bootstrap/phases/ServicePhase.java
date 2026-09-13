@@ -32,7 +32,6 @@ import io.justsearch.app.services.braininstall.BrainInstallServiceImpl;
 import io.justsearch.app.services.brainruntime.BrainRuntimeServiceImpl;
 import io.justsearch.app.services.diagnostics.DiagnosticsServiceImpl;
 import io.justsearch.app.services.excludes.ExcludesServiceImpl;
-import io.justsearch.app.services.lease.OperationLeaseServiceImpl;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.packimport.PackImportServiceImpl;
@@ -47,7 +46,7 @@ import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.app.services.vdu.OfflineCoordinator;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.Telemetry;
@@ -75,8 +74,11 @@ public final class ServicePhase {
 
   /** Bundled inputs (record keeps the parameter surface manageable). */
   public record Input(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       IndexingService indexingService,
       Supplier<IndexingService> indexingServiceSupplier,
       DocumentService documentService,
@@ -90,11 +92,12 @@ public final class ServicePhase {
       // Tempdoc 672: live supplier for the VDU offline coordinator, mirroring
       // indexingServiceSupplier — the Worker client is null at bootstrap (async connect) and
       // must be re-read at use-time, not captured by value.
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       // Tempdoc 672 follow-up: live supplier for the Head's own activity/energy signals (used to
       // abort an in-progress VDU batch if the user becomes active mid-run) — same live-reference
       // rationale as knowledgeClientSupplier above.
-      Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier) {}
+      Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
+      OperationLeaseService operationLeases) {}
 
   /**
    * Inference-manager teardown handles (tempdoc 737 Phase 1). Bundles the GPU-broadcast listener
@@ -176,14 +179,16 @@ public final class ServicePhase {
     OnlineAiService onlineAiService;
     io.justsearch.app.api.ModeChangeListener gpuListener = null;
     OfflineCoordinator offlineCoordinator = null;
+    try {
     RuntimeReconciler runtimeReconciler = null;
     RuntimeSpecStore runtimeSpecStore = null;
     // §31 Phase 1.A: EnterprisePolicyService impl in app-services. Tempdoc 737: constructed up-front
     // (moved from below) so the runtime reconciler can read the online-AI policy ceiling.
     EnterprisePolicyService enterprisePolicy = new EnterprisePolicyServiceImpl();
     if (in.inferenceManager() != null) {
-      onlineAiService = new OnlineAiServiceImpl(in.inferenceManager());
-      gpuListener = InferenceWiring.wireGpuStatusBroadcast(in.inferenceManager(), in.knowledgeServer());
+      onlineAiService = new OnlineAiServiceImpl(in.engineAdmission(), in.inferenceManager());
+      gpuListener = InferenceWiring.wireGpuStatusBroadcast(
+          in.inferenceManager(), in.knowledgeServerBootstrapSupplier());
       // Tempdoc 672 follow-up: composed once here and threaded down as a single BooleanSupplier —
       // VduBatchProcessor doesn't need to know about KnowledgeServerBootstrap/EnergyState itself,
       // only "should I stop now". Deliberately does NOT include inferenceManager.isOnline() — see
@@ -224,6 +229,7 @@ public final class ServicePhase {
 
       offlineCoordinator =
           OfflineCoordinatorBuilder.build(
+              in.executors(), in.engineAdmission(),
               in.inferenceManager(),
               runtimeReconciler,
               onlineAiService,
@@ -244,11 +250,12 @@ public final class ServicePhase {
     GpuCapabilitiesService gpuCapabilitiesService = new GpuCapabilitiesService();
 
     // §31 Phase 3: offlineProcessingTrigger derived from offlineCoordinator (computed above).
-    Runnable offlineProcessingTrigger =
+    java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger =
         offlineCoordinator != null ? offlineCoordinator::startOfflineProcessing : null;
 
     AgentToolFactory.Output agentTools =
         AgentToolFactory.build(
+            in.perSourceSearch(),
             in.dataDir(),
             in.knowledgeServer(),
             in.knowledgeClient(),
@@ -282,11 +289,12 @@ public final class ServicePhase {
     // async Worker connect) — mirrors the same fix already shipped for the VDU offline coordinator.
     WorkerFeatureCache workerFeatureCache =
         () -> {
-          RemoteKnowledgeClient client = in.knowledgeClientSupplier().get();
+          KnowledgeClient client = in.knowledgeClientSupplier().get();
           return client != null ? client.getLastKnownOnnxModels() : List.of();
         };
     RuntimeActivationService runtimeActivationHelper =
         new RuntimeActivationService(
+            in.executors(),
             onlineAiService,
             in.settingsStore(),
             gpuCapabilitiesService,
@@ -342,9 +350,8 @@ public final class ServicePhase {
             debugProviderSupplier,
             statusProviderSupplier);
 
-    // Tempdoc 542: op-lease SPI. Reads JUSTSEARCH_DEV_RUNNER_STATE_ROOT env var; no-op when
-    // unset (production / non-dev-runner launch). Single Java writer to op-leases.json.
-    OperationLeaseService operationLeaseService = new OperationLeaseServiceImpl();
+    // One precomposed process-local admission owner; only its dev-runner file projection is optional.
+    OperationLeaseService operationLeaseService = java.util.Objects.requireNonNull(in.operationLeases());
 
     // Tempdoc 617: both services run their work on background threads that outlive the HTTP
     // request, so the request-scoped mutation lease is released while multi-GB asset writes are
@@ -393,5 +400,12 @@ public final class ServicePhase {
         packAllowlistService,
         gpuCapabilitiesService,
         operationLeaseService);
+    } catch (RuntimeException | Error failure) {
+      if (offlineCoordinator != null) {
+        try { offlineCoordinator.close(); }
+        catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      }
+      throw failure;
+    }
   }
 }

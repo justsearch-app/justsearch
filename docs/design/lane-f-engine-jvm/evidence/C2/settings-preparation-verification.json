@@ -1,0 +1,271 @@
+{
+  "date": "2026-09-13",
+  "revision": "49bc940d2 + listed preparation/storage source changes",
+  "status": "LOCAL_FOUNDATION_PASS; runner and producer migration incomplete",
+  "retention": "Through lane acceptance plus30days; export before worktree release",
+  "runs": [
+    {
+      "revision": "478a41c41 + C2-6 preparation/storage cut1",
+      "command": "./gradlew.bat :modules:configuration:spotlessApply :modules:app-services:spotlessApply :modules:configuration:test --tests '*AtomicFileWritesTest' :modules:app-services:test --tests '*ConfigStoreRebuilderTest' --tests '*UiSettingsStore*Test' :modules:configuration:pmdMain :modules:configuration:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 82,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 16
+      },
+      "tasks": [
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 73,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "revision": "49bc940d2 + C2-6 preparation/storage corrections",
+      "command": "./gradlew.bat :modules:configuration:spotlessApply :modules:app-services:spotlessApply :modules:configuration:test --tests '*AtomicFileWritesTest' :modules:app-services:test --tests '*ConfigStoreRebuilderTest' --tests '*UiSettingsStore*Test' :modules:configuration:pmdMain :modules:configuration:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest --console=plain",
+      "summary": {
+        "tests": 85,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 16
+      },
+      "tasks": [
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 76,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "revision": "49bc940d2 + final C2-6 preparation/storage cut1",
+      "command": "./gradlew.bat :modules:configuration:spotlessApply :modules:app-services:spotlessApply :modules:configuration:test --tests '*AtomicFileWritesTest' :modules:app-services:test --tests '*ConfigStoreRebuilderTest' --tests '*UiSettingsStore*Test' :modules:configuration:pmdMain :modules:configuration:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:installDist --console=plain",
+      "summary": {
+        "tests": 85,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 16
+      },
+      "tasks": [
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "FROM-CACHE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 76,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ],
+      "result": "PASS"
+    }
+  ],
+  "negative": {
+    "revision": "49bc940d2 + temporary strict-replace/copy/quarantine mutants",
+    "command": "./gradlew.bat :modules:configuration:test --tests '*AtomicFileWritesTest' :modules:app-services:test --tests '*UiSettingsStoreRevisionTest' --continue --console=plain",
+    "summary": {
+      "tests": 23,
+      "failures": 6,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    "tasks": [
+      {
+        "module": "configuration",
+        "task": "test",
+        "status": "FAILED",
+        "tests": 9,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 14,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      }
+    ],
+    "result": "EXPECTED_FAILURE"
+  },
+  "artifacts": [
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java",
+      "sha256": "85652437cfcf7c4ec1d9e60a50e8b5ec94e504b8f1e95f414dea1204f39e14fc",
+      "bytes": 4786
+    },
+    {
+      "path": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/AtomicFileWritesTest.java",
+      "sha256": "e0362fde542089308e7b1b66f2dd01be265a0b128efae51b2edca21fa5e5c056",
+      "bytes": 6961
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ConfigStore.java",
+      "sha256": "0bbe000adb5eafa60fd4e3f16950c62963b49e10b11a00f0e9d34b75a271c80e",
+      "bytes": 5957
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java",
+      "sha256": "19e8a86592a6d52f5577c2fd0d16e0e4a0de1746f55fc5ca6d53f14d5038e24c",
+      "bytes": 7753
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/config/ConfigStoreRebuilderTest.java",
+      "sha256": "e38973599ddc3eda3f71d0791baf8c0faa13250149757fa5ac8b58add445bd48",
+      "bytes": 9287
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+      "sha256": "3d5d218ba6f88a86daaa4bd5b148970d1590723fe08d32b3a67306e825b54dec",
+      "bytes": 18729
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "sha256": "eb0743ee1efef4a3df8120db27a4079096ff2da958089214059ae543c35b2670",
+      "bytes": 5518
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
+      "sha256": "190949aa50423f7c1b574c7e1b13c9c1930b7d28a30ba5fc8cead9fb8a00f255",
+      "bytes": 16297
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "sha256": "15365c71fdd689e2a96b424abd3bbfe644d4af93dbe9175bae128453fd99975f",
+      "bytes": 7838
+    },
+    {
+      "path": "tmp/c2-6-preparation1254.txt",
+      "sha256": "f5cda142e6a8628172fb76f2fe7e6f0e966a4bdb5da55121554f3f51ec4dab26",
+      "bytes": 52434
+    },
+    {
+      "path": "tmp/c2-6-preparation1254-counts.json",
+      "sha256": "f9432155100e5bce706623fdfea03f9f4b622d8fa9b33837594f85ab4cb58add",
+      "bytes": 1022
+    },
+    {
+      "path": "tmp/c2-6-preparation1254-xml.zip",
+      "sha256": "573eb47cefd7a765ccbc39935e65c9bcdf1c80b53f923afd188581def6118746",
+      "bytes": 60449
+    },
+    {
+      "path": "tmp/c2-6-preparation1256.txt",
+      "sha256": "7e93af9c379d4bc938aa132222b7878864f13187671f30d2d1fd168b7b72bf0e",
+      "bytes": 46371
+    },
+    {
+      "path": "tmp/c2-6-preparation1256-counts.json",
+      "sha256": "4fe2e5b03414b3aac6c1ec03e64199000ab2e523cda4dc0908318b40293b77ad",
+      "bytes": 1031
+    },
+    {
+      "path": "tmp/c2-6-preparation1256-xml.zip",
+      "sha256": "c66b8f82b625b650998878f70aaca8d7b460191c4561fcb2380a7ba94f52c0fd",
+      "bytes": 61307
+    },
+    {
+      "path": "tmp/c2-6-preparation1259.txt",
+      "sha256": "470b5ac601b13ca46df42bedb45f02a2989cf27b0af651be4b2c4c95087b4d44",
+      "bytes": 68772
+    },
+    {
+      "path": "tmp/c2-6-preparation1259-counts.json",
+      "sha256": "d3c258975dbb2ff2bd6b807635fe4d316f5bf4397f902733856de583ea0cbbed",
+      "bytes": 1054
+    },
+    {
+      "path": "tmp/c2-6-preparation1259-xml.zip",
+      "sha256": "98e4ef5fcdf19a6f2447a08c0b8aee607575adbbe6076c095cece28dfeabc5f1",
+      "bytes": 61506
+    },
+    {
+      "path": "tmp/c2-6-negative1258.txt",
+      "sha256": "36456e1605f8aa5ae2f43134095283d0d871ce9d9b77ddcdf5412cd87f88e9eb",
+      "bytes": 48121
+    },
+    {
+      "path": "tmp/c2-6-negative1258-counts.json",
+      "sha256": "40500b7a19f123b17faf80a836a12f656e7b75f329506a2b61f493009718a746",
+      "bytes": 836
+    },
+    {
+      "path": "tmp/c2-6-negative1258-xml.zip",
+      "sha256": "90149fa02510a781a3187e4ac77d0a36c92ba54c74911c1a80244c1849e1bfe5",
+      "bytes": 39421
+    },
+    {
+      "path": "tmp/c2-6-negative1258-atomic.original",
+      "sha256": "85652437cfcf7c4ec1d9e60a50e8b5ec94e504b8f1e95f414dea1204f39e14fc",
+      "bytes": 4786
+    },
+    {
+      "path": "tmp/c2-6-negative1258-settings.original",
+      "sha256": "61c85e3c9780ac73c7b781917d769efbca757fd96f00c49976df1a91774106c4",
+      "bytes": 18558
+    },
+    {
+      "path": "tmp/c2-6-negative1258-exit.json",
+      "sha256": "c34bc644b4dfc96082e294ccb49ac40bdf34a3c659c956ffef43981ed30b2234",
+      "bytes": 23
+    },
+    {
+      "path": "tmp/c2-6-docs1262.txt",
+      "sha256": "515498b837c57169675238d7bb9bcef14373a859900fe5cb0d10164e2d06ab31",
+      "bytes": 609
+    }
+  ]
+}

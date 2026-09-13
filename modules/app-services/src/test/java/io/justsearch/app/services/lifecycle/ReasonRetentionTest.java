@@ -32,7 +32,6 @@ final class ReasonRetentionTest {
   private static final String LOST = LifecycleReasonCode.WORKER_LOST.code();
   private static final String CORRUPT = LifecycleReasonCode.WORKER_INDEX_CORRUPT.code();
   private static final String RECOVERING_CODE = LifecycleReasonCode.WORKER_RECOVERING.code();
-  private static final String RESTART_EXHAUSTED = LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code();
   private static final String RECOVERY_EXHAUSTED =
       LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code();
   private static final String MODEL_NOT_FOUND = LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code();
@@ -192,15 +191,7 @@ final class ReasonRetentionTest {
     assertEquals(RECOVERING_CODE, recovering.pendingReason());
     assertEquals("attempt 1 of 4", recovering.pendingDetail(), "its detail rides with it");
 
-    // …and the three neighbours it must NOT touch.
-    WorkerCapability supervisionGaveUp = new WorkerCapability();
-    supervisionGaveUp.transition(CapabilityHealth.DEGRADED, RESTART_EXHAUSTED, "budget spent");
-    supervisionGaveUp.transition(CapabilityHealth.RECOVERING, RECOVERING_CODE, "attempt 1 of 4");
-    assertEquals(
-        RESTART_EXHAUSTED,
-        supervisionGaveUp.pendingReason(),
-        "825 §D5 decision 2: supervision's terminal verdict is never superseded by boot recovery");
-
+    // Neither a fatal cause nor local budget exhaustion is superseded.
     WorkerCapability corrupt = new WorkerCapability();
     corrupt.transition(CapabilityHealth.DEGRADED, CORRUPT, "rebuild to recover");
     corrupt.transition(CapabilityHealth.RECOVERING, RECOVERING_CODE, "attempt 1 of 4");

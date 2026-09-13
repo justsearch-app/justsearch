@@ -87,7 +87,7 @@ final class UIDiagnosticChannelViewConformanceTest {
             Optional.of("trace"),
             Optional.of("diagnostic")),
         Set.of(DataClass.USER_PATHS, DataClass.CONFIG_VALUES),
-        ProducerKind.WORKER_GRPC_STREAM,
+        ProducerKind.EXTERNAL_OBSERVER,
         DeliveryMode.SSE_STREAM,
         new LoggerNamespaceSelector(
             Map.of("io.justsearch.", SubCategory.CORE_DIAGNOSTIC, "org.apache.", SubCategory.LIBRARY_TRACE),

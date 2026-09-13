@@ -19,7 +19,7 @@ class McpToolHandlerTest {
   @Test
   void successfulCallReturnsToolText() {
     McpToolHandler handler = new McpToolHandler(initializedClient(), "echo");
-    OperationResult result = handler.execute("{\"message\":\"hi there\"}");
+    OperationResult result = handler.execute("{\"message\":\"hi there\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals("hi there", result.message());
   }
@@ -27,7 +27,7 @@ class McpToolHandlerTest {
   @Test
   void emptyArgumentsAreAccepted() {
     McpToolHandler handler = new McpToolHandler(initializedClient(), "add");
-    OperationResult result = handler.execute("");
+    OperationResult result = handler.execute("", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals("0", result.message());
   }
@@ -35,7 +35,7 @@ class McpToolHandlerTest {
   @Test
   void toolReportedErrorBecomesFailureNotException() {
     McpToolHandler handler = new McpToolHandler(initializedClient(), "boom");
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("reported an error"));
   }
@@ -43,7 +43,7 @@ class McpToolHandlerTest {
   @Test
   void malformedArgumentsJsonBecomesFailure() {
     McpToolHandler handler = new McpToolHandler(initializedClient(), "echo");
-    OperationResult result = handler.execute("{not json");
+    OperationResult result = handler.execute("{not json", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Invalid arguments JSON"));
   }
@@ -55,7 +55,7 @@ class McpToolHandlerTest {
     client.initialize();
     transport.transportFailure = true;
     McpToolHandler handler = new McpToolHandler(client, "echo");
-    OperationResult result = handler.execute("{\"message\":\"x\"}");
+    OperationResult result = handler.execute("{\"message\":\"x\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("call failed"));
   }
@@ -63,7 +63,7 @@ class McpToolHandlerTest {
   @Test
   void nonTextContentSurfacesInStructuredData() {
     McpToolHandler handler = new McpToolHandler(initializedClient(), "get-image");
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     // The image survives into structuredData.mcpContent (so the FE can render it).
     assertTrue(result.structuredData().containsKey("mcpContent"), "mcpContent must carry non-text blocks");

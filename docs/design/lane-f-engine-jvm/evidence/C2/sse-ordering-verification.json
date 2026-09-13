@@ -1,0 +1,213 @@
+{
+  "baseRevision": "f3c07654bdbb4f462f6f962ea442b912a858df90",
+  "testedSource": "Base plus the source files hashed below; no production changes during these checks.",
+  "retention": "Retain raw artifacts through lane acceptance plus 30 days; export before worktree release.",
+  "limits": [
+    "Local focused/compatibility proof; full1202 predates these source changes.",
+    "Atomic snapshot/reconnect, incarnation tokens, live SSE and installed/hosted proof remain owed."
+  ],
+  "runs": [
+    {
+      "revision": "4c6389be4 + ordering regressions only",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*SsePublicationOrderingTest' --console=plain",
+      "summary": {
+        "tests": 3,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "result": "EXPECTED_FAILURE",
+      "executedCases": 3,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering-negative1204.txt",
+          "bytes": 35398,
+          "sha256": "3def93cf16a12d0472b56863ea267ae82635a92493ab890db9058d63dc283bac"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering-negative1204-xml.zip",
+          "bytes": 8573,
+          "sha256": "3660a7f3d319785742b9ce4fd30457ba2cf914ea125140ea794da2cd0d91f06b"
+        }
+      ]
+    },
+    {
+      "revision": "f3c07654b + ordered channel and keyed resource diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*OperationHistoryResourceCatalogTest' :modules:app-services:test --tests '*ResourceJacksonProjectionTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:app-agent-api:spotlessCheck :modules:ui:compileIntegrationTestJava --continue --console=plain",
+      "summary": {
+        "tests": 70,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 11
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 55,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 70,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1206.txt",
+          "bytes": 69702,
+          "sha256": "df3233b39d7dc0b8b925bcaf86ddd8f83d23063b5d4d584885c4435caec26428"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1206-xml.zip",
+          "bytes": 50289,
+          "sha256": "82e6d38b2575bd511243a460eb249809a15e2ebf2fa94a7b82a53e6930e95ff3"
+        }
+      ]
+    },
+    {
+      "revision": "f3c07654b + final ordered channel and keyed resource diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*OperationHistoryResourceCatalogTest' :modules:app-services:test --tests '*ResourceJacksonProjectionTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:app-agent-api:spotlessCheck :modules:ui:compileIntegrationTestJava --continue --console=plain",
+      "summary": {
+        "tests": 71,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 11
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 56,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 56,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1210.txt",
+          "bytes": 38657,
+          "sha256": "f9340793f66abdbb3015b5724aed45fa53dd946a30154bf8e2ae453ace69ba75"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-ordering1210-xml.zip",
+          "bytes": 50206,
+          "sha256": "cfe4a1655169c702b66995c2d9fbf6ad409124d42bd645b44b28c11e4570f44e"
+        }
+      ]
+    },
+    {
+      "revision": "f3c07654b + final ordered channel and keyed resource diff",
+      "command": "./gradlew.bat :modules:app-observability:test :modules:ui:test --tests '*Sse*Test' --tests '*RunStreamWriterTest' --continue --console=plain",
+      "summary": {
+        "tests": 572,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 89
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 10
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 510,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 79
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 572,
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-compatibility1213.txt",
+          "bytes": 38658,
+          "sha256": "7453f49fc3f6a821317389366c196cf394a80c45a7d008732c7687a98f851666"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-sse-compatibility1213-xml.zip",
+          "bytes": 95029,
+          "sha256": "fc25b4208aa4f224b6ae94585de313016a22bda416a5c5d66af0db3c0674b9dc"
+        }
+      ]
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/SseStreamChannel.java",
+      "bytes": 7631,
+      "sha256": "65e3456288efa741086bc369baf448df94a42ed6199a9132c9903f168ab031cd"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SsePublicationOrderingTest.java",
+      "bytes": 6072,
+      "sha256": "3149b612a8e8d5af80d839f68dcad31a12ebd4bdc501e21099ccd9f61a212871"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelAtomicSubscribeTest.java",
+      "bytes": 11422,
+      "sha256": "bfbdaff11e487d8a7555f57c70c7901c65d4aab498616a81309a540ee2d9172d"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelBoundedHandoffTest.java",
+      "bytes": 13980,
+      "sha256": "03d1ec1d96e0b22520df95c2ab8be3554befa0e948f2c4686f388f0b4aafe5cc"
+    }
+  ],
+  "review": "Independent read-only review found obsolete blocked-attach expectation and identical-Error aggregation risk; both corrected. Added the requested actual-eviction numeric-zero regression and executed it in1210/1213. No remaining reviewed implementation defect.",
+  "negative": "1204 prior production delivers [2,1] and strands the healthy first frame behind a blocked socket; two intended failures. The later obsolete-lock test change preserves exact replay assertions while requiring nonblocking attach."
+}

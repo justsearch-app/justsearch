@@ -25,7 +25,7 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
   private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
   private final EnterprisePolicyService enterprisePolicyService;
-  private final Runnable offlineProcessingTrigger;
+  private final java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger;
   // Tempdoc 737 fix pack (fix 4): the runtime-intent authority. switchInferenceMode records the
   // chat-enabled intent through these (spec write + reconciler nudge) instead of a raw switchTo*.
   // Nullable for graceful degradation / test seams that don't exercise the mode switch.
@@ -36,7 +36,7 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       EnterprisePolicyService enterprisePolicyService,
-      Runnable offlineProcessingTrigger) {
+      java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger) {
     this(onlineAi, settingsStore, enterprisePolicyService, offlineProcessingTrigger, null, null);
   }
 
@@ -50,7 +50,7 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       EnterprisePolicyService enterprisePolicyService,
-      Runnable offlineProcessingTrigger,
+      java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger,
       RuntimeSpecStore runtimeSpecStore,
       RuntimeReconciler runtimeReconciler) {
     this.onlineAi = onlineAi;
@@ -86,12 +86,14 @@ public final class BrainRuntimeServiceImpl implements BrainRuntimeService {
   }
 
   @Override
-  public void triggerOfflineProcessing() throws Exception {
+  public java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>
+      triggerOfflineProcessing(io.justsearch.core.context.EngineContext context,
+          java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome> progress) {
     if (offlineProcessingTrigger == null) {
       throw new UnsupportedOperationException("Offline processing not available");
     }
     log.info("Triggering offline processing (VDU + Embeddings)");
-    Thread.ofVirtual().name("offline-processing").start(offlineProcessingTrigger);
+    return offlineProcessingTrigger.apply(context, progress);
   }
 
   /**

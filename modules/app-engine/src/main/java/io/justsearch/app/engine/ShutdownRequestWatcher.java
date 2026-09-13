@@ -1,0 +1,187 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.engine;
+
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.Objects;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Polls for {@link ShutdownRequest} and runs the ordered shutdown when one appears (design 7.3,
+ * stage B item B3).
+ *
+ * <p><b>Its own thread, and that is the entire point.</b> Design 7.3 is explicit that this must
+ * never run on the API pool: the case a supervisor exists for is an Engine that answers no HTTP,
+ * and a watcher sharing the pool with the API front would be starved by exactly the condition it
+ * exists to resolve. One scheduled single-thread executor, named, so the separation is assertable
+ * rather than assumed.
+ *
+ * <p><b>Started after readiness, deliberately.</b> A request that arrives during boot is left on
+ * disk rather than acted on half-way through startup; the supervisor's deadline covers the case
+ * where an Engine never reaches readiness at all, and killing a booting process is the supervisor's
+ * job, not the booting process's.
+ *
+ * <p><b>The poll is the mechanism, not a fallback.</b> A filesystem watch would be lighter, but the
+ * request can be written by a Rust process or a Node process on any filesystem the user's data
+ * directory happens to live on, including network paths where change notification is unreliable. A
+ * poll that costs one {@code isRegularFile} per second is the honest choice.
+ */
+public final class ShutdownRequestWatcher implements AutoCloseable {
+
+  /** Admission decision for a well-formed request. */
+  public enum Acceptance {
+    ACCEPT,
+    REFUSE
+  }
+
+  private static final Logger log = LoggerFactory.getLogger(ShutdownRequestWatcher.class);
+
+  /** The watcher thread's name. Asserted against, so it is part of the contract. */
+  public static final String THREAD_NAME = "engine-shutdown-request-watcher";
+
+  /** Poll cadence. A shutdown that starts a second late is not a defect; a busy loop is. */
+  public static final long DEFAULT_POLL_INTERVAL_MS = 1_000L;
+
+  private final Path runtimeDir;
+  private final Consumer<ShutdownRequest> onRequest;
+  private final Function<ShutdownRequest, Acceptance> acceptance;
+  private final long pollIntervalMs;
+  private final AtomicBoolean fired = new AtomicBoolean();
+  private final EngineExecutorRegistry.Registration executorOwner;
+  private volatile ScheduledExecutorService executor;
+  private volatile Thread workerThread;
+
+  /**
+   * @param runtimeDir the {@code <dataDir>/runtime/} directory to watch
+   * @param acceptance whether a well-formed host request should be acted on or refused and deleted
+   * @param onRequest what to run when a request is accepted; in production, the ordered shutdown
+   */
+  public ShutdownRequestWatcher(
+      EngineExecutorRegistry executors,
+      Path runtimeDir,
+      Function<ShutdownRequest, Acceptance> acceptance,
+      Consumer<ShutdownRequest> onRequest,
+      long pollIntervalMs) {
+    this.runtimeDir = runtimeDir;
+    this.acceptance = Objects.requireNonNull(acceptance, "acceptance");
+    this.onRequest = onRequest;
+    this.pollIntervalMs = pollIntervalMs;
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new EngineExecutorSpec(
+        "engine.shutdown-request-watcher", EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+  }
+
+  /** Starts polling. Idempotent; a second call is ignored. */
+  public synchronized void start() {
+    if (executor != null) {
+      return;
+    }
+    executor =
+        executorOwner.openScheduled(
+            r -> {
+              Thread t = new Thread(r, THREAD_NAME);
+              t.setDaemon(true);
+              workerThread = t;
+              return t;
+            });
+    try {
+      executor.scheduleWithFixedDelay(
+          this::pollOnce, pollIntervalMs, pollIntervalMs, TimeUnit.MILLISECONDS);
+    } catch (RuntimeException | Error failure) {
+      executorOwner.close();
+      throw failure;
+    }
+    log.info(
+        "Watching {} for shutdown requests every {}ms on {}",
+        ShutdownRequest.pathIn(runtimeDir),
+        pollIntervalMs,
+        THREAD_NAME);
+  }
+
+  /**
+   * One poll. Package-private so a test can drive it without waiting on a scheduler.
+   *
+   * <p>Never throws: this runs on a {@code scheduleWithFixedDelay} task, and an escaping exception
+   * would cancel the schedule silently — the watcher would stop watching and nothing would say so.
+   */
+  void pollOnce() {
+    try {
+      if (fired.get()) {
+        return;
+      }
+      Optional<ShutdownRequest> request = ShutdownRequest.read(runtimeDir);
+      if (request.isEmpty()) {
+        // Absent, malformed or unknown-reason. ShutdownRequest.read has already logged why.
+        return;
+      }
+      ShutdownRequest req = request.get();
+      Acceptance decision = acceptance.apply(req);
+      if (req.deadlineEpochMs() < System.currentTimeMillis()) {
+        log.warn(
+            "Ignoring expired shutdown request with reason {} (issuedBy={}, deadlineEpochMs={})",
+            req.reason().wire(),
+            req.issuedBy(),
+            req.deadlineEpochMs());
+        ShutdownRequest.clear(runtimeDir);
+        return;
+      }
+      if (decision != Acceptance.ACCEPT) {
+        log.warn(
+            "Ignoring a shutdown request with reason {} (issuedBy={}): it was refused by the"
+                + " acceptance check, most likely a nonce that does not match this Engine's"
+                + " upgrade. Deleting it so it is not re-read every poll.",
+            req.reason().wire(),
+            req.issuedBy());
+        ShutdownRequest.clear(runtimeDir);
+        return;
+      }
+      if (!fired.compareAndSet(false, true)) {
+        return;
+      }
+      log.info(
+          "Shutdown request accepted (reason={}, issuedBy={}, deadlineEpochMs={})",
+          req.reason().wire(),
+          req.issuedBy(),
+          req.deadlineEpochMs());
+      // Consume BEFORE acting: the ordered shutdown can take seconds, and a request still on disk
+      // when the next Engine starts would shut the new one down too.
+      ShutdownRequest.clear(runtimeDir);
+      onRequest.accept(req);
+    } catch (Exception e) {
+      log.warn("Shutdown-request poll failed (continuing to watch): {}", e.toString());
+    }
+  }
+
+  /** Whether a request has been accepted and acted on. */
+  public boolean hasFired() {
+    return fired.get();
+  }
+
+  @Override
+  public synchronized void close() {
+    ScheduledExecutorService e = executor;
+    executor = null;
+    if (e != null) {
+      if (Thread.currentThread() == workerThread) {
+        // The accepted request runs the ordered shutdown on this executor thread. Interrupting
+        // ourselves here would leave the interrupt flag set for every later close step.
+        // The process registry retains this instance through actual exit and final shutdown.
+        e.shutdown();
+      } else {
+        executorOwner.close();
+      }
+    } else {
+      executorOwner.close();
+    }
+    workerThread = null;
+  }
+}

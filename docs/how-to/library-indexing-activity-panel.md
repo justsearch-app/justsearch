@@ -40,7 +40,7 @@ Today the Library tab shows watched roots and lets the user trigger a
 reindex. It does NOT show what *happened* — which files succeeded,
 skipped, or failed; how recent activity went; or what's currently
 being scanned. The substrate to answer those questions exists
-(diagnostic ledger endpoints, gRPC scan progress stream, scoped
+(diagnostic ledger endpoints, the scan-progress stream, scoped
 path-resolution); this panel is where the user finally sees it.
 
 ## Endpoints to consume
@@ -87,7 +87,7 @@ GET /api/scans/{scanId}/progress  (Server-Sent Events stream)
 ```
 
 Closing the SSE connection (e.g., `eventSource.close()`) propagates a
-gRPC cancel to the worker via T3 substrate cancel — that's the
+cancel to the index half via the T3 `CancelToken` substrate — that's the
 "Cancel scan" affordance.
 
 ## Reusable patterns
@@ -171,7 +171,7 @@ eventSource.addEventListener('complete', (ev) => {
   eventSource.close();
 });
 // User clicks Cancel:
-eventSource.close();  // triggers backend gRPC cancel via T3
+eventSource.close();  // triggers backend cancel via the T3 CancelToken
 ```
 
 ### Host components

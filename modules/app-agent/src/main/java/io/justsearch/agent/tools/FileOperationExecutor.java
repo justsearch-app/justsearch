@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileVisitResult;
@@ -26,12 +28,12 @@ final class FileOperationExecutor {
   private static final Logger LOG = LoggerFactory.getLogger(FileOperationExecutor.class);
   private static final int MAX_SUFFIX_ATTEMPTS = 1000;
 
-  private final Supplier<List<Path>> indexedRootsSupplier;
+  private final java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier;
   private final FileOperationsTool.IndexUpdateCallback indexUpdateCallback;
   private final FileOperationLog transactionLog;
 
   FileOperationExecutor(
-      Supplier<List<Path>> indexedRootsSupplier,
+      java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier,
       FileOperationsTool.IndexUpdateCallback indexUpdateCallback,
       FileOperationLog transactionLog) {
     this.indexedRootsSupplier = indexedRootsSupplier;
@@ -42,12 +44,12 @@ final class FileOperationExecutor {
   // ===== Validation =====
 
   /** Validate with default FAIL strategy. */
-  ValidationReport validate(List<FileOperation> operations) {
-    return validate(operations, ConflictStrategy.FAIL);
+  ValidationReport validate(List<FileOperation> operations, EngineContext engineContext) {
+    return validate(operations, ConflictStrategy.FAIL, engineContext);
   }
 
-  ValidationReport validate(List<FileOperation> operations, ConflictStrategy strategy) {
-    List<Path> roots = indexedRootsSupplier.get();
+  ValidationReport validate(List<FileOperation> operations, ConflictStrategy strategy, EngineContext engineContext) {
+    List<Path> roots = indexedRootsSupplier.apply(engineContext);
     List<ValidationResult> results = new ArrayList<>();
     for (int i = 0; i < operations.size(); i++) {
       results.add(validateOperation(operations.get(i), roots, i, strategy));
@@ -118,10 +120,10 @@ final class FileOperationExecutor {
    * supplier is the live indexing service, so "the Worker is down" must read as "containment cannot
    * be proven", not as an exception escaping into the undo path.
    */
-  boolean isWithinIndexedRoots(Path path) {
+  boolean isWithinIndexedRoots(Path path, EngineContext engineContext) {
     List<Path> roots;
     try {
-      roots = indexedRootsSupplier.get();
+      roots = indexedRootsSupplier.apply(engineContext);
     } catch (RuntimeException e) {
       LOG.warn("Indexed-root lookup failed; containment not proven for: {}", path, e);
       return false;
@@ -187,12 +189,12 @@ final class FileOperationExecutor {
   // ===== Execution =====
 
   /** Execute with default FAIL strategy. */
-  ExecutionReport execute(List<FileOperation> operations, String explanation) {
-    return execute(operations, explanation, ConflictStrategy.FAIL);
+  ExecutionReport execute(List<FileOperation> operations, String explanation, EngineContext engineContext) {
+    return execute(operations, explanation, ConflictStrategy.FAIL, engineContext);
   }
 
   ExecutionReport execute(
-      List<FileOperation> operations, String explanation, ConflictStrategy strategy) {
+      List<FileOperation> operations, String explanation, ConflictStrategy strategy, EngineContext engineContext) {
     String batchId = UUID.randomUUID().toString();
     List<ExecutionResult> results = new ArrayList<>();
     Map<Path, Path> pathMappings = new HashMap<>();
@@ -248,7 +250,7 @@ final class FileOperationExecutor {
     // Update index for MOVE/RENAME operations
     if (!pathMappings.isEmpty()) {
       try {
-        int updatedCount = indexUpdateCallback.updatePaths(pathMappings);
+        int updatedCount = indexUpdateCallback.updatePaths(pathMappings, engineContext);
         LOG.info("Updated {} index entries after file operations", updatedCount);
       } catch (Exception e) {
         LOG.error("Index update failed after file operations (files moved successfully)", e);

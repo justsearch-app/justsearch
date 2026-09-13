@@ -159,7 +159,8 @@ class EmbeddingConfigTest {
       System.clearProperty(KEY_MODEL_PATH);
       System.clearProperty(KEY_EMBED_ENABLED);
 
-      // Set up ConfigStore with a resolved model path (simulating the snapshot at ordinal 450)
+      // Set up ConfigStore with a resolved model path. Pre-A19 this simulated the ordinal-450
+      // worker snapshot; that tier is deleted, so it now simulates the one resolved config.
       ConfigStore store =
           new ConfigStore(
               TestResolvedConfigHelper.fromEntries(

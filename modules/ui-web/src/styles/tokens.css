@@ -459,7 +459,7 @@
      --text-primary omitted: same 0.95 opacity as dark → derived from --p-text */
   --text-secondary: rgba(var(--p-text), 0.88);
   --text-tertiary: rgba(var(--p-text), 0.72);
-  --text-muted: rgba(var(--p-text), 0.58);
+  --text-muted: rgba(var(--p-text), 0.62);
   --text-ghost: rgba(var(--p-text), 0.35);
 
   /* Accent - darken teal for visibility on light backgrounds */

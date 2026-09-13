@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationResult;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,11 @@ import java.util.function.Consumer;
  * orchestrator.
  */
 public interface AgentRunQueries {
+
+  /** Read the current live gate for its private approval display; a removed gate is absent. */
+  default java.util.Optional<PendingToolApproval> pendingToolApproval(String sessionId, String callId) {
+    return java.util.Optional.empty();
+  }
 
   /**
    * List all available Operation entries (tempdoc 429 §E.4 substrate).
@@ -55,7 +62,7 @@ public interface AgentRunQueries {
   List<io.justsearch.agent.api.registry.Operation> offeredOperations();
 
   /** Undo a previous tool execution by its execution ID. */
-  default OperationResult undoOperation(String toolName, String executionId) {
+  default OperationResult undoOperation(String toolName, String executionId, EngineContext engineContext) {
     throw new UnsupportedOperationException("Undo not supported");
   }
 
@@ -75,7 +82,7 @@ public interface AgentRunQueries {
   }
 
   /** Resume the most recent persisted session. */
-  default void resumeLastSession(Consumer<AgentEvent> eventConsumer) {
+  default void resumeLastSession(Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     throw new UnsupportedOperationException("Resume not supported");
   }
 
@@ -109,10 +116,10 @@ public interface AgentRunQueries {
 
   /**
    * Resume a specific persisted session by id. Tempdoc 415 follow-up (C20). Sibling of
-   * {@link #resumeLastSession(Consumer)} — emits the same events and inherits the same
+   * {@link #resumeLastSession(Consumer, EngineContext)} — emits the same events and inherits the same
    * resume-state safety gate.
    */
-  default void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer) {
+  default void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     throw new UnsupportedOperationException("Resume not supported");
   }
 
@@ -122,7 +129,7 @@ public interface AgentRunQueries {
    * the original). No resume-state gate — a fork is meaningful for a DONE/ERRORED run.
    */
   default void forkSession(
-      String sessionId, String editedMessage, Consumer<AgentEvent> eventConsumer) {
+      String sessionId, String editedMessage, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     throw new UnsupportedOperationException("Fork not supported");
   }
 

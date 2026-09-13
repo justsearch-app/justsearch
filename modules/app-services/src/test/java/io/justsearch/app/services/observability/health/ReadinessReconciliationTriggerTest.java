@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -21,15 +22,18 @@ import org.junit.jupiter.api.Test;
 final class ReadinessReconciliationTriggerTest {
 
   private ReadinessReconciliationTrigger trigger;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
-    trigger = new ReadinessReconciliationTrigger();
+    processExecutors = new TestEngineExecutors();
+    trigger = new ReadinessReconciliationTrigger(processExecutors);
   }
 
   @AfterEach
   void tearDown() {
     trigger.close();
+    processExecutors.close();
   }
 
   @Test

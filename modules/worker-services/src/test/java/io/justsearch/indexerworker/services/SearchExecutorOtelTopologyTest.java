@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -32,7 +31,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +50,7 @@ import org.junit.jupiter.api.Test;
  * {@code TracingWorkflowSpanAttributeProcessorTest}.
  */
 @DisplayName("SearchExecutor OTel span topology (tempdoc 517 invariant #12)")
-final class SearchExecutorOtelTopologyTest {
+final class SearchExecutorOtelTopologyTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @Test
   @DisplayName("Sparse-only query emits search/retrieval span under the request context")
@@ -65,7 +63,7 @@ final class SearchExecutorOtelTopologyTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       // Create a synthetic request-level parent span so the retrieval span's
       // explicit-parent-context discipline is observable in the export.
       var tracer = GlobalOpenTelemetry.get().getTracer("test");
@@ -119,7 +117,7 @@ final class SearchExecutorOtelTopologyTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-1", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       var tracer = GlobalOpenTelemetry.get().getTracer("test");
       Span requestSpan = tracer.spanBuilder("test.request").startSpan();
       try (Scope ignored = Context.current().with(requestSpan).makeCurrent()) {
@@ -174,7 +172,7 @@ final class SearchExecutorOtelTopologyTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-oi", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -228,7 +226,7 @@ final class SearchExecutorOtelTopologyTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-2", "Lorem ipsum")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       // Hybrid request with no embedding service → dense leg fails → degraded BM25-only path.
       SearchResponse response =
           invokeSearch(
@@ -272,7 +270,7 @@ final class SearchExecutorOtelTopologyTest {
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     try (RunningRuntime lifecycle = newLifecycleWithOneDoc("doc-3", "Hello world")) {
-      GrpcSearchService service = new GrpcSearchService(lifecycle);
+      WorkerSearchService service = new WorkerSearchService(lifecycle);
       SearchResponse response =
           invokeSearch(
               service,
@@ -317,32 +315,15 @@ final class SearchExecutorOtelTopologyTest {
     assertFalse(value == null, () -> "span " + span.getName() + " must have attribute " + key);
   }
 
-  private static SearchResponse invokeSearch(GrpcSearchService service, SearchRequest request) {
-    AtomicReference<SearchResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.search(
-        request,
-        new StreamObserver<>() {
-          @Override
-          public void onNext(SearchResponse value) {
-            responseRef.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            errorRef.set(t);
-          }
-
-          @Override
-          public void onCompleted() {}
-        });
-    if (errorRef.get() != null) {
-      throw new RuntimeException("search() errored", errorRef.get());
+  private static SearchResponse invokeSearch(WorkerSearchService service, SearchRequest request) {
+    try {
+      return service.search(request, CallContext.none());
+    } catch (WorkerServiceException e) {
+      throw new RuntimeException("search() errored", e);
     }
-    return responseRef.get();
   }
 
-  private static RunningRuntime newLifecycleWithOneDoc(String docId, String content)
+  private RunningRuntime newLifecycleWithOneDoc(String docId, String content)
       throws Exception {
     FieldCatalogDef catalog = FieldCatalogDef.forChunkTesting(4);
     Path base = Files.createTempDirectory("justsearch-otel-topology-test-");
@@ -355,7 +336,7 @@ final class SearchExecutorOtelTopologyTest {
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().open();
+    RunningRuntime lifecycle = IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

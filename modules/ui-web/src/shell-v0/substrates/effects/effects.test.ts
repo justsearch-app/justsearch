@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   recordEffect,
   listJournal,
+  journalEventId,
   listJournalFor,
   getJournalSize,
   undoLastEffect,
@@ -212,6 +213,33 @@ describe('Per-Provenance filtering (§13.5 rule 2)', () => {
 });
 
 describe('Cross-session persistence (§13.7 q.3)', () => {
+  it('preserves the minted ledger id across reload while new clients have distinct identities', () => {
+    const first = recordEffect({ kind: 'navigate', to: '#first' }, CORE_PROVENANCE);
+    const identity = journalEventId(first);
+    expect(identity).toMatch(/^fe-effect:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    _resetInMemoryOnly();
+    restoreJournalFromStorage();
+    expect(journalEventId(listJournal()[0]!)).toBe(identity);
+    __resetJournalForTest();
+    const otherClient = recordEffect({ kind: 'navigate', to: '#other' }, CORE_PROVENANCE);
+    expect(otherClient.id).toBe(first.id);
+    expect(journalEventId(otherClient)).not.toBe(identity);
+  });
+
+  it('keeps the previous wire id for restored legacy entries instead of re-ingesting a duplicate', () => {
+    recordEffect({ kind: 'navigate', to: '#legacy' }, CORE_PROVENANCE);
+    const storage = globalThis.localStorage;
+    const payload = JSON.parse(storage.getItem('justsearch.effect-journal.v1')!) as { entries: Array<{ ledgerId?: string }> };
+    delete payload.entries[0]!.ledgerId;
+    storage.setItem('justsearch.effect-journal.v1', JSON.stringify(payload));
+    _resetInMemoryOnly();
+    restoreJournalFromStorage();
+    expect(journalEventId(listJournal()[0]!)).toBe('fe-effect:1');
+    const next = recordEffect({ kind: 'navigate', to: '#new' }, CORE_PROVENANCE);
+    expect(next.id).toBe(2);
+    expect(journalEventId(next)).not.toBe('fe-effect:2');
+  });
+
   it('round-trips entries through localStorage', () => {
     recordEffect({ kind: 'navigate', to: '#a' }, CORE_PROVENANCE);
     recordEffect({ kind: 'noop' }, CORE_PROVENANCE);

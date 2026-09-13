@@ -10,7 +10,7 @@
  * asserting Shell's `surfaces` array reflects the changes.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../chrome/Shell.js';
 import {
   __resetForTest as resetSurfaceCatalog,
@@ -22,6 +22,7 @@ import {
   setSurfaceVisibility,
 } from '../state/userConfigState.js';
 import { __resetUiModeForTest, setUiMode } from '../state/uiModeState.js';
+import { __resetAiStateForTest } from '../state/aiStateStore.js';
 // Tempdoc 586 follow-up — renderShell() triggers fire-and-forget lazy-surface imports; drain them in
 // afterEach so a dynamic import() can't resolve after teardown (vitest-4 EnvironmentTeardownError).
 import { __flushInFlightSurfaces } from '../views/lazySurfaceRegistry.js';
@@ -118,6 +119,15 @@ describe('Shell — userConfig-driven rail (slice 472)', () => {
   beforeEach(() => {
     resetSurfaceCatalog();
     __resetUserConfigForTest();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ entries: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
   });
 
   afterEach(async () => {
@@ -126,6 +136,8 @@ describe('Shell — userConfig-driven rail (slice 472)', () => {
     // vitest-4 EnvironmentTeardownError that reddened the full-suite exit code while all tests passed).
     await __flushInFlightSurfaces();
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
+    vi.unstubAllGlobals();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
   });
@@ -218,10 +230,21 @@ describe('Shell — Simple/Detailed rail filter (tempdoc 586 F-2)', () => {
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetUiModeForTest();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ entries: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
   });
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
+    vi.unstubAllGlobals();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetUiModeForTest();

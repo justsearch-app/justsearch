@@ -30,7 +30,7 @@ class AgentServiceUnavailableTest {
   void runAgentEmitsError() {
     var events = new ArrayList<AgentEvent>();
     var request = new AgentRequest(List.of(Map.of("role", "user", "content", "test")), List.of(), 1);
-    service.runAgent(request, events::add);
+    service.runAgent(request, events::add, TestEngineContexts.agentLoop());
     assertEquals(1, events.size());
     assertInstanceOf(AgentEvent.AgentError.class, events.getFirst());
     var error = (AgentEvent.AgentError) events.getFirst();

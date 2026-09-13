@@ -34,13 +34,13 @@ final class NavigateToSurfaceHandlerTest {
   void dispatchesNavigationIntent() {
     var captured = new AtomicReference<Intent>();
     BackendIntentRouter router =
-        (intent, prov) -> {
+        (intent, prov, engineContext) -> {
           captured.set(intent);
           return new IntentDispatchResult.Forwarded("env-123");
         };
     NavigateToSurfaceHandler handler = new NavigateToSurfaceHandler(() -> router);
 
-    OperationResult result = handler.execute("{\"surfaceId\":\"core.library-surface\"}");
+    OperationResult result = handler.execute("{\"surfaceId\":\"core.library-surface\"}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertNotNull(captured.get());
@@ -56,8 +56,8 @@ final class NavigateToSurfaceHandlerTest {
   @DisplayName("Missing surfaceId returns BAD_REQUEST failure")
   void missingSurfaceIdReturnsBadRequest() {
     NavigateToSurfaceHandler handler =
-        new NavigateToSurfaceHandler(() -> (intent, prov) -> new IntentDispatchResult.Forwarded("x"));
-    OperationResult result = handler.execute("{}");
+        new NavigateToSurfaceHandler(() -> (intent, prov, engineContext) -> new IntentDispatchResult.Forwarded("x"));
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertEquals("BAD_REQUEST", result.errorCode().orElse(null));
   }
@@ -66,8 +66,8 @@ final class NavigateToSurfaceHandlerTest {
   @DisplayName("Blank surfaceId returns BAD_REQUEST failure")
   void blankSurfaceIdReturnsBadRequest() {
     NavigateToSurfaceHandler handler =
-        new NavigateToSurfaceHandler(() -> (intent, prov) -> new IntentDispatchResult.Forwarded("x"));
-    OperationResult result = handler.execute("{\"surfaceId\":\"\"}");
+        new NavigateToSurfaceHandler(() -> (intent, prov, engineContext) -> new IntentDispatchResult.Forwarded("x"));
+    OperationResult result = handler.execute("{\"surfaceId\":\"\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertEquals("BAD_REQUEST", result.errorCode().orElse(null));
   }
@@ -76,7 +76,7 @@ final class NavigateToSurfaceHandlerTest {
   @DisplayName("Null router returns SERVICE_UNAVAILABLE failure")
   void nullRouterReturnsServiceUnavailable() {
     NavigateToSurfaceHandler handler = new NavigateToSurfaceHandler(() -> null);
-    OperationResult result = handler.execute("{\"surfaceId\":\"core.library-surface\"}");
+    OperationResult result = handler.execute("{\"surfaceId\":\"core.library-surface\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertEquals("SERVICE_UNAVAILABLE", result.errorCode().orElse(null));
   }
@@ -86,10 +86,9 @@ final class NavigateToSurfaceHandlerTest {
    * context-aware execute() overload.
    */
   private static InvocationProvenance provenance(TransportTag transport) {
-    return new InvocationProvenance(
-        transport,
+    return InvocationProvenance.fromEngineContext(
+        io.justsearch.app.services.TestEngineContexts.forTransport(transport),
         ExecutorTag.UI,
-        Optional.empty(),
         Instant.parse("2026-05-14T00:00:00Z"),
         Optional.empty());
   }
@@ -100,7 +99,7 @@ final class NavigateToSurfaceHandlerTest {
   void transportPropagatedFromProvenanceAgentLoop() {
     var captured = new AtomicReference<Intent>();
     BackendIntentRouter router =
-        (intent, prov) -> {
+        (intent, prov, engineContext) -> {
           captured.set(intent);
           return new IntentDispatchResult.Forwarded("env-x");
         };
@@ -108,7 +107,9 @@ final class NavigateToSurfaceHandlerTest {
 
     OperationResult result =
         handler.execute(
-            "{\"surfaceId\":\"core.library-surface\"}", provenance(TransportTag.AGENT_LOOP));
+            "{\"surfaceId\":\"core.library-surface\"}", provenance(TransportTag.AGENT_LOOP),
+            io.justsearch.app.services.TestEngineContexts.forProvenance(
+                provenance(TransportTag.AGENT_LOOP)));
 
     assertTrue(result.success());
     assertEquals(TransportTag.AGENT_LOOP, captured.get().transport());
@@ -120,7 +121,7 @@ final class NavigateToSurfaceHandlerTest {
   void transportPropagatedFromProvenancePalette() {
     var captured = new AtomicReference<Intent>();
     BackendIntentRouter router =
-        (intent, prov) -> {
+        (intent, prov, engineContext) -> {
           captured.set(intent);
           return new IntentDispatchResult.Forwarded("env-y");
         };
@@ -128,7 +129,9 @@ final class NavigateToSurfaceHandlerTest {
 
     OperationResult result =
         handler.execute(
-            "{\"surfaceId\":\"core.library-surface\"}", provenance(TransportTag.PALETTE));
+            "{\"surfaceId\":\"core.library-surface\"}", provenance(TransportTag.PALETTE),
+            io.justsearch.app.services.TestEngineContexts.forProvenance(
+                provenance(TransportTag.PALETTE)));
 
     assertTrue(result.success());
     assertEquals(TransportTag.PALETTE, captured.get().transport());
@@ -140,7 +143,7 @@ final class NavigateToSurfaceHandlerTest {
   void transportPropagatedFromProvenanceRail() {
     var captured = new AtomicReference<Intent>();
     BackendIntentRouter router =
-        (intent, prov) -> {
+        (intent, prov, engineContext) -> {
           captured.set(intent);
           return new IntentDispatchResult.Forwarded("env-z");
         };
@@ -148,7 +151,9 @@ final class NavigateToSurfaceHandlerTest {
 
     OperationResult result =
         handler.execute(
-            "{\"surfaceId\":\"core.library-surface\"}", provenance(TransportTag.RAIL));
+            "{\"surfaceId\":\"core.library-surface\"}", provenance(TransportTag.RAIL),
+            io.justsearch.app.services.TestEngineContexts.forProvenance(
+                provenance(TransportTag.RAIL)));
 
     assertTrue(result.success());
     assertEquals(TransportTag.RAIL, captured.get().transport());
@@ -158,11 +163,11 @@ final class NavigateToSurfaceHandlerTest {
   @DisplayName("Router exception surfaces as DISPATCH_FAILED failure")
   void routerExceptionReturnsDispatchFailed() {
     BackendIntentRouter router =
-        (intent, prov) -> {
+        (intent, prov, engineContext) -> {
           throw new RuntimeException("boom");
         };
     NavigateToSurfaceHandler handler = new NavigateToSurfaceHandler(() -> router);
-    OperationResult result = handler.execute("{\"surfaceId\":\"core.unknown-surface\"}");
+    OperationResult result = handler.execute("{\"surfaceId\":\"core.unknown-surface\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertEquals("DISPATCH_FAILED", result.errorCode().orElse(null));
     assertEquals("core.unknown-surface", result.errorDetails().get("surfaceId"));

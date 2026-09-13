@@ -70,7 +70,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     IndexSchema schema = buildSchemaWithDim(4);
 
     // Seed: open, write a doc, commit, close. Leaves valid Lucene segment files.
-    RunningRuntime seed = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -104,7 +104,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     ResolvedConfig recoveryCfg = resolvedConfigWith(autoRecoveryYaml(true));
     RunningRuntime recovered =
         schema
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .withFallbackIndexPath(dataRoot)
             .withConfig(recoveryCfg)
             .withIndexOpenGuard(guardSpy)
@@ -170,7 +170,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
 
     IndexSchema schema = buildSchemaWithDim(4);
 
-    RunningRuntime seed = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -190,7 +190,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
             IndexRuntimeIOException.class,
             () ->
                 schema
-                    .atPath(indexPath)
+                    .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
                     .withFallbackIndexPath(dataRoot)
                     .withConfig(noRecoveryCfg)
                     .open());
@@ -219,7 +219,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     // Schema A: title is a TEXT field (IndexOptions=DOCS_AND_FREQS_AND_POSITIONS,
     // DocValuesType=NONE). Seed the index with one doc that exercises the field.
     IndexSchema schemaA = buildSchemaWithTitleType("text");
-    RunningRuntime seed = schemaA.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schemaA.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -238,7 +238,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
 
     RunningRuntime recovered =
         schemaB
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .withFallbackIndexPath(dataRoot)
             .withConfig(rebuildCfg)
             .open();
@@ -284,7 +284,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     Files.createDirectories(indexPath);
 
     IndexSchema schemaA = buildSchemaWithTitleType("text");
-    RunningRuntime seed = schemaA.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schemaA.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -304,7 +304,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
             IndexRuntimeIOException.class,
             () ->
                 schemaB
-                    .atPath(indexPath)
+                    .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
                     .withFallbackIndexPath(dataRoot)
                     .withConfig(strictCfg)
                     .open());
@@ -329,7 +329,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     Files.createDirectories(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
-    RunningRuntime seed = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     for (int i = 0; i < 50; i++) {
       seed.indexingCoordinator()
           .indexSingle(
@@ -350,7 +350,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     ResolvedConfig cfg =
         resolvedConfigWith("index:\n  integrity_check: FULL\n  auto_recovery: true\n");
     RunningRuntime recovered =
-        schema.atPath(indexPath).withFallbackIndexPath(dataRoot).withConfig(cfg).open();
+        schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).withConfig(cfg).open();
 
     SearchResult result =
         recovered
@@ -378,7 +378,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     Files.createDirectories(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
-    RunningRuntime seed = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -393,7 +393,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
 
     ResolvedConfig cfg = resolvedConfigWith(autoRecoveryYaml(true));
     DeferredRuntime recovered =
-        schema.atPath(indexPath).withFallbackIndexPath(dataRoot).withConfig(cfg).openDeferred();
+        schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).withConfig(cfg).openDeferred();
 
     assertNotNull(
         recovered, "deferred (read-only-first) open of a corrupt index must recover, not fail to start");
@@ -424,7 +424,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     Files.createDirectories(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
-    RunningRuntime rw = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime rw = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     rw.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -439,7 +439,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
         Files.exists(CleanShutdownMarker.pathFor(indexPath)),
         "a graceful writable close must write the clean-shutdown marker");
 
-    ReadOnlyRuntime ro = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).openReadOnly();
+    ReadOnlyRuntime ro = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).openReadOnly();
     ro.close();
     assertTrue(
         Files.exists(CleanShutdownMarker.pathFor(indexPath)),
@@ -447,7 +447,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
             + " nothing, so it cannot be the session that dirties the index");
 
     // A writer CAN die mid-commit, so its open is what invalidates the previous clean shutdown.
-    RunningRuntime rw2 = schema.atPath(indexPath).withFallbackIndexPath(dataRoot).open();
+    RunningRuntime rw2 = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
     assertFalse(
         Files.exists(CleanShutdownMarker.pathFor(indexPath)),
         "opening a WRITER must consume (clear) the clean-shutdown marker");

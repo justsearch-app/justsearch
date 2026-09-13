@@ -74,7 +74,7 @@ final class ResourceApiModule implements ApiModule {
       HeadAssembly headAssembly,
       Telemetry telemetry,
       RuntimeManifestPublisher runtimeManifestPublisher,
-      Path indexBasePath) {
+      Path indexBasePath, io.justsearch.app.api.EngineAdmissionService admission) {
     this.headAssembly = headAssembly;
     // Tempdoc 429 §F.11: multi-catalog wiring — CoreOperationCatalog (3 admin seeds)
     // + AgentToolsOperationCatalog (4 tool migrations). RegistryController aggregates
@@ -126,10 +126,10 @@ final class ResourceApiModule implements ApiModule {
                 // contributed one — the example plugin is dev-gated). handleResources flat-maps the list.
                 headAssembly.substrate().resources().pluginResources()),
             // Slice 448 phase 2: DiagnosticChannel — the fourth registry primitive. Tempdoc 560 §10.4:
-            // core head-log + the composed plugin-contributed channels (empty unless a plugin
+            // core engine-log + the composed plugin-contributed channels (empty unless a plugin
             // contributed one — the example plugin is dev-gated).
             List.of(
-                headAssembly.substrate().channels().headLogCatalog(),
+                headAssembly.substrate().channels().engineLogCatalog(),
                 headAssembly.substrate().channels().pluginChannelCatalog()),
             // Slice 449 phase 4: Surface Manifest catalogs. Tempdoc 560 §10.4: core surfaces +
             // the composed plugin-contributed surfaces (empty unless a plugin contributed one —
@@ -156,44 +156,45 @@ final class ResourceApiModule implements ApiModule {
     // Tempdoc 560 §28 Phase 3 — the run-tier witness reads the live composed registry.
     this.witnessController = new WitnessController(headAssembly.liveRegistry());
     this.capabilitiesStreamController =
-        new CapabilitiesStreamController(
+        new CapabilitiesStreamController(headAssembly.executors(),
             headAssembly.substrate().conversation().capabilitiesChanges(), telemetry);
     // Tempdoc 501 Phase 2 / Phase 37 (F7): runtime axis wiring (manifest REST + SSE +
     // well-known + per-instance history + probes) extracted into RuntimeApiRoutes.
     this.runtimeApiRoutes =
         runtimeManifestPublisher == null
             ? null
-            : new io.justsearch.ui.api.routes.RuntimeApiRoutes(runtimeManifestPublisher);
+            : new io.justsearch.ui.api.routes.RuntimeApiRoutes(headAssembly.executors(), runtimeManifestPublisher);
     // Tempdoc 430 Phase 2: SSE controller for the HealthEvent stream.
     this.healthEventStreamController =
-        new HealthEventStreamController(
+        new HealthEventStreamController(headAssembly.executors(),
             headAssembly.substrate().health().conditionStore(),
             headAssembly.substrate().health().occurrenceLog(),
             headAssembly.substrate().health().changes(),
             telemetry);
     // Slice 487 §4.3: SSE controller for the always-on intent envelope stream.
     this.intentStreamController =
-        new IntentStreamController(headAssembly.substrate().intent().changes());
+        new IntentStreamController(headAssembly.executors(), headAssembly.substrate().intent().changes());
     // Slice 448 phase 3: SSE controller for the DiagnosticChannel stream.
     this.diagnosticChannelStreamController =
-        new DiagnosticChannelStreamController(
+        new DiagnosticChannelStreamController(headAssembly.executors(),
             headAssembly.substrate().channels().streams(), telemetry);
     // Slice 445: SSE controller for the indexing-jobs TABULAR stream.
     this.indexingJobsStreamController =
-        new IndexingJobsStreamController(
+        new IndexingJobsStreamController(headAssembly.executors(),
             headAssembly.substrate().conversation().indexingJobsChanges(),
             headAssembly.indexingJobsBridge(),
             telemetry);
     // Slice 440: REST + SSE endpoints for the runtime-context STATE Resource.
     this.runtimeContextController =
-        new RuntimeContextController(
+        new RuntimeContextController(headAssembly.executors(),
             headAssembly.substrate().context().holder(),
             headAssembly.substrate().context().changes());
     // Slice 444b: REST + SSE endpoints for the operation-history HISTORY Resource.
     this.operationHistoryController =
-        new OperationHistoryController(
+        new OperationHistoryController(headAssembly.executors(),
             headAssembly.substrate().conversation().operationHistoryStore(),
-            headAssembly.substrate().conversation().operationHistoryChanges());
+            headAssembly.substrate().conversation().operationHistoryChanges(),
+            headAssembly::operationOutcome);
     // Tempdoc 550 C3 / 655: shared pending-authorization registry — the backend records a
     // gated dispatch here and the FE approves by its id, so a capsule can only be minted
     // against an op the backend actually gated (WA-5). Shared between the invoke
@@ -216,17 +217,17 @@ final class ResourceApiModule implements ApiModule {
             List.of(
                 headAssembly.substrate().operations().operations(),
                 headAssembly.substrate().operations().agentTools()),
-            java.time.Clock.systemUTC());
+            admission);
     // Slice 494: per-class advisory SSE controllers.
     this.operationCompletedAdvisoryStreamController =
-        new AdvisoryStreamController(
+        new AdvisoryStreamController(headAssembly.executors(),
             io.justsearch.app.observability.advisory.OperationCompletionProjector.CLASS_ID,
             headAssembly.substrate().advisory().logs().get(
                 io.justsearch.app.observability.advisory.OperationCompletionProjector.CLASS_ID),
             headAssembly.substrate().advisory().changes(),
             telemetry);
     this.healthRecoverableAdvisoryStreamController =
-        new AdvisoryStreamController(
+        new AdvisoryStreamController(headAssembly.executors(),
             io.justsearch.app.observability.advisory.HealthRecoveryProjector.CLASS_ID,
             headAssembly.substrate().advisory().logs().get(
                 io.justsearch.app.observability.advisory.HealthRecoveryProjector.CLASS_ID),
@@ -241,7 +242,7 @@ final class ResourceApiModule implements ApiModule {
     // liveness — peek() already fails closed on consumed/unknown/expired ids (§DEFAULT_TTL),
     // so the filter needs no independent notion of "resolved."
     this.authorizationPendingAdvisoryStreamController =
-        new AdvisoryStreamController(
+        new AdvisoryStreamController(headAssembly.executors(),
             io.justsearch.app.observability.advisory.PendingAuthorizationAdvisoryProjector
                 .CLASS_ID,
             headAssembly.substrate().advisory().logs().get(
@@ -255,7 +256,7 @@ final class ResourceApiModule implements ApiModule {
             });
     // Slice 447-impl-D: derived inverse Resource — Operation → Conditions referencing it.
     this.conditionRecoveryIndexController =
-        new ConditionRecoveryIndexController(
+        new ConditionRecoveryIndexController(headAssembly.executors(),
             headAssembly.substrate().health().conditionStore(),
             headAssembly.substrate().health().recoveryIndexChanges());
     // Slice 447-followup-tier3-tooling §A: eval-mode-only synthetic-trip primitive.
@@ -268,21 +269,21 @@ final class ResourceApiModule implements ApiModule {
     // Slice 3a.1.4 Phase 5: REST + SSE endpoints for the worker.job_queue.depth
     // TIMESERIES Resource (the canonical first instance proving the substrate).
     this.jobQueueDepthMetricController =
-        new JobQueueDepthMetricController(
+        new JobQueueDepthMetricController(headAssembly.executors(),
             headAssembly.substrate().metrics().jobQueueDepthHolder(),
             headAssembly.substrate().metrics().jobQueueDepthChanges());
     // Slice 3a.1.4b cohort: REST + SSE endpoints for the three follow-up TIMESERIES
     // Resources.
     this.documentsIndexedRateMetricController =
-        new DocumentsIndexedRateMetricController(
+        new DocumentsIndexedRateMetricController(headAssembly.executors(),
             headAssembly.substrate().metrics().documentsIndexedRateHolder(),
             headAssembly.substrate().metrics().documentsIndexedRateChanges());
     this.gpuUtilizationMetricController =
-        new GpuUtilizationMetricController(
+        new GpuUtilizationMetricController(headAssembly.executors(),
             headAssembly.substrate().metrics().gpuUtilizationHolder(),
             headAssembly.substrate().metrics().gpuUtilizationChanges());
     this.gpuMemoryUtilizationMetricController =
-        new GpuMemoryUtilizationMetricController(
+        new GpuMemoryUtilizationMetricController(headAssembly.executors(),
             headAssembly.substrate().metrics().gpuMemoryUtilizationHolder(),
             headAssembly.substrate().metrics().gpuMemoryUtilizationChanges());
     // Slice 3a.1.2: OperationsController dispatches to the registered handler set
@@ -310,7 +311,7 @@ final class ResourceApiModule implements ApiModule {
             headAssembly.substrate().conversation().intentGateEvaluator());
     // Tempdoc 550 Slice C1 (Outcome face): unified action-ledger read-view.
     this.actionLedgerController =
-        new ActionLedgerController(
+        new ActionLedgerController(headAssembly.executors(),
             headAssembly.substrate().conversation().operationHistoryStore(),
             headAssembly.substrate().conversation().navigationHistoryStore(),
             headAssembly.substrate().conversation().authorizationOutcomeStore(),
@@ -321,7 +322,7 @@ final class ResourceApiModule implements ApiModule {
     // records that already exist — ConversationStore (chat) + AgentRunStore (agent, via
     // AgentService) — joined by conversationId. No new store.
     this.interactionThreadController =
-        new InteractionThreadController(
+        new InteractionThreadController(headAssembly.operationAttempts(),
             // Tempdoc 727 (fix): the live cipher — a projection of StoreCatalog.CONVERSATIONS's
             // recoverability class (AUTHORED), same as ConversationApiAssembly's build (:204-209),
             // NOT the single-arg ctor's disabled() default. The single-arg ctor permanently disables
@@ -337,7 +338,8 @@ final class ResourceApiModule implements ApiModule {
                     io.justsearch.agent.api.encryption.StoreCatalog.CONVERSATIONS.recoverability())),
             headAssembly.core().agent() != null
                 ? headAssembly.core().agent()
-                : io.justsearch.agent.api.AgentService.unavailable());
+                : io.justsearch.agent.api.AgentService.unavailable(),
+            headAssembly.executors(), admission);
     // Tempdoc 778 — the local feedback-capture flag surface, reading/writing the ONE settings
     // authority (nullable on the test-only path where HeadAssembly built none).
     this.feedbackCaptureController =
@@ -356,7 +358,7 @@ final class ResourceApiModule implements ApiModule {
     // instances constructed above (reuses their channel()/snapshotExtras() accessors, not a
     // forked copy of their channel-lookup or projection logic).
     this.shellEventsStreamController =
-        new ShellEventsStreamController(
+        new ShellEventsStreamController(headAssembly.executors(),
             headAssembly.substrate().intent().changes(),
             operationCompletedAdvisoryStreamController,
             healthRecoverableAdvisoryStreamController,
@@ -403,14 +405,14 @@ final class ResourceApiModule implements ApiModule {
     // Slice 487 §4.3: always-on intent envelope SSE stream.
     app.sse("/api/intent/stream", intentStreamController::handle);
 
-    // Slice 448 phase 3: DiagnosticChannel SSE — V1 ships a single channel (core.head-log).
+    // Slice 448 phase 3: DiagnosticChannel SSE — V1 ships a single channel (core.engine-log).
     app.sse(
-        "/api/diagnostic-channels/head-log/stream",
+        "/api/diagnostic-channels/engine-log/stream",
         sseClient ->
             diagnosticChannelStreamController.handle(
                 sseClient,
-                io.justsearch.app.observability.diagnostic.HeadLogDiagnosticChannelCatalog
-                    .HEAD_LOG_ID));
+                io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog
+                    .ENGINE_LOG_ID));
 
     // Slice 445: indexing-jobs TABULAR SSE stream.
     app.sse("/api/indexing-jobs/stream", indexingJobsStreamController::handle);
@@ -474,6 +476,7 @@ final class ResourceApiModule implements ApiModule {
     // Slice 444b: operation-history REST + SSE endpoints (HISTORY Resource: append stream).
     app.get("/api/operation-history", operationHistoryController::handleGet);
     app.sse("/api/operation-history/stream", operationHistoryController::handleStream);
+    app.get("/api/operation-history/{operationKey}", operationHistoryController::handleOutcome);
 
     // Slice 494: per-class advisory SSE endpoints.
     app.sse(
@@ -537,6 +540,9 @@ final class ResourceApiModule implements ApiModule {
     }
     shutdownQuietly("IndexingJobsStreamController", indexingJobsStreamController::shutdown);
     shutdownQuietly("HealthEventStreamController", healthEventStreamController::shutdown);
+    shutdownQuietly("IntentStreamController", intentStreamController::shutdown);
+    shutdownQuietly("InteractionThreadController", interactionThreadController::shutdown);
+    shutdownQuietly("ConditionRecoveryIndexController", conditionRecoveryIndexController::shutdown);
     shutdownQuietly("DiagnosticChannelStreamController", diagnosticChannelStreamController::shutdown);
     shutdownQuietly("RuntimeContextController", runtimeContextController::shutdown);
     shutdownQuietly("OperationHistoryController", operationHistoryController::shutdown);

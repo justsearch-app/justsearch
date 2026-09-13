@@ -159,10 +159,10 @@ public class IndexingLoop implements Closeable {
 
   /**
    * Loop state, exposed for system test observability and the worker-state wire emitter
-   * ({@code GrpcHealthService.workerStateSupplier} via
+   * ({@code WorkerHealthService.workerStateSupplier} via
    * {@code DefaultWorkerAppServices.indexingLoopState()}). Wire-string identity is
    * preserved through {@link Enum#name()} — every consumer that pinned the literal
-   * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code ChaosSuiteTest} and
+   * {@code "IDLE"}/{@code "RUNNING"}/{@code "PAUSED"} (notably {@code EngineForegroundPacingTest} and
    * {@code KnowledgeServer}'s queue-depth gauge at L1127) keeps working unchanged.
    *
    * <p>Tempdoc 516 P2: previously a stringly-typed FSM (the {@code STATE_*} String
@@ -227,6 +227,8 @@ public class IndexingLoop implements Closeable {
    * @param signalBus The signal bus for coordination
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -234,7 +236,7 @@ public class IndexingLoop implements Closeable {
       IndexCountOps indexCountOps,
       Supplier<ResolvedConfig> resolvedConfigSupplier,
       WorkerSignalBus signalBus) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(ocrRegistration, timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         null, null, null, null, null,
@@ -254,6 +256,8 @@ public class IndexingLoop implements Closeable {
    * @param embeddingService The embedding service for vector generation (may be null)
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -262,7 +266,7 @@ public class IndexingLoop implements Closeable {
       Supplier<ResolvedConfig> resolvedConfigSupplier,
       WorkerSignalBus signalBus,
       EmbeddingService embeddingService) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(ocrRegistration, timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         embeddingService, null, null, null, null,
@@ -276,6 +280,8 @@ public class IndexingLoop implements Closeable {
    * typed histogram.
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -286,7 +292,7 @@ public class IndexingLoop implements Closeable {
       EmbeddingService embeddingService,
       IndexingPipelineMetricCatalog pipelineCatalog,
       ExtractionMetricCatalog extractionCatalog) {
-    this(jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
+    this(ocrRegistration, timeboxRegistration, jobQueue, indexingCoordinator, commitOps, documentFieldOps, indexCountOps,
         resolvedConfigSupplier, signalBus,
         IndexingPacing.unthrottled(),
         embeddingService, pipelineCatalog, extractionCatalog,
@@ -314,6 +320,8 @@ public class IndexingLoop implements Closeable {
    *     extractor is created)
    */
   public IndexingLoop(
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration ocrRegistration,
+      io.justsearch.core.execution.EngineExecutorRegistry.Registration timeboxRegistration,
       JobQueue jobQueue,
       IndexingCoordinator indexingCoordinator,
       CommitOps commitOps,
@@ -349,7 +357,7 @@ public class IndexingLoop implements Closeable {
     }
     this.contentExtractor = contentExtractor != null
         ? contentExtractor
-        : ExtractionSandboxFactory.inProcessStructured(extractionCatalog);
+        : ExtractionSandboxFactory.inProcessStructured(ocrRegistration, timeboxRegistration, extractionCatalog);
     this.pipelineCatalog = pipelineCatalog;
     this.outcomeWriteFailureCounter =
         ingestionOutcomeCatalog == null
@@ -1046,8 +1054,8 @@ public class IndexingLoop implements Closeable {
    *
    * <p>Backed by {@link LoopState}; new callers should prefer {@link #loopState()} for
    * type safety. This String accessor is retained for the worker-state wire emission
-   * path ({@code ChaosSuiteTest}, {@code WorkerAppServices.indexingLoopState()},
-   * existing Mockito stubs in the {@code GrpcIngestService*} test family) where the
+   * path ({@code EngineForegroundPacingTest}, {@code WorkerAppServices.indexingLoopState()},
+   * existing Mockito stubs in the {@code WorkerIngestService*} test family) where the
    * String form crosses a process or test-mock boundary.
    *
    * @deprecated since tempdoc 516 Slice 2 — prefer {@link #loopState()} for typed
@@ -1107,6 +1115,13 @@ public class IndexingLoop implements Closeable {
       }
     }
 
+    // Retain all later component resources if OCR still owns a task or child. The enclosing
+    // service/server keeps this extractor reachable and can retry close after actual exit.
+    if (contentExtractor != null) {
+      try { contentExtractor.close(); }
+      catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
+    }
+
     // Close NER service — IndexingLoop is the sole closer (KnowledgeServer does not
     // retain a reference). Other borrowed services (embeddingService, spladeEncoder,
     // disambiguationService) are closed by KnowledgeServer after this method returns.
@@ -1116,15 +1131,6 @@ public class IndexingLoop implements Closeable {
         ner.close();
       } catch (Exception e) {
         log.warn("Error closing NER service: {}", e.getMessage());
-      }
-    }
-
-    // Close the timeboxed content extractor (owned by IndexingLoop)
-    if (contentExtractor != null) {
-      try {
-        contentExtractor.close();
-      } catch (Exception e) {
-        log.warn("Error closing content extractor: {}", e.getMessage());
       }
     }
 

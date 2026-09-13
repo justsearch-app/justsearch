@@ -5,7 +5,7 @@
  * ref-counted subscribe, the per-channel resume bundle, and shared connection-state fan-out.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { MultiplexedStream } from './MultiplexedStream.js';
 import type { SseEnvelope } from './envelope-types.js';
 import {
@@ -79,6 +79,53 @@ function lifecycleFrame(streamId: string, kind: string, seq: number, resumeToken
 }
 
 describe('MultiplexedStream', () => {
+  it('reducer failure clears only its stream checkpoint before reconnecting the shared source', async () => {
+    vi.useFakeTimers();
+    const sources: FakeEventSource[] = [];
+    const mux = new MultiplexedStream({
+      url: 'http://test/api/shell-events/stream',
+      reconnectBaseMs: 10, reconnectCapMs: 10, watchdogStaleMs: 0,
+      eventSourceFactory: (url) => {
+        const source = new FakeEventSource(url);
+        sources.push(source);
+        return source as unknown as EventSource;
+      },
+    });
+    mux.subscribe('system:test-a', () => ({
+      initialState: 0,
+      reducer: (state: number, envelope: SseEnvelope) => {
+        if (envelope.seq === 2) throw new Error('cannot apply A');
+        return envelope.frameKind === 'LIFECYCLE' ? 7 : state + 1;
+      },
+    }), () => {});
+    mux.subscribe('system:test-b', () => ({ initialState: COUNTER_INITIAL, reducer: counterReducer }), () => {});
+    try {
+      mux.start();
+      sources[0]!.emitFrame(updateFrame('system:test-a', 1, 'tok-a-1'));
+      sources[0]!.emitFrame(updateFrame('system:test-b', 1, 'tok-b-1'));
+      sources[0]!.emitFrame(updateFrame('system:test-a', 2, 'tok-a-2'));
+      expect(sources[0]!.closed).toBe(true);
+      expect(mux.getSnapshot<number>('system:test-a')).toMatchObject({
+        payload: 1, seq: 2, resumeToken: null, isConnected: false,
+      });
+      expect(mux.getSnapshot<CounterState>('system:test-b')).toMatchObject({
+        resumeToken: 'tok-b-1', isConnected: false,
+      });
+      sources[0]!.emitFrame(updateFrame('system:test-b', 2, 'ignored-late-token'));
+      expect(mux.getSnapshot<CounterState>('system:test-b')!.resumeToken).toBe('tok-b-1');
+      await vi.advanceTimersByTimeAsync(10);
+      expect(sources).toHaveLength(2);
+      expect(sources[1]!.url).toBe('http://test/api/shell-events/stream?since=tok-b-1');
+      sources[1]!.emitFrame(lifecycleFrame('system:test-a', 'snapshot', 10, 'tok-a-10'));
+      sources[1]!.emitFrame(updateFrame('system:test-b', 2, 'tok-b-2'));
+      expect(mux.getSnapshot<number>('system:test-a')).toMatchObject({ payload: 7, resumeToken: 'tok-a-10' });
+      expect(mux.getSnapshot<CounterState>('system:test-b')!.payload.count).toBe(2);
+    } finally {
+      mux.stop();
+      vi.useRealTimers();
+    }
+  });
+
   beforeEach(() => {
     __resetOriginContactForTest();
     __resetLiveChannelBudgetForTest();

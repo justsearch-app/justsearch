@@ -280,12 +280,12 @@ describe('OperationClient', () => {
     expect(fetchImpl.mock.calls.some(c => String(c[0]).includes('/authorizations/approve'))).toBe(false);
   });
 
-  it('approveByPendingId POSTs {pendingId} and returns the capsule', async () => {
+  it('approveByPendingId POSTs {pendingId} and returns the approval capability', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(fakeResponse({ capsule: 'cap-xyz' }));
     const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
 
     const capsule = await client.approveByPendingId('pa-42', true);
-    expect(capsule).toBe('cap-xyz');
+    expect(capsule).toEqual({ capsule: 'cap-xyz' });
     expect(fetchImpl.mock.calls[0]![0]).toBe('http://localhost:33221/api/authorizations/approve');
     expect(JSON.parse(fetchImpl.mock.calls[0]![1]!.body as string)).toEqual({
       pendingId: 'pa-42',
@@ -552,5 +552,48 @@ describe('OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7)', ()
     // No capsule was invented for an ungated reversal.
     const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
     expect(body.confirmationToken).toBeUndefined();
+  });
+});
+
+
+describe('OperationClient exact prepared approval continuation', () => {
+  const key = '019940e2-3400-7000-8000-000000000001';
+  const nonce = 'cea77faa-e010-45b0-a3c0-c0a177b9ddae';
+
+  it.each([false, true])('preserves server key and nonce outside public args (undo=%s)', async (undo) => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(fakeResponse({ success: false, errorClass: 'CONFIRMATION_REQUIRED', pendingId: 'prepared',
+        operationKey: key, preparationNonce: nonce }, 428))
+      .mockResolvedValueOnce(fakeResponse({ capsule: 'exact-capsule', operationKey: key, preparationNonce: nonce }))
+      .mockResolvedValueOnce(fakeResponse({ success: true, message: 'done' }));
+    const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
+    const request = { args: { nested: { text: 'original' } }, transport: 'BUTTON' };
+    const requestConsent = async () => {
+      request.args.nested.text = 'changed during approval';
+      return { approved: true, allowAlways: false };
+    };
+    if (undo) await client.undoWithConsent('core.file-note', 'exec-1', { requestConsent, transport: 'BUTTON' });
+    else await client.invokeWithConsent('core.file-note', request, { requestConsent });
+    const retry = JSON.parse(fetchImpl.mock.calls[2]![1]!.body as string);
+    expect(retry).toEqual({ ...(undo ? { executionId: 'exec-1' } : { args: { nested: { text: 'original' } } }),
+      idempotencyKey: key, preparationNonce: nonce, confirmationToken: 'exact-capsule' });
+    expect(fetchImpl.mock.calls[2]![1]!.headers).toMatchObject({ 'X-JustSearch-Transport': 'BUTTON' });
+  });
+
+  it.each([
+    { capsule: 'token' },
+    { capsule: 'token', preparationNonce: nonce },
+    { capsule: 'token', operationKey: key, preparationNonce: 'another-preparation' },
+    { capsule: 'token', operationKey: 'another-key', preparationNonce: nonce },
+  ])('refuses a lost or changed approval reference without retry: %j', async (approval) => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(fakeResponse({ success: false, errorClass: 'CONFIRMATION_REQUIRED', pendingId: 'prepared',
+        operationKey: key, preparationNonce: nonce }, 428))
+      .mockResolvedValueOnce(fakeResponse(approval))
+      .mockResolvedValue(fakeResponse({ success: true, message: 'unexpected retry' }));
+    const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
+    await expect(client.invokeWithConsent('core.file-note', { args: {} }, { consented: true }))
+      .rejects.toMatchObject({ errorClass: 'CAPSULE_MINT_FAILED' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
