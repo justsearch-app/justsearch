@@ -17,7 +17,10 @@ passes14 exchanges across restart, full UI1175 passes6511,27 UI gates pass and
 independent reader review is clear. [Correction proof](evidence/C2/effect-identity.md).
 The first full UI1171 watchdog timing failure is retained; its assertion now uses a
 controlled clock. Negative1178 catches disabled expiry; full1179 passes6511.
-[Separate test correction](evidence/C2/watchdog-test.md). Full JVM1180 is in progress.
+[Separate test correction](evidence/C2/watchdog-test.md). Full JVM1180 finishes with
+one unused journal factory failure among10342 represented tests; all other checks
+pass. The consolidated factory passes64 focused cases in1182. [Integrated finding
+and correction](evidence/C2/integrated1180.md). A new full green boundary remains owed.
 The pending-source review found no defects. Journal force/retry is now verified:
 negative1155/1157, final1158 passes47 represented cases (32 execute), independent
 review clear after adding rotated-generation proof. [Sink proof](evidence/C2/journal-force.md).

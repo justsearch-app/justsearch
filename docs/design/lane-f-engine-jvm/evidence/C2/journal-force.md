@@ -1,5 +1,9 @@
 # C2-4 journal durability barrier
 
+Follow-up integrated1180 finds the test factory disconnected from production.
+The [factory correction and focused1182 proof](integrated1180.md) consolidate that
+route without altering force/ack ordering or weakening the dead-code gate.
+
 Implemented 2026-09-13 from652949e43. The existing journal crosses FileChannel.force(true)
 before append returns success. Retried retained identities force their actual file
 generation too: a complete line parsed after an uncertain force is not sufficient

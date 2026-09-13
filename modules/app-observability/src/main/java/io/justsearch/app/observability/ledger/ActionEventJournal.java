@@ -105,10 +105,6 @@ public final class ActionEventJournal {
   private final Map<Integer, Set<String>> retainedIds = new java.util.HashMap<>();
   private boolean retainedIndexReady;
 
-  private ActionEventJournal(Path auditDir, long maxGenerationBytes) {
-    this(auditDir, maxGenerationBytes, ActionEventJournal::forceFile);
-  }
-
   private ActionEventJournal(Path auditDir, long maxGenerationBytes, DurabilityBarrier durability) {
     this.auditDir = auditDir;
     this.maxGenerationBytes = maxGenerationBytes;
@@ -124,7 +120,7 @@ public final class ActionEventJournal {
 
   /** A journal that writes nothing and serves an empty tail — test / read-only-mode wiring. */
   public static ActionEventJournal disabled() {
-    return new ActionEventJournal(null, MAX_GENERATION_BYTES);
+    return at(null, MAX_GENERATION_BYTES);
   }
 
   /** A journal rooted at {@code <dataDir>/audit} (the production location). */
@@ -146,7 +142,7 @@ public final class ActionEventJournal {
    * exercisable at a threshold that does not require writing the production 4 MB per generation.
    */
   static ActionEventJournal at(Path auditDir, long maxGenerationBytes) {
-    return new ActionEventJournal(auditDir, maxGenerationBytes);
+    return at(auditDir, maxGenerationBytes, ActionEventJournal::forceFile);
   }
 
   static ActionEventJournal at(Path auditDir, long maxGenerationBytes, DurabilityBarrier durability) {
