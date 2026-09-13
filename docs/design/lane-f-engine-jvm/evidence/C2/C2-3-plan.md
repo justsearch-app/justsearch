@@ -178,11 +178,14 @@ regardless of an obsolete nonce, without granting another effect. Retention remo
 accepted payload bytes with their parent row. Existing key-history expiry still
 applies before acceptance; a pending value is not a way around that fence.
 
-Next wiring uses a fixed bounded set of reentrant key locks in the existing runner,
+The runner now uses a fixed bounded set of reentrant key locks in the existing runner,
 with every runner acceptance sharing them. A preparation scope mints an absent key
-once, repeats lookup under the key lock, and calls pure application preparation and
-store persistence outside the SQLite lock. The scope ends before effect admission
-or async execution. The dispatcher then consumes the frozen value or returns the
+once, repeats lookup under the key lock, and passes the validated existing-row metadata
+snapshot to pure application preparation outside the SQLite lock. Pending save is
+reentrant. The scope ends before acceptance, live observation, effect admission or
+async execution. Acceptance shares the stripe for its transaction but publishes
+completion listeners only after releasing it; nested same-stripe observation refuses.
+This avoids the proven late-terminal callback deadlock without a publication queue. The dispatcher then consumes the frozen value or returns the
 existing receipt; approval carries the exact preparation nonce. Generic passthrough
 handlers remain transient and do not require content encryption. Reconciliation is
 still the only owner that can authorize replay of accepted incomplete work.

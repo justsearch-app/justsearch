@@ -30,6 +30,10 @@ import java.util.function.Function;
 /** One terminal writer. Live capabilities/futures are projections, never a second durable ledger. */
 public final class OperationAttemptRunnerImpl implements OperationAttemptRunner {
   private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(OperationAttemptRunnerImpl.class);
+  private final java.util.concurrent.locks.ReentrantLock[] preparationLocks =
+      java.util.stream.IntStream.range(0, 256)
+          .mapToObj(ignored -> new java.util.concurrent.locks.ReentrantLock())
+          .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
   private final OperationStore store;
   private final Clock clock;
   private final Set<OperationKind> ownedKinds;
@@ -57,16 +61,72 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   @Override
-  public PreparedAttempt accept(Request request) {
+  public <T> T withPreparation(Request request, Function<PreparationScope, T> prepare) {
+    Objects.requireNonNull(prepare, "prepare");
+    return withKey(request, stable -> prepare.apply(
+        new PreparationScope(stable, store.lookup(stable.key(), stable.descriptor()))));
+  }
+
+  private <T> T withKey(Request request, Function<Request, T> prepare) {
+    Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(prepare, "prepare");
     String key = request.key() == null ? OperationKeys.generate(clock) : request.key();
-    var accepted = store.accept(key, request.descriptor(), request.context(), request.provenance());
+    var keyLock = preparationLocks[Math.floorMod(key.hashCode(), preparationLocks.length)];
+    keyLock.lock();
+    try {
+      return prepare.apply(new Request(key, request.descriptor(), request.context(), request.provenance()));
+    } finally {
+      keyLock.unlock();
+    }
+  }
+
+  @Override
+  public PreparedAttempt accept(Request request) {
+    requireOutsidePreparation(request);
+    return prepared(withKey(request, stable -> store.accept(stable.key(), stable.descriptor(),
+        stable.context(), stable.provenance())));
+  }
+
+  @Override
+  public PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce) {
+    requireOutsidePreparation(request);
+    return prepared(withKey(request, stable -> store.acceptPrepared(stable.key(), stable.descriptor(),
+        stable.context(), stable.provenance(), nonce)));
+  }
+
+  private PreparedAttempt prepared(OperationStore.Acceptance accepted) {
     return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
   }
 
   @Override
+  public Optional<OperationStore.Preparation> pendingPreparation(Request request) {
+    return store.pendingPreparation(Objects.requireNonNull(request.key(), "preparation key"), request.descriptor());
+  }
+
+  @Override
+  public Optional<OperationStore.Preparation> savePreparation(Request request, OperationStore.Preparation preparation) {
+    Objects.requireNonNull(request.key(), "preparation key");
+    return withKey(request, stable -> store.savePreparation(stable.key(), stable.descriptor(), preparation));
+  }
+
+  @Override
+  public Optional<OperationStore.Preparation> acceptedPreparation(long id) {
+    return store.acceptedPreparation(id);
+  }
+
+  @Override
   public Optional<PreparedAttempt> lookup(Request request) {
+    requireOutsidePreparation(request);
     return store.lookup(request.key(), request.descriptor())
         .map(row -> new Prepared(controlFor(row), row, true));
+  }
+
+  private void requireOutsidePreparation(Request request) {
+    Objects.requireNonNull(request, "request");
+    if (request.key() != null && preparationLocks[Math.floorMod(request.key().hashCode(), preparationLocks.length)]
+        .isHeldByCurrentThread()) {
+      throw new IllegalStateException("Observe or accept an operation after leaving its preparation scope");
+    }
   }
 
   private Control controlFor(OperationRecord row) {

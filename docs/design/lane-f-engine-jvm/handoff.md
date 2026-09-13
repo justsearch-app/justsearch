@@ -32,8 +32,9 @@ See [MCP key proof](evidence/C2/mcp-key.md). The bounded prepared-envelope codec
 prerequisite passes548 represented cases at950; [codec proof](evidence/C2/prepared-codec.md).
 Operations.db v3 prepared storage passes363 represented cases at958, with atomic
 transfer, stale nonce, retention and migration proof; [store proof](evidence/C2/prepared-store.md).
-Next: runner key serialization, dispatcher/cipher wiring and frozen approval nonce
-transfer, then remaining ingress and integrated acceptance. Hosted v3 proof remains
+Runner serialization and completion publication outside the key lock pass336 represented
+cases at966 (reuse explicitly recorded); [runner proof](evidence/C2/prepared-runner.md).
+Next: dispatcher/cipher wiring and frozen approval nonce transfer, then remaining ingress and integrated acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 

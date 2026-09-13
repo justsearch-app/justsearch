@@ -31,6 +31,23 @@ public interface OperationAttemptRunner {
 
   record Result(OperationRecord record, OperationResult response, CompletionStage<OperationRecord> completion) {}
 
+  /** Validated metadata snapshot; observing it never publishes completion callbacks. */
+  record PreparationScope(Request request, java.util.Optional<OperationRecord> existing) {}
+
+  /**
+   * Serialize pure preparation for one key, minting an absent key once. The callback receives
+   * the stable request and validated existing-row snapshot outside the SQLite lock. It may
+   * read/save pending preparation for this key. Return before calling lookup, acceptance,
+   * admission, scheduling or execution: those can publish arbitrary completion listeners.
+   * An existing row bypasses preparation and never authorizes a repeated effect.
+   */
+  <T> T withPreparation(Request request, Function<PreparationScope, T> prepare);
+
+  java.util.Optional<OperationStore.Preparation> pendingPreparation(Request request);
+  java.util.Optional<OperationStore.Preparation> savePreparation(Request request, OperationStore.Preparation preparation);
+  PreparedAttempt acceptPrepared(Request request, java.util.UUID nonce);
+  java.util.Optional<OperationStore.Preparation> acceptedPreparation(long id);
+
   /** Must return before scheduling or any other effect; storage failure propagates. */
   PreparedAttempt accept(Request request);
 
