@@ -78,6 +78,7 @@ final class SettingsV2ContractTest {
     assertEquals(original.llm().maxTokens(), roundTripped.llm().maxTokens());
     assertEquals(original.llm().gpuLayers(), roundTripped.llm().gpuLayers());
     assertEquals(original.llm().modelPath(), roundTripped.llm().modelPath());
+    assertEquals(original.llm().llamaLibPath(), roundTripped.llm().llamaLibPath());
 
     // Verify indexPaths
     assertEquals(original.indexPaths(), roundTripped.indexPaths());

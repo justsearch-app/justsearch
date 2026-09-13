@@ -17,7 +17,6 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -26,11 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * HTTP routing layer for settings endpoints. SettingsService interface is owned by
- * {@code io.justsearch.app.services.settings.SettingsServiceImpl} (tempdoc 519 §9 Step 3),
- * which delegates to {@link #resetToDefaults} via a method reference. The reset logic
- * stays here because its inputs ({@code SettingsV2}, {@code UiSettingsV2},
- * {@code LlmSettingsV2}) are a ui-internal DTO cluster outside §9's literal scope.
+ * HTTP routing layer for settings endpoints. SettingsServiceImpl currently forwards
+ * reset to {@link #resetToDefaults} through a method reference. Response DTOs belong
+ * to app-api and their shared projection belongs to app-services. HTTP default-index
+ * injection and per-client UI-mode intent ordering remain in this controller.
  */
 public class SettingsController {
   private static final Logger log = LoggerFactory.getLogger(SettingsController.class);
@@ -152,39 +150,9 @@ public class SettingsController {
     }
   }
 
-  /** Maps internal {@link UiSettings} to the canonical {@link SettingsV2} DTO. */
-  private SettingsV2 toSettingsV2(UiSettings s) {
-    UiSettingsV2 ui = new UiSettingsV2(
-        s.getTheme(),
-        s.isHighContrast(),
-        s.getDensity(),
-        s.isVimMode(),
-        s.getDefaultAction(),
-        s.getInspectorWidth() > 0 ? s.getInspectorWidth() : null,
-        s.isPauseIndexingDuringAi(),
-        s.getMode(),
-        s.isTrustLoopNudgeSeen(),
-        s.getExcludePatterns(),
-        s.getChatEnabled()
-    );
-
-    LlmSettingsV2 llm = new LlmSettingsV2(
-        blankToNull(s.getServerExecutablePath()),
-        s.getContextLength(),
-        s.getMaxTokens(),
-        s.getGpuLayers(),
-        blankToNull(s.getLlmModelPath()),
-        blankToNull(s.getLlamaLibPath())
-    );
-
-    List<String> indexPaths = new ArrayList<>();
-    String basePath = s.getIndexBasePath();
-    if (basePath != null && !basePath.isBlank()) {
-      indexPaths.add(basePath);
-    }
-
-    String mode = settingsStore.mode().name().toLowerCase(Locale.ROOT);
-    return new SettingsV2(ui, llm, indexPaths, mode);
+  /** Maps internal settings without adding persistence or default-path authority. */
+  private SettingsV2 toSettingsV2(UiSettings settings) {
+    return io.justsearch.app.services.settings.SettingsV2Projection.toSettingsV2(settings, settingsStore.mode());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
@@ -259,10 +227,6 @@ public class SettingsController {
   }
 
   private record UiModeIntent(String clientId, long sequence) {}
-
-  private static String blankToNull(String s) {
-    return (s == null || s.isBlank()) ? null : s;
-  }
 
   /**
    * Rebuilds the ResolvedConfig with updated settings and swaps it into the ConfigStore.
