@@ -27,6 +27,7 @@ public final class IndexRootLock implements Closeable {
 
   private static final java.util.Set<Path> HELD_IN_JVM = new java.util.HashSet<>();
 
+  private final Path indexBasePath;
   private Path lockFile;
   private FileChannel channel;
   private FileLock lock;
@@ -39,6 +40,7 @@ public final class IndexRootLock implements Closeable {
     if (base.getParent() == null) {
       throw new IllegalArgumentException("indexBasePath must not be a filesystem root: " + base);
     }
+    this.indexBasePath = base;
     // Important for Windows: IndexGenerationManager may rename/move the indexBasePath directory during
     // legacy import. If we lock a file *inside* indexBasePath, the directory move can fail with
     // AccessDeniedException because Windows refuses to move a folder containing an open/locked file.
@@ -57,8 +59,18 @@ public final class IndexRootLock implements Closeable {
     if (lock != null) {
       return;
     }
-    Files.createDirectories(lockFile.getParent());
-    lockFile = lockFile.getParent().toRealPath().resolve(lockFile.getFileName());
+    Files.createDirectories(indexBasePath.getParent());
+    Path realBase;
+    try {
+      realBase = indexBasePath.toRealPath();
+    } catch (java.nio.file.NoSuchFileException notCreated) {
+      if (Files.exists(indexBasePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw notCreated;
+      realBase = indexBasePath.getParent().toRealPath().resolve(indexBasePath.getFileName());
+    }
+    if (realBase.getParent() == null) {
+      throw new IOException("Index base resolves to a filesystem root: " + indexBasePath);
+    }
+    lockFile = realBase.resolveSibling(realBase.getFileName().toString() + ".index.lock");
     // A second channel close may release this JVM's first native lock on POSIX.
     if (HELD_IN_JVM.contains(lockFile)) {
       throw new IOException("Index base path is already locked in this JVM: " + lockFile);

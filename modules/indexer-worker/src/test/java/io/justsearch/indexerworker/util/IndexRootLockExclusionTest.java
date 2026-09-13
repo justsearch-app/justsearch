@@ -46,6 +46,59 @@ class IndexRootLockExclusionTest {
     assertEquals(0, probe());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void directoryAliasSharesSameJvmAndProcessExclusion(boolean aliasOwns) throws Exception {
+    Path base = Files.createDirectory(directory.resolve("index"));
+    Path alias = directory.resolve("index-alias");
+    createDirectoryAlias(alias, base);
+    assertEquals(base.toRealPath(), alias.toRealPath(), "the fixture must alias the same directory");
+    Path ownerPath = aliasOwns ? alias : base;
+    Path contenderPath = aliasOwns ? base : alias;
+    try (var owner = new IndexRootLock(ownerPath)) {
+      owner.acquire();
+      try (var contender = new IndexRootLock(contenderPath)) {
+        assertThrows(java.io.IOException.class, contender::acquire);
+      }
+      assertEquals(23, probe(contenderPath, false), "another JVM must share the canonical exclusion");
+    }
+    assertEquals(0, probe(alias, false));
+    assertEquals(0, probe(base, false));
+  }
+
+  @Test
+  void unresolvedDirectoryAliasCannotAcquireASeparateLock() throws Exception {
+    Path base = Files.createDirectory(directory.resolve("index"));
+    Path alias = directory.resolve("index-alias");
+    createDirectoryAlias(alias, base);
+    Files.move(base, directory.resolve("moved-index"));
+    assertTrue(Files.exists(alias, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+    try (var contender = new IndexRootLock(alias)) {
+      assertThrows(java.io.IOException.class, contender::acquire);
+    }
+  }
+
+  private void createDirectoryAlias(Path alias, Path target) throws Exception {
+    if (!System.getProperty("os.name").startsWith("Windows")) {
+      Files.createSymbolicLink(alias, target);
+      return;
+    }
+    // Same directory-alias fixture as IndexedRootGrantScopeTest: a Windows junction needs
+    // no symlink privilege. Failure is a failed witness, not a silently skipped lock check.
+    Path output = directory.resolve("junction.log");
+    var child = new ProcessBuilder("cmd", "/c", "mklink", "/J", alias.toString(), target.toString())
+        .redirectErrorStream(true).redirectOutput(output.toFile()).start();
+    try {
+      assertTrue(child.waitFor(30, TimeUnit.SECONDS), "junction creation must exit");
+      assertEquals(0, child.exitValue(), () -> "junction creation failed: " + readOutput(output));
+    } finally {
+      if (child.isAlive()) {
+        child.destroyForcibly();
+        assertTrue(child.waitFor(10, TimeUnit.SECONDS), "owned junction helper must stop");
+      }
+    }
+  }
+
   @Test
   void processDeathReleasesLockWithoutDeletingItsFile() throws Exception {
     assertEquals(71, probe(true), "child halts while holding its acquired lock");
@@ -58,10 +111,14 @@ class IndexRootLockExclusionTest {
   }
 
   private int probe(boolean halt) throws Exception {
+    return probe(directory.resolve("index"), halt);
+  }
+
+  private int probe(Path indexBase, boolean halt) throws Exception {
     Path output = directory.resolve("probe.log");
     String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
     var child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", executable).toString(),
-        "-cp", System.getProperty("java.class.path"), Probe.class.getName(), directory.resolve("index").toString(), halt ? "halt" : "close")
+        "-cp", System.getProperty("java.class.path"), Probe.class.getName(), indexBase.toString(), halt ? "halt" : "close")
         .redirectErrorStream(true).redirectOutput(output.toFile()).start();
     try {
       assertTrue(child.waitFor(30, TimeUnit.SECONDS), "lock probe must exit");
