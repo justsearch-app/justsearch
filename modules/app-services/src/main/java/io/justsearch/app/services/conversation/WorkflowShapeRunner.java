@@ -112,7 +112,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
 
   @Override
   public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext incomingContext) {
-    run(body, audience, sink, incomingContext, false);
+    run(body, audience, sink, incomingContext,
+        body != null && Boolean.TRUE.equals(body.get(ConversationEngine.BACKGROUND_RUN_KEY)));
   }
 
   /** Background is supplied by the enclosing server run, never parsed from public workflow arguments. */
@@ -189,7 +190,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
               Map.of("nodeId", node.nodeId(), "kind", kindOf(node), "index", index)));
       try {
         switch (node) {
-          case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext);
+          case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext, background);
           case WorkflowNode.GateStep step -> {
             if (!runGateStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background)) {
               // User declined at the gate — terminate the workflow cleanly.
@@ -269,7 +270,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
    * single terminal {@code done}; a sub-shape {@code error} aborts the workflow.
    */
   private String runLlmStep(
-      WorkflowNode.LlmStep step, String priorOutput, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext) {
+      WorkflowNode.LlmStep step, String priorOutput, Audience audience, Consumer<SseEvent> sink,
+      EngineContext engineContext, boolean background) {
     String seed = step.prompt() != null ? step.prompt() : priorOutput;
     // Pass the seed under both body contracts a conversation shape may read: `prompt` (single-turn
     // shapes — free-chat / ask / summarize via UserPromptInjector) and `messages` (the agent /
@@ -303,7 +305,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
           }
         };
 
-    engineSupplier.get().run(step.shape(), subBody, audience, filtered, engineContext);
+    engineSupplier.get().run(step.shape(), subBody, audience, filtered, engineContext, background);
     if (errorMessage[0] != null) {
       throw new WorkflowAbortedException(
           "LLM step '" + step.nodeId() + "' failed: " + errorMessage[0]);

@@ -224,12 +224,18 @@ public final class ConversationEngine {
       Map<String, Object> body,
       Audience audience,
       Consumer<SseEvent> sink, EngineContext engineContext) {
+    run(shapeId, body, audience, sink, engineContext, false);
+  }
+
+  /** Server-owned non-interactive posture, carried by nested workflow delegation. */
+  public void run(ConversationShapeRef shapeId, Map<String, Object> body, Audience audience,
+      Consumer<SseEvent> sink, EngineContext engineContext, boolean background) {
     try (var work = admission == null ? null : admission.attach(engineContext)) {
       EngineContext context = work == null ? engineContext : work.context();
       if (work != null) work.cancellationReason().ifPresent(reason -> {
         throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
       });
-      runAdmitted(shapeId, body, audience, sink, context, work);
+      runAdmitted(shapeId, body, audience, sink, context, work, background);
     }
   }
 
@@ -237,7 +243,8 @@ public final class ConversationEngine {
       ConversationShapeRef shapeId,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
+      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work,
+      boolean background) {
     Objects.requireNonNull(shapeId, "shapeId");
     Objects.requireNonNull(audience, "audience");
     Objects.requireNonNull(sink, "sink");
@@ -254,7 +261,7 @@ public final class ConversationEngine {
     validateAudience(shape, audience);
 
     switch (shape.executionMode()) {
-      case SHAPE_DRIVEN -> dispatchShapeDriven(shape, safeBody, audience, sink, engineContext, work);
+      case SHAPE_DRIVEN -> dispatchShapeDriven(shape, safeBody, audience, sink, engineContext, work, background);
       case SUBSTRATE_DRIVEN -> dispatchSubstrateDriven(shape, safeBody, audience, sink, engineContext, work);
     }
   }
@@ -286,12 +293,15 @@ public final class ConversationEngine {
    * client-supplied value in the request body can never be mistaken for the engine's decision.
    */
   public static final String RECORDS_TO_THREAD_KEY = "recordsToThread";
+  /** Internal dispatch projection: the engine overwrites caller input on every shape dispatch. */
+  static final String BACKGROUND_RUN_KEY = "backgroundRun";
 
   private void dispatchShapeDriven(
       ConversationShape shape,
       Map<String, Object> body,
       Audience audience,
-      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
+      Consumer<SseEvent> sink, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work,
+      boolean background) {
     ShapeRunner runner = runnersByShape.get(shape.id());
     if (runner == null) {
       throw new IllegalStateException(
@@ -320,6 +330,7 @@ public final class ConversationEngine {
 
     Map<String, Object> dispatchBody = new LinkedHashMap<>(body);
     dispatchBody.put(RECORDS_TO_THREAD_KEY, recordKey != null);
+    dispatchBody.put(BACKGROUND_RUN_KEY, background);
 
     if (recordKey == null) {
       runner.run(dispatchBody, audience, sink, engineContext);

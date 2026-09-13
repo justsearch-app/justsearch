@@ -156,7 +156,7 @@ public final class ToolIteratingShapeRunner implements ShapeRunner {
           }
           sink.accept(
               AgentEventSseTranslator.translate(event, intentGateEvaluator, opsByToolName));
-        }, engineContext);
+        }, Boolean.TRUE.equals(body.get(ConversationEngine.BACKGROUND_RUN_KEY)), engineContext);
   }
 
   /**

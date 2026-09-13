@@ -56,8 +56,9 @@ including the full684-case agent suite and the scope-order negative1022;
 Workflow preparation-reference carry-through, declared confirmation floors and
 nested approval snapshots now pass2155 cases at1027 (one inherited UI skip);
 [workflow proof](evidence/C2/workflow-continuation.md).
-Next: preserve background posture through LlmStep shape delegation (the concrete
-section0/plan item), then connect the frontend private lookup,
+Nested background posture through LlmStep/engine/agent shape delegation now passes747
+represented cases at1029 after negative1028; [posture proof](evidence/C2/background-shape.md).
+Next: connect the frontend private lookup,
 then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
