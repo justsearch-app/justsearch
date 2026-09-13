@@ -33,7 +33,7 @@ class IndexRootLockFailureTest {
         assertThrows(IOException.class, contender::acquire);
       }
       assertEquals(23, probe(), "failed close must retain native cross-process exclusion");
-      
+
     } finally {
       field.set(owner, real);
       owner.close();
@@ -57,7 +57,7 @@ class IndexRootLockFailureTest {
       assertSame(failure, assertThrows(UncheckedIOException.class, owner::close).getCause());
       assertThrows(IOException.class, owner::acquire);
       try (var contender = new IndexRootLock(directory.resolve("index"))) { assertThrows(IOException.class, contender::acquire); }
-      
+
     } finally {
       real.close();
       // This test deliberately models process-lifetime refusal. Only remove this fixture's

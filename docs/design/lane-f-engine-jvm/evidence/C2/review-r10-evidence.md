@@ -1,5 +1,18 @@
 # R10 evidence, build and hosted reconciliation
 
+September13 final-review correction boundary supersedes the pre-review status below.
+Full900 at2168d1245 represents10156 cases/1649 suites, zero test failures/errors and35
+inherited skips, but the build FAILS on two whitespace-only blank lines in the new
+IndexRootLockFailureTest. Preserve the failed build; passing XML does not override it.
+Formatting902 removes those spaces and passes `:modules:indexer-worker:spotlessJavaSourcesCheck`
+and `:modules:ui:compileIntegrationTestJava`. It changes no assertion or production code.
+Current latest-full-run-summary.json records900 and its execution/reuse honestly;
+869 remains retrievable from21fbe728a. Final correction review still requires queue
+close/open ownership propagation, followed by fresh integrated proof.
+Raw: `tmp/c2-review-final-full900.txt`, `tmp/c2-review-final-full900-xml/`,
+`tmp/c2-review-final-full900-counts.json`, and `tmp/c2-review-final-format902.txt`.
+
+
 Current code checkpoint:c56e1a838. Final independent review is in progress across
 R1–R10; correction-batch closure is not claimed here.
 

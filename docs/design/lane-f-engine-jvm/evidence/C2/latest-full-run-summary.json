@@ -1,12 +1,12 @@
 {
-  "revision": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+  "revision": "2168d124588de7e7afb0e6d90ae6f53485639b15",
   "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
   "summary": {
-    "tests": 10133,
+    "tests": 10156,
     "failures": 0,
     "errors": 0,
     "skipped": 35,
-    "suites": 1647
+    "suites": 1649
   },
   "tasks": [
     {
@@ -20,16 +20,6 @@
       "suites": 3
     },
     {
-      "module": "ai-backend",
-      "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 62,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 13
-    },
-    {
       "module": "adapters-lucene",
       "task": "test",
       "status": "UP-TO-DATE",
@@ -40,9 +30,19 @@
       "suites": 102
     },
     {
-      "module": "app-agent",
+      "module": "ai-backend",
       "task": "test",
       "status": "UP-TO-DATE",
+      "tests": 62,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "EXECUTED",
       "tests": 674,
       "failures": 0,
       "errors": 0,
@@ -80,16 +80,6 @@
       "suites": 1
     },
     {
-      "module": "app-inference",
-      "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 320,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 30
-    },
-    {
       "module": "app-engine",
       "task": "test",
       "status": "EXECUTED",
@@ -100,9 +90,19 @@
       "suites": 47
     },
     {
-      "module": "app-launcher",
+      "module": "app-inference",
       "task": "test",
       "status": "UP-TO-DATE",
+      "tests": 320,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 30
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
       "tests": 87,
       "failures": 0,
       "errors": 0,
@@ -112,8 +112,8 @@
     {
       "module": "app-observability",
       "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 439,
+      "status": "EXECUTED",
+      "tests": 443,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
@@ -122,7 +122,7 @@
     {
       "module": "app-services",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 2646,
       "failures": 0,
       "errors": 0,
@@ -132,7 +132,7 @@
     {
       "module": "app-services",
       "task": "integrationTest",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 3,
       "failures": 0,
       "errors": 0,
@@ -142,12 +142,12 @@
     {
       "module": "app-util",
       "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 15,
+      "status": "EXECUTED",
+      "tests": 20,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 3
+      "suites": 4
     },
     {
       "module": "benchmarks",
@@ -192,7 +192,7 @@
     {
       "module": "dead-code-audit",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 2,
       "failures": 0,
       "errors": 0,
@@ -222,12 +222,12 @@
     {
       "module": "indexer-worker",
       "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 466,
+      "status": "EXECUTED",
+      "tests": 480,
       "failures": 0,
       "errors": 0,
       "skipped": 12,
-      "suites": 81
+      "suites": 82
     },
     {
       "module": "indexing",
@@ -322,7 +322,7 @@
     {
       "module": "system-tests",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 96,
       "failures": 0,
       "errors": 0,
@@ -352,7 +352,7 @@
     {
       "module": "ui",
       "task": "test",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 1133,
       "failures": 0,
       "errors": 0,
@@ -362,7 +362,7 @@
     {
       "module": "ui",
       "task": "integrationTest",
-      "status": "UP-TO-DATE",
+      "status": "EXECUTED",
       "tests": 9,
       "failures": 0,
       "errors": 0,
@@ -390,9 +390,24 @@
       "suites": 256
     }
   ],
-  "result": "BUILD SUCCESSFUL in 6m49s",
-  "rawLog": "tmp/c2-review-r10-full869.txt",
-  "rawXml": "tmp/c2-review-r10-full869-xml/",
-  "executionNote": "app-engine:test executes all 231 cases. Other test tasks are UP-TO-DATE at unchanged inputs; their copied XML is retained, not relabelled as fresh execution. Full863 previously executed the remaining changed correction modules and passed them; its one Engine workflow failure is corrected here.",
-  "supersedes": "Prior latest-full-run-summary.json remains retrievable from git show c56e1a838:docs/design/lane-f-engine-jvm/evidence/C2/latest-full-run-summary.json; that full744 proof retains its historical revision."
+  "buildResult": "FAILED",
+  "failure": ":modules:indexer-worker:spotlessJavaSourcesCheck: two whitespace-only blank lines in IndexRootLockFailureTest",
+  "elapsed": "10m52s",
+  "raw": {
+    "log": "tmp/c2-review-final-full900.txt",
+    "xml": "tmp/c2-review-final-full900-xml/",
+    "counts": "tmp/c2-review-final-full900-counts.json"
+  },
+  "reuse": {
+    "executedTasks": 12,
+    "executedCases": 5824,
+    "unchangedTasks": 26
+  },
+  "supersedes": {
+    "revision": "c56e1a838",
+    "run": "869",
+    "retrieval": "git show 21fbe728a:docs/design/lane-f-engine-jvm/evidence/C2/latest-full-run-summary.json",
+    "result": "SUCCESS, historical before final-review corrections"
+  },
+  "next": "Whitespace correction902 passes its focused gate; queue owner correction from the final review and fresh integrated verification remain owed."
 }
