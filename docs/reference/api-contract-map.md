@@ -359,6 +359,7 @@ Endpoints:
 
 - `GET /api/action-ledger` — Snapshot of the one action-event log (Outcome face, Slice C1). Returns `{entries: ActionLedgerRow[]}` projected by `ActionLedgerProjection.toWireRow`. Each row: `id` (deterministic, stable across snapshot + stream), `kind` (`operation` | `navigation` | `gate` | `grant` | `effect` | `index`), `occurredAt`, plus kind-specific fields — operation: `operationId`/`outcome`/`executionId`; navigation: `targetSurface`/`sourceId`; gate: `operationId`/`disposition`/`gateBehavior`/`sourceTier`/`outcome`; grant: `grantId`/`action`/`subject`/`outcome`; effect: `effectKind`/`subject`; index: `pathHash`/`collection`/`state`/`outcome`/`attempts`/`errorMessage?`. Receipt, timeline, undo, and trust-audit are projections over this one feed, never re-joins.
   - **Retention (tempdoc 812 D1).** Two tiers with different guarantees. `grant`, `gate` and `operation` rows are **durable**: they are written synchronously to an append-only JSONL audit journal under `<dataDir>/audit/action-ledger.jsonl` (rotated at 4 MB × 8 generations, oldest dropped) as they fan into the log, so they survive a Head restart. `navigation`, `effect` and `index` rows are **ring-only ephemera** — process-lifetime telemetry, deliberately not journaled (the authoritative live indexing view is the indexing-jobs Resource, and a 5k-document ingest would otherwise write 5k audit lines). This endpoint serves the in-memory ring **∪** the journal's tail, deduped by `id`; before 812 the whole feed was ring-only and Activity started empty after every restart. The journal is a write-behind copy for audit reads — the per-kind stores stay authoritative (550:468's rejection of re-sourcing the rail stands). Deep history beyond the served tail is the journal files themselves; there is no cursor pagination (deliberately deferred, 812 §D3).
+  - **Journal retries (lane F C2-4).** The journal deduplicates IDs across its retained file generations, including records outside the500-entry read tail. Opening it builds that derived in-memory index from the existing files; rotation retires the corresponding IDs. A failed append does not enter the durable tail. The fan-in attempts persistence before ring deduplication, so a retry can persist an already-visible event without repeating its live delivery. A torn trailing line is separated from the next append; readable prior records and the fragment are preserved. This is sink idempotency within its retention window, not a claim that operations-row catch-up is already connected.
   - **Query params (all optional and additive — a request with none behaves exactly as before).** `?correlationId=<id>` (561 P-B1) keeps rows carrying that loop/session join key; `?originator=<user|agent|system>` keeps that attribution; `?kind=<kind>` (repeatable, 812 D3) keeps only the named kinds; `?limit=<n>` (812 D3) returns the **newest** `n` rows after filtering — default 500, capped at 2000, with an unparseable or non-positive value falling back to the default. Sources: `ActionLedgerController.handleGet` + `ActionEventJournal`.
 - `GET /api/action-ledger/stream` (SSE) — Live read-view of the same projection (G3/G4/G5). Stream-only (no journal fold); rows dedup by `id`. "Snapshot" and "stream" are two reads of one projection, never two code paths. **Tempdoc 662: also reachable multiplexed via `/api/shell-events/stream` below** — the FE shell subscribes there by default; this dedicated endpoint stays live for direct/tooling consumers.
 - `POST /api/action-ledger/events` — Process-spanning ingest (thesis I): the FE folds local effects into the ONE log. Idempotent by event `id` (re-ingest on reload does not duplicate). Body: an effect event (`id`, `effectKind`, `subject`, `occurredAt`).
@@ -564,7 +565,7 @@ namespaced tool `_meta` plus a description fallback without changing standard an
 production catalog is empty, so no current tool is deprecated and the tool-surface version does not
 change.
 
-6-tool curated surface (tempdoc 500, adapted from eval-validated 4-tool TS server in tempdoc 366):
+7-tool curated surface (tempdoc 500, extended by lane F C2-4):
 
 | # | Tool | Purpose | Backend |
 |---|------|---------|---------|
@@ -574,6 +575,7 @@ change.
 | 4 | `justsearch_ingest` | File indexing (`paths[]`, optional `collection` — tempdoc 811 C-2a) | `core.ingest-files` Operation |
 | 5 | `justsearch_status` | Index health + enrichment | `KnowledgeHttpApiAdapter.status()` |
 | 6 | `justsearch_runtime_manifest` | Redacted runtime manifest for identity-aware caching | `RuntimeManifestPublisher` |
+| 7 | `justsearch_operation_outcome` | Read a recorded outcome by UUIDv7 operation key | `OperationStore.outcome()` via `HeadAssembly` |
 
 `justsearch_search`'s `structuredContent` evidence tier (projected by `McpEvidenceProjection`)
 carries the same `appliedFilters` echo the REST response does — see

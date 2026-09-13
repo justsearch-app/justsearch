@@ -46,13 +46,12 @@ import tools.jackson.databind.json.JsonMapper;
  * kept — the active {@code action-ledger.jsonl} plus {@code action-ledger.1.jsonl} …
  * {@code action-ledger.7.jsonl}, oldest dropped first. Worst case on disk is therefore ~32 MB.
  *
- * <p><b>Read bound.</b> A request never streams the whole journal. The journal keeps an in-memory
- * mirror of its newest {@link #TAIL_CAPACITY} (500) events, seeded ONCE at construction by reading
- * backwards from the newest generation and stopping as soon as 500 events are in hand (so boot
- * touches at most the newest few generations, never all 32 MB), and kept current by every
- * subsequent {@link #append}. {@link #tail} serves that mirror, so the union read the controller
- * performs is O(1) IO regardless of journal size, and rows evicted from the ring mid-session are
- * still served from the mirror.
+ * <p><b>Read and deduplication bounds.</b> Requests read the newest
+ * {@link #TAIL_CAPACITY} (500) events from memory. Opening the journal reads its retained
+ * generations once, deriving an id set per generation as well as that tail. Deduplication
+ * therefore covers retained files even when an id has left the read tail. Rotation updates
+ * those derived sets; no additional persistent identity registry is created. An uncertain
+ * write/rotation failure invalidates the index so a later append reconstructs it first.
  *
  * <p><b>Synchronous by design (812 critical-analysis (b)).</b> Every {@link #append} writes and
  * closes through to the file before returning. Buffering or handing the write to another thread
@@ -100,12 +99,20 @@ public final class ActionEventJournal {
 
   // Newest-last mirror of the journal's newest TAIL_CAPACITY events. Guarded by `this`.
   private final Deque<ActionEvent> tailMirror = new ArrayDeque<>();
+  // Derived from the retained files, never another durable identity authority. The read tail
+  // alone cannot deduplicate a retained event that is older than its 500-entry window.
+  private final Map<Integer, Set<String>> retainedIds = new java.util.HashMap<>();
+  private boolean retainedIndexReady;
 
   private ActionEventJournal(Path auditDir, long maxGenerationBytes) {
     this.auditDir = auditDir;
     this.maxGenerationBytes = maxGenerationBytes;
     if (auditDir != null) {
-      seedTailMirror();
+      try {
+        seedRetainedState();
+      } catch (IOException | RuntimeException failure) {
+        log.warn("Action-ledger audit journal could not be read from {}", auditDir, failure);
+      }
     }
   }
 
@@ -153,26 +160,55 @@ public final class ActionEventJournal {
 
   /**
    * Append one event if its kind is durable. Synchronous: the line is on disk when this returns.
-   * Best-effort — an IO failure is logged and never propagates, because losing an audit copy must
-   * not alter the semantics of the action that produced it (the same fail-open discipline the grant
-   * emitters already use).
+   * Returns true only if this event is now (or already was) retained by the durable sink.
+   * Disabled/non-durable inputs return false. An IO failure is logged and returns false; it
+   * cannot change the action that produced the event. Callers may retry the same id.
    */
-  public synchronized void append(ActionEvent event) {
+  public synchronized boolean append(ActionEvent event) {
     if (event == null || !isDurableKind(event.kind()) || auditDir == null) {
-      return;
+      return false;
     }
-    rememberInTail(event);
     try {
+      if (!retainedIndexReady) seedRetainedState();
+      if (isRetained(event.id())) return true;
       byte[] line =
           (MAPPER.writeValueAsString(ActionLedgerProjection.toWireRow(event)) + "\n")
               .getBytes(StandardCharsets.UTF_8);
       Files.createDirectories(auditDir);
       rotateIfNeeded(line.length);
+      preserveLineBoundary();
       Files.write(
           activeFile(), line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+      retainedIds.computeIfAbsent(0, ignored -> new java.util.HashSet<>()).add(event.id());
+      rememberInTail(event);
+      return true;
     } catch (IOException | RuntimeException e) {
+      // Rotation or append may have changed the files before failing. The next attempt must
+      // reconstruct its index instead of treating that uncertain state as an acknowledged id.
+      retainedIndexReady = false;
       log.warn("Action-ledger audit journal append failed for event {}", event.id(), e);
+      return false;
     }
+  }
+
+  private boolean isRetained(String id) {
+    return retainedIds.values().stream().anyMatch(ids -> ids.contains(id));
+  }
+
+  /** Keep a killed writer's trailing fragment separate from the next complete record. */
+  private void preserveLineBoundary() throws IOException {
+    Path active = activeFile();
+    if (!Files.exists(active)) return;
+    boolean needsNewline;
+    try (var channel = Files.newByteChannel(active, StandardOpenOption.READ)) {
+      long size = channel.size();
+      if (size == 0) return;
+      var lastByte = java.nio.ByteBuffer.allocate(1);
+      channel.position(size - 1);
+      if (channel.read(lastByte) != 1) throw new IOException("Cannot read journal line boundary");
+      needsNewline = lastByte.array()[0] != '\n';
+    }
+    if (needsNewline) Files.write(active, new byte[] {'\n'}, StandardOpenOption.APPEND);
   }
 
   /**
@@ -219,6 +255,12 @@ public final class ActionEventJournal {
       }
     }
     Files.move(active, generation(1), StandardCopyOption.REPLACE_EXISTING);
+    retainedIds.remove(MAX_GENERATIONS - 1);
+    for (int n = MAX_GENERATIONS - 2; n >= 0; n--) {
+      var ids = retainedIds.remove(n);
+      if (ids != null) retainedIds.put(n + 1, ids);
+    }
+    tailMirror.removeIf(event -> !isRetained(event.id()));
   }
 
   /** Rotated generation {@code n} ({@code 1} = most recently rotated). */
@@ -227,33 +269,39 @@ public final class ActionEventJournal {
   }
 
   /**
-   * Seed the tail mirror from disk, newest generation first, stopping as soon as
-   * {@link #TAIL_CAPACITY} events are in hand — the bounded boot read that makes the Activity
-   * surface non-empty after a restart.
+   * Derive retained-id sets and the newest read tail from the existing bounded file generations.
+   * Publish the reconstructed state only after every generation was read successfully.
    */
-  private void seedTailMirror() {
+  private void seedRetainedState() throws IOException {
     List<ActionEvent> newestFirst = new ArrayList<>();
-    try {
-      readGenerationBackwards(activeFile(), newestFirst);
-      for (int n = 1; n < MAX_GENERATIONS && newestFirst.size() < TAIL_CAPACITY; n++) {
-        readGenerationBackwards(generation(n), newestFirst);
-      }
-    } catch (IOException | RuntimeException e) {
-      log.warn("Action-ledger audit journal could not be read from {}", auditDir, e);
+    Map<Integer, Set<String>> loadedIds = new java.util.HashMap<>();
+    Set<String> seen = new java.util.HashSet<>();
+    for (int n = 0; n < MAX_GENERATIONS; n++) {
+      Set<String> ids = new java.util.HashSet<>();
+      readGenerationBackwards(n == 0 ? activeFile() : generation(n), newestFirst, ids, seen);
+      loadedIds.put(n, ids);
     }
+    retainedIds.clear();
+    retainedIds.putAll(loadedIds);
+    tailMirror.clear();
     for (int i = newestFirst.size() - 1; i >= 0; i--) {
       tailMirror.addLast(newestFirst.get(i));
     }
+    retainedIndexReady = true;
   }
 
-  /** Append this generation's events to {@code newestFirst}, newest line first, up to the cap. */
-  private void readGenerationBackwards(Path file, List<ActionEvent> newestFirst) throws IOException {
+  /** Read every retained id, while collecting only the newest bounded event tail. */
+  private void readGenerationBackwards(Path file, List<ActionEvent> newestFirst,
+      Set<String> ids, Set<String> seen) throws IOException {
     if (file == null || !Files.exists(file)) {
       return;
     }
     List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-    for (int i = lines.size() - 1; i >= 0 && newestFirst.size() < TAIL_CAPACITY; i--) {
-      parseLine(lines.get(i)).ifPresent(newestFirst::add);
+    for (int i = lines.size() - 1; i >= 0; i--) {
+      parseLine(lines.get(i)).ifPresent(event -> {
+        ids.add(event.id());
+        if (seen.add(event.id()) && newestFirst.size() < TAIL_CAPACITY) newestFirst.add(event);
+      });
     }
   }
 

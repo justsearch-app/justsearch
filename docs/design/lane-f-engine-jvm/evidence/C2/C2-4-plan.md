@@ -125,3 +125,36 @@ another thread reading the same store. Cover non-dispatched MEMORY/NOTE rows,
 repeated finish, before-start rejection, listener failure, removal and store close.
 The launcher architecture fixture must implement every new port method and stay
 in the affected compile/test set after the query-cut omission.
+
+## Journal retry prerequisite
+
+At e47275e59, negative1104 reproduces three sink failures: an unwritten event enters
+its durable tail, ring dedup suppresses a persistence retry, and a restart appends
+an already-retained id outside the500-entry read tail. Fix these at the existing
+journal/registry boundary before attaching source-row replay. Append reports whether
+the durable sink retained the event; update its tail only after a successful write.
+Attempt the journal before ring dedup, preserving one live delivery while allowing
+an already-visible event to retry persistence.
+
+Derive retained-id sets from the existing eight journal generations, once per open,
+and maintain them through rotation. The500-entry tail remains the read bound; it
+is not the deduplication bound. This cache is a projection of retained files, not a
+new persistent identity registry. On uncertain append/rotation failure, rebuild the
+cache before a subsequent write. Preserve the existing generation/byte retention,
+legacy journal format, disabled-mode behavior and non-durable event kinds. Test
+retained ids beyond the tail, rotation, failed-write retry and duplicate live
+suppression against real files. Do not claim this bounded sink alone solves
+source-row catch-up across the operations/journal retention mismatch; that next
+projection decision still precedes its activation.
+
+1105 adds a torn-line replay case and reproduces a further append boundary failure:
+a valid next record is concatenated onto the killed writer's fragment and disappears
+on reopen. Preserve the fragment but terminate its line before the next append.
+This is part of the same journal retry cut; no truncation/rewriting of prior events.
+The source-row projection decision is still open: the acknowledgement alternative
+must preserve pending source rows within the hard row cap and avoid acknowledging
+newer rows while an older replay backlog is blocked. The direct-source read
+alternative would change the current one-log read authority. Compare both against
+955's explicit durable-journal fan-in before choosing; no owner decision is needed.
+Numeric database-local IDs can be reused after quarantine/recovery (C2-2 already
+records this); the accepted UUIDv7 row key scopes any stable ledger source identity.

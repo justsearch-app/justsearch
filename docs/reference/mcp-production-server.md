@@ -106,7 +106,7 @@ In all three: replace `8080` with the `head.apiPort` value from
 
 Every flow above needs a build that serves `POST /mcp`; the v0.1.0 installer release may predate it.
 If a client reports no tools, probe the endpoint before debugging the client — it should answer with
-the six tools, and a 404 means the running build has no MCP endpoint (use a newer release or a
+the seven tools, and a 404 means the running build has no MCP endpoint (use a newer release or a
 from-source build):
 
 ```bash

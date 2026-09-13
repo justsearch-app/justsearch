@@ -42,6 +42,14 @@ consumer is activated yet. [Proof](evidence/C2/completion-subscription.md). Cont
 with acceptance-time history visibility, bounded terminal reads, retention/replay
 ordering and the ledger deduplication contract in the C2-4 plan.
 
+**C2-4 journal retry prerequisite:** final1106 executes38 passing cases after
+negative1104/1105. The existing journal now deduplicates retained ids beyond its
+read tail, retries persistence before live-ring dedup and preserves a torn-line
+boundary. [Proof](evidence/C2/journal-retry.md). No source-row replay consumer is
+activated. The next design choice must reconcile the operations/journal retention
+windows before the durable-history swap; the alternatives and numeric-id recovery
+constraint are recorded in the C2-4 plan. Current hosted jobs remain queued.
+
 Final independent correction verification is clear at **b713307ea**. Full905 passes
 in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;
 seven test tasks execute2040 cases and31 reuse unchanged successful inputs. PMD,

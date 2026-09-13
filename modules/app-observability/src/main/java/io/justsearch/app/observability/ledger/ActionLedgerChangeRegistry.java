@@ -123,21 +123,19 @@ public final class ActionLedgerChangeRegistry {
   }
 
   private void publish(ActionEvent event) {
+    // Retry the durable sink even when a prior failed write already reached the live ring.
+    // The journal owns retained-id deduplication; the ring only owns duplicate live delivery.
+    journal.append(event);
     // Append to the one log FIRST (so the snapshot a new subscriber reads already includes it),
     // then broadcast the live UPDATE.
     //
-    // The ring's id-idempotency (550 F1) is the ONE dedup point, so EVERY downstream consumer is
-    // gated on it — not just the durable journal. A re-delivered event that reached the SSE
+    // The ring's id-idempotency gates live downstream consumers after the journal attempt. A re-delivered event that reached the SSE
     // channel or the typed listeners anyway would contradict the snapshot the same subscriber
     // reads (the row is there exactly once) and would double-count in listeners that aggregate,
     // e.g. ScanRollupLedger's per-scan terminal counts.
     if (!store.append(event)) {
       return;
     }
-    // Tempdoc 812 D1: the durable copy, written synchronously and gated on the ring having
-    // accepted the id — so a re-delivered event does not duplicate on disk either. Only the
-    // actor kinds are durable; the journal itself decides, so there is one place that knows.
-    journal.append(event);
     channel.publish(SseFrameKind.UPDATE, ActionLedgerProjection.toWireRow(event));
     for (Consumer<ActionEvent> listener : eventListeners) {
       try {
