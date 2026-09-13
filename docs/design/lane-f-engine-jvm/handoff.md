@@ -352,7 +352,7 @@ then proves recovery within the unchanged 180-second search bound. Healthy runs 
 Review found and root fixed stale-lastExit and partial-acceptance holes; four Node tests and
 counterfactual237 prove those guards. Installed235 exercised fatal recovery in both lock arms.
 Final guarded installed239 is running; its result and XML must be preserved. See
-[lock phase evidence](evidence/C1/hostile-lock-phase.md) and design Â§16's explicit decision.
+[lock phase evidence](evidence/C1/hostile-lock-phase.md) and design §16's explicit decision.
 
 Hosted34350223349 also failed one migration recovery attempt with a supervisor-state EPERM rename
 and timeout waiting for rollback restart. This is independently under diagnosis; local235's
@@ -631,7 +631,7 @@ B1 to B6 fix batch below. The implementer's own attack list, in its order: `Shel
 critical-analysis findings lived there); `dev-runner.cjs` grew about 780 lines on the path every
 agent's stack uses (the port-wait no longer short-circuits on an explicit `--api-port`; the
 engine and frontend spawn commands are overridable through `JUSTSEARCH_DEV_RUNNER_{ENGINE,FRONTEND}_COMMAND`,
-both gated behind `JUSTSEARCH_SUPERVISOR_HARNESS=1` â€” verify the gate, not the variable);
+both gated behind `JUSTSEARCH_SUPERVISOR_HARNESS=1` — verify the gate, not the variable);
 timing-shaped conformance cases (`hang-soft` at a 1.5 s graceful deadline was flaky before the
 re-entrancy guard; margins are harness-tuned); the `watch_manifest` thread accumulates one per
 Tauri restart (pre-existing shape, newly reachable; duplicate `backend-restart` emits are
@@ -698,7 +698,7 @@ independent review of the fix range. Decisions per finding:
    `lib.rs:804-808` mislabels the prod flag (delete); `check-runtime-manifest-closure.mjs:58`
    describes the Tauri supervisor and the dev-runner as writers in the present tense (say
    "will"); the sequence exits with bare `0`/`1` outside `EngineExit`'s pin, so a requested but
-   unclean shutdown reads as a transient crash â€” add `EngineExit.REQUESTED_UNCLEAN` (a new
+   unclean shutdown reads as a transient crash — add `EngineExit.REQUESTED_UNCLEAN` (a new
    code classified `REQUESTED`), route both exits through the constants, and extend the call-site
    pin to `EngineShutdownSequence`. Because B8's dev-runner classifier and B10's Rust classifier
    read `EngineExit`'s table, adding the code after them must trip their drift tests; if it does
@@ -719,7 +719,7 @@ producer and the rename, `readinessNotice.ts` rows), B15 (`restart_required` on 
 requested-restart consumer), B16 (residue sweep), B17 (stress-suite policy). Then the stage-end
 protocol of 17.6: full suite plus ui-web gates; the checkpoint proof run live and recorded under
 `evidence/B/` (harness green on both adapters, **a forced kill on the live dev stack recovers
-under the budget** â€” the orchestrator runs this under a dev-stack lease, it is not delegated
+under the budget** — the orchestrator runs this under a dev-stack lease, it is not delegated
 fire-and-forget; the death-observability test green in CI); an independent review of the whole
 B range; `git merge origin/main` at the boundary; then the owner's "continue".
 
@@ -730,11 +730,11 @@ base `e692b86ef` while B7 was landing. Their section 0 lists the `verified-facts
 found (ten for C1, twelve for C2); **apply those to `verified-facts.md` at the stage start**,
 not before, since B may move them again. All eleven open questions are decided in design section
 0 ("Stage C1 and C2 checklists drafted during B"). The three items each drafter judged most at
-risk: C1 â€” admission as the `ForegroundLoad` producer (rule 6b bars `ui` from the type, the
+risk: C1 — admission as the `ForegroundLoad` producer (rule 6b bars `ui` from the type, the
 gate forbids a second wrap, the front's filter skips GET: the producer must **move**, not be
 added), parser confinement (no module boundary exists and VDU already parses PDF in the
 Engine), context through the 33-method port (a `withContext` bound view is the decision);
-C2 â€” no journal commit sequence number exists (the operations table's own autoincrement key is
+C2 — no journal commit sequence number exists (the operations table's own autoincrement key is
 the decision), `jobs.db` re-classification is refused by the installed updater's closed-set rule
 (batch every durable-store identity change into one register change, and relax the rule's
 successor in the same commit), and `version conflict` has no subject until the global
@@ -816,7 +816,7 @@ the 3965-test affected-module inventory, post-final-edit targeted verification,
 falsification limits and all remaining findings. Strict boot cleanup's placement
 has source/helper evidence, not a live boot-failure proof. Stage B is still open.
 
-The independent B7â€“B10 findings are in
+The independent B7–B10 findings are in
 `evidence/B/b7-b10-independent-review.md`. Dated design section 0 now settles the
 B6 acknowledgement/nonce transaction, first-claim-wins request protocol, focused
 production host ownership, v2 child ownership handoff, and B13 process hold/evidence/UI
@@ -1027,7 +1027,7 @@ that move. Prove both durable queue outcomes. Then finish the single-writer
 shutdown re-cut's production proofs and B11-B17; D1 live runtime replacement and
 the rejected shared request-slot protocol remain outside this repair.
 
-## Integrated B11â€“B14 and B16 checkpoint (2026-09-08)
+## Integrated B11–B14 and B16 checkpoint (2026-09-08)
 
 Resume in `F:/justsearch-public/.claude/worktrees/lane-F-A`, branch `worktree-lane-F-A`.
 The root is sole implementer; reviewers are read-only and have returned signoff.
@@ -1042,12 +1042,12 @@ A stale Tauri conformance executable caused an initial failed invocation; rebuil
 that binary explicitly before adapter runs. The two B11 stale UI assertions were
 corrected to the new public schema and completion ordering and independently reviewed.
 
-B11â€“B14 and B16 are complete at the permitted branch proof tier. The signed
+B11–B14 and B16 are complete at the permitted branch proof tier. The signed
 installer/user-store exercise is assigned to final validation in stage E, registered under
 `upgrade-dead-engine-recovery`; the 2026-09-08 final-validation amendment in design section 0
 supersedes the earlier first-post-merge scheduling. Stage F carries the gap if main-only signing
 requires the actual run to wait for the first eligible installer after the final merge. B15 and remaining B17 work are next:
-actual promotion â†’ requested whole-Engine restart â†’ promoted generation served;
+actual promotion → requested whole-Engine restart → promoted generation served;
 hostile-lock survival through real supervision; PROCESSING as well as PENDING replay;
 and the single-writer shutdown re-cut's four production proofs. Read `scope-recut.md`
 before changing shutdown transport. No shared request-slot/accepted-marker protocol
@@ -1099,7 +1099,7 @@ origin/main into this lane, then run the full suite with stress enabled and reru
 installed-process suite against that integrated candidate. B17 is not yet closed.
 `evidence/B/b17-recovery-proofs.md` records the checkpoint; raw outputs stay ignored.
 
-B completion (2026-09-08): B1â€“B17 are complete. B17 is `b8094f9cf`; main/PR 0b
+B completion (2026-09-08): B1–B17 are complete. B17 is `b8094f9cf`; main/PR 0b
 `f938c4eb2` is integrated by `39f598efa`, with all conflict resolutions independently
 reviewed. The following closeout corrects a fixture-only transient manifest read and
 records final proof: full units plus stress 9,456/0 (25 skips), installed recovery 5/5,
@@ -1129,8 +1129,8 @@ unproved supported-OS whole-Engine recovery coverage as well as signed installer
 C1 and C2 grounded (2026-09-09, design orchestrator, branch `worktree-lane-F-design`): both
 checklists were re-grounded at `be47faa40` by a code-verified pass (investigation by two
 read-only agents, the design writing by the orchestrator). `stages/C1.md` and `stages/C2.md`
-now cite `design.md` by section and code by `file:line` at that commit; their Â§0 carries the
-corrections, Â§11 the decisions, and **Â§12 the implementation batches, which are the briefs**:
+now cite `design.md` by section and code by `file:line` at that commit; their §0 carries the
+corrections, §11 the decisions, and **§12 the implementation batches, which are the briefs**:
 one implementer per batch, sequential on the lane branch, read-only review after each, at most
 two review rounds before the orchestrator takes the diff. Three design amendments landed with
 them (17.3 rows C1 and C2, 17.9 row C2, 7.5's store sentence) and five dated rows in the section 0
@@ -1139,7 +1139,7 @@ existing durable store changes owner, class or reconciliation in lane F**, becau
 updater compares every register row by count and identity; stage B's new rows already cost 0.3.0
 installs an in-place upgrade, and C2-1 lands the successor rule plus a release-descriptor
 baseline so that boundary is paid once. `verified-facts.md` has a dated correction section for
-everything the pass found. C1 starts with batch 1 of `stages/C1.md` Â§12 once PR 718's hosted
+everything the pass found. C1 starts with batch 1 of `stages/C1.md` §12 once PR 718's hosted
 correction is green; C2 starts after C1's batch 2 has landed and been reviewed.
 
 Later stages designed (2026-09-09, design orchestrator, `worktree-lane-F-design`): `stages/E.md`
@@ -1149,9 +1149,9 @@ minutes, the split side measured on `origin/main` at E, the collector protocol, 
 representative changes, the signed dead-Engine round, the record layout). `stages/D1.md`,
 `stages/D2.md` and `stages/F.md` are code-verified drafts at `be47faa40` with their decisions
 recorded in design section 0; each is re-grounded at its stage start because C1, C2 and the
-stage before it move the code. All five later-stage files follow the C1/C2 shape: Â§0
-corrections, Â§1 ledger, Â§3 items with runnable acceptance, Â§7 harness, Â§9 allowed reds, Â§11
-decisions, Â§12 batches (the briefs). The Codex agent implements from Â§12 of the current stage
+stage before it move the code. All five later-stage files follow the C1/C2 shape: §0
+corrections, §1 ledger, §3 items with runnable acceptance, §7 harness, §9 allowed reds, §11
+decisions, §12 batches (the briefs). The Codex agent implements from §12 of the current stage
 and never from a draft two stages ahead.
 
 C1 batch 1 complete (2026-09-08 continuation, checkpoint containing this note): integrated
@@ -1176,7 +1176,7 @@ unchanged. E observes three forty-minute runs to honor the original one-hour per
 
 C1 batch 2 in progress (2026-09-09 continuation, based on `dd11e372d`): required contexts now
 propagate through ports, documents, agents/tools, conversation runners, request controllers,
-MCP and pending approvals. `stages/C1.md Â§0.1` records the ingress/trust decisions and scope.
+MCP and pending approvals. `stages/C1.md §0.1` records the ingress/trust decisions and scope.
 Jobs schema V14 persists admission originator/transport; maintenance preserves prior values,
 atomic claims snapshot them for terminal writes, and versioned SWITCHING UPSERTs preserve collection
 and attribution while reading legacy paths. The projection remains owned by the action ledger.
