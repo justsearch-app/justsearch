@@ -11,7 +11,7 @@ scenarios and R9's schema reconciliation are still open; this is not batch closu
 
 ## Implemented boundary
 
-C2-1 supplies operations.db v1, process lifetime and recovery, jobs.db v15 and
+C2-1 now supplies operations.db v2 (R5), process lifetime and recovery, jobs.db v16 and
 compatible installed-store upgrade ownership. C2-11 supplies the day-one installed
 PROCESSING replay and path-idempotent retry fixture. Its six keyed fault points
 remain with C2-2 through C2-10 and the final C2-11 proof; they are not claimed here.
@@ -19,7 +19,12 @@ Actual boot acceptance and drain-time operation checkpoint writes require those
 producer bindings. The foundation's lifetime tests already verify open/close order
 and retention on failed drain.
 
-## Required batch1 gates
+September13 R9 reopens the migration/compatibility gate for14 → 15 → 16 and
+operations1 → 2. The table below is historical proof; current results are in
+[R9 reconciliation](review-r9-reconciliation.md). content_hash remains without a
+unit-recovery consumer until C2-8.
+
+## Historical required batch1 gates
 
 | Gate | Result, revision and accessible evidence |
 | --- | --- |

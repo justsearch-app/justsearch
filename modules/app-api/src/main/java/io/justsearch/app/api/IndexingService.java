@@ -211,12 +211,6 @@ public interface IndexingService {
     throw new UnsupportedOperationException("Serving generation capture unavailable");
   }
 
-  /** Freeze watched-root scope and serving generation without scheduling or admitting index work. */
-  default io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(
-      boolean force, EngineContext engineContext) {
-    throw new UnsupportedOperationException("Recorded reindex preparation unavailable");
-  }
-
   /**
    * Tempdoc 626 §Recency (Move C) — verify/reconcile a SINGLE watched root identified by its {@code
    * pathHash} (the privacy-safe wire identifier — ADR-0028; raw paths never cross the wire). The

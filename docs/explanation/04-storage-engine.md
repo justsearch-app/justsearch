@@ -368,25 +368,17 @@ the work owner retains its original survival for cancellation and disconnect han
 Recorded producers must resolve their survival policy before admission, or admit a
 separately owned child, before activating a recovery classification.
 
-Recorded parent owners can accept an ingest child through
-`OperationAttemptRunner.acceptIngestChild`, using a handle issued by that runner and
-one exact root from the parent's persisted `RecordedRootPlan`. The store transaction
-copies the stored context and attribution, retaining the frozen generation, policy
-and partition exclusions. The child's identity includes the parent operation key and
-one-root prepared plan. Existing children are reused; creating one requires a running
-parent. A handle whose completion persistence failed cannot accept another child.
-The architecture gate forbids producers from calling the store's lifecycle methods
-directly, including child acceptance.
-`governance/engine-ports.v1.json` catalogs both existing interfaces and their distinct
-implementations, with the actual outer process binding sites and consumers. The
-operation-surface register separately governs sibling records and row cardinality.
+The current compiled operations API contains the shared acceptance/attempt runner.
+Recorded root-plan preparation and child-acceptance APIs are held outside the compiled
+surface until their ingest/reindex producers are implemented. Generic preparation
+remains pure and transient; a handler returning a replay schema is refused before
+its effect. Public arguments persist only as a canonical digest. Server-built replay
+payloads must not participate in that identity comparison.
 
-Parent owners explicitly compose child durable completion into their returned
-completion stage. Existing interrupted children resume through kind reconciliation;
-normal start only executes newly accepted work. Store failures preserve their bounded
-typed code in parent failure receipts. Production ingest and reindex owners still
-need their scan-key, generation and committed-unit completion integration before
-these primitives can establish recorded scan completion.
+The architecture gate forbids producers from calling the store's lifecycle methods
+directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,
+their outer process bindings and consumers. The operation-surface register separately
+governs sibling records and row cardinality.
 
 A failed durable attempt transition logs an ERROR with its key and intended state.
 The runner retains the first persistence failure for the process; Health reports it

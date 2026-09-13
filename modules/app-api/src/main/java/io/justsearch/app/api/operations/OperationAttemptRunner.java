@@ -35,13 +35,6 @@ public interface OperationAttemptRunner {
   PreparedAttempt accept(Request request);
 
   /**
-   * Find or accept a child inside this runner's parent capability and recorded root scope.
-   * The Engine mints its key; callers cannot repartition scope or supply another generation.
-   * Existing children never execute through start; interrupted children use INGEST reconciliation.
-   */
-  PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root);
-
-  /**
    * Called after admission. An existing acceptance never executes the supplied body.
    * Non-dispatched producers use this same port: commit their effect inside the body and return
    * {@link OperationExecution#finished(OperationResult)} for synchronous work, or supply the

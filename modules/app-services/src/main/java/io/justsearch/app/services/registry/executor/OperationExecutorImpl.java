@@ -430,10 +430,10 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       if (!argumentsJson.equals(value.argumentsJson())) {
         throw new IllegalArgumentException("Preparation must retain the public arguments unchanged");
       }
-      OperationDescriptor descriptor = value.replaySchema() == null ? generic
-          : OperationDescriptor.preparedInvocation(op.policy().recordKind(), op.id().value(),
-              argumentsJson, value.replaySchema(), value.replayPayloadJson());
-      return new PreparedInvocation(handler, value, descriptor, null, null);
+      if (value.replaySchema() != null) {
+        throw new IllegalArgumentException("Prepared replay is unavailable");
+      }
+      return new PreparedInvocation(handler, value, generic, null, null);
     } catch (OperationPreparationRefused refusal) {
       return new PreparedInvocation(null, null, generic, refusal.refusal(), null);
     } catch (RuntimeException failure) {

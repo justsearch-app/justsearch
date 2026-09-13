@@ -12,7 +12,6 @@ import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationStoreException;
-import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.core.context.EngineContext;
 import java.time.Clock;
 import java.util.List;
@@ -61,16 +60,6 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   public PreparedAttempt accept(Request request) {
     String key = request.key() == null ? OperationKeys.generate(clock) : request.key();
     var accepted = store.accept(key, request.descriptor(), request.context(), request.provenance());
-    return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
-  }
-
-  @Override
-  public PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root) {
-    if (!(parent instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
-        || control.done.isCompletedExceptionally()) {
-      throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
-    }
-    var accepted = store.acceptIngestChild(control.key, OperationKeys.generate(clock), root);
     return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
   }
 
@@ -284,7 +273,6 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private final class Control implements OperationRecordHandle {
-    private final OperationAttemptRunnerImpl owner = OperationAttemptRunnerImpl.this;
     private final long id;
     private final String key;
     private final AtomicBoolean started = new AtomicBoolean();

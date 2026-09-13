@@ -90,59 +90,39 @@ final class OperationExecutorImplTest {
   }
 
   @Test
-  void preparedScopeIsAcceptedAndExecutedWithoutRereadingMutableInput() {
+  void unactivatedReplayPlanCannotEnterTheCurrentRowIdentity() throws Exception {
     var handlers = new HandlerRegistry();
-    var id = new OperationRef("core.prepared-test");
-    var currentRoot = new java.util.concurrent.atomic.AtomicReference<>("original-root");
-    var frozen = new java.util.concurrent.atomic.AtomicReference<OperationPreparation>();
-    var preparationCalls = new java.util.concurrent.atomic.AtomicInteger();
-    var key = new java.util.concurrent.atomic.AtomicReference<String>();
-    var context = io.justsearch.app.services.TestEngineContexts.internal();
-    String publicInput = "{\"privateBody\":\"not-for-the-row\"}";
+    var id = new OperationRef("core.held-replay-test");
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
     handlers.register(id, new OperationHandler() {
-      @Override public OperationResult execute(String args, EngineContext ctx) {
-        throw new AssertionError("Must execute the frozen invocation");
+      @Override public OperationResult execute(String args, EngineContext context) {
+        calls.incrementAndGet();
+        return OperationResult.success("effect");
       }
-      @Override public OperationPreparation prepare(String args,
-          InvocationProvenance provenance, EngineContext ctx) {
-        org.junit.jupiter.api.Assertions.assertSame(context, ctx);
-        assertTrue(operationStore.openRecords().isEmpty(), "scope must be captured before acceptance");
-        preparationCalls.incrementAndGet();
-        var value = new OperationPreparation(args, "root-plan.v1",
-            rootPlanPayload(currentRoot.get()));
-        frozen.set(value);
-        currentRoot.set("changed-after-preparation");
-        return value;
-      }
-      @Override public OperationExecution executePrepared(
-          OperationPreparation value, InvocationProvenance provenance,
-          EngineContext ctx, OperationRecordHandle handle) {
-        org.junit.jupiter.api.Assertions.assertSame(frozen.get(), value);
-        org.junit.jupiter.api.Assertions.assertSame(context, ctx);
-        key.set(handle.key());
-        var row = operationStore.find(handle.key()).orElseThrow();
-        assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING, row.state());
-        String identity = row.descriptor().identityJson();
-        assertTrue(identity.contains("original-root"));
-        assertTrue(identity.contains("root-plan.v1"));
-        assertFalse(identity.contains("changed-after-preparation"));
-        assertFalse(identity.contains("privateBody"));
-        assertFalse(identity.contains("not-for-the-row"));
-        assertTrue(identity.contains(io.justsearch.app.api.operations.CanonicalOperationArguments.digest(publicInput)));
-        return OperationExecution.finished(OperationResult.success("Committed"));
+      @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
+          EngineContext context) {
+        return new OperationPreparation(args, "root-plan.v1", rootPlanPayload("held"));
       }
     });
-    assertTrue(new OperationExecutorImpl(attempts, admission, handlers)
-        .dispatch(makeOp(id, TrustTier.CORE, false), publicInput, context).success());
-    assertEquals(1, preparationCalls.get());
-    assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
-        operationStore.find(key.get()).orElseThrow().state());
+    assertThrows(IllegalArgumentException.class,
+        () -> new OperationExecutorImpl(attempts, admission, handlers)
+        .dispatch(makeOp(id, TrustTier.CORE, false), "{}",
+            io.justsearch.app.services.TestEngineContexts.internal()));
+    assertEquals(0, calls.get());
+    try (var connection = java.sql.DriverManager.getConnection(
+        "jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
+        var statement = connection.createStatement();
+        var row = statement.executeQuery("SELECT identity_json, state FROM operations")) {
+      assertTrue(row.next());
+      assertEquals("FAILED", row.getString("state"));
+      assertFalse(row.getString("identity_json").contains("preparedInvocation"));
+      assertFalse(row.next());
+    }
   }
 
   @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(boolean prepared) throws Exception {
-    var kind = prepared ? OperationKind.REINDEX : OperationKind.INGEST;
+  @org.junit.jupiter.params.provider.EnumSource(value = OperationKind.class, names = {"REINDEX", "INGEST"})
+  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(OperationKind kind) throws Exception {
     var handlers = new HandlerRegistry();
     var id = new OperationRef("core.arbitrary-kind-fixture");
     var calls = new java.util.concurrent.atomic.AtomicInteger();
@@ -153,8 +133,7 @@ final class OperationExecutorImplTest {
       }
       @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
           EngineContext ctx) {
-        return prepared ? new OperationPreparation(args, "root-plan.v1", rootPlanPayload("frozen"))
-            : OperationPreparation.passthrough(args);
+        return OperationPreparation.passthrough(args);
       }
       @Override public OperationExecution executePrepared(OperationPreparation value,
           InvocationProvenance provenance, EngineContext ctx, OperationRecordHandle handle) {
@@ -180,7 +159,7 @@ final class OperationExecutorImplTest {
       assertEquals(kind, row.descriptor().kind());
       assertEquals(id.value(), row.descriptor().operationRef());
       assertEquals(context.survival(), row.context().survival());
-      assertEquals(prepared, row.descriptor().identityJson().contains("preparedInvocation"));
+      assertFalse(row.descriptor().identityJson().contains("preparedInvocation"));
       return new io.justsearch.app.api.operations.OperationAttemptRunner.Reconciliation.Complete(
           new io.justsearch.app.api.operations.OperationReceipt("SUCCESS", null));
     });

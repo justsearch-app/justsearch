@@ -1,8 +1,10 @@
 # C1 acceptance reconciliation
 
-Status: COMPLETE, 2026-09-12. Application candidate8f8c7d775 is unchanged through
+Status: historical COMPLETE at2026-09-12; current verification amended September13 R9. Application candidate8f8c7d775 is unchanged through
 source checkpoint35d03f7c4 and documentation checkpointa480ac6f6.
-This table maps the current stage contract to evidence; implementation, local verification,
+The later MCP quota correction fc67f6ed9 has negative599/positive601 proof,
+separate from this closure. R10 reconciles current integration and hosted coverage.
+This historical table maps the then-current stage contract to evidence; implementation, local verification,
 hosted verification and live acceptance are separate. Every C1 item is reconciled below; later-stage obligations retain their named placement.
 
 Full455 invokes build, test, system integration and installDist with includeStress=true and

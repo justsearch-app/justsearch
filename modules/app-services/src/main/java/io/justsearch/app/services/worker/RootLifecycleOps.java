@@ -125,16 +125,6 @@ final class RootLifecycleOps {
 
     // ========== Watched Root Accessors ==========
 
-    io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(String generation, boolean force) {
-        var bindings = watchedRootsState.snapshotBindings();
-        List<String> patterns = List.copyOf(excludeMatcherSupplier.get().patterns());
-        var roots = bindings.stream().map(binding -> new io.justsearch.app.api.operations.RecordedRootPlan.Root(
-                binding.path(), binding.collection() == null || binding.collection().isBlank()
-                    ? IngestCollectionPolicy.DEFAULT_COLLECTION : binding.collection(),
-                force, false, patterns, List.of())).toList();
-        return io.justsearch.app.api.operations.RecordedRootPlan.partition(generation, roots);
-    }
-
     List<Path> getWatchedPaths(EngineContext engineContext) {
         return List.copyOf(watchedRoots.keySet());
     }

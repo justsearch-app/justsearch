@@ -1,6 +1,9 @@
 # C2-2: implementation seams and verification plan
 
-Status: source-grounded at6a4059352 on2026-09-12; batch1 closed at e60e2cb0d; C2-2 implementation and negative proofs in progress.
+Status: September13 correction batch in progress. C2-2 ends at the dispatcher and
+background-agent producers. The earlier dated remaining-work statements below are
+historical; ingest/reindex activation belongs to C2-8/C2-10. R9 reconciles held
+preparation surfaces; R10 and the final independent review precede batch closure.
 The root owns all edits/builds. A read-only explorer mapped the seams; decisions
 below resolve its returned ambiguities without owner gates.
 

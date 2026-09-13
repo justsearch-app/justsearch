@@ -6,13 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
-import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.ipc.DeleteByIdResponse;
 import io.justsearch.ipc.DeleteByPathResponse;
@@ -118,79 +114,6 @@ final class RecordedRootPreparationTest {
   }
 
   @Test
-  @DisplayName("preparation is pure and freezes nested labels, excludes, and directory metadata")
-  void prepareSnapshotsPurelyAndPreservesDistinctNestedPolicy() throws Exception {
-    Path parent = Files.createDirectories(tempDir.resolve("library")).toAbsolutePath().normalize();
-    Path child = Files.createDirectories(parent.resolve("private")).toAbsolutePath().normalize();
-    Path sibling = Files.createDirectories(tempDir.resolve("library-other")).toAbsolutePath().normalize();
-    Path rootsFile = tempDir.resolve("prepared-roots.json");
-    AtomicInteger excludeCalls = new AtomicInteger();
-    Fixture fixture =
-        new Fixture(
-            () -> {
-              excludeCalls.incrementAndGet();
-              return ExcludeMatcher.fromPatterns(List.of("*.tmp"), false);
-            },
-            null,
-            rootsFile);
-
-    fixture.state.register(parent, "notes", false);
-    fixture.state.register(child, "secret", false);
-    fixture.state.register(sibling, "  ", false);
-
-    RecordedRootPlan plan = fixture.ops.prepareReindexPlan("generation-1", true);
-
-    assertEquals(1, excludeCalls.get(), "the exclusion source is captured once");
-    assertEquals(3, plan.roots().size(), "distinct nested policies remain separate roots");
-    RecordedRootPlan.Root plannedParent = rootFor(plan, parent);
-    RecordedRootPlan.Root plannedChild = rootFor(plan, child);
-    RecordedRootPlan.Root plannedSibling = rootFor(plan, sibling);
-    assertEquals("notes", plannedParent.collection());
-    assertEquals("secret", plannedChild.collection());
-    assertEquals(IngestCollectionPolicy.DEFAULT_COLLECTION, plannedSibling.collection());
-    assertEquals(List.of(child), plannedParent.excludedSubtrees());
-    assertEquals(List.of("**/*.tmp"), plannedParent.excludePatterns());
-    assertEquals(List.of("**/*.tmp"), plannedChild.excludePatterns());
-    assertTrue(plannedParent.force());
-    assertFalse(plannedParent.singleFile(), "watched roots are directory units");
-    assertFalse(plannedChild.singleFile(), "watched roots are directory units");
-
-    // Scope is frozen in the immutable plan even when live state changes after capture.
-    fixture.state.register(child, "changed-after-capture", false);
-    Path late = Files.createDirectories(tempDir.resolve("late")).toAbsolutePath().normalize();
-    fixture.state.register(late, "late", false);
-    assertEquals("secret", rootFor(plan, child).collection());
-    assertEquals(3, plan.roots().size());
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> plan.roots().get(0).excludePatterns().add("late/**"));
-
-    assertFalse(Files.exists(rootsFile), "pure preparation must not persist root state");
-    assertEquals(0, fixture.submittedWalks.get());
-    assertEquals(0, fixture.watchCalls.get());
-    assertEquals(0, fixture.scanCalls.get());
-    assertEquals(0, fixture.deleteCalls.get());
-    verify(fixture.walkExecutor, never()).execute(any(Runnable.class));
-  }
-
-  @Test
-  @DisplayName("null and explicit default labels collapse before partitioning")
-  void nullAndDefaultCollectionsHaveOneEffectivePolicy() throws Exception {
-    Path parent = Files.createDirectories(tempDir.resolve("shared")).toAbsolutePath().normalize();
-    Path child = Files.createDirectories(parent.resolve("child")).toAbsolutePath().normalize();
-    Fixture fixture = new Fixture(ExcludeMatcher::empty, null);
-    fixture.state.register(parent, null, false);
-    fixture.state.register(child, IngestCollectionPolicy.DEFAULT_COLLECTION, false);
-
-    RecordedRootPlan plan = fixture.ops.prepareReindexPlan("generation-2", false);
-
-    assertEquals(1, plan.roots().size(), "null and default must be normalized before partitioning");
-    assertEquals(parent, plan.roots().get(0).path());
-    assertEquals(IngestCollectionPolicy.DEFAULT_COLLECTION, plan.roots().get(0).collection());
-    assertEquals(List.of(), plan.roots().get(0).excludedSubtrees());
-  }
-
-  @Test
   @DisplayName("concurrent duplicate registration queues and records one root")
   void concurrentDuplicateRegistrationIsAtomic() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("concurrent")).toAbsolutePath().normalize();
@@ -270,13 +193,6 @@ final class RecordedRootPreparationTest {
     assertFalse(fixture.watchedRoots.containsKey(root));
   }
 
-  private static RecordedRootPlan.Root rootFor(RecordedRootPlan plan, Path path) {
-    return plan.roots().stream()
-        .filter(root -> root.path().equals(path))
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("missing planned root " + path));
-  }
-
   private static final class Fixture {
     private final Map<Path, Instant> watchedRoots = new java.util.concurrent.ConcurrentHashMap<>();
     private final WatchedRootsState state;
@@ -284,8 +200,6 @@ final class RecordedRootPreparationTest {
     private final RootLifecycleOps ops;
     private final AtomicInteger submittedWalks = new AtomicInteger();
     private final AtomicInteger watchCalls = new AtomicInteger();
-    private final AtomicInteger scanCalls = new AtomicInteger();
-    private final AtomicInteger deleteCalls = new AtomicInteger();
     private final AtomicReference<List<IngestCollectionPolicy.RootBinding>> bindingsAtSubmission =
         new AtomicReference<>();
     private final AtomicReference<Consumer<io.justsearch.core.context.EngineContext>> queuedWalk =
@@ -307,11 +221,9 @@ final class RecordedRootPreparationTest {
       RootLifecycleOps.ScanRootFn scan =
           scanRootFn == null
               ? (rootPath, collection, mode, globs, progress, context) -> {
-                scanCalls.incrementAndGet();
                 return null;
               }
               : (rootPath, collection, mode, globs, progress, context) -> {
-                scanCalls.incrementAndGet();
                 return scanRootFn.scan(rootPath, collection, mode, globs, progress, context);
               };
       this.ops =
@@ -330,7 +242,6 @@ final class RecordedRootPreparationTest {
                 public void unwatch(String rootPath, io.justsearch.core.context.EngineContext context) {}
               },
               (path, context) -> {
-                deleteCalls.incrementAndGet();
                 return DeleteByPathResponse.newBuilder().build();
               },
               (id, context) -> DeleteByIdResponse.newBuilder().setSuccess(true).build(),

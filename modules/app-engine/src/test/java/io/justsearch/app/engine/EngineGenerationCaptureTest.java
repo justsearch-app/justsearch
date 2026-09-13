@@ -69,7 +69,6 @@ final class EngineGenerationCaptureTest {
         var failure = assertThrows(KnowledgeClientException.class,
             () -> client.captureServingGeneration(TestEngineContexts.FOREGROUND));
         assertEquals(KnowledgeClientException.Status.UNAVAILABLE, failure.status());
-        assertUnavailable(() -> client.prepareReindexPlan(false, TestEngineContexts.FOREGROUND));
         assertEquals(0, admission.activeWorkCount());
       }
       if (before == null) assertFalse(Files.exists(layout.statePath()), "capture must not recover missing state");
@@ -101,10 +100,6 @@ final class EngineGenerationCaptureTest {
           verify(worker).captureServingGeneration(captured.capture());
           // Admission returns a fresh immutable view so detach can change urgency.
           assertEquals(owner.context(), captured.getValue().engineContext());
-          var plan = client.prepareReindexPlan(true, owner.context());
-          assertEquals(layout.activeGenerationId(), plan.generation());
-          assertTrue(plan.roots().isEmpty());
-          verify(worker, times(2)).captureServingGeneration(any());
         }
         generations.startMigration("replacement-test");
         var promoted = generations.promoteBuildingGenerationToActive();

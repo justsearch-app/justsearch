@@ -5,7 +5,7 @@ package io.justsearch.app.api.operations;
 public final class OperationStoreException extends RuntimeException {
   private static final long serialVersionUID = 1L;
   public enum Code { STORAGE_FAILED, OPERATION_KEY_REUSED, OPERATION_EXPIRED, INVALID_OPERATION_KEY,
-    CHILD_ACCEPTANCE_REFUSED, OPERATIONS_CAPACITY }
+    OPERATIONS_CAPACITY }
   private final Code code;
   private final long retryAfterMillis;
 

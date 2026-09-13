@@ -1,0 +1,32 @@
+{
+  "base": "41d0ab86da181a7bba7656f28bf4f7445c27c283",
+  "patch": "root-replay-retirement.patch",
+  "sha256": "fa4ddf0da9f9e6fa652068630fa77a9b79572b16bdd99ed25fb3c1d248dcfa0b",
+  "files": [
+    "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RootPlanReplayProjection.java",
+    "modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java",
+    "modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java",
+    "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java",
+    "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+    "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+    "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+    "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java",
+    "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+    "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+    "modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java",
+    "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java",
+    "modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java"
+  ],
+  "owners": [
+    "C2-3",
+    "C2-8",
+    "C2-10"
+  ]
+}

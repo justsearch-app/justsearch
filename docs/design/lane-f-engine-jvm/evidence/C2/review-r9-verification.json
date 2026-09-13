@@ -1,0 +1,129 @@
+{
+  "revision": "41d0ab86d + final R9 held-source and reconciliation diff",
+  "command": "gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.JobQueueMigrationTest --tests io.justsearch.indexerworker.queue.SwitchBufferVersionTest :modules:app-api:test --tests '*Operation*' :modules:app-observability:test --tests '*SqliteOperationStoreTest' --tests '*OperationRetentionTest' --tests '*OperationAttemptRunnerTest' :modules:app-services:test --tests '*OperationExecutorImplTest' --tests '*RecordedRootPreparationTest' :modules:app-engine:test --tests '*EngineGenerationCaptureTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:ui:test --tests '*RequestEngineContextTest' --tests '*EngineAdmissionTransportTest' --tests '*McpProtocolHandlerTest' --tests '*McpOriginValidationTest' :modules:ui:compileIntegrationTestJava :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-engine:pmdTest :modules:app-launcher:pmdTest -PskipWebBuild=true -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 281,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 37
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 42,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 15
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 92,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 66,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "environment": "Windows 11, Temurin 25.0.2; lane-F-A; no shared dev stack",
+  "raw": "tmp/c2-review-r9-final835.txt and tmp/c2-review-r9-final835-xml/",
+  "reuse": "Launcher and UI executed in 835; five UP-TO-DATE tasks reuse successful executions with unchanged inputs from this item.",
+  "retention": "Lane acceptance plus 30 days; export before releasing worktree.",
+  "remaining": "R10 full batch and hosted verification; final independent batch review.",
+  "additionalChecks": [
+    {
+      "command": "cargo test --lib --locked (modules/shell/src-tauri)",
+      "result": "85 passed, 0 failed, 0 ignored",
+      "raw": "tmp/c2-review-r9-rust824.txt"
+    },
+    {
+      "command": "node scripts/ci/check-store-recoverability.mjs",
+      "result": "6 catalog stores, 45 durable authorities pass",
+      "raw": "tmp/c2-review-r9-store836.txt"
+    },
+    {
+      "command": "node --test scripts/ci/check-store-recoverability.test.mjs scripts/release/app-release-assets.test.mjs",
+      "result": "13 test entries pass; 75 store self-test assertions and 12 release cases",
+      "raw": "tmp/c2-review-r9-compat826.txt"
+    },
+    {
+      "command": "node scripts/docs/verify-canonical-doc-links.mjs",
+      "result": "156 files pass",
+      "raw": "tmp/c2-review-r9-links837.txt"
+    },
+    {
+      "command": "node scripts/governance/gates/engine-port/enforcer.test.mjs",
+      "result": "passed",
+      "raw": "tmp/c2-review-r9-port838.txt"
+    },
+    {
+      "command": "node scripts/governance/run.mjs --gate engine-port --mode gate",
+      "result": "passed",
+      "raw": "tmp/c2-review-r9-port839.txt"
+    }
+  ],
+  "negativeControl": {
+    "raw": "tmp/c2-review-r9-negative827.txt and matching -xml/",
+    "result": "One intended failure: prior prepared-replay acceptance violates fail-closed assertion. Final fixture also asserts existing preparation-error exception."
+  },
+  "heldSource": {
+    "manifest": "held/manifest.json",
+    "check": "git apply --reverse --check docs/design/lane-f-engine-jvm/evidence/C2/held/root-replay-retirement.patch",
+    "result": "passed"
+  }
+}

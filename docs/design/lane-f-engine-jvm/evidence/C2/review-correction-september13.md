@@ -59,6 +59,9 @@ scope addition is recorded under the next item's section0.1, never silently expa
    Supersede lookup-margin decision; restore historical queue-projection sentence
    and add a new dated row. Restore per-item section0.1 instruction/entries; reconcile
    C1 status with the later MCP correction. Never rewrite dated decisions in place.
+   [R9 proof](review-r9-reconciliation.md): final835 represents281 passing cases;
+   Rust85, store/release compatibility, ports and canonical links pass. Held source
+   reconstructs from its packet. Final batch review remains pending.
 10. **R10 OPEN — evidence/build/CI.** Generate and commit C2 raw-artifact SHA inventory
     plus latest full-run summary; repair source snapshots from a committed tree;
     include ui:compileIntegrationTestJava in every implementation item's gate;

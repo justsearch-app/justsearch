@@ -30,7 +30,7 @@ class OperationStoreArchitectureTest {
     @Override public void check(JavaClass item, ConditionEvents events) {
       for (var call : item.getCodeUnitAccessesFromSelf()) {
         if (call.getTargetOwner().isAssignableTo(OperationStore.class)
-            && java.util.Set.of("accept", "acceptIngestChild", "start", "resume", "rejectBeforeStart", "finish")
+            && java.util.Set.of("accept", "start", "resume", "rejectBeforeStart", "finish")
                 .contains(call.getName())
             && !item.getFullName().equals(RUNNER) && !item.getFullName().startsWith(RUNNER + "$")) {
           events.add(SimpleConditionEvent.violated(item,
@@ -71,26 +71,7 @@ class OperationStoreArchitectureTest {
     }
   }
 
-  @Test
-  void attemptWriterRuleRejectsAProducerAcceptingAChildWithoutParentCapability() {
-    var imported = new ClassFileImporter().importClasses(UnauthorizedChildWriter.class, OperationStore.class);
-    var result = ATTEMPT_WRITER.evaluate(imported);
-    assertTrue(result.hasViolation());
-    assertTrue(result.getFailureReport().toString().contains("OperationStore.acceptIngestChild"));
-  }
-
-  static final class UnauthorizedChildWriter {
-    void acceptChild(OperationStore store, String parentKey, String childKey,
-        io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
-      store.acceptIngestChild(parentKey, childKey, root);
-    }
-  }
-
   static final class UnauthorizedStore implements OperationStore {
-    @Override public Acceptance acceptIngestChild(String parentKey, String childKey,
-        io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
-      throw new UnsupportedOperationException();
-    }
     @Override public Acceptance accept(String key,
         io.justsearch.app.api.operations.OperationDescriptor descriptor,
         io.justsearch.core.context.EngineContext context,

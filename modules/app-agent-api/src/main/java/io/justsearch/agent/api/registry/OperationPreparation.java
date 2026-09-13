@@ -10,6 +10,8 @@ import java.util.Objects;
  * it in an operation row. A replay payload is optional, but when present its schema and payload are
  * both required and bounded. The payload is reserved for safe replay data such as paths, roots,
  * generation, collection, and policy; it must not contain prompts or document content.
+ * The current dispatcher refuses non-null replay schemas until C2-3 provides separate persisted
+ * preparation and public-input key comparison; this value alone does not activate replay.
  */
 public record OperationPreparation(
     String argumentsJson, String replaySchema, String replayPayloadJson) {

@@ -121,7 +121,7 @@ prune(now)                             -> rows evicted; advances history_since
 `accept` is `INSERT ... ON CONFLICT(operation_key) DO NOTHING` followed by a read in one
 transaction, so two concurrent same-key calls produce one execution and the loser receives the
 in-progress outcome only when the canonical request identity matches. Compare the
-stored operation reference and canonical argument/dependency identity before returning
+stored operation reference and canonical public-input identity before returning
 an existing row; reuse for another operation or different input refuses
 `OPERATION_KEY_REUSED` (CONFLICT), with no new execution and no unrelated result.
 Include invocation versus undo and the undo target execution id in that identity.
@@ -142,7 +142,9 @@ children. Duplicate/ancestor roots are normalized, and overlapping recorded walk
 serialize through committed completion. Recorded scan ids are explicit
 Java method arguments beside the unchanged protobuf request. Generic argument
 identity stores a canonical digest, avoiding document or prompt bodies in
-operations.db; replay descriptors retain their required roots/generation/policy.
+operations.db. September13 R9: the unactivated root-plan/child descriptor code is
+held outside compiled sources. C2-3 persists required preparation separately from
+public identity before C2-8/C2-10 activate those producers.
 See [C2-2 implementation plan](C2-2-plan.md) for the source evidence and checks.
 
 - **Dispatched catalog operations.** One shared `OperationAttemptRunner` owns acceptance and

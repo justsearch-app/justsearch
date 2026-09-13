@@ -5,7 +5,8 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: C1 COMPLETE; C2 is open. Batch1's historical foundation proof is
+Latest state: C1 implementation complete with later-correction verification pending
+the current R10 boundary; C2 is open. Batch1's historical foundation proof is
 reopened for the C2-11 operations-row witness (R7) and later schema reproof (R9);
 C2-2 implementation remains in progress.
 
@@ -21,9 +22,17 @@ completion publication. R6's named acceptance-before-effect child-JVM kill passe
 at814, with two wrong-side controls. R7's installed operations-row proof passes816,
 and restoring the former acceptance bypass fails817. The six keyed C2-11 scenarios
 remain open. R8's failure boundaries and coalescing pass136 cases at821, with
-named negative controls819/820/822 and exact-source restoration823. Next is R9
-checklist reconciliation, then R10 evidence/CI wiring and the batch gate. Root owns corrections; one final independent review per batch.
+named negative controls819/820/822 and exact-source restoration823. R9 reconciliation
+and held-source gate pass835 (281 cases), native85 and compatibility/port checks.
+Next is R10 evidence/CI wiring and the batch gate. Root owns corrections; one final independent review per batch.
 The prior next-step ingestion notes below are superseded by that ordered batch.
+
+September13 R9 holds the unactivated root-plan and ingest-child APIs outside compiled
+sources. Their [source packet](evidence/C2/held/README.md) is preserved for C2-3/C2-8/C2-10;
+it must be adapted to separate public key identity from persisted preparation before
+activation. Current R9 proof is [the reconciliation record](evidence/C2/review-r9-reconciliation.md).
+
+## Historical checkpoints (current next work is the correction batch above)
 
 The [recorded ingest child primitive](evidence/C2/recorded-ingest-child.md) has complete
 local proof at fc679f92a plus this item: focused786 passes96 cases; broader787 executes
