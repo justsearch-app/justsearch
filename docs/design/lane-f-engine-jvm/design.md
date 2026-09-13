@@ -411,6 +411,8 @@ it is history, not a second current contract. Evidence records retain the experi
 
 | 2026-09-13 | **C2 R9 final-review correction: living schema checklist.** Reconcile C2 section8 with the existing R9 amendment: jobs14 → 15 → 16 and operations1 → 2, content_hash unconsumed until C2-8, and the current migration, store-gate, updater and release compatibility checks. Preserve dated batch1 proof as history. This corrects the checklist, not either schema. | R9; final review finding6; governing register and migration tests unchanged |
 
+| 2026-09-13 | **C2 R10 final-review correction: historical commit proof.** The73-commit reviewed range has54 empty bodies. Preserve published history and supply an immutable hash-to-item/result/command-evidence index for each, including historical failures, reuse and later retirement. The body-and-immediate-push requirement applies to every new correction commit from5a10b9dc9 onward; do not claim it was met retroactively. The mapping is a projection of existing Git evidence, not new execution proof. | R10; final review finding7; historical-commit-proof-map.md/json;85 verified Markdown blobs |
+
 
 **2026-09-10 corrections from the inference-host design audits** (four read-only audits at
 `4229f1091`, `docs/design/inference-host/evidence/audits/`), inside decided lines: (a) sections

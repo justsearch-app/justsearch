@@ -66,7 +66,10 @@ scope addition is recorded under the next item's section0.1, never silently expa
     plus latest full-run summary; repair source snapshots from a committed tree;
     include ui:compileIntegrationTestJava in every implementation item's gate;
     correct final hosted outcomes and record successful runs; wire release-assets
-    self-test into CI. Every commit has an item/command/result body and is pushed.
+    self-test into CI. Every new correction commit from5a10b9dc9 onward has an
+    item/command/result body (or an exact command/result evidence pointer) and is pushed
+    immediately. The54 earlier bodyless commits are mapped without rewriting history
+    in [the historical proof index](historical-commit-proof-map.md).
     [R10 evidence](review-r10-evidence.md): full869 passes10133 represented cases,
     with231 Engine cases freshly executed. Hosted CI34730328727 passes all13 jobs;
     source snapshots and held archives verify exactly. Current CI34731185342 also
@@ -90,3 +93,13 @@ citations resolve, and latest-full-run-summary.json records successful full869 w
 explicit reuse. The original inventory and full744 summary remain available from
 their prior Git revisions. Final independent review is underway atc56e1a838; R1–R10
 stay OPEN until its findings are resolved and the final evidence is accepted.
+
+September13 final review is complete atc56e1a838/a0c7d390a with seven findings.
+Implementation corrections are committed through2168d1245; the same reviewer is
+checking those corrections. The living schema row is corrected at06a8f85c2. The
+literal every-commit-body claim above is narrowed to new correction commits; all54
+historical missing bodies now have an immutable item/result/proof mapping with85
+verified source blobs. Existing20 correction commits through06a8f85c2 all have bodies.
+No history is rewritten, no old check is rerun by this mapping, and no prior failed
+or partial proof is reclassified as success. Full900 and fresh hosted verification
+remain pending; R1–R10 remain OPEN until correction verification is complete.
