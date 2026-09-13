@@ -85,3 +85,40 @@ trailing-space break. All compiled/product sources remain identical to the teste
 These proofs are local and bind the above source tree. The clean committed candidate's
 publication preflight, identity range, replacement draft/review record and exact-head
 hosted CI remain next. F readiness and remaining C2/D1/D2/E/F acceptance remain open.
+
+## Publication preflight isolation and evidence correction (2026-09-13)
+
+Candidatecfa4a78b8 is pushed on codex/lane-f-pr1. Preflight1353 passes the complete
+Public claims command group, then fails at frontend npm ci: Windows refuses unlink
+of lightningcss.win32-x64-msvc.node. Loaded-module inspection identifies the registered
+ui-shot helpers as holders. The repository's orientation with the actual Codex session
+id reports other-session/lease-lapsed/owner-unknown for those records. They are not reaped.
+The resolver otherwise falls back to an older local session stamp; subsequent commands
+supply the existing JUSTSEARCH_AGENT_SESSION_ID/--session-id contract explicitly.
+
+Root created and registered an isolated checkout at
+F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify, branch codex/lane-f-pr1-verify,
+at exactlycfa4a78b8. Preflight1355 is running there with its own dependencies. The main
+checkout and registered foreign helpers remain untouched. Original artifacts below retain
+F:/justsearch-public/.claude/worktrees/lane-F-A as their root;1355 has the isolated root.
+The failed npm ci may have removed unlocked dependency files in lane-F-A, so future builds
+must use a verified dependency installation rather than assuming that cache survived.
+
+The user review requires a non-empty item/command/result body on every item commit.
+Root's8bf81ea2d andcfa4a78b8 omitted those bodies. Their committed evidence remains valid,
+but this was a process miss. This evidence commit records the missing item/proof details;
+future commits use a body. Already pushed metadata is preserved without force-push.
+
+-8bf81ea2d: C2-6 settings owner entry correction. Focused1344 passes81 cases with
+ PMD/format after byte-exact restoration; negative1343 fails exactly at the unauthorized
+ reset-apply assertion. Source hashes and commands are in settings-owner-entry-verification.json.
+-cfa4a78b8: PR1 fresh publication snapshot. Full1346 passes10,496 cases (25 skips),
+ build1351 passes, frontend1347 passes6,521 tests, and1350 includes both stress tests.
+ The [committed full-suite summary](publication-full-suite-summary.json) now includes
+ every module task, execution/cache status and count, beside the existing artifact inventory.
+
+The review calibration remains binding: one independent review per implementation batch,
+at most two substantive correction rounds, then root takes the diff; named acceptance and
+item gates first; focused per-item verification and UI integration compilation, full suite
+at the named integrated boundary. This publication boundary's full checks implement the
+already-recorded lineage protocol, not a new per-helper proof tier.
