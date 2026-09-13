@@ -361,7 +361,10 @@ public final class WorkflowShapeRunner implements ShapeRunner {
    */
   private boolean awaitApproval(
       Consumer<SseEvent> sink, String callId, String toolName, String argsJson, RiskTier risk) {
-    CompletableFuture<Boolean> gate = gateRegistry.create(callId);
+    var detail = new io.justsearch.agent.api.AgentEvent.PendingApproval(callId, toolName, argsJson,
+        risk.name().toLowerCase(java.util.Locale.ROOT), risk == RiskTier.HIGH ? "typed_confirm" : "inline_confirm");
+    CompletableFuture<Boolean> gate = gateRegistry.create(callId,
+        new io.justsearch.agent.api.PendingToolApproval(detail, Optional.empty()));
     boolean approved;
     try {
       // Announcing the call can synchronously deliver its reply; the future must already exist.

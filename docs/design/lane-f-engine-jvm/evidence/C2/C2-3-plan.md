@@ -156,6 +156,52 @@ cannot satisfy that path. Recorded plans query through the router again without 
 capsule, so a later hard-stop or receipt change is observed rather than returning a
 cached result. Agent/workflow loop wiring and private display lookup follow.
 
+## Connected consumers and private display (September13)
+
+1. Extend each existing pending gate's value with a PendingToolApproval read view:
+   its existing public PendingApproval detail plus optional OperationApprovalPreview.
+   The value is a projection of that same gate, not another store or execution input.
+   AgentRunQueries delegates lookup through AgentSessionRegistry/AgentSession;
+   WorkflowGateRegistry owns the workflow equivalent. GET /api/chat/approval takes
+   the same sessionId/callId used by the unified reply path and returns the live
+   display projection, or404 after removal. The gate id remains routing, not a new
+   credential; existing local API trust rules apply. Do not put the preview in the
+   public pending detail, tracing, run-event persistence or global routing SSE.
+2. The frontend always resolves the live pending gate before a human ceremony. Use
+   the returned complete summary and gate/risk; failed, missing or stale lookup must
+   not fall back to a raw prompt for a possibly prepared call. Check that the run and
+   call are still pending after the asynchronous lookup, so a late response cannot
+   open a ceremony after run conclusion. AUTO issuance still follows the server's
+   existing verdict. Public event/snapshot fields remain projections of the open
+   gate; only the point-to-point response contains the frozen summary.
+3. In the agent step, merge document scope before preparation/gating and preserve the
+   original call for loop guard/history. Compute the existing issuance verdict once,
+   retain safe-by-default background refusal, and obtain one OperationDispatchPlan
+   through GatedOperationExecutor. A recorded plan skips another prompt; a ready plan
+   supplies private display and survives the entire retry loop. Actual dispatch uses
+   routePrepared. The projected-workflow outer call has no operation handler, so its
+   existing streaming branch stays explicit; preparation belongs to each inner tool.
+4. Workflow tools use the shared IntentGateEvaluator at ASSIST, including the declared
+   confirmation floor. Prepare without effect before registering/announcing a gate,
+   preserve the plan and execute through routePrepared. Pass the server background
+   flag from the agent bridge into the runner; any node requiring confirmation in
+   that posture refuses immediately. WorkflowOperationProjection's LOW classification
+   does not make its inner write or explicit GateStep safe to run unattended.
+5. A workflow creates its own session id, so retain both that id and the incoming
+   observer session on its existing gate entry. The WorkflowToolRunner query projects
+   pending public details for the enclosing agent's snapshot; AgentLoopService's
+   existing snapshot supplier combines those with its session gates. This is a
+   projection of live owners, not a second cache or durable hierarchy. The unified
+   reply endpoint already resolves an inner call carrying the outer agent session.
+
+Implement as bounded backend lookup, agent continuation, workflow continuation and
+frontend integration items, each compiled/verified/committed/pushed. Reconcile the
+canonical API map and regenerate docs after the new endpoint. Named checks include
+private display absent from event/row history, missing-preview refusal, delayed
+lookup after run closure, scoped WATCH approval before effect, one key/nonce across
+retries, background nested-write refusal, declared LOW confirmation, and nested
+snapshot reattachment. The preceding kernel proofs do not close these consumer items.
+
 ## Reach and teardown
 
 The useful principle is stable input identity with separately frozen execution

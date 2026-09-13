@@ -773,6 +773,11 @@ public final class AgentLoopService implements AgentService {
   }
 
   @Override
+  public java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String sessionId, String callId) {
+    return sessionRegistry.pendingToolApproval(sessionId, callId);
+  }
+
+  @Override
   public boolean tryRejectToolCall(String sessionId, String callId, String reason) {
     return sessionRegistry.tryRejectToolCall(sessionId, callId, reason);
   }

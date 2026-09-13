@@ -290,14 +290,18 @@ final class AgentToolDispatcher {
     // Emit the pending-approval carrying the backend's issuance verdict. The FE auto-approves (which
     // mints the consent capsule via the normal approve path enforcement requires) iff gateBehavior is
     // AUTO; otherwise it prompts the user. Either way the approval flows through one path.
-    eventConsumer.accept(
-        new AgentEvent.ToolCallPendingApproval(
-            call.id(), call.toolName(), call.arguments(), risk, gateBehavior));
     try {
-      return gate.get(AgentTimeouts.approvalGateMs(), TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      LOG.warn("Approval gate timeout/error for call {}", call.id(), e);
-      return false;
+      eventConsumer.accept(
+          new AgentEvent.ToolCallPendingApproval(
+              call.id(), call.toolName(), call.arguments(), risk, gateBehavior));
+      try {
+        return gate.get(AgentTimeouts.approvalGateMs(), TimeUnit.MILLISECONDS);
+      } catch (Exception e) {
+        LOG.warn("Approval gate timeout/error for call {}", call.id(), e);
+        return false;
+      }
+    } finally {
+      session.discardApprovalGate(call.id());
     }
   }
 }

@@ -298,6 +298,37 @@ final class AgentController {
     dispatchGate(ctx, false);
   }
 
+  /** GET /api/chat/approval — private display from the live owner, never a durable event projection. */
+  void handleApproval(Context ctx) {
+    ctx.header("Cache-Control", "no-store");
+    String callId = ctx.queryParam("callId");
+    if (callId == null || callId.isBlank()) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "callId is required", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+    var approval = agentService().pendingToolApproval(ctx.queryParam("sessionId"), callId);
+    if (approval.isEmpty() && workflowGateRegistry != null) {
+      approval = workflowGateRegistry.pendingToolApproval(callId);
+    }
+    if (approval.isEmpty()) {
+      ctx.status(404).json(ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND,
+          "No pending approval gate", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+    var pending = approval.orElseThrow();
+    var detail = pending.detail();
+    var response = new LinkedHashMap<String, Object>();
+    response.put("callId", detail.callId());
+    response.put("operationId", detail.toolName());
+    response.put("gateBehavior", detail.gateBehavior() == null ? null
+        : detail.gateBehavior().toUpperCase(Locale.ROOT));
+    response.put("riskTier", detail.risk() == null ? null : detail.risk().toUpperCase(Locale.ROOT));
+    response.put("argsSummary", pending.preview().map(io.justsearch.agent.api.registry.OperationApprovalPreview::summary)
+        .orElseGet(() -> ArgsSummary.summarize(detail.arguments())));
+    ctx.json(response);
+  }
+
   /**
    * The unified gate-dispatch DECISION (Context-free, unit-testable): try the agent gate
    * ({@code sessionId}+{@code callId}) first, then the session-agnostic workflow gate registry

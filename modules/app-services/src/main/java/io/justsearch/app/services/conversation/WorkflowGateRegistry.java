@@ -17,13 +17,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class WorkflowGateRegistry {
 
-  private final Map<String, CompletableFuture<Boolean>> gates = new ConcurrentHashMap<>();
+  private record Gate(CompletableFuture<Boolean> future, io.justsearch.agent.api.PendingToolApproval approval) {}
+
+  private final Map<String, Gate> gates = new ConcurrentHashMap<>();
 
   /** Registers a new gate for {@code callId} and returns the future the runner blocks on. */
   public CompletableFuture<Boolean> create(String callId) {
+    return create(callId, null);
+  }
+
+  /** Keep display on this live gate only; public events receive approval.detail(), never its preview. */
+  public CompletableFuture<Boolean> create(String callId, io.justsearch.agent.api.PendingToolApproval approval) {
     CompletableFuture<Boolean> future = new CompletableFuture<>();
-    gates.put(callId, future);
+    gates.put(callId, new Gate(future, approval));
     return future;
+  }
+
+  public java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String callId) {
+    if (callId == null || callId.isBlank()) return java.util.Optional.empty();
+    var gate = gates.get(callId);
+    return gate == null ? java.util.Optional.empty() : java.util.Optional.ofNullable(gate.approval());
   }
 
   /**
@@ -32,8 +45,8 @@ public final class WorkflowGateRegistry {
    * @return {@code true} if a gate was waiting (decision delivered); {@code false} if unknown/stale
    */
   public boolean complete(String callId, boolean approved) {
-    CompletableFuture<Boolean> future = gates.remove(callId);
-    return future != null && future.complete(approved);
+    var gate = gates.remove(callId);
+    return gate != null && gate.future().complete(approved);
   }
 
   /** Drops a gate without completing it (cleanup on abort); harmless if already completed. */

@@ -47,7 +47,10 @@ entry points pass358 cases at1011 after the route-first LOW-effect negative; [pl
 Workflow gate registration-before-announcement and nested live approval delivery pass32
 represented cases at1014 after four intended negative1012 failures;
 [delivery proof](evidence/C2/workflow-approval-delivery.md).
-Next: connect agent/workflow preparation-reference carry-through and private preview lookup,
+Private live approval lookup now passes427 represented cases at1021, including
+reply/announcement/cancellation lifetime and private full-target display;
+[lookup proof](evidence/C2/private-approval.md).
+Next: connect agent/workflow preparation-reference carry-through and the frontend private lookup,
 including nested approval snapshot reattachment,
 then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.

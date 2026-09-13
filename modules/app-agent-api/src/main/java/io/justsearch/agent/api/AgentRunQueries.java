@@ -22,6 +22,11 @@ import java.util.function.Consumer;
  */
 public interface AgentRunQueries {
 
+  /** Read the current live gate for its private approval display; a removed gate is absent. */
+  default java.util.Optional<PendingToolApproval> pendingToolApproval(String sessionId, String callId) {
+    return java.util.Optional.empty();
+  }
+
   /**
    * List all available Operation entries (tempdoc 429 §E.4 substrate).
    *

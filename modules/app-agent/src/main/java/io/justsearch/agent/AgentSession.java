@@ -45,7 +45,9 @@ final class AgentSession {
    * frame has been evicted from the replay ring.
    */
   record PendingGate(
-      AgentEvent.PendingApproval detail, long sinceEpochMs, CompletableFuture<Boolean> future) {}
+      AgentEvent.PendingApproval detail,
+      java.util.Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview,
+      long sinceEpochMs, CompletableFuture<Boolean> future) {}
 
   private final Map<String, PendingGate> approvalGates = new ConcurrentHashMap<>();
   /**
@@ -750,9 +752,27 @@ final class AgentSession {
    * emitted as {@code tool_call_pending}, retained so the state snapshot can carry the open gate.
    */
   CompletableFuture<Boolean> createApprovalGate(String callId, AgentEvent.PendingApproval detail) {
+    return createApprovalGate(callId, detail, java.util.Optional.empty());
+  }
+
+  CompletableFuture<Boolean> createApprovalGate(String callId, AgentEvent.PendingApproval detail,
+      java.util.Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview) {
     var gate = new CompletableFuture<Boolean>();
-    approvalGates.put(callId, new PendingGate(detail, System.currentTimeMillis(), gate));
+    approvalGates.put(callId, new PendingGate(detail, Objects.requireNonNull(preview, "preview"),
+        System.currentTimeMillis(), gate));
     return gate;
+  }
+
+  java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String callId) {
+    if (callId == null || callId.isBlank()) return java.util.Optional.empty();
+    var gate = approvalGates.get(callId);
+    return gate == null || gate.detail() == null || gate.future().isDone() ? java.util.Optional.empty()
+        : java.util.Optional.of(new io.justsearch.agent.api.PendingToolApproval(gate.detail(), gate.preview()));
+  }
+
+  /** The waiter owns cleanup when announcement or waiting ends without an approve/reject reply. */
+  void discardApprovalGate(String callId) {
+    approvalGates.remove(callId);
   }
 
   /** Approve a pending tool call. Returns whether a gate with that callId existed (was completed). */

@@ -31,6 +31,22 @@ The projection currently contains exactly six read-only operations: runtime mani
 readiness, liveness, health, and status. See [Runtime Contract](runtime-contract.md#generated-node-client)
 for package scope and regeneration commands.
 
+### Pending tool approval display
+
+`GET /api/chat/approval?sessionId=<run>&callId=<call>` reads an existing live agent or
+workflow gate through `AgentController`. It returns `callId`, `operationId`,
+`gateBehavior`, `riskTier` and `argsSummary`; a missing call id is400 and a removed or
+unknown gate is404. Responses use `Cache-Control: no-store`. This is a local read
+under the existing API trust boundary, not an approval or execution request.
+
+`AgentRunQueries.pendingToolApproval` and `WorkflowGateRegistry` project the live
+owners. When a producer attaches `OperationApprovalPreview`, the response includes
+its complete bounded frozen summary; otherwise it uses the shared200-character raw
+argument summary. Frozen preview, operation key, nonce and execution payload are
+absent from pending-call events and snapshots. The private lookup reads no durable
+run history and cannot recreate a gate. Replies use `POST /api/chat/approve` or
+`POST /api/chat/reject` with the same session/call ids.
+
 ### Engine admission and cancellation
 
 `EngineAdmissionController` is the shared owner for HTTP/MCP admission and upgrade freezing.
