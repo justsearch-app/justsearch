@@ -1,5 +1,11 @@
 # C1 acceptance reconciliation
 
+Current status, September13 R10: C1 COMPLETE including the later MCP quota correction.
+Its pending integrated/hosted obligation below is satisfied by executed local863
+UI cases, successful full869 and successful CI34730328727. The
+[quota correction record](mcp-session-quota.md) distinguishes execution from reuse
+and links the retained artifacts. The earlier closure table remains historical.
+
 Status: historical COMPLETE at2026-09-12; current verification amended September13 R9. Application candidate8f8c7d775 is unchanged through
 source checkpoint35d03f7c4 and documentation checkpointa480ac6f6.
 The later MCP quota correction fc67f6ed9 has negative599/positive601 proof,

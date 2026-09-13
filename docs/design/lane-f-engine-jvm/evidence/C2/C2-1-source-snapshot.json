@@ -1,14 +1,20 @@
 {
-  "base": "e247533bd",
-  "status": "C2-1 foundation; focused563 passes177 tests; full integrated rerun pending",
+  "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+  "status": "R10 corrected source inventory from committed Git blobs; this identifies current sources and does not relabel historical test runs.",
+  "supersedes": {
+    "snapshotAt": "6b109c27c",
+    "declaredBase": "e247533bd",
+    "reason": "Historical inventory hashes did not identify the declared committed tree. Original document remains available via git show 6b109c27c:docs/design/lane-f-engine-jvm/evidence/C2/C2-1-source-snapshot.json"
+  },
+  "hashSource": "git show <base>:<path> (raw blob bytes; no working-tree line-ending conversion)",
   "sourceFiles": [
     {
       "path": "governance/readiness-reason-codes.v1.json",
-      "sha256": "2b31594f92cfac55263d0c98f30c13f689cd14c9797b3ed195088b0beb21667b"
+      "sha256": "22b3a937a27d7131268a7a2966964d09df5e4f31e7b0f81b77fad9a29c6f665f"
     },
     {
       "path": "governance/store-recoverability.v1.json",
-      "sha256": "dff046cadde759dab469dc02b69a48893d22c9c3c43d4a61c2f7025845d31e1f"
+      "sha256": "dc0eceb5281c46cdbefb66809c41458393ed5bd9547e7a17630107584fe1147d"
     },
     {
       "path": "modules/app-agent/gradle.lockfile",
@@ -16,71 +22,71 @@
     },
     {
       "path": "modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleReasonCode.java",
-      "sha256": "36dc22f0b958ba7d909ffd0613bdcd4d5adfba6415e3417025c9d62376d0acfd"
+      "sha256": "9813edcf1b2d5a6c8b58043cd8e99f117d9a67ee883ae3bccd2f53a0ce36c549"
     },
     {
       "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
-      "sha256": "172bde8b9623a20f2658197a214626c3fb8d03597c79a7b8d9c75dad606155de"
+      "sha256": "c451bc2625199681a81581780580c14a18764ae4e6e1c412f47c9be20b843cc7"
     },
     {
       "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
-      "sha256": "64bf6100461ee55bf59ace79f67f64f82ee7ecc0fda9fde9ecf19a9642b6bab1"
+      "sha256": "f5e28db4919996bb62d4d42f2d572ca6357681bd1c31022dfed6b566ac057426"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExecutorLifetimeTest.java",
-      "sha256": "7e0051e37347c935188c131afe48bcba11f6b5dff231f6673fd16e7f215b9348"
+      "sha256": "76bf3d4c586b399693d71fa852cde12ede2ed9cde46ef8d1934feef12d5f27ff"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
-      "sha256": "fbbde84832ee9d93e744ca98b3a9c48962df6673673adf5179a64b62fcfd2eff"
+      "sha256": "7cee1f2efa5ca2ce1bf0718d6b3d0912aae88c800ab0f606e4ede8b998f1004b"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexBasePathLockTest.java",
-      "sha256": "76883b885eebe70c36f9d8cc52da8c943a169ddbac42cbfe569735179418d452"
+      "sha256": "258a851b27e6708953d99f456a22cf41ffd3ea6d6b093c62d7a7ed052602a743"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexingJobsFlowTest.java",
-      "sha256": "6ac0da47ee9c384ac1fc026c22e9483c3b299ca94113d5d0afe5be1c65c4e103"
+      "sha256": "19763f755eee978601e65ca407cefb12e111658aa0586b536a3a5bb727d48472"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineMigrationRestartDispatchTest.java",
-      "sha256": "232f28d88688fc449e3f47af34dbe5be2d1097b76bcdb44134dabfaac90120ba"
+      "sha256": "abcaa8be49a9a88a90cc59f6db43406b399ed9aaaf85a953fbff8bac943b8e0d"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineReadWhileWriteTest.java",
-      "sha256": "d3045eb037db41b402d17f989074656e75e8d34c65c084724a98f43923fef542"
+      "sha256": "879ff72b574fbec59d42029e80da1459a99bc23b298ae1a7ffa961fc3b4de5f8"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
-      "sha256": "16df1959552d289c21e6d511e402b7ec76b747a6318ffd80735b76e04b1673cf"
+      "sha256": "180231fef09a1e6c9add1304e3b01f9b8f07dc9e186e4a431dc18d78abf1a63b"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootTerminalWriterFailureTest.java",
-      "sha256": "31463b9c79f1179baa5595447bbf289a3d1fcf26da089d48f51ee827d56a9479"
+      "sha256": "72f04a5508d61ceea7b5c88b8766645e99074839475d822c249e066440ccbfee"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineScanRootFlowTest.java",
-      "sha256": "51af4ab1912b8198e419c83e503e8380b5933127efefc15f636ea805e27d2760"
+      "sha256": "1a7e60b26d03eeea9b6e3a0ee00c5ba479d489e9ad31e5616208e1de7c1b7c30"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java",
-      "sha256": "9cad2052296f477b01aea93753c96f6c91dec9550f8af1d84772c7a0f20f784b"
+      "sha256": "7dea8e2ec777c41dcf8b615620908e5a0053a22f19bd8bd7d652070fe1d236aa"
     },
     {
       "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/RichDocumentInProcessTest.java",
-      "sha256": "1ae4361bcdc707be312d0713620cbf74f9b8c6199b49d03add34e8351b878ebb"
+      "sha256": "9e326c2bd468f81cb907f87ee07e310391a15079bd44c9ffce1ac56abffd1147"
     },
     {
       "path": "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
-      "sha256": "a8ffb7dd53f640d2dca6fd3dd8698d1f812e3193d45a2b3f230f89c525632c88"
+      "sha256": "75bd179d64a502a03d3b073d4b25519538ac721a86b8aa39290467e97dc32085"
     },
     {
       "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
-      "sha256": "2eceb7577ceaeb896173d99e503c2b09bb2a9de616ed5d5fe58b0b65f0325cd4"
+      "sha256": "aa75f4dff287ec499e56cf29b4b509f166bec55b1ceb81e7d9d40e21cd6ccf4b"
     },
     {
       "path": "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherEnvironmentCloseTest.java",
-      "sha256": "27f13d60a48e5af53f7ed7f1df76d9e557ac2ff26ba51499dc38116be0cc175d"
+      "sha256": "c9649550c5e3b0429fb074eea4d0dfbdaba339a4509589e42586649e24e05efe"
     },
     {
       "path": "modules/app-observability/build.gradle.kts",
@@ -92,19 +98,19 @@
     },
     {
       "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
-      "sha256": "b1637686ba56971d493b3eca982cd4fc9ffbd0426ba3b8989684673891956eaa"
+      "sha256": "0f8ed50289a934dc86ede801286a6bd613413f492036cefbc68b48cc3fe235c5"
     },
     {
       "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
-      "sha256": "b8643e19375b367482426df1889c8c8d0f77ce67b5a0fcb34f03455f282e1447"
+      "sha256": "25b67aee1e0ba0b2a813d3dfd7ef763d325b9a3974714be99df71a87d07d4bc0"
     },
     {
       "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationStoreCrashChild.java",
-      "sha256": "bad214b386cac06dc9cfcbc6ddaa70c9a7ad213db24a862832428e57b82509cb"
+      "sha256": "79717e963e8eadb3f921973457f51309961c9ac668804fe3fc5c898ea8066560"
     },
     {
       "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
-      "sha256": "ef1675fdf7df4c19aace11d237df065cb9485e0941dbd63758e96808ad85e8c9"
+      "sha256": "125356b1985fd8db5c16f66c33ee5bfb9faf27511e576d1da2cf30fedf8161a3"
     },
     {
       "path": "modules/app-services/gradle.lockfile",
@@ -112,23 +118,23 @@
     },
     {
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
-      "sha256": "213fbcaa3d33c8d0cddcff79cdbb991b850776450819caee8a520fc290f0a065"
+      "sha256": "9cd6cb8e8c28a7e3a48041b3d6c31550da2317752fc894b983bd79fe40716820"
     },
     {
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java",
-      "sha256": "7500d3fe39c3b8c52a613f01a0d3335a933be5d8be6a1043b69758808e750832"
+      "sha256": "74f467760739e4d3e2ce725784d12e898750d7527242815a6553ef91c7d45733"
     },
     {
       "path": "modules/app-services/src/test/java/io/justsearch/app/services/DefaultAppFacadeTest.java",
-      "sha256": "46725fcec2d390a8268b78bbc1a40eaf098a433d079a14d4b99dc619bb0c92f8"
+      "sha256": "3f4801d200c1ab77da9c4bb2ab7fda70003db86197b024d3f06cca7bdad976b3"
     },
     {
       "path": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java",
-      "sha256": "1c8b2668aff3ae5c99a7e4994d417c85a670d18ceb250c2c76280bba7567621a"
+      "sha256": "7708dd6722d02dfc2c830f687232f15c079fbe1c82cbabfff47a776e332cf9a3"
     },
     {
       "path": "modules/app-services/src/test/java/io/justsearch/app/services/HeadExecutorConstructionTest.java",
-      "sha256": "55bd7a69d823123fcdf088aca8612bfb4440c221b076a62e73ba42be8acacd96"
+      "sha256": "f57553e6882d05e5ebca62bcf3301dcf5066c63b44ce734c51fae936d2fafd63"
     },
     {
       "path": "modules/app-services/src/test/java/io/justsearch/app/services/operations/OperationRecoveryNoticeTest.java",
@@ -140,39 +146,39 @@
     },
     {
       "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueMigrationOps.java",
-      "sha256": "c8face8281fd158a70e026412baf7c53f7144aa129026dbd39a4e727144fe7cc"
+      "sha256": "afe237ed34c3832af178004ecf457c0532f00609e9e56f5b4c252ceb4d09cd9c"
     },
     {
       "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
-      "sha256": "2e379378adecf83ba78eb66fda387e20a1b3947a847c95f078915cd96298eeb5"
+      "sha256": "87be7ab540db7596929697463099b5ab2db725c38953c7bc14709957ef6529d6"
     },
     {
       "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
-      "sha256": "cbf0c4e8f5e913b1031df3d7a04ed12fd72e8adb263a20b713de8af5be9eb349"
+      "sha256": "c4fc99965f2840e0a301fc52e6186353ffd5ca46b9b5e4bfe6130b03c3fd6d4e"
     },
     {
       "path": "modules/shell/src-tauri/src/updater.rs",
-      "sha256": "7bb0982bfbd35d01607a2da09bfb8cbe54c01d6a63301c91d3ba424eb4c12039"
+      "sha256": "e789361fc628549442377521d8c6e913f889621d64774359f103d13f1189c0c5"
     },
     {
       "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
-      "sha256": "d90be03f8e574374c6fd6e7394ff704b1389774d13d43389113c9639e778f33a"
+      "sha256": "915cb5f886c4d669d8f1ec98799a64be36c638e556053a6513775258e42eb813"
     },
     {
       "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
-      "sha256": "cca90f8a6aa9e02d35906433b06424965108f4d0eca4d4ded108b6b647627a75"
+      "sha256": "ab9ddcd5a4163a213a2fd702f8f27c102d452f77c6ad431fc4e50f442a3b8136"
     },
     {
       "path": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/SchemaMismatchStatusContractTest.java",
-      "sha256": "6e64c95ba0e52b4c20b74d25d1da0f7dfc5c30c02a7f8b3e65f03c58dfc12a48"
+      "sha256": "8c8091a6266cc0e76667167fa5a4691ff581b4c2040481dce44a330c696fdb08"
     },
     {
       "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
-      "sha256": "eef8b7097a2557cc45a9fd9746af038e90b9731cac6f6f6c8d981efac7d73598"
+      "sha256": "20b8f5457c0d62bf99fc29e9dcb3f89fd2b3779055c690beb5bbae22c2b819b3"
     },
     {
       "path": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppShutdownWiringTest.java",
-      "sha256": "5bf7c4ce739ba6464e2590ac6a39aa4a4f4d240f7e5e644318f6a03cf1a54052"
+      "sha256": "203f5f254566da6daf03a193d092995fe942ed1c0003e19600f221bc0a09efbc"
     },
     {
       "path": "modules/ui/src/test/java/io/justsearch/ui/api/UpgradeLifecycleContractTest.java",
@@ -188,7 +194,7 @@
     },
     {
       "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IngestionProvenancePersistenceTest.java",
-      "sha256": "87ef20d05436395cdecf5d25bd53ab797a85c95ae6d7f114601baae31552b111"
+      "sha256": "99ee5507b3c3c7fdabb401eed7e1485a8df41894b8061a58a756330d6528d90c"
     }
   ]
 }

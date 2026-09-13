@@ -5,8 +5,8 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: C1 implementation complete with later-correction verification pending
-the current R10 boundary; C2 is open. Batch1's historical foundation proof is
+Latest state: C1 complete including the later MCP quota correction, verified at
+the R10 boundary; C2 is open. Batch1's historical foundation proof is
 reopened for the C2-11 operations-row witness (R7) and later schema reproof (R9);
 C2-2 implementation remains in progress.
 
@@ -24,7 +24,21 @@ and restoring the former acceptance bypass fails817. The six keyed C2-11 scenari
 remain open. R8's failure boundaries and coalescing pass136 cases at821, with
 named negative controls819/820/822 and exact-source restoration823. R9 reconciliation
 and held-source gate pass835 (281 cases), native85 and compatibility/port checks.
-Next is R10 evidence/CI wiring and the batch gate. Root owns corrections; one final independent review per batch.
+R10 is in progress: c94494525 corrects app/index lock exclusion after a Linux hosted
+failure reopened R2; gate848 passes63 cases. CI now runs release-assets tests.
+Full853 exposed a fixture completion race;33e54dfcd gives all five port calls one
+owner and focused857 passes12 cases. Full858 then found the unused snapshot helper;
+d9c80a646 holds it with its fixtures, and45 active cases pass862. Full863 exposed a
+false-positive lifecycle marker search: c56e1a838 requires modified indexed content
+before deletion; negative867 rejects a missing submission and focused868 passes8 cases.
+Full869 now passes10133 represented cases/1647 suites,35 inherited skips, with the
+Engine suite executed and other unchanged results reused. CI34730328727 atd9c80a646
+passes all13 jobs, including first-attempt Linux exclusion, MCP quota, installed
+operations recovery and parser orphan witnesses. It supplies the fresh installed tier;
+no duplicate local installed rerun is needed. Current CI34731185342 atc56e1a838 also passes all13 jobs.
+One final independent R1-R10 review remains pending. Both source snapshots match53
+committed blobs; held patches reconstruct23 originals. The R10 artifact inventory
+and full-run summary record the final available proof with explicit reuse. Root owns corrections.
 The prior next-step ingestion notes below are superseded by that ordered batch.
 
 September13 R9 holds the unactivated root-plan and ingest-child APIs outside compiled

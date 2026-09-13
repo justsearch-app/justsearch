@@ -67,6 +67,10 @@ scope addition is recorded under the next item's section0.1, never silently expa
     include ui:compileIntegrationTestJava in every implementation item's gate;
     correct final hosted outcomes and record successful runs; wire release-assets
     self-test into CI. Every commit has an item/command/result body and is pushed.
+    [R10 evidence](review-r10-evidence.md): full869 passes10133 represented cases,
+    with231 Engine cases freshly executed. Hosted CI34730328727 passes all13 jobs;
+    source snapshots and held archives verify exactly. Current CI34731185342 also
+    passes all13 jobs; the single final independent review remains pending.
 
 ## Verification discipline
 
@@ -80,3 +84,9 @@ First review-batch raw inventory is committed in raw-evidence-sha256.json: 194 c
 12,912 available files (about1.47GB). Unresolved shorthand citations remain explicit
 and are R10 work, not silently counted as proof. latest-full-run-summary.json retains
 full744 at its original revision; it does not certify this correction batch.
+
+September13 R10 supersedes that initial inventory/summary state: all literal raw
+citations resolve, and latest-full-run-summary.json records successful full869 with
+explicit reuse. The original inventory and full744 summary remain available from
+their prior Git revisions. Final independent review is underway atc56e1a838; R1–R10
+stay OPEN until its findings are resolved and the final evidence is accepted.

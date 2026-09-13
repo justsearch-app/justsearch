@@ -2,40 +2,25 @@ diff --git a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registr
 index bbbe98143..739397e53 100644
 --- a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java
 +++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java
-@@ -10,6 +10,8 @@ import java.util.Objects;
-  * it in an operation row. A replay payload is optional, but when present its schema and payload are
-  * both required and bounded. The payload is reserved for safe replay data such as paths, roots,
-  * generation, collection, and policy; it must not contain prompts or document content.
+@@ -12,0 +13,2 @@ import java.util.Objects;
 + * The current dispatcher refuses non-null replay schemas until C2-3 provides separate persisted
 + * preparation and public-input key comparison; this value alone does not activate replay.
-  */
- public record OperationPreparation(
-     String argumentsJson, String replaySchema, String replayPayloadJson) {
 diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java b/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
 index 3f670e542..2cb7ebd99 100644
 --- a/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
 +++ b/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
-@@ -211,12 +211,6 @@ public interface IndexingService {
-     throw new UnsupportedOperationException("Serving generation capture unavailable");
-   }
- 
+@@ -214,6 +213,0 @@ public interface IndexingService {
 -  /** Freeze watched-root scope and serving generation without scheduling or admitting index work. */
 -  default io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(
 -      boolean force, EngineContext engineContext) {
 -    throw new UnsupportedOperationException("Recorded reindex preparation unavailable");
 -  }
 -
-   /**
-    * Tempdoc 626 §Recency (Move C) — verify/reconcile a SINGLE watched root identified by its {@code
-    * pathHash} (the privacy-safe wire identifier — ADR-0028; raw paths never cross the wire). The
 diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java
 index 8cdaf095a..d6d38ff4f 100644
 --- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java
 +++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java
-@@ -34,13 +34,6 @@ public interface OperationAttemptRunner {
-   /** Must return before scheduling or any other effect; storage failure propagates. */
-   PreparedAttempt accept(Request request);
- 
+@@ -37,7 +36,0 @@ public interface OperationAttemptRunner {
 -  /**
 -   * Find or accept a child inside this runner's parent capability and recorded root scope.
 -   * The Engine mints its key; callers cannot repartition scope or supply another generation.
@@ -43,38 +28,22 @@ index 8cdaf095a..d6d38ff4f 100644
 -   */
 -  PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root);
 -
-   /**
-    * Called after admission. An existing acceptance never executes the supplied body.
-    * Non-dispatched producers use this same port: commit their effect inside the body and return
 diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java
 index edd395767..f0de637fc 100644
 --- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java
 +++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java
-@@ -4,18 +4,14 @@ package io.justsearch.app.api.operations;
- import io.justsearch.agent.api.registry.OperationKind;
- 
- import java.util.Objects;
+@@ -7,2 +6,0 @@ import java.util.Objects;
 -import java.util.Map;
 -import tools.jackson.databind.json.JsonMapper;
- 
- /**
+@@ -11,2 +9,2 @@ import tools.jackson.databind.json.JsonMapper;
 - * The replay dependency identity. Generic arguments are represented by a canonical digest;
 - * replayable owners may retain roots, generation and policy, never document or prompt content.
 + * The public invocation identity. Arguments are represented by a canonical digest;
 + * server-prepared replay data must stay separate from this key comparison.
-  * The store canonicalizes the JSON before comparison. Invoke/undo and the undo target belong
-  * inside this identity, so sharing a key cannot return an unrelated operation's receipt.
-  */
- public record OperationDescriptor(OperationKind kind, String operationRef, String identityJson) {
+@@ -17,2 +14,0 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
 -  private static final JsonMapper JSON = JsonMapper.builder().build();
 -
-   /** Generic invocation identity persists a digest rather than the content-bearing arguments. */
-   public static OperationDescriptor invocation(OperationKind kind, String operationRef,
-       String argumentsJson, boolean undo) {
-@@ -24,36 +20,6 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
-         "{\"mode\":\"" + (undo ? "undo" : "invoke") + "\",\"argumentsSha256\":\"" + digest + "\"}");
-   }
- 
+@@ -27,30 +22,0 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
 -  /** Persist the safe frozen replay projection beside the unchanged public argument identity. */
 -  public static OperationDescriptor preparedInvocation(OperationKind kind, String operationRef,
 -      String argumentsJson, String replaySchema, String replayPayloadJson) {
@@ -105,17 +74,11 @@ index edd395767..f0de637fc 100644
 -    return RootPlanReplayProjection.parseIdentity(identityJson);
 -  }
 -
-   public OperationDescriptor {
-     Objects.requireNonNull(kind, "kind");
-     Objects.requireNonNull(identityJson, "identityJson");
 diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
 index 0e369720c..51387782b 100644
 --- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
 +++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
-@@ -13,13 +13,6 @@ public interface OperationStore extends AutoCloseable {
-       io.justsearch.core.context.EngineContext context,
-       io.justsearch.agent.api.registry.InvocationProvenance provenance);
- 
+@@ -16,7 +15,0 @@ public interface OperationStore extends AutoCloseable {
 -  /**
 -   * Atomically find or accept one frozen ingest child. The runner validates its parent capability;
 -   * this transaction derives scope and attribution from the stored parent. Only a new child needs
@@ -123,22 +86,13 @@ index 0e369720c..51387782b 100644
 -   */
 -  Acceptance acceptIngestChild(String parentKey, String childKey, RecordedRootPlan.Root root);
 -
-   record Acceptance(OperationRecord record, boolean created) {}
- 
-   /** Row-first lookup: callers compare a missing key's timestamp with historySinceMillis(). */
 diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java
 index e78f9ae1c..1a15e8a04 100644
 --- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java
 +++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java
-@@ -5,7 +5,7 @@ package io.justsearch.app.api.operations;
- public final class OperationStoreException extends RuntimeException {
-   private static final long serialVersionUID = 1L;
-   public enum Code { STORAGE_FAILED, OPERATION_KEY_REUSED, OPERATION_EXPIRED, INVALID_OPERATION_KEY,
+@@ -8 +8 @@ public final class OperationStoreException extends RuntimeException {
 -    CHILD_ACCEPTANCE_REFUSED, OPERATIONS_CAPACITY }
 +    OPERATIONS_CAPACITY }
-   private final Code code;
-   private final long retryAfterMillis;
- 
 diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java
 deleted file mode 100644
 index 4ae439dea..000000000
@@ -528,21 +482,16 @@ diff --git a/modules/app-api/src/test/java/io/justsearch/app/api/operations/Oper
 index 5e4accb35..acd962383 100644
 --- a/modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java
 +++ b/modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java
-@@ -2,141 +2,10 @@
- package io.justsearch.app.api.operations;
- 
- import io.justsearch.agent.api.registry.OperationKind;
+@@ -5,3 +4,0 @@ import io.justsearch.agent.api.registry.OperationKind;
 -
 -import static org.junit.jupiter.api.Assertions.assertEquals;
 -import static org.junit.jupiter.api.Assertions.assertFalse;
- import static org.junit.jupiter.api.Assertions.assertThrows;
- import org.junit.jupiter.api.Test;
+@@ -10,4 +6,0 @@ import org.junit.jupiter.api.Test;
 -import java.nio.file.Path;
 -import java.util.List;
 -import java.util.Map;
 -import tools.jackson.databind.json.JsonMapper;
- 
- final class OperationDescriptorPreparationTest {
+@@ -16,124 +8,0 @@ final class OperationDescriptorPreparationTest {
 -  @org.junit.jupiter.api.io.TempDir Path directory;
 -
 -  private Map<String, Object> root() {
@@ -667,9 +616,6 @@ index 5e4accb35..acd962383 100644
 -        new OperationDescriptor(OperationKind.REINDEX, "core.parent-fixture", identity).recordedRootPlan());
 -  }
 -
-   @Test
-   void identityBoundCountsUtf8BytesRatherThanJavaCharacters() {
-     String identity = "{\"metadata\":\"" + "é".repeat(131072) + "\"}";
 diff --git a/modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java b/modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java
 deleted file mode 100644
 index c90c74004..000000000
@@ -855,42 +801,21 @@ diff --git a/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGen
 index 367a3756c..0b597bc5e 100644
 --- a/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java
 +++ b/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java
-@@ -69,7 +69,6 @@ final class EngineGenerationCaptureTest {
-         var failure = assertThrows(KnowledgeClientException.class,
-             () -> client.captureServingGeneration(TestEngineContexts.FOREGROUND));
-         assertEquals(KnowledgeClientException.Status.UNAVAILABLE, failure.status());
+@@ -72 +71,0 @@ final class EngineGenerationCaptureTest {
 -        assertUnavailable(() -> client.prepareReindexPlan(false, TestEngineContexts.FOREGROUND));
-         assertEquals(0, admission.activeWorkCount());
-       }
-       if (before == null) assertFalse(Files.exists(layout.statePath()), "capture must not recover missing state");
-@@ -101,10 +100,6 @@ final class EngineGenerationCaptureTest {
-           verify(worker).captureServingGeneration(captured.capture());
-           // Admission returns a fresh immutable view so detach can change urgency.
-           assertEquals(owner.context(), captured.getValue().engineContext());
+@@ -104,4 +102,0 @@ final class EngineGenerationCaptureTest {
 -          var plan = client.prepareReindexPlan(true, owner.context());
 -          assertEquals(layout.activeGenerationId(), plan.generation());
 -          assertTrue(plan.roots().isEmpty());
 -          verify(worker, times(2)).captureServingGeneration(any());
-         }
-         generations.startMigration("replacement-test");
-         var promoted = generations.promoteBuildingGenerationToActive();
 diff --git a/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java b/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java
 index 5cc165edd..334e6f97f 100644
 --- a/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java
 +++ b/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java
-@@ -30,7 +30,7 @@ class OperationStoreArchitectureTest {
-     @Override public void check(JavaClass item, ConditionEvents events) {
-       for (var call : item.getCodeUnitAccessesFromSelf()) {
-         if (call.getTargetOwner().isAssignableTo(OperationStore.class)
+@@ -33 +33 @@ class OperationStoreArchitectureTest {
 -            && java.util.Set.of("accept", "acceptIngestChild", "start", "resume", "rejectBeforeStart", "finish")
 +            && java.util.Set.of("accept", "start", "resume", "rejectBeforeStart", "finish")
-                 .contains(call.getName())
-             && !item.getFullName().equals(RUNNER) && !item.getFullName().startsWith(RUNNER + "$")) {
-           events.add(SimpleConditionEvent.violated(item,
-@@ -71,26 +71,7 @@ class OperationStoreArchitectureTest {
-     }
-   }
- 
+@@ -74,15 +73,0 @@ class OperationStoreArchitectureTest {
 -  @Test
 -  void attemptWriterRuleRejectsAProducerAcceptingAChildWithoutParentCapability() {
 -    var imported = new ClassFileImporter().importClasses(UnauthorizedChildWriter.class, OperationStore.class);
@@ -906,30 +831,18 @@ index 5cc165edd..334e6f97f 100644
 -    }
 -  }
 -
-   static final class UnauthorizedStore implements OperationStore {
+@@ -90,4 +74,0 @@ class OperationStoreArchitectureTest {
 -    @Override public Acceptance acceptIngestChild(String parentKey, String childKey,
 -        io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
 -      throw new UnsupportedOperationException();
 -    }
-     @Override public Acceptance accept(String key,
-         io.justsearch.app.api.operations.OperationDescriptor descriptor,
-         io.justsearch.core.context.EngineContext context,
 diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java
 index 27a037290..ee8d08c5d 100644
 --- a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java
 +++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java
-@@ -12,7 +12,6 @@ import io.justsearch.app.api.operations.OperationRecord;
- import io.justsearch.app.api.operations.OperationState;
- import io.justsearch.app.api.operations.OperationStore;
- import io.justsearch.app.api.operations.OperationStoreException;
+@@ -15 +14,0 @@ import io.justsearch.app.api.operations.OperationStoreException;
 -import io.justsearch.app.api.operations.RecordedRootPlan;
- import io.justsearch.core.context.EngineContext;
- import java.time.Clock;
- import java.util.List;
-@@ -64,16 +63,6 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner
-     return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
-   }
- 
+@@ -67,10 +65,0 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner
 -  @Override
 -  public PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root) {
 -    if (!(parent instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
@@ -940,33 +853,15 @@ index 27a037290..ee8d08c5d 100644
 -    return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
 -  }
 -
-   private Control controlFor(OperationRecord row) {
-     if (row.state().terminal()) {
-       Control completed = new Control(row);
-@@ -284,7 +273,6 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner
-   }
- 
-   private final class Control implements OperationRecordHandle {
+@@ -287 +275,0 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner
 -    private final OperationAttemptRunnerImpl owner = OperationAttemptRunnerImpl.this;
-     private final long id;
-     private final String key;
-     private final AtomicBoolean started = new AtomicBoolean();
 diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java
 index 38c0d8bbd..c79f44083 100644
 --- a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java
 +++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java
-@@ -9,7 +9,6 @@ import io.justsearch.app.api.operations.OperationReceipt;
- import io.justsearch.app.api.operations.OperationRecord;
- import io.justsearch.app.api.operations.OperationState;
- import io.justsearch.app.api.operations.OperationStoreException;
+@@ -12 +11,0 @@ import io.justsearch.app.api.operations.OperationStoreException;
 -import io.justsearch.app.api.operations.RecordedRootPlan;
- import io.justsearch.core.context.EngineContext;
- import io.justsearch.agent.api.registry.InvocationProvenance;
- import tools.jackson.databind.ObjectMapper;
-@@ -326,90 +325,6 @@ public final class SqliteOperationStore implements OperationStore {
-     }));
-   }
- 
+@@ -329,84 +327,0 @@ public final class SqliteOperationStore implements OperationStore {
 -  @Override
 -  public Acceptance acceptIngestChild(String parentKey, String childKey, RecordedRootPlan.Root root) {
 -    return locked(() -> transaction(() -> {
@@ -1051,9 +946,6 @@ index 38c0d8bbd..c79f44083 100644
 -    return new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, cause);
 -  }
 -
-   private static String canonicalIdentity(String json) {
-     var value = JSON.readTree(json);
-     if (value == null || !value.isObject()) throw new IllegalArgumentException("Operation identity must be an object");
 diff --git a/modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java b/modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java
 deleted file mode 100644
 index 66e33cc21..000000000
@@ -1572,10 +1464,7 @@ diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/regis
 index a151e8e2d..14f1c2e2e 100644
 --- a/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
-@@ -430,10 +430,10 @@ public final class OperationExecutorImpl implements OperationDispatcher {
-       if (!argumentsJson.equals(value.argumentsJson())) {
-         throw new IllegalArgumentException("Preparation must retain the public arguments unchanged");
-       }
+@@ -433,4 +433,4 @@ public final class OperationExecutorImpl implements OperationDispatcher {
 -      OperationDescriptor descriptor = value.replaySchema() == null ? generic
 -          : OperationDescriptor.preparedInvocation(op.policy().recordKind(), op.id().value(),
 -              argumentsJson, value.replaySchema(), value.replayPayloadJson());
@@ -1584,17 +1473,11 @@ index a151e8e2d..14f1c2e2e 100644
 +        throw new IllegalArgumentException("Prepared replay is unavailable");
 +      }
 +      return new PreparedInvocation(handler, value, generic, null, null);
-     } catch (OperationPreparationRefused refusal) {
-       return new PreparedInvocation(null, null, generic, refusal.refusal(), null);
-     } catch (RuntimeException failure) {
 diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
 index 50fd0b3ad..5c7f53832 100644
 --- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
-@@ -993,13 +993,6 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
-             IngestServiceCalls::captureServingGeneration, engineContext);
-     }
- 
+@@ -996,7 +995,0 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 -    @Override
 -    public io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(
 -            boolean force, EngineContext engineContext) {
@@ -1602,17 +1485,11 @@ index 50fd0b3ad..5c7f53832 100644
 -        return rootLifecycleOps.prepareReindexPlan(generation, force);
 -    }
 -
-     @Override
-     public boolean reconcileRoot(String pathHash, boolean force, EngineContext engineContext) {
-         // Tempdoc 626 §Recency (Move C) — resolve the privacy-safe pathHash to the real root Head-side
 diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java
 index 7c7abe401..07e375658 100644
 --- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java
-@@ -125,16 +125,6 @@ final class RootLifecycleOps {
- 
-     // ========== Watched Root Accessors ==========
- 
+@@ -128,10 +127,0 @@ final class RootLifecycleOps {
 -    io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(String generation, boolean force) {
 -        var bindings = watchedRootsState.snapshotBindings();
 -        List<String> patterns = List.copyOf(excludeMatcherSupplier.get().patterns());
@@ -1623,20 +1500,14 @@ index 7c7abe401..07e375658 100644
 -        return io.justsearch.app.api.operations.RecordedRootPlan.partition(generation, roots);
 -    }
 -
-     List<Path> getWatchedPaths(EngineContext engineContext) {
-         return List.copyOf(watchedRoots.keySet());
-     }
 diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java
 index 8177c9e43..218c1e197 100644
 --- a/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java
 +++ b/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java
-@@ -90,59 +90,39 @@ final class OperationExecutorImplTest {
-   }
- 
-   @Test
+@@ -93 +93 @@ final class OperationExecutorImplTest {
 -  void preparedScopeIsAcceptedAndExecutedWithoutRereadingMutableInput() {
 +  void unactivatedReplayPlanCannotEnterTheCurrentRowIdentity() throws Exception {
-     var handlers = new HandlerRegistry();
+@@ -95,7 +95,2 @@ final class OperationExecutorImplTest {
 -    var id = new OperationRef("core.prepared-test");
 -    var currentRoot = new java.util.concurrent.atomic.AtomicReference<>("original-root");
 -    var frozen = new java.util.concurrent.atomic.AtomicReference<OperationPreparation>();
@@ -1646,7 +1517,7 @@ index 8177c9e43..218c1e197 100644
 -    String publicInput = "{\"privateBody\":\"not-for-the-row\"}";
 +    var id = new OperationRef("core.held-replay-test");
 +    var calls = new java.util.concurrent.atomic.AtomicInteger();
-     handlers.register(id, new OperationHandler() {
+@@ -103,13 +98,3 @@ final class OperationExecutorImplTest {
 -      @Override public OperationResult execute(String args, EngineContext ctx) {
 -        throw new AssertionError("Must execute the frozen invocation");
 -      }
@@ -1663,7 +1534,7 @@ index 8177c9e43..218c1e197 100644
 +      @Override public OperationResult execute(String args, EngineContext context) {
 +        calls.incrementAndGet();
 +        return OperationResult.success("effect");
-       }
+@@ -117,16 +102,3 @@ final class OperationExecutorImplTest {
 -      @Override public OperationExecution executePrepared(
 -          OperationPreparation value, InvocationProvenance provenance,
 -          EngineContext ctx, OperationRecordHandle handle) {
@@ -1683,8 +1554,7 @@ index 8177c9e43..218c1e197 100644
 +      @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
 +          EngineContext context) {
 +        return new OperationPreparation(args, "root-plan.v1", rootPlanPayload("held"));
-       }
-     });
+@@ -135,5 +107,14 @@ final class OperationExecutorImplTest {
 -    assertTrue(new OperationExecutorImpl(attempts, admission, handlers)
 -        .dispatch(makeOp(id, TrustTier.CORE, false), publicInput, context).success());
 -    assertEquals(1, preparationCalls.get());
@@ -1704,58 +1574,31 @@ index 8177c9e43..218c1e197 100644
 +      assertFalse(row.getString("identity_json").contains("preparedInvocation"));
 +      assertFalse(row.next());
 +    }
-   }
- 
-   @org.junit.jupiter.params.ParameterizedTest
+@@ -143,3 +124,2 @@ final class OperationExecutorImplTest {
 -  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
 -  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(boolean prepared) throws Exception {
 -    var kind = prepared ? OperationKind.REINDEX : OperationKind.INGEST;
 +  @org.junit.jupiter.params.provider.EnumSource(value = OperationKind.class, names = {"REINDEX", "INGEST"})
 +  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(OperationKind kind) throws Exception {
-     var handlers = new HandlerRegistry();
-     var id = new OperationRef("core.arbitrary-kind-fixture");
-     var calls = new java.util.concurrent.atomic.AtomicInteger();
-@@ -153,8 +133,7 @@ final class OperationExecutorImplTest {
-       }
-       @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
-           EngineContext ctx) {
+@@ -156,2 +136 @@ final class OperationExecutorImplTest {
 -        return prepared ? new OperationPreparation(args, "root-plan.v1", rootPlanPayload("frozen"))
 -            : OperationPreparation.passthrough(args);
 +        return OperationPreparation.passthrough(args);
-       }
-       @Override public OperationExecution executePrepared(OperationPreparation value,
-           InvocationProvenance provenance, EngineContext ctx, OperationRecordHandle handle) {
-@@ -180,7 +159,7 @@ final class OperationExecutorImplTest {
-       assertEquals(kind, row.descriptor().kind());
-       assertEquals(id.value(), row.descriptor().operationRef());
-       assertEquals(context.survival(), row.context().survival());
+@@ -183 +162 @@ final class OperationExecutorImplTest {
 -      assertEquals(prepared, row.descriptor().identityJson().contains("preparedInvocation"));
 +      assertFalse(row.descriptor().identityJson().contains("preparedInvocation"));
-       return new io.justsearch.app.api.operations.OperationAttemptRunner.Reconciliation.Complete(
-           new io.justsearch.app.api.operations.OperationReceipt("SUCCESS", null));
-     });
 diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
 index ef0bbf586..4ec293fc4 100644
 --- a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
 +++ b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
-@@ -6,13 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
- import static org.junit.jupiter.api.Assertions.assertNotNull;
- import static org.junit.jupiter.api.Assertions.assertThrows;
- import static org.junit.jupiter.api.Assertions.assertTrue;
+@@ -9 +8,0 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 -import static org.mockito.ArgumentMatchers.any;
- import static org.mockito.Mockito.mock;
+@@ -11,2 +9,0 @@ import static org.mockito.Mockito.mock;
 -import static org.mockito.Mockito.never;
 -import static org.mockito.Mockito.verify;
- 
- import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
+@@ -15 +11,0 @@ import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 -import io.justsearch.app.api.operations.RecordedRootPlan;
- import io.justsearch.app.services.TestEngineContexts;
- import io.justsearch.ipc.DeleteByIdResponse;
- import io.justsearch.ipc.DeleteByPathResponse;
-@@ -117,79 +113,6 @@ final class RecordedRootPreparationTest {
-         List.of(new IngestCollectionPolicy.RootBinding(root, "labelled")), observed.get());
-   }
- 
+@@ -120,73 +115,0 @@ final class RecordedRootPreparationTest {
 -  @Test
 -  @DisplayName("preparation is pure and freezes nested labels, excludes, and directory metadata")
 -  void prepareSnapshotsPurelyAndPreservesDistinctNestedPolicy() throws Exception {
@@ -1829,13 +1672,7 @@ index ef0bbf586..4ec293fc4 100644
 -    assertEquals(List.of(), plan.roots().get(0).excludedSubtrees());
 -  }
 -
-   @Test
-   @DisplayName("concurrent duplicate registration queues and records one root")
-   void concurrentDuplicateRegistrationIsAtomic() throws Exception {
-@@ -270,13 +193,6 @@ final class RecordedRootPreparationTest {
-     assertFalse(fixture.watchedRoots.containsKey(root));
-   }
- 
+@@ -273,7 +195,0 @@ final class RecordedRootPreparationTest {
 -  private static RecordedRootPlan.Root rootFor(RecordedRootPlan plan, Path path) {
 -    return plan.roots().stream()
 -        .filter(root -> root.path().equals(path))
@@ -1843,35 +1680,12 @@ index ef0bbf586..4ec293fc4 100644
 -        .orElseThrow(() -> new AssertionError("missing planned root " + path));
 -  }
 -
-   private static final class Fixture {
-     private final Map<Path, Instant> watchedRoots = new java.util.concurrent.ConcurrentHashMap<>();
-     private final WatchedRootsState state;
-@@ -284,8 +200,6 @@ final class RecordedRootPreparationTest {
-     private final RootLifecycleOps ops;
-     private final AtomicInteger submittedWalks = new AtomicInteger();
-     private final AtomicInteger watchCalls = new AtomicInteger();
+@@ -287,2 +202,0 @@ final class RecordedRootPreparationTest {
 -    private final AtomicInteger scanCalls = new AtomicInteger();
 -    private final AtomicInteger deleteCalls = new AtomicInteger();
-     private final AtomicReference<List<IngestCollectionPolicy.RootBinding>> bindingsAtSubmission =
-         new AtomicReference<>();
-     private final AtomicReference<Consumer<io.justsearch.core.context.EngineContext>> queuedWalk =
-@@ -307,11 +221,9 @@ final class RecordedRootPreparationTest {
-       RootLifecycleOps.ScanRootFn scan =
-           scanRootFn == null
-               ? (rootPath, collection, mode, globs, progress, context) -> {
+@@ -310 +223,0 @@ final class RecordedRootPreparationTest {
 -                scanCalls.incrementAndGet();
-                 return null;
-               }
-               : (rootPath, collection, mode, globs, progress, context) -> {
+@@ -314 +226,0 @@ final class RecordedRootPreparationTest {
 -                scanCalls.incrementAndGet();
-                 return scanRootFn.scan(rootPath, collection, mode, globs, progress, context);
-               };
-       this.ops =
-@@ -330,7 +242,6 @@ final class RecordedRootPreparationTest {
-                 public void unwatch(String rootPath, io.justsearch.core.context.EngineContext context) {}
-               },
-               (path, context) -> {
+@@ -333 +244,0 @@ final class RecordedRootPreparationTest {
 -                deleteCalls.incrementAndGet();
-                 return DeleteByPathResponse.newBuilder().build();
-               },
-               (id, context) -> DeleteByIdResponse.newBuilder().setSuccess(true).build(),

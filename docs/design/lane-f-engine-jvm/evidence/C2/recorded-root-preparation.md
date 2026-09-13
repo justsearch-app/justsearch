@@ -218,11 +218,11 @@ It uses the focused command without test filters and additionally
 `:modules:app-observability:test`. This is not a full repository or live producer proof.
 
 Base a0cf80c0b plus this preparation diff, Windows/Java25. Logs, XML and task-aware
-counts are accessible at worktree `tmp/c2-2-preparation-{756,759,761}` and
-`tmp/c2-2-preparation-negative-757` prefixes (`.txt`, `-counts.json`, `-xml/`).
+counts are accessible at worktree `tmp/c2-2-preparation-{756,759,761}*` and
+`tmp/c2-2-preparation-negative-757*` prefixes (`.txt`, `-counts.json`, `-xml/`).
 Compile-only failures758/760 have logs. Retain through lane acceptance plus30 days,
 and export before releasing the worktree. The same suffixes hold for
-`tmp/c2-2-preparation-negative-762` and `tmp/c2-2-preparation-modules-763`.
+`tmp/c2-2-preparation-negative-762*` and `tmp/c2-2-preparation-modules-763*`.
 Canonical storage documentation is updated; index regeneration, skill sync and
 canonical link checks pass. Full repository/hosted/live validation remains part of
 the next integrated producer checkpoint.
@@ -255,7 +255,7 @@ gradlew.bat :modules:app-api:test --tests *RecordedRootPlanTest
 ```
 
 Negative772 uses only RecordedRootPlanTest and omits PMD. Artifacts are worktree
-tmp/c2-2-root-plan-771 and tmp/c2-2-root-plan-negative-772 with .txt, -counts.json,
+tmp/c2-2-root-plan-771* and tmp/c2-2-root-plan-negative-772* with .txt, -counts.json,
 -xml/ suffixes. The reused capture helper labels the earlier c4fbcb53f base; actual
 HEAD is154742d4a plus the unchanged DTO scope and added trailing-token test. Retain
 through lane acceptance plus30 days, exporting before worktree release. This proves
@@ -299,8 +299,8 @@ gradlew.bat :modules:app-services:test --tests *RecordedRootPreparationTest
 ```
 
 Negative774 selects only the two new app-services fixtures and omits PMD. Base04716d41e
-plus snapshot diff, Windows/Java25. Artifacts: worktree tmp/c2-2-root-snapshot-{773,775}
-and tmp/c2-2-root-snapshot-negative-774, each with .txt, -counts.json, -xml/ suffixes.
+plus snapshot diff, Windows/Java25. Artifacts: worktree tmp/c2-2-root-snapshot-{773,775}*
+and tmp/c2-2-root-snapshot-negative-774*, each with .txt, -counts.json, -xml/ suffixes.
 Retain through lane acceptance plus30 days, exporting before worktree release.
 Hosted run34720523685 passes04716d41e, including the prior preparation/generation/DTO
 and Windows-native fixture. It precedes this snapshot; broader snapshot/producer proof
@@ -320,7 +320,7 @@ snapshot check, not recorded ingestion or C2-2.
 :modules:worker-services:test`, plus pmdMain/pmdTest for app-api, app-services,
 app-engine, worker-core and worker-services, with `-PtestParallelism=1 --max-workers=4
 --console=plain`. Retained log, task-aware counts and XML are at worktree
-`tmp/c2-2-root-preparation-modules-776` with `.txt`, `-counts.json`, `-xml/` suffixes,
+`tmp/c2-2-root-preparation-modules-776*` with `.txt`, `-counts.json`, `-xml/` suffixes,
 under the same retention requirement above. An untracked app-agent-api policy test
 draft was added while776 ran; that test/source set was not an input to776. No production
 source or selected test source changed during the build.
@@ -385,7 +385,7 @@ Java. 777 uses `:modules:app-api:updateSchemas`;780 selects only
 parallelism flags. Both operation.v1 copies match; all eight `regen-all --check` sets pass,
 as do canonical-doc link, doc-index, skill-sync and module-dependency checks after regeneration.
 The storage doc is not embedded into a shared skill; existing links remain valid.
-Logs/counts/XML are `tmp/c2-2-kind-{778,779,781}` and `tmp/c2-2-kind-negative-780` with
+Logs/counts/XML are `tmp/c2-2-kind-{778,779,781}*` and `tmp/c2-2-kind-negative-780*` with
 `.txt`, `-counts.json`, `-xml/` suffixes; schema log is `tmp/c2-2-kind-schema-777.txt`.
 Retention is through lane acceptance plus30 days, exporting before worktree release.
 This proves classification and its store/recovery connection, not production reindex

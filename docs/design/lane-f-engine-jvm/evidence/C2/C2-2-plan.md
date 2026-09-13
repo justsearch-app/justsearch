@@ -307,8 +307,8 @@ refused queue admission previously returned clean completion. Scan counters now
 advance only after complete batch admission; refusal throws the typed UNAVAILABLE
 QUEUE_ADMISSION_FAILED error instead of producing a clean terminal frame.
 
-Evidence: tmp/c2-2-scan-admission-negative-572.txt/.xml and
- tmp/c2-2-journal-identity-negative-573.txt/.xml. Focused571 passed after updating the
+Evidence: tmp/c2-2-scan-admission-negative-572.{txt,xml} and
+ tmp/c2-2-journal-identity-negative-573.{txt,xml}. Focused571 passed after updating the
 IndexingLoopTest reflective helper to the new claim signature (569 and570 each
 failed nine old-signature calls; 569 XML retained under
  tmp/c2-2-worker-services-569-xml). Integrated574 completed with eleven failures, all the other old reflective helper
@@ -535,7 +535,7 @@ before607.603's test constructor access mistake was fixed using the store's publ
 constructor;604's78-test pass predates the independent review corrections.
 Evidence: tmp/c2-2-runtime-completion-{603,604,607}.txt,
 tmp/c2-2-runtime-{604,607,609}-xml and corresponding -counts.json;
-tmp/c2-2-runtime-negative-606.txt/.xml; tmp/c2-2-runtime-failures-609.txt.
+tmp/c2-2-runtime-negative-606.{txt,xml}; tmp/c2-2-runtime-failures-609.txt.
 These are local owner/transport proofs; integrated stress, installed crash and live
 model inclusion remain required at the coherent C2 boundary. No C2-2 closure.
 
@@ -568,7 +568,7 @@ Reaper prerequisite: negative612 observes failed instead of running while the ow
 guard remains claimed. The correction preserves that guard and the duplicate-start
 refusal; the original stale-unowned and fresh-status tests pass unchanged.613 passes
 10 tests in6 suites, no failures/errors/skips, plus app-services PMD main/test.
-Evidence: tmp/c2-2-install-reaper-negative-612.txt/.xml,
+Evidence: tmp/c2-2-install-reaper-negative-612.{txt,xml},
 tmp/c2-2-install-reaper-613.txt, tmp/c2-2-install-reaper-613-xml and -counts.json.
 This prerequisite is committed separately before install completion wiring.
 
@@ -585,7 +585,7 @@ and one unnecessary qualification; both corrected. Negative616 restores the old
 finished-started adapter and fails the pending-completion assertion at held cleanup;
 restored immediately afterward. Evidence: tmp/c2-2-install-completion-{614,615}.txt,
 tmp/c2-2-install-{614,615}-xml, tmp/c2-2-install-615-counts.json,
-tmp/c2-2-install-negative-616.txt/.xml. Live download/model success is not claimed by
+tmp/c2-2-install-negative-616.{txt,xml}. Live download/model success is not claimed by
 these deterministic owner/runner fixtures; the existing install truth/limitation,
 smoke-cancel, duplicate-start and status suites are included.
 

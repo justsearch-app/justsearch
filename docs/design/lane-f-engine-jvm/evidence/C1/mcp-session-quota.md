@@ -1,5 +1,16 @@
 # MCP session quota correction (2026-09-12)
 
+September13 R10 boundary: the later verification obligation below is now satisfied.
+Full863 executes RequestEngineContextTest6 and EngineAdmissionTransportTest9 with no
+failures/errors/skips. Successful full869 atc56e1a838 reuses those unchanged UI inputs;
+the unrelated Engine lifecycle fixture failure from863 is corrected. Hosted
+CI34730328727 atd9c80a646 executes both suites on Linux, including the real HTTP
+header-rotation refusal and unknown-session bucketing, with no skips or retry entries.
+See [C2 hosted evidence](../C2/hosted-ci.md) and
+[the full-run record](../C2/latest-full-run-summary.json) for exact revision, execution
+status and accessible XML. This supersedes the pending-boundary statement below;
+the original focused proof remains historical.
+
 This implements design section0 item955-1 during C2. The base is871a021bb;
 the correction commit contains this record. The older C1 hosted/live proof is
 not evidence for this newly changed identity path.

@@ -47,8 +47,8 @@ requireService with the old dereference behavior: three intended NPE/status fail
 in12 cases. Exact production source bytes are restored afterward. Its command is
 the app-engine task above restricted to EngineGenerationCaptureTest, without PMD.
 
-Artifacts: worktree tmp/c2-2-generation-root-{765,767,768} and
-tmp/c2-2-generation-negative-769, with .txt, -counts.json and -xml/ suffixes.
+Artifacts: worktree tmp/c2-2-generation-root-{765,767,768}* and
+tmp/c2-2-generation-negative-769*, with .txt, -counts.json and -xml/ suffixes.
 764 has tmp/c2-2-generation-capture-764.txt. Retain through lane acceptance plus30 days
 and export before releasing this worktree.
 

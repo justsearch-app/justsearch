@@ -1,7 +1,7 @@
 ---
 title: "Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain"
 type: design
-status: "LOCKED design; A/B complete at the agreed proof tier; C1 implemented with later-correction verification at the C2 boundary; C2 open, R10 full/hosted proof and final correction review pending; D1-F remain. Merge placement stays F/PR1 on draft PR718."
+status: "LOCKED design; A/B/C1 complete at the agreed proof tier, including later MCP quota verification; C2 open, correction full869 and hosted c56e1 proof pass, final independent review pending; D1-F remain. Merge placement stays F/PR1 on draft PR718."
 created: 2026-09-06
 updated: 2026-09-13
 lane: F (decision re-examination programme, wave 4)

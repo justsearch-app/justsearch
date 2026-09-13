@@ -33,7 +33,7 @@ gradlew.bat :modules:adapters-lucene:test --tests '*Stress*'
 Result: three cases/three suites, zero failures/errors/skips,1m29s. The changed
 parser chaos test executes; adapters-lucene is UP-TO-DATE and ort-common FROM-CACHE
 with unchanged inputs. Logs, XML and per-task counts are retained under
-tmp/c2-2-projection-stress-{658,659} (XML/counts for659). No test selector, tag or
+tmp/c2-2-projection-stress-{658,659}* (XML/counts for659). No test selector, tag or
 assertion was weakened to bypass the empty modules.
 
 ## Hosted revision758aeb2eb

@@ -1,18 +1,24 @@
 {
-  "base": "396d16e22",
-  "run": "564",
+  "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+  "status": "R10 corrected source inventory from committed Git blobs; this identifies current sources and does not relabel historical test runs.",
+  "supersedes": {
+    "snapshotAt": "6b109c27c",
+    "declaredBase": "396d16e22",
+    "reason": "Historical inventory hashes did not identify the declared committed tree. Original document remains available via git show 6b109c27c:docs/design/lane-f-engine-jvm/evidence/C2/C2-11-source-snapshot.json"
+  },
+  "hashSource": "git show <base>:<path> (raw blob bytes; no working-tree line-ending conversion)",
   "sourceFiles": [
     {
       "path": "scripts/supervisor-conformance/operation-resume-scenario.mjs",
-      "sha256": "03d88827c9643cdf2b727cfb83d435ab1f746eb1dac9e1f2892e8e991d8cf281"
+      "sha256": "721824b8c4d508d2c3b4a90bc3d95e2e645c4c61e1b0a9c00bc83117d6faf00a"
     },
     {
       "path": "scripts/supervisor-conformance/processing-replay-scenario.mjs",
-      "sha256": "4f0267105ada0858678c83ef61c557ea1b2db6f820fa0438eca65c79c052685a"
+      "sha256": "2bbc3f65c0f982559acdd2523f1b12daaf23283378f59bb27db2201eaac5c734"
     },
     {
       "path": "scripts/supervisor-conformance/real-writer-recovery.mjs",
-      "sha256": "365007955240f266123292d3eb4005df1a617456f5411e1bb1d38669c9a500d8"
+      "sha256": "50d412a8a6ed2dc8df84bafcc259d6df7162339aa8cfe8e483aa8ca1eff798cb"
     },
     {
       "path": "modules/system-tests/build.gradle.kts",
@@ -20,11 +26,11 @@
     },
     {
       "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
-      "sha256": "e6a4ec877b57c213d0902e26e96f24bc141eb03d9abb3208163e176ea12f70ce"
+      "sha256": "3bbf4e8d6513fe852eab2c93530b4477b1fc82ccd189d548052f05e029a7e6d9"
     },
     {
       "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/OperationResumeE2ETest.java",
-      "sha256": "15fc3867764f262c7be68b6d35874e4867fd9ba1e05d87f19e5f0e6f9dbdbaff"
+      "sha256": "861e886236b63c2691968869647d4167276cd957d0393b73a93479e87006a1cd"
     }
   ]
 }

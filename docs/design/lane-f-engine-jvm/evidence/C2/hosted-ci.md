@@ -1,5 +1,46 @@
 # C2 hosted verification
 
+September13 final code checkpoint: [CI34731185342](https://github.com/justsearch-app/justsearch/actions/runs/34731185342)
+atc56e1a838 completes **success**, all13 jobs, after the lifecycle fixture correction.
+Metadata: `tmp/c2-review-r10-hosted-c56e1-status.json`. This resolves the earlier
+pending current-CI statements. Detailed named-case execution is retained atd9c80a646
+below; product code is unchanged between those two checkpoints. Local full869 executes
+the corrected Engine tests. Final independent correction review remains open.
+
+## September13 R10 successful correction checkpoint
+
+[CI34730328727](https://github.com/justsearch-app/justsearch/actions/runs/34730328727)
+atd9c80a646 completes **success**, all13 jobs. This resolves the pending outcome
+below. The release-assets step executes12 cases, all passing. Task logs show the
+app-launcher and UI unit tasks and system-tests integration task executed, with no
+failed build or retry. Retained XML has no failure, error or retry element for:
+
+- LauncherEnvironmentCloseTest:11 cases, including live-operation exclusion on Linux.
+- AppInstanceLockExclusionTest and IndexRootLockExclusionTest:4 cases each on Windows.
+- EngineAdmissionTransportTest:9 cases, including MCP header-rotation quota refusal;
+  RequestEngineContextTest:6 cases, including unknown-session hint rotation.
+- OperationResumeE2ETest:1 unskipped case,37.093s, observing the durable operations
+  row across installed Engine death/restart.
+- ExtractionSandboxOrphanE2ETest:1 unskipped case, with the corrected reused-parser
+  identity witness. This resolves the earlier checkpoint's fresh hosted orphan proof.
+
+Artifact totals are app-ui5336 cases/810 suites/4 skips, search-worker3369/598/43,
+integration89/21/42, and Windows-native111/9/0; all have zero failures/errors.
+These totals include unrelated environment-gated skips and are not a claim that
+every case executed. Named witnesses above have no skips. Exact metadata, counts,
+task excerpts, full log and retained XML:
+`tmp/c2-review-r10-hosted-d9c80-{status,counts,artifacts}.json`,
+`tmp/c2-review-r10-hosted-d9c80-{execution,log}.txt`, and
+`tmp/c2-review-r10-hosted-d9c80/`.
+
+The hosted installed recovery execution supplies R10's fresh R7 tier after the
+native lock correction; repeating the same installed tier locally is unnecessary.
+Windows-native artifact expiry is October13; other retained test artifacts expire
+December12,2026. Local copies remain through lane acceptance plus30 days and must
+be exported before worktree release. Local full863's later lifecycle-fixture
+correction and final batch review remain required; this success does not certify
+uncommitted changes.
+
 ## September13 R10 outcome reconciliation
 
 Re-read final API metadata for all four review-named runs. CI34700660160 completed
@@ -21,6 +62,15 @@ and is corrected with matching process probes. Local evidence and fresh hosted
 success are required before closure. Raw failed job log:
 `tmp/c2-review-r10-hosted-r8-failure.txt`; XML:
 `tmp/c2-review-r10-hosted-r8-app-ui/`.
+
+CI34729778873 at33e54dfcd completed failure: all three app-ui failures are the
+same UnreferencedCodeTest snapshotBindings residue observed by local full858.
+The unchanged launcher-exclusion test passes on Linux with no retry entry. This is
+item-level R2 proof, not an overall green workflow. Corrected retirement d9c80a646
+starts CI34730328727; its final result remains pending. Metadata/log/XML:
+`tmp/c2-review-r10-hosted-33e54-status.json`,
+`tmp/c2-review-r10-hosted-33e54-app-ui-failure.txt`, and
+`tmp/c2-review-r10-hosted-33e54-app-ui/`.
 
 The following dated records retain what was known at each original checkpoint.
 

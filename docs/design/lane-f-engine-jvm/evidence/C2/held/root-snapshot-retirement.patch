@@ -2,10 +2,7 @@ diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worke
 index 42ddc054b..da590cb63 100644
 --- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
-@@ -103,15 +103,6 @@ final class WatchedRootsState {
-     return collections.get(root);
-   }
- 
+@@ -106,9 +105,0 @@ final class WatchedRootsState {
 -  /** Membership and labels share one observation; no filesystem availability work is scheduled. */
 -  synchronized java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>
 -      snapshotBindings() {
@@ -15,25 +12,13 @@ index 42ddc054b..da590cb63 100644
 -        .toList();
 -  }
 -
-   /** Register membership and its label together, preserving the caller's duplicate policy. */
-   synchronized boolean register(Path root, String collection, boolean onlyIfAbsent) {
-     if (onlyIfAbsent && watchedRoots.containsKey(root)) return false;
 diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
 index 4ec293fc4..aa48a535f 100644
 --- a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
 +++ b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
-@@ -4,7 +4,6 @@ package io.justsearch.app.services.worker;
- import static org.junit.jupiter.api.Assertions.assertEquals;
- import static org.junit.jupiter.api.Assertions.assertFalse;
- import static org.junit.jupiter.api.Assertions.assertNotNull;
+@@ -7 +6,0 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 -import static org.junit.jupiter.api.Assertions.assertThrows;
- import static org.junit.jupiter.api.Assertions.assertTrue;
- import static org.mockito.Mockito.mock;
- 
-@@ -36,83 +35,6 @@ final class RecordedRootPreparationTest {
- 
-   @TempDir Path tempDir;
- 
+@@ -39,77 +37,0 @@ final class RecordedRootPreparationTest {
 -  @Test
 -  @DisplayName("snapshot bindings is immutable")
 -  void snapshotBindingsIsImmutable() throws Exception {
@@ -111,41 +96,19 @@ index 4ec293fc4..aa48a535f 100644
 -        List.of(new IngestCollectionPolicy.RootBinding(root, "labelled")), observed.get());
 -  }
 -
-   @Test
-   @DisplayName("concurrent duplicate registration queues and records one root")
-   void concurrentDuplicateRegistrationIsAtomic() throws Exception {
-@@ -148,8 +70,8 @@ final class RecordedRootPreparationTest {
-       callers.shutdownNow();
-     }
- 
+@@ -151,2 +73,2 @@ final class RecordedRootPreparationTest {
 -    assertEquals(1, fixture.state.snapshotBindings().size());
 -    assertEquals("same-label", fixture.state.snapshotBindings().get(0).collection());
 +    assertEquals(1, fixture.watchedRoots.size());
 +    assertEquals("same-label", fixture.state.getCollection(root));
-     assertEquals(1, fixture.submittedWalks.get(), "only one duplicate may queue a walk");
-     assertEquals(1, fixture.watchCalls.get(), "only one duplicate may register a watcher");
-     assertEquals("same-label", fixture.bindingsAtSubmission.get().get(0).collection());
-@@ -189,7 +111,7 @@ final class RecordedRootPreparationTest {
-       walker.shutdownNow();
-     }
- 
+@@ -192 +114 @@ final class RecordedRootPreparationTest {
 -    assertTrue(fixture.state.snapshotBindings().isEmpty());
 +    assertEquals(null, fixture.state.getCollection(root));
-     assertFalse(fixture.watchedRoots.containsKey(root));
-   }
- 
-@@ -249,40 +171,11 @@ final class RecordedRootPreparationTest {
-               walkExecutor,
-               (body, context) -> {
-                 submittedWalks.incrementAndGet();
+@@ -252 +174,2 @@ final class RecordedRootPreparationTest {
 -                bindingsAtSubmission.set(state.snapshotBindings());
 +                bindingsAtSubmission.set(watchedRoots.keySet().stream()
 +                    .map(root -> new IngestCollectionPolicy.RootBinding(root, state.getCollection(root))).toList());
-                 queuedWalk.set(body);
-               });
-     }
-   }
- 
+@@ -258,30 +180,0 @@ final class RecordedRootPreparationTest {
 -  /** Pauses the first membership put after it is visible but before register can publish its label. */
 -  private static final class PausingMap extends java.util.concurrent.ConcurrentHashMap<Path, Instant> {
 -    private static final long serialVersionUID = 1L;
@@ -176,18 +139,11 @@ index 4ec293fc4..aa48a535f 100644
 -      return prior;
 -    }
 -  }
- }
 diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java
 index 199a88fa2..ac1a689ec 100644
 --- a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java
 +++ b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java
-@@ -65,7 +65,8 @@ final class RootCompletionMembershipTest {
-       walking.get(3, TimeUnit.SECONDS);
-       removing.get(3, TimeUnit.SECONDS);
-       assertFalse(roots.containsKey(path), "completed walk must not resurrect a removed root");
+@@ -68 +68,2 @@ final class RootCompletionMembershipTest {
 -      assertTrue(state.snapshotBindings().isEmpty());
 +      assertTrue(roots.isEmpty());
 +      assertNull(state.getCollection(path));
-     } finally {
-       roots.release.countDown();
-       walker.join(Duration.ofSeconds(3));

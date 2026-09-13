@@ -75,7 +75,7 @@ gradlew.bat :modules:app-api:test --tests *OperationDescriptorPreparationTest
   -PtestParallelism=1 --max-workers=4 --console=plain
 ```
 
-Windows/Java25; artifacts at worktree tmp/c2-2-child-grammar-782 with .txt,
+Windows/Java25; artifacts at worktree tmp/c2-2-child-grammar-782* with .txt,
 -counts.json and -xml/ suffixes. Retain through lane acceptance plus30 days and
 export before releasing the worktree.
 
@@ -95,6 +95,6 @@ gradlew.bat :modules:app-api:test --tests *OperationDescriptorPreparationTest
 Negative785 uses only `:modules:app-observability:test` and
 `--tests *OperationChildAcceptanceTest.childStorageRefusalInParent*` with the same
 parallelism flags. Broad787 selects the same three module test tasks without filters,
-plus the same PMD tasks and flags. Artifacts use `tmp/c2-2-child-783`, `-784`, `-786`,
-`tmp/c2-2-child-negative-785`, and `tmp/c2-2-child-modules-787`, each with `.txt`,
+plus the same PMD tasks and flags. Artifacts use `tmp/c2-2-child-783*`, `-784`, `-786`,
+`tmp/c2-2-child-negative-785*`, and `tmp/c2-2-child-modules-787*`, each with `.txt`,
 `-counts.json`, and `-xml/` suffixes, under the same retention rule.

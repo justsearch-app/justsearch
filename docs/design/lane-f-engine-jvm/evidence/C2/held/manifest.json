@@ -1,7 +1,7 @@
 {
   "base": "41d0ab86da181a7bba7656f28bf4f7445c27c283",
   "patch": "root-replay-retirement.patch",
-  "sha256": "fa4ddf0da9f9e6fa652068630fa77a9b79572b16bdd99ed25fb3c1d248dcfa0b",
+  "sha256": "52795138301ea0af49d8f232142d076d33fc404f2e8b17c9d577eaed16dd5f1e",
   "files": [
     "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java",
     "modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java",
@@ -34,12 +34,15 @@
     {
       "base": "33e54dfcde19a205e3e6a5f3d7e2a30a24bf5f93",
       "patch": "root-snapshot-retirement.patch",
-      "sha256": "433012cf240816914ff0aa47c66776e6ad55d40b56be62596d146ddc018be6cf",
+      "sha256": "e357c6adc0cbe5b675f2463c60b084540355e71998cdc50bc4dd7c333e6bb9f3",
       "files": [
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java"
-      ]
+      ],
+      "retirementRevision": "d9c80a64658a5f5476642ebaca4e1a91f7e987f0",
+      "format": "Git unified diff with zero context; apply with --unidiff-zero"
     }
-  ]
+  ],
+  "format": "Git unified diff with zero context; apply with --unidiff-zero"
 }

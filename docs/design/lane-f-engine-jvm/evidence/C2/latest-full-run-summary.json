@@ -1,24 +1,14 @@
 {
-  "revision": "82e0e185d code/tests; configured before commit with unchanged inputs",
-  "command": "gradlew.bat build pmdAll -PtestParallelism=1 --max-workers=4 --console=plain",
+  "revision": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+  "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
   "summary": {
-    "tests": 10047,
+    "tests": 10133,
     "failures": 0,
     "errors": 0,
     "skipped": 35,
-    "suites": 1636
+    "suites": 1647
   },
   "tasks": [
-    {
-      "module": "ai-backend",
-      "task": "test",
-      "status": "UP-TO-DATE",
-      "tests": 62,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 13
-    },
     {
       "module": "api-contract-projection-java",
       "task": "test",
@@ -30,24 +20,54 @@
       "suites": 3
     },
     {
-      "module": "app-agent-api",
+      "module": "ai-backend",
       "task": "test",
       "status": "UP-TO-DATE",
-      "tests": 229,
+      "tests": 62,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 39
+      "suites": 13
+    },
+    {
+      "module": "adapters-lucene",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 724,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 102
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 674,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 49
+    },
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 41
     },
     {
       "module": "app-api",
       "task": "test",
       "status": "UP-TO-DATE",
-      "tests": 202,
+      "tests": 204,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 41
+      "suites": 42
     },
     {
       "module": "app-config",
@@ -60,39 +80,9 @@
       "suites": 1
     },
     {
-      "module": "adapters-lucene",
-      "task": "test",
-      "status": "EXECUTED",
-      "tests": 724,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 102
-    },
-    {
-      "module": "app-agent",
-      "task": "test",
-      "status": "EXECUTED",
-      "tests": 672,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 49
-    },
-    {
-      "module": "app-engine",
-      "task": "test",
-      "status": "EXECUTED",
-      "tests": 214,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "suites": 45
-    },
-    {
       "module": "app-inference",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 320,
       "failures": 0,
       "errors": 0,
@@ -100,10 +90,20 @@
       "suites": 30
     },
     {
-      "module": "app-launcher",
+      "module": "app-engine",
       "task": "test",
       "status": "EXECUTED",
-      "tests": 83,
+      "tests": 231,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 47
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 87,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
@@ -112,27 +112,27 @@
     {
       "module": "app-observability",
       "task": "test",
-      "status": "EXECUTED",
-      "tests": 420,
+      "status": "UP-TO-DATE",
+      "tests": 439,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 67
+      "suites": 68
     },
     {
       "module": "app-services",
       "task": "test",
-      "status": "EXECUTED",
-      "tests": 2615,
+      "status": "UP-TO-DATE",
+      "tests": 2646,
       "failures": 0,
       "errors": 0,
       "skipped": 3,
-      "suites": 408
+      "suites": 411
     },
     {
       "module": "app-services",
       "task": "integrationTest",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 3,
       "failures": 0,
       "errors": 0,
@@ -143,11 +143,11 @@
       "module": "app-util",
       "task": "test",
       "status": "UP-TO-DATE",
-      "tests": 16,
+      "tests": 15,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "suites": 2
+      "suites": 3
     },
     {
       "module": "benchmarks",
@@ -172,7 +172,7 @@
     {
       "module": "core",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 102,
       "failures": 0,
       "errors": 0,
@@ -192,7 +192,7 @@
     {
       "module": "dead-code-audit",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 2,
       "failures": 0,
       "errors": 0,
@@ -222,12 +222,12 @@
     {
       "module": "indexer-worker",
       "task": "test",
-      "status": "EXECUTED",
-      "tests": 464,
+      "status": "UP-TO-DATE",
+      "tests": 466,
       "failures": 0,
       "errors": 0,
       "skipped": 12,
-      "suites": 80
+      "suites": 81
     },
     {
       "module": "indexing",
@@ -262,7 +262,7 @@
     {
       "module": "ipc-common",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 4,
       "failures": 0,
       "errors": 0,
@@ -322,7 +322,7 @@
     {
       "module": "system-tests",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 96,
       "failures": 0,
       "errors": 0,
@@ -332,7 +332,7 @@
     {
       "module": "telemetry",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 94,
       "failures": 0,
       "errors": 0,
@@ -352,7 +352,7 @@
     {
       "module": "ui",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 1133,
       "failures": 0,
       "errors": 0,
@@ -362,7 +362,7 @@
     {
       "module": "ui",
       "task": "integrationTest",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 9,
       "failures": 0,
       "errors": 0,
@@ -372,7 +372,7 @@
     {
       "module": "worker-core",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 342,
       "failures": 0,
       "errors": 0,
@@ -382,7 +382,7 @@
     {
       "module": "worker-services",
       "task": "test",
-      "status": "EXECUTED",
+      "status": "UP-TO-DATE",
       "tests": 1347,
       "failures": 0,
       "errors": 0,
@@ -390,5 +390,9 @@
       "suites": 256
     }
   ],
-  "evidenceScope": "Latest completed full build/PMD snapshot, predating the September13 review corrections; not proof of the current revision."
+  "result": "BUILD SUCCESSFUL in 6m49s",
+  "rawLog": "tmp/c2-review-r10-full869.txt",
+  "rawXml": "tmp/c2-review-r10-full869-xml/",
+  "executionNote": "app-engine:test executes all 231 cases. Other test tasks are UP-TO-DATE at unchanged inputs; their copied XML is retained, not relabelled as fresh execution. Full863 previously executed the remaining changed correction modules and passed them; its one Engine workflow failure is corrected here.",
+  "supersedes": "Prior latest-full-run-summary.json remains retrievable from git show c56e1a838:docs/design/lane-f-engine-jvm/evidence/C2/latest-full-run-summary.json; that full744 proof retains its historical revision."
 }

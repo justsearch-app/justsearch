@@ -97,7 +97,7 @@ global enrichment drain, broad search quality or D1 generation carry-forward.
 Worktree artifacts: tmp/c2-2-offline-live-746-start.txt,
 tmp/c2-2-offline-live-746-primary.json, tmp/c2-2-offline-live-747-start.txt,
 tmp/c2-2-offline-instrument-748.txt, corpus tmp/c2-2-offline-live-746-corpus,
-and isolated data directories tmp/c2-2-offline-live-746-data/747-data.
+and isolated data directories tmp/c2-2-offline-live-{746,747}-data/.
 Final evidence: tmp/c2-2-offline-instrument-752.txt,
 tmp/c2-2-offline-instrument-negative-753.txt, tmp/c2-2-offline-live-754.json,
 tmp/c2-2-offline-live-754-keyword.json, tmp/c2-2-offline-live-754-distribution.json,

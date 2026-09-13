@@ -55,8 +55,8 @@ lease. D1 still owns carry-forward and activation/retirement under accepted writ
 
 ## Evidence access
 
-This worktree's `tmp/c2-2-engine-vdu-replay-{715,716,719,721}` and
-`tmp/c2-2-engine-vdu-replay-negative-{718,720}` each contain `.txt`, `-xml/` and
+This worktree's `tmp/c2-2-engine-vdu-replay-{715,716,719,721}*` and
+`tmp/c2-2-engine-vdu-replay-negative-{718,720}*` each contain `.txt`, `-xml/` and
 `-counts.json`. Launcher failure717 is `tmp/c2-2-engine-vdu-replay-launch-717.txt`.
 `tmp/c2-engine-vdu-replay-mutant.py` restores KnowledgeServer's exact original
 bytes in finally; its original-byte backup is beside the script. Capture utility:
