@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.app.api.OperationLease;
 import io.justsearch.app.api.OperationLeaseService;
@@ -22,11 +24,13 @@ final class UpgradeController {
 
   private final OperationLeaseService leases;
   private final UpgradeShutdownAction orderlyShutdown;
-  private final Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient;
+  private final Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient;
   private final UpgradeReconciliationProbe reconciliation;
   private String noncePreparationId;
   private String shutdownNonce;
-  private boolean shutdownCommitted;
+  private CommitPhase commitPhase = CommitPhase.OPEN;
+  private CommitReservation commitReservation;
+  private boolean preparationInProgress;
   private boolean cancellationInProgress;
 
   UpgradeController(OperationLeaseService leases, Runnable orderlyShutdown) {
@@ -36,14 +40,14 @@ final class UpgradeController {
   UpgradeController(
       OperationLeaseService leases,
       UpgradeShutdownAction orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient) {
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient) {
     this(leases, orderlyShutdown, workerClient, null, null, null, null);
   }
 
   UpgradeController(
       OperationLeaseService leases,
       UpgradeShutdownAction orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient,
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient,
       Path dataDir,
       Supplier<String> runningVersion,
       BooleanSupplier headReady,
@@ -60,20 +64,30 @@ final class UpgradeController {
   }
 
   void prepare(Context ctx) {
-    OperationLeaseSnapshot snapshot = leases.freezeAdmission("application upgrade");
-    snapshot = leases.requestCancellation(snapshot.preparationId());
-    String nonce = nonceFor(snapshot.preparationId());
-    ctx.json(response(snapshot, nonce, prepareWorker(snapshot.preparationId())));
+    var engineContext = RequestEngineContext.get(ctx);
+    if (!reservePreparation()) {
+      preparationBusy(ctx);
+      return;
+    }
+    try {
+      OperationLeaseSnapshot snapshot = leases.freezeAdmission("application upgrade");
+      snapshot = leases.requestCancellation(snapshot.preparationId());
+      String nonce = nonceFor(snapshot.preparationId());
+      ctx.json(response(snapshot, nonce, prepareWorker(snapshot.preparationId(), engineContext)));
+    } finally {
+      releasePreparation();
+    }
   }
 
   void cancel(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     UpgradeRequest request = requiredRequest(ctx);
     if (!reserveCancellation(request)) {
       preparationMismatch(ctx);
       return;
     }
     String preparationId = request.preparationId();
-    if (!cancelWorker(preparationId)) {
+    if (!cancelWorker(preparationId, engineContext)) {
       releaseCancellationReservation(request);
       ctx.status(503)
           .json(
@@ -95,6 +109,7 @@ final class UpgradeController {
   }
 
   void commitShutdown(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     UpgradeRequest request = requiredRequest(ctx);
     String preparationId = request.preparationId();
     OperationLeaseSnapshot snapshot = leases.snapshot();
@@ -105,13 +120,9 @@ final class UpgradeController {
       return;
     }
     List<OperationLease> blockers = blocking(snapshot);
-    Map<String, Object> worker = workerStatus(preparationId);
+    Map<String, Object> worker = workerStatus(preparationId, engineContext);
     if (!blockers.isEmpty() || !Boolean.TRUE.equals(worker.get("ready"))) {
       ctx.status(409).json(response(snapshot, request.shutdownNonce(), worker));
-      return;
-    }
-    if (!claimCommit(request)) {
-      preparationMismatch(ctx);
       return;
     }
     byte[] response =
@@ -124,18 +135,48 @@ final class UpgradeController {
                 "admissionFrozen", true,
                 "activeLeaseCount", 0,
                 "issuedAtEpochMs", System.currentTimeMillis()));
-    ctx.contentType("application/json");
-    ctx.res().setContentLength(response.length);
+    CommitReservation reservation = claimCommit(request);
+    if (reservation == null) {
+      preparationMismatch(ctx);
+      return;
+    }
+    Thread dispatch;
     try {
+      UpgradeShutdownAction action =
+          orderlyShutdown instanceof UpgradeShutdownBridge bridge
+              ? bridge.boundAction()
+              : orderlyShutdown;
+      dispatch =
+          Thread.ofPlatform()
+              .name("engine-upgrade-shutdown")
+              .unstarted(() -> action.shutdown(preparationId, request.shutdownNonce()));
+    } catch (RuntimeException e) {
+      restoreOpen(reservation);
+      ctx.status(503)
+          .json(
+              Map.of(
+                  "shutdownAccepted", false,
+                  "preparationId", preparationId,
+                  "error", "Upgrade shutdown action is not ready",
+                  "errorCode", "UPGRADE_SHUTDOWN_NOT_READY"));
+      return;
+    }
+    try {
+      ctx.contentType("application/json");
+      ctx.res().setContentLength(response.length);
       ctx.res().getOutputStream().write(response);
       ctx.res().flushBuffer();
     } catch (IOException e) {
+      restoreOpen(reservation);
       throw new UncheckedIOException("failed to acknowledge orderly upgrade shutdown", e);
+    } catch (RuntimeException e) {
+      restoreOpen(reservation);
+      throw e;
     }
-    Thread.ofPlatform()
-        .daemon(true)
-        .name("upgrade-orderly-shutdown")
-        .start(() -> orderlyShutdown.shutdown(preparationId, request.shutdownNonce()));
+    acknowledge(reservation);
+    // Starting after the successful flush keeps API close off its own request thread. A failure
+    // from here cannot undo an acknowledgement; absence of the nonce-bound receipt holds install.
+    dispatch.start();
   }
 
   private static Map<String, Object> response(
@@ -162,7 +203,7 @@ final class UpgradeController {
     return response;
   }
 
-  private Map<String, Object> prepareWorker(String preparationId) {
+  private Map<String, Object> prepareWorker(String preparationId, EngineContext engineContext) {
     if (workerClient == null) return Map.of("required", false, "ready", true);
     try {
       var client = workerClient.get();
@@ -170,14 +211,14 @@ final class UpgradeController {
         return Map.of(
             "required", true, "ready", false, "blockers", List.of("Worker is unavailable"));
       }
-      return workerMap(client.prepareUpgrade(preparationId));
+      return workerMap(client.prepareUpgrade(preparationId, engineContext));
     } catch (RuntimeException e) {
       return Map.of(
           "required", true, "ready", false, "blockers", List.of("Worker prepare failed"));
     }
   }
 
-  private Map<String, Object> workerStatus(String preparationId) {
+  private Map<String, Object> workerStatus(String preparationId, EngineContext engineContext) {
     if (workerClient == null) return Map.of("required", false, "ready", true);
     try {
       var client = workerClient.get();
@@ -185,19 +226,19 @@ final class UpgradeController {
         return Map.of(
             "required", true, "ready", false, "blockers", List.of("Worker is unavailable"));
       }
-      return workerMap(client.upgradeStatus(preparationId));
+      return workerMap(client.upgradeStatus(preparationId, engineContext));
     } catch (RuntimeException e) {
       return Map.of(
           "required", true, "ready", false, "blockers", List.of("Worker status failed"));
     }
   }
 
-  private boolean cancelWorker(String preparationId) {
+  private boolean cancelWorker(String preparationId, EngineContext engineContext) {
     if (workerClient == null) return true;
     try {
       var client = workerClient.get();
       if (client == null) return false;
-      client.cancelUpgrade(preparationId);
+      client.cancelUpgrade(preparationId, engineContext);
       return true;
     } catch (RuntimeException ignored) {
       // Keep Head admission frozen so the caller can retry without admitting writes while Worker
@@ -230,7 +271,8 @@ final class UpgradeController {
     if (!preparationId.equals(noncePreparationId)) {
       noncePreparationId = preparationId;
       shutdownNonce = java.util.UUID.randomUUID().toString();
-      shutdownCommitted = false;
+      commitPhase = CommitPhase.OPEN;
+      commitReservation = null;
       cancellationInProgress = false;
     }
     return shutdownNonce;
@@ -241,20 +283,42 @@ final class UpgradeController {
         && request.shutdownNonce().equals(shutdownNonce);
   }
 
-  private synchronized boolean claimCommit(UpgradeRequest request) {
-    if (!ownsNonce(request) || shutdownCommitted || cancellationInProgress) return false;
-    shutdownCommitted = true;
-    return true;
+  private synchronized CommitReservation claimCommit(UpgradeRequest request) {
+    if (!ownsNonce(request)
+        || commitPhase != CommitPhase.OPEN
+        || preparationInProgress
+        || cancellationInProgress) return null;
+    commitPhase = CommitPhase.ACKNOWLEDGING;
+    commitReservation = new CommitReservation(request.preparationId(), request.shutdownNonce());
+    return commitReservation;
+  }
+
+  private synchronized void restoreOpen(CommitReservation reservation) {
+    if (commitPhase == CommitPhase.ACKNOWLEDGING && commitReservation == reservation) {
+      commitPhase = CommitPhase.OPEN;
+      commitReservation = null;
+    }
+  }
+
+  private synchronized void acknowledge(CommitReservation reservation) {
+    if (commitPhase != CommitPhase.ACKNOWLEDGING || commitReservation != reservation) {
+      throw new IllegalStateException("upgrade commit reservation is no longer active");
+    }
+    commitPhase = CommitPhase.ACKNOWLEDGED;
   }
 
   private synchronized boolean reserveCancellation(UpgradeRequest request) {
-    if (!ownsNonce(request) || shutdownCommitted || cancellationInProgress) return false;
+    if (!ownsNonce(request)
+        || commitPhase != CommitPhase.OPEN
+        || preparationInProgress
+        || cancellationInProgress)
+      return false;
     cancellationInProgress = true;
     return true;
   }
 
   private synchronized void releaseCancellationReservation(UpgradeRequest request) {
-    if (ownsNonce(request) && !shutdownCommitted) {
+    if (ownsNonce(request) && commitPhase == CommitPhase.OPEN) {
       cancellationInProgress = false;
     }
   }
@@ -263,7 +327,29 @@ final class UpgradeController {
     if (!ownsNonce(request)) return;
     noncePreparationId = null;
     shutdownNonce = null;
+    commitPhase = CommitPhase.OPEN;
+    commitReservation = null;
     cancellationInProgress = false;
+  }
+
+  private synchronized boolean reservePreparation() {
+    if (preparationInProgress
+        || cancellationInProgress
+        || commitPhase != CommitPhase.OPEN) return false;
+    preparationInProgress = true;
+    return true;
+  }
+
+  private synchronized void releasePreparation() {
+    preparationInProgress = false;
+  }
+
+  private static void preparationBusy(Context ctx) {
+    ctx.status(409)
+        .json(
+            Map.of(
+                "error", "Another upgrade preparation transaction is in progress",
+                "errorCode", "UPGRADE_PREPARATION_BUSY"));
   }
 
   private static void preparationMismatch(Context ctx) {
@@ -275,6 +361,14 @@ final class UpgradeController {
   }
 
   private record UpgradeRequest(String preparationId, String shutdownNonce) {}
+
+  private enum CommitPhase {
+    OPEN,
+    ACKNOWLEDGING,
+    ACKNOWLEDGED
+  }
+
+  private record CommitReservation(String preparationId, String shutdownNonce) {}
 
   private static UpgradeRequest requiredRequest(Context ctx) {
     try {

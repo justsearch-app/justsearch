@@ -2,7 +2,7 @@
 title: API Contract Map
 type: reference
 status: stable
-description: "HTTP and gRPC contract sources, error sanitization."
+description: "HTTP and in-process port contract sources, error sanitization."
 ---
 
 # API Contract Map
@@ -30,6 +30,74 @@ served by `SchemaController` as well as embedded into the SDK projection.
 The projection currently contains exactly six read-only operations: runtime manifest and mirror,
 readiness, liveness, health, and status. See [Runtime Contract](runtime-contract.md#generated-node-client)
 for package scope and regeneration commands.
+
+### Pending tool approval display
+
+`GET /api/chat/approval?sessionId=<run>&callId=<call>` reads an existing live agent or
+workflow gate through `AgentController`. It returns `callId`, `operationId`,
+`gateBehavior`, `riskTier` and `argsSummary`; a missing call id is400 and a removed or
+unknown gate is404. Responses use `Cache-Control: no-store`. This is a local read
+under the existing API trust boundary, not an approval or execution request.
+
+`AgentRunQueries.pendingToolApproval` and `WorkflowGateRegistry` project the live
+owners. When a producer attaches `OperationApprovalPreview`, the response includes
+its complete bounded frozen summary; otherwise it uses the shared200-character raw
+argument summary. Frozen preview, operation key, nonce and execution payload are
+absent from pending-call events and snapshots. The private lookup reads no durable
+run history and cannot recreate a gate. Replies use `POST /api/chat/approve` or
+`POST /api/chat/reject` with the same session/call ids.
+
+The live run controller reads this projection before a human ceremony and uses its
+complete summary and server gate/risk fields. A failed, missing or malformed lookup
+refuses the pending action with a notice; replayed raw arguments cannot replace the
+private display. Run conclusion, replacement and call completion invalidate an
+in-flight lookup. Explicit backend AUTO approvals keep their existing path.
+Each stream's abort handle owns event delivery, failure handling and cleanup, so a
+replaced stream cannot prompt for approval or end the new run. Pending frames need
+a live run. Reattaching to the same run preserves its pending approval; replacing
+the run clears queued AUTO calls until the new run establishes its own identity.
+
+### Projected workflow delegation
+
+`WorkflowToolRunnerImpl` resolves an agent-facing workflow operation back to its
+catalog declaration. Delegated shapes use that workflow's declared audience;
+the operation projection's AGENT exposure does not replace the composition audience.
+`ConversationEngine` still checks each target shape's audience, and workflow tool
+nodes still use the intent gate. The server-owned background posture reaches nested
+shapes and persisted run metadata. If execution throws before a terminal event,
+`WorkflowShapeRunner` finalizes that metadata as ERROR and preserves the exception
+for the existing transport error handler.
+
+### Engine admission and cancellation
+
+`EngineAdmissionController` is the shared owner for HTTP/MCP admission and upgrade freezing.
+Capacity is bounded per `(clientKind, clientId)` and across the Engine; all declared client kinds
+use identical caps. Aggregate exhaustion takes precedence when both budgets are exhausted.
+`GET /api/debug/effective-config` projects the running owner's immutable `engineAdmission` limits:
+`perContextLimit`, `aggregateLimit`, and `retryAfterSeconds`, plus current `activeWorkCount`
+excluding the inspecting HTTP request. Internal background producers count toward the aggregate.
+A startup aggregate reduction is
+bounded by the packaged maximum; the diagnostic projection reports the applied value.
+`RequestEngineWork` maps capacity refusal to HTTP `429` with `ADMISSION_CONTEXT_LIMIT` or
+`ADMISSION_ENGINE_LIMIT`, with `Retry-After`; upgrade freezing returns `503` with
+`UPGRADE_PREPARING`. Health remains available while admission is full or frozen. CORS
+`OPTIONS` preflights never reserve Engine work, including while full or frozen; the Host and
+Origin checks still apply. Allowed browser origins can read `Retry-After` through
+`Access-Control-Expose-Headers`.
+
+REST refusal includes `retrySafe: true` only when admission refused before dispatch, including
+approval execution before consuming its pending record. A later execution refusal carries
+`retrySafe: false`; `retryable` alone never authorizes replay of a mutation. The webview waits
+abortably and retries replayable requests only with the explicit safe guarantee, showing one
+superseding informational notice. MCP uses JSON-RPC error `-32000` and preserves the request id. Its `error.data.retrySafe`
+is explicitly `true` for front admission refusal and `false` for a handler-thrown refusal;
+notifications have no response body.
+
+An admitted work id is process-local and remains occupied until its last asynchronous owner exits.
+Cancellation preserves the first reason through model producers, callback delivery and turn
+finalization. A managed SSE creator disconnect changes durable foreground work to background;
+normal server retirement does not cause that transition. Interactive one-shot work continues
+through a socket disconnect. This connection behavior does not establish restart survival.
 
 ### Lifecycle schema v1 (minimum stable subset)
 
@@ -257,7 +325,8 @@ Substrate endpoints:
 - `GET /infra/capabilities/stream` (SSE) — Capability change stream. Initial `snapshot` event carries current `catalogVersion`; `capability_changed` events emit on broadcast; heartbeat ticks the FE's lastSeen every 30s. No replay buffer — disconnect/reconnect requires fresh snapshot.
 - `GET /api/registry/operations` — Operation catalog (admin seeds + agent tools when knowledgeClient is wired). Returns `{$schema, schemaVersion, catalogVersion, namespace, primitive, entries[]}`. Each entry is a generated single-authority projection of the `UIOperationView` wire record (record → JSON Schema `operation-wire.v1.json` → {TS, Zod}, precise/required per tempdoc 560 §4c); `consumers` is a flat `{consumerId, audience}` list.
 - `core.copy-diagnostic-summary` — Head-local, LOW-risk/NONE-confirmation, USER-audience operation. It returns one transient `summary` string built by `DiagnosticsService` from an explicit typed allowlist (build/runtime-contract versions, platform, lifecycle reason codes, safe GPU capability, and parseable crash timestamp/process/exception type). It has no Worker or Inference capability requirement and uses `METADATA_ONLY` audit policy, so operation history records identity/outcome but never the summary payload.
-- `POST /api/undo/{id}` — Undo a reversible Operation dispatch. Body: `{executionId: string}`. Returns `OperationInvocationResponse`. Fails with `HANDLER_FAILURE` if `!op.policy().undoSupported()`. The `executionId` is the handler-opaque batch key returned in `OperationResult.executionId` from the original dispatch. Emits an `UNDONE` history entry on success. Per G157 (slice g157-suggested-action-primitive).
+- `POST /api/operations/{id}/invoke` — Dispatch a catalog operation. Body: `{args?: object, idempotencyKey?: string, confirmationToken?: string}`. The optional key is a canonical UUIDv7. Matching public input returns the durable metadata receipt before preparation; changed input returns `409 CONFLICT` with `OPERATION_KEY_REUSED`. Invalid keys return `400 BAD_REQUEST`/`OPERATION_KEY_INVALID`; expired keys return `409 CONFLICT`/`OPERATION_KEY_EXPIRED`. Accepted responses include `structuredData.operationKey` and `operationRecordId`, including Engine-minted keys for unkeyed calls. Receipt access preserves provenance, plugin and hard-stop restrictions; it cannot start another effect or reuse a spent approval capsule.
+- `POST /api/undo/{id}` — Undo a reversible operation. Body: `{executionId: string, idempotencyKey?: string, confirmationToken?: string}`. Uses the same key and error contract as invoke; identity distinguishes undo and its target execution id. A retry returns the recorded outcome without reversing again. The pending-authorization ceremony retains the original key and invoke/undo mode through server-side approval. Returns `OperationInvocationResponse`; unsupported undo returns `HANDLER_FAILURE`. Audited successful undo emits `UNDONE` history once. Both routes retain the existing local API authentication and mutation-authorization gates for new effects.
 - `GET /api/registry/resources` — Resource catalog. Entries are a generated single-authority projection of the `UIResourceView` wire record (`resource.v1.json` → {TS, Zod}, precise/required; tempdoc 560 §4c), with the same flat `{consumerId, audience}` consumer shape. V1 ships core OBSERVABLE resources (health-events, runtime-context, indexing/failed-jobs, capabilities, etc.) — not empty. Tempdoc 560 §29 Phase 2: plugin-contributed Resources (from a TRUSTED plugin's `Installation`) are composed in and served here too.
 - `GET /api/registry/prompts` — Prompt catalog. Tempdoc 560 §29 Phase 2: serves core + plugin-contributed Prompts (a TRUSTED plugin's `Installation` prompts are merged into the served catalog by `SubstrateGraphAssembler`); core prompts are empty in V1, so the catalog is plugin-only until a core prompt ships.
 - `GET /api/registry/workflows` — Workflow catalog (tempdoc 565 §26.C — the run-window's workflow PICKER wire). Same envelope `{$schema?, schemaVersion, catalogVersion, namespace, primitive, entries[]}`; each entry is the lean picker projection from `UIWorkflowEmitter` (`{id, type:"workflow", presentation:{labelKey, descriptionKey}, audience, nodes:[{nodeId, kind}]}`) — deliberately lighter than the operations/resources wire (no PreciseWire/generated Zod; a picker needs no fail-closed parse boundary). The FE `WorkflowCatalogClient` does a light parse; the launcher projects this catalog instead of a hardcoded `WORKFLOW_ID`.
@@ -290,6 +359,7 @@ Endpoints:
 
 - `GET /api/action-ledger` — Snapshot of the one action-event log (Outcome face, Slice C1). Returns `{entries: ActionLedgerRow[]}` projected by `ActionLedgerProjection.toWireRow`. Each row: `id` (deterministic, stable across snapshot + stream), `kind` (`operation` | `navigation` | `gate` | `grant` | `effect` | `index`), `occurredAt`, plus kind-specific fields — operation: `operationId`/`outcome`/`executionId`; navigation: `targetSurface`/`sourceId`; gate: `operationId`/`disposition`/`gateBehavior`/`sourceTier`/`outcome`; grant: `grantId`/`action`/`subject`/`outcome`; effect: `effectKind`/`subject`; index: `pathHash`/`collection`/`state`/`outcome`/`attempts`/`errorMessage?`. Receipt, timeline, undo, and trust-audit are projections over this one feed, never re-joins.
   - **Retention (tempdoc 812 D1).** Two tiers with different guarantees. `grant`, `gate` and `operation` rows are **durable**: they are written synchronously to an append-only JSONL audit journal under `<dataDir>/audit/action-ledger.jsonl` (rotated at 4 MB × 8 generations, oldest dropped) as they fan into the log, so they survive a Head restart. `navigation`, `effect` and `index` rows are **ring-only ephemera** — process-lifetime telemetry, deliberately not journaled (the authoritative live indexing view is the indexing-jobs Resource, and a 5k-document ingest would otherwise write 5k audit lines). This endpoint serves the in-memory ring **∪** the journal's tail, deduped by `id`; before 812 the whole feed was ring-only and Activity started empty after every restart. The journal is a write-behind copy for audit reads — the per-kind stores stay authoritative (550:468's rejection of re-sourcing the rail stands). Deep history beyond the served tail is the journal files themselves; there is no cursor pagination (deliberately deferred, 812 §D3).
+  - **Journal retries (lane F C2-4).** The journal deduplicates IDs across its retained file generations, including records outside the500-entry read tail. Opening it builds that derived in-memory index from the existing files; rotation retires the corresponding IDs. A failed append does not enter the durable tail. The fan-in attempts persistence before ring deduplication, so a retry can persist an already-visible event without repeating its live delivery. A torn trailing line is separated from the next append; readable prior records and the fragment are preserved. This is sink idempotency within its retention window, not a claim that operations-row catch-up is already connected.
   - **Query params (all optional and additive — a request with none behaves exactly as before).** `?correlationId=<id>` (561 P-B1) keeps rows carrying that loop/session join key; `?originator=<user|agent|system>` keeps that attribution; `?kind=<kind>` (repeatable, 812 D3) keeps only the named kinds; `?limit=<n>` (812 D3) returns the **newest** `n` rows after filtering — default 500, capped at 2000, with an unparseable or non-positive value falling back to the default. Sources: `ActionLedgerController.handleGet` + `ActionEventJournal`.
 - `GET /api/action-ledger/stream` (SSE) — Live read-view of the same projection (G3/G4/G5). Stream-only (no journal fold); rows dedup by `id`. "Snapshot" and "stream" are two reads of one projection, never two code paths. **Tempdoc 662: also reachable multiplexed via `/api/shell-events/stream` below** — the FE shell subscribes there by default; this dedicated endpoint stays live for direct/tooling consumers.
 - `POST /api/action-ledger/events` — Process-spanning ingest (thesis I): the FE folds local effects into the ONE log. Idempotent by event `id` (re-ingest on reload does not duplicate). Body: an effect event (`id`, `effectKind`, `subject`, `occurredAt`).
@@ -302,6 +372,39 @@ Endpoints:
 - `GET /api/operation-history` + `GET /api/operation-history/stream` (SSE) — Operation Outcome read-view snapshot + append stream (Slice 444b).
 
 `GET /api/navigation-history` (Slice F1) was removed (tempdoc 689 teardown): superseded by `GET /api/action-ledger` kind:'navigation' — the FE reads Navigation entries there now, and the backend `ActionLedgerProjection` still consumes `NavigationHistoryStore` in-process (the store itself is unchanged, only the standalone REST snapshot was torn down for having zero consumers).
+
+### Keyed operation outcome
+
+`GET /api/operation-history/{operationKey}` and MCP `justsearch_operation_outcome`
+read the same `OperationOutcomeView` from the operations database. The key is the
+original UUIDv7 operation key; an undo executionId is not a query key. This read
+never dispatches, retries or accepts work. HTTP marks it `Cache-Control: no-store`.
+
+The answer contains `state` and `historySince`, with optional `phase`, `acceptedAt`,
+`completedAt`, `unitsCompleted`, `unitsFailed`, `reason` and `result`. Timestamps are
+UTC epoch milliseconds. A present row always wins, including below the retention
+boundary. A missing key earlier than that boundary answers `expired`; a missing
+retained-window key answers `unknown`. Unknown means no acceptance and no effect
+because producers must persist acceptance before effects. Expired makes no such
+claim. Malformed/non-v7 keys and missing far-future keys return `OPERATION_KEY_INVALID`.
+
+| Durable state | Public state | Additional projection |
+|---|---|---|
+| ACCEPTED | accepted | Acceptance time and committed unit counts |
+| RUNNING | running | Current phase and committed unit counts |
+| COMPLETE | complete | Completion time and safe receipt |
+| FAILED | failed | Reason, completion time and committed unit counts |
+| CANCELLED | failed | `reason: cancelled` |
+| COMPLETE_WITH_GAPS | running | `phase: awaiting_acceptance`; recorded gaps when present |
+
+`result` carries only receipt `code`/optional `executionId`, or a pending gap list
+of `{unitId, reason}`. The read excludes public input, arbitrary handler results
+and sealed preparation. HTTP returns200 for every successful query, including a
+recorded failed operation; invalid keys return400 and store failures500. MCP uses
+the same body as `structuredContent` and serializes it into its text block.
+
+The existing recent-history snapshot and SSE remain separate read views; the keyed
+query's durability does not make the current process-local snapshot survive restart.
 
 ### Agent API
 
@@ -354,11 +457,12 @@ Interaction / memory surfaces (tempdoc 561 P-A/P-B + 565):
 - `tool_call_rejected`
 - `budget_update` (`phase`, `tokensConsumed`, `tokensRemaining`)
 - `done` (`finalResponse`, `iterationsUsed`, `toolCallsExecuted`, `totalTokensUsed`, optional `sources[]`, optional `citations[]`) — note: `toolCallsExecuted` counts tool calls from the primary agent only; sub-agent calls (via handoff) are not included in this count. **Grounding (tempdoc 565 §3.A):** `sources[]` is the one citation authority — each `AgentSource` is a chunk-identified local passage (`parentDocId`, `chunkIndex`, `path`, `title`, `excerpt`, `startLine`, `endLine`, `headingText`); `citations[]` are the per-sentence inline-mark links (`AgentSentenceCite`: `sentenceText`, `sourceIndex`, `similarity`), present only when the answer↔source matcher ran. Both are declared on the `core.agent-run` shape's `done` `EventDescriptor` (so the generated FE type is truthful — §13.8) and emitted by `AgentController`/`ToolIteratingShapeRunner`. Empty/absent ⇒ ungrounded answer.
-- `error` (`error`, `errorCode`, `errorClass`, `retryable`, optional `retryAction`, optional `retryAttempt`)
+- `error` (`error`, `errorCode`, `errorClass`, `retryable`, optional `retryAction`, optional `retryAttempt`, optional `reasonCode`)
 
 Resume contract notes:
 
 - Supported persisted resume states: `WAITING_APPROVAL`, `READY_FOR_LLM`, `AFTER_TOOL_RESULT`.
+- `CANCELLED` is a terminal persisted state, with cancellation reason carried on the error event; it is not a resumable ready state.
 - Unsupported states return typed `UNSUPPORTED_RESUME_STATE` with remediation guidance.
 - For resumed sessions, pending write/destructive actions require fresh approval.
 
@@ -461,7 +565,7 @@ namespaced tool `_meta` plus a description fallback without changing standard an
 production catalog is empty, so no current tool is deprecated and the tool-surface version does not
 change.
 
-6-tool curated surface (tempdoc 500, adapted from eval-validated 4-tool TS server in tempdoc 366):
+7-tool curated surface (tempdoc 500, extended by lane F C2-4):
 
 | # | Tool | Purpose | Backend |
 |---|------|---------|---------|
@@ -471,6 +575,7 @@ change.
 | 4 | `justsearch_ingest` | File indexing (`paths[]`, optional `collection` — tempdoc 811 C-2a) | `core.ingest-files` Operation |
 | 5 | `justsearch_status` | Index health + enrichment | `KnowledgeHttpApiAdapter.status()` |
 | 6 | `justsearch_runtime_manifest` | Redacted runtime manifest for identity-aware caching | `RuntimeManifestPublisher` |
+| 7 | `justsearch_operation_outcome` | Read a recorded outcome by UUIDv7 operation key | `OperationStore.outcome()` via `HeadAssembly` |
 
 `justsearch_search`'s `structuredContent` evidence tier (projected by `McpEvidenceProjection`)
 carries the same `appliedFilters` echo the REST response does — see
@@ -506,7 +611,8 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `querySyntax` (or `query_syntax` alias) — since tempdoc 821 §P / register F-046, `lucene` is
   honoured on **every** retrieval path (previously only the sparse-only one; multi-leg legs escaped
   the operators and retrieved a SIMPLE parse), so a malformed `lucene` query now fails the request
-  with HTTP `400` / `INVALID_REQUEST` (Worker gRPC `INVALID_ARGUMENT`) instead of being silently
+  with HTTP `400` / `INVALID_REQUEST` (`KnowledgeClientException.Status.INVALID_ARGUMENT` from the
+  index half) instead of being silently
   parsed as plain text.
 - `projection[]`
 - `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`)
@@ -588,7 +694,7 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 `GET /api/knowledge/status`:
 
 - Returns readiness/liveness for the Knowledge Server bridge.
-- Always returns a full `KnowledgeStatusView` record (consistent shape regardless of Worker state). When Worker gRPC is unreachable, serves the last-known-good cached view with `statusStale: true` and `statusStaleMs: <elapsed>` (120s cap, then falls back to defaults).
+- Always returns a full `KnowledgeStatusView` record (consistent shape regardless of Worker state). When the index half is unreachable, serves the last-known-good cached view with `statusStale: true` and `statusStaleMs: <elapsed>` (120s cap, then falls back to defaults).
 - Key fields: `state`, `ready`, `indexState`, `healthy`, `indexedDocuments`, `embeddingCoveragePercent`, `spladeCoveragePercent`, `chunkEmbeddingReady` (chunk-level vector queryability, independent from parent-doc `embeddingCoveragePercent`), `statusStale`, `statusStaleMs`.
 - When `statusStale: true`, `healthy` is overridden to `false` and `indexState` to `"UNKNOWN"` — other enrichment fields reflect the last-known-good state.
 
@@ -602,7 +708,7 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 `DELETE /api/indexing/collections`:
 
 - Request body: `collection` (required string). Removal route for collection-tagged ad-hoc ingests — `removeWatchedRoot` and `PruneOps.pruneByPathPrefix` are both watched-root-prefix driven, so before 811 an out-of-root ingest had no removal route at all.
-- Deletes every parent and chunk document carrying the collection term (Worker RPC `IngestService.DeleteByCollection`), then commits.
+- Deletes every parent and chunk document carrying the collection term (port call `IngestServiceCalls#deleteByCollection`), then commits.
 - Refuses (`400`) the reserved app-internal collections (`justsearch-help`, `agent-history`) and the untagged `default` bucket — the latter would be a whole-index wipe wearing a collection's clothes.
 - Response: `status: "ok"`, `collection`, `deletedDocs` (documents matched and submitted for deletion).
 
@@ -612,15 +718,15 @@ Frontend compatibility note: `modules/ui-web/src/api/domains/search.ts` maps thi
 + `modules/app-services/src/main/java/io/justsearch/app/services/worker/ScanProgressRegistry.java`
 + `modules/app-api/src/main/java/io/justsearch/app/api/scan/ScanProgressEvent.java`
 
-`GET /api/scans/{scanId}/progress` — Server-Sent Events stream backed by an in-memory `ScanProgressRegistry`. Bridges the synchronous gRPC scan progress consumer to UI subscribers.
+`GET /api/scans/{scanId}/progress` — Server-Sent Events stream backed by an in-memory `ScanProgressRegistry`. Bridges the synchronous in-process scan-progress consumer to UI subscribers.
 
 - Path param: `scanId` — the value returned in `KnowledgeIngestResponse.scanId`.
 - Response: `text/event-stream`. Events:
   - `event: progress` payload `{scanId, filesWalked, filesAdmitted, filesSkipped, bytesWalked, currentDirectory, complete: false}` per `ScanRootProgress` from the worker. `currentDirectory` is privacy-hashed (matches the tempdoc 410 / 418 path-hash contract — never a raw path).
   - `event: complete` payload `{scanId, ..., complete: true, terminalReasonCode}` once when the scan ends. `terminalReasonCode` is empty on clean completion or one of `CLIENT_CANCELLED`, `IO_ERROR`, `RPC_FAILED`, `ROOT_NOT_DIRECTORY`, `UNKNOWN_SCAN_OR_RETENTION_EXPIRED`.
   - `event: error` payload `{message}` on RPC-level failure during streaming.
-- **Cancel:** closing the SSE connection (`EventSource.close()`) propagates a gRPC cancel to the worker via the `CancelToken` substrate (T3); the worker scan terminates with `CLIENT_CANCELLED` within the next batch.
-- **Replay window:** subscribers that connect after the scan completes still see the full event sequence as long as the buffer is in memory (default retention `30s`, controlled by the registry — not env-configurable yet).
+- **Cancel:** closing the SSE connection (`EventSource.close()`) propagates a cancel to the index half via the `CancelToken` substrate (T3 — a plain observable boolean since lane F item A10 re-homed it off `io.grpc.Context`); the scan terminates with `CLIENT_CANCELLED` within the next batch.
+- **Replay window:** each scan retains the latest events up to the Engine background queue limit (64 by default). New subscribers replay that suffix, including final counters when complete. A live subscriber overtaken by retention receives `UNKNOWN_SCAN_OR_RETENTION_EXPIRED`; this ends observation without changing the scan outcome. Completed entries expire after `30s` or are evicted oldest-first for a new scan. The registry holds at most the aggregate work limit (64) of mapped scans and the foreground queue limit (48) of open subscriptions. Subscriptions share replay storage and close on HTTP handler exit; an evicted completed ring can remain referenced by a subscription, so retained rings are bounded by the sum of those limits. If all scan entries are active or all subscription slots are occupied, the new registration/subscription receives typed capacity refusal.
 
 ### Health Event Stream API (tempdoc 430)
 
@@ -652,7 +758,7 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 ### Library Resolve-Hash (ADR-0028, scoped exemption)
 
 **Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java` (`handleResolvePathHash`)
-+ `modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java` (`resolvePathHash`)
++ `modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java` (`resolvePathHash`)
 + `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java`
 
 `POST /api/library/resolve-hash`:
@@ -739,8 +845,8 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 
 **Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java` (`handleSettleIndex`)
 
-`POST /api/indexing/settle` purges deleted-but-unmerged documents from the ACTIVE index (Worker RPC
-`IngestService.SettleIndex`). Tempdoc 931 section E item 10: a tombstone still counts in the BM25
+`POST /api/indexing/settle` purges deleted-but-unmerged documents from the ACTIVE index (port call
+`IngestServiceCalls#settleIndex`). Tempdoc 931 section E item 10: a tombstone still counts in the BM25
 collection statistics, so two indexes of the same corpus carrying different tombstone counts answer
 the same query differently. A paired evaluation calls this between the indexing phase and the query
 phase so both arms compare with equal merge state.
@@ -784,21 +890,26 @@ JustSearch's loopback HTTP server exposes a minimal OpenAI-compatible surface th
 - `/v1/embeddings` — JustSearch's embedding encoder is in-process in the Worker; no HTTP server hosts it.
 - Loopback-only. The proxy does not apply rate limiting, billing, or quota checks; those would belong on a Javalin `before` handler if needed.
 
-## gRPC (Head <-> Worker IPC)
+## Protobuf messages (in-process port DTOs)
 
-**Source of truth:** `.proto` files in `modules/ipc-common/src/main/proto/`
+**Source of truth:** `modules/ipc-common/src/main/proto/indexing.proto` — the one remaining
+`.proto` file, and the request/response vocabulary of the Engine's in-process ports.
 
-Start with:
+It declares **messages only**. Lane F stage A deleted the Head↔index gRPC channel (items A9-A11)
+and then, at item A14, the last `service` blocks (`SearchService`, `IngestService`,
+`HealthService`), the separate `io/justsearch/ipc/v1/infra_diagnostics.proto` with its
+`InfraDiagnosticsService`, and the `protoc-gen-grpc-java` generator in
+`modules/ipc-common/build.gradle.kts`. `protoc` still runs, so the generated message classes
+remain; nothing generates or serves a stub. See [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md).
+These proto DTOs at the port signatures are transitional
+(`modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchServiceCalls.java`
+records the follow-up that replaces them with `app-api` records).
 
-- `modules/ipc-common/src/main/proto/indexing.proto` (SearchService, indexing/control messages)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/health.proto` (liveness/readiness probes)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/ai.proto` (AI-related RPCs)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/pipeline_indexing_types.proto` (shared envelope/types)
-- `modules/ipc-common/src/main/proto/io/justsearch/ipc/v1/infra_diagnostics.proto` (infrastructure health snapshots)
+### Port-call TCK coverage gaps
 
-### gRPC TCK coverage gaps
-
-`GET /api/preview` delegates paged stored-text reads to `SearchService.FetchDocumentSlice`.
+`GET /api/preview` delegates paged stored-text reads to the index half's `fetchDocumentSlice`
+port call (`SearchServiceCalls#fetchDocumentSlice`, bound in-process by
+`modules/app-engine/src/main/java/io/justsearch/app/engine/WorkerSearchCalls.java`).
 The Worker reads content and extraction provenance through one searcher. Its metadata map carries
 the canonical `content_sha256`, projected by Head as nullable `contentSha256`; this identifies the
 complete stored UTF-8 text, including VDU replacements. `sourceSha256` identifies the extracted source
@@ -806,20 +917,18 @@ bytes and has a separate meaning. Pages use UTF-16 character offsets, preserve U
 and include `totalChars`. Strict measurement clients require an unchanged content revision across pages
 and verify the assembled text against it. `SUCCESS_EMPTY` remains a found document with empty content.
 
-The following RPCs are covered by integration tests but lack isolated TCK-style contract tests in `app-api-tck`. Highest-value additions are marked.
+The following port calls are covered by integration tests but lack isolated TCK-style contract tests in `app-api-tck`. Highest-value additions are marked. (They were gRPC RPCs until lane F stage A item A6 re-homed the same call surface onto `SearchServiceCalls`; the names and signatures are unchanged.)
 
-| Service | RPC | Priority |
+| Port | Call | Priority |
 |---------|-----|----------|
-| `SearchService` | `Suggest` | **High** â€” user-facing autocomplete hot path |
-| `SearchService` | `RetrieveContext` | **High** â€” RAG context retrieval hot path |
-| `SearchService` | `FetchDocuments` | Medium |
-| `SearchService` | `FetchDocumentSlice` | Medium |
-| `SearchService` | `Rerank` | Medium — cross-encoder reranking via Worker GPU (360) |
-| `SearchService` | `MatchCitations` | Low |
-| `SearchService` | `ListFolders` | Low |
-| `SearchService` | `ListFolderFiles` | Low |
-| `AiService` | `TranslateIntent`, `Embed`, `Classify` | Low |
-| `InfraDiagnosticsService` | `CurrentSnapshot`, `StreamSnapshots` | Low |
+| `SearchServiceCalls` | `suggest` | **High** — user-facing autocomplete hot path |
+| `SearchServiceCalls` | `retrieveContext` | **High** — RAG context retrieval hot path |
+| `SearchServiceCalls` | `fetchDocuments` | Medium |
+| `SearchServiceCalls` | `fetchDocumentSlice` | Medium |
+| `SearchServiceCalls` | `rerank` | Medium — cross-encoder reranking on the index half's GPU (360) |
+| `SearchServiceCalls` | `matchCitations` | Low |
+| `SearchServiceCalls` | `listFolders` | Low |
+| `SearchServiceCalls` | `listFolderFiles` | Low |
 
 ### Why not Pact / consumer-driven contracts
 
@@ -928,8 +1037,8 @@ All cross-language contract tests use `ORDER_MAP_ENTRIES_BY_KEYS` for determinis
 
 `POST /api/debug/reset-index` — wipes all index state for pipeline profiling
 (tempdoc 355). Gated on `justsearch.eval.mode=true` (set by
-`runHeadlessEval`); returns 404 in production. Sequence: Worker reset via
-gRPC (stop loop → delete all docs → commit + refresh → clear queue +
+`runHeadlessEval`); returns 404 in production. Sequence: index-half reset via
+the `resetIndex` port call (stop loop → delete all docs → commit + refresh → clear queue +
 clusters + metrics → restart loop), then Head clears watched roots +
 persists empty state. Response: `{"reset": true}` on success, 500 on
 failure.
@@ -937,16 +1046,16 @@ failure.
 `GET /api/debug/session-policies` — resolved `RuntimePolicy` + per-encoder
 `ModelSessionPolicy` snapshots as JSON. **Not gated on eval mode** —
 available in production (unlike `/api/debug/reset-index`). Proxied from
-the Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC
-rpc (tempdoc 397 §14.28 U4); Head does not re-resolve. Response shape:
+the index half's live `InferenceSurface` via the `getSessionPolicies` port
+call (tempdoc 397 §14.28 U4); Head does not re-resolve. Response shape:
 `{configStatus, runtime, models}` where `configStatus ∈ {ok,
 config-unavailable, surface-unavailable, worker-unreachable}`
 (`config-unavailable` = no `ResolvedConfig` on Head; `surface-unavailable`
-= Worker hasn't composed yet; `worker-unreachable` = gRPC failed or no
-client). Controller: `modules/ui/src/main/java/io/justsearch/ui/api/SessionPoliciesController.java`.
+= Worker hasn't composed yet; `worker-unreachable` = the port call failed or
+there is no client). Controller: `modules/ui/src/main/java/io/justsearch/ui/api/SessionPoliciesController.java`.
 
 Other debug endpoints: `/api/debug/commit-metadata`, `/api/debug/effective-config`,
-`/api/debug/events`, `/api/debug/worker-log`, `/api/debug/dashboard`,
+`/api/debug/events`, `/api/debug/engine-log`, `/api/debug/dashboard`,
 `/api/debug/chunks`, `/api/debug/logging` (GET/POST),
 `/api/debug/metrics/timeseries`, `/api/debug/metrics/timeseries/available`.
 

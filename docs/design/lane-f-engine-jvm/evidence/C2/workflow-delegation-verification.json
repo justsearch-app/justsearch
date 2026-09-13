@@ -1,0 +1,157 @@
+{
+  "revision": "85fad8249 + final workflow delegation and primary failure preservation",
+  "command": "gradlew.bat :modules:app-services:test --tests '*Workflow*Test' --tests '*ConversationEngine*Test' --tests '*ToolIteratingShapeRunner*Test' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 81,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 13
+  },
+  "tasks": [
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 81,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    }
+  ],
+  "earlier1056": {
+    "revision": "85fad8249 + final workflow delegation diff",
+    "command": "gradlew.bat :modules:app-services:test --tests '*Workflow*Test' --tests '*ConversationEngine*Test' --tests '*ToolIteratingShapeRunner*Test' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "summary": {
+      "tests": 80,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 80,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 13
+      }
+    ],
+    "executed1055": {
+      "revision": "85fad8249 + declared audience and terminal metadata",
+      "command": "gradlew.bat :modules:app-services:test --tests '*Workflow*Test' --tests '*ConversationEngine*Test' --tests '*ToolIteratingShapeRunner*Test' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 80,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 13
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 80,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        }
+      ]
+    },
+    "negative1054": {
+      "revision": "85fad8249 + workflow delegation and terminal regressions",
+      "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowBackgroundDelegationTest' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 17,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 17,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ]
+    },
+    "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+    "rawPrefixes": [
+      "c2-3-workflow-delegation-negative1054",
+      "c2-3-workflow-delegation1055",
+      "c2-3-workflow-delegation1056"
+    ],
+    "sources": [
+      {
+        "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowToolRunnerImpl.java",
+        "sha256": "d6b7cd9ccd1330a307f918ad5b8cccdbc415af1dc9df4e33bd783031d66de46a"
+      },
+      {
+        "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowShapeRunner.java",
+        "sha256": "9c2fad629c969ee701c68a16c0e8773f83df122a90a90684bab82c0880ee6683"
+      },
+      {
+        "path": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowBackgroundDelegationTest.java",
+        "sha256": "29f416840f3fb577ceca5612068ba9a8771eebbc315daca223df4f010d7ea080"
+      }
+    ]
+  },
+  "negative1057": {
+    "revision": "85fad8249 + cleanup failure regression",
+    "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowBackgroundDelegationTest' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "summary": {
+      "tests": 18,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 18,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      }
+    ]
+  },
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-workflow-delegation-negative1054",
+    "c2-3-workflow-delegation1055",
+    "c2-3-workflow-delegation1056",
+    "c2-3-workflow-cleanup-negative1057",
+    "c2-3-workflow-delegation1058"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowToolRunnerImpl.java",
+      "sha256": "d6b7cd9ccd1330a307f918ad5b8cccdbc415af1dc9df4e33bd783031d66de46a"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowShapeRunner.java",
+      "sha256": "8d604fcb3b24efc9df2597bb6eaf9208be0d4ad31095cd0675810e3ca1ecf347"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowBackgroundDelegationTest.java",
+      "sha256": "981fc34098185e24f65479459eb8bb8d1be3530f502cc033507d0e298fcb3bf8"
+    }
+  ]
+}

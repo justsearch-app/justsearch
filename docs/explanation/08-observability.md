@@ -481,7 +481,16 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   holder rewrite is a focused follow-up tempdoc with a smaller blast radius.
 
 - **IPC metrics (Head `ipc.*` namespace)**:
-  These metrics track Worker process lifecycle and gRPC communication health:
+  These metrics track Worker process lifecycle and, historically, channel health.
+
+  **Lane F stage A (2026-09):** items A9-A11 merged the Head and the Worker into one Engine JVM.
+  The three channel counters (`ipc.grpc.reconnect`, `ipc.circuit_breaker.state_change`,
+  `ipc.circuit_breaker.rejected`) were removed from the catalog with the wire client stack that
+  emitted them — there is no channel to reconnect or trip a breaker on. The spawn/supervision
+  counters below are still declared but have had no producer since A11 deleted the Worker process;
+  they are held for the stage B supervisor rather than removed. Only `ipc.status.poll_ms` and
+  `ipc.status.response_bytes` are emitted today.
+
 
   | Metric | Type | Description |
   | :--- | :--- | :--- |
@@ -493,17 +502,14 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   | `ipc.worker.stability_reset` | Counter | Restart counter resets after stable operation |
   | `ipc.shutdown.timeout` | Counter | Shutdown timeouts |
   | `ipc.shutdown.forcible_kill` | Counter | Forcible process kills |
-  | `ipc.grpc.reconnect` | Counter | gRPC reconnections |
-  | `ipc.circuit_breaker.state_change` | Counter | Circuit breaker state transitions (tags: `from`, `to`) |
-  | `ipc.circuit_breaker.rejected` | Counter | Requests rejected by open circuit |
   | `ipc.status.poll_ms` | Timer | Status polling latency |
   | `ipc.status.response_bytes` | Histogram | Status response size |
 
 #### Worker-side OperationalMetrics (dual-system rationale)
 
-The Worker maintains a separate `OperationalMetrics` LongAdder-based singleton alongside OpenTelemetry. This is architecturally intentional: OTel counters are write-only by design (no `get()` or `value()` method), but the gRPC status response path needs readable counter values. `ObservableLongCounter` callbacks bridge the two — LongAdder fields are the source of truth for gRPC reads, and registered OTel callbacks pull from those same fields during each periodic flush (5s) for NDJSON export.
+The Worker maintains a separate `OperationalMetrics` LongAdder-based singleton alongside OpenTelemetry. This is architecturally intentional: OTel counters are write-only by design (no `get()` or `value()` method), but the status response path needs readable counter values. `ObservableLongCounter` callbacks bridge the two — LongAdder fields are the source of truth for the status read, and registered OTel callbacks pull from those same fields during each periodic flush (5s) for NDJSON export.
 
-Key OperationalMetrics fields exposed via gRPC → `/api/status`:
+Key OperationalMetrics fields exposed via the `indexStatus` port call → `/api/status`:
 - Counters: `documentsIndexed`, `searchesTotal`, `searchesZeroResultTotal`, `searchesFailedTotal`, `batchesSubmitted`, `batchesRejected`
 - Maps: `failedByFileKind` (per-MIME-type failure counts, ~10 buckets: pdf, office, code, text, etc.)
 - Gauges: `queueDepth`, `lastSearchLatencyMs`, `lastIndexLatencyMs`
@@ -552,14 +558,14 @@ A single user action (e.g., "Search for 'Invoice'") traverses multiple boundarie
 1.  **Frontend:** User clicks button.
 2.  **API:** `LocalApiServer` receives request.
 3.  **AppFacade:** Business logic.
-4.  **IPC:** gRPC call to Worker (metadata: `x-trace-id`).
+4.  **Port call:** direct in-process call into the index half — since lane F stage A there is no IPC hop and no `x-trace-id` metadata to propagate: the caller's OTel context is already current on the callee's thread (except across a thread hand-off, which must wrap its tasks).
 5.  **Worker:** Lucene query.
 
 We use a `TraceId` to link these disconnected events together in the logs.
 
 #### Worker Indexing Spans (OTel)
 
-The Worker has its own `TracingBootstrap` (initialized in `KnowledgeServer.start()` before service construction) that emits OTel spans for the indexing pipeline. Controlled by `JUSTSEARCH_INDEX_TRACING_LEVEL`:
+The indexing pipeline emits OTel spans from a `TracingBootstrap` initialized in `KnowledgeServer.start()` before service construction, controlled by `JUSTSEARCH_INDEX_TRACING_LEVEL`:
 
 | Level | Behavior |
 |-------|----------|
@@ -674,13 +680,24 @@ lossy for sub-ms encoder calls. Consumers should prefer `duration_ms` and fall
 back to `(end − start)` only for legacy `traces.ndjson` files produced
 before D-1 landed.
 
+**One SDK per JVM (lane F stage A).** `GlobalOpenTelemetry` can be registered once, and since
+item A6 the Head and the index half are one JVM, so the two levels above are no longer independent.
+The Head's bootstrap runs first (its API phase precedes `KnowledgeServer.start()`), so
+`JUSTSEARCH_HEAD_TRACING_LEVEL` governs both halves; `JUSTSEARCH_INDEX_TRACING_LEVEL` takes effect
+only when the head level is `none`. `KnowledgeServer` logs the skip at INFO naming the
+consequence rather than swallowing it. Collapsing the two keys into one belongs with stage B's
+re-cut of the worker projection, not to stage A.
+
 Application-level gating (`maybeSpan()` returning `Span.getInvalid()`) provides true zero-cost when off. The OTel sampler acts as a safety net, not the primary gate. Validated overhead: sub-10µs per batch (tempdoc 312 item 7). End-to-end verification (tempdoc 400 §23) measured no indexing throughput regression (22.5 → 23.2 d/s across 3 runs) with detailed tracing enabled.
 
 #### Local trace viewer (`otel-desktop-viewer`)
 
 Tempdoc 518 Appendix G W4.2 activated head-side tracing (via
 `JUSTSEARCH_HEAD_TRACING_LEVEL`); cross-process tracing was already
-wired (`TraceClientInterceptor` / `TracingServerInterceptor`).
+wired through a client/server interceptor pair. Lane F stage A item A9
+deleted the server half with the gRPC server: inside one JVM the caller's
+OTel context is already current on the callee's thread, so there is
+nothing to extract.
 Combined with the existing OTLP fan-out support in
 `TracingBootstrap.buildOptionalOtlpExporter` (reads
 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`),
@@ -703,8 +720,15 @@ in-memory. Ideal for "do a thing, see the trace tree" debugging.
    - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces`
      (routes the BatchSpanProcessor fan-out to the viewer).
 4. Do a thing in the UI (search, chat, mode switch). Spans appear in
-   the viewer's browser tab, with head + worker spans stitched
-   automatically via the W3C TraceContext gRPC interceptors.
+   the viewer's browser tab. Head and index spans are one tree by
+   construction now rather than by stitching: item A9 deleted the
+   TraceContext interceptor pair, because the caller's context is
+   already current on the callee's thread inside one JVM. The one
+   place that is not automatic is a thread hand-off — a per-source
+   federated search fans out onto virtual threads, so
+   `SearchPerSourceExecutor` wraps its executor with
+   `Context.taskWrapping`; without that the sub-queries would each
+   start a new trace.
 
 **Why the viewer is ephemeral**: the canonical persistent store is
 still `<dataDir>/telemetry/traces.ndjson` (rotated locally). The
@@ -942,6 +966,16 @@ The OTel span tree is **additive** — it coexists with the `EventTraceSequencer
 
 ## Real-Time Insights
 
+### SSE replay handoff
+
+`SseStreamChannel.subscribeAndReplay` captures retained history and registers its listener
+atomically, then delivers the replay outside the channel write lock. While replay is being
+written, the listener buffers at most `FrameHistoryRingBuffer.capacity()` incoming live frames.
+If that queue fills, the channel removes only the slow listener and clears its queued frames;
+the replay call fails when its blocked callback returns. Publishers continue, and a failed handoff
+cannot claim a successful replay with missing frames. A successful handoff preserves replay/live
+ordering. The limit counts frames; payload sizes follow each stream's existing contract.
+
 ### The Ring Buffer (`EventBuffer`)
 We maintain a circular buffer of the last 50 significant events in memory.
 *   **Endpoint:** `/api/debug/events`
@@ -957,7 +991,7 @@ The frontend (and dev tooling) treats `/api/status` as the canonical “what’s
 `/api/status` is a **read of a sample**, not an observation. The Worker's `IndexStatus` unary is performed by an internal sampler on the Head, and the request thread never calls the Worker.
 
 *   **Where the sampler runs.** `KnowledgeServerHealthMonitor`'s existing schedule (a single daemon thread; no executor was added for this). Its per-tick callback drives `ReadinessReconciliationTrigger`, whose thunk is `StatusLifecycleHandler.sampleAndBuildStatusSnapshot` — the one method that performs the Worker RPC and reconciles every health tap (`LifecycleSnapshotTap`, `WorkerSnapshotTap`, `IndexDriftHealthTap`, `AtRestHealthTap`, the conversation-protection tap and the worker-metrics publisher). The trigger also fires on every worker/inference capability transition, and self-seeds one sample when the composition root attaches it.
-*   **Sampling period.** 10 s while idle, 2 s while the Worker has index work in flight or the inference runtime is activating (`StatusLifecycleHandler.samplingPeriodMs()`, derived from the **last** sample so the decision costs no RPC). The monitor re-arms itself with that value, clamped to `[1 s, pollIntervalMs]` — the health poll's own configured interval is the ceiling. Resume detection still measures its inter-tick gap against the configured interval, not the actual delay, so a faster tick can only make it more conservative.
+*   **Sampling period.** 10 s while idle, 2 s while the Worker has index work in flight or the inference runtime is activating (`StatusLifecycleHandler.samplingPeriodMs()`, derived from the **last** sample so the decision costs no RPC). The monitor retains one fixed-delay timer reservation and checks a monotonic due time with a fixed delay of at most one second between callbacks. Actual samples use that value, clamped to `[1 s, pollIntervalMs]`; scheduling can add up to one heartbeat interval. Keeping the reservation prevents competing timer work from permanently stopping health sampling between ticks. Initial timer admission retries for at most five seconds using the registered retry delay; exhausted admission fails startup and closes the unpublished monitor. Manual recovery capacity refusal returns HTTP 429 with the registered `Retry-After`. Resume detection still measures its inter-tick gap against the configured interval, not the actual delay, so a faster tick can only make it more conservative.
 *   **The fast arm engages one period late, and not at all for a short ingest.** "In progress" is derived from the LAST sample, so the sampler must already have observed in-flight work before it can shorten its period — and an ingest that starts and drains inside one idle period is never observed at all. Measured: an 822-file ingest produced 17 consecutive ~2 s intervals; a 30-file ingest produced none, because it had drained before the next 10 s tick. This is the design's cost, not a defect — deciding to sample faster requires a sample — and it is bounded: the work a 2 s cadence exists for (a long backfill, a large scan) is exactly the work that outlives a period.
 *   **What a request does.** `GET /api/status` builds the response from the cached sample and runs **no** taps. The one exception is the boot window: if no sample has ever been taken, the first request takes one synchronously. That can happen at most once per process.
 *   **Freshness semantics.** `meta.workerRpcAtMs` is the sample's observation time (stamped immediately before the call), so a consumer's age is `now - workerRpcAtMs`. `meta.workerRpcStale` is `true` when the last sample failed **or** when it is older than three sampling periods — a wedged sampler surfaces as "contact lost" rather than as a frozen snapshot served as fresh. Per-dimension `stale`/`stalenessMs` derive from the same fact (see the health/readiness contract).
@@ -985,7 +1019,7 @@ For quick "what's running?" introspection, the backend also exposes:
   - `use_thinking`: `boolean` (from `JUSTSEARCH_USE_THINKING` env var, default `true`)
   - Model paths, context size, GPU layers
   - Runtime mode and availability
-* **`GET /api/debug/worker-log`**: last worker log tail (best-effort)
+* **`GET /api/debug/engine-log`**: last Engine log tail (best-effort)
 * **`GET /api/inference/status`**: inference mode + effective runtime model/context when available (plus external server adoption diagnostics when applicable)
 
 ### Telemetry health monitoring (`/api/telemetry/health`)
@@ -1170,7 +1204,7 @@ For dashboard trend visualization, `RrdMetricStore` provides fixed-size time-ser
 - Head: `httpInflightRequests`
 - JVM: `heapUsedBytes`, `threadsLive`, `gcCollectionCount` (per-process)
 - AI/LLM: `intentSuccessTotal`, `summarySuccessTotal`, `llmQueueDepth`
-- IPC: `grpcReconnect`, `circuitBreakerRejected`
+- IPC: *(none — `grpcReconnect` / `circuitBreakerRejected` went with the wire client stack at lane F items A9-A11; see the IPC metrics note above)*
 - GPU: `gpu.utilization.percent`, `gpu.memory.utilization.percent`
 
 **Archives** (3-tier consolidation, fixed total size ~50KB):

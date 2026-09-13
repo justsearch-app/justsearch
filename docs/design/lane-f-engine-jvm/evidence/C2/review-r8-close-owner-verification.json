@@ -1,0 +1,29 @@
+{
+  "revision": "da3dccf88 + retained normal queue close and server shutdown ownership",
+  "command": "gradlew.bat :modules:indexer-worker:test --tests '*IndexingJobsChangeStreamTest' --tests '*QueueProjectionCommitTest' --tests '*JobQueueTest' --tests '*KnowledgeServerCloseCompletionTest' --tests '*IndexRootLock*' :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:spotlessJavaSourcesCheck :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 100,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 8
+  },
+  "tasks": [
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 8
+    }
+  ],
+  "negativeControl": {
+    "log": "tmp/c2-review-r8-close-owner-negative903.txt",
+    "tests": 8,
+    "failures": 2,
+    "reason": "normal close permits reopening over retained connection; server reports complete shutdown after queue-close failure"
+  }
+}

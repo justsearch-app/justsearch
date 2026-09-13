@@ -164,13 +164,13 @@ final class StreamingCitationMatcherPayloadTest {
   private static DocumentService stubDocs(CitationMatchResult result) {
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
       @Override
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-          String answerText, List<DocumentService.VerificationSource> sources, double threshold) {
+          String answerText, List<DocumentService.VerificationSource> sources, double threshold, io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.completedFuture(result);
       }
     };
@@ -179,6 +179,11 @@ final class StreamingCitationMatcherPayloadTest {
   private static ConversationContext stubCtx(Map<String, Object> attributes) {
     Map<String, Object> attrs = new HashMap<>(attributes);
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       @Override
       public List<Map<String, Object>> messages() {
         return List.of();

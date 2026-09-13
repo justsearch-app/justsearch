@@ -5,6 +5,7 @@ import io.justsearch.indexerworker.extract.ContentExtractor.BudgetExceededExcept
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.text.TextQualityAnalyzer;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,7 +14,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntFunction;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -27,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * <p>This is the Worker-side adapter where JustSearch budgets are translated to Tika-native
  * parser configuration, output limits, MIME admission, and artifact provenance.
  */
-public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider {
+public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider, AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(PolicyDrivenTikaExtractor.class);
   private static final String OCR_FALLBACK_DIRECT_TESSERACT = "direct_tesseract";
   private static final String OCR_FALLBACK_RENDERED_PDF = "rendered_pdf";
@@ -40,24 +43,30 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   private final PdfOcrEngine ocrEngine;
   private final ExtractionFallbackBudget fallbackBudget;
 
-  public PolicyDrivenTikaExtractor() {
-    this(TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled());
-  }
-
-  public PolicyDrivenTikaExtractor(TikaExtractionPolicy policy) {
-    this(policy, OcrRoutingConfig.disabled());
-  }
-
-  public PolicyDrivenTikaExtractor(TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig) {
-    this(policy, ocrConfig, OcrMetricCatalog.noop());
+  public PolicyDrivenTikaExtractor(IntFunction<ExecutorService> poolFactory) {
+    this(poolFactory, TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled());
   }
 
   public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory, TikaExtractionPolicy policy) {
+    this(poolFactory, policy, OcrRoutingConfig.disabled());
+  }
+
+  public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig) {
+    this(poolFactory, policy, ocrConfig, OcrMetricCatalog.noop());
+  }
+
+  public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory,
       TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog) {
-    this(policy, ocrConfig, ocrMetricCatalog, ExtractionFallbackBudget.defaults());
+    this(poolFactory, policy, ocrConfig, ocrMetricCatalog, ExtractionFallbackBudget.defaults());
   }
 
   public PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
       OcrMetricCatalog ocrMetricCatalog,
@@ -71,11 +80,16 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor = new StructuredContentExtractor(this.policy.maxExtractedChars());
-    this.ocrEngine = PdfOcrEngine.create(this.ocrConfig, log);
+    this.ocrEngine = PdfOcrEngine.create(poolFactory, this.ocrConfig, log);
   }
 
   public TikaExtractionPolicy policy() {
     return policy;
+  }
+
+  @Override
+  public void close() {
+    ocrEngine.close();
   }
 
   @Override
@@ -131,12 +145,25 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       ocrEvidence.skip(ocrAttempt.skipReason());
     }
     if (ocrAttempt.shouldAttempt()) {
+      try {
       ExtractionArtifact ocrArtifact =
           summary.mixedPdf()
               ? trySelectivePdfOcr(file, result, summary, ocrEvidence)
               : tryOcr(file, result, summary, ocrEvidence);
       if (ocrArtifact != null) {
         return ocrArtifact;
+      }
+      } catch (java.util.concurrent.RejectedExecutionException refusal) {
+        // OCR is an enhancement of an already extracted document. Keep that baseline while
+        // making this capacity failure visible; the OCR engine itself preserves typed refusal.
+        String reason = refusal instanceof EngineExecutorRejectedException registered
+            ? registered.reason().name()
+            : refusal instanceof PdfOcrEngine.OcrCapacityException capacity
+                ? capacity.reason().name() : "QUEUE_LIMIT";
+        ocrEvidence.skip(OcrSkipReason.UNKNOWN);
+        ocrMetricCatalog.failedTotal.increment(OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, reason));
+        log.warn("OCR capacity refused for {} ({}); preserving structured extraction",
+            file.getFileName(), reason);
       }
     }
     return withVisualEvidence(

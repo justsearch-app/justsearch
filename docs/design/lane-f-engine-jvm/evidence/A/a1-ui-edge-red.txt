@@ -1,0 +1,44 @@
+# A1 falsification — app-engine -> ui edge reds onlyAppLauncherMayDependOnUi
+
+Date: 2026-09-07   Worktree: .claude/worktrees/lane-F-A   Branch: worktree-lane-F-A
+Base commit: 2845d9e83
+
+## Injection (temporary, reverted immediately after this capture)
+
+  modules/app-engine/build.gradle.kts   + implementation(project(":modules:ui"))
+  modules/app-engine/src/main/java/io/justsearch/app/engine/FalsificationProbe.java  (new)
+      imports io.justsearch.ui.HeadlessApp and returns HeadlessApp.class
+
+## Command
+
+  ./gradlew.bat :modules:app-launcher:test --tests '*LayeringEnforcementTest*' \
+      -PskipWebBuild=true --console=plain
+
+## Result: BUILD FAILED (gradle exit 1)
+
+```
+LayeringEnforcementTest > onlyAppLauncherMayDependOnUi FAILED
+    java.lang.AssertionError at ArchRule.java:94
+
+25 tests completed, 1 failed
+
+> Task :modules:app-launcher:test FAILED
+BUILD FAILED in 13s
+```
+
+## Assertion detail (from modules/app-launcher/build/test-results/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml)
+
+```
+java.lang.AssertionError: Architecture Violation [Priority: MEDIUM] - Rule 'only app-launcher may depend on ui module (ui is the top layer)' was violated (1 times):
+Method <io.justsearch.app.engine.FalsificationProbe.probe()> references class object <io.justsearch.ui.HeadlessApp> in (FalsificationProbe.java:12)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.assertNoViolation(ArchRule.java:94)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.check(ArchRule.java:86)
+```
+
+## Revert
+
+FalsificationProbe.java deleted; the ui dependency removed from
+modules/app-engine/build.gradle.kts. Post-revert re-run is recorded in the A1 commit.
+
+This is also the evidence A.md section 8 asks for in the *first* of rule 6b's two
+directions (A2 references this file rather than repeating the injection).

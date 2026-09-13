@@ -18,10 +18,6 @@ public interface WorkerRecoveryAuthority {
     NOT_APPLICABLE,
     /** An attempt is already running; the request is a no-op rather than a second concurrent spawn. */
     ALREADY_RUNNING,
-    /** Supervision holds the restart budget for this worker; boot recovery stands down. */
-    VETOED_SUPERVISION,
-    /** Supervision has already given up ({@code worker.restart_exhausted}); that stays terminal. */
-    VETOED_RESTART_EXHAUSTED,
     /** This authority's own bounded budget is spent ({@code worker.spawn_recovery_exhausted}). */
     EXHAUSTED
   }

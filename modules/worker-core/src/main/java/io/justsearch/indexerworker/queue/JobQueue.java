@@ -19,24 +19,39 @@ import io.justsearch.indexerworker.ingest.IngestionOutcome;
  *   <li>Job state tracking (PENDING, PROCESSING, DONE, FAILED)</li>
  * </ul>
  *
- * <p>Implementations:
- * <ul>
- *   <li>{@link SqliteJobQueue} - SQLite-backed durable queue for production</li>
- *   <li>InMemoryJobQueue - In-memory queue for hermetic testing (in testFixtures)</li>
- * </ul>
+ * <p>The production implementation is SQLite-backed; tests use scoped recording queues.
  */
 public interface JobQueue extends Closeable {
 
   /**
-   * A pending job with its associated path and optional collection tag.
+   * An atomically claimed job with its path, collection and admission attribution snapshot.
    *
    * @param path the file path to index
    * @param collection collection tag for the indexed document, or null for default
+   * @param provenance admission attribution, or null for an unknown legacy origin
    */
-  record IndexJob(Path path, String collection) {}
+  record IndexJob(Path path, String collection, EnqueueProvenance provenance) {
+    /** Legacy/internal fixture with unknown admission attribution. */
+    public IndexJob(Path path, String collection) {
+      this(path, collection, null);
+    }
+  }
 
   /** Sentinel for {@link EnqueueEntry#sizeBytes()} when the file's byte size could not be read. */
   long UNKNOWN_SIZE_BYTES = -1L;
+
+  /** Persistable attribution projected by the Engine bridge; never an authorization input. */
+  record EnqueueProvenance(String originator, String transport) {
+    public EnqueueProvenance {
+      if (originator == null || !List.of("user", "agent", "system").contains(originator)) {
+        throw new IllegalArgumentException("Unknown ingestion originator");
+      }
+      if (transport == null || transport.isBlank() || transport.length() > 256
+          || transport.chars().anyMatch(Character::isISOControl)) {
+        throw new IllegalArgumentException("Invalid ingestion transport");
+      }
+    }
+  }
 
   /**
    * A path to enqueue plus the byte size observed at enqueue time (tempdoc 813 Slice B).
@@ -49,7 +64,12 @@ public interface JobQueue extends Closeable {
    * @param path the file path to index
    * @param sizeBytes byte size at enqueue time, or {@link #UNKNOWN_SIZE_BYTES} when unknown
    */
-  record EnqueueEntry(Path path, long sizeBytes) {
+  record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance) {
+
+    /** Maintenance without new attribution preserves the existing durable job attribution. */
+    public EnqueueEntry(Path path, long sizeBytes) {
+      this(path, sizeBytes, null);
+    }
 
     /** An entry whose size is not known (persisted as NULL, excluded from pending-bytes sums). */
     public static EnqueueEntry ofUnknownSize(Path path) {
@@ -71,6 +91,11 @@ public interface JobQueue extends Closeable {
       } catch (IOException | RuntimeException e) {
         return ofUnknownSize(path);
       }
+    }
+
+    /** Stats a newly admitted path while retaining the caller's explicit attribution. */
+    public static EnqueueEntry stat(Path path, EnqueueProvenance provenance) {
+      return new EnqueueEntry(path, stat(path).sizeBytes(), provenance);
     }
 
     /** Wraps each path with an unknown size. */
@@ -303,6 +328,24 @@ public interface JobQueue extends Closeable {
     markDone(path);
   }
 
+  /** Complete only the exact process-local claim returned by pollPending. */
+  default boolean markClaimDone(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry) {
+    markDone(claim.path(), outcome, entry);
+    return true;
+  }
+
+  /** Fail only the exact process-local claim returned by pollPending. */
+  default boolean markClaimFailed(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry) {
+    markFailed(claim.path(), outcome, entry);
+    return true;
+  }
+
+  /** Defer only the exact process-local claim returned by pollPending. */
+  default boolean deferClaim(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry) {
+    defer(claim.path(), outcome, entry);
+    return true;
+  }
+
   /**
    * Marks multiple jobs as successfully completed in a single batch operation.
    *
@@ -330,7 +373,8 @@ public interface JobQueue extends Closeable {
     if (transitions == null) return;
     for (IngestionLedgerTransition transition : transitions) {
       if (transition != null) {
-        markDone(transition.path(), outcome, transition.entry());
+        if (transition.claim() == null) markDone(transition.path(), outcome, transition.entry());
+        else markClaimDone(transition.claim(), outcome, transition.entry());
       }
     }
   }
@@ -501,7 +545,17 @@ public interface JobQueue extends Closeable {
       String sourceKind,
       String artifactStatus,
       String policyId,
-      String parserId) {
+      String parserId,
+      String originator,
+      String transport) {
+    /** Explicitly unknown attribution for legacy entries; never replaced by a later admission. */
+    public IngestionLedgerEntry(String pathHash, String collection, Long sourceSizeBytes,
+        Long sourceModifiedAtMs, String sourceKind, String artifactStatus, String policyId,
+        String parserId) {
+      this(pathHash, collection, sourceSizeBytes, sourceModifiedAtMs, sourceKind, artifactStatus,
+          policyId, parserId, null, null);
+    }
+
     public IngestionLedgerEntry {
       pathHash = capField(pathHash);
       collection = capField(collection);
@@ -509,6 +563,8 @@ public interface JobQueue extends Closeable {
       artifactStatus = capField(artifactStatus);
       policyId = capField(policyId);
       parserId = capField(parserId);
+      originator = capField(originator);
+      transport = capField(transport);
     }
 
     private static String capField(String value) {
@@ -528,7 +584,23 @@ public interface JobQueue extends Closeable {
   int LEDGER_ENTRY_MAX_FIELD_CHARS = 256;
 
   /** Path plus privacy-safe metadata for an outcome transition. */
-  record IngestionLedgerTransition(Path path, IngestionLedgerEntry entry) {}
+  record IngestionLedgerTransition(Path path, IngestionLedgerEntry entry, IndexJob claim) {
+    /** Administrative/fixture transition without a processing claim. */
+    public IngestionLedgerTransition(Path path, IngestionLedgerEntry entry) {
+      this(path, entry, null);
+    }
+
+    /** Retain the actual claimed object through the Lucene commit boundary. */
+    public IngestionLedgerTransition(IndexJob claim, IngestionLedgerEntry entry) {
+      this(claim.path(), entry, claim);
+    }
+
+    public IngestionLedgerTransition {
+      if (claim != null && !claim.path().equals(path)) {
+        throw new IllegalArgumentException("Transition path differs from its claim");
+      }
+    }
+  }
 
   /** Export-safe ingestion ledger row. Raw job paths are intentionally omitted. */
   record IngestionEventView(
@@ -718,7 +790,16 @@ public interface JobQueue extends Closeable {
    * <p>Implementations that do not use a write-ahead log may return {@code true}. A false result
    * blocks the handoff.
    */
-  default boolean checkpointForUpgrade() {
+  /**
+   * Drains the write-ahead log into the database file.
+   *
+   * <p>Renamed off {@code checkpointForUpgrade} at lane F stage B item B5. The old name said WHO
+   * called it rather than what it does, and it was load-bearing: the ordinary close did not
+   * checkpoint at all, so an Engine that exited any way other than through the upgrade barrier
+   * left its WAL for the next start to replay. Design 7.3 step 7 makes the checkpoint part of
+   * every ordered close.
+   */
+  default boolean checkpointWal() {
     return true;
   }
 

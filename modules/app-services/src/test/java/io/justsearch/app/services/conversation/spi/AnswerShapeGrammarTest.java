@@ -201,7 +201,7 @@ final class AnswerShapeGrammarTest {
         PIN_SHAPE_ID,
         Map.of(AnswerShapeGrammar.ARM_SWITCH_KEY, true),
         Audience.USER,
-        ev -> {});
+        ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     String systemPrompt = (String) llm.calls.get(0).get(0).get("content");
     String grammar = AnswerShapeGrammar.INSTANCE.contribute(armB()).orElseThrow().text();
@@ -235,7 +235,7 @@ final class AnswerShapeGrammarTest {
             IterationControllerRegistry.of(List.of()),
             () -> llm);
 
-    engine.run(PIN_SHAPE_ID, Map.of("question", "q"), Audience.USER, ev -> {});
+    engine.run(PIN_SHAPE_ID, Map.of("question", "q"), Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     String systemPrompt = (String) llm.calls.get(0).get(0).get("content");
     String grammar = AnswerShapeGrammar.INSTANCE.contribute(armB()).orElseThrow().text();
@@ -341,6 +341,11 @@ final class AnswerShapeGrammarTest {
 
   private static ConversationContext stubCtxWithBody(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
 
       @Override

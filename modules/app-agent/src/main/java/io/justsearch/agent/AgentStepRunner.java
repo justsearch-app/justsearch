@@ -114,6 +114,11 @@ final class AgentStepRunner {
    * Tempdoc 560 WS5 — late-bind the streaming workflow-as-tool runner (set by {@code LocalApiServer}
    * once {@code WorkflowShapeRunner} exists). Idempotent; safe to call before the first agent run.
    */
+  List<AgentEvent.PendingApproval> pendingWorkflowApprovals(String sessionId) {
+    var runner = workflowToolRunner;
+    return runner == null ? List.of() : runner.pendingApprovals(sessionId);
+  }
+
   void setWorkflowToolRunner(io.justsearch.agent.api.registry.WorkflowToolRunner runner) {
     this.workflowToolRunner = runner;
   }
@@ -138,17 +143,7 @@ final class AgentStepRunner {
       AtomicReference<AgentEventTracing.Sequencer> traceSequencerRef,
       Consumer<AgentEvent> sink) {
         if (session.isCancelled()) {
-          errorEmitter.emitError(
-              sink,
-              "Session cancelled",
-              AgentErrorCode.CANCELLED,
-              AgentErrorClass.CANCELLED,
-              RetryAction.ABORT,
-              null);
-          // F1: state-first, durability-second.
-          session.markTerminated(TerminalDisposition.CANCELLED, null, CancelTrigger.USER);
-          checkpointer.checkpoint(sessionId, session, "CANCELLED", "Session cancelled");
-          return IterationOutcome.terminated(false);
+          return cancelledIteration(session, sessionId, sink);
         }
 
         // Tempdoc 565 §30 — DIRECTION authority: drain a queued human STEERING directive at the
@@ -247,7 +242,7 @@ final class AgentStepRunner {
         // tool schemas this iteration will pass. The chat template renders those schemas into the
         // prompt, so counting messages alone measured a different prompt, not an approximation of
         // this one. `tools` is the list built a few lines above and handed to the LLM call below.
-        var projectedTokens = onlineAiService.countPromptTokens(session.messages(), tools);
+        var projectedTokens = onlineAiService.countPromptTokens(session.messages(), tools, session.engineContext());
         if (projectedTokens.isPresent()) {
           int tokens = projectedTokens.get();
           int budgetSnapshot;
@@ -350,6 +345,7 @@ final class AgentStepRunner {
               session.clearContextGate();
             }
 
+            if (session.isCancelled()) return cancelledIteration(session, sessionId, sink);
             if (ctxDecision == AgentSession.ContextGateDecision.STOP) {
               errorEmitter.emitError(
                   sink,
@@ -444,7 +440,7 @@ final class AgentStepRunner {
               // check below against the now-shorter message history so it reflects reality.
               // Same tool list as the projection above (878 §D.6): a recompute that measured a
               // different prompt than the check it is correcting would be its own defect.
-              var recomputed = onlineAiService.countPromptTokens(session.messages(), tools);
+              var recomputed = onlineAiService.countPromptTokens(session.messages(), tools, session.engineContext());
               if (recomputed.isPresent()) {
                 tokens = recomputed.get();
                 synchronized (session) {
@@ -505,6 +501,7 @@ final class AgentStepRunner {
               }
             }
 
+            if (session.isCancelled()) return cancelledIteration(session, sessionId, sink);
             if (decision == AgentSession.BudgetGateDecision.STOP) {
               errorEmitter.emitError(
                   sink,
@@ -600,6 +597,11 @@ final class AgentStepRunner {
           } else {
             result = llmCaller.callLlmWithRetries(session, tools, sink);
           }
+        } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+          sink.accept(session.cancellationEvent());
+          session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
+          checkpointer.checkpoint(sessionId, session, "CANCELLED", cancelled.reasonCode());
+          return IterationOutcome.terminated(false);
         } catch (Exception e) {
           errorEmitter.emitError(
               sink,
@@ -720,18 +722,8 @@ final class AgentStepRunner {
           ToolCallRequest call = toolCalls.get(ci);
 
           if (session.isCancelled()) {
-            errorEmitter.emitError(
-                sink,
-                "Session cancelled",
-                AgentErrorCode.CANCELLED,
-                AgentErrorClass.CANCELLED,
-                RetryAction.ABORT,
-                null);
-            // F1: state-first, durability-second.
-            session.markTerminated(TerminalDisposition.CANCELLED, null, CancelTrigger.USER);
-            checkpointer.checkpoint(sessionId, session, "CANCELLED", "Session cancelled");
-            return IterationOutcome.terminated(false);
-          }
+          return cancelledIteration(session, sessionId, sink);
+        }
 
           // Handoff detection — before regular tool resolution (handoff tools are not in
           // toolRegistry)
@@ -925,12 +917,17 @@ final class AgentStepRunner {
             continue;
           }
 
+          // Scope belongs to the canonical invocation before preparation and human approval.
+          // The original model call still owns loop-guard and conversation-history semantics.
+          ToolCallRequest scopedCall = toolDispatcher.scopeToolCall(op, call, session);
+          io.justsearch.agent.api.registry.WorkflowToolRunner wfRunner = this.workflowToolRunner;
+          boolean streamingWorkflow = wfRunner != null && wfRunner.handles(op.id());
           // Safety gate
           if (op.policy().risk() != RiskTier.LOW) {
             checkpointer.checkpoint(sessionId, session, "WAITING_APPROVAL", "Waiting for tool approval: " + call.toolName());
           }
-          boolean approved = toolDispatcher.handleSafetyGate(session, call, op, sink);
-          if (!approved) {
+          var approval = toolDispatcher.prepareAndApprove(session, scopedCall, op, sink, streamingWorkflow);
+          if (!approval.approved()) {
             sink.accept(
                 new AgentEvent.ToolCallRejected(call.id(), "User rejected"));
             // Append rejection to conversation and continue
@@ -987,19 +984,17 @@ final class AgentStepRunner {
           // events) instead of the synchronous executor. The safety gate + approval above already ran
           // for it like any other tool; only the execution channel differs. The vop_* branch earlier
           // is the precedent for sink-aware special tool handling.
-          io.justsearch.agent.api.registry.WorkflowToolRunner wfRunner = this.workflowToolRunner;
           OperationResult toolResult;
           // Tempdoc S7 — when this run carries a docIds scope (FE scope chips), scopeToolCall
           // merges it into the search tool's own arguments; a no-op copy of `call` for any other
           // operation or an unscoped run. `call` itself (used below for loop-guard/history) stays
           // the LLM's original, unscoped arguments.
-          ToolCallRequest scopedCall = toolDispatcher.scopeToolCall(op, call, session);
-          if (wfRunner != null && wfRunner.handles(op.id())) {
-            toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink);
+          if (streamingWorkflow) {
+            toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink, session.engineContext(), session.isBackground());
           } else {
             // Tempdoc 561 P-A1: thread the agent sessionId so the dispatched call stamps it as the
             // ledger correlationId (the History join key).
-            toolResult = toolDispatcher.executeOperationWithPolicy(op, scopedCall, sessionId);
+            toolResult = toolDispatcher.executeOperationWithPolicy(op, scopedCall, sessionId, session.engineContext(), approval.plan());
           }
           // Tempdoc 415: tool_failure_total counts post-policy-retry failures of executed calls.
           if (!toolResult.success()) {
@@ -1235,7 +1230,7 @@ final class AgentStepRunner {
     AgentCitationResolver.Resolved resolved =
         citationResolver == null
             ? AgentCitationResolver.Resolved.none()
-            : citationResolver.resolve(response, sources);
+            : citationResolver.resolve(response, sources, session.engineContext());
     return new AgentEvent.AgentDone(
         response,
         session.iterationsUsed(),
@@ -1401,4 +1396,12 @@ final class AgentStepRunner {
     session.recordCompression(compressor.compressToolMessages(session.messages()));
     checkpointer.checkpoint(sessionId, session, "AFTER_TOOL_RESULT", "Virtual tool completed: " + call.toolName());
   }
+  private IterationOutcome cancelledIteration(AgentSession session, String sessionId, Consumer<AgentEvent> sink) {
+    agentTelemetry.recordError(AgentErrorCode.CANCELLED, AgentErrorClass.CANCELLED);
+    sink.accept(session.cancellationEvent());
+    session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
+    checkpointer.checkpoint(sessionId, session, "CANCELLED", session.cancellationReason());
+    return IterationOutcome.terminated(false);
+  }
+
 }

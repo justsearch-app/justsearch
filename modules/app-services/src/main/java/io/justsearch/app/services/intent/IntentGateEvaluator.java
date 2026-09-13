@@ -55,7 +55,12 @@ public final class IntentGateEvaluator {
 
   /** Derive the source tier for a transport: strictest ({@code UNTRUSTED}) when unregistered. */
   public SourceTier sourceTierFor(TransportTag transport) {
-    return intentSourceCatalog
+    return sourceTierFor(intentSourceCatalog, transport);
+  }
+
+  /** Shared resolution for port attribution and the dispatch verdict. */
+  static SourceTier sourceTierFor(IntentSourceCatalog catalog, TransportTag transport) {
+    return catalog
         .findByTransport(transport)
         .map(IntentSource::sourceTier)
         .orElse(SourceTier.UNTRUSTED);

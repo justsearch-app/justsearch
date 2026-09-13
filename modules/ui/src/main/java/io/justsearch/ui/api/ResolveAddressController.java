@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.justsearch.app.api.DocumentService;
@@ -47,6 +49,7 @@ public final class ResolveAddressController {
 
   /** Bound handler for {@code POST /api/document/{id}/resolve-address}. */
   public void handle(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     String docIdParam = ctx.pathParam("id");
     String body = ctx.body();
     DocumentAddress address;
@@ -65,7 +68,7 @@ public final class ResolveAddressController {
       return;
     }
     try {
-      DocumentAddress.Canonical resolved = resolve(address);
+      DocumentAddress.Canonical resolved = resolve(address, engineContext);
       Map<String, Object> out = new LinkedHashMap<>();
       out.put("coords", "canonical");
       out.put("docId", resolved.docId());
@@ -80,7 +83,7 @@ public final class ResolveAddressController {
     }
   }
 
-  private DocumentAddress.Canonical resolve(DocumentAddress address) {
+  private DocumentAddress.Canonical resolve(DocumentAddress address, EngineContext engineContext) {
     return switch (address) {
       case DocumentAddress.Canonical c -> c;
       case DocumentAddress.Display d -> {
@@ -96,12 +99,12 @@ public final class ResolveAddressController {
         throw new UnresolvableAddressException(
             "Unsupported viewId without canonicalHint: " + d.viewId());
       }
-      case DocumentAddress.Lines l -> linesToCanonical(l);
+      case DocumentAddress.Lines l -> linesToCanonical(l, engineContext);
     };
   }
 
-  private DocumentAddress.Canonical linesToCanonical(DocumentAddress.Lines l) {
-    String content = fetchContent(l.docId());
+  private DocumentAddress.Canonical linesToCanonical(DocumentAddress.Lines l, EngineContext engineContext) {
+    String content = fetchContent(l.docId(), engineContext);
     if (content == null) {
       throw new UnresolvableAddressException(
           "Cannot resolve lines for missing document: " + l.docId());
@@ -125,10 +128,10 @@ public final class ResolveAddressController {
     return new DocumentAddress.Canonical(l.docId(), startOffset, endOffset);
   }
 
-  private String fetchContent(String docId) {
+  private String fetchContent(String docId, EngineContext engineContext) {
     try {
       DocumentRecord r =
-          documents.fetch(docId).toCompletableFuture().get(FETCH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+          documents.fetch(docId, engineContext).toCompletableFuture().get(FETCH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
       return r == null ? null : r.content();
     } catch (Exception e) {
       LOG.info("resolve-address: fetch failed for {}: {}", docId, e.getMessage());

@@ -36,7 +36,7 @@ export interface AuthorizationPrompt {
   readonly riskTier?: string;
   /** Whether the action is reversible (undo-supported) — drives a "can't be undone" warning. */
   readonly undoSupported?: boolean;
-  /** A short, display-safe summary of the invocation arguments. */
+  /** Display-safe raw-argument summary or complete bounded frozen target/scope metadata. */
   readonly argsSummary?: string;
   /** Human rationale / message: why this needs approval. */
   readonly purpose?: string;

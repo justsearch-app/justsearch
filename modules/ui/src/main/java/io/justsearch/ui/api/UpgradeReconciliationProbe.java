@@ -88,7 +88,7 @@ final class UpgradeReconciliationProbe {
       if (intent == null
           || !"RECONCILING".equals(text(intent, "phase"))
           || !request.attemptId().equals(text(intent, "attemptId"))
-          || !request.shutdownNonce().equals(text(intent, "shutdownNonce"))
+          || !matchesStopEvidence(request, intent)
           || !request.sourceVersion().equals(text(intent, "sourceVersion"))
           || !request.targetVersion().equals(text(intent, "targetVersion"))
           || request.releaseSequence() != longValue(intent, "releaseSequence")) {
@@ -126,7 +126,10 @@ final class UpgradeReconciliationProbe {
     Map<String, Object> response = new LinkedHashMap<>();
     response.put("schemaVersion", 1);
     response.put("attemptId", request.attemptId());
-    response.put("shutdownNonce", request.shutdownNonce());
+    response.put("stopEvidenceKind", request.stopEvidenceKind());
+    if ("PREPARED".equals(request.stopEvidenceKind())) {
+      response.put("shutdownNonce", request.shutdownNonce());
+    }
     response.put("targetVersion", request.targetVersion());
     response.put("headPid", actualPid);
     response.put("ready", ready);
@@ -135,6 +138,34 @@ final class UpgradeReconciliationProbe {
     response.put("owners", owners);
     if (error != null) response.put("error", error);
     return response;
+  }
+
+  private static String evidenceKind(JsonNode node, String field) {
+    String kind = text(node, field);
+    if (kind == null) return "PREPARED"; // Existing durable intents use the prepared path.
+    if (!"PREPARED".equals(kind) && !"ENGINE_UNRECOVERABLE".equals(kind)) {
+      throw new IllegalArgumentException("Unknown stop evidence kind");
+    }
+    return kind;
+  }
+
+  private static boolean matchesStopEvidence(ReconcileRequest request, JsonNode intent) {
+    JsonNode evidence = intent.get("stopEvidence");
+    String kind = evidenceKind(evidence, "kind");
+    if (!kind.equals(request.stopEvidenceKind())) return false;
+    if ("PREPARED".equals(kind)) {
+      return (evidence == null || evidence.size() == 1)
+          && request.shutdownNonce().equals(text(intent, "shutdownNonce"));
+    }
+    String previousPid = text(evidence, "enginePid");
+    return request.attemptId().equals(text(evidence, "attemptId"))
+        && longValue(evidence, "confirmedGoneAtEpochMs") > 0
+        && (previousPid == null || longValue(evidence, "enginePid") > 0)
+        && text(intent, "preparationId") == null
+        && text(intent, "shutdownNonce") == null
+        && text(intent, "shutdownReceipt") == null
+        && text(intent, "headShutdownReceipt") == null
+        && text(intent, "headPid") == null;
   }
 
   private String safeVersion() {
@@ -179,9 +210,17 @@ final class UpgradeReconciliationProbe {
                 ""));
       }
       owners.sort(Comparator.comparing(RuntimeOwner::ownerId));
+      String kind = evidenceKind(root, "stopEvidenceKind");
+      String nonce = text(root, "shutdownNonce");
+      if ("PREPARED".equals(kind)) {
+        nonce = requiredText(root, "shutdownNonce");
+      } else if (nonce != null && !nonce.isEmpty()) {
+        throw new IllegalArgumentException("Dead Engine evidence cannot carry a shutdown nonce");
+      }
       return new ReconcileRequest(
           requiredText(root, "attemptId"),
-          requiredText(root, "shutdownNonce"),
+          kind,
+          nonce == null ? "" : nonce,
           requiredText(root, "sourceVersion"),
           requiredText(root, "targetVersion"),
           longValue(root, "releaseSequence"),
@@ -264,6 +303,7 @@ final class UpgradeReconciliationProbe {
 
   private record ReconcileRequest(
       String attemptId,
+      String stopEvidenceKind,
       String shutdownNonce,
       String sourceVersion,
       String targetVersion,

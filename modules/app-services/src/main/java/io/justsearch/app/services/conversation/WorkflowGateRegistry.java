@@ -17,13 +17,43 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class WorkflowGateRegistry {
 
-  private final Map<String, CompletableFuture<Boolean>> gates = new ConcurrentHashMap<>();
+  private record Gate(CompletableFuture<Boolean> future, io.justsearch.agent.api.PendingToolApproval approval,
+      String workflowSessionId, String enclosingSessionId) {}
+
+  private final Map<String, Gate> gates = new ConcurrentHashMap<>();
 
   /** Registers a new gate for {@code callId} and returns the future the runner blocks on. */
   public CompletableFuture<Boolean> create(String callId) {
+    return create(callId, null);
+  }
+
+  /** Keep display on this live gate only; public events receive approval.detail(), never its preview. */
+  public CompletableFuture<Boolean> create(String callId, io.justsearch.agent.api.PendingToolApproval approval) {
+    return create(callId, approval, null, null);
+  }
+
+  /** Associations are read projections for reattachment, never permission or execution authority. */
+  public CompletableFuture<Boolean> create(String callId, io.justsearch.agent.api.PendingToolApproval approval,
+      String workflowSessionId, String enclosingSessionId) {
     CompletableFuture<Boolean> future = new CompletableFuture<>();
-    gates.put(callId, future);
+    gates.put(callId, new Gate(future, approval, workflowSessionId, enclosingSessionId));
     return future;
+  }
+
+  public java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String callId) {
+    if (callId == null || callId.isBlank()) return java.util.Optional.empty();
+    var gate = gates.get(callId);
+    return gate == null ? java.util.Optional.empty() : java.util.Optional.ofNullable(gate.approval());
+  }
+
+  public java.util.List<io.justsearch.agent.api.AgentEvent.PendingApproval> pendingApprovals(String sessionId) {
+    if (sessionId == null || sessionId.isBlank()) return java.util.List.of();
+    return gates.values().stream()
+        .filter(g -> !g.future().isDone() && g.approval() != null)
+        .filter(g -> sessionId.equals(g.workflowSessionId()) || sessionId.equals(g.enclosingSessionId()))
+        .map(g -> g.approval().detail())
+        .sorted(java.util.Comparator.comparing(io.justsearch.agent.api.AgentEvent.PendingApproval::callId))
+        .toList();
   }
 
   /**
@@ -32,8 +62,8 @@ public final class WorkflowGateRegistry {
    * @return {@code true} if a gate was waiting (decision delivered); {@code false} if unknown/stale
    */
   public boolean complete(String callId, boolean approved) {
-    CompletableFuture<Boolean> future = gates.remove(callId);
-    return future != null && future.complete(approved);
+    var gate = gates.remove(callId);
+    return gate != null && gate.future().complete(approved);
   }
 
   /** Drops a gate without completing it (cleanup on abort); harmless if already completed. */

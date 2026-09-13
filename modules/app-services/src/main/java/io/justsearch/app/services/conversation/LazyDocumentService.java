@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.RetrieveContextParams;
 import java.util.List;
@@ -44,46 +46,46 @@ public final class LazyDocumentService implements DocumentService {
   }
 
   @Override
-  public CompletionStage<DocumentRecord> fetch(String docId) {
-    return resolve(d -> d.fetch(docId));
+  public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
+    return resolve(d -> d.fetch(docId, engineContext));
   }
 
   @Override
-  public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
-    return resolve(d -> d.fetchBatch(docIds));
+  public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
+    return resolve(d -> d.fetchBatch(docIds, engineContext));
   }
 
   @Override
-  public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars) {
-    return resolve(d -> d.fetchSlice(docId, offsetChars, maxChars));
+  public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
+    return resolve(d -> d.fetchSlice(docId, offsetChars, maxChars, engineContext));
   }
 
   @Override
-  public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
-    return resolve(d -> d.listAllDocumentIds(offset, limit));
-  }
-
-  @Override
-  public CompletionStage<ContextResult> retrieveContextWithMeta(
-      String question, Set<String> docIds, int topK) {
-    return resolve(d -> d.retrieveContextWithMeta(question, docIds, topK));
+  public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
+    return resolve(d -> d.listAllDocumentIds(offset, limit, engineContext));
   }
 
   @Override
   public CompletionStage<ContextResult> retrieveContextWithMeta(
-      String question, Set<String> docIds, int topK, int maxContextTokens) {
-    return resolve(d -> d.retrieveContextWithMeta(question, docIds, topK, maxContextTokens));
+      String question, Set<String> docIds, int topK, EngineContext engineContext) {
+    return resolve(d -> d.retrieveContextWithMeta(question, docIds, topK, engineContext));
   }
 
   @Override
-  public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params) {
-    return resolve(d -> d.retrieveContext(params));
+  public CompletionStage<ContextResult> retrieveContextWithMeta(
+      String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
+    return resolve(d -> d.retrieveContextWithMeta(question, docIds, topK, maxContextTokens, engineContext));
+  }
+
+  @Override
+  public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, EngineContext engineContext) {
+    return resolve(d -> d.retrieveContext(params, engineContext));
   }
 
   @Override
   public CompletionStage<CitationMatchResult> matchCitations(
-      String answerText, List<ContextCitation> citations, double threshold) {
-    return resolve(d -> d.matchCitations(answerText, citations, threshold));
+      String answerText, List<ContextCitation> citations, double threshold, EngineContext engineContext) {
+    return resolve(d -> d.matchCitations(answerText, citations, threshold, engineContext));
   }
 
   /**
@@ -93,7 +95,7 @@ public final class LazyDocumentService implements DocumentService {
    */
   @Override
   public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-      String answerText, List<VerificationSource> sources, double threshold) {
-    return resolve(d -> d.matchCitationsAgainst(answerText, sources, threshold));
+      String answerText, List<VerificationSource> sources, double threshold, EngineContext engineContext) {
+    return resolve(d -> d.matchCitationsAgainst(answerText, sources, threshold, engineContext));
   }
 }

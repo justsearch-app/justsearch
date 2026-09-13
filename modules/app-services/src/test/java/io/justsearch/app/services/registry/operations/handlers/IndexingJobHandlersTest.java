@@ -37,7 +37,7 @@ final class IndexingJobHandlersTest {
   @DisplayName("cancel: missing pathHash returns failure")
   void cancelMissingHash() {
     var handler = new CancelIndexingJobHandler(() -> stubIndexing());
-    OperationResult r = handler.execute("{}");
+    OperationResult r = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().contains("pathHash"), () -> "got: " + r.message());
   }
@@ -46,7 +46,7 @@ final class IndexingJobHandlersTest {
   @DisplayName("cancel: null service returns failure")
   void cancelNullService() {
     var handler = new CancelIndexingJobHandler(() -> null);
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().contains("Indexing service unavailable"));
   }
@@ -59,12 +59,12 @@ final class IndexingJobHandlersTest {
             () ->
                 new BaseStub() {
                   @Override
-                  public Map<String, Object> cancelIndexingJob(String pathHash) {
+                  public Map<String, Object> cancelIndexingJob(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
                     assertEquals(VALID_HASH, pathHash);
                     return Map.of("cancelled", true, "previousState", "PROCESSING");
                   }
                 });
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success());
     assertTrue(r.message().contains("PROCESSING"));
     assertNotNull(r.structuredData());
@@ -78,11 +78,11 @@ final class IndexingJobHandlersTest {
             () ->
                 new BaseStub() {
                   @Override
-                  public Map<String, Object> cancelIndexingJob(String pathHash) {
+                  public Map<String, Object> cancelIndexingJob(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
                     return Map.of("cancelled", false, "previousState", "UNKNOWN");
                   }
                 });
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().contains("UNKNOWN"));
   }
@@ -93,7 +93,7 @@ final class IndexingJobHandlersTest {
   @DisplayName("retry: missing pathHash returns failure")
   void retryMissingHash() {
     var handler = new RetryIndexingJobHandler(() -> stubIndexing());
-    OperationResult r = handler.execute("{}");
+    OperationResult r = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().contains("pathHash"));
   }
@@ -106,12 +106,12 @@ final class IndexingJobHandlersTest {
             () ->
                 new BaseStub() {
                   @Override
-                  public Map<String, Object> retryIndexingJob(String pathHash) {
+                  public Map<String, Object> retryIndexingJob(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
                     assertEquals(VALID_HASH, pathHash);
                     return Map.of("retried", true, "previousState", "FAILED");
                   }
                 });
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success());
     assertTrue(r.message().contains("FAILED"));
   }
@@ -124,11 +124,11 @@ final class IndexingJobHandlersTest {
             () ->
                 new BaseStub() {
                   @Override
-                  public Map<String, Object> retryIndexingJob(String pathHash) {
+                  public Map<String, Object> retryIndexingJob(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
                     throw new UnsupportedOperationException("degraded mode");
                   }
                 });
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().contains("Retry indexing job failed"));
   }
@@ -143,7 +143,7 @@ final class IndexingJobHandlersTest {
             () ->
                 new BaseStub() {
                   @Override
-                  public Map<String, Object> resolvePathHash(String pathHash) {
+                  public Map<String, Object> resolvePathHash(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
                     return Map.of(
                         "found", true,
                         "path", "/x/y/z.txt",
@@ -151,7 +151,7 @@ final class IndexingJobHandlersTest {
                         "removedAtMs", 0L);
                   }
                 });
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success());
     assertEquals("Path resolved", r.message());
     assertEquals("/x/y/z.txt", r.structuredData().get("path"));
@@ -165,11 +165,11 @@ final class IndexingJobHandlersTest {
             () ->
                 new BaseStub() {
                   @Override
-                  public Map<String, Object> resolvePathHash(String pathHash) {
+                  public Map<String, Object> resolvePathHash(String pathHash, io.justsearch.core.context.EngineContext engineContext) {
                     return Map.of("found", false);
                   }
                 });
-    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}");
+    OperationResult r = handler.execute("{\"pathHash\":\"" + VALID_HASH + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success(), "not-found is a valid result, not a failure");
     assertTrue(r.message().contains("No path on record"));
   }
@@ -178,7 +178,7 @@ final class IndexingJobHandlersTest {
   @DisplayName("resolve: invalid JSON arguments → failure")
   void resolveBadJson() {
     var handler = new ResolvePathHashHandler(() -> stubIndexing());
-    OperationResult r = handler.execute("not-json");
+    OperationResult r = handler.execute("not-json", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(r.message().contains("Invalid arguments JSON"));
   }
@@ -195,19 +195,19 @@ final class IndexingJobHandlersTest {
    */
   private static class BaseStub implements IndexingService {
     @Override
-    public java.util.List<java.nio.file.Path> getWatchedPaths() {
+    public java.util.List<java.nio.file.Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return java.util.List.of();
     }
 
     @Override
-    public void addWatchedPath(java.nio.file.Path path) {}
+    public void addWatchedPath(java.nio.file.Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(java.nio.file.Path path) {
+    public int removeWatchedPath(java.nio.file.Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
   }
 }

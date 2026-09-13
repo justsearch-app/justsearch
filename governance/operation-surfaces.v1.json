@@ -40,6 +40,13 @@
       "store": "modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java",
       "feProjection": "modules/ui-web/src/shell-v0/views/MemorySurface.ts (GET /api/memory whatItKnows)",
       "note": "Tempdoc 561 P-E: the ONE learned-memory record. Constructed once in HeadAssembly and shared by both producers (the core_remember agent tool + the MemoryExtractionConsumer) AND the /api/memory surface, so the gate now makes a SECOND memory authority that references MemoryStore fail the build unless declared (unrepresentability extended to the memory domain)."
+    },
+    {
+      "name": "OperationRecord",
+      "tempdoc": 936,
+      "definition": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
+      "store": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "note": "Lane F C2: operations.db is the sole acceptance/checkpoint/outcome authority. The shared attempt runner writes terminal transitions after actual completion; history and UI project these rows. Job lifecycle and ActionEvent remain sibling records, not alternate operation acceptance stores."
     }
   ],
   "forbiddenReintroduction": [
@@ -73,7 +80,10 @@
       "io.justsearch.app.observability.ledger.ActionEvent",
       "io.justsearch.agent.AgentRunStore",
       "io.justsearch.agent.api.interaction.InteractionEvent",
-      "io.justsearch.agent.api.memory.MemoryStore"
+      "io.justsearch.agent.api.memory.MemoryStore",
+      "io.justsearch.app.api.operations.OperationRecord",
+      "io.justsearch.app.api.operations.OperationAttemptRunner",
+      "io.justsearch.app.api.operations.OperationOutcomeView"
     ],
     "javaMainRoots": [
       "modules"
@@ -143,7 +153,7 @@
       "path": "modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java",
       "guard": "test:IndexingControllerFailedJobsWireContractTest",
       "consumesProjection": "canonical-record",
-      "note": "Tempdoc 911 (#614), registered by 913 — the TERMINAL-state read projection: GET /api/indexing-jobs/failed and /failed/by-prefix, both served by the one toJobView mapper (IndexingController.java:931) that maps IndexingService.FailedJobInfo onto the canonical IndexingJobView wire record. It consumes canonical-record rather than head-bridge because the lineage is SqliteJobQueue.listFailedJobs → gRPC DelegatingIngestService → RemoteKnowledgeClient → here: it queries the one jobs table directly and never touches IndexingJobsChangeStream — the same shape as count-projection, a second direct read of the one record rather than a derivation of another projection. It is a PROJECTION, not a fork: before #614 both routes hand-built an almost-IndexingJobView Map that dropped scanId, which is precisely the F-2 drift class this register exists to catch; typing them onto the canonical record is what made this file a declarable surface. The named guard pins the other end (the JSON the live route returns validates against SSOT/schemas/failed-indexing-jobs-response.v1.json), so a handler reverting to a hand-built map fails there. NOT EXHAUSTIVE for this file: a THIRD failed-jobs route lives in it, GET /api/indexing/failed-jobs (IndexingController.java:604-636, registered at IndexingRoutes.java:26), which serves the older non-canonical FailedJobsResponse/FailedJob shape (tempdoc 564 Phase 5) and does NOT go through toJobView. It is not a second lifecycle model — it is the pre-substrate spelling of the same jobs-table read — but this row governs the two IndexingJobView-typed routes only, so do not read the file's registration here as covering it. The 911 §F projection gap is CLOSED: scan_id is now selected by both failed-jobs SELECTs in SqliteJobQueue, carried as FailedJob field 7, passed by RemoteKnowledgeClient, and held by IndexingService.FailedJobInfo, so scanId on this surface is the queue's own value and an empty string means what IndexingJobView says it means (single-file ingest, watcher, or a pre-scan_id row)."
+      "note": "Tempdoc 911 (#614), registered by 913 — the TERMINAL-state read projection: GET /api/indexing-jobs/failed and /failed/by-prefix, both served by the one toJobView mapper (IndexingController.java:931) that maps IndexingService.FailedJobInfo onto the canonical IndexingJobView wire record. It consumes canonical-record rather than head-bridge because the lineage is SqliteJobQueue.listFailedJobs → WorkerIngestService → KnowledgeClient → here (it was a gRPC DelegatingIngestService hop in the middle until lane F stage A item A9 deleted the wire; the projection is the same): it queries the one jobs table directly and never touches IndexingJobsChangeStream — the same shape as count-projection, a second direct read of the one record rather than a derivation of another projection. It is a PROJECTION, not a fork: before #614 both routes hand-built an almost-IndexingJobView Map that dropped scanId, which is precisely the F-2 drift class this register exists to catch; typing them onto the canonical record is what made this file a declarable surface. The named guard pins the other end (the JSON the live route returns validates against SSOT/schemas/failed-indexing-jobs-response.v1.json), so a handler reverting to a hand-built map fails there. NOT EXHAUSTIVE for this file: a THIRD failed-jobs route lives in it, GET /api/indexing/failed-jobs (IndexingController.java:604-636, registered at IndexingRoutes.java:26), which serves the older non-canonical FailedJobsResponse/FailedJob shape (tempdoc 564 Phase 5) and does NOT go through toJobView. It is not a second lifecycle model — it is the pre-substrate spelling of the same jobs-table read — but this row governs the two IndexingJobView-typed routes only, so do not read the file's registration here as covering it. The 911 §F projection gap is CLOSED: scan_id is now selected by both failed-jobs SELECTs in SqliteJobQueue, carried as FailedJob field 7, passed by KnowledgeClient.listFailedJobs / listFailedJobsByPathPrefix (which map j.getScanId() into the record; RemoteKnowledgeClient, named here before lane F stage A item A9/A10, no longer exists), and held by IndexingService.FailedJobInfo, so scanId on this surface is the queue's own value and an empty string means what IndexingJobView says it means (single-file ingest, watcher, or a pre-scan_id row)."
     },
     {
       "id": "count-projection",
@@ -459,6 +469,276 @@
       "guard": "test:RetrospectivePanel.test.ts",
       "consumesProjection": "fe-event-row-projection",
       "note": "Tempdoc 558 §S1 — composes renderEventRow (the shared row projection) to render workspace activity + history; consumes UnifiedActionEntry via that projection only, no independent model."
+    },
+    {
+      "id": "operation-record-type",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
+      "guard": "test:OperationAcceptanceStoreTest",
+      "consumesProjection": "self",
+      "note": "Immutable internal projection of the operations.db row."
+    },
+    {
+      "id": "operation-store-port",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "guard": "test:OperationAcceptanceStoreTest",
+      "consumesProjection": "operation-record-type",
+      "note": "The one acceptance/checkpoint/outcome store port."
+    },
+    {
+      "id": "operation-attempt-runner-port",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "guard": "test:OperationAttemptRunnerTest",
+      "consumesProjection": "operation-store-port",
+      "note": "Shared runner contract; accepted capabilities and actual completion."
+    },
+    {
+      "id": "operation-record-handle",
+      "kind": "source",
+      "lang": "java",
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationRecordHandle.java",
+      "guard": "test:OperationAttemptRunnerTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Restricted handler identity/checkpoint handle; no terminal or acceptance writes."
+    },
+    {
+      "id": "operation-record-store",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "guard": "test:OperationAcceptanceStoreTest",
+      "consumesProjection": "operation-store-port",
+      "note": "Sole SQLite implementation. Acceptance is transactional and terminal rows immutable."
+    },
+    {
+      "id": "operation-attempt-runner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "guard": "test:OperationAttemptRunnerTest",
+      "consumesProjection": "operation-record-store",
+      "note": "Sole terminal writer after actual work completion; owner-scoped restart reconciliation."
+    },
+    {
+      "id": "recorded-operation-dispatch",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+      "guard": "test:OperationExecutorImplTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Accepts dispatch/undo through the shared runner; history and advisory projections follow durable actual completion."
+    },
+    {
+      "id": "recorded-background-agent-run",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/BackgroundRunService.java",
+      "guard": "test:BackgroundWorkLifetimeTest",
+      "consumesProjection": "operation-attempt-runner-port",
+      "note": "Accepts before timer submission; runner starts after admission and completes from the durable agent run after runAgent returns. Owner boot reconciliation reads that same run."
+    },
+    {
+      "id": "runtime-activation-completion-owner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Existing owner returns frozen started status and actual terminal completion after lease cleanup; no row writes."
+    },
+    {
+      "id": "runtime-activation-completion-adapter",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimevariant/RuntimeVariantServiceImpl.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Reads broad status before effect start and carries the exact owner stage to recorded handlers."
+    },
+    {
+      "id": "runtime-activate-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ActivateRuntimeVariantHandler.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded activation returns owner completion instead of terminalizing its started response."
+    },
+    {
+      "id": "runtime-deactivate-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/DeactivateRuntimeVariantHandler.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded deactivation returns owner completion instead of terminalizing its started response."
+    },
+    {
+      "id": "runtime-activation-outcome-projection",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RuntimeActivationOutcome.java",
+      "guard": "test:RuntimeActivationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects actual terminal status into shared-runner completion; failed/inconclusive self-test never claims activation."
+    },
+    {
+      "id": "ai-install-completion-owner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Existing install owner snapshots start and actual completion after cleanup; its guard cannot be revoked by stale progress."
+    },
+    {
+      "id": "ai-install-completion-adapter",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/braininstall/BrainInstallServiceImpl.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Carries the exact install/repair attempt through the service port without a post-start status read."
+    },
+    {
+      "id": "ai-install-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/StartAiInstallHandler.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded install projects owner completion, not its started response."
+    },
+    {
+      "id": "ai-repair-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RepairAiInstallHandler.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Recorded repair uses the same actual install owner completion."
+    },
+    {
+      "id": "ai-install-outcome-projection",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/BrainInstallHandlerSupport.java",
+      "guard": "test:AiInstallOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects failed/completed/cancelled owner states into the runner; plan completion retains installedFully limitations semantics."
+    },
+    {
+      "id": "pack-import-owner-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/AiPackImportService.java",
+      "guard": "test:AiPackOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Existing pack owner reports actual terminal status after lease cleanup and retains its live single-flight guard."
+    },
+    {
+      "id": "pack-import-service-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/packimport/PackImportServiceImpl.java",
+      "guard": "test:AiPackOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Carries the exact owner attempt without a post-start status read."
+    },
+    {
+      "id": "pack-import-handler-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ImportAiPackHandler.java",
+      "guard": "test:AiPackOperationCompletionTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects actual completed/failed import status into shared-runner completion; installed is distinct from activated."
+    },
+    {
+      "id": "offline-procedure-owner",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Shared manual/automatic actual-exit owner. Manual runs feed the recorded dispatch; automatic sampling carries explicit internal admission but does not itself accept a dispatch row."
+    },
+    {
+      "id": "offline-batch-outcome",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduBatchProcessor.java",
+      "guard": "test:VduBatchAcknowledgedOutcomeTest",
+      "consumesProjection": "offline-procedure-owner",
+      "note": "Projects only acknowledged document outcomes over one captured selection, preserving blocked remainder and write failures."
+    },
+    {
+      "id": "offline-pass-outcome-type",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/OfflineProcessingOutcome.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "offline-batch-outcome",
+      "note": "Intentional per-pass count/reason projection, not a global backlog or independent durable lifecycle authority."
+    },
+    {
+      "id": "offline-runtime-service-completion",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImpl.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "offline-procedure-owner",
+      "note": "Carries exact admitted context and actual completion; no detached manual thread."
+    },
+    {
+      "id": "offline-recorded-handler",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/TriggerOfflineProcessingHandler.java",
+      "guard": "test:OfflineProcessingOperationLifecycleIntegrationTest",
+      "consumesProjection": "recorded-operation-dispatch",
+      "note": "Projects acknowledged checkpoints and actual completion to the shared runner; never terminalizes at the started response."
+    },
+    {
+      "id": "offline-automatic-trigger",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduOfflineTriggerSampler.java",
+      "guard": "test:VduProcedureExecutorLifetimeTest",
+      "consumesProjection": "offline-procedure-owner",
+      "note": "Timer-only pacing producer; manual and automatic attempts share coordinator single-flight and its one procedure executor."
+    },
+    {
+      "id": "operation-outcome-view",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationOutcomeView.java",
+      "guard": "test:OperationOutcomeQueryTest",
+      "consumesProjection": "operation-record-store",
+      "note": "Typed six-state receipt read from the operations row and retention fence. Never another lifecycle authority."
+    },
+    {
+      "id": "operation-outcome-http",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationHistoryController.java",
+      "guard": "test:OperationOutcomeTransportTest",
+      "consumesProjection": "operation-outcome-view",
+      "note": "Existing history controller serves the shared keyed outcome. Recent-history/SSE durability remains the C2-4 swap obligation."
+    },
+    {
+      "id": "operation-outcome-mcp",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "guard": "test:OperationOutcomeTransportTest",
+      "consumesProjection": "operation-outcome-view",
+      "note": "Curated read-only outcome query uses HeadAssembly and the same store observation, never dispatch acceptance."
     }
   ]
 }

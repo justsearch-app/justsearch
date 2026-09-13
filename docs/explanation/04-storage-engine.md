@@ -291,3 +291,99 @@ JustSearch uses tuned Lucene defaults optimized for desktop workloads:
 | Commit interval | 10s / 1000 docs | Balance between durability and performance |
 
 These defaults are optimized for desktop systems with sufficient RAM. The RAM buffer setting can be overridden via `index.writer.ram_buffer_mb` in configuration YAML if needed.
+
+## Operation outcome storage
+
+`operations.db` is a separate SQLite store owned by the Engine composition. Its app-api port is
+opened only after the process acquires AppInstanceLock for its data directory, including
+LauncherEnvironment. A second launcher in the same JVM must acquire its own lock and
+is refused while the first remains active. Shutdown retains the lock until the operations
+store closes; failed setup releases it after safe store cleanup. The port is
+implemented in app-observability, and the same instance is injected into the application and index
+composition before asynchronous startup. It closes after the index half drains. The schema starts
+at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
+for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
+history fence; `jobs.db` independently uses version 16, retaining nullable `jobs.content_hash`
+for legacy rows and adding an opaque revision to each accepted switch-buffer replacement.
+Replay removes only the versions it applied and committed, preserving admissions that arrive
+during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
+roll back both.
+
+Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.
+SQLite reads that copy, including uncheckpointed committed versions, so refusing a future format
+cannot change the original main file, WAL or SHM. The temporary copy is removed before startup
+continues. This costs temporary disk space proportional to one database plus its WAL; it avoids
+hand-written WAL parsing and SQLite's otherwise writable shared-memory side effects in read-only
+mode. Callers must exclude concurrent writers during inspection. The operations
+store uses SQLite `quick_check` for startup integrity inspection.
+
+Terminal operation rows expire after 30 days by completion time. A 100000-row cap
+evicts the oldest terminal rows first; open work and COMPLETE_WITH_GAPS are never
+evicted. If only open work fills the cap, acceptance refuses with OPERATIONS_CAPACITY.
+Pruning runs once at store open and hourly through the registered
+`head.operations-retention` timer; acceptance reserves capacity under the same store
+lock. Timer failures log ERROR and retry on the next tick. Its owner cancels and
+awaits the timer before releasing its executor registration.
+
+Each eviction transaction advances `history_since_ms` to at least the newest evicted
+key's UUIDv7 timestamp plus one millisecond. A present row wins over that fence;
+an absent older key is expired. A fence ahead of the clock includes its remaining
+retry delay in the store refusal. Terminal transitions return their committed row
+snapshot under the store lock, so eviction cannot erase an outcome before live
+completion publication. There is no extra retention window for those observers.
+
+An unreadable operations database is preserved with its WAL and SHM in one timestamped directory.
+An interrupted `.pending` directory is resumed before creating a replacement. The replacement's
+singleton metadata records a history fence at recovery time plus five minutes plus one millisecond;
+old preservation directories retain that fence if initialization itself is interrupted. The Health
+surface reports the history loss, the preservation directory and the fence time. Failure to preserve
+bytes refuses startup. An external rollback to a valid older database is outside this detection
+contract. Durable operation acceptance and replay are separate consumers of this store.
+
+Operation dispatch validates caller context and trust before pure handler preparation.
+`OperationPreparation` retains transient public arguments and optionally a bounded safe replay
+projection. The dispatcher persists that versioned projection beside the public-argument digest
+before invoking the same prepared value. Raw public arguments are not written to the row.
+Preparation may read scope but must not schedule work, register roots or enqueue writes.
+Ordinary preparation failures receive an accepted attempt without a replay payload and a terminal refusal; capability
+and admission checks still gate execution after acceptance. Generic handlers use the passthrough
+default, and undo retains its existing target identity. This seam does not yet provide keyed
+ingress, recovery replay or sealed content-bearing preparation.
+
+`OperationPolicy.recordKind` classifies ordinary, prepared, refused and undo attempts.
+Every dispatched operation accepts a durable attempt, including operations with
+`AuditPolicy.NONE`; that policy suppresses history projection only. Admission
+refusals persist their specific reason (`CONTEXT_LIMIT`, `ENGINE_LIMIT`, `FROZEN`
+or `WORK_FINISHED`) without invoking the handler.
+The registry's `OperationKind` enum in app-agent-api is also the store's kind contract;
+its JSON and SQLite spelling is the same closed lowercase vocabulary, including `memory`
+and `note`. Existing policy constructors default to `operation`. The full declaration
+schema includes this backend field; the selected policy axes in the live UI registry
+projection do not include it. Java consumers of the former app-api enum must update
+their import to `io.justsearch.agent.api.registry.OperationKind`.
+
+Production catalog entries still use the ordinary default until their recorded handlers
+and recovery owners are connected. Declaring a kind does not change admitted survival:
+the work owner retains its original survival for cancellation and disconnect handling.
+Recorded producers must resolve their survival policy before admission, or admit a
+separately owned child, before activating a recovery classification.
+
+The current compiled operations API contains the shared acceptance/attempt runner.
+Recorded root-plan preparation and child-acceptance APIs are held outside the compiled
+surface until their ingest/reindex producers are implemented. Generic preparation
+remains pure and transient; a handler returning a replay schema is refused before
+its effect. Public arguments persist only as a canonical digest. Server-built replay
+payloads must not participate in that identity comparison.
+
+The architecture gate forbids producers from calling the store's lifecycle methods
+directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,
+their outer process bindings and consumers. The operation-surface register separately
+governs sibling records and row cardinality.
+
+A failed durable attempt transition logs an ERROR with its key and intended state.
+The runner retains the first persistence failure for the process; Health reports it
+through a sticky `operations.persistence_failed` condition even when Health attaches
+after the failure. Dispatcher history records FAILURE with a bounded error code;
+it never reports successful completion when the terminal write failed. The durable
+row remains unresolved. Exception details are retained in diagnostics, while the
+Health condition carries only operation metadata.

@@ -302,14 +302,14 @@ final class CoreSurfaceCatalogTest {
         entry.members());
     // Post-review honesty fix (571 §8): the hub COMPOSES members; it declares NO authority it does not
     // itself project. Empty consumes ⟹ derives PRODUCT. The per-member altitude framing lives inside
-    // <jf-surface-tabs>. (No fake head-log consumption → no false consumer hook in SurfaceConsumerIndex.)
+    // <jf-surface-tabs>. (No fake engine-log consumption → no false consumer hook in SurfaceConsumerIndex.)
     assertTrue(entry.consumes().diagnosticChannels().isEmpty());
     assertTrue(entry.consumes().resources().isEmpty());
     assertTrue(entry.consumes().operations().isEmpty());
   }
 
   @Test
-  @DisplayName("Slice 3a.2.e: Logs surface entry shape (OPERATOR audience; consumes core.head-log channel)")
+  @DisplayName("Slice 3a.2.e: Logs surface entry shape (OPERATOR audience; consumes core.engine-log channel)")
   void logsSurfaceShape() {
     Surface entry =
         new CoreSurfaceCatalog().findById(CoreSurfaceCatalog.LOGS_SURFACE_ID).orElseThrow();
@@ -319,10 +319,10 @@ final class CoreSurfaceCatalogTest {
     // Tempdoc 571 §11 / 578 — Logs is a MEMBER of the System hub: DEEPLINK (off the rail).
     assertSame(Placement.DEEPLINK, entry.placement());
     assertEquals("jf-log-surface", entry.mountTag());
-    // Consumes the core.head-log DiagnosticChannel (slice 448 substrate).
+    // Consumes the core.engine-log DiagnosticChannel (slice 448 substrate).
     assertEquals(
         java.util.Set.of(
-            new io.justsearch.agent.api.registry.DiagnosticChannelRef("core.head-log")),
+            new io.justsearch.agent.api.registry.DiagnosticChannelRef("core.engine-log")),
         entry.consumes().diagnosticChannels());
     assertTrue(entry.consumes().operations().isEmpty());
     assertTrue(entry.consumes().resources().isEmpty());

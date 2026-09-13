@@ -69,6 +69,12 @@ final class AgentSessionRegistry {
     return session != null && session.approve(callId);
   }
 
+  java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String sessionId, String callId) {
+    if (sessionId == null || sessionId.isBlank()) return java.util.Optional.empty();
+    var session = sessions.get(sessionId);
+    return session == null ? java.util.Optional.empty() : session.pendingToolApproval(callId);
+  }
+
   boolean tryRejectToolCall(String sessionId, String callId, String reason) {
     if (sessionId == null || sessionId.isBlank()) {
       return false;

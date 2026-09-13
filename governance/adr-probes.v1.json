@@ -7,44 +7,50 @@
   "reviewStaleDays": 183,
   "probes": [
     {
-      "id": "adr-0001-lucene-owners-pinned",
-      "adr": "0001",
-      "premise": "The Head process never touches Lucene: only adapters-lucene and the Worker (indexerworker) may depend on Lucene classes.",
+      "id": "adr-0049-lucene-owners-pinned",
+      "adr": "0049",
+      "premise": "Application code never touches Lucene: only adapters-lucene and the index half (indexerworker) may depend on Lucene classes. RETARGETED from adr-0001-lucene-owners-pinned at lane F item A15. The property is unchanged and the test is unchanged -- only its owning decision moved, because ADR-0001 is superseded. Sharing an address space does not license reaching past a port into the index, which is precisely why this pin matters MORE after the merge than before it: while the Head was a separate process the boundary was also enforced by the OS.",
       "kind": "test",
       "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/IndexWriterOwnershipTest.java",
-      "test": "io.justsearch.app.launcher.IndexWriterOwnershipTest#onlyLuceneOwnersMayDependOnLuceneClasses"
+      "test": "io.justsearch.app.launcher.IndexWriterOwnershipTest#onlyLuceneOwnersMayDependOnLuceneClasses",
+      "note": "Not weakened by the merge. ADR-0049 carries the class-level Lucene-owner pin verbatim; the PROCESS half of ADR-0001 invariant 1 became ArchUnit rule 6b, which has its own probe (adr-0049-engine-port-boundary) rather than being folded into this one -- two properties, two probes."
     },
     {
-      "id": "adr-0002-mmf-layout-pinned",
-      "adr": "0002",
-      "premise": "The MMF signal region is a fixed 64-byte layout whose reserved tail runs exactly to the end of the region — the property that makes a new signal an explicit layout change rather than a silent overwrite.",
+      "id": "adr-0049-engine-port-boundary",
+      "adr": "0049",
+      "premise": "Only the Engine composition root, the index half itself and the Lucene adapters may reach into the index half’s internals. This is the process half of ADR-0001 invariant 1, re-expressed as a module boundary now that there is no process boundary to carry it: rule 6b permits io.justsearch.app.engine.., io.justsearch.indexerworker.. and io.justsearch.adapters.. to depend on io.justsearch.indexerworker.{server,services,loop}.., and nothing else. Losing it means application code can call the index half directly, which is the drift one address space makes possible and two did not.",
       "kind": "test",
-      "file": "modules/ipc-common/src/test/java/io/justsearch/ipc/mmf/MmfWorkerSignalLayoutV1Test.java",
-      "test": "io.justsearch.ipc.mmf.MmfWorkerSignalLayoutV1Test#reserved1EndsAtMmfSize"
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/LayeringEnforcementTest.java",
+      "test": "io.justsearch.app.launcher.LayeringEnforcementTest#onlyEngineAndWorkerMayDependOnWorkerInternals",
+      "note": "Added at lane F item A15. Complements the engine-port register (governance/engine-ports.v1.json + the engine-port gate), which guards the other direction: this stops code reaching PAST a port, the register stops a second implementation claiming to BE one."
     },
     {
-      "id": "adr-0002-mmf-constants-pinned",
-      "adr": "0002",
-      "premise": "The V1 layout's size and its published field offsets are frozen: 64 bytes total, worker gRPC port at offset 20. Moving either is a wire-compatibility break between Head and Worker, not an edit.",
-      "kind": "grep-present",
-      "pattern": "(MMF_SIZE_BYTES = 64|OFFSET_WORKER_GRPC_PORT = 20)",
-      "paths": [
-        "modules/ipc-common/src/main/java/io/justsearch/ipc/mmf/MmfWorkerSignalLayoutV1.java"
-      ],
-      "expect": 2
-    },
-    {
-      "id": "adr-0002-grpc-present",
-      "adr": "0002",
-      "premise": "gRPC carries the structured-data half of the hybrid IPC — the modules on both ends of the boundary actually depend on it, not merely the version catalog.",
-      "kind": "grep-present",
-      "pattern": "libs\\.grpc|io\\.grpc",
+      "id": "adr-0049-no-grpc-in-module-builds",
+      "adr": "0049",
+      "premise": "NO module build file declares a gRPC dependency. REPLACES adr-0002-grpc-present, inverted: that probe asserted gRPC was PRESENT because the hybrid IPC depended on it, so the honest successor is an absence probe (this register preference order puts absence above counts). Item A14 removed the last declaration anywhere under modules/, including the infra-health service that had been the one exemption, so the scope is the whole tree rather than the index half alone. A libs.grpc line reappearing in ANY module build means the deleted channel is being rebuilt.",
+      "kind": "grep-absent",
+      "pattern": "libs\\.grpc",
       "paths": [
         "modules"
       ],
       "include": [
         ".kts"
-      ]
+      ],
+      "note": "Added at lane F item A15, widened to all of modules/ at A14. It was briefly scoped to worker-core/worker-services/indexer-worker while the infra-health gRPC service was expected to survive; the owner then decided that service is part of the wire and it was deleted, so the exemption is gone and the probe means the simpler thing. Note that grep-absent counts COMMENTS as well as code, and that is deliberate here: a comment naming libs.grpc is residue by the same rule that deleted the dependency, and the probe caught exactly one such comment in modules/indexer-worker/build.gradle.kts before it passed."
+    },
+    {
+      "id": "adr-0049-no-grpc-imports-in-java",
+      "adr": "0049",
+      "premise": "NO Java source under modules/ imports io.grpc. The build-file probe above is necessary and not sufficient: it watches the DECLARATION, and a declaration can return by a route that does not spell 'libs.grpc' - a transitive edge, a version-catalog alias, a direct coordinate string. What ADR-0049 actually decided is that no gRPC method is served and no gRPC type crosses a seam, and the cheapest mechanical restatement of THAT is the import statement, which is where a returning dependency first becomes visible in code.",
+      "kind": "grep-absent",
+      "pattern": "(^|\\n)import io\\.grpc",
+      "paths": [
+        "modules"
+      ],
+      "include": [
+        ".java"
+      ],
+      "note": "Added at the lane F stage A checkpoint. Anchored to a line start deliberately, and this is the one place it differs from its build-file sibling: that probe counts comments on purpose (a comment naming libs.grpc is residue), whereas io.grpc is still NAMED in prose all over the tree - GplJobCoordinator, AgentToolErrors, KnowledgeClientException and CancelToken all explain in javadoc which io.grpc type they used to match, and those explanations are the record of the retargeting, not residue. An unanchored pattern would have to delete that history to go green, which is the wrong trade. Main AND test sources are in scope: a test importing io.grpc means a gRPC artifact is back on a test classpath, which is how the dependency returns before anyone ships it."
     },
     {
       "id": "adr-0003-lucene-direct",
@@ -83,7 +89,7 @@
       "kind": "grep-present",
       "pattern": "setCitationScorer|isCitationScorerActive|matchCitations",
       "paths": [
-        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/GrpcSearchService.java"
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java"
       ]
     },
     {
@@ -93,7 +99,7 @@
       "kind": "grep-present",
       "pattern": "(citationMatchOps\\.execute\\(|citationMatchOps\\.setCitationScorer\\()",
       "paths": [
-        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/GrpcSearchService.java"
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java"
       ],
       "expect": 2
     },
@@ -589,18 +595,44 @@
     {
       "id": "adr-0048-chaos-witness",
       "adr": "0048",
-      "premise": "The duty-cycle claim is a live property, not a unit one: indexing must be throttled rather than stopped while real foreground searches are in flight. This chaos case is the witness that runs against merged code.",
+      "premise": "The duty-cycle claim is a live property, not a stubbed one: indexing must be throttled rather than stopped while real foreground searches are in flight, and status/health polling must not throttle it at all. Retargeted at lane F stage A item A12 — the witness kept its subject and both arms, and moved from ChaosSuiteTest$TimeLordTests (an opt-in systemTest tier that had been unreachable since item A9 deleted the gRPC server the spawned Worker published a port on) to a test that composes the same index half in-process and runs on every build. The witness is stronger, not weaker: in one JVM it can also assert the gauge itself (ForegroundLoad.startedTotal), which the wire test could not see.",
       "kind": "test",
-      "file": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ChaosSuiteTest.java",
-      "test": "io.justsearch.systemtests.ChaosSuiteTest$TimeLordTests#indexingRunsAtAReducedDutyUnderForegroundSearchLoad"
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
+      "test": "io.justsearch.app.engine.EngineForegroundPacingTest#indexingRunsAtAReducedDutyUnderForegroundSearchLoad"
     },
     {
       "id": "adr-0048-foreground-gauge-is-worker-local",
       "adr": "0048",
-      "premise": "ForegroundLoad is a worker-services type so it survives a Head/Worker merge; the gRPC interceptor that feeds it is the throwaway adapter. This test pins the gauge's balance across ok/error/cancel closes, which is the property the duty cycle depends on.",
+      "premise": "The gauge balance claim remains true under the 2026-09-09 amendment: interactive foreground work increments during execution and balances normal return, exception, cancellation and Error on actual completion. This unit property is separate from urgency selection, durable ownership, and the live Engine producer witness.",
       "kind": "test",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/ForegroundLoadInterceptorTest.java",
-      "test": "io.justsearch.indexerworker.server.ops.ForegroundLoadInterceptorTest#okCloseBalancesTheGauge"
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
+      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#normalExceptionCancellationAndErrorAlwaysBalanceInteractiveWork",
+      "note": "RETARGETED, not weakened, by lane F stage A item A9 (2026-09-07). The premise is unchanged and is now MORE true: ADR-0048 predicted that the interceptor was the throwaway adapter and that the gauge would survive the Head/Worker merge, and A9 is where the adapter was thrown away. The named file moved with the producer — ForegroundLoadInterceptorTest went with the interceptor; ForegroundLoadGateTest pins the same balance property (ok / exception / cancellation / Error, plus never-negative under concurrency) on ForegroundLoadGate, which is now the gauge's only producer. Per this register's own amendment rule the probe was not edited to make a violation pass: the violation is that the pin's SUBJECT was deleted by a decision this ADR anticipated. 2026-09-09 amendment: Re-examined against ForegroundLoadGate and its current tests after C1 replaced the operation-name predicate with explicit EngineContext urgency and work ownership. The former method was replaced; the normal/error/cancel/Error assertions remain, and separate probes pin both survival axes and durable held lifetime. The actual Engine producer probe remains unchanged."
+    },
+    {
+      "id": "adr-0048-foreground-urgency-is-explicit",
+      "premise": "ForegroundLoad is selected by explicit EngineContext urgency, independently of interactive/durable survival, for both call and run forms. Background work does not increment or update foreground time.",
+      "adr": "0048",
+      "kind": "test",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
+      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#urgencyAloneCountsAcrossBothSurvivalAxesAndBothForms"
+    },
+    {
+      "id": "adr-0048-durable-foreground-held-once",
+      "premise": "One foreground durable work identity holds one pacing increment across retained owners and repeated calls, then balances on client detachment or final owner completion.",
+      "adr": "0048",
+      "kind": "test",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
+      "test": "io.justsearch.app.engine.ForegroundLoadGateTest#durableWorkHoldsExactlyOnceUntilDetachOrLastOwnerCompletes"
+    },
+    {
+      "id": "adr-0048-foreground-gauge-has-a-live-producer",
+      "adr": "0048",
+      "premise": "The duty cycle needs the gauge to be FED, not merely balanced. Between lane F item A6 and the 2026-09-07 fix it was not: ForegroundLoadGate mirrored the interceptor's gRPC method names while the executor seam passes lower-camel operation labels, so the gauge read zero on every call and indexing never yielded to a waiting search. Both existing suites stayed green because both fed the gate the vocabulary the gate itself declared. A gauge probe that does not enter through the seam's real caller tests the gauge against itself.",
+      "kind": "test",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
+      "test": "io.justsearch.app.engine.EngineRootInProcessPortsTest#ingestAndSearchThroughTheInProcessPorts",
+      "note": "Added by the lane F stage A A6-A9 review (2026-09-07). The pinned assertion is that a real client.search(...) through EngineRoot moves ForegroundLoad.startedTotal. It lives inside the full boot test deliberately: the defect was that the seam's real caller never reached the gate, and a test that builds its own gate cannot observe that. This is the assertion that failed 'expected: <1> but was: <0>' on its first run."
     },
     {
       "id": "adr-0048-retry-exhausted-terminal",
@@ -625,6 +657,14 @@
       ],
       "expect": 1,
       "note": "expect 1 is the population: one enum declaration. The pattern pins the three policy-bearing leading arguments, including the literal default, while allowing orthogonal declaration metadata after them; a default flip still fails the probe."
+    },
+    {
+      "id": "adr-0048-observer-front-exclusion",
+      "adr": "0048",
+      "premise": "Status, health and diagnostics observers enter through the real API filters with BACKGROUND urgency and do not start foreground work; a real search through the same client still increments the gauge.",
+      "kind": "test",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineObserverPacingTest.java",
+      "test": "io.justsearch.ui.api.EngineObserverPacingTest#observerRequestsThroughRealFiltersNeverStartForegroundWork"
     }
   ]
 }

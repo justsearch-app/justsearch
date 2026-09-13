@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "tempdoc": 936,
+  "design": "docs/design/lane-f-engine-jvm/design.md section 3.3 — Ports: an open, catalogued set",
+  "note": "The engine port catalogue. Design 3.3: 'The engine API is a set of ports, each an interface in a contract module (core or app-api), catalogued with its owner and consumers, and ArchUnit-pinned so only the composition root binds an implementation. Adding a port is a catalogue entry, an interface and a composition-root binding.' This file is the catalogue half. It exists because collapsing the Head and the Worker into one JVM removes the thing that used to make the engine API obvious: when the index half was a second process, the API was the set of RPCs, enumerable from a .proto file, and unreachable by accident. In one address space nothing stops application code from constructing its own implementation of a port, or from reaching past a port into Lucene, except a rule that says so. Rule 6b (LayeringEnforcementTest, ADR-0049) is the outer pin — only io.justsearch.app.engine.., io.justsearch.indexerworker.. and io.justsearch.adapters.. may depend on io.justsearch.indexerworker.{server,services,loop}.. — and this register is the inner one: an implementation of a registered port that is not declared here fails the engine-port gate. HONEST LIMIT: like every register in this directory, it covers DECLARED concepts. It catches a second implementation of a port that exists; it cannot catch a new engine capability that never becomes a port at all, which stays a review question.",
+  "compositionRoot": {
+    "package": "io.justsearch.app.engine",
+    "module": "modules/app-engine",
+    "class": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+    "note": "Design 3.2 places the composition root outside the three rings: it binds every implementation and owns the two sequences that span rings, startup and shutdown. It is the only module permitted to depend on both halves of the Engine."
+  },
+  "scan": {
+    "comment": "The gate re-derives the implementation set from source rather than trusting this file: it scans javaMainRoots for classes whose `implements` clause names a registered port interface, and fails on any that is not declared below. That direction is the one that matters — the drift is a NEW binding appearing, not a declared one going missing.",
+    "javaMainRoots": ["modules"],
+    "javaInclude": "/src/main/java/",
+    "expectedMinImplementations": 5,
+    "expectedMinImplementationsNote": "The source scan counts three direct existing port declarations (KnowledgeClient for SearchPort and IndexingService, plus NoopSearchPort), now plus OperationAttemptRunnerImpl and SqliteOperationStore: floor 5. EngineKnowledgeClient inherits the facade and is validated separately via extends. A lower count requires an explained binding retirement or scan repair."
+  },
+  "ports": [
+    {
+      "id": "search",
+      "title": "Search",
+      "kind": "interface",
+      "interface": "io.justsearch.core.search.SearchPort",
+      "interfaceFile": "modules/core/src/main/java/io/justsearch/core/search/SearchPort.java",
+      "contractModule": "modules/core",
+      "owner": "the index half (worker-services SearchOrchestrator, through KnowledgeServer's WorkerAppServices)",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.services.worker.KnowledgeClient",
+          "file": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+          "boundBy": "abstract — declares the port surface, binds no transport",
+          "note": "Transport-independent facade. It carries the deadline categories, the per-call result-size bound (BoundedDocumentFetch) and the batch clamp, because design section 6 makes those requirements of the WORK rather than of the network, so they had to survive the channel rather than be deleted with it."
+        },
+        {
+          "class": "io.justsearch.app.engine.EngineKnowledgeClient",
+          "file": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java",
+          "via": "extends KnowledgeClient",
+          "boundBy": "io.justsearch.app.engine.EngineRoot",
+          "note": "The live binding, and it never writes 'implements SearchPort' — it reaches the port by extending the facade. Recorded with an explicit 'via' rather than being left out, because the register's job is to say what actually answers a search: leaving it implicit would have had the catalogue describe the abstract facade as though it were the thing that runs. Calls are direct calls under a budget; the four operation contracts (deadline, result-size bound, streaming flow control, cancellation) are re-homed onto it rather than inherited from gRPC."
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.phases.NoopSearchPort",
+          "file": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/NoopSearchPort.java",
+          "boundBy": "io.justsearch.app.services.bootstrap.phases — the pre-connect placeholder",
+          "note": "DECLARED EXCEPTION to 'only the composition root binds an implementation', and a deliberate one: it is the Null Object the API front holds between HTTP-listener start and index-half readiness, so a search arriving in that window gets an answer about readiness rather than an NPE. It binds nothing — it is the absence of a binding, given a type. Retiring it means giving readiness a different shape, which is design section 7.6's staged-readiness work, not this register's."
+        }
+      ],
+      "consumers": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OrchestrationPhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/search/SearchServiceImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeHttpApiAdapter.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java",
+        "modules/ui/src/main/java/io/justsearch/ui/api/KnowledgeSearchController.java"
+      ],
+      "note": "C1 requires EngineContext on every search call. Consumers include typed callers, composition carriers and the HTTP adapter chain. SearchTrace remains the sole pipeline-execution authority governed by governance/execution-surfaces.v1.json."
+    },
+    {
+      "id": "indexing",
+      "title": "Indexing",
+      "kind": "interface",
+      "interface": "io.justsearch.app.api.IndexingService",
+      "interfaceFile": "modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java",
+      "contractModule": "modules/app-api",
+      "owner": "the index half (worker-services WorkerIngestService + the indexing loop)",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.services.worker.KnowledgeClient",
+          "file": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+          "boundBy": "abstract — declares the port surface, binds no transport",
+          "note": "The same facade implements both day-one ports, which is a fact about today's surface rather than a decision: the ~90 methods behind them were one gRPC client. Splitting them is design 3.3's 'open set' work, not stage A's."
+        },
+        {
+          "class": "io.justsearch.app.engine.EngineKnowledgeClient",
+          "file": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java",
+          "via": "extends KnowledgeClient",
+          "boundBy": "io.justsearch.app.engine.EngineRoot"
+        }
+      ],
+      "consumers": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/WorkerServices.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherCommands.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/AgentToolFactory.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/AgentToolHandlers.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationHandlerRegistrations.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OrchestrationAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OrchestrationPhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServiceGraphAssembler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/excludes/ExcludesServiceImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/observability/health/IndexDriftHealthTap.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/AddWatchedRootHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/BulkReindexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/CancelIndexingJobHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ClearFailedJobsHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/IndexGcHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RebuildIndexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReconcileRootHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ReindexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RemoveWatchedRootHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ResolvePathHashHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RetryIndexingJobHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/SettleIndexHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/MigrationOps.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridge.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java",
+        "modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java",
+        "modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java"
+      ],
+      "note": "C1 requires EngineContext on every indexing-port call; the facade and all callers preserve it into the index half. Consumers include typed callers, composition carriers and the indexing-jobs subscription bridge. The immediate index-and-return capability remains the later section 4 operation work."
+    },
+    {
+      "id": "operations",
+      "title": "Operations attempt lifecycle",
+      "kind": "interface",
+      "interface": "io.justsearch.app.api.operations.OperationAttemptRunner",
+      "interfaceFile": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "contractModule": "modules/app-api",
+      "owner": "Engine operation attempt lifecycle; app-observability owns the implementation",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.observability.operations.OperationAttemptRunnerImpl",
+          "file": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+          "boundBy": "io.justsearch.ui.HeadlessApp and io.justsearch.applauncher.LauncherEnvironment; shared through EngineRoot",
+          "note": "Constructed beside the store before asynchronous index startup. Both halves receive the same runner; only it writes attempt lifecycle transitions."
+        }
+      ],
+      "consumers": [
+        "modules/app-agent/src/main/java/io/justsearch/agent/BackgroundRunService.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInit.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+        "modules/ui/src/main/java/io/justsearch/ui/api/InteractionThreadController.java"
+      ],
+      "authority": "governance/operation-surfaces.v1.json",
+      "note": "C2 separates the producer attempt port from its persistence port below. OperationStoreArchitectureTest pins lifecycle mutation to the shared runner, including child acceptance. The operation-surface register still governs sibling record scope and row cardinality. Record-kind declaration does not itself authorize recovery or alter admitted survival."
+    },
+    {
+      "id": "operations-store",
+      "title": "Operations persistence and lifetime",
+      "kind": "interface",
+      "interface": "io.justsearch.app.api.operations.OperationStore",
+      "interfaceFile": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "contractModule": "modules/app-api",
+      "owner": "Engine durable operations store; app-observability owns SQLite",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.observability.operations.SqliteOperationStore",
+          "file": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+          "boundBy": "io.justsearch.ui.HeadlessApp and io.justsearch.applauncher.LauncherEnvironment; shared through EngineRoot",
+          "note": "Outer process composition opens operations.db before the asynchronous index fork and closes it after index drain. HeadAssembly does not construct or independently close this store."
+        }
+      ],
+      "consumers": [
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"
+      ],
+      "note": "This is the existing persistence interface, not a second producer lifecycle. Producers use OperationAttemptRunner; raw lifecycle writes are architecture-restricted. Read/recovery/lifetime consumers carry the store without acquiring terminal-write authority."
+    },
+
+    {
+      "id": "memory",
+      "title": "Memory",
+      "kind": "planned",
+      "currentAuthority": "the memory API and the `remember` operation, Head-side (governance/operation-surfaces.v1.json siblingRecords.AgentMemory)",
+      "note": "Design 3.3: 'moves under the core's durable stores; no new behaviour in lane F'. Nothing moved in stage A, so there is nothing to catalogue yet. Declared here so the port is enumerable as PLANNED rather than looking forgotten — the failure this register exists to prevent is a capability that is neither a port nor visibly not one."
+    },
+    {
+      "id": "health",
+      "title": "Health and self-description",
+      "kind": "http-surface",
+      "authority": "/api/health, /api/debug/state, /infra/capabilities",
+      "note": "An HTTP surface, not a Java interface, and design 3.3 says it 'becomes the engine's component map (section 10)'. Its contract is pinned by the readiness reason codes (scripts/ci/check-readiness-reason-codes.mjs) and the runtime manifest, not by this register. Listed for completeness of the day-one set."
+    }
+  ],
+  "rules": [
+    {
+      "id": "engine-port/undeclared-implementation",
+      "statement": "A class implementing a registered port interface must be declared under that port's `implementations`.",
+      "why": "This is the whole point of the catalogue in one JVM. While the index half was a second process, an implementation of the engine API meant writing a gRPC server; now it means writing `implements SearchPort`, which any module can do by accident. An undeclared binding is a second authority for what the engine answers."
+    },
+    {
+      "id": "engine-port/missing-interface",
+      "statement": "Every `kind: interface` port names a file that exists and declares that interface.",
+      "why": "A catalogue entry pointing at a moved or deleted file is residue that reads as authority — the register would go on asserting a port that is not there."
+    },
+    {
+      "id": "engine-port/missing-implementation",
+      "statement": "Every declared implementation names a file that exists and implements the interface.",
+      "why": "Same direction as above, from the other end. It also catches the rename that this lane keeps producing."
+    },
+    {
+      "id": "engine-port/vacuous-scan",
+      "statement": "The source scan must find at least `expectedMinImplementations` implementations.",
+      "why": "Without it, a renamed scan root turns every check above into a pass over an empty set — the failure mode that makes a gate worse than no gate, because it reports green."
+    }
+  ]
+}

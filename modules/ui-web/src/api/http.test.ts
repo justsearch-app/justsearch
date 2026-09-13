@@ -35,6 +35,7 @@ describe('http module', () => {
       (globalThis as { window?: typeof window }).window = originalWindow;
     }
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('SESSION_TOKEN_HEADER constant', () => {
@@ -183,6 +184,41 @@ describe('http module', () => {
 
       expect(callCount).toBe(1); // Should not retry
     });
+
+    it.each([
+      ['UPGRADE_PREPARING', undefined],
+      ['SERVICE_UNAVAILABLE', false],
+    ])('does not retry an unsafe 503 (%s)', async (errorCode, retrySafe) => {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        error: 'Request cannot be replayed',
+        errorCode,
+        ...(retrySafe === undefined ? {} : { retrySafe }),
+      }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+
+      const { request } = await import('./http');
+      await expect(request('http://localhost:3000', '/api/test', { retries: 3 }))
+        .rejects.toMatchObject({ code: errorCode, status: 503 });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry after fetch rejects with a custom caller abort reason', async () => {
+      const controller = new AbortController();
+      const reason = new Error('caller stopped this request');
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        controller.abort(reason);
+        return Promise.reject(reason);
+      });
+
+      const { request } = await import('./http');
+      await expect(request('http://localhost:3000', '/api/test', {
+        signal: controller.signal,
+        retries: 3,
+      })).rejects.toBe(reason);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('generateSessionToken utility (backend)', () => {
@@ -221,6 +257,24 @@ describe('http module', () => {
   });
 
   describe('resolveApiEndpoint', () => {
+    it('does not invent a proxy API for a desktop host with no Engine port', async () => {
+      mocks.isTauriRuntime.mockReturnValue(true);
+      mocks.invoke.mockResolvedValue(null);
+      vi.stubEnv('DEV', true);
+      vi.stubEnv('VITE_API_PORT', '');
+      vi.stubEnv('VITE_JUSTSEARCH_API_PORT', '');
+      (globalThis as { window?: Pick<typeof window, 'location'> }).window = {
+        location: { search: '', origin: 'http://localhost:5174' } as Location,
+      };
+      globalThis.fetch = vi.fn();
+      const { resolveApiEndpoint } = await import('./http');
+      await expect(resolveApiEndpoint()).resolves.toEqual({ port: null, baseUrl: null, source: 'unresolved' });
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      mocks.isTauriRuntime.mockReturnValue(false);
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('no manifest'));
+      await expect(resolveApiEndpoint()).resolves.toMatchObject({ baseUrl: 'http://localhost:5174', source: 'proxy' });
+    });
+
     it('uses the Tauri api_port command for packaged desktop origins', async () => {
       mocks.isTauriRuntime.mockReturnValue(true);
       mocks.invoke.mockResolvedValue(8080);

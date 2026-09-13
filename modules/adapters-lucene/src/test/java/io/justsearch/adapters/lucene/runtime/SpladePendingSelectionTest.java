@@ -30,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
  * shrinkable; this pins that it filters on the structural marker and nothing else.
  */
 @DisplayName("splade-pending work selection")
-class SpladePendingSelectionTest {
+class SpladePendingSelectionTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -155,7 +155,7 @@ class SpladePendingSelectionTest {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
   }
 
-  private static RunningRuntime openRuntime() {
+  private RunningRuntime openRuntime() {
     try {
       String json =
           """
@@ -184,7 +184,7 @@ class SpladePendingSelectionTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

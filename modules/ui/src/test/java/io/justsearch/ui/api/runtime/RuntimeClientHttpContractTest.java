@@ -41,7 +41,7 @@ class RuntimeClientHttpContractTest {
               config.showJavalinBanner = false;
               config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
             });
-    new RuntimeApiRoutes(publisher).register(app);
+    new RuntimeApiRoutes(new io.justsearch.core.execution.TestEngineExecutors(), publisher).register(app);
     app.start("127.0.0.1", 0);
     client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
   }
@@ -54,8 +54,8 @@ class RuntimeClientHttpContractTest {
   @Test
   void manifestAndWellKnownHandlersSerializeThePublicSchema() throws Exception {
     current.set(manifest("LIFECYCLE_STATE_READY"));
-    assertGet("/api/runtime/manifest", 200, "runtime-manifest-public.v1.json");
-    assertGet("/.well-known/justsearch/manifest.json", 200, "runtime-manifest-public.v1.json");
+    assertGet("/api/runtime/manifest", 200, "runtime-manifest-public.v2.json");
+    assertGet("/.well-known/justsearch/manifest.json", 200, "runtime-manifest-public.v2.json");
 
     current.set(null);
     assertGet("/api/runtime/manifest", 503, "api-error-response.v1.json");
@@ -122,7 +122,7 @@ class RuntimeClientHttpContractTest {
 
   private static RuntimeManifest manifest(String lifecycle) {
     return RuntimeManifestBuilder.builder()
-        .schemaVersion(1)
+        .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
         .instanceId("sdk-http-instance")
         .pid(1234L)
         .startedAt("2026-09-03T00:00:00Z")

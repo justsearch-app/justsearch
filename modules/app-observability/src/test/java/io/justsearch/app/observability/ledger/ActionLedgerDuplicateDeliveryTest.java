@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.stream.SseEnvelope;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,6 +26,13 @@ import org.junit.jupiter.api.Test;
  */
 @DisplayName("action-ledger duplicate delivery")
 final class ActionLedgerDuplicateDeliveryTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static ActionEvent indexEvent(String pathHash, String state, String scanId) {
     return ActionLedgerProjection.projectIndex(
@@ -72,7 +81,8 @@ final class ActionLedgerDuplicateDeliveryTest {
   @DisplayName("a duplicate terminal cannot inflate a scan's counts or trip completion early")
   void duplicateTerminalDoesNotInflateRollup() {
     ActionLedgerChangeRegistry registry = new ActionLedgerChangeRegistry();
-    ScanRollupLedger ledger = new ScanRollupLedger(registry, Runnable::run, null, () -> 1_000L, 60_000L);
+    ScanRollupLedger ledger =
+        new ScanRollupLedger(processExecutors, registry, Runnable::run, null, () -> 1_000L, 60_000L);
 
     ledger.scanStarted("scan-1", "scifact", "C:/corpus");
     ledger.scanEnumerated("scan-1", 3);
@@ -104,7 +114,8 @@ final class ActionLedgerDuplicateDeliveryTest {
   @DisplayName("close() emits a PARTIAL row for every open scan — no dangling STARTED in the journal")
   void closeEmitsPartialForOpenScans() {
     ActionLedgerChangeRegistry registry = new ActionLedgerChangeRegistry();
-    ScanRollupLedger ledger = new ScanRollupLedger(registry, Runnable::run, null, () -> 4_000L, 60_000L);
+    ScanRollupLedger ledger =
+        new ScanRollupLedger(processExecutors, registry, Runnable::run, null, () -> 4_000L, 60_000L);
 
     ledger.scanStarted("scan-a", "scifact", "C:/corpus");
     ledger.scanEnumerated("scan-a", 5);
@@ -137,7 +148,8 @@ final class ActionLedgerDuplicateDeliveryTest {
   @DisplayName("close() is idempotent — a second close emits nothing")
   void closeIsIdempotent() {
     ActionLedgerChangeRegistry registry = new ActionLedgerChangeRegistry();
-    ScanRollupLedger ledger = new ScanRollupLedger(registry, Runnable::run, null, () -> 1_000L, 60_000L);
+    ScanRollupLedger ledger =
+        new ScanRollupLedger(processExecutors, registry, Runnable::run, null, () -> 1_000L, 60_000L);
     ledger.scanStarted("scan-x", "notes", "C:/notes");
 
     ledger.close();

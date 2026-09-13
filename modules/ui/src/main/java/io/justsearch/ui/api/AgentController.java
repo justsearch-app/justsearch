@@ -90,6 +90,7 @@ final class AgentController {
   private io.justsearch.app.services.conversation.WorkflowGateRegistry workflowGateRegistry;
 
   AgentController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Supplier<AgentService> agentServiceSupplier,
       ConversationEngine engine,
       AgentSseWriter sseWriter,
@@ -104,6 +105,7 @@ final class AgentController {
     // keeps construction as total as it was before the heartbeat moved out of this class.
     this.heartbeat =
         new SseHeartbeat(
+            executors,
             (ctx, event, payload) -> sseWriter.writeEvent(ctx, event, payload),
             "agent-stream-heartbeat");
   }
@@ -171,7 +173,7 @@ final class AgentController {
                   // Tempdoc 577 §2.14 Root I (#13) — the initiating run observer EVICTS on
                   // disconnect (it throws, so the run drops it), the precondition the
                   // zero-observer park needs.
-                  sseEvent -> sseWriter.writeOrEvict(ctx, sseEvent.name(), sseEvent.payload())));
+                  sseEvent -> sseWriter.writeOrEvict(ctx, sseEvent.name(), sseEvent.payload()), RequestEngineContext.agent(ctx)));
     } catch (UnknownShapeException unknown) {
       LOG.warn("Rejecting agent run for unknown shapeId: {}", unknown.getMessage());
       Map<String, Object> errPayload = new LinkedHashMap<>();
@@ -294,6 +296,37 @@ final class AgentController {
   /** POST /api/chat/reject — reject sibling of {@link #handleApprove} (same unified dispatch). */
   void handleReject(Context ctx) {
     dispatchGate(ctx, false);
+  }
+
+  /** GET /api/chat/approval — private display from the live owner, never a durable event projection. */
+  void handleApproval(Context ctx) {
+    ctx.header("Cache-Control", "no-store");
+    String callId = ctx.queryParam("callId");
+    if (callId == null || callId.isBlank()) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "callId is required", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+    var approval = agentService().pendingToolApproval(ctx.queryParam("sessionId"), callId);
+    if (approval.isEmpty() && workflowGateRegistry != null) {
+      approval = workflowGateRegistry.pendingToolApproval(callId);
+    }
+    if (approval.isEmpty()) {
+      ctx.status(404).json(ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND,
+          "No pending approval gate", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+    var pending = approval.orElseThrow();
+    var detail = pending.detail();
+    var response = new LinkedHashMap<String, Object>();
+    response.put("callId", detail.callId());
+    response.put("operationId", detail.toolName());
+    response.put("gateBehavior", detail.gateBehavior() == null ? null
+        : detail.gateBehavior().toUpperCase(Locale.ROOT));
+    response.put("riskTier", detail.risk() == null ? null : detail.risk().toUpperCase(Locale.ROOT));
+    response.put("argsSummary", pending.preview().map(io.justsearch.agent.api.registry.OperationApprovalPreview::summary)
+        .orElseGet(() -> ArgsSummary.summarize(detail.arguments())));
+    ctx.json(response);
   }
 
   /**
@@ -612,7 +645,7 @@ final class AgentController {
     sseWriter.initSseHeaders(ctx, "/api/chat/sessions/resume-last");
     try {
       withHeartbeat(
-          ctx, () -> agentService().resumeLastSession(event -> sseWriter.writeAgentEvent(ctx, event)));
+          ctx, () -> agentService().resumeLastSession(event -> sseWriter.writeAgentEvent(ctx, event), RequestEngineContext.agent(ctx)));
     } catch (Exception e) {
       LOG.error("Failed to resume last agent session", e);
       Map<String, Object> resumeErr = new LinkedHashMap<>();
@@ -645,7 +678,7 @@ final class AgentController {
     try {
       withHeartbeat(
           ctx,
-          () -> agentService().resumeSession(sessionId, event -> sseWriter.writeAgentEvent(ctx, event)));
+          () -> agentService().resumeSession(sessionId, event -> sseWriter.writeAgentEvent(ctx, event), RequestEngineContext.agent(ctx)));
     } catch (Exception e) {
       LOG.error("Failed to resume agent session {}", sessionId, e);
       Map<String, Object> resumeErr = new LinkedHashMap<>();
@@ -690,7 +723,7 @@ final class AgentController {
           ctx,
           () ->
               agentService()
-                  .forkSession(sessionId, forkMessage, event -> sseWriter.writeAgentEvent(ctx, event)));
+                  .forkSession(sessionId, forkMessage, event -> sseWriter.writeAgentEvent(ctx, event), RequestEngineContext.agent(ctx)));
     } catch (Exception e) {
       LOG.error("Failed to fork agent session {}", sessionId, e);
       Map<String, Object> forkErr = new LinkedHashMap<>();

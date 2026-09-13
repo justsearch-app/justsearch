@@ -4,7 +4,8 @@ package io.justsearch.app.inference;
 /**
  * Declared supervision policy for the Brain (llama-server) process — the recovery-contract parameters
  * as named data (tempdoc 627). This is the Brain's analogue of the Worker's
- * {@link io.justsearch.app.services.worker.SupervisionPolicy}: it lifts the crash/health-recovery
+ * the Worker's former {@code SupervisionPolicy} (deleted at lane F stage A item A11 with the
+ * Worker process): it lifts the crash/health-recovery
  * constants that were scattered as {@code private static final} fields in {@link LlamaServerOps} into
  * one legible value object, so the recovery contract is declared (and assertable against
  * {@code governance/supervision-contract.v1.json}) rather than implicit.

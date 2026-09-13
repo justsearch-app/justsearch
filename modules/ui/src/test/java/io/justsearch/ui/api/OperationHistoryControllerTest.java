@@ -18,6 +18,8 @@ import io.justsearch.app.observability.operations.OperationHistoryChangeRegistry
 import io.justsearch.app.observability.operations.OperationHistoryEntry;
 import io.justsearch.app.observability.operations.OperationHistoryStore;
 import io.justsearch.app.observability.operations.OperationOutcome;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +32,13 @@ import org.junit.jupiter.api.Test;
 @DisplayName("OperationHistoryController")
 final class OperationHistoryControllerTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
   private OperationHistoryStore store;
   private OperationHistoryChangeRegistry registry;
   private OperationHistoryController controller;
@@ -38,7 +47,11 @@ final class OperationHistoryControllerTest {
   void setUp() {
     store = new OperationHistoryStore();
     registry = new OperationHistoryChangeRegistry();
-    controller = new OperationHistoryController(store, registry);
+    controller = new OperationHistoryController(
+            processExecutors,
+              store, registry, key -> new io.justsearch.app.api.operations.OperationOutcomeView(
+                  io.justsearch.app.api.operations.OperationOutcomeView.State.UNKNOWN,
+                  null, 0, null, null, null, null, null, null));
   }
 
   @AfterEach

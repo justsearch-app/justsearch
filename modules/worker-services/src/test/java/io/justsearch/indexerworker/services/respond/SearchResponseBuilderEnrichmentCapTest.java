@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
  * the fix, {@code SearchResponseBuilder.toGrpcResponseBuilder} only enriched (parent title /
  * excerpt regions) the first 10 hits in that pre-rerank order, so a reranked-up hit arrived blank.
  */
-final class SearchResponseBuilderEnrichmentCapTest {
+final class SearchResponseBuilderEnrichmentCapTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final FieldCatalogDef CATALOG = FieldCatalogDef.forChunkTesting(0);
   private static final int HIT_COUNT = 13;
@@ -36,7 +36,7 @@ final class SearchResponseBuilderEnrichmentCapTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().open();
+    lifecycle = IndexSchema.fromCatalog(CATALOG).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     lifecycle
         .indexingCoordinator()
         .indexSingle(

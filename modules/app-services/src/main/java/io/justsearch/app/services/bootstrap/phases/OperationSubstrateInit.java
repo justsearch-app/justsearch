@@ -111,12 +111,14 @@ public final class OperationSubstrateInit {
    *     reads from {@code WorkerCapability} + {@code InferenceCapability}.
    * @return bundled substrate values for the caller to assign into bootstrap state.
    */
-  public static Output run(
+  public static Output run(io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission, io.justsearch.core.execution.EngineExecutorRegistry executors,
       HandlerRegistry operationHandlers,
       OperationCatalog operationCatalog,
       OperationCatalog agentToolsCatalog,
       Function<RequiredCapability, Boolean> capabilityResolver,
-      io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog) {
+      io.justsearch.agent.api.registry.SurfaceCatalog coreSurfaceCatalog,
+      io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     OperationHistoryResourceCatalog operationHistoryResourceCatalog =
         new OperationHistoryResourceCatalog();
     // Tempdoc 571 §4c: the action-ledger Resource — the TRUST-role authority the Activity surface
@@ -184,7 +186,7 @@ public final class OperationSubstrateInit {
     // operation-kind event. Owned here (beside the log it projects) rather than on the API
     // composition root, so its quiescence sweeper's lifetime is the substrate's.
     io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger =
-        new io.justsearch.app.observability.ledger.ScanRollupLedger(actionLedgerChangeRegistry);
+        new io.justsearch.app.observability.ledger.ScanRollupLedger(executors, actionLedgerChangeRegistry);
     // Tempdoc 550 E2: process-wide emergency stop the lattice consults (default released).
     io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop =
         new io.justsearch.app.services.registry.executor.GlobalHardStop();
@@ -241,7 +243,7 @@ public final class OperationSubstrateInit {
     navigationHistoryStore.addAppendListener(actionLedgerChangeRegistry::broadcastNavigation);
     authorizationOutcomeStore.addAppendListener(actionLedgerChangeRegistry::broadcastGate);
     OperationExecutorImpl operationExecutorImpl =
-        new OperationExecutorImpl(
+        new OperationExecutorImpl(attempts, admission,
             operationHandlers,
             entry -> {
               // F5: append fans into the one log via the store's listener — no separate call here.
@@ -262,7 +264,7 @@ public final class OperationSubstrateInit {
             capabilityResolver,
             consentCapsuleService,
             // F5: append fans the gate firing into the one log via the store's listener.
-            authorizationOutcomeStore::append);
+            authorizationOutcomeStore::append, preparationCipher);
     operationExecutorImpl.setGlobalHardStop(globalHardStop);
     // Tempdoc 550 thesis IV: the gate consults the durable allow-always grants before requiring a
     // fresh capsule. Tempdoc 875 C.3: paired with the argument scope that bounds them — the wiring

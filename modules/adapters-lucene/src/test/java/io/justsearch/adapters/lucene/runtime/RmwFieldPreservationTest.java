@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
  * ({@code preserve-reread}); SPLADE data cannot be re-read, so its status field is driven
  * ({@code reset-status}) to force a re-encode. Startup fail-fast rejects an undeclared fragile field.
  */
-class RmwFieldPreservationTest {
+class RmwFieldPreservationTest extends LuceneExecutorTestBase {
 
   private static final float[] VEC = {0.25f, -0.5f, 0.75f, 1.0f};
 
@@ -987,7 +987,7 @@ class RmwFieldPreservationTest {
   }
 
   private RunningRuntime createRuntimeWithChunkText() {
-    return IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    return IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   private RunningRuntime open(String json) {
@@ -999,7 +999,7 @@ class RmwFieldPreservationTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

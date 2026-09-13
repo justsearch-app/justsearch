@@ -2,7 +2,7 @@
 /**
  * Slice 3a.2.e — `<jf-log-surface>` Log surface.
  *
- * Consumes the `core.head-log` DiagnosticChannel (slice 448
+ * Consumes the `core.engine-log` DiagnosticChannel (slice 448
  * substrate). Renders a scrollable log view with a bounded ring
  * buffer + filter chips (severity + sub-category + substring
  * search) + pause/resume.
@@ -14,7 +14,7 @@
  * Logs rail icon is clicked.
  *
  * Architecture per slice 448 phase 5:
- *   - `getDiagnosticChannel('core.head-log')` from the
+ *   - `getDiagnosticChannel('core.engine-log')` from the
  *     DiagnosticChannelCatalogClient gives the channel definition
  *     (endpoint + presentation metadata).
  *   - `diagnosticChannelStrategy({ cap, subCategoryFilter })`
@@ -34,7 +34,6 @@
  *   - Log persistence / export
  *   - Structured log parsing beyond severity + sub-category
  *   - Server-side filtering pushdown
- *   - Worker → Head log forwarding (V1 scopes to Head process only)
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -65,7 +64,7 @@ import type {
   SubCategory,
 } from '../../api/types/diagnostic.js';
 
-const LOG_CHANNEL_ID = 'core.head-log';
+const LOG_CHANNEL_ID = 'core.engine-log';
 const RING_BUFFER_CAP = 5000;
 const VIRTUALIZER_THRESHOLD = 200;
 

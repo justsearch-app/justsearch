@@ -213,6 +213,11 @@ final class MemoryExtractionConsumerTest {
     List<Map<String, Object>> messages =
         List.of(Map.of("role", "user", "content", userMessage));
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
 
       @Override

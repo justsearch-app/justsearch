@@ -33,14 +33,15 @@ class DefaultAppFacadeTest {
             Map.of());
 
     SearchPort port =
-        intent -> {
+        (intent, engineContext) -> {
           assertEquals(10, intent.limit());
           assertEquals("text/plain", intent.filters().mime());
           return coreResult;
         };
 
-    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(port, new NoopTelemetry());
-    SearchResponse response = facade.workers().search().search(request);
+    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class));
+    SearchResponse response =
+        facade.workers().search().search(request, TestEngineContexts.internal());
 
     assertEquals(
         new SearchResponse(
@@ -56,13 +57,14 @@ class DefaultAppFacadeTest {
     SearchRequest request = new SearchRequest(5, 0, false, null, null, List.of(), null);
     Result coreResult = new Result(List.of(), Map.of(), null, Map.of());
     SearchPort port =
-        intent -> {
+        (intent, engineContext) -> {
           assertEquals(new Query(5, 0, false, null, null, List.of(), null), intent);
           return coreResult;
         };
 
-    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(port, new NoopTelemetry());
-    SearchResponse response = facade.workers().search().search(request);
+    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class));
+    SearchResponse response =
+        facade.workers().search().search(request, TestEngineContexts.internal());
     assertNotNull(response);
   }
 

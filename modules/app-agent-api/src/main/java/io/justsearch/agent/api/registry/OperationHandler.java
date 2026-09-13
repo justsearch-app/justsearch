@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
+import java.util.Objects;
+
 /**
  * SPI for executing an Operation invocation.
  *
@@ -10,24 +13,24 @@ package io.justsearch.agent.api.registry;
  * {@code OperationExecutor} resolves the handler via {@code Binding.handlerId()} and
  * dispatches.
  *
- * <p>{@code execute(argumentsJson)} takes the raw argument JSON string (mirroring the
+ * <p>{@code execute(argumentsJson, engineContext)} takes the raw argument JSON string (mirroring the
  * legacy {@code ToolDefinition.execute} contract per §A.2 — bit-for-bit preserved
  * AgentLoopService behavior). Handlers parse via their own ObjectMapper (this module
  * has Jackson annotations only).
  *
- * <p>{@code undo(executionId)} default throws {@link UnsupportedOperationException}.
+ * <p>{@code undo(executionId, engineContext)} default throws {@link UnsupportedOperationException}.
  * Handlers that support undo override it; the executor checks
  * {@link OperationPolicy#undoSupported()} before delegating per §E.3.
  */
 public interface OperationHandler {
 
   /** Execute the operation against the parsed argument JSON. */
-  OperationResult execute(String argumentsJson);
+  OperationResult execute(String argumentsJson, EngineContext engineContext);
 
   /**
    * Slice 491 F6 — context-aware execute overload. Receives the
    * {@link InvocationProvenance} record alongside the args JSON. Default delegates
-   * to {@link #execute(String)} so existing handlers keep working unchanged.
+   * to {@link #execute(String, EngineContext)} while preserving the required Engine context.
    *
    * <p>Handlers that need transport / source-tier / dispatch-time context override
    * this overload. Reference case: {@code NavigateToSurfaceHandler} reads
@@ -37,11 +40,96 @@ public interface OperationHandler {
    * invocations).
    *
    * <p>The executor (e.g., {@code OperationExecutorImpl}) calls this overload at
-   * every dispatch site; the default-method delegation ensures the ~25 existing
-   * handlers that don't need context are unaffected.
+   * every dispatch site; handlers can read dispatch-only fields while downstream port calls
+   * retain the same Engine context.
    */
-  default OperationResult execute(String argumentsJson, InvocationProvenance provenance) {
-    return execute(argumentsJson);
+  default OperationResult execute(String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
+    return execute(argumentsJson, engineContext);
+  }
+
+  /**
+   * Prepare an invocation before its parent operation is accepted.
+   *
+   * <p>The default adapts existing handlers by carrying the raw arguments transiently. This hook
+   * is pure: it must not schedule work, register an operation, or perform another effect. An
+   * expected no-effect refusal should be reported with {@link OperationPreparationRefused} so the
+   * runner can retain the generic invocation identity and return its typed failure without
+   * scheduling or admitting work.
+   */
+  default OperationPreparation prepare(
+      String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
+    return OperationPreparation.passthrough(argumentsJson);
+  }
+
+  /**
+   * Execute a previously prepared invocation while preserving its frozen preparation.
+   *
+   * <p>The default supports only the transient passthrough preparation. A handler that returns a
+   * replay payload must override this method so that the payload cannot be silently ignored. When
+   * no record exists, the ordinary context-aware execute path is used; a record is forwarded to
+   * the existing recorded execution path unchanged.
+   */
+  default OperationExecution executePrepared(
+      OperationPreparation prepared,
+      InvocationProvenance provenance,
+      EngineContext engineContext,
+      OperationRecordHandle record) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.replaySchema() != null) {
+      throw new UnsupportedOperationException(
+          "Handler must override executePrepared for replay-capable preparation");
+    }
+    if (record != null) {
+      return executeRecorded(prepared.argumentsJson(), provenance, engineContext, record);
+    }
+    return OperationExecution.finished(execute(prepared.argumentsJson(), provenance, engineContext));
+  }
+
+  /** Synchronous default; asynchronous owners override and supply actual completion. */
+  default OperationExecution executeRecorded(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext, OperationRecordHandle record) {
+    return OperationExecution.finished(execute(argumentsJson, provenance, engineContext));
+  }
+
+  /**
+   * Project approval metadata from this frozen value only: never re-resolve a path or read
+   * changing state, and never include document content. A replay owner must explicitly supply
+   * its target/scope when confirmation is needed; public JSON cannot describe a server target.
+   */
+  default OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    throw new UnsupportedOperationException("Prepared handler must supply an approval preview");
+  }
+
+  /**
+   * Validate only the frozen format/version/content classification, before persistence and after
+   * decode. This is pure and must not re-resolve a target or inspect changing execution state.
+   * A replay owner opts in by validating its schemas; unsupported preparations refuse by default.
+   */
+  default void validatePreparation(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.replaySchema() != null) throw new IllegalArgumentException("Handler has no validated preparation schema");
+  }
+
+  /** Pure undo preparation has the same frozen-value contract as forward preparation. */
+  default OperationPreparation prepareUndo(String executionId, InvocationProvenance provenance,
+      EngineContext engineContext) {
+    return OperationPreparation.passthrough(OperationDispatcher.undoArguments(executionId));
+  }
+
+  /** A replay-capable undo owner must consume its frozen value explicitly. */
+  default OperationExecution undoPrepared(OperationPreparation prepared, String executionId,
+      InvocationProvenance provenance, EngineContext engineContext, OperationRecordHandle record) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.replaySchema() != null) throw new UnsupportedOperationException("Handler must override undoPrepared for replay-capable preparation");
+    return record == null ? OperationExecution.finished(undo(executionId, engineContext))
+        : undoRecorded(executionId, engineContext, record);
+  }
+
+  /** Undo participates in the same runner-owned attempt and actual-completion contract. */
+  default OperationExecution undoRecorded(String executionId, EngineContext engineContext,
+      OperationRecordHandle record) {
+    return OperationExecution.finished(undo(executionId, engineContext));
   }
 
   /**
@@ -53,7 +141,7 @@ public interface OperationHandler {
    * — invocations on operations without undo support fail fast with a typed denial,
    * never reach the handler.
    */
-  default OperationResult undo(String executionId) {
+  default OperationResult undo(String executionId, EngineContext engineContext) {
     throw new UnsupportedOperationException(
         "Undo not supported by " + getClass().getSimpleName());
   }

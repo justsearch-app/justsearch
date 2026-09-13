@@ -1,0 +1,69 @@
+{
+  "revision": "d799f00a0 + complete HTTP and approval key/result projection",
+  "command": "gradlew.bat :modules:app-api:test :modules:app-services:test --tests '*PendingAuthorizationStoreTest' :modules:ui:test --tests '*OperationsControllerTest' --tests '*AuthorizationControllerTest' :modules:app-api:pmdMain :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 265,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 50
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 49,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "negative": [
+    {
+      "run": "914",
+      "cases": 4,
+      "intendedFailures": 2,
+      "subject": "Existing HTTP invoke/undo drop the key."
+    },
+    {
+      "run": "916",
+      "result": "compile failure before tests: test omitted existing clock constructor parameter; corrected before917."
+    },
+    {
+      "run": "917",
+      "cases": 4,
+      "intendedFailures": 2,
+      "subject": "Old approval consumer drops key and invokes instead of preserving undo mode."
+    }
+  ],
+  "docs": {
+    "index": "919 generation, 920 check SUCCESS",
+    "skills": "921 SUCCESS; no embedded source section changed",
+    "canonicalLinks": "922 SUCCESS,156 documents"
+  },
+  "limits": "Focused implementation proof; no new live API/model/hosted claim. Remaining C2-3 ingress and prepared persistence follow.",
+  "final": "923 includes approved result key/row projection and typed approved-dispatch failure; UI49 executed, services12/app-api204 reused with unchanged inputs."
+}

@@ -8,6 +8,7 @@
 
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
 import { parseSseBuffer, parseSseBufferJson } from './sse';
+import { fetchWithAdmissionWait } from './admissionFetch.js';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
 // Tempdoc 941 — what the app DOES when one of our per-event handlers throws (reader notice +
 // diagnostics ring). The POLICY lives in shell-v0 beside the message-class vocabulary it names,
@@ -428,8 +429,14 @@ export async function streamRequest<TDone = Record<string, unknown>>(
   }
 
   const controller = new AbortController();
+  let unlinkSignal: (() => void) | undefined;
   if (signal) {
-    signal.addEventListener('abort', () => controller.abort(), { once: true });
+    if (signal.aborted) controller.abort(signal.reason);
+    else {
+      const onAbort = () => controller.abort(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+      unlinkSignal = () => signal.removeEventListener('abort', onAbort);
+    }
   }
   const mergedSignal = controller.signal;
 
@@ -446,7 +453,7 @@ export async function streamRequest<TDone = Record<string, unknown>>(
       headers[SESSION_TOKEN_HEADER] = sessionToken;
     }
 
-    const response = await fetch(url, {
+    const response = await fetchWithAdmissionWait(fetch, url, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -535,6 +542,9 @@ export async function streamRequest<TDone = Record<string, unknown>>(
     } else {
       onError?.(new Error(String(err)));
     }
+  } finally {
+    // The stream's lifetime is over; do not retain the controller through the caller's signal.
+    unlinkSignal?.();
   }
 }
 
@@ -639,7 +649,7 @@ export async function consumeShapeStream(
       ? `${url}${url.includes('?') ? '&' : '?'}sinceSeq=${encodeURIComponent(String(options.sinceSeq))}`
       : url;
 
-  const response = await fetch(target, {
+  const response = await fetchWithAdmissionWait(fetch, target, {
     method: 'POST',
     headers,
     body: JSON.stringify(body ?? {}),

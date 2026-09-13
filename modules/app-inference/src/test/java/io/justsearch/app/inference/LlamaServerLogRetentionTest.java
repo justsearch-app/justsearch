@@ -142,7 +142,7 @@ final class LlamaServerLogRetentionTest {
   }
 
   private static LlamaServerOps newOps() {
-    return new LlamaServerOps(
+    return new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
         HttpClient.newHttpClient(),
         new ObjectMapper(),
         () -> null,

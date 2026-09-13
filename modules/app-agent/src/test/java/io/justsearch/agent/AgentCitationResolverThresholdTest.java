@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -39,13 +40,16 @@ class AgentCitationResolverThresholdTest {
       double[] sink, List<DocumentService.VerificationSource> sourceSink) {
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
       @Override
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-          String answerText, List<VerificationSource> sources, double threshold) {
+          String answerText,
+          List<VerificationSource> sources,
+          double threshold,
+          EngineContext engineContext) {
         sink[0] = threshold;
         sourceSink.addAll(sources);
         return CompletableFuture.completedFuture(null);
@@ -63,7 +67,7 @@ class AgentCitationResolverThresholdTest {
   @DisplayName("799 Q: a configured 0 resolves to the DEFAULT, matching the RAG path exactly")
   void configuredZeroResolvesToDefault() {
     double[] seen = {-1.0};
-    new AgentCitationResolver(capturingDocs(seen), 0.0).resolve("The grass is green.", oneSource());
+    new AgentCitationResolver(capturingDocs(seen), 0.0).resolve("The grass is green.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(DocumentService.DEFAULT_CITATION_SIMILARITY_THRESHOLD, seen[0], 1e-9);
     assertNotEquals(
         0.01, seen[0], 1e-9, "0.01 was the RAG path's old floor — the two must not diverge again");
@@ -73,7 +77,7 @@ class AgentCitationResolverThresholdTest {
   @DisplayName("799 Q: an in-range configured cutoff passes through untouched")
   void inRangePassesThrough() {
     double[] seen = {-1.0};
-    new AgentCitationResolver(capturingDocs(seen), 0.83).resolve("The grass is green.", oneSource());
+    new AgentCitationResolver(capturingDocs(seen), 0.83).resolve("The grass is green.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(0.83, seen[0], 1e-9);
   }
 
@@ -103,7 +107,7 @@ class AgentCitationResolverThresholdTest {
     double[] seen = {-1.0};
     var captured = new java.util.ArrayList<DocumentService.VerificationSource>();
     new AgentCitationResolver(capturingDocs(seen, captured), 0.5)
-        .resolve("A sentence.", List.of(opened, retrieved));
+        .resolve("A sentence.", List.of(opened, retrieved), EngineContextTestFixtures.AGENT_LOOP);
 
     assertEquals(2, captured.size(), "one VerificationSource per AgentSource, in order");
     assertEquals(

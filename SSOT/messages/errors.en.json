@@ -2,6 +2,8 @@
   "$schema" : "https://ssot.justsearch/v1/schemas/i18n-catalog.json",
   "locale" : "en",
   "messages" : {
+    "errors.ADMISSION_CONTEXT_LIMIT" : "Too many requests from this client. Retry after the indicated delay.",
+    "errors.ADMISSION_ENGINE_LIMIT" : "The Engine is busy. Retry after the indicated delay.",
     "errors.AI_INSTALL_ERROR" : "AI installation failed.",
     "errors.AI_OFFLINE" : "AI is not available. Check that models are installed.",
     "errors.AI_STARTING" : "AI is starting up. Please wait a moment.",

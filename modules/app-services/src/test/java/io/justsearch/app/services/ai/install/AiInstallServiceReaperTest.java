@@ -50,6 +50,24 @@ final class AiInstallServiceReaperTest {
   }
 
   @Test
+  void getStatusNeverRevokesALiveOwnersGuardBecauseProgressIsStale() throws Exception {
+    AiInstallService svc = new AiInstallService(null, null, null, null, tmp);
+    AiInstallStatus status = statusOf(svc);
+    status.state = "running";
+    status.updatedAtEpochMs = System.currentTimeMillis() - (10 * 60_000L);
+    Field field = AiInstallService.class.getDeclaredField("running");
+    field.setAccessible(true);
+    var running = (java.util.concurrent.atomic.AtomicBoolean) field.get(svc);
+    running.set(true);
+
+    assertEquals("running", svc.getStatus().state);
+    org.junit.jupiter.api.Assertions.assertTrue(running.get());
+    var refusal = org.junit.jupiter.api.Assertions.assertThrows(
+        io.justsearch.app.api.AiInstallException.class, () -> svc.startInstall(true));
+    assertEquals(io.justsearch.app.api.ApiErrorCode.INSTALL_ALREADY_RUNNING, refusal.errorCode());
+  }
+
+  @Test
   void getStatus_leavesAFreshRunningInstallAlone() throws Exception {
     AiInstallService svc = new AiInstallService(null, null, null, null, tmp);
     AiInstallStatus status = statusOf(svc);

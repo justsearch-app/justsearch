@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -195,7 +197,7 @@ class AgentToolAuthorityBoundaryTest {
             3,
             profiles,
             "primary"),
-        events::add);
+        events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     assertNull(
         firstOfType(events, AgentEvent.ToolCallRejected.class),
@@ -263,7 +265,7 @@ class AgentToolAuthorityBoundaryTest {
     service.runAgent(
         new AgentRequest(
             List.of(Map.of("role", "user", "content", "go")), List.of(), 3, List.of(), null),
-        events::add);
+        events::add, EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(firing.get(), "precondition: availability must actually have flipped mid-run");
     assertNull(
@@ -378,7 +380,7 @@ class AgentToolAuthorityBoundaryTest {
         new AgentRequest(
             List.of(Map.of("role", "user", "content", "go")), selectedToolNames, 3);
     var events = new CopyOnWriteArrayList<AgentEvent>();
-    service.runAgent(request, events::add);
+    service.runAgent(request, events::add, EngineContextTestFixtures.AGENT_LOOP);
     return events;
   }
 

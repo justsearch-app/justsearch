@@ -69,6 +69,7 @@ public final class IngestionOutcomeJournal {
 
   /** Enqueues a successful write's ledger transition for drain after the next commit. */
   public void enqueueTransition(JobQueue.IngestionLedgerTransition transition) {
+    java.util.Objects.requireNonNull(transition.claim(), "Committed transitions require their processing claim");
     pendingMarkDone.add(transition);
   }
 
@@ -114,9 +115,14 @@ public final class IngestionOutcomeJournal {
       drainGroup(fullSuccess, fullSuccess());
       drainGroup(partialSuccess, partialSuccess());
       drainGroup(emptySuccess, emptySuccess());
-      pendingMarkDone.removeAll(fullSuccess);
-      pendingMarkDone.removeAll(partialSuccess);
-      pendingMarkDone.removeAll(emptySuccess);
+      // Value-equal records can carry different live claims. A stale transition discarded by
+      // fallback must not remove the current claim whose outcome write rolled back.
+      java.util.Set<JobQueue.IngestionLedgerTransition> drained =
+          java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+      drained.addAll(fullSuccess);
+      drained.addAll(partialSuccess);
+      drained.addAll(emptySuccess);
+      pendingMarkDone.removeIf(drained::contains);
     } finally {
       markDoneSpan.end();
     }
@@ -126,7 +132,7 @@ public final class IngestionOutcomeJournal {
    * Drains one outcome-grouped batch. Try a batched {@code markDoneTransitions}; on
    * {@link OutcomeWriteException} fall back to per-path so a single bad row doesn't block the
    * rest. Paths that fail per-path stay in {@code pendingMarkDone} (via the caller's
-   * {@code removeAll} of the surviving in-list) so the next drain or
+   * identity removal of the surviving in-list) so the next drain or
    * {@code recoverStuckJobs} on Worker restart can retry.
    */
   private void drainGroup(
@@ -145,7 +151,7 @@ public final class IngestionOutcomeJournal {
     while (it.hasNext()) {
       JobQueue.IngestionLedgerTransition transition = it.next();
       try {
-        jobQueue.markDone(transition.path(), outcome, transition.entry());
+        jobQueue.markClaimDone(transition.claim(), outcome, transition.entry());
       } catch (OutcomeWriteException ex) {
         log.warn(
             "Per-path markDone after commit rolled back; will retry on next drain: {}",

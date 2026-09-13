@@ -15,6 +15,13 @@ edition = "2021"
 name = "shell_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Lane F stage B item B10 (stages/B.md Q2). This binary proves the shared supervision loop with a
+# distinct fake actuator. Production child ownership is exercised by `engine_host.rs` library tests;
+# the conformance adapter does not stand in for `ShellActuator` or its OS/Tauri bindings.
+[[bin]]
+name = "supervisor-conformance"
+path = "src/bin/supervisor_conformance.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -33,6 +40,7 @@ tauri-plugin-notification = "2"
 tauri-plugin-updater = "=2.10.1"
 base64 = "0.22"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 ring = "0.17"
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }

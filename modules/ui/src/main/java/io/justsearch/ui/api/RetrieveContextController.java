@@ -154,7 +154,7 @@ public class RetrieveContextController {
           .metaAuthor(metaAuthor)
           .metaCategory(metaCategory)
           .build();
-      normFuture = normService.normalize(tempFilters, facetSnapshotSupplier.get());
+      normFuture = normService.normalize(tempFilters, facetSnapshotSupplier.get(), RequestEngineContext.get(ctx));
     }
 
     // Collect normalization result
@@ -186,7 +186,7 @@ public class RetrieveContextController {
 
     try {
       ContextResult result = documentService()
-          .retrieveContext(params)
+          .retrieveContext(params, RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(RETRIEVE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
@@ -235,11 +235,12 @@ public class RetrieveContextController {
         try {
           ContextSufficiencyService.SufficiencyResult sr =
               sufficiencyService
-                  .classify(question, result.context())
+                  .classify(question, result.context(), RequestEngineContext.get(ctx))
                   .toCompletableFuture()
                   .get(5, TimeUnit.SECONDS);
           quality.put("context_sufficient", sr != null ? sr.sufficient() : null);
         } catch (Exception e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           log.debug("Sufficiency check timed out or failed: {}", e.getMessage());
           quality.put("context_sufficient", null);
         }
@@ -251,6 +252,7 @@ public class RetrieveContextController {
 
       ctx.json(response);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       log.error("Failed to retrieve context", e);
       ctx.status(500).json(Map.of("ok", false, "error", e.getMessage()));
     }
@@ -294,7 +296,7 @@ public class RetrieveContextController {
 
     try {
       var result = documentService()
-          .matchCitationsAgainst(answerText, sources, threshold)
+          .matchCitationsAgainst(answerText, sources, threshold, RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(CITATIONS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 

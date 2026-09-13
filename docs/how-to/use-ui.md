@@ -117,7 +117,7 @@ The app includes built-in introspection tools reachable via browser.
 | **Dashboard** | `http://localhost:33221/api/debug/dashboard` | Visual status of Worker, Index, and Memory. |
 | **State JSON** | `http://localhost:33221/api/debug/state` | Raw JSON dump of the entire internal state. |
 | **Event Log** | `http://localhost:33221/api/debug/events` | Ring buffer of the last 50 system events. |
-| **Worker Log Tail** | `http://localhost:33221/api/debug/worker-log` | Quick peek at recent worker logs (best-effort). |
+| **Engine Log Tail** | `http://localhost:33221/api/debug/engine-log` | Quick peek at recent engine logs (best-effort). |
 | **Health** | `http://localhost:33221/api/health` | Lightweight backend health check. |
 | **Inference Status** | `http://localhost:33221/api/inference/status` | Current AI mode + queues + effective runtime model/context (best-effort); includes external server adoption diagnostics when applicable. |
 
@@ -259,10 +259,10 @@ After modifying Java code:
 1. Stop the dev stack:
    - If you used `npm --prefix modules/ui-web run dev:all`, press **Ctrl+C** in that terminal.
    - If you used `run-headless-api.ps1`, press **Ctrl+C** in that terminal.
-2. Rebuild (Java-only, skips web bundle): `.\gradlew.bat :modules:ui:compileJava :modules:app-services:compileJava :modules:indexer-worker:installDist -PskipWebBuild=true --no-daemon`
+2. Rebuild (Java-only, skips web bundle): `.\gradlew.bat :modules:ui:installDist -PskipWebBuild=true --no-daemon`
 3. Restart: `.\scripts\dev\run-headless-api.ps1 -SkipBuild`
 
-**Worker distribution note:** `:modules:ui:runHeadless` now builds `:modules:indexer-worker:installDist` automatically, so the spawned Worker stays in sync with new gRPC methods (e.g. `/api/preview` / `FetchDocumentSlice`).
+**One distribution:** lane F stage A item A13 deleted the Worker distribution. `:modules:ui:installDist` builds the only tree the backend launches from, and the index half is in its `lib/` — there is no second artifact that can drift out of sync.
 
 ### API Testing Without UI
 

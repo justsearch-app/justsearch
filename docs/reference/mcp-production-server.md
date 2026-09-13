@@ -33,7 +33,7 @@ MCP server on?" is exactly "which port is the API on?":
 - **Discover the actual port:** the backend writes it as `head.apiPort` in the runtime manifest,
   `<data dir>\runtime\manifest.json` — for the installed desktop app that is
   `%APPDATA%\io.justsearch.shell\runtime\manifest.json`. It also prints
-  `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\headless-backend.log`) and serves
+  `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\engine.log`) and serves
   `GET /api/health` once up. (Gradle dev tasks like `runHeadless`/`devAll` default to `33221`,
   which is why older docs and scripts mention that number — the installed app does not use it.)
 
@@ -106,7 +106,7 @@ In all three: replace `8080` with the `head.apiPort` value from
 
 Every flow above needs a build that serves `POST /mcp`; the v0.1.0 installer release may predate it.
 If a client reports no tools, probe the endpoint before debugging the client — it should answer with
-the six tools, and a 404 means the running build has no MCP endpoint (use a newer release or a
+the seven tools, and a 404 means the running build has no MCP endpoint (use a newer release or a
 from-source build):
 
 ```bash
@@ -185,11 +185,11 @@ Protocol version: `2025-11-25`. Capabilities: tools, resources,
 prompts. Curated tool-surface version (single-sourced from
 `McpContractVersions.TOOL_SURFACE_VERSION`, reported as
 `serverInfo._meta["io.justsearch/toolSurfaceVersion"]` and as the runtime
-manifest's `mcpToolSurfaceVersion`): `0.7.0`. MCP `serverInfo.version` is the
+manifest's `mcpToolSurfaceVersion`): `0.9.0`. MCP `serverInfo.version` is the
 **build** version (bound to `EnvRegistry.APP_VERSION`) — a host that logs or
 gates on server version must see this build's number, not the tool surface's.
 
-## Available Tools (6, position-bias ordered)
+## Available Tools (7, position-bias ordered)
 
 | # | Tool | Backend | Purpose |
 |---|------|---------|---------|
@@ -199,8 +199,30 @@ gates on server version must see this build's number, not the tool surface's.
 | 4 | `justsearch_ingest` | `core.ingest-files` Operation | File indexing. The only mutating tool — see Trust Model below. |
 | 5 | `justsearch_status` | `KnowledgeHttpApiAdapter.status()` | Index health + enrichment coverage. |
 | 6 | `justsearch_runtime_manifest` | `RuntimeManifestPublisher` | Redacted runtime manifest (identity, lifecycle, AI runtime state) for identity-aware caching. |
+| 7 | `justsearch_operation_outcome` | `HeadAssembly.operationOutcome()` | Recorded six-state outcome by original UUIDv7 operation key; never executes work. |
 
-All 6 tools validate their arguments against a declared JSON Schema at the MCP boundary before
+`justsearch_browse` and `justsearch_ingest` accept an optional `operationKey`
+(UUIDv7). It is transport metadata, removed before the Operation validates its
+public input. An identical keyed retry returns the recorded receipt without another
+preparation or effect; changed public input returns `OPERATION_KEY_REUSED`. An
+omitted key is minted by the dispatcher and returned with the operation row id.
+Approval retains the supplied key. Receipt access still checks current provenance
+and hard-stop policy. Invalid/expired keys and storage failures have typed error
+codes in both MCP text and `structuredContent`; native causes and stored payloads
+are excluded. The HTTP operation endpoint names the same optional field
+`idempotencyKey` in its request envelope.
+
+
+`justsearch_operation_outcome` requires `operationKey` as its read argument.
+Its `structuredContent` and JSON text match `GET /api/operation-history/{operationKey}`:
+accepted/running/complete/failed/unknown/expired, retention boundary and available
+receipt/counts. Timestamps are UTC epoch milliseconds. Unknown means no acceptance
+and no effect; expired means history cannot answer. A recorded failed operation is
+a successful tool query. Invalid keys and unavailable storage are tool errors.
+Public input and sealed preparation are never exposed. See
+[the outcome contract](api-contract-map.md#keyed-operation-outcome).
+
+All 7 tools validate their arguments against a declared JSON Schema at the MCP boundary before
 dispatch (tempdoc 655) — a malformed call gets a clean tool error rather than an internal cast
 failure.
 
@@ -208,7 +230,7 @@ failure.
 
 MCP has no standard tool-deprecation fields, so JustSearch advertises the versioned experimental
 capability `capabilities.experimental["io.justsearch/tool-lifecycle"] = {"version":"1.0"}`.
-Lifecycle data comes from a closed, validated catalog beside the six tool declarations: every
+Lifecycle data comes from a closed, validated catalog beside the seven tool declarations: every
 catalog row must resolve to exactly one live tool, and duplicate or orphaned rows fail fast.
 
 When a tool is deprecated, `tools/list` adds only namespaced top-level `_meta` keys:
@@ -216,7 +238,7 @@ When a tool is deprecated, `tools/list` adds only namespaced top-level `_meta` k
 `io.justsearch/sunsetAt`, and `io.justsearch/replacement`. The standard `annotations` object is left
 unchanged. A short deprecation sentence is also prepended to the description for clients that ignore
 extensions. The production catalog is currently empty, so no shipped tool emits this metadata and
-the curated tool-surface version is `0.7.0` after the additive failure metadata below.
+the curated tool-surface version is `0.9.0` after the keyed outcome query addition.
 
 ## Response shape (tempdoc 725)
 

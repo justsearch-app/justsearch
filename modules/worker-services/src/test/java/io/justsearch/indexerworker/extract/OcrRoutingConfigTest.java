@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -93,5 +94,43 @@ final class OcrRoutingConfigTest {
         new ResolvedConfig.Ocr(false, List.of("eng"), 12_000, 7, 2048, 8_000_000, 220, 3);
 
     assertEquals(false, OcrRoutingConfig.from(disabled).enabled());
+  }
+
+  @Test
+  void withWorkerLimitResolvesAutoToPositiveBoundedCopy() {
+    OcrRoutingConfig source = OcrRoutingConfig.defaults();
+
+    OcrRoutingConfig resolved = source.withWorkerLimit(1);
+
+    assertEquals(1, resolved.ocrWorkers());
+    assertEquals(1, resolved.effectiveOcrWorkers());
+    assertEquals(source.enabled(), resolved.enabled());
+    assertEquals(source.languages(), resolved.languages());
+    assertEquals(0, source.ocrWorkers(), "normalization must return a copy");
+  }
+
+  @Test
+  void withWorkerLimitHonorsExplicitValueAtOrBelowBound() {
+    OcrRoutingConfig source =
+        new OcrRoutingConfig(true, List.of("eng"), 30_000, null, null, null, null, 3);
+
+    assertEquals(3, source.withWorkerLimit(3).ocrWorkers());
+    assertThrows(IllegalArgumentException.class, () -> source.withWorkerLimit(2));
+  }
+
+  @Test
+  void withWorkerLimitRejectsExplicitValueAboveBoundWithConfigName() {
+    OcrRoutingConfig source =
+        new OcrRoutingConfig(true, List.of("eng"), 30_000, null, null, null, null, 3);
+
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> source.withWorkerLimit(2));
+
+    assertTrue(failure.getMessage().contains("ocr.workers"), failure.getMessage());
+  }
+
+  @Test
+  void withWorkerLimitRejectsNonPositiveBound() {
+    assertThrows(IllegalArgumentException.class, () -> OcrRoutingConfig.defaults().withWorkerLimit(0));
   }
 }

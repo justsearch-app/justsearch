@@ -268,7 +268,7 @@ public final class RegistryController {
   /**
    * Slice 448 phase 2: serves the DiagnosticChannel catalog envelope at
    * {@code /api/registry/diagnostic-channels}. Aggregates definitions across all
-   * registered DiagnosticChannel catalogs (V1 ships {@code HeadLogDiagnosticChannelCatalog}
+   * registered DiagnosticChannel catalogs (V1 ships {@code EngineLogDiagnosticChannelCatalog}
    * only; plugin-supplied catalogs land later).
    */
   /**

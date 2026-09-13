@@ -1,0 +1,37 @@
+{
+  "revision": "6a33258d9 + canonical index-base and dangling alias correction",
+  "command": "gradlew.bat :modules:indexer-worker:test --tests '*IndexRootLock*' :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:ui:compileIntegrationTestJava -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 18,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 3
+  },
+  "tasks": [
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    }
+  ],
+  "negativeControls": [
+    {
+      "log": "tmp/c2-review-r10-alias-negative878.txt",
+      "tests": 8,
+      "failures": 2,
+      "reason": "alias and target used separate sibling locks"
+    },
+    {
+      "log": "tmp/c2-review-r10-alias-dangling880.txt",
+      "tests": 7,
+      "failures": 1,
+      "reason": "dangling Windows junction acquired a separate sibling lock"
+    }
+  ]
+}

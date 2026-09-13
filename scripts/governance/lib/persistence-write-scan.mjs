@@ -24,7 +24,8 @@ const RUST_MUTATION =
   /\b(?:std::fs|fs)::(?:write|rename|copy|remove_file|remove_dir_all|create_dir_all)\b|\bOpenOptions::new\b/;
 
 /**
- * Remove comments while PRESERVING string literals, so a match means a call in code.
+ * Remove comments, preserving literals by default for mode-bearing write calls.
+ * Pass stripLiterals for declaration checks that must ignore example code in literals.
  *
  * This is the fix for the defect that motivated the rewrite. Discovery used to require a "durable
  * anchor" word (`dataDir`, `telemetry`, `StoreCatalog`, …) to appear anywhere in the file TEXT,
@@ -41,9 +42,10 @@ const RUST_MUTATION =
  * with backslash escapes. That is the whole grammar these regexes need.
  *
  * @param {string} source
+ * @param {{stripLiterals?: boolean}} options
  * @returns {string}
  */
-export function stripJavaComments(source) {
+export function stripJavaComments(source, { stripLiterals = false } = {}) {
   let out = '';
   let i = 0;
   const n = source.length;
@@ -58,9 +60,12 @@ export function stripJavaComments(source) {
     } else if (c === '"' && source[i + 1] === '"' && source[i + 2] === '"') {
       const start = i;
       i += 3;
-      while (i < n && !(source[i] === '"' && source[i + 1] === '"' && source[i + 2] === '"')) i++;
+      while (i < n && !(source[i] === '"' && source[i + 1] === '"' && source[i + 2] === '"')) {
+        if (source[i] === '\\') i += 2;
+        else i++;
+      }
       i = Math.min(n, i + 3);
-      out += source.slice(start, i);
+      out += stripLiterals ? ' ' : source.slice(start, i);
     } else if (c === '"' || c === "'") {
       const quote = c;
       const start = i;
@@ -70,7 +75,7 @@ export function stripJavaComments(source) {
         else i++;
       }
       i++;
-      out += source.slice(start, Math.min(n, i));
+      out += stripLiterals ? ' ' : source.slice(start, Math.min(n, i));
     } else {
       out += c;
       i++;

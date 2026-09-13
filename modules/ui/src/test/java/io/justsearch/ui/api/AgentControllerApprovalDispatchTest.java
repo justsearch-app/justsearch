@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,7 +57,7 @@ final class AgentControllerApprovalDispatchTest {
     }
 
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {}
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {}
 
     @Override
     public void approveToolCall(String sessionId, String callId) {
@@ -89,7 +90,7 @@ final class AgentControllerApprovalDispatchTest {
   }
 
   private static AgentController controller(AgentService svc, WorkflowGateRegistry reg) {
-    AgentController ctrl = new AgentController(() -> svc, null, null, null);
+    AgentController ctrl = new AgentController(new io.justsearch.core.execution.TestEngineExecutors(), () -> svc, null, null, null);
     if (reg != null) {
       ctrl.setWorkflowGateRegistry(reg);
     }
@@ -139,6 +140,18 @@ final class AgentControllerApprovalDispatchTest {
     assertTrue(ctrl.resolveApprovalGate(null, "call-wf", false, "no thanks"));
     assertTrue(gate.isDone());
     assertFalse(gate.get()); // rejected=false delivered
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void nestedWorkflowGateResolvesWithTheOuterAgentSession(boolean approved) throws Exception {
+    var service = new GateStubService("sess-a", "call-agent");
+    var registry = new WorkflowGateRegistry();
+    var gate = registry.create("call-wf");
+    assertTrue(controller(service, registry).resolveApprovalGate("sess-a", "call-wf", approved, "declined"));
+    assertEquals(approved, gate.get());
+    assertNull(service.lastApprovedCallId); assertNull(service.lastRejectedCallId);
+    assertFalse(registry.complete("call-wf", approved), "A repeated reply cannot resolve another gate");
   }
 
   @Test

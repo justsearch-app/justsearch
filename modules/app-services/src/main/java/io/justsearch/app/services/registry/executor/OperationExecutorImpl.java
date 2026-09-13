@@ -1,6 +1,19 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.executor;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationDispatchPlan;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.EngineAdmissionService;
+import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.operations.OperationDescriptor;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.services.intent.EngineProvenance;
+
 import io.justsearch.agent.api.registry.AuditPolicy;
 import io.justsearch.agent.api.registry.ConfirmationRequiredException;
 import io.justsearch.agent.api.registry.GateBehavior;
@@ -42,13 +55,24 @@ import java.util.function.Consumer;
  * know who did" — equivalence is intentional, not dead code), UNTRUSTED_PLUGIN throws
  * with a V1.5 sandbox doc pointer.
  *
- * <p>Per §E.3: {@link #undo(Operation, String)} checks
+ * <p>Per §E.3: {@link #undo(Operation, String, EngineContext)} checks
  * {@code op.policy().undoSupported()} before delegating; operations without undo
  * support fail fast with a typed denial, never reaching the handler. Per tempdoc 875 §C.7 it
  * then meets the SAME trust lattice a forward dispatch meets — a reversal is an operation and
  * inherits the risk class of its forward form.
  */
 public final class OperationExecutorImpl implements OperationDispatcher {
+  private final OperationAttemptRunner attempts;
+  private final PreparedInvocationCodec preparationCodec;
+  private final EngineAdmissionService admission;
+  private static void validateEngineContext(
+      EngineContext engineContext, InvocationProvenance provenance) {
+    var projected = EngineProvenance.invocation(engineContext, provenance.executor(),
+        provenance.occurredAt(), provenance.signedIntentToken());
+    if (!projected.equals(provenance)) {
+      throw new IllegalArgumentException("Invocation provenance disagrees with Engine context");
+    }
+  }
 
   private static final org.slf4j.Logger LOG =
       org.slf4j.LoggerFactory.getLogger(OperationExecutorImpl.class);
@@ -138,14 +162,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   private final OperationInputSchemaValidator inputValidator =
       new OperationInputSchemaValidator();
 
-  public OperationExecutorImpl(HandlerRegistry handlers) {
-    this(handlers, null, Map.of(), Clock.systemUTC(), null, null);
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission, HandlerRegistry handlers) {
+    this(attempts, admission, handlers, null, Map.of(), Clock.systemUTC(), null, null);
   }
 
   /** Pre-slice-490 constructor — legacy callers compile unchanged with no advisory wiring. */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers, Consumer<OperationHistoryEntry> historyEmitter, Clock clock) {
-    this(handlers, historyEmitter, Map.of(), clock, null, null);
+    this(attempts, admission, handlers, historyEmitter, Map.of(), clock, null, null);
   }
 
   /**
@@ -154,12 +178,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * {@code core.advisory-operation-completed}'s ResourceRef. New callers should
    * use the {@code Map} form directly.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Consumer<OperationCompletionEvent> advisoryEmitter,
       Clock clock) {
-    this(
+    this(attempts, admission,
         handlers,
         historyEmitter,
         advisoryEmitter == null
@@ -175,12 +199,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * Slice 490 Group B2 constructor — multi-emitter routing form. Pre-slice-487 callers
    * (no trust lattice). Delegates to the slice-487 6-arg form with null lattice deps.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
       Clock clock) {
-    this(handlers, historyEmitter, advisoryEmitters, clock, null, null);
+    this(attempts, admission, handlers, historyEmitter, advisoryEmitters, clock, null, null);
   }
 
   /**
@@ -191,14 +215,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * <p>When {@code trustEvaluator} or {@code intentSourceCatalog} is null, the lattice
    * is skipped (legacy/test compat). Both must be present for the lattice to enforce.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
       Clock clock,
       TrustEvaluator trustEvaluator,
       IntentSourceCatalog intentSourceCatalog) {
-    this(handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator, intentSourceCatalog, null);
+    this(attempts, admission, handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator, intentSourceCatalog, null);
   }
 
   /**
@@ -208,7 +232,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * capability is unavailable, dispatch returns CAPABILITY_UNAVAILABLE without
    * reaching the handler.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -216,7 +240,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       TrustEvaluator trustEvaluator,
       IntentSourceCatalog intentSourceCatalog,
       java.util.function.Function<RequiredCapability, Boolean> capabilityResolver) {
-    this(
+    this(attempts, admission,
         handlers,
         historyEmitter,
         advisoryEmitters,
@@ -233,7 +257,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * consent capsule satisfies a non-AUTO gate (additive to the legacy non-blank-token
    * path). Production wiring (HeadAssembly / OperationSubstrateInit) uses this form.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -242,7 +266,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       IntentSourceCatalog intentSourceCatalog,
       java.util.function.Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService) {
-    this(
+    this(attempts, admission,
         handlers,
         historyEmitter,
         advisoryEmitters,
@@ -260,7 +284,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
    * is recorded so the action ledger / trust audit can read gate firings. Production wiring
    * (OperationSubstrateInit) uses this form.
    */
-  public OperationExecutorImpl(
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
       HandlerRegistry handlers,
       Consumer<OperationHistoryEntry> historyEmitter,
       Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters,
@@ -271,6 +295,23 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService,
       Consumer<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>
           authorizationOutcomeEmitter) {
+    this(attempts, admission, handlers, historyEmitter, advisoryEmitters, clock, trustEvaluator,
+        intentSourceCatalog, capabilityResolver, capsuleService, authorizationOutcomeEmitter,
+        io.justsearch.agent.api.encryption.StoreCipher.disabled());
+  }
+
+  /** The composition root supplies the existing data-key cipher; metadata needs no configured key. */
+  public OperationExecutorImpl(OperationAttemptRunner attempts, EngineAdmissionService admission,
+      HandlerRegistry handlers, Consumer<OperationHistoryEntry> historyEmitter,
+      Map<ResourceRef, Consumer<OperationCompletionEvent>> advisoryEmitters, Clock clock,
+      TrustEvaluator trustEvaluator, IntentSourceCatalog intentSourceCatalog,
+      java.util.function.Function<RequiredCapability, Boolean> capabilityResolver,
+      io.justsearch.agent.api.registry.ConsentCapsuleAuthority capsuleService,
+      Consumer<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry> authorizationOutcomeEmitter,
+      io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
+    this.preparationCodec = new PreparedInvocationCodec(preparationCipher);
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
+    this.admission = Objects.requireNonNull(admission, "admission");
     this.handlers = Objects.requireNonNull(handlers, "handlers");
     this.historyEmitter = historyEmitter;
     this.advisoryEmitters =
@@ -288,18 +329,18 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   }
 
   @Override
-  public OperationResult dispatch(Operation op, String argumentsJson) {
-    // Legacy 2-arg overload — defaults to system-internal provenance. Per slice 490
-    // §4.B, new call sites should use the 3-arg overload to carry transport / executor
-    // context. The fallback preserves observed shape for tests, agent-loop callers,
-    // and any code path that has not yet been threaded for provenance.
-    return dispatch(op, argumentsJson, InvocationProvenance.systemInternal(clock.instant()));
+  public OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext) {
+    // Project the caller's required context for direct UI dispatch without a signed intent.
+    // Explicit executor/token callers use the canonical overload below.
+    return dispatch(op, argumentsJson,
+        EngineProvenance.invocation(engineContext,
+            io.justsearch.agent.api.registry.ExecutorTag.UI, clock.instant(), Optional.empty()), engineContext);
   }
 
   @Override
   public OperationResult dispatch(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
-    return dispatch(op, argumentsJson, provenance, Optional.empty());
+      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
+    return dispatch(op, argumentsJson, provenance, Optional.empty(), engineContext);
   }
 
   @Override
@@ -307,79 +348,273 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Operation op,
       String argumentsJson,
       InvocationProvenance provenance,
-      Optional<String> confirmationToken) {
+      Optional<String> confirmationToken, EngineContext engineContext) {
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext, null);
+  }
+
+  @Override
+  public OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext, operationKey, null);
+  }
+
+  @Override
+  public OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext engineContext, String operationKey, java.util.UUID preparationNonce) {
+    validateRequest(op, argumentsJson, provenance, confirmationToken, engineContext);
+    return dispatchAttempt(op, argumentsJson, provenance, confirmationToken, engineContext,
+        null, operationKey, preparationNonce);
+  }
+
+  private void validateRequest(Operation op, String argumentsJson, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext context) {
     Objects.requireNonNull(op, "op");
     Objects.requireNonNull(argumentsJson, "argumentsJson");
     Objects.requireNonNull(provenance, "provenance");
     Objects.requireNonNull(confirmationToken, "confirmationToken");
-    // Slice 490 follow-up — provenance integrity validation. A {@code TRUSTED_PLUGIN}
-    // caller cannot spoof user-facing transports (BUTTON / URL_BAR / LLM_EMISSION etc.)
-    // — only system-tier or plugin-tier transports are admissible. {@code CORE}
-    // dispatch is unrestricted (callers within the head process are trusted to claim
-    // their actual transport); {@code UNTRUSTED_PLUGIN} throws below regardless.
+    validateEngineContext(context, provenance);
     validateProvenance(op, provenance);
+    validateCurrentAuthority(op, provenance);
+  }
 
-    // Slice 487 §4.4: (SourceTier × RiskTier) → GateBehavior lattice. Runs between
-    // validateProvenance (transport spoofing defense) and inputValidator.validate
-    // (schema validation). Skipped silently when trust deps absent (legacy/test wiring).
+  private OperationResult dispatchAttempt(Operation op, String argumentsJson, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext context, String undoId, String key, java.util.UUID nonce) {
+    var existing = existingInvocation(op, argumentsJson, provenance, context, key, undoId != null);
+    if (existing.isPresent()) return existing.get();
+    InvocationPlan plan = planInvocation(op, argumentsJson, provenance, context, undoId, key, nonce);
+    // A winner can accept while this request leaves its pure scope. Receipt lookup never
+    // publishes under a preparation lock and never consumes another mutation capsule.
+    existing = existingInvocation(op, argumentsJson, provenance, context, plan.request().key(), undoId != null);
+    if (existing.isPresent()) return existing.get();
+    if (plan.existing()) throw preparationUnavailable();
     if (intentGateEvaluator != null) {
-      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken);
+      enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, context,
+          plan.invocation().value(), plan.request().key(), plan.pending() == null ? null : plan.pending().nonce());
     }
+    return executeAttempt(op, plan, undoId);
+  }
 
-    // Tempdoc 502 §B1: check required capabilities before dispatch.
-    if (capabilityResolver != null) {
-      var missingCap = checkCapabilities(op);
-      if (missingCap != null) {
-        Instant t = clock.instant();
-        String msg = capabilityUnavailableMessage(missingCap);
-        OperationResult denied =
-            OperationResult.failure(msg, "CAPABILITY_UNAVAILABLE", Map.of("capability", missingCap), true);
-        emitHistory(op, t, OperationOutcome.FAILURE, msg, provenance, Optional.empty());
-        return denied;
+  @Override
+  public OperationDispatchPlan prepare(Operation op, String argumentsJson, InvocationProvenance provenance,
+      EngineContext context, String operationKey, boolean includeApprovalPreview) {
+    validateRequest(op, argumentsJson, provenance, Optional.empty(), context);
+    var existing = existingInvocation(op, argumentsJson, provenance, context, operationKey, false);
+    if (existing.isPresent()) return new OperationDispatchPlan.Recorded(operationKey, existing.get());
+    InvocationPlan plan = planInvocation(op, argumentsJson, provenance, context, null, operationKey, null);
+    String stableKey = plan.request().key();
+    existing = existingInvocation(op, argumentsJson, provenance, context, stableKey, false);
+    if (existing.isPresent()) return new OperationDispatchPlan.Recorded(stableKey, existing.get());
+    if (plan.existing()) throw preparationUnavailable();
+    var nonce = plan.pending() == null ? null : plan.pending().nonce();
+    var preview = !includeApprovalPreview || nonce == null ? null
+        : Objects.requireNonNull(plan.invocation().handler().approvalPreview(plan.invocation().value()), "approvalPreview");
+    return new OperationDispatchPlan.Ready(stableKey, nonce, Optional.ofNullable(preview));
+  }
+
+  private InvocationPlan planInvocation(Operation op, String argumentsJson, InvocationProvenance provenance,
+      EngineContext context, String undoId, String key, java.util.UUID nonce) {
+    var identity = OperationDescriptor.invocation(op.policy().recordKind(), op.id().value(), argumentsJson, undoId != null);
+    var request = new OperationAttemptRunner.Request(key, identity, context, provenance);
+    return attempts.withPreparation(request, scope -> {
+      var stable = scope.request();
+      if (scope.existing().isPresent()) return new InvocationPlan(stable, null, null, true);
+      var pending = attempts.pendingPreparation(stable);
+      if (nonce != null && (pending.isEmpty() || !nonce.equals(pending.get().nonce()))) {
+        throw preparationUnavailable();
+      }
+      if (pending.isPresent()) return persistedPlan(op, stable, pending.get());
+      PreparedInvocation invocation = prepareInvocation(op, argumentsJson, provenance, context, undoId);
+      if (invocation.value() == null || invocation.value().replaySchema() == null) {
+        return new InvocationPlan(stable, invocation, null, false);
+      }
+      var preparationId = java.util.UUID.randomUUID();
+      var envelope = preparationCodec.freeze(stable.key(), preparationId, identity, invocation.value(), context, provenance);
+      var stored = new io.justsearch.app.api.operations.OperationStore.Preparation(preparationId, preparationCodec.encode(envelope));
+      var saved = attempts.savePreparation(stable, stored);
+      return saved.isEmpty() ? new InvocationPlan(stable, null, null, true) : persistedPlan(op, stable, saved.get());
+    });
+  }
+
+  private record InvocationPlan(OperationAttemptRunner.Request request, PreparedInvocation invocation,
+      io.justsearch.app.api.operations.OperationStore.Preparation pending, boolean existing) {}
+
+  private InvocationPlan persistedPlan(Operation op, OperationAttemptRunner.Request request,
+      io.justsearch.app.api.operations.OperationStore.Preparation pending) {
+    var envelope = preparationCodec.decode(pending.payload(), request.key(), pending.nonce(), request.descriptor());
+    EngineContext origin = envelope.context();
+    // Only reattach identical attribution and work axes. A different caller remains separately
+    // admitted; attach(origin) admits a fresh original-context child instead of relabelling it.
+    if (request.context().workId().isPresent()
+        && origin.withWorkId(request.context().workId().orElseThrow()).equals(request.context())) {
+      origin = request.context();
+    }
+    var execution = new OperationAttemptRunner.Request(request.key(), request.descriptor(), origin, envelope.provenance());
+    var handler = resolveHandler(op);
+    handler.validatePreparation(envelope.preparation());
+    return new InvocationPlan(execution, new PreparedInvocation(handler, envelope.preparation(), null, null), pending, false);
+  }
+
+  private static io.justsearch.app.api.operations.OperationStoreException preparationUnavailable() {
+    return new io.justsearch.app.api.operations.OperationStoreException(
+        io.justsearch.app.api.operations.OperationStoreException.Code.OPERATION_PREPARATION_UNAVAILABLE, null);
+  }
+
+  /** Pure preparation freezes scope; acceptance still precedes all effects and refusals. */
+  private OperationResult executeAttempt(Operation op, InvocationPlan plan, String undoId) {
+    Instant startedAt = clock.instant();
+    PreparedInvocation invocation = plan.invocation();
+    EngineContext context = plan.request().context();
+    InvocationProvenance provenance = plan.request().provenance();
+    // Every declaration has a record kind. Audit only controls history projection.
+    OperationAttemptRunner.PreparedAttempt prepared = plan.pending() == null
+        ? attempts.accept(plan.request()) : attempts.acceptPrepared(plan.request(), plan.pending().nonce());
+    if (prepared.existing()) {
+      return attempts.start(prepared, ignored -> {
+        throw new IllegalStateException("Existing acceptance must never execute");
+      }).response();
+    }
+    var _ = prepared.completion().whenComplete((row, failure) -> {
+      if (failure != null) {
+        emitHistory(op, startedAt, OperationOutcome.FAILURE, completionFailureCode(failure), provenance, Optional.empty());
+        return;
+      }
+      boolean success = row.state() == OperationState.COMPLETE;
+      OperationOutcome outcome = success
+          ? (undoId == null ? OperationOutcome.SUCCESS : OperationOutcome.UNDONE) : OperationOutcome.FAILURE;
+      Optional<String> undoExecution = success && undoId == null && op.policy().undoSupported()
+          ? Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::executionId)
+          : Optional.empty();
+      emitHistory(op, startedAt, outcome, success ? null : row.failureReason(), provenance, undoExecution);
+    });
+    try {
+      OperationResult refusal = preflight(op, invocation.refusal());
+      if (refusal != null) {
+        attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
+        return recordedResponse(refusal, prepared.accepted());
+      }
+      if (invocation.failure() != null) throw invocation.failure();
+      try (var work = admission.attach(context)) {
+        var result = attempts.start(prepared,
+            handle -> invokeOwnedHandler(invocation, provenance, work, undoId, handle));
+        return recordedResponse(result.response(), result.record());
+      }
+    } catch (io.justsearch.app.api.EngineAdmissionException failure) {
+      try { attempts.rejectBeforeStart(prepared, failure.reason().name()); }
+      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
+      throw failure;
+    } catch (RuntimeException failure) {
+      try { attempts.rejectBeforeStart(prepared, "UNCAUGHT_EXCEPTION"); }
+      catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
+      throw failure;
+    }
+  }
+
+  private Optional<OperationResult> existingInvocation(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext context, String operationKey, boolean undo) {
+    if (operationKey == null) return Optional.empty();
+    validateCurrentAuthority(op, provenance);
+    var identity = OperationDescriptor.invocation(op.policy().recordKind(), op.id().value(), argumentsJson, undo);
+    return attempts.lookup(new OperationAttemptRunner.Request(operationKey, identity, context, provenance))
+        .map(found -> attempts.start(found, ignored -> {
+          throw new IllegalStateException("Existing lookup cannot execute another effect");
+        }).response());
+  }
+
+  private void validateCurrentAuthority(Operation op, InvocationProvenance provenance) {
+    if (op.provenance().tier() == TrustTier.UNTRUSTED_PLUGIN) {
+      throw new UnsupportedOperationException("Untrusted plugin operations require V1.5 sandbox infrastructure");
+    }
+    // A receipt is a metadata read, not a second authorization of the mutation. Preserve the
+    // current hard stop and provenance validation without consuming a spent consent capsule.
+    if (intentGateEvaluator != null) {
+      var verdict = intentGateEvaluator.evaluate(op.policy().risk(), provenance.transport());
+      if (verdict.gateBehavior() == GateBehavior.DENY) {
+        emitGateOutcome(op, provenance, verdict.sourceTier(), GateBehavior.DENY,
+            io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED);
+        throw new TrustGateDeniedException(op.id(), verdict.sourceTier());
       }
     }
+  }
 
-    Instant startTime = clock.instant();
+  private static OperationResult recordedResponse(OperationResult response,
+      io.justsearch.app.api.operations.OperationRecord record) {
+    Map<String, Object> metadata = new java.util.HashMap<>(response.structuredData());
+    metadata.put("operationKey", record.key());
+    metadata.put("operationRecordId", record.id());
+    return new OperationResult(response.success(), response.message(), response.executionId(), metadata,
+        response.errorCode(), response.errorDetails(), response.retryable());
+  }
 
-    // Slice 3a-2-c Phase C: validate args against the declared input schema
-    // BEFORE invoking the handler. Catches "missing required arg" / "wrong
-    // type" centrally so per-handler ad-hoc parsing simplifies. On invalid
-    // args, return a typed BAD_REQUEST failure WITHOUT calling the handler;
-    // emit FAILURE history (consistent with uncaught-exception path).
-    var validationFailure = inputValidator.validate(op, argumentsJson);
-    if (validationFailure.isPresent()) {
-      OperationInputSchemaValidator.ValidationResult vr = validationFailure.get();
-      OperationResult invalid =
-          OperationResult.failure(vr.message(), "BAD_REQUEST", vr.details(), false);
-      emitHistory(op, startTime, OperationOutcome.FAILURE, vr.message(), provenance, Optional.empty());
-      return invalid;
-    }
+  private record PreparedInvocation(OperationHandler handler, OperationPreparation value,
+      OperationResult refusal, RuntimeException failure) {}
 
-    OperationResult result;
+  private static String completionFailureCode(Throwable failure) {
+    Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
+        ? failure.getCause() : failure;
+    return cause instanceof io.justsearch.app.api.operations.OperationStoreException storage
+        ? storage.code().name() : "UNCAUGHT_EXCEPTION";
+  }
+
+  private PreparedInvocation prepareInvocation(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext context, String undoId) {
     try {
-      result =
-          switch (op.provenance().tier()) {
-            case CORE -> dispatchCore(op, argumentsJson, provenance);
-            case TRUSTED_PLUGIN -> dispatchTrustedPlugin(op, argumentsJson, provenance);
-            case UNTRUSTED_PLUGIN -> throw new UnsupportedOperationException(
-                "Untrusted plugin operations require V1.5 sandbox infrastructure. "
-                    + "See docs/tempdocs/421-frontend-destination-architecture/421-stack.md "
-                    + "§Plugin trust model — V1.5 tier.");
-          };
-    } catch (RuntimeException e) {
-      // Per slice 444b: still emit a FAILURE history entry on uncaught dispatch error
-      // before propagating. The thrown exception is the truthful result; the entry
-      // captures that the dispatch happened.
-      emitHistory(op, startTime, OperationOutcome.FAILURE, e.getMessage(), provenance, Optional.empty());
-      throw e;
+      if (undoId == null) {
+        var invalid = inputValidator.validate(op, argumentsJson);
+        if (invalid.isPresent()) {
+          var refusal = invalid.get();
+          return new PreparedInvocation(null, null,
+              OperationResult.failure(refusal.message(), "BAD_REQUEST", refusal.details(), false), null);
+        }
+      }
+      OperationHandler handler = resolveHandler(op);
+      OperationPreparation value = Objects.requireNonNull(
+          undoId == null ? handler.prepare(argumentsJson, provenance, context)
+              : handler.prepareUndo(undoId, provenance, context), "handler preparation");
+      if (!argumentsJson.equals(value.argumentsJson())) {
+        throw new IllegalArgumentException("Preparation must retain the public arguments unchanged");
+      }
+      handler.validatePreparation(value);
+      return new PreparedInvocation(handler, value, null, null);
+    } catch (OperationPreparationRefused refusal) {
+      return new PreparedInvocation(null, null, refusal.refusal(), null);
+    } catch (RuntimeException failure) {
+      // A failed pure preparation is still an attempted operation. Accept its generic
+      // identity, then publish a refusal without scheduling or invoking the handler.
+      return new PreparedInvocation(null, null, null, failure);
     }
-    OperationOutcome outcome = result.success() ? OperationOutcome.SUCCESS : OperationOutcome.FAILURE;
-    Optional<String> undoExecutionId =
-        (outcome == OperationOutcome.SUCCESS && op.policy().undoSupported())
-            ? result.executionId()
-            : Optional.empty();
-    emitHistory(op, startTime, outcome, null, provenance, undoExecutionId);
-    return result;
+  }
+
+  /** Retain exact admitted work before invoking a handler that may fork before returning. */
+  private OperationExecution invokeOwnedHandler(PreparedInvocation invocation,
+      InvocationProvenance provenance, EngineWorkHandle work, String undoId, OperationRecordHandle record) {
+    var owner = work.retain();
+    try {
+      OperationExecution execution = undoId == null
+          ? invocation.handler().executePrepared(invocation.value(), provenance, owner.context(), record)
+          : invocation.handler().undoPrepared(invocation.value(), undoId, provenance, owner.context(), record);
+      return new OperationExecution(execution.response(),
+          execution.completion().whenComplete((result, failure) -> owner.close()));
+    } catch (RuntimeException | Error failure) {
+      owner.close();
+      throw failure;
+    }
+  }
+
+  private OperationResult preflight(Operation op, OperationResult invalidInput) {
+    if (capabilityResolver != null) {
+      var missing = checkCapabilities(op);
+      if (missing != null) return OperationResult.failure(capabilityUnavailableMessage(missing),
+          "CAPABILITY_UNAVAILABLE", Map.of("capability", missing), true);
+    }
+    return invalidInput;
+  }
+
+  private OperationHandler resolveHandler(Operation op) {
+    if (op.provenance().tier() == TrustTier.UNTRUSTED_PLUGIN) {
+      throw new UnsupportedOperationException("Untrusted plugin operations require V1.5 sandbox infrastructure");
+    }
+    return handlers.resolve(new OperationRef(op.binding().handlerId()))
+        .orElseThrow(() -> new IllegalStateException("No handler registered for binding " + op.binding().handlerId()));
   }
 
   private void emitHistory(
@@ -527,12 +762,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
   }
 
   @Override
-  public OperationResult undo(Operation op, String executionId) {
+  public OperationResult undo(Operation op, String executionId, EngineContext engineContext) {
     // Legacy 2-arg overload — defaults to system-internal provenance and no confirmation
     // token, exactly as the 2-arg dispatch does. Callers that know their transport should
     // use the 4-arg overload so the gate sees the real source tier.
     return undo(
-        op, executionId, InvocationProvenance.systemInternal(clock.instant()), Optional.empty());
+        op, executionId, EngineProvenance.invocation(engineContext,
+            io.justsearch.agent.api.registry.ExecutorTag.UI, clock.instant(), Optional.empty()),
+        Optional.empty(), engineContext);
   }
 
   /**
@@ -557,76 +794,24 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Operation op,
       String executionId,
       InvocationProvenance provenance,
-      Optional<String> confirmationToken) {
-    Objects.requireNonNull(op, "op");
+      Optional<String> confirmationToken, EngineContext engineContext) {
+    return undo(op, executionId, provenance, confirmationToken, engineContext, null);
+  }
+
+  @Override
+  public OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
+    return undo(op, executionId, provenance, confirmationToken, engineContext, operationKey, null);
+  }
+
+  @Override
+  public OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext engineContext, String operationKey, java.util.UUID preparationNonce) {
     Objects.requireNonNull(executionId, "executionId");
-    Objects.requireNonNull(provenance, "provenance");
-    Objects.requireNonNull(confirmationToken, "confirmationToken");
-    if (!op.policy().undoSupported()) {
-      return OperationResult.failure("Undo not supported by " + op.id().value());
-    }
-    // Same order as dispatch: transport-spoofing defense, then the lattice.
-    validateProvenance(op, provenance);
-    if (intentGateEvaluator != null) {
-      enforceTrustLattice(
-          op, OperationDispatcher.undoArguments(executionId), provenance, confirmationToken);
-    }
-    if (capabilityResolver != null) {
-      var missingCap = checkCapabilities(op);
-      if (missingCap != null) {
-        return OperationResult.failure(
-            capabilityUnavailableMessage(missingCap) + " (undo)",
-            "CAPABILITY_UNAVAILABLE",
-            Map.of("capability", missingCap),
-            true);
-      }
-    }
-    OperationHandler handler =
-        handlers
-            .resolve(new OperationRef(op.binding().handlerId()))
-            .orElseThrow(
-                () -> new IllegalStateException(
-                    "No handler registered for binding " + op.binding().handlerId()));
-    Instant startTime = clock.instant();
-    OperationResult result;
-    try {
-      result = handler.undo(executionId);
-    } catch (RuntimeException e) {
-      emitHistory(op, startTime, OperationOutcome.FAILURE, e.getMessage(), provenance, Optional.empty());
-      throw e;
-    }
-    OperationOutcome outcome = result.success() ? OperationOutcome.UNDONE : OperationOutcome.FAILURE;
-    emitHistory(op, startTime, outcome, null, provenance, Optional.empty());
-    return result;
-  }
-
-  private OperationResult dispatchCore(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
-    OperationHandler handler =
-        handlers
-            .resolve(new OperationRef(op.binding().handlerId()))
-            .orElseThrow(
-                () -> new IllegalStateException(
-                    "No handler registered for binding " + op.binding().handlerId()));
-    // Slice 491 F6: dispatch with the context-aware overload so handlers that need
-    // transport / source-tier visibility (e.g., NavigateToSurfaceHandler) read it
-    // from provenance. Handlers that don't override the overload get the default
-    // delegation to execute(argumentsJson) — no behavior change.
-    return handler.execute(argumentsJson, provenance);
-  }
-
-  private OperationResult dispatchTrustedPlugin(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
-    // V1's trust model is "you wrote it, or you know who did" — TRUSTED_PLUGIN
-    // operations execute equivalently to CORE in V1. This is intentional, not dead
-    // code: V1 plugins (per slice 3a.7) DO produce TRUSTED_PLUGIN-marked operations
-    // and route through this branch. V1.5 will add a policy floor here (e.g., risk
-    // minimum lifted to MEDIUM regardless of declaration). Per §B.D the equivalence
-    // is a semantic statement about V1's trust model, not a code-smell stub.
-    if (op.provenance().tier() != TrustTier.TRUSTED_PLUGIN) {
-      throw new IllegalStateException("Expected TRUSTED_PLUGIN, got " + op.provenance().tier());
-    }
-    return dispatchCore(op, argumentsJson, provenance);
+    String args = OperationDispatcher.undoArguments(executionId);
+    validateRequest(op, args, provenance, confirmationToken, engineContext);
+    if (!op.policy().undoSupported()) return OperationResult.failure("Undo not supported by " + op.id().value());
+    return dispatchAttempt(op, args, provenance, confirmationToken, engineContext, executionId, operationKey, preparationNonce);
   }
 
   /**
@@ -655,7 +840,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       Operation op,
       String argumentsJson,
       InvocationProvenance provenance,
-      Optional<String> confirmationToken) {
+      Optional<String> confirmationToken, EngineContext engineContext, OperationPreparation prepared,
+      String operationKey, java.util.UUID preparationNonce) {
     // Tempdoc 550 thesis III: ONE structural verdict (derived source tier + (SourceTier × RiskTier)
     // lattice gate + Global Hard Stop override), the same computation/instance the Preview endpoint
     // reads. The E2 hard-stop DENY (engaged → DENY every UNTRUSTED dispatch, user-driven untouched)
@@ -683,8 +869,9 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         var scope = this.durableGrantScope;
         if (durable != null
             && durable.isAllowed(
-                op.id().value(), op.policy().capabilityFamily(), op.policy().risk(), sourceTier)
-            && scope.coversArguments(op, argumentsJson)) {
+                op.id().value(), op.policy().capabilityFamily(), op.policy().risk(), engineContext)
+            && (preparationNonce == null ? scope.coversArguments(op, argumentsJson, engineContext)
+                : scope.coversPreparation(op, prepared, engineContext))) {
           emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
           return; // durable-grant-satisfied
@@ -702,15 +889,19 @@ public final class OperationExecutorImpl implements OperationDispatcher {
         // path removed, the audit caller-migration is complete: a fabricated or stale
         // non-capsule token from ANY source now fails closed.
         if (capsuleService != null
-            && capsuleService.verifyAndConsume(token, op.id().value(), argumentsJson)) {
+            && (preparationNonce == null ? capsuleService.verifyAndConsume(token, op.id().value(), argumentsJson)
+                : capsuleService.verifyPreparedAndConsume(token, op.id().value(), argumentsJson, operationKey, preparationNonce))) {
           // Tempdoc 550 Outcome face: record the gate firing as APPROVED, then proceed.
           emitGateOutcome(op, provenance, sourceTier, gate,
               io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
           return; // capsule-satisfied
         }
+        var preview = preparationNonce == null ? null
+            : Objects.requireNonNull(resolveHandler(op).approvalPreview(prepared), "approvalPreview");
         emitGateOutcome(op, provenance, sourceTier, gate,
             io.justsearch.app.observability.operations.AuthorizationDisposition.GATED);
-        throw new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier);
+        throw new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier,
+            operationKey, preparationNonce, preview);
       }
       case DENY -> {
         emitGateOutcome(op, provenance, sourceTier, gate,

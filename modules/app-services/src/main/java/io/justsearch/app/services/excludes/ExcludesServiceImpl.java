@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.excludes;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.ExcludesService;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.services.indexing.ExcludeGlobs;
@@ -30,8 +32,7 @@ import java.util.function.Supplier;
  * the settings list into, which reported a GUI value as an operator override.
  */
 public final class ExcludesServiceImpl implements ExcludesService {
-
-  private static final int MAX_WALK_FILES = 500_000;
+private static final int MAX_WALK_FILES = 500_000;
 
   private final Supplier<IndexingService> indexingServiceSupplier;
 
@@ -41,7 +42,7 @@ public final class ExcludesServiceImpl implements ExcludesService {
   }
 
   @Override
-  public ExcludesResult applyExcludes(boolean dryRun) throws Exception {
+  public ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception {
     IndexingService indexing = indexingServiceSupplier.get();
     // globalOrNull, not global(): this is an HTTP handler so the store is set in production, but
     // failing the request with IllegalStateException would be a worse answer than "no excludes".
@@ -62,7 +63,7 @@ public final class ExcludesServiceImpl implements ExcludesService {
     AtomicInteger matchedFiles = new AtomicInteger();
     AtomicInteger visited = new AtomicInteger();
 
-    for (IndexingService.WatchedRoot root : indexing.getWatchedRoots()) {
+    for (IndexingService.WatchedRoot root : indexing.getWatchedRoots(engineContext)) {
       if (root == null || root.path() == null) continue;
       Path rootPath = root.path().toAbsolutePath().normalize();
       if (!Files.exists(rootPath) || !Files.isDirectory(rootPath)) {
@@ -84,7 +85,7 @@ public final class ExcludesServiceImpl implements ExcludesService {
                 perPatternCount[idx]++;
               }
               if (!dryRun) {
-                deletedByPathJobs.addAndGet(indexing.deleteDocsByPathPrefix(dir));
+                deletedByPathJobs.addAndGet(indexing.deleteDocsByPathPrefix(dir, engineContext));
               }
               return FileVisitResult.SKIP_SUBTREE;
             }
@@ -101,7 +102,7 @@ public final class ExcludesServiceImpl implements ExcludesService {
               matchedFiles.incrementAndGet();
               perPatternCount[idx]++;
               if (!dryRun) {
-                boolean ok = indexing.deleteDocById(file.toAbsolutePath().toString());
+                boolean ok = indexing.deleteDocById(file.toAbsolutePath().toString(), engineContext);
                 if (ok) {
                   deletedById.incrementAndGet();
                 }

@@ -1,4 +1,7 @@
-# Samples the Head and Worker JVM working sets once per interval to a CSV until the stop file appears.
+# Samples the merged Engine JVM's working set once per interval to a CSV until the stop file
+# appears. Lane F stage A merged the Head and Worker processes into one Engine JVM (HeadlessApp
+# entry point) — there is no longer a separate IndexerWorker process to sample, so this reports
+# a single 'engine' role rather than the former 'head'/'worker' split.
 # Usage: powershell -File tmp/head-rss-sampler.ps1 -Out tmp/head-rss.csv -Stop tmp/head-rss.stop [-IntervalSec 2]
 param(
   [string]$Out = "tmp/head-rss.csv",
@@ -12,8 +15,7 @@ while (-not (Test-Path $Stop)) {
     $cl = $p.CommandLine
     if (-not $cl) { continue }
     $role = $null
-    if ($cl -match 'HeadlessApp') { $role = 'head' }
-    elseif ($cl -match 'IndexerWorker') { $role = 'worker' }
+    if ($cl -match 'HeadlessApp') { $role = 'engine' }
     if (-not $role) { continue }
     $gp = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
     if (-not $gp) { continue }

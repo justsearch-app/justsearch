@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -69,7 +71,7 @@ public final class FileOperationsTool implements OperationHandler {
    * @param transactionLog shared transaction log for recording operations and undo
    */
   public FileOperationsTool(
-      Supplier<List<Path>> indexedRootsSupplier,
+      java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier,
       IndexUpdateCallback indexUpdateCallback,
       FileOperationLog transactionLog) {
     this(indexedRootsSupplier, indexUpdateCallback, transactionLog, null);
@@ -80,7 +82,7 @@ public final class FileOperationsTool implements OperationHandler {
    * null {@code rootsView} resolves nothing, which is exactly the pre-877 behaviour.
    */
   public FileOperationsTool(
-      Supplier<List<Path>> indexedRootsSupplier,
+      java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier,
       IndexUpdateCallback indexUpdateCallback,
       FileOperationLog transactionLog,
       AgentToolPaths.RootsView rootsView) {
@@ -91,7 +93,7 @@ public final class FileOperationsTool implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     try {
       JsonNode args = ToolArgs.parse(argumentsJson);
       JsonNode opsNode = args.get("operations");
@@ -107,7 +109,7 @@ public final class FileOperationsTool implements OperationHandler {
                 + ". Split into smaller batches.");
       }
 
-      List<FileOperation> operations = parseOperations(opsNode);
+      List<FileOperation> operations = parseOperations(opsNode, engineContext);
       String explanation = ToolArgs.stringArg(args, "explanation", "File operations");
 
       ConflictStrategy strategy = ConflictStrategy.FAIL;
@@ -122,13 +124,13 @@ public final class FileOperationsTool implements OperationHandler {
       }
 
       // Validate all operations first
-      var validation = executor.validate(operations, strategy);
+      var validation = executor.validate(operations, strategy, engineContext);
       if (!validation.allValid()) {
         return OperationResult.failure("Validation failed: " + validation.summary());
       }
 
       // Execute
-      var report = executor.execute(operations, explanation, strategy);
+      var report = executor.execute(operations, explanation, strategy, engineContext);
 
       if (report.allSucceeded()) {
         return OperationResult.success(report.summary(), report.batchId());
@@ -148,7 +150,7 @@ public final class FileOperationsTool implements OperationHandler {
   }
 
   @Override
-  public OperationResult undo(String executionId) {
+  public OperationResult undo(String executionId, EngineContext engineContext) {
     try {
       Map<String, Object> batch = transactionLog.readBatch(executionId);
       if (batch == null) {
@@ -264,12 +266,12 @@ public final class FileOperationsTool implements OperationHandler {
 
       // Execute reverse MOVE/RENAME through executor for index updates
       if (!reverseMovesAndRenames.isEmpty()) {
-        var validation = executor.validate(reverseMovesAndRenames);
+        var validation = executor.validate(reverseMovesAndRenames, engineContext);
         if (!validation.allValid()) {
           return OperationResult.failure("Undo validation failed: " + validation.summary());
         }
         var report =
-            executor.execute(reverseMovesAndRenames, "Undo of batch " + executionId);
+            executor.execute(reverseMovesAndRenames, "Undo of batch " + executionId, engineContext);
         undoneCount += report.successCount();
         result.append(report.summary());
       }
@@ -291,7 +293,7 @@ public final class FileOperationsTool implements OperationHandler {
               // is strictly more dangerous than the forward operation. The MOVE/RENAME arm above
               // re-validates through executor.validate(...); this arm must re-prove containment
               // too, because the indexed roots can shrink between the operation and the undo.
-              if (!executor.isWithinIndexedRoots(action.path)) {
+              if (!executor.isWithinIndexedRoots(action.path, engineContext)) {
                 skippedCount++;
                 outOfRoots.add(action.path);
                 LOG.warn(
@@ -472,7 +474,7 @@ public final class FileOperationsTool implements OperationHandler {
    * produce a clear, self-correcting validation error, never an NPE. Mirrors the
    * defensive idiom this class already uses for `explanation`/`conflict_strategy`.
    */
-  private List<FileOperation> parseOperations(JsonNode opsNode) {
+  private List<FileOperation> parseOperations(JsonNode opsNode, EngineContext engineContext) {
     List<FileOperation> operations = new ArrayList<>();
     int index = 0;
     for (JsonNode opNode : opsNode) {
@@ -488,7 +490,7 @@ public final class FileOperationsTool implements OperationHandler {
             "operation " + index + ": unknown op '" + opStr + "' (expected one of MOVE, RENAME, MKDIR, COPY)");
       }
 
-      String sourceStr = resolveAgainstRoots(ToolArgs.stringArg(opNode, "source"));
+      String sourceStr = resolveAgainstRoots(ToolArgs.stringArg(opNode, "source"), engineContext);
       Path source = (sourceStr != null && !sourceStr.isEmpty()) ? Path.of(sourceStr) : null;
 
       // Accept `path` as an alias for the schema's canonical `destination`: smaller
@@ -502,7 +504,7 @@ public final class FileOperationsTool implements OperationHandler {
             "operation " + index + " (" + opStr + "): missing required field 'destination'");
       }
 
-      operations.add(new FileOperation(opType, source, Path.of(resolveAgainstRoots(destStr))));
+      operations.add(new FileOperation(opType, source, Path.of(resolveAgainstRoots(destStr, engineContext))));
       index++;
     }
     return operations;
@@ -518,11 +520,11 @@ public final class FileOperationsTool implements OperationHandler {
    * through unchanged so {@code FileOperationExecutor}'s sandbox check still rejects it with its own
    * message — degrade-open on resolution, fail-closed on sandboxing, the split the other tools use.
    */
-  private String resolveAgainstRoots(String raw) {
+  private String resolveAgainstRoots(String raw, EngineContext engineContext) {
     if (raw == null || raw.isBlank() || AgentToolPaths.looksAbsolute(raw)) {
       return raw;
     }
-    String resolved = rootsView.resolveRelative(raw);
+    String resolved = rootsView.resolveRelative(raw, engineContext);
     return resolved == null ? raw : resolved;
   }
 
@@ -554,6 +556,6 @@ public final class FileOperationsTool implements OperationHandler {
      * @param pathMappings map of old absolute path to new absolute path
      * @return number of parent documents updated
      */
-    int updatePaths(Map<Path, Path> pathMappings);
+    int updatePaths(Map<Path, Path> pathMappings, EngineContext engineContext);
   }
 }

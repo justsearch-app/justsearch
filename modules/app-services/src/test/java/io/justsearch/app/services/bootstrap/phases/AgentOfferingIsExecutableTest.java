@@ -22,7 +22,7 @@ import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.NavigateToSurfaceHandler;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.nio.file.Path;
@@ -75,7 +75,7 @@ final class AgentOfferingIsExecutableTest {
   @Test
   @DisplayName("every operation the agent offering surfaces is executable")
   void offeredOperationsAreAllExecutable(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     WorkerCapability capability = mock(WorkerCapability.class);
     when(capability.available()).thenReturn(true);
 
@@ -88,6 +88,7 @@ final class AgentOfferingIsExecutableTest {
 
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -99,6 +100,7 @@ final class AgentOfferingIsExecutableTest {
 
     boolean lateBoundRan =
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             operationHandlers,
             mock(KnowledgeServerBootstrap.class),
             client,

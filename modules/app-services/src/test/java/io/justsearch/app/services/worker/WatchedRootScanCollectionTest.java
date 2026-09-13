@@ -6,15 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import io.grpc.ManagedChannel;
-import io.grpc.Server;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.stub.StreamObserver;
+import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
-import io.justsearch.ipc.IngestServiceGrpc;
 import io.justsearch.ipc.ScanMode;
-import io.justsearch.ipc.ScanRootProgress;
 import io.justsearch.ipc.ScanRootRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,7 +74,7 @@ final class WatchedRootScanCollectionTest {
               watchedRoots,
               state,
               () -> ExcludeMatcher.empty(),
-              (rootPath, collection, mode, globs, progress) -> {
+              (rootPath, collection, mode, globs, progress, engineContext) -> {
                 scannedRoot.set(rootPath);
                 scannedCollection.set(collection);
                 scannedMode.set(mode);
@@ -88,17 +82,17 @@ final class WatchedRootScanCollectionTest {
               },
               new RootLifecycleOps.WorkerWatchFn() {
                 @Override
-                public void watch(String rootPath, String collection) {
+                public void watch(String rootPath, String collection, io.justsearch.core.context.EngineContext engineContext) {
                   watchedCollection.set(collection);
                 }
 
                 @Override
-                public void unwatch(String rootPath) {}
+                public void unwatch(String rootPath, io.justsearch.core.context.EngineContext engineContext) {}
               },
-              p -> null,
-              s -> null,
+              (p, engineContext) -> null,
+              (s, engineContext) -> null,
               mock(SyncOps.class),
-              walkExecutor);
+              walkExecutor, (body, context) -> walkExecutor.execute(() -> body.accept(context)));
     }
 
     /** Drains the queued walk, then reports what each arm saw. */
@@ -117,7 +111,7 @@ final class WatchedRootScanCollectionTest {
 
   private Arms addRootAndCapture(String label, Path root) throws Exception {
     Capture capture = new Capture(root.getFileName().toString());
-    capture.ops.addWatchedRoot(label, root);
+    capture.ops.addWatchedRoot(label, root, TestEngineContexts.internal());
     return capture.drain();
   }
 
@@ -157,13 +151,13 @@ final class WatchedRootScanCollectionTest {
     Path root = Files.createDirectories(tempDir.resolve("listed"));
     Capture capture = new Capture("listed-roots");
 
-    capture.ops.addWatchedRoot("lane-c4-live", root);
+    capture.ops.addWatchedRoot("lane-c4-live", root, TestEngineContexts.internal());
     capture.drain();
 
     // 885 §UL.6: POST /api/indexing/roots with {"collection":"lane-c4-live"} returned 200 and the
     // subsequent GET reported "default". Both write-only arms had the label; the listing did not,
     // because nothing kept it. This is that GET, one layer down.
-    var listed = capture.ops.getWatchedRoots();
+    var listed = capture.ops.getWatchedRoots(TestEngineContexts.internal());
     assertEquals(1, listed.size(), "the root was registered");
     assertEquals(
         "lane-c4-live",
@@ -177,8 +171,8 @@ final class WatchedRootScanCollectionTest {
     Path root = Files.createDirectories(tempDir.resolve("inherit"));
     Path unlabeledRoot = Files.createDirectories(tempDir.resolve("inherit-plain"));
     Capture capture = new Capture("inherit-roots");
-    capture.ops.addWatchedRoot("my-notes", root);
-    capture.ops.addWatchedRoot(null, unlabeledRoot);
+    capture.ops.addWatchedRoot("my-notes", root, TestEngineContexts.internal());
+    capture.ops.addWatchedRoot(null, unlabeledRoot, TestEngineContexts.internal());
     capture.drain();
 
     // getWatchedRoots() feeds IngestCollectionPolicy.RootBinding at AgentToolFactory:203 and
@@ -189,7 +183,7 @@ final class WatchedRootScanCollectionTest {
     // different collection depending on which arm admitted it — but it is a behaviour change and is
     // pinned here rather than left to be discovered.
     List<IngestCollectionPolicy.RootBinding> bindings =
-        capture.ops.getWatchedRoots().stream()
+        capture.ops.getWatchedRoots(TestEngineContexts.internal()).stream()
             .map(r -> new IngestCollectionPolicy.RootBinding(r.path(), r.collection()))
             .toList();
 
@@ -213,13 +207,13 @@ final class WatchedRootScanCollectionTest {
 
     // Boot 1: the user adds a labelled root; the label is persisted with it.
     Capture first = new Capture("relabeled-roots");
-    first.ops.addWatchedRoot("my-notes", root);
+    first.ops.addWatchedRoot("my-notes", root, TestEngineContexts.internal());
     first.drain();
 
     // Boot 2: a fresh state over the SAME store file — exactly what a restart does.
     Capture second = new Capture("relabeled-roots");
     second.state.loadPersistedRoots();
-    second.ops.reindexPersistedRoots();
+    second.ops.reindexPersistedRoots(TestEngineContexts.durableInternal());
     Arms arms = second.drain();
 
     assertEquals("my-notes", arms.watched(), "the watcher arm re-registers under the real label");
@@ -238,7 +232,7 @@ final class WatchedRootScanCollectionTest {
     // A root persisted BEFORE the collection field existed: known, with no recorded label.
     capture.state.markNeverIndexed(root.toAbsolutePath().normalize());
 
-    capture.ops.reindexPersistedRoots();
+    capture.ops.reindexPersistedRoots(TestEngineContexts.durableInternal());
     Arms arms = capture.drain();
 
     // One root must carry ONE label. A rewalk that disagrees with its own watcher — or with what
@@ -255,20 +249,22 @@ final class WatchedRootScanCollectionTest {
 
   /**
    * The tests above run against a test-supplied ScanRootFn, so they pin the Java threading but not
-   * the PRODUCTION lambda that maps it onto the RPC. This drives the real
-   * {@link RemoteKnowledgeClient#addWatchedRoot} over an in-process gRPC server and asserts the
-   * {@link ScanRootRequest} the Worker would actually receive — so reverting that lambda's
-   * collection argument to {@code null} fails here. Harness pattern per
-   * {@link RemoteKnowledgeClientSearchRoundTripTest}.
+   * the PRODUCTION lambda that maps it onto the port call. This drives the real
+   * {@link KnowledgeClient#addWatchedRoot} through a {@link TestKnowledgeClient} and asserts the
+   * {@link ScanRootRequest} the index half would actually receive — so reverting that lambda's
+   * collection argument to {@code null} fails here.
+   *
+   * <p>Lane F stage A item A10 replaced the in-process gRPC server and the memory-mapped signal bus
+   * this nested class used with the client double. The subject is unchanged: the assertions were
+   * always about the request the production ScanRootFn assembles, never about how it travelled.
    */
   @Nested
-  @DisplayName("production lambda → ScanRootRequest (in-process gRPC)")
-  class ProductionWireForwarding {
+  @DisplayName("production lambda -> ScanRootRequest")
+  class ProductionScanRequestForwarding {
 
-    private Server server;
-    private ManagedChannel channel;
-    private CapturingIngestService ingest;
-    private RemoteKnowledgeClient client;
+    private final AtomicReference<ScanRootRequest> request = new AtomicReference<>();
+    private final CountDownLatch received = new CountDownLatch(1);
+    private KnowledgeClient client;
     private String prevDataDir;
 
     @BeforeEach
@@ -277,31 +273,22 @@ final class WatchedRootScanCollectionTest {
       Path dataDir = Files.createDirectories(tempDir.resolve("data"));
       System.setProperty("justsearch.data.dir", dataDir.toString());
 
-      String name = InProcessServerBuilder.generateName();
-      ingest = new CapturingIngestService();
-      server =
-          InProcessServerBuilder.forName(name).directExecutor().addService(ingest).build().start();
-      channel = InProcessChannelBuilder.forName(name).directExecutor().build();
-
-      // Signal bus is never opened/read: connectForTesting bypasses reconnect() port discovery.
-      MainSignalBus signalBus = new MainSignalBus(dataDir.resolve("signals/worker-signal.mmf"));
-      client = new RemoteKnowledgeClient(signalBus, /*deadlineMs=*/ 5000, /*maxRetries=*/ 0);
-      client.connectForTesting(channel);
+      client =
+          new TestKnowledgeClient(
+              new io.justsearch.core.execution.TestEngineExecutors(),
+              null,
+              null,
+              req -> {
+                request.set(req);
+                received.countDown();
+              });
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
       if (client != null) {
         client.close();
         client = null;
-      }
-      if (channel != null) {
-        channel.shutdownNow();
-        channel.awaitTermination(2, TimeUnit.SECONDS);
-      }
-      if (server != null) {
-        server.shutdownNow();
-        server.awaitTermination(2, TimeUnit.SECONDS);
       }
       if (prevDataDir == null) {
         System.clearProperty("justsearch.data.dir");
@@ -311,42 +298,27 @@ final class WatchedRootScanCollectionTest {
     }
 
     @Test
-    @DisplayName("addWatchedRoot's scan reaches the wire with the root's collection set")
+    @DisplayName("addWatchedRoot's scan reaches the index half with the root's collection set")
     void scanRequestCarriesTheRootsCollection() throws Exception {
       Path root = Files.createDirectories(tempDir.resolve("wired"));
 
-      client.addWatchedRoot("my-notes", root);
+      client.addWatchedRoot("my-notes", root, TestEngineContexts.internal());
 
       assertTrue(
-          ingest.received.await(10, TimeUnit.SECONDS),
-          "the background walk must dispatch a ScanRoot RPC");
-      ScanRootRequest request = ingest.request.get();
+          received.await(10, TimeUnit.SECONDS),
+          "the background walk must dispatch a ScanRoot call");
+      ScanRootRequest sent = request.get();
       assertEquals(
           "my-notes",
-          request.getCollection(),
+          sent.getCollection(),
           "the production ScanRootFn must forward the collection into ScanRootRequest — a literal"
               + " null here is the defect this pins");
       assertEquals(
           root.toAbsolutePath().normalize().toString(),
-          request.getRootPath(),
+          sent.getRootPath(),
           "same request, so the collection cannot belong to some other root's scan");
       assertEquals(
-          ScanMode.SCAN_MODE_INITIAL, request.getMode(), "a watched root's own scan is the initial one");
-    }
-  }
-
-  /** In-process IngestService that records the ScanRootRequest and completes the stream. */
-  private static final class CapturingIngestService
-      extends IngestServiceGrpc.IngestServiceImplBase {
-    private final AtomicReference<ScanRootRequest> request = new AtomicReference<>();
-    private final CountDownLatch received = new CountDownLatch(1);
-
-    @Override
-    public void scanRoot(ScanRootRequest req, StreamObserver<ScanRootProgress> responseObserver) {
-      request.set(req);
-      responseObserver.onNext(ScanRootProgress.newBuilder().setComplete(true).build());
-      responseObserver.onCompleted();
-      received.countDown();
+          ScanMode.SCAN_MODE_INITIAL, sent.getMode(), "a watched root's own scan is the initial one");
     }
   }
 }

@@ -30,7 +30,7 @@ final class BaselineMetricCatalogSmokeTest {
   @Test
   void localTelemetryRegistersBaselineCatalogAutomatically() throws Exception {
     Path tmp = Files.createTempDirectory("baseline-catalog-smoke");
-    try (LocalTelemetry tel = new LocalTelemetry(tmp, 200, "test-baseline", "0")) {
+    try (LocalTelemetry tel = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 200, "test-baseline", "0")) {
       // No explicit catalog list — the LocalTelemetry constructor appends BaselineMetricCatalog.
       assertNotNull(tel.registry());
       tel.flush();
@@ -47,7 +47,7 @@ final class BaselineMetricCatalogSmokeTest {
   void explicitSupplierIsWiredThrough() throws Exception {
     Path tmp = Files.createTempDirectory("baseline-catalog-supplier");
     try (LocalTelemetry tel =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp, 200, "test-baseline-supplier", "0", "metrics.ndjson", List.of())) {
       // Construct catalog with a custom supplier returning a fixed sentinel value.
       new BaselineMetricCatalog(tel.registry(), () -> 42_424_242L);

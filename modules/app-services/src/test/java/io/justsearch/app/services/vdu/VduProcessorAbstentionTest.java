@@ -32,6 +32,10 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("VduProcessor — abstention cascade (tempdoc 677 Stages 0+1)")
 final class VduProcessorAbstentionTest {
+  private static final io.justsearch.core.context.EngineContext TEST_CONTEXT =
+      io.justsearch.app.services.intent.EngineProvenance.internal("vdu-test",
+          io.justsearch.core.context.EngineContext.Survival.DURABLE,
+          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
 
   @TempDir Path tempDir;
 
@@ -55,7 +59,7 @@ final class VduProcessorAbstentionTest {
   void allPagesIllegibleSkipsModelAndRejects() throws Exception {
     Path image = writeUniformGrayImage("blank.png");
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(0, aiService.getVisionCallCount(), "the model must never be called");
     assertEquals(0, aiService.getChatCompletionCallCount(), "pass 2 must not run either");
@@ -74,7 +78,7 @@ final class VduProcessorAbstentionTest {
     aiService.withDefaultVisionResult(
         new VisionCompletionResult("plausible-looking fabricated text", "stop", 50, -2.0, 0.5));
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(1, aiService.getVisionCallCount(),
         "REJECT band must not run the Stage 2 probe — a single call total");
@@ -98,7 +102,7 @@ final class VduProcessorAbstentionTest {
         new VisionCompletionResult("Hello World transcription", "stop", 30, -0.058, 0.0));
     aiService.withChatCompletionResult("{\"summary\":\"a document\"}");
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertFalse(result.gateVerdict().rejected());
     assertEquals(GateVerdict.Band.PASS, result.gateVerdict().band());
@@ -126,7 +130,7 @@ final class VduProcessorAbstentionTest {
             "completely different unrelated confabulated zzz words", "stop", 60, -0.2, 0.01);
     aiService.withVisionResults(pass1Result, probeResult);
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(2, aiService.getVisionCallCount(),
         "AMBIGUOUS band must run exactly one Stage 2 probe call (pass 1 + probe)");
@@ -156,7 +160,7 @@ final class VduProcessorAbstentionTest {
     aiService.withVisionResults(pass1Result, probeResult);
     aiService.withChatCompletionResult("{\"summary\":\"resolved\"}");
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(2, aiService.getVisionCallCount(),
         "AMBIGUOUS band must run exactly one Stage 2 probe call (pass 1 + probe)");
@@ -178,7 +182,7 @@ final class VduProcessorAbstentionTest {
     aiService.withDefaultVisionResult(
         new VisionCompletionResult("some transcription", "stop", 0, null, null));
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertFalse(
         result.gateVerdict().rejected(), "NO SIGNAL must never be treated as low confidence");

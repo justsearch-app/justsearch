@@ -37,19 +37,20 @@ final class LibraryResolveHashOnlyCallerPin {
    * <ul>
    *   <li>{@code IndexingController} — owns {@code POST /api/library/resolve-hash} (the
    *       single approved HTTP entry point).
-   *   <li>{@code GrpcIngestService} — gRPC server-side handler for {@code LookupPathByHash}.
+   *   <li>{@code WorkerIngestService} — the index half's handler for {@code lookupPathByHash} (a
+   *       gRPC server-side handler until lane F stage A item A9; a direct port call since).
    *   <li>{@code IndexingLoop} — holds the store + Supplier wire to JobBatchExtractor.
    *   <li>{@code IndexingLoopOptions} — record field; the store is passed at ctor time
    *       by DWAS (tempdoc 516 P3 / W7.2 followup — startup-config setters moved to ctor).
    *   <li>{@code JobBatchExtractor} — records {@code (pathHash, normalizedPath)} on
    *       admission (tempdoc 516 Slice 4a.3 / W5.2 — extracted from IndexingLoop).
    *   <li>{@code DefaultWorkerAppServices} — wires the store into IndexingLoop and
-   *       GrpcIngestService at boot.
+   *       WorkerIngestService at boot.
    *   <li>{@code KnowledgeServer} — constructs the SQLite-backed store and exposes it via
    *       {@code InfraContext}.
    *   <li>{@code InfraContext} — passes the store reference between modules.
    *   <li>{@code SqlitePathResolutionStore} — the implementation itself.
-   *   <li>{@code RemoteKnowledgeClient} — Head-side gRPC client wrapper for the lookup RPC.
+   *   <li>{@code KnowledgeClient} — Head-side gRPC client wrapper for the lookup RPC.
    *   <li>{@code IndexingService} — interface declares the {@code resolvePathHash} method
    *       so {@code IndexingController} can call it.
    * </ul>
@@ -59,7 +60,7 @@ final class LibraryResolveHashOnlyCallerPin {
    */
   static final java.util.Set<String> APPROVED_CALLERS = java.util.Set.of(
       "io.justsearch.ui.api.IndexingController",
-      "io.justsearch.indexerworker.services.GrpcIngestService",
+      "io.justsearch.indexerworker.services.WorkerIngestService",
       "io.justsearch.indexerworker.loop.IndexingLoop",
       "io.justsearch.indexerworker.loop.IndexingLoopOptions",
       "io.justsearch.indexerworker.loop.JobBatchExtractor",
@@ -67,7 +68,7 @@ final class LibraryResolveHashOnlyCallerPin {
       "io.justsearch.indexerworker.server.KnowledgeServer",
       "io.justsearch.indexerworker.server.InfraContext",
       "io.justsearch.indexerworker.queue.SqlitePathResolutionStore",
-      "io.justsearch.app.services.worker.RemoteKnowledgeClient",
+      "io.justsearch.app.services.worker.KnowledgeClient",
       "io.justsearch.app.api.IndexingService");
 
   /**
@@ -76,7 +77,7 @@ final class LibraryResolveHashOnlyCallerPin {
    * silently slip out of the guard.
    */
   static final java.util.Set<String> EXPORT_CLASSES_FORBIDDEN_FROM_RESOLVER = java.util.Set.of(
-      // RemoteKnowledgeClient hosts both the export reads (recentIngestionEvents,
+      // KnowledgeClient hosts both the export reads (recentIngestionEvents,
       // ingestionOutcomeSummary) and the resolver call. The class is APPROVED above because
       // the resolver method exists; the per-method enforcement happens in IndexingController
       // (export handlers don't invoke resolvePathHash).

@@ -19,6 +19,15 @@
       "expectedStressTests": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/LifecycleStressTest.java"
       ]
+    },
+    {
+      "modulePath": "modules/app-engine",
+      "gradleTask": ":modules:app-engine:test",
+      "owner": "Engine composition root / index half",
+      "reason": "EngineExtractionSandboxChaosTest deliberately wedges a parser for its 60-second deadline and exhausts a child heap. Its wall-clock workload belongs in the explicit stress tier. Lane F B17 moved the hostile-file-lock workload into EngineSupervisedRecoveryE2ETest in the installed-process integration tier, preserving the attack and indexing/search assertions while allowing whole-Engine fatal recovery.",
+      "expectedStressTests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExtractionSandboxChaosTest.java"
+      ]
     }
   ]
 }

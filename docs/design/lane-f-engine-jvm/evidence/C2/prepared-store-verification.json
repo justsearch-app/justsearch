@@ -1,0 +1,80 @@
+{
+  "revision": "df4bedf07 + final v3 preparation store",
+  "command": "gradlew.bat :modules:app-api:test :modules:app-observability:test --tests '*OperationPreparationStoreTest' --tests '*SqliteOperationStoreTest' --tests '*OperationRetentionTest' --tests '*OperationKeyLookupTest' --tests '*OperationAttemptRunnerTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:ui:test --tests '*OperationsControllerTest' --tests '*AuthorizationControllerTest' --tests '*McpOperationKeyTest' :modules:app-api:pmdMain :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 363,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 67
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 63,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 15
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 61,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "sourceHashes": [
+    {
+      "path": "modules\\app-api\\src\\main\\java\\io\\justsearch\\app\\api\\operations\\OperationStore.java",
+      "sha256": "49e627906d68cfa9c44517760f807c3c47894439e65cbf752f4009a270dfef20"
+    },
+    {
+      "path": "modules\\app-observability\\src\\main\\java\\io\\justsearch\\app\\observability\\operations\\OperationSchema.java",
+      "sha256": "d36433737b8487e3af2418512f3503225e271801cfbd8e31e90ba4869871f1bc"
+    },
+    {
+      "path": "modules\\app-observability\\src\\main\\java\\io\\justsearch\\app\\observability\\operations\\SqliteOperationStore.java",
+      "sha256": "5341a31e3ba2c0b2d429f79d4e3ed50f99b2c911960baf9f104260b50e432341"
+    },
+    {
+      "path": "modules\\app-observability\\src\\test\\java\\io\\justsearch\\app\\observability\\operations\\OperationPreparationStoreTest.java",
+      "sha256": "07489b1ebcb78853eda40d490a84dde89f4cc6e7b56ec001641a064c095874e0"
+    },
+    {
+      "path": "modules\\app-observability\\src\\test\\resources\\operations-v2.sql",
+      "sha256": "604f8427163f5becf72943b78df48bc03e802c75d81ce61d4d354acab732ffe2"
+    },
+    {
+      "path": "governance\\store-recoverability.v1.json",
+      "sha256": "16c273bc9e72a76715ed6009095dab99dd001a8d5a5511f65dd18f488835ce1c"
+    }
+  ]
+}

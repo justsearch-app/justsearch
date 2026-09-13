@@ -16,7 +16,7 @@ import java.util.List;
 public interface SwitchBufferCapableQueue extends JobQueue {
 
   /** A buffered operation stored during cutover (SWITCHING). */
-  record SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs) {}
+  record SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs, String revision) {}
 
   /**
    * Inserts or replaces an operation in the durable switch buffer.
@@ -31,12 +31,19 @@ public interface SwitchBufferCapableQueue extends JobQueue {
    */
   boolean putSwitchBuffer(String key, String op, String payload);
 
+  /** Atomically buffers sync; maintenance preserves an earlier admission's attribution. */
+  boolean putSyncRoot(String key, SwitchBufferSyncRoot payload);
+
   /** Returns the number of buffered ops currently in the durable switch buffer. */
   long switchBufferDepth();
 
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
   List<SwitchBufferOp> listSwitchBufferOps();
 
-  /** Clears all buffered ops. Returns the number of ops removed. */
-  int clearSwitchBuffer();
+  /**
+   * Removes only unchanged versions from a successfully committed replay snapshot.
+   * Concurrent insertions/replacements survive, including identical payloads/timestamps.
+   * Storage failure throws; no caller may substitute an unconditional table clear.
+   */
+  int removeReplayedSwitchBufferOps(List<SwitchBufferOp> replayed);
 }

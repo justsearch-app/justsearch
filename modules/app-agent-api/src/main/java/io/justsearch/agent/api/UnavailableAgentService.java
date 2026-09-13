@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationResult;
 import java.util.List;
@@ -12,7 +14,7 @@ enum UnavailableAgentService implements AgentService {
   INSTANCE;
 
   @Override
-  public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+  public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     eventConsumer.accept(
         new AgentEvent.AgentError(
             "Agent capability is not available",
@@ -48,7 +50,7 @@ enum UnavailableAgentService implements AgentService {
   }
 
   @Override
-  public OperationResult undoOperation(String toolName, String executionId) {
+  public OperationResult undoOperation(String toolName, String executionId, EngineContext engineContext) {
     return OperationResult.failure("Agent capability is not available");
   }
 
@@ -58,7 +60,7 @@ enum UnavailableAgentService implements AgentService {
   }
 
   @Override
-  public void resumeLastSession(Consumer<AgentEvent> eventConsumer) {
+  public void resumeLastSession(Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     eventConsumer.accept(
         new AgentEvent.AgentError(
             "Agent capability is not available",

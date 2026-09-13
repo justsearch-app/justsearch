@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.applauncher;
 
-import io.justsearch.configuration.Faults;
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -15,8 +15,6 @@ import io.justsearch.telemetry.Telemetry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Shared launcher environment wiring that aligns with the configured profile and telemetry setup.
@@ -25,14 +23,19 @@ import org.slf4j.LoggerFactory;
  * handlers execute against the same wiring that the application will use in production.
  */
 final class LauncherEnvironment implements AutoCloseable {
-  private static final Logger LOG = LoggerFactory.getLogger(LauncherEnvironment.class);
 
   private final Path profilePath;
   private final String previousConfigProperty;
   private final String previousEgressProperty;
+  private final String previousDataDirProperty;
+  private final ConfigStore previousConfigStore;
+  private final ConfigStore installedConfigStore;
   private final ConfigManagerBootstrap configManager;
   private final LocalTelemetry telemetry;
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final HeadAssembly HeadAssembly;
+  private final io.justsearch.app.api.operations.OperationStore operations;
+  private final io.justsearch.app.util.AppInstanceLock instanceLock;
   private static final ConfigManagerFactory DEFAULT_CONFIG_MANAGER_FACTORY =
       ConfigManagerBootstrap::new;
   // Tempdoc 417 Phase 2 + F1 follow-up: register catalogs for every metric the Launcher process
@@ -41,9 +44,9 @@ final class LauncherEnvironment implements AutoCloseable {
   // LayeringEnforcementTest rule) so app-launcher can import their DEFINITIONS without
   // depending on `ui`.
   private static final TelemetryFactory DEFAULT_TELEMETRY_FACTORY =
-      (dataDir, profile) ->
+      (executors, dataDir, profile) ->
           new LocalTelemetry(
-              dataDir,
+              executors, dataDir,
               5_000,
               "justsearch-launcher",
               profile,
@@ -86,14 +89,26 @@ final class LauncherEnvironment implements AutoCloseable {
                   // Worker — its memory/threads do not flow to either of those metric files).
                   io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher")));
   private static final AppFacadeFactory DEFAULT_APP_FACADE_FACTORY =
-      (telemetry, configManager) ->
-          new HeadAssembly(
-              telemetry,
-              configManager,
-              null,
-              new io.justsearch.app.services.settings.UiSettingsStore(
-                  io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
-              null);
+      (executors, telemetry, configManager, operations) -> {
+        var admission = loadAdmission(java.util.ServiceLoader.load(
+            io.justsearch.app.api.EngineAdmissionService.class).stream().toList());
+        if (!(admission instanceof io.justsearch.app.api.OperationLeaseService leases)) {
+          throw new IllegalStateException("Engine admission provider must also own operation leases");
+        }
+        var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+            operations, java.time.Clock.systemUTC(), java.util.Set.of(
+                io.justsearch.agent.api.registry.OperationKind.INGEST,
+                io.justsearch.agent.api.registry.OperationKind.REINDEX,
+                io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
+                io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+                io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
+                io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
+        return new HeadAssembly(operations, attempts,
+            executors, telemetry, configManager, null,
+            new io.justsearch.app.services.settings.UiSettingsStore(
+                io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+            null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), leases, admission);
+      };
   private static volatile ConfigManagerFactory configManagerFactory = DEFAULT_CONFIG_MANAGER_FACTORY;
   private static volatile TelemetryFactory telemetryFactory = DEFAULT_TELEMETRY_FACTORY;
   private static volatile AppFacadeFactory appFacadeFactory = DEFAULT_APP_FACADE_FACTORY;
@@ -127,19 +142,70 @@ final class LauncherEnvironment implements AutoCloseable {
     this.profilePath = resolveProfilePath(profile);
     this.previousConfigProperty = System.getProperty(EnvRegistry.CONFIG_PATH.sysProp());
     this.previousEgressProperty = System.getProperty("egress.block_all");
-    System.setProperty("justsearch.config", profilePath.toString());
-    System.setProperty("egress.block_all", "true");
-    this.configManager = configManagerFactory.create();
-    // Initialize ConfigStore so downstream code (SmokeDriver, etc.) can use ordinal-based resolution.
-    ResolvedConfigBuilder rcBuilder = ResolvedConfig.builder();
-    rcBuilder.contributeBaseSources();
-    ConfigStore.setGlobal(new ConfigStore(rcBuilder.build()));
-    this.telemetry = telemetryFactory.create(PlatformPaths.resolveDataDir(), profile);
-    // Phase 3d: construct the Launcher JVM catalog so its async gauges are wired to the
-    // Launcher's LocalTelemetry registry (matches LocalApiServer ("head") / KnowledgeServer
-    // ("worker") wireup pattern).
-    io.justsearch.telemetry.JvmRuntimeGauges.register(this.telemetry, "launcher");
-    this.HeadAssembly = appFacadeFactory.create(telemetry, configManager);
+    this.previousDataDirProperty = System.getProperty(EnvRegistry.DATA_DIR.sysProp());
+    ConfigStore previousStore = ConfigStore.globalOrNull();
+    ConfigStore installedStore = null;
+    io.justsearch.core.execution.EngineExecutorRegistry createdExecutors = null;
+    LocalTelemetry createdTelemetry = null;
+    io.justsearch.app.api.operations.OperationStore createdOperations = null;
+    io.justsearch.app.util.AppInstanceLock createdInstanceLock = null;
+    try {
+      System.setProperty("justsearch.config", profilePath.toString());
+      System.setProperty("egress.block_all", "true");
+      ConfigManagerBootstrap createdConfig = configManagerFactory.create();
+      ResolvedConfigBuilder rcBuilder = ResolvedConfig.builder();
+      rcBuilder.contributeBaseSources();
+      if ("smoke".equals(profile)) {
+        rcBuilder.putDefault(EnvRegistry.DATA_DIR.sysProp(),
+            Path.of(System.getProperty("user.home"), ".justsearch-smoke").toString());
+      }
+      installedStore = new ConfigStore(rcBuilder.build());
+      ConfigStore.setGlobal(installedStore);
+      Path resolvedDataDir = installedStore.get().paths().dataDir();
+      if (resolvedDataDir != null) {
+        // Keep legacy PlatformPaths consumers aligned with this scoped resolved configuration.
+        System.setProperty(EnvRegistry.DATA_DIR.sysProp(), resolvedDataDir.toString());
+      }
+      createdExecutors = loadExecutors(java.util.ServiceLoader.load(
+          io.justsearch.core.execution.EngineExecutorRegistry.class).stream().toList());
+      createdTelemetry = telemetryFactory.create(
+          createdExecutors, PlatformPaths.resolveDataDir(), profile);
+      io.justsearch.telemetry.JvmRuntimeGauges.register(createdTelemetry, "launcher");
+      // Even another owner in this JVM is a distinct launcher, not permission to share its stores.
+      createdInstanceLock = new io.justsearch.app.util.AppInstanceLock(PlatformPaths.resolveDataDir());
+      createdInstanceLock.acquire();
+      createdOperations = new io.justsearch.app.observability.operations.SqliteOperationStore(
+          PlatformPaths.resolveDataDir().resolve("operations.db"));
+      this.HeadAssembly = appFacadeFactory.create(createdExecutors, createdTelemetry, createdConfig, createdOperations);
+      this.operations = createdOperations;
+      this.instanceLock = createdInstanceLock;
+      this.configManager = createdConfig;
+      this.executors = createdExecutors;
+      this.telemetry = createdTelemetry;
+      this.previousConfigStore = previousStore;
+      this.installedConfigStore = installedStore;
+    } catch (Exception | Error failure) {
+      boolean operationsClosed = createdOperations == null;
+      if (createdOperations != null) {
+        try { createdOperations.close(); operationsClosed = true; } catch (IOException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      if (operationsClosed && createdInstanceLock != null) createdInstanceLock.close();
+      if (createdTelemetry != null) {
+        try { createdTelemetry.close(); } catch (RuntimeException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      if (createdExecutors != null) {
+        try { createdExecutors.close(); } catch (RuntimeException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      if (installedStore != null) ConfigStore.restoreGlobal(installedStore, previousStore);
+      restoreProperties();
+      throw failure;
+    }
   }
 
   @SuppressWarnings("unused") // Called from LauncherEnvironmentCloseTest
@@ -168,12 +234,15 @@ final class LauncherEnvironment implements AutoCloseable {
 
   @FunctionalInterface
   interface TelemetryFactory {
-    LocalTelemetry create(Path dataDir, String profile) throws Exception;
+    LocalTelemetry create(io.justsearch.core.execution.EngineExecutorRegistry executors,
+        Path dataDir, String profile) throws Exception;
   }
 
   @FunctionalInterface
   interface AppFacadeFactory {
-    HeadAssembly create(LocalTelemetry telemetry, ConfigManagerBootstrap configManager)
+    HeadAssembly create(io.justsearch.core.execution.EngineExecutorRegistry executors,
+        LocalTelemetry telemetry, ConfigManagerBootstrap configManager,
+        io.justsearch.app.api.operations.OperationStore operations)
         throws Exception;
   }
 
@@ -188,17 +257,67 @@ final class LauncherEnvironment implements AutoCloseable {
 
   @Override
   public void close() {
-    Faults.debugAndContinue(LOG, "shutdown", () -> HeadAssembly.close());
-    telemetry.close();
-    if (previousConfigProperty == null) {
-      System.clearProperty("justsearch.config");
-    } else {
-      System.setProperty("justsearch.config", previousConfigProperty);
+    // A retained procedure can still write to operations and use telemetry/configuration.
+    // Propagate refusal and leave a later close able to finish after the body exits.
+    Throwable failure = null;
+    try {
+      if (HeadAssembly != null) HeadAssembly.close();
+    } catch (RuntimeException | Error headFailure) {
+      if (!HeadAssembly.isDependencyTeardownStarted()) throw headFailure;
+      failure = headFailure;
     }
-    if (previousEgressProperty == null) {
-      System.clearProperty("egress.block_all");
-    } else {
-      System.setProperty("egress.block_all", previousEgressProperty);
+    try { operations.close(); } catch (IOException storeFailure) {
+      var retained = new java.io.UncheckedIOException(
+          "Operations store did not close; retaining its instance lock", storeFailure);
+      if (failure != null) retained.addSuppressed(failure);
+      throw retained;
+    } catch (RuntimeException | Error storeFailure) {
+      if (failure != null && failure != storeFailure) storeFailure.addSuppressed(failure);
+      throw storeFailure;
     }
+    try {
+      telemetry.close();
+    } catch (RuntimeException | Error cleanupFailure) {
+      failure = appendCloseFailure(failure, cleanupFailure);
+    }
+    try { executors.close(); }
+    catch (RuntimeException | Error cleanupFailure) { failure = appendCloseFailure(failure, cleanupFailure); }
+    try { if (instanceLock != null) instanceLock.close(); }
+    catch (RuntimeException | Error cleanupFailure) { failure = appendCloseFailure(failure, cleanupFailure); }
+    try { restoreProperties(); }
+    catch (RuntimeException | Error cleanupFailure) { failure = appendCloseFailure(failure, cleanupFailure); }
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    if (failure instanceof Error error) throw error;
+  }
+
+  private static Throwable appendCloseFailure(Throwable previous, Throwable failure) {
+    if (previous == null) return failure;
+    if (previous != failure) previous.addSuppressed(failure);
+    return previous;
+  }
+
+  static io.justsearch.core.execution.EngineExecutorRegistry loadExecutors(
+      java.util.List<java.util.ServiceLoader.Provider<
+          io.justsearch.core.execution.EngineExecutorRegistry>> providers) {
+    if (providers.size() != 1) {
+      throw new IllegalStateException("Expected exactly one Engine executor registry provider, found "
+          + providers.size());
+    }
+    return providers.getFirst().get();
+  }
+
+  static io.justsearch.app.api.EngineAdmissionService loadAdmission(
+      java.util.List<java.util.ServiceLoader.Provider<io.justsearch.app.api.EngineAdmissionService>> providers) {
+    if (providers.size() != 1) {
+      throw new IllegalStateException("Expected exactly one Engine admission provider, found " + providers.size());
+    }
+    return providers.getFirst().get();
+  }
+
+  private void restoreProperties() {
+    if (installedConfigStore != null) ConfigStore.restoreGlobal(installedConfigStore, previousConfigStore);
+    SystemAccess.setSysProp(EnvRegistry.DATA_DIR.sysProp(), previousDataDirProperty);
+    SystemAccess.setSysProp(EnvRegistry.CONFIG_PATH.sysProp(), previousConfigProperty);
+    SystemAccess.setSysProp("egress.block_all", previousEgressProperty);
   }
 }

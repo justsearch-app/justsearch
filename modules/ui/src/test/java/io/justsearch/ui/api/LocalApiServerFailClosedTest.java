@@ -72,7 +72,7 @@ final class LocalApiServerFailClosedTest {
   @DisplayName("build() refuses, and the refusal is not swallowed into a bound server")
   void prodModeWithoutTokenRefusesToAssemble() {
     LocalApiServer.Builder builder =
-        LocalApiServer.builder(settingsStore(), tempDir.resolve("index"))
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore(), tempDir.resolve("index"))
             .onlineAiService(offlineAi());
 
     IllegalStateException thrown = assertThrows(IllegalStateException.class, builder::build);
@@ -92,7 +92,7 @@ final class LocalApiServerFailClosedTest {
     // prodMode with generateSessionToken). This is the case that distinguishes "refuses when
     // unsafe" from "refuses always".
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore(), tempDir.resolve("index"))
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore(), tempDir.resolve("index"))
             .onlineAiService(offlineAi())
             .sessionToken("test-token-not-a-secret")
             .build();

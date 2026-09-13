@@ -1,100 +1,170 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.core.execution.EngineExecutorRejectedException.Reason;
+import java.util.ArrayDeque;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * Ordered, off-lock dispatch of one stream's consumer callbacks.
- *
- * <p>The streaming transport holds the process-wide online-request lock for the whole llama-server
- * exchange, and the exchange is the body read. Invoking consumer callbacks inline from that read
- * loop put SSE writes and citation scoring <em>inside</em> the lock, so an arbitrarily slow — or
- * permanently blocked — consumer held the one lock every chat, VDU and stream request needs.
- * Callbacks are queued here instead and run on a separate thread, strictly in submission order,
- * while the read loop keeps draining the response.
- *
- * <p>Failure semantics are preserved rather than swallowed: a callback that throws stops further
- * dispatch and records the throwable, which the read loop picks up on its next line and rethrows —
- * so a {@code CancellationException} from a consumer still aborts the stream and routes to {@code
- * onError}, exactly as it did when callbacks ran inline.
- */
+/** Ordered, bounded, off-lock dispatch of one stream's consumer callbacks. */
 final class StreamCallbackPump implements AutoCloseable {
-  private static final Logger LOG = LoggerFactory.getLogger(StreamCallbackPump.class);
-
-  private final ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>();
-  private final Semaphore available = new Semaphore(0);
-  private final AtomicReference<RuntimeException> failure = new AtomicReference<>();
+  private final ExecutorService foreground;
+  private final ExecutorService background;
+  private final int capacity;
+  private final int retryAfterSeconds;
+  private final ArrayDeque<Runnable> queue = new ArrayDeque<>();
+  private final AtomicReference<Throwable> failure = new AtomicReference<>();
   private final CountDownLatch drained = new CountDownLatch(1);
-  private volatile boolean stopping;
+  private final EngineWorkHandle work;
+  private final AtomicBoolean workClosed = new AtomicBoolean();
+  private boolean active;
+  private boolean stopping;
 
   StreamCallbackPump(ExecutorService executor) {
-    executor.execute(this::drainLoop);
+    this(executor, executor, 64, 1, null);
   }
 
-  /** Queue a callback. Dropped once a callback has failed — that stream is being torn down. */
-  void dispatch(Runnable callback) {
-    if (failure.get() != null || stopping) {
-      return;
+  StreamCallbackPump(ExecutorService executor, EngineWorkHandle work) {
+    this(executor, executor, 64, 1, work);
+  }
+
+  StreamCallbackPump(
+      ExecutorService foreground,
+      ExecutorService background,
+      int capacity,
+      int retryAfterSeconds,
+      EngineWorkHandle work) {
+    this.foreground = Objects.requireNonNull(foreground, "foreground");
+    this.background = Objects.requireNonNull(background, "background");
+    if (capacity < 1) throw new IllegalArgumentException("capacity must be positive");
+    this.capacity = capacity;
+    if (retryAfterSeconds < 1) {
+      throw new IllegalArgumentException("retryAfterSeconds must be positive");
     }
-    queue.add(callback);
-    available.release();
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.work = work == null ? null : work.retain();
   }
 
-  /** The throwable a callback raised, or {@code null} if none has. */
-  RuntimeException failure() {
+  void dispatch(Runnable callback) {
+    Objects.requireNonNull(callback, "callback");
+    synchronized (this) {
+      if (failure.get() != null || stopping) return;
+      if (cancelled()) {
+        failure.compareAndSet(null, new CancellationException("Model callback work cancelled"));
+        stopping = true;
+        queue.clear();
+        if (!active) finish();
+        return;
+      }
+      if (queue.size() >= capacity) {
+        failure.compareAndSet(
+            null,
+            new EngineExecutorRejectedException(
+                Reason.QUEUE_LIMIT, "inference.callback", retryAfterSeconds));
+        queue.clear();
+        stopping = true;
+        if (!active) finish();
+        return;
+      }
+      queue.addLast(callback);
+      if (!active) scheduleNextLocked();
+    }
+  }
+
+  Throwable failure() {
     return failure.get();
   }
 
-  /**
-   * Blocks until every callback dispatched so far has run. Called after the body read completes and
-   * <em>after</em> the online-request lock is released, so the terminal callback never fires before
-   * the content it follows.
-   */
+  void rethrowFailure() {
+    Throwable problem = failure.get();
+    if (problem instanceof RuntimeException runtime) throw runtime;
+    if (problem instanceof Error error) throw error;
+  }
+
   void awaitDrain() throws InterruptedException {
     close();
     drained.await();
   }
 
-  /** Stops the drain loop once the already-queued callbacks have run. Idempotent. */
   @Override
-  public void close() {
+  public synchronized void close() {
     stopping = true;
-    available.release();
+    if (!active && queue.isEmpty()) finish();
   }
 
-  private void drainLoop() {
-    try {
-      for (; ; ) {
-        available.acquire();
-        Runnable next = queue.poll();
-        if (next == null) {
-          if (stopping) {
-            return;
-          }
-          continue;
-        }
-        if (failure.get() != null) {
-          continue;
-        }
-        try {
-          next.run();
-        } catch (RuntimeException e) {
-          // Recorded, not swallowed: the read loop rethrows this on its next line so the stream
-          // ends through the same onError path an inline callback failure used to take.
-          failure.compareAndSet(null, e);
-          LOG.debug("Stream callback threw ({}); aborting the stream", e.toString());
-        }
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    } finally {
-      drained.countDown();
+  private void scheduleNextLocked() {
+    Runnable callback = queue.pollFirst();
+    if (callback == null) {
+      active = false;
+      if (stopping) finish();
+      return;
     }
+    active = true;
+    FutureTask<Void> task =
+        new FutureTask<>(
+            () -> {
+              callback.run();
+              return null;
+            }) {
+          @Override
+          protected void done() {
+            callbackFinished(this);
+          }
+        };
+    try {
+      executorNow().execute(task);
+    } catch (RuntimeException | Error refused) {
+      failure.compareAndSet(null, refused);
+      task.cancel(false);
+    }
+  }
+
+  private void callbackFinished(FutureTask<Void> task) {
+    if (Thread.currentThread().isInterrupted()) {
+      failure.compareAndSet(null, new CancellationException("Model callback dispatcher interrupted"));
+    }
+    try {
+      task.get();
+    } catch (CancellationException cancelled) {
+      failure.compareAndSet(null, cancelled);
+    } catch (ExecutionException failed) {
+      failure.compareAndSet(null, failed.getCause());
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      failure.compareAndSet(null, interrupted);
+    }
+    synchronized (this) {
+      active = false;
+      if (failure.get() != null || cancelled()) {
+        queue.clear();
+        stopping = true;
+      }
+      scheduleNextLocked();
+    }
+  }
+
+  private ExecutorService executorNow() {
+    if (work == null) return background;
+    return work.context().urgency() == EngineContext.Urgency.FOREGROUND
+        ? foreground
+        : background;
+  }
+
+  private boolean cancelled() {
+    return work != null && work.cancellationReason().isPresent();
+  }
+
+  private void finish() {
+    if (work != null && workClosed.compareAndSet(false, true)) work.close();
+    drained.countDown();
   }
 }

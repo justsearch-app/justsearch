@@ -18,12 +18,13 @@ class OperationSubstrateInitTest {
     OperationCatalog agentTools = OperationCatalog.of("core", List.of());
 
     OperationSubstrateInit.Output out =
-        OperationSubstrateInit.run(
+        OperationSubstrateInit.run(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class), new io.justsearch.core.execution.TestEngineExecutors(),
             handlers,
             ops,
             agentTools,
             req -> true,
-            new io.justsearch.app.observability.surface.CoreSurfaceCatalog());
+            new io.justsearch.app.observability.surface.CoreSurfaceCatalog(),
+            io.justsearch.agent.api.encryption.StoreCipher.disabled());
 
     assertNotNull(out.operationHistoryResourceCatalog());
     assertNotNull(out.operationHistoryStore());

@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-07.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-09-09.
 
 Precedence note:
 1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.
@@ -157,9 +157,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.CONFIG_PATH | permanent | - | JUSTSEARCH_CONFIG | justsearch.config | CONFIG_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.CONTEXT_SIZE | permanent | - | JUSTSEARCH_CONTEXT_SIZE | justsearch.context.size | CONTEXT_SIZE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.DATA_DIR | permanent | - | JUSTSEARCH_DATA_DIR | justsearch.data.dir | DATA_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.DEV_DEBUG_PORT | permanent | - | JUSTSEARCH_DEV_DEBUG_PORT | justsearch.dev.debug.port | DEV_DEBUG_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.DEV_HOTRELOAD | permanent | - | JUSTSEARCH_DEV_HOTRELOAD | justsearch.dev.hotreload | DEV_HOTRELOAD | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.DEV_HOTRELOAD_CLASSES_DIR | permanent | - | JUSTSEARCH_DEV_HOTRELOAD_CLASSES_DIR | justsearch.dev.hotreload.classesDir | DEV_HOTRELOAD_CLASSES_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_BACKEND | permanent | - | JUSTSEARCH_EMBED_BACKEND | justsearch.embed.backend | EMBED_BACKEND | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_CONTEXT_LENGTH | permanent | - | JUSTSEARCH_EMBED_CONTEXT_LENGTH | justsearch.embed.context_length | EMBED_CONTEXT_LENGTH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_DIMENSION_OVERRIDE | permanent | - | JUSTSEARCH_EMBED_DIM | justsearch.embed.dimension | EMBED_DIMENSION_OVERRIDE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -169,6 +167,7 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.EMBED_LATE_CHUNKING_CONTEXT_LENGTH | permanent | - | JUSTSEARCH_EMBED_LATE_CHUNKING_CONTEXT_LENGTH | justsearch.embed.late_chunking_context_length | EMBED_LATE_CHUNKING_CONTEXT_LENGTH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_LATE_CHUNKING_ENABLED | permanent | - | JUSTSEARCH_EMBED_LATE_CHUNKING_ENABLED | justsearch.embed.late_chunking_enabled | EMBED_LATE_CHUNKING_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_ONNX_MODEL_PATH | permanent | - | JUSTSEARCH_EMBED_ONNX_MODEL_PATH | justsearch.embed.onnx.model_path | EMBED_ONNX_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT | permanent | - | JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT | justsearch.engine.admission.aggregate_limit | ENGINE_ADMISSION_AGGREGATE_LIMIT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_COMMAND | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND | justsearch.extraction.sandbox.command | EXTRACTION_SANDBOX_COMMAND | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_HEAP | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_HEAP | justsearch.extraction.sandbox.heap | EXTRACTION_SANDBOX_HEAP | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_MAX_REQUESTS | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_MAX_REQUESTS | justsearch.extraction.sandbox.max_requests | EXTRACTION_SANDBOX_MAX_REQUESTS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -179,7 +178,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.GPL_REEVAL_SIZE_FACTOR | permanent | - | JUSTSEARCH_GPL_REEVAL_SIZE_FACTOR | justsearch.gpl.reeval_size_factor | GPL_REEVAL_SIZE_FACTOR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPU_ENABLED | permanent | - | JUSTSEARCH_GPU_ENABLED | justsearch.gpu.enabled | GPU_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPU_LAYERS | permanent | - | JUSTSEARCH_GPU_LAYERS | justsearch.gpu.layers | GPU_LAYERS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.HEAD_PID | permanent | - | JUSTSEARCH_HEAD_PID | justsearch.head.pid | HEAD_PID | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HEAD_BUILD_STAMP | permanent | - | JUSTSEARCH_HEAD_BUILD_STAMP | justsearch.head.stamp | HEAD_BUILD_STAMP | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HEAD_TRACING_LEVEL | permanent | - | JUSTSEARCH_HEAD_TRACING_LEVEL | justsearch.head.tracing_level | HEAD_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HOME | permanent | - | JUSTSEARCH_HOME | justsearch.home | HOME | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -194,8 +192,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.INDEXER_QUEUE_SIZE | permanent | justsearch.indexer.queueSize | JUSTSEARCH_INDEXER_QUEUE_SIZE | justsearch.indexer.queueSize | INDEXER_QUEUE_SIZE | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_COOLDOWN_MS | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_COOLDOWN_MS | justsearch.indexing.foreground_cooldown_ms | INDEXING_FOREGROUND_COOLDOWN_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_DUTY_PCT | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_DUTY_PCT | justsearch.indexing.foreground_duty_pct | INDEXING_FOREGROUND_DUTY_PCT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.INFRA_HEALTH_HOST | permanent | - | JUSTSEARCH_INFRA_HEALTH_HOST | justsearch.infra.health.host | INFRA_HEALTH_HOST | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.INFRA_HEALTH_PORT | permanent | - | JUSTSEARCH_INFRA_HEALTH_PORT | justsearch.infra.health.port | INFRA_HEALTH_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_DIRECTORY_NAMES | permanent | - | JUSTSEARCH_INGESTION_SKIP_DIRECTORY_NAMES | justsearch.ingestion.skip.directory_names | INGESTION_SKIP_DIRECTORY_NAMES | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_EXTENSIONS | permanent | - | JUSTSEARCH_INGESTION_SKIP_EXTENSIONS | justsearch.ingestion.skip.extensions | INGESTION_SKIP_EXTENSIONS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_PATTERNS | permanent | - | JUSTSEARCH_INGESTION_SKIP_PATTERNS | justsearch.ingestion.skip.patterns | INGESTION_SKIP_PATTERNS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -290,7 +286,6 @@ Tempdoc 883 decision 4 deleted the settings-to-sysprop promotions for `justsearc
 | EnvRegistry.VRAM_THRESHOLD_12GB | permanent | - | JUSTSEARCH_VRAM_THRESHOLD_12GB | justsearch.vram.threshold.12gb | VRAM_THRESHOLD_12GB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.VRAM_THRESHOLD_4GB | permanent | - | JUSTSEARCH_VRAM_THRESHOLD_4GB | justsearch.vram.threshold.4gb | VRAM_THRESHOLD_4GB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.VRAM_THRESHOLD_8GB | permanent | - | JUSTSEARCH_VRAM_THRESHOLD_8GB | justsearch.vram.threshold.8gb | VRAM_THRESHOLD_8GB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.WORKER_CONFIG_SNAPSHOT | permanent | - | JUSTSEARCH_WORKER_CONFIG_SNAPSHOT | justsearch.worker.config_snapshot | WORKER_CONFIG_SNAPSHOT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED | permanent | - | JUSTSEARCH_POLICY_GPU_ACCELERATION_ENABLED | policy.gpu_acceleration_enabled | POLICY_GPU_ACCELERATION_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.RAG_CHUNK_SPLADE_ENABLED | permanent | rag.chunk_splade.enabled | JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED | rag.chunk_splade.enabled | RAG_CHUNK_SPLADE_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |
 | EnvRegistry.RAG_CHUNK_VECTORS_ENABLED | permanent | rag.chunk_vectors.enabled | JUSTSEARCH_RAG_CHUNK_VECTORS_ENABLED | rag.chunk_vectors.enabled | RAG_CHUNK_VECTORS_ENABLED | modules/configuration (ResolvedConfigBuilder) | YAML > sysprop > env > default |

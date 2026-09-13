@@ -25,20 +25,20 @@ final class SettleIndexHandlerTest {
   /** Minimal IndexingService base — subclasses override what each test needs. */
   private static class FakeIndexingService implements IndexingService {
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return List.of();
     }
 
     @Override
-    public void addWatchedPath(Path path) {}
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
   }
 
   @Test
@@ -51,7 +51,7 @@ final class SettleIndexHandlerTest {
                 new FakeIndexingService() {
                   @Override
                   public SettleIndexOutcome settleIndex(
-                      boolean expungeDeletesOnly, int maxSegments) {
+                      boolean expungeDeletesOnly, int maxSegments, io.justsearch.core.context.EngineContext engineContext) {
                     capturedExpunge.set(expungeDeletesOnly);
                     capturedSegments.set(maxSegments);
                     return new SettleIndexOutcome(true, 2851L, 222L, 222L, 222L, 4, 1234L, "");
@@ -59,7 +59,7 @@ final class SettleIndexHandlerTest {
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(Boolean.TRUE, capturedExpunge.get(), "default expungeDeletesOnly=true");
@@ -84,7 +84,7 @@ final class SettleIndexHandlerTest {
                 new FakeIndexingService() {
                   @Override
                   public SettleIndexOutcome settleIndex(
-                      boolean expungeDeletesOnly, int maxSegments) {
+                      boolean expungeDeletesOnly, int maxSegments, io.justsearch.core.context.EngineContext engineContext) {
                     capturedExpunge.set(expungeDeletesOnly);
                     capturedSegments.set(maxSegments);
                     return new SettleIndexOutcome(true, 10L, 8L, 8L, 8L, 1, 5L, "");
@@ -93,7 +93,7 @@ final class SettleIndexHandlerTest {
             LEASE);
 
     OperationResult result =
-        handler.execute("{\"expungeDeletesOnly\": false, \"maxSegments\": 3}");
+        handler.execute("{\"expungeDeletesOnly\": false, \"maxSegments\": 3}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(Boolean.FALSE, capturedExpunge.get());
@@ -108,13 +108,13 @@ final class SettleIndexHandlerTest {
                 new FakeIndexingService() {
                   @Override
                   public SettleIndexOutcome settleIndex(
-                      boolean expungeDeletesOnly, int maxSegments) {
+                      boolean expungeDeletesOnly, int maxSegments, io.justsearch.core.context.EngineContext engineContext) {
                     return SettleIndexOutcome.refused("Index migration is MIGRATING");
                   }
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertTrue(
@@ -131,14 +131,14 @@ final class SettleIndexHandlerTest {
                 new FakeIndexingService() {
                   @Override
                   public SettleIndexOutcome settleIndex(
-                      boolean expungeDeletesOnly, int maxSegments) {
+                      boolean expungeDeletesOnly, int maxSegments, io.justsearch.core.context.EngineContext engineContext) {
                     calls.incrementAndGet();
                     return new SettleIndexOutcome(true, 0L, 0L, 0L, 0L, 1, 0L, "");
                   }
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{\"maxSegments\": -1}");
+    OperationResult result = handler.execute("{\"maxSegments\": -1}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(0, calls.get(), "an invalid argument must never reach the Worker");

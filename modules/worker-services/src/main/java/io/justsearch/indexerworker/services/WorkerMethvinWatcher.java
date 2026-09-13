@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.core.execution.EngineExecutorRejectedException.Reason;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.methvin.watcher.DirectoryChangeEvent;
@@ -15,7 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -73,13 +76,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   // event delivery (mirrors the Head's dedicated sync-scheduler thread).
   private final BiConsumer<Path, Boolean> reconcileSink;
   private final WorkerBurstDetector burstDetector = new WorkerBurstDetector();
-  private final ScheduledExecutorService reconcileExecutor =
-      Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "worker-watcher-reconcile");
-            t.setDaemon(true);
-            return t;
-          });
+  private final ScheduledExecutorService reconcileExecutor;
+  private final Map<Path, Boolean> pendingReconciliations = new ConcurrentHashMap<>();
   private final Map<Path, RootSubscription> watchers = new ConcurrentHashMap<>();
   private final Map<Path, CompletableFuture<Void>> watchFutures = new ConcurrentHashMap<>();
 
@@ -101,6 +99,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    * (typed) instead of the legacy {@code Telemetry.Counter} per-kind map.
    */
   public WorkerMethvinWatcher(
+      EngineExecutorRegistry.Registration reconcileRegistration,
       JobQueue jobQueue,
       WorkerWatcherMetricCatalog watcherCatalog,
       Consumer<String> deletePathSink,
@@ -109,6 +108,14 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     this.deletePathSink = Objects.requireNonNull(deletePathSink, "deletePathSink");
     this.watcherCatalog = watcherCatalog == null ? WorkerWatcherMetricCatalog.noop() : watcherCatalog;
     this.reconcileSink = reconcileSink == null ? (root, force) -> {} : reconcileSink;
+    this.reconcileExecutor =
+        Objects.requireNonNull(reconcileRegistration, "reconcileRegistration")
+            .openScheduled(
+                r -> {
+                  Thread t = new Thread(r, "worker-watcher-reconcile");
+                  t.setDaemon(true);
+                  return t;
+                });
   }
 
   /**
@@ -116,8 +123,11 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    * wiring uses the 4-arg constructor so OVERFLOW/burst recovery is never silently dropped.
    */
   WorkerMethvinWatcher(
-      JobQueue jobQueue, WorkerWatcherMetricCatalog watcherCatalog, Consumer<String> deletePathSink) {
-    this(jobQueue, watcherCatalog, deletePathSink, null);
+      EngineExecutorRegistry.Registration reconcileRegistration,
+      JobQueue jobQueue,
+      WorkerWatcherMetricCatalog watcherCatalog,
+      Consumer<String> deletePathSink) {
+    this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, null);
   }
 
   /**
@@ -266,7 +276,9 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    */
   static JobQueue.EnqueueEntry entryForLiveEvent(Path path) {
     JobQueue.EnqueueEntry stated = JobQueue.EnqueueEntry.stat(path);
-    return stated.sizeBytes() == 0L ? JobQueue.EnqueueEntry.ofUnknownSize(path) : stated;
+    return new JobQueue.EnqueueEntry(path,
+        stated.sizeBytes() == 0L ? JobQueue.UNKNOWN_SIZE_BYTES : stated.sizeBytes(),
+        CallContext.none().provenance());
   }
 
   /**
@@ -300,7 +312,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private void submitReconcile(Path root, boolean force, int delaySeconds) {
     if (root == null) return;
     try {
-      var unused =
+      var _ =
           reconcileExecutor.schedule(
               () -> {
                 try {
@@ -311,13 +323,35 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
                       root,
                       force,
                       e.getMessage());
+                } finally {
+                  retryPendingReconciliations();
                 }
               },
               delaySeconds,
               TimeUnit.SECONDS);
+    } catch (EngineExecutorRejectedException e) {
+      if (e.reason() == Reason.CLOSED) {
+        log.debug("Worker watcher reconcile rejected during close for {}", root);
+        return;
+      }
+      pendingReconciliations.merge(root, force, (left, right) -> left || right);
+      log.warn(
+          "Worker watcher reconcile retained after executor capacity refusal for {} "
+              + "(force={}, reason={})",
+          root,
+          force,
+          e.reason());
     } catch (java.util.concurrent.RejectedExecutionException e) {
-      // Executor shutting down (close() in progress) — drop; periodic sync is the backstop.
+      // A non-registry rejection can only be the concrete executor closing.
       log.debug("Worker watcher reconcile rejected (shutting down) for {}", root);
+    }
+  }
+
+  private void retryPendingReconciliations() {
+    for (Map.Entry<Path, Boolean> pending : List.copyOf(pendingReconciliations.entrySet())) {
+      if (pendingReconciliations.remove(pending.getKey(), pending.getValue())) {
+        submitReconcile(pending.getKey(), pending.getValue(), 0);
+      }
     }
   }
 
@@ -382,7 +416,12 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     }
     watchers.clear();
     watchFutures.clear();
-    reconcileExecutor.shutdownNow();
+    pendingReconciliations.clear();
+    for (Runnable queued : reconcileExecutor.shutdownNow()) {
+      if (queued instanceof Future<?> future) {
+        future.cancel(false);
+      }
+    }
   }
 
   private record RootSubscription(Path root, String collection, DirectoryWatcher watcher) {}

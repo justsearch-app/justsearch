@@ -23,14 +23,6 @@
       "minStrength": 100,
       "maxNoCoverage": 0
     },
-    "worker-supervision": {
-      "minStrength": 88,
-      "maxNoCoverage": 1
-    },
-    "worker-liveness-suicide": {
-      "minStrength": 93,
-      "maxNoCoverage": 0
-    },
     "ocr-outcome-classifier": {
       "minStrength": 100,
       "maxNoCoverage": 0
@@ -73,6 +65,10 @@
     },
     "acquisition-rate": {
       "minStrength": 97,
+      "maxNoCoverage": 0
+    },
+    "extraction-process-routing": {
+      "minStrength": 100,
       "maxNoCoverage": 0
     }
   }

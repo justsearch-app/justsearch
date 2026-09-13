@@ -54,7 +54,8 @@ final class DiagnosticsServiceImplRedactionTest {
     Files.writeString(settings, input);
 
     Path zip =
-        new DiagnosticsServiceImpl(null, null, () -> null, () -> null).exportDiagnostics();
+        new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+            .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
     String redacted;
     try (ZipFile zipFile = new ZipFile(zip.toFile())) {
       ZipEntry entry = zipFile.getEntry("ui/settings.json");

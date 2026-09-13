@@ -110,4 +110,37 @@ public record OcrRoutingConfig(
   public int effectiveOcrWorkers() {
     return ocrWorkers == null || ocrWorkers <= 0 ? PdfOcrEngine.defaultPoolSize() : ocrWorkers;
   }
+
+  /**
+   * Resolves OCR parallelism against the process-wide worker limit.
+   *
+   * <p>An explicit positive setting that exceeds the limit is a configuration error. Auto sizing
+   * is clamped to the limit and always returns a positive worker count.
+   */
+  public OcrRoutingConfig withWorkerLimit(int maxWorkers) {
+    if (maxWorkers <= 0) {
+      throw new IllegalArgumentException("ocr maxWorkers must be positive");
+    }
+    int configured = ocrWorkers == null ? AUTO_OCR_WORKERS : ocrWorkers;
+    if (configured > 0) {
+      if (configured > maxWorkers) {
+        throw new IllegalArgumentException(
+            "ocr.workers=" + configured + " exceeds max worker limit " + maxWorkers);
+      }
+      return copyWithWorkers(configured);
+    }
+    return copyWithWorkers(Math.min(PdfOcrEngine.defaultPoolSize(), maxWorkers));
+  }
+
+  private OcrRoutingConfig copyWithWorkers(int workers) {
+    return new OcrRoutingConfig(
+        enabled,
+        languages,
+        perFileTimeoutMs,
+        maxPages,
+        maxImageDimension,
+        maxImagePixels,
+        renderDpi,
+        workers);
+  }
 }

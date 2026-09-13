@@ -22,7 +22,8 @@ import org.junit.jupiter.api.io.TempDir;
  * end of Install AI. The post-Install-AI worker restart never fired, the boot-1
  * worker JVM kept its empty ORT native_path, and ONNX encoders stayed broken
  * until the user manually relaunched the app. Round-7 sandbox confirmed: zero
- * "Restarting worker" log lines in {@code headless-backend.log.boot1} after the
+ * "Restarting worker" log lines in {@code engine.log.boot1} (then named
+ * {@code headless-backend.log.boot1}; renamed at lane F stage A item A16) after the
  * {@code alpha.14 fix B: ORT native path set} message. The fix made the field
  * volatile and added a setter that {@code lateBindKnowledgeServer} now calls.
  *

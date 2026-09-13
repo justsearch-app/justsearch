@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSort;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexing.SchemaFields;
@@ -43,7 +44,7 @@ import org.junit.jupiter.api.Test;
  * (HttpAiQualityTest) rather than unit tests.
  */
 @DisplayName("RAG Document Retrieval")
-class ChunkSearchIntegrationTest {
+class ChunkSearchIntegrationTest extends LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private Path tempDir;
@@ -65,7 +66,7 @@ class ChunkSearchIntegrationTest {
     System.setProperty("justsearch.config", cfg.toString());
 
     // Use chunk-aware testing catalog with 4-dim vectors
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach
@@ -408,7 +409,7 @@ class ChunkSearchIntegrationTest {
   // ========== Phase 6: Chunk-Level Hybrid (chunk vectors) ==========
 
   @Test
-  @DisplayName("searchChunksHybrid (Phase 6) fuses by chunk doc_id (RRF id match)")
+  @DisplayName("searchChunksHybrid (Phase 6, io.justsearch.core.execution.EngineTaskLifetime.NONE) fuses by chunk doc_id (RRF id match)")
   void searchChunksHybridPhase6FusesByChunkDocId() throws Exception {
     indexDoc("doc-1", "Parent content");
 
@@ -417,7 +418,7 @@ class ChunkSearchIntegrationTest {
 
     commitAndRefresh();
 
-    var result = runtime.chunkSearchOps().searchChunksHybrid("apple", v, Set.of("doc-1"), 1, true, null);
+    var result = runtime.chunkSearchOps().searchChunksHybrid("apple", v, Set.of("doc-1"), 1, true, null, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
     assertNotNull(result);
     assertEquals(1, result.hits().size(), "Should return exactly 1 fused hit");
@@ -437,14 +438,14 @@ class ChunkSearchIntegrationTest {
     var result =
         runtime
             .chunkSearchOps()
-            .searchChunksHybrid("the", vector, Set.of("doc-1"), 1, true, null);
+            .searchChunksHybrid("the", vector, Set.of("doc-1"), 1, true, null, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
     assertEquals(1, result.hits().size(), "the direct RAG path must still execute chunk KNN");
     assertEquals(chunkId, result.hits().get(0).docId());
   }
 
   @Test
-  @DisplayName("searchChunksHybrid (Phase 6) caps vector-only chunks on low-signal queries")
+  @DisplayName("searchChunksHybrid (Phase 6, io.justsearch.core.execution.EngineTaskLifetime.NONE) caps vector-only chunks on low-signal queries")
   void searchChunksHybridPhase6CapsVectorOnlyOnLowSignal() throws Exception {
     indexDoc("doc-1", "Parent content");
 
@@ -460,7 +461,7 @@ class ChunkSearchIntegrationTest {
     int limit = 10;
     int cap = runtime.resolvedConfig().hybridSearch().vectorOnlyCapLowSignal();
 
-    var result = runtime.chunkSearchOps().searchChunksHybrid("nonmatching-query", far, Set.of("doc-1"), limit, true, null);
+    var result = runtime.chunkSearchOps().searchChunksHybrid("nonmatching-query", far, Set.of("doc-1"), limit, true, null, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
     assertNotNull(result);
     assertEquals(Math.min(cap, limit), result.hits().size(),
@@ -663,7 +664,7 @@ class ChunkSearchIntegrationTest {
 
     // Null queryVector forces the BM25 (searchFullDocs) branch; both parents match "coral".
     var result =
-        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", null, Set.of(), 10, null);
+        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", null, Set.of(), 10, null, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
     assertNotNull(result);
     assertEquals(2, result.hits().size(), "BM25 union path returns both matching parents");
     Set<String> ids =
@@ -674,7 +675,7 @@ class ChunkSearchIntegrationTest {
   }
 
   @Test
-  @DisplayName("searchDocLevelUnion (hybrid branch) excludes chunk docs by construction (tempdoc 749 review PF-2)")
+  @DisplayName("searchDocLevelUnion (hybrid branch, io.justsearch.core.execution.EngineTaskLifetime.NONE) excludes chunk docs by construction (tempdoc 749 review PF-2)")
   void searchDocLevelUnionHybridExcludesChunkDocs() throws Exception {
     // Regular parent: matches the BM25 leg via content, carries no vector of its own.
     indexDoc("doc-1", "Coral reefs support diverse marine life");
@@ -698,7 +699,7 @@ class ChunkSearchIntegrationTest {
     // Non-null, non-empty queryVector and no query-skip condition -> dispatches to the hybrid
     // branch (searchHybridFiltered), not the BM25 (searchFullDocs) fallback.
     var result =
-        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", queryVector, Set.of(), 10, null);
+        runtime.chunkSearchOps().searchDocLevelUnion("coral reef", queryVector, Set.of(), 10, null, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
     assertNotNull(result);
     for (var hit : result.hits()) {
@@ -1186,7 +1187,7 @@ class ChunkSearchIntegrationTest {
     Map<String, String> chunkIds = mintReverseOrderedChunkIds();
 
     RunningRuntime probe =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       String parentContent = TIE_CHUNK_TEXT + " " + TIE_CHUNK_TEXT;
       for (String parentDocId : List.of("tie-a", "tie-b")) {
@@ -1282,7 +1283,7 @@ class ChunkSearchIntegrationTest {
             + "would produce the expected order for the wrong reason");
 
     RunningRuntime probe =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       // Commit tie-b's chunk FIRST so the internal-docId order is b, a.
       for (String parentDocId : List.of("tie-b", "tie-a")) {
@@ -1378,7 +1379,7 @@ class ChunkSearchIntegrationTest {
     List<String> chunkIds = mintDiscriminatingChunkIds(commitOrder.size());
 
     RunningRuntime probe =
-        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     try {
       Map<String, Object> parent = new LinkedHashMap<>();
       parent.put(SchemaFields.DOC_ID, parentDocId);

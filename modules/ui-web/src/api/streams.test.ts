@@ -152,6 +152,30 @@ describe('streams.ts terminal event handling', () => {
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it('does not fetch when the caller signal is already aborted', async () => {
+    globalThis.fetch = vi.fn();
+    const controller = new AbortController();
+    controller.abort(new Error('caller stopped this stream'));
+
+    const { streamRequest } = await import('./streams');
+    const onError = vi.fn();
+    await streamRequest('http://localhost/api/test', {}, { onError }, controller.signal);
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'CANCELLED' }));
+  });
+
+  it('removes the caller abort listener when the stream completes', async () => {
+    mockFetchSse(sseStream('event: done\ndata: {}\n\n'));
+    const controller = new AbortController();
+    const removeEventListener = vi.spyOn(controller.signal, 'removeEventListener');
+
+    const { streamRequest } = await import('./streams');
+    await streamRequest('http://localhost/api/test', {}, {}, controller.signal);
+
+    expect(removeEventListener).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
 });
 
 describe('consumeShapeStream', () => {

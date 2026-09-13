@@ -34,4 +34,13 @@ public final class InProcessExtractionSandbox implements ExtractionSandbox {
         ? policyDriven.policy()
         : TikaExtractionPolicy.defaults();
   }
+
+  @Override
+  public void close() {
+    if (delegate instanceof AutoCloseable owner) {
+      try { owner.close(); }
+      catch (RuntimeException failure) { throw failure; }
+      catch (Exception failure) { throw new IllegalStateException("Extractor close failed", failure); }
+    }
+  }
 }

@@ -32,7 +32,7 @@ class HealthSubstrateInitTest {
         new ConditionRecoveryIndexChangeRegistry();
 
     HealthSubstrateInit.Output out =
-        HealthSubstrateInit.run(256, projector, changes, logs, recoveryChanges);
+        HealthSubstrateInit.run(new io.justsearch.core.execution.TestEngineExecutors(), 256, projector, changes, logs, recoveryChanges);
 
     assertNotNull(out.conditionStore());
     assertNotNull(out.occurrenceLog());

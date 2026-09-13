@@ -96,8 +96,8 @@ export function verdictForSharedContributor({ violations }) {
 
 /**
  * Verdict (THE Channel-vs-Resource foreclosure — tempdoc 575 §4.2): one or more Resources declare an
- * operator-trace {@code origin} ({@link ProducerKind} — IN_PROCESS_LOGBACK / WORKER_GRPC_STREAM /
- * EXTERNAL_OBSERVER). Operator-trace data is not Resource truth (ADR-0036 / C-012) — it belongs on a
+ * operator-trace {@code origin} ({@link ProducerKind} — IN_PROCESS_LOGBACK / EXTERNAL_OBSERVER).
+ * Operator-trace data is not Resource truth (ADR-0036 / C-012) — it belongs on a
  * {@link DiagnosticChannel} (different consumer model, schema discipline, privacy class, self-observation
  * risk). The `origin` facet exists so this boundary is representable-and-rejected rather than a silent
  * mis-model. Bounded teeth: it catches the EXPLICIT mis-model, not a silent omission.

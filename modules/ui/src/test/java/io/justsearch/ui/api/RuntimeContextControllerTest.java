@@ -16,6 +16,8 @@ import io.justsearch.app.observability.runtime.RuntimeContext;
 import io.justsearch.app.observability.runtime.RuntimeContextChangeRegistry;
 import io.justsearch.app.observability.runtime.RuntimeContextHolder;
 import io.justsearch.app.observability.runtime.SystemMode;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +34,13 @@ import org.junit.jupiter.api.Test;
 @DisplayName("RuntimeContextController")
 final class RuntimeContextControllerTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
   private RuntimeContextHolder holder;
   private RuntimeContextChangeRegistry registry;
   private RuntimeContextController controller;
@@ -40,7 +49,9 @@ final class RuntimeContextControllerTest {
   void setUp() {
     holder = new RuntimeContextHolder(new RuntimeContext(SystemMode.PRODUCTION, false));
     registry = new RuntimeContextChangeRegistry();
-    controller = new RuntimeContextController(holder, registry);
+    controller = new RuntimeContextController(
+            processExecutors,
+              holder, registry);
   }
 
   @AfterEach

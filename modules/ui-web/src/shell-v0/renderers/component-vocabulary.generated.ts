@@ -52,6 +52,7 @@ export type ComponentTag =
   | 'jf-effect-audit-log'
   | 'jf-effect-line'
   | 'jf-elicit-host'
+  | 'jf-engine-recovery'
   | 'jf-enter-action-picker'
   | 'jf-enum-control'
   | 'jf-error-alert'
@@ -198,6 +199,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-effect-audit-log',
   'jf-effect-line',
   'jf-elicit-host',
+  'jf-engine-recovery',
   'jf-enter-action-picker',
   'jf-enum-control',
   'jf-error-alert',

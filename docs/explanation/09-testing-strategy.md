@@ -7,7 +7,16 @@ description: "The 4-tier Test Pyramid, Chaos testing, and AI Judge."
 
 # Testing Strategy
 
-JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), crucial for a multi-process application where "Unit Tests" alone cannot catch deadlock or IPC bugs.
+JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), crucial for an application whose real behaviour spans process and I/O boundaries that "Unit Tests" alone cannot catch.
+
+> **Lane F stage A (2026-09-07).** The Head and Worker collapsed into one **Engine** JVM, so the
+> boundary the old Tier 3 existed to cross — spawn a Worker, discover its port through a
+> memory-mapped file, talk gRPC to it — no longer exists. The tests whose *subject* was that
+> boundary are retired; the tests that only used it to reach a working index were re-expressed
+> against the in-process composition root (`EngineRoot`) and moved to
+> `modules/app-engine/src/test/java/io/justsearch/app/engine/`, where they run on **every build**
+> instead of in an opt-in tier. The process boundaries that survive — `llama-server` and the
+> extraction sandbox child pool — are still exercised from `modules/system-tests`.
 
 ## Tier 1: Unit Tests (Fast)
 *   **Scope:** Single class/method.
@@ -24,21 +33,21 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
 *   **Example:** `BatchUpdateIntegrationTest` (Does it actually write to disk?).
 *   **Rule:** IO allowed. No networking/sockets if possible.
 *   **Examples (current):**
-    *   `KnowledgeServerIntegrationTest` (app-services ↔ worker wiring via real gRPC)
+    *   `EngineRootInProcessPortsTest` (app-engine ↔ worker wiring through the in-process ports). This replaced `KnowledgeServerIntegrationTest`, whose ingest-then-search cases it covers; lane F stage A item A11 deleted that class along with the worker process, port discovery and spawner it also pinned.
     *   `InferenceLifecycleManagerExternalServerTest` (adopting an already-running `llama-server` on the configured port)
     *   `LlamaServerPropsParsingTest` (robust `/props` parsing for `n_ctx` / `model_alias`)
     *   `LocalApiCorsPolicyTest` (regression for loopback-only CORS allowlist / local bind safety)
     *   `LuceneIndexRuntimeTest` (regressions for user-safe query parsing, facets, and cursor-based `searchAfter` paging)
-    *   `GrpcSearchServiceSearchPayloadTest` (ensures interactive search hits do not ship `content`)
+    *   `WorkerSearchServiceSearchPayloadTest` (ensures interactive search hits do not ship `content`)
     *   `VduEligibilityPdfFixturesTest` (real PDF fixtures → correct `vdu_status` marking without llama-server)
     *   `TimeboxedContentExtractorTest` (deterministic extraction timeout guardrail)
     *   `ContextBudgeterTest` (strict character budgeting logic for RAG context assembly)
-    *   `GrpcSearchServiceRetrieveContextTest` (retrieveContext respects `maxChars` via strict budgeting)
-    *   `GrpcSearchServiceReasonCodeContractTest` (allowlisted reason codes for vector/hybrid fallback and RAG retrieval mode/reason)
+    *   `WorkerSearchServiceRetrieveContextTest` (retrieveContext respects `maxChars` via strict budgeting)
+    *   `WorkerSearchServiceReasonCodeContractTest` (allowlisted reason codes for vector/hybrid fallback and RAG retrieval mode/reason)
     *   `RemoteDocumentServiceContextBudgetTest` (fallback full-doc context retrieval is budgeted)
     *   `SummaryControllerRagSectionTruncationTest` (head-side truncation filters citations/sections consistently)
     *   `ChunkDocumentWriterTest` (chunk regeneration consistency: offsets + metadata)
-    *   `GrpcIngestServiceChunkRegenerationTest` (VDU update path regenerates chunks without drift)
+    *   `WorkerIngestServiceChunkRegenerationTest` (VDU update path regenerates chunks without drift)
 
 ## Tier 2.5: Guardrails & Contract Tests (Fast/Medium, drift prevention)
 
@@ -65,27 +74,35 @@ These tests exist to prevent architectural drift and contract breakage in a mult
   - `modules/ui/src/integrationTest/java/io/justsearch/ui/api/SchemaMismatchStatusContractTest.java` seeds a mismatched `index_fingerprint` and asserts `/api/status` surfaces `reindexRequired=true` with a stable reason.
 
 ## Tier 3: System Tests (Slow)
-This is the most critical tier for verifying the "3-Process Architecture".
-*   **Mechanism:** `WorkerSpawnTest` and `GrpcCommunicationTest` actually **spawn** the child Java process.
-*   **Verification:** It communicates via real gRPC and MMF.
-*   **Use Case:** Verifying the "Suicide Pact" (simulated parent death via stale heartbeat, worker self-termination).
-*   **Chaos:** `ChaosSuiteTest` and torture/system flows intentionally stress corruption, locking, restart, and recovery logic.
+This tier verifies behaviour that spans a real boundary the Engine still has.
+*   **Mechanism:** the surviving classes compose the Engine's index half **in process** (`EngineRoot`) and drive a real external dependency — `llama-server` for the AI/VDU lanes, a real extraction-sandbox child process for `ExtractionSandboxChaosTest`.
+*   **Retired with the split (lane F stage A item A12):** `WorkerSpawnTest`, `GrpcCommunicationTest` and `ConfigPropagationTest` asserted that a Worker process spawned, that it published a port over the memory-mapped signal file, that gRPC framing round-tripped, and that config crossed the process boundary via the config snapshot. None of those propositions is true of one JVM. The "Suicide Pact" (stale-heartbeat self-termination) went the same way: item A10 deleted the memory-mapped bus that carried the heartbeat, so there is no pact left to verify.
+*   **Chaos:** the corruption, locking, migration and read-while-write flows survive as *product* properties and now run in `modules/app-engine`'s unit suite — see the list below. `ExtractionSandboxChaosTest` stays in this tier because its subject is a real child process.
 *   **Performance benchmarks** — all benchmark + eval capabilities now in `scripts/jseval/` (slice 3a-1-8f §B.14, 2026-05-12 — the prior `scripts/bench/` infrastructure was deleted by commit `a9c484f59` 2026-03-16; jseval covers Claim A/B/C/D + Track G + agent + RAG via `engine-bench`, `ingest-bench`, `bench-concurrency`, `knn-bench`, `agent-eval`, `rag-eval`, `retrieval-eval`, etc.):
     *   **Claim A (engine-only):** `python -m jseval engine-bench` — isolated Lucene throughput
     *   **Claim B (pipeline):** `python -m jseval ingest-bench` — full Worker pipeline throughput
     *   **Claim C (UX):** `python -m jseval ui-perf` — UI responsiveness during indexing
 
-System tests also cover schema migration + blue/green correctness (current):
+Schema migration + blue/green correctness, and the rest of the index half's end-to-end behaviour,
+are covered **in process** in `modules/app-engine/src/test/java/io/justsearch/app/engine/`
+(current — all of these run in the default `test` task except where noted):
 
-* `MigrationControlE2ETest` (start/cutover/rollback control surface)
-* `SwitchingFenceBufferingE2ETest` (durable buffering during `SWITCHING`)
-* `RollbackE2ETest` (rollback safety after cutover)
-* `PauseResumeMigrationE2ETest` (pause orchestration semantics)
-* `IndexBasePathLockE2ETest` (index-root lock prevents concurrent Workers)
+* `EngineMigrationLifecycleTest` (start/cutover control surface, rollback after cutover, pause/resume orchestration)
+* `EngineSwitchingFenceBufferingTest` (durable buffering of upsert/delete/sync during `SWITCHING`, and replay after cutover)
+* `EngineCorruptionRebuildTest` (tempdoc 628: a corrupt index is backed up, never deleted, and rebuilt from source)
+* `EngineIndexBasePathLockTest` (the index-root lock refuses a second owner of one index base path)
+* `EngineIndexingWorkflowTest` (create → index → search → modify → re-index → delete → sync-prune, batch, nested directories, large and unsupported files, concurrency)
+* `EngineSyncDirectoryTest` (`syncDirectory` add/prune semantics and the source-tree/Obsidian admission policy)
+* `EngineDocumentFetchAndContextTest` (`FetchDocuments`, `FetchDocumentSlice` paging, `RetrieveContext` relevance and filters)
+* `EngineForegroundPacingTest` (indexing is throttled but not stopped under foreground search load; status/health polling never throttles it — the ADR-0048 witness)
+* `EngineReadWhileWriteTest` (real searches during a real ingest; many concurrent callers)
+* `EngineFormatCapabilityMatrixTest` (every format-matrix row through admission, extraction, indexing, search, fetch and ledger reconciliation)
+* `EngineFileLockContentionTest` (antivirus-style file-lock contention during boot and during ingest) — **`@Tag("stress")`, opt in with `-PincludeStress=true`.** Its instrument (`FileIntruder`) promises 10-50 ms lock holds, and that promise is a claim about the OS scheduler: on a box saturated by a concurrent whole-repo build the holds stretch and the writer starves, so the test stops measuring survival and starts measuring machine load. Registered in `scripts/ci/stress-suite-policy.v1.json`.
+* `EngineVduRecoveryTest` (documents stuck in VDU `PROCESSING` are recovered)
+* `EngineSoakTest` (scaled-down search stress, repeated open/close, sustained load)
 
 Additional high-signal system/contract tests (current):
 
-* `MmfSignalBusCompatibilityTest` (prevents MMF layout drift between Head/Worker by exercising cross-read/write compatibility)
 * `HttpPagingCursorE2ETest` (end-to-end cursor round-trip semantics over HTTP)
 * `VduBatchProcessorE2ETest` (Tier-2 VDU OCR lane; requires llama-server for scanned-PDF OCR/searchability assertions)
 
@@ -97,7 +114,7 @@ retired TS e2e tier described below:
 * **Frontend unit tests (Vitest)** — see Tier 1 above; run via `npm run test:unit:run` from
   `modules/ui-web`. Covers SSE framing, HTTP client behavior, and (per file) component/state logic.
 * **Java module/system-test suites** — see Tiers 1-3 above. HTTP-contract-level coverage
-  (`LocalApiCorsPolicyTest`, `HttpPagingCursorE2ETest`, `GrpcSearchServiceSearchPayloadTest`, etc.)
+  (`LocalApiCorsPolicyTest`, `HttpPagingCursorE2ETest`, `WorkerSearchServiceSearchPayloadTest`, etc.)
   exercises the same `/api/*` contracts the retired tier drove through a browser, at a faster,
   more deterministic layer.
 * **Visual/measurement verification (`jseval ui-shot` / `ui-check`)** — a **live, Python**
@@ -273,9 +290,16 @@ See [Agent Analytics Pipeline](21-agent-analytics-pipeline.md) for the behaviora
 *   **Purpose:** Since we have strict interfaces (`SearchPort`, `IngestPort`, etc.), the TCK ensures that both the "Real" implementation (Worker) and the "Mock" implementations used in tests behave identically.
 
 ## Stress & Soak Testing
-*   **Module:** `modules/system-tests` (soak package)
-*   **Behavior:** Runs for hours. Indexing 100k tiny files, renaming folders rapidly, etc.
+*   **Module:** `modules/app-engine` (`EngineSoakTest`). The `soakTest` source set and its Gradle
+    task were removed at lane F stage A item A12: its only class, `SoakSuiteTest`, drove a spawned
+    Worker, and two of its three arms (repeated worker restarts, sustained load on a spawned
+    process) were assertions about that process.
+*   **Behavior:** search stress over a real corpus, repeated open/close of the index half, and
+    sustained mixed load — scaled to the unit tier so it runs on every build.
 *   **Goal:** Find memory leaks and file handle exhaustion (Windows `AccessDenied`).
+*   **Honest limit:** the retired tier ran for hours over 100k files. The scaled version catches a
+    leak that shows up in hundreds of iterations, not one that needs hundreds of thousands. A
+    nightly long-run tier is stage B/E work, not something A12 replaced.
 
 ## Node.js DAG Runner Tests — RETIRED 2026-05-12
 

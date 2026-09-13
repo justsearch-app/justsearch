@@ -45,8 +45,30 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   // Tempdoc 501 Phase 18 (2026-05-21) removed api-port.txt outright. All consumers
   // (Vite proxy, dev-runner, prod MCP, integration test harness, sidecar smoke)
   // now read manifest.json. The entry is no longer on this allowlist.
-  ['worker-config-snapshot.json', 'tempdoc 501 §5 carve-out — Head→Worker config passing (-Djustsearch.worker.config_snapshot), not an external discovery surface'],
+  // worker-config-snapshot.json was here as a tempdoc 501 §5 carve-out for Head→Worker config
+  // passing. Lane F stage A deleted the second JVM (items A11/A13) and then the writer and the
+  // ordinal-450 tier (item A19), so nothing produces the file and nothing reads it — see the
+  // retired `worker-config-snapshot` row in governance/store-corruption-policies.v1.json. An
+  // allowlist entry for a file no code writes is a sanction for nothing; it is removed rather
+  // than relabelled so a reappearance fails this gate.
   ['instances', 'tempdoc 501 §3.7 — per-instance history directory (mirror of tmp/dev-runner/runs/)'],
+  // Lane F stage B item B2 (design 7.3). Not a discovery surface: it carries a shutdown REQUEST
+  // (reason, deadline, optional nonce, issuer) from the supervisor to the Engine. It exists
+  // because the cooperative trigger is HTTP and the case a supervisor exists for is an Engine
+  // that answers no HTTP, and Windows has no graceful signal for a JVM. Written by the Tauri
+  // supervisor and the dev-runner, read and deleted by the Engine.
+  ['shutdown-request.v1.json', 'lane F stage B item B2 (design 7.3) — out-of-band shutdown request from the supervisor to the Engine'],
+  ['shutdown-request.v1.json.tmp', 'lane F stage B item B2 — atomic-rename staging file for shutdown-request.v1.json'],
+  // Lane F stage B item B8 (design 7.1). Not a discovery surface and deliberately not an API: it
+  // carries the supervisor's state (starting / running / stopping / restarting / exhausted, the
+  // restart count, the last exit reason), and the moment it matters is the moment the Engine is down
+  // and can answer nothing. Written by the dev-runner and the Tauri shell — the two implementations
+  // of design 7.1's one supervisor contract — and read by the updater's dead-Engine path (B13),
+  // quick_health, jseval and the dev MCP. Beside the port manifest because a reader that has the
+  // manifest's directory has this one too.
+  ['supervisor.v1.json', 'lane F stage B item B8 (design 7.1) — the supervisor state a dead Engine cannot report'],
+  ['supervisor.v1.json.tmp', 'lane F stage B item B8 — atomic-rename staging file for supervisor.v1.json'],
+  ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 
 /**
@@ -57,6 +79,14 @@ const SCAN_GLOBS = [
   'modules/**/src/main/**/*.java',
   'modules/**/src/main/**/*.kt',
   'modules/ui-web/src/**/*.{ts,tsx,js,mjs}',
+  // BOTH globs, and the second one is not redundant: the tiny glob translator below turns `**` into
+  // `.*` and then requires the following `/`, so `src/**/*.rs` matches `src/bin/foo.rs` and NEVER
+  // matches `src/lib.rs`. Every Rust file in this crate that mattered until now lived directly under
+  // `src/`, which means the Rust half of this check has been scanning nothing since it was written —
+  // and `lib.rs`'s SKIP_PATHS entry was hiding a file the scan could not have seen anyway. Found at
+  // lane F stage B item B10 by removing that entry, planting an unsanctioned artifact name, and
+  // watching the check stay green.
+  'modules/shell/src-tauri/src/*.rs',
   'modules/shell/src-tauri/src/**/*.rs',
   'scripts/**/*.{cjs,mjs,js}',
 ];
@@ -68,16 +98,26 @@ const SKIP_PATHS = [
   // HeadlessApp writes the deprecated api-port.txt mirror plus shutdown
   // cleanup; the strings are tracked under the allowlist.
   'modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java',
-  // The dev-runner writes nothing into <dataDir>/runtime/ — it observes —
-  // but the path strings live there for cleanup. Permit by file name.
-  'scripts/dev/dev-runner.cjs',
+  // scripts/dev/dev-runner.cjs was skipped here with the justification "the dev-runner writes
+  // nothing into <dataDir>/runtime/ — it observes". Lane F stage B item B8 made it a WRITER
+  // (supervisor.v1.json, the shutdown request file, the terminal-state mirror), so the skip stopped
+  // being a description and became an exemption — and an exemption over a new writer is exactly the
+  // vacuous green this check exists to prevent. Removed rather than re-justified: its artifacts are
+  // on the allowlist above, which is what "checked" means here.
+  //
   // Vite/Node consumers read manifest.json by name; that's not creating new
   // sibling files. The shared platform-paths module is the canonical reader.
   'modules/ui-web/vite.config.js',
   'scripts/lib/platform-paths.mjs',
   'scripts/prod/justsearch-mcp/discovery.mjs',
-  // Tauri shell reads manifest.json by name.
-  'modules/shell/src-tauri/src/lib.rs',
+  // modules/shell/src-tauri/src/lib.rs was skipped here with the justification "Tauri shell reads
+  // manifest.json by name". Lane F stage B item B10 made it a WRITER — the supervisor publishes
+  // supervisor.v1.json and the shutdown request — so the skip stopped being a description of a
+  // reader and became an exemption for a writer, which is the vacuous green this check exists to
+  // prevent. Removed rather than re-justified: its artifacts are on the allowlist above, and the
+  // write sites join `runtime` and the artifact name literally so this check can see them (a
+  // `runtime_dir()` helper would have hidden them just as effectively as the skip did).
+  //
   // This script itself.
   'scripts/ci/check-runtime-manifest-closure.mjs',
 ];
@@ -88,7 +128,11 @@ const SKIP_PATHS = [
 // noise all use that substring). The capture group must end in a known
 // artifact-class extension (.json, .txt, .lock, .log, .ndjson) or be the
 // literal `instances` directory.
-const ARTIFACT_TAIL = '(?:[A-Za-z0-9._-]+\\.(?:json|txt|lock|log|ndjson)|instances)';
+// `request` is here for the same reason the other extensions are: an artifact class that appears
+// in <dataDir>/runtime/ must be one the closure rule can see. Adding dev-reload.request to the
+// allowlist without adding its extension here would have been a sanction for something the check
+// was not watching — the allowlist would have grown while coverage stayed the same.
+const ARTIFACT_TAIL = '(?:[A-Za-z0-9._-]+\\.(?:json|txt|lock|log|ndjson|request)|instances)';
 const PATTERNS = [
   // Java/Kotlin Path API: .resolve("runtime").resolve("<artifact>")
   new RegExp(`\\.resolve\\(["']runtime["']\\)\\s*\\.resolve\\(["'](${ARTIFACT_TAIL})["']\\)`, 'g'),

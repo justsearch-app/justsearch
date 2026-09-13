@@ -16,7 +16,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,40 +27,17 @@ import org.sqlite.SQLiteConnection;
 import org.sqlite.SQLiteUpdateListener;
 
 /**
- * Slice 445 producer scaffolding: captures per-row mutations on the {@code jobs}
- * SQLite table via the Xerial driver's {@code addUpdateListener} +
- * {@code addCommitListener} hooks, materializes them into typed {@link Delta}
- * events, and broadcasts to subscribers.
+ * Projects committed jobs-table changes into privacy-safe deltas. SQLite hooks only collect
+ * provisional row identities: the native commit callback precedes commit completion and must
+ * not execute SQL or invoke subscribers. The queue calls {@link #commitSucceeded()} after JDBC
+ * commit returns, then {@link #drainCommitted()} after its outermost claim bookkeeping finishes.
  *
- * <p>Verified API surface (checkpoint commit {@code 044b21ab3}):
- * {@link SQLiteConnection#addUpdateListener(SQLiteUpdateListener)} fires per-row
- * INSIDE each transaction; {@link SQLiteConnection#addCommitListener(SQLiteCommitListener)}
- * fires once on commit (flush) or rollback (drop). This separation gives us
- * transactional consistency: deltas are buffered during the transaction and
- * emitted only on commit.
+ * <p>Snapshot reads and subscriptions share the queue's connection lock. Committed deltas carry
+ * an internal sequence so a subscriber created during reentrant delivery cannot receive changes
+ * already included in its snapshot. Delivery is serialized, including subscriber-triggered writes.
+ * This is a projection of queue state, not proof that a Lucene effect has committed.
  *
- * <p>Privacy contract: the wire {@link JobRow} carries {@code pathHash} (SHA-256
- * hex of the absolute normalized path), never raw paths. Matches ADR-0028 +
- * {@code LibraryResolveHashOnlyCallerPin}: paths leave the worker boundary only
- * via {@code POST /api/library/resolve-hash}; the substrate path is
- * {@code core.resolve-path-hash} Operation in slice 445 §A.9.
- *
- * <p>Snapshot↔delta consistency: {@link #subscribeWithSnapshot} captures a
- * sequence-tagged snapshot + adds the subscriber atomically under the
- * change-stream's monitor. New commits that fire between this method's return
- * and the subscriber's first delta are guaranteed to have {@code seq >
- * snapshotSeq}; the FE consumer rebuilds its keyed map from the snapshot then
- * applies deltas.
- *
- * <p>Per the verification analysis (checkpoint {@code 044b21ab3}):
- * {@link SqliteJobQueue} uses a single {@link Connection} field, so attaching
- * one update_hook captures every mutation across the queue's API. No
- * per-call-site instrumentation needed.
- *
- * <p>Scope (per slice 445 §A.3 D2): concrete to the {@code jobs} table for V1.
- * Future TABULAR Resources backed by SQLite tables can extract this into a
- * generic {@code SqliteChangeStream<V>} primitive when motivated by a second
- * instance.
+ * <p>The wire {@link JobRow} carries a SHA-256 path hash, never a raw path (ADR-0028).
  */
 public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Closeable {
 
@@ -72,19 +51,23 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   private final Connection conn;
   private final SQLiteConnection sqliteConn;
+  private final ReentrantLock ownerLock;
+  private final Runnable ensureOwnerOpen;
 
   /** rowId → pathHash mapping; required for DELETE notifications (the row is gone post-commit). */
   private final ConcurrentHashMap<Long, String> rowIdToPathHash = new ConcurrentHashMap<>();
 
-  /** Pending changes captured during the current transaction; flushed on commit, dropped on rollback. */
+  /** Provisional changes, discarded on rollback and materialized only after JDBC commit returns. */
   private final List<PendingChange> pending = new ArrayList<>();
   private final Object pendingLock = new Object();
+  private final List<CommittedDelta> committed = new ArrayList<>();
+  private final AtomicBoolean draining = new AtomicBoolean();
 
   /** Subscribers; copy-on-write to allow safe iteration during emit. */
-  private final List<Consumer<Delta>> subscribers = new CopyOnWriteArrayList<>();
+  private final List<Subscriber> subscribers = new CopyOnWriteArrayList<>();
 
   /**
-   * Monotonic sequence counter. Bumps on every emitted delta. Used by FE consumers
+   * Monotonic sequence counter. Bumps on every materialized committed delta. Used by FE consumers
    * to detect stale snapshots / reconcile resume tokens.
    */
   private final AtomicLong seq = new AtomicLong(0);
@@ -96,6 +79,10 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   private record PendingChange(SQLiteUpdateListener.Type type, long rowId) {}
 
+  private record CommittedDelta(long sequence, Delta delta) {}
+
+  private record Subscriber(long afterSequence, Consumer<Delta> consumer) {}
+
   /**
    * Attaches update + commit hooks to {@code conn}. Eagerly populates the
    * rowId→pathHash cache from the current jobs table so DELETE notifications
@@ -105,7 +92,9 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
    * Per {@link SqliteJobQueue} architecture (single-connection model verified
    * checkpoint {@code 044b21ab3}), attaching once captures every mutation.
    */
-  public IndexingJobsChangeStream(Connection conn) throws SQLException {
+  IndexingJobsChangeStream(Connection conn, ReentrantLock ownerLock, Runnable ensureOwnerOpen) throws SQLException {
+    this.ownerLock = Objects.requireNonNull(ownerLock, "ownerLock");
+    this.ensureOwnerOpen = Objects.requireNonNull(ensureOwnerOpen, "ensureOwnerOpen");
     this.conn = Objects.requireNonNull(conn, "conn");
     this.sqliteConn = conn.unwrap(SQLiteConnection.class);
     populateRowIdCache();
@@ -114,7 +103,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
         new SQLiteCommitListener() {
           @Override
           public void onCommit() {
-            flushPending();
+            // SQLite has not committed yet. Only the JDBC owner can confirm success.
           }
 
           @Override
@@ -133,42 +122,62 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   }
 
   @Override
-  public synchronized SnapshotAndSubscription subscribeWithSnapshot(Consumer<Delta> subscriber)
+  public SnapshotAndSubscription subscribeWithSnapshot(Consumer<Delta> subscriber)
       throws SQLException {
     Objects.requireNonNull(subscriber, "subscriber");
-    long snapshotSeq = seq.get();
-    List<JobRow> rows = readAllRows();
-    subscribers.add(subscriber);
-    Subscription sub =
-        () -> subscribers.remove(subscriber);
-    return new SnapshotAndSubscription(snapshotSeq, rows, sub);
+    ownerLock.lock();
+    try {
+      ensureOwnerOpen.run();
+      if (closed) throw new IllegalStateException("Indexing jobs feed is closed");
+      long snapshotSeq = seq.get();
+      List<JobRow> rows = readAllRows();
+      return new SnapshotAndSubscription(snapshotSeq, rows, addSubscriber(subscriber));
+    } finally {
+      ownerLock.unlock();
+    }
   }
 
   @Override
   public Subscription subscribe(Consumer<Delta> subscriber) {
     Objects.requireNonNull(subscriber, "subscriber");
+    ownerLock.lock();
+    try {
+      ensureOwnerOpen.run();
+      if (closed) throw new IllegalStateException("Indexing jobs feed is closed");
+      return addSubscriber(subscriber);
+    } finally {
+      ownerLock.unlock();
+    }
+  }
+
+  private Subscription addSubscriber(Consumer<Delta> consumer) {
+    Subscriber subscriber = new Subscriber(seq.get(), consumer);
     subscribers.add(subscriber);
     return () -> subscribers.remove(subscriber);
   }
 
   @Override
-  public synchronized void close() {
-    if (closed) return;
-    closed = true;
+  public void close() {
+    ownerLock.lock();
     try {
-      sqliteConn.removeUpdateListener(updateListener);
-    } catch (RuntimeException e) {
-      log.warn("removeUpdateListener threw on close", e);
-    }
-    try {
-      sqliteConn.removeCommitListener(commitListener);
-    } catch (RuntimeException e) {
-      log.warn("removeCommitListener threw on close", e);
-    }
-    subscribers.clear();
-    rowIdToPathHash.clear();
-    synchronized (pendingLock) {
-      pending.clear();
+      if (closed) return;
+      closed = true;
+      try {
+        sqliteConn.removeUpdateListener(updateListener);
+      } catch (RuntimeException e) {
+        log.warn("removeUpdateListener threw on close", e);
+      }
+      try {
+        sqliteConn.removeCommitListener(commitListener);
+      } catch (RuntimeException e) {
+        log.warn("removeCommitListener threw on close", e);
+      }
+      subscribers.clear();
+      rowIdToPathHash.clear();
+      committed.clear();
+      discardPending();
+    } finally {
+      ownerLock.unlock();
     }
   }
 
@@ -236,26 +245,41 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     }
   }
 
-  private void flushPending() {
+  /** Called under the connection lock only after JDBC commit has returned successfully. */
+  void commitSucceeded() {
     if (closed) return;
     List<PendingChange> snapshot;
     synchronized (pendingLock) {
-      if (pending.isEmpty()) return;
       snapshot = List.copyOf(pending);
       pending.clear();
     }
+    // Freeze rows now: a later committed chunk or a reentrant subscriber may replace/delete them.
     for (PendingChange change : snapshot) {
       Delta delta = materialize(change);
-      if (delta != null) {
-        seq.incrementAndGet();
-        for (Consumer<Delta> sub : subscribers) {
-          try {
-            sub.accept(delta);
-          } catch (RuntimeException e) {
-            log.warn("Subscriber threw on delta delivery; continuing", e);
+      if (delta != null) committed.add(new CommittedDelta(seq.incrementAndGet(), delta));
+    }
+  }
+
+  /** Called under the queue lock after the outermost queue operation's claim bookkeeping. */
+  void drainCommitted() {
+    if (closed || !draining.compareAndSet(false, true)) return;
+    try {
+      while (!committed.isEmpty() && !closed) {
+        List<CommittedDelta> batch = List.copyOf(committed);
+        committed.clear();
+        for (CommittedDelta change : batch) {
+          for (Subscriber subscriber : subscribers) {
+            if (change.sequence() <= subscriber.afterSequence()) continue;
+            try {
+              subscriber.consumer().accept(change.delta());
+            } catch (RuntimeException e) {
+              log.warn("Subscriber threw on delta delivery; continuing", e);
+            }
           }
         }
       }
+    } finally {
+      draining.set(false);
     }
   }
 

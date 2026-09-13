@@ -1,7 +1,7 @@
 {
   "version": 2,
   "tempdoc": 617,
-  "note": "The StoreCatalog mirror remains the cipher-selection authority for its six stores. durableStores is the broader in-place-upgrade compatibility register: every process-owned durable authority names its owner, recovery class, format, write behavior, reconciliation, implementation, and evidence. HARDENING_REQUIRED rows are an explicit tempdoc-617 ratchet; the gate forbids adding an unnamed gap. Tempdoc 879 added two required per-row answers. pathVerification: LITERAL means ONE implementationSources file contains the string literal of every segment of the declared path - a union across several files does not count, because that made LITERAL satisfiable by adding an unrelated file that merely mentions the missing word; COMPOSED means the path is assembled at runtime, and pathVerificationNote must say by what. encryption: SEALED_BY_STORE_CIPHER = the StoreCatalog cipher seals it; UNSEALED_KEY_ROOT = it IS the key root and cannot be sealed by the key it holds; UNSEALED_EXTERNAL_AUTHORITY = the bytes belong to the user or an operator, not the app; UNSEALED_NO_JVM_CIPHER = Shell-owned, written by Rust with no reach to the JVM StoreCipher; UNSEALED_DERIVED_OS_DISK_ENCRYPTION = StoreCatalog's Framing.OPAQUE position, a derived/rebuildable store that does hold user-derived content in the clear and is covered by OS disk encryption only; UNSEALED_GAP = no structural reason, simply not sealed yet; NOT_APPLICABLE = there is nothing here worth sealing. UNSEALED_GAP, UNSEALED_DERIVED_OS_DISK_ENCRYPTION and NOT_APPLICABLE are all claims about what the bytes hold, so the gate requires an encryptionNote on each saying what the file actually contains - before 879 NOT_APPLICABLE was the one value nobody had to justify, and it was standing in for both 'nothing sensitive' and 'the user's own document text'. Known limit of the LITERAL check: it matches string literals, so it cannot tell a path constant from a same-named error-message label - a few rows (agent-runs, memories, conversations) are LITERAL-green via a CorruptDurableStoreException store label rather than a path constant, which means a rename of those directories could pass. Closing that needs the gate to recognise resolve(...)-shaped occurrences specifically; tracked in tempdoc 879. nonDurableWriteSites is the OTHER answer the coverage check accepts: a production source the write-site scanner flags that holds no durable state at all, so there is no recovery, upgrade or encryption policy to state for it. The bar is that every path it writes is scratch - process-scoped, regenerated on demand, and outside the data dir - so losing or deleting the file costs a recomputation and nothing else. It is not an escape hatch for a durable store whose row is inconvenient to write: if deleting the file would lose user-visible state, it belongs in durableStores. TempFileManager and WorkerProcessManager are JVM/OS temp scratch; ExtractionSandboxFactory writes one JVM temp file for the extraction child's startup probe and deletes it in the same method (tempdoc 885 item 14). THIS REGISTER IS A WIRE CONTRACT, NOT DOCUMENTATION. Two consumers read durableStores at RUNTIME, and a row is a commitment to both. (1) modules/shell/src-tauri/src/updater.rs embeds it with include_str! (:31-32) and deserialises every row into LocalDurableStore, whose current_version is a u32 with NO serde default - so ONE row missing currentVersion makes the whole register unparseable and validate_store_compatibility rejects EVERY release descriptor. (2) modules/ui UpgradeReconciliationProbe.loadOwnerRegister (:196-225) builds the closed owner set for /api/upgrade/reconcile and returns an EMPTY register with a configuration error if ANY row has status != READY, which makes reconcile answer 409 and blocks in-place upgrades outright. Both were discovered the hard way in PR #604, which added six HARDENING_REQUIRED rows and broke both consumers at once. (3) A THIRD consumer, named in tempdoc 909: scripts/release/app-release-assets.mjs:77-80 GENERATES every release descriptor's compatibility table from durableStores and throws on any row that is not READY, so a non-READY row does not merely fail a gate - it makes the release assets unbuildable. Its test is scripts/release/app-release-assets.test.mjs. Consequences for an author: a row change is a wire change; HARDENING_REQUIRED is not a documentation tier but a refusal signal, and knownCompatibilityGaps is empty because the tempdoc-617 conversion finished - re-populating it turns upgrades off. Add a row only when it can be READY. DISCOVERY (wave-1 residue R1): the write-site scanner keys on write CALLS in code (scripts/governance/lib/persistence-write-scan.mjs strips comments, keeps literals), not on a \"durable anchor\" word appearing anywhere in the file text. The retired rule decided by reading English prose, which discovered ExtractionSandboxFactory via a javadoc sentence and missed ExtractionSandboxCommand's real argfile write. It over-discovers by design -- benchmarks, SSOT generators and the agent file tools all write to disk -- and each costs one honest nonDurableWriteSites line. nonDurableWriteSites entries are now { path, reason }: the classification is a claim, and every other row here justifies its claims. The broadened scan also found EIGHT files writing durable state no row owns. They were parked in pendingDurableClassification, not forced into durableStores: each needed a settled corruption policy and a recovery/preservation test before it could be READY, and a non-READY row would disable in-place upgrade outright (see the wire-contract paragraph above). Tempdoc 909 (wave-1 residue R4) did that work and drained the list to empty; the block and its cap of 8 remain as the ratchet for the next one. ROOTS (tempdoc 909): a fourth storage root, USER_INDEXED_ROOTS, joins DATA_DIR / AI_HOME / PROGRAM_DATA_OR_DATA_DIR. It exists for exactly one row - the user's own documents, which the agent's file-operations tool moves, copies and deletes in place. That authority is real and durable, but it lives under none of the app-owned roots, so before 909 it could not be written down at all: the register named the undo JOURNAL and not the thing the journal is about.",
+  "note": "The StoreCatalog mirror remains the cipher-selection authority for its six stores. durableStores is the broader in-place-upgrade compatibility register: every process-owned durable authority names its owner, recovery class, format, write behavior, reconciliation, implementation, and evidence. HARDENING_REQUIRED rows are an explicit tempdoc-617 ratchet; the gate forbids adding an unnamed gap. Tempdoc 879 added two required per-row answers. pathVerification: LITERAL means ONE implementationSources file contains the string literal of every segment of the declared path - a union across several files does not count, because that made LITERAL satisfiable by adding an unrelated file that merely mentions the missing word; COMPOSED means the path is assembled at runtime, and pathVerificationNote must say by what. encryption: SEALED_BY_STORE_CIPHER = the StoreCatalog cipher seals it; UNSEALED_KEY_ROOT = it IS the key root and cannot be sealed by the key it holds; UNSEALED_EXTERNAL_AUTHORITY = the bytes belong to the user or an operator, not the app; UNSEALED_NO_JVM_CIPHER = Shell-owned, written by Rust with no reach to the JVM StoreCipher; UNSEALED_DERIVED_OS_DISK_ENCRYPTION = StoreCatalog's Framing.OPAQUE position, a derived/rebuildable store that does hold user-derived content in the clear and is covered by OS disk encryption only; UNSEALED_GAP = no structural reason, simply not sealed yet; NOT_APPLICABLE = there is nothing here worth sealing. UNSEALED_GAP, UNSEALED_DERIVED_OS_DISK_ENCRYPTION and NOT_APPLICABLE are all claims about what the bytes hold, so the gate requires an encryptionNote on each saying what the file actually contains - before 879 NOT_APPLICABLE was the one value nobody had to justify, and it was standing in for both 'nothing sensitive' and 'the user's own document text'. Known limit of the LITERAL check: it matches string literals, so it cannot tell a path constant from a same-named error-message label - a few rows (agent-runs, memories, conversations) are LITERAL-green via a CorruptDurableStoreException store label rather than a path constant, which means a rename of those directories could pass. Closing that needs the gate to recognise resolve(...)-shaped occurrences specifically; tracked in tempdoc 879. nonDurableWriteSites is the OTHER answer the coverage check accepts: a production source the write-site scanner flags that holds no durable state at all, so there is no recovery, upgrade or encryption policy to state for it. The bar is that every path it writes is scratch - process-scoped, regenerated on demand, and outside the data dir - so losing or deleting the file costs a recomputation and nothing else. It is not an escape hatch for a durable store whose row is inconvenient to write: if deleting the file would lose user-visible state, it belongs in durableStores. TempFileManager is JVM/OS temp scratch; ExtractionSandboxFactory writes one JVM temp file for the extraction child's startup probe and deletes it in the same method (tempdoc 885 item 14). THIS REGISTER IS A WIRE CONTRACT, NOT DOCUMENTATION. Two consumers read durableStores at RUNTIME, and a row is a commitment to both. (1) modules/shell/src-tauri/src/updater.rs embeds it with include_str! (:31-32) and deserialises every row into LocalDurableStore, whose current_version is a u32 with NO serde default - so ONE row missing currentVersion makes the whole register unparseable and validate_store_compatibility rejects EVERY release descriptor. (2) modules/ui UpgradeReconciliationProbe.loadOwnerRegister (:196-225) builds the closed owner set for /api/upgrade/reconcile and returns an EMPTY register with a configuration error if ANY row has status != READY, which makes reconcile answer 409 and blocks in-place upgrades outright. Both were discovered the hard way in PR #604, which added six HARDENING_REQUIRED rows and broke both consumers at once. (3) A THIRD consumer, named in tempdoc 909: scripts/release/app-release-assets.mjs:77-80 GENERATES every release descriptor's compatibility table from durableStores and throws on any row that is not READY, so a non-READY row does not merely fail a gate - it makes the release assets unbuildable. Its test is scripts/release/app-release-assets.test.mjs. Consequences for an author: a row change is a wire change; HARDENING_REQUIRED is not a documentation tier but a refusal signal, and knownCompatibilityGaps is empty because the tempdoc-617 conversion finished - re-populating it turns upgrades off. Add a row only when it can be READY. DISCOVERY (wave-1 residue R1): the write-site scanner keys on write CALLS in code (scripts/governance/lib/persistence-write-scan.mjs strips comments, keeps literals), not on a \"durable anchor\" word appearing anywhere in the file text. The retired rule decided by reading English prose, which discovered ExtractionSandboxFactory via a javadoc sentence and missed ExtractionSandboxCommand's real argfile write. It over-discovers by design -- benchmarks, SSOT generators and the agent file tools all write to disk -- and each costs one honest nonDurableWriteSites line. nonDurableWriteSites entries are now { path, reason }: the classification is a claim, and every other row here justifies its claims. The broadened scan also found EIGHT files writing durable state no row owns. They were parked in pendingDurableClassification, not forced into durableStores: each needed a settled corruption policy and a recovery/preservation test before it could be READY, and a non-READY row would disable in-place upgrade outright (see the wire-contract paragraph above). Tempdoc 909 (wave-1 residue R4) did that work and drained the list to empty; the block and its cap of 8 remain as the ratchet for the next one. ROOTS (tempdoc 909): a fourth storage root, USER_INDEXED_ROOTS, joins DATA_DIR / AI_HOME / PROGRAM_DATA_OR_DATA_DIR. It exists for exactly one row - the user's own documents, which the agent's file-operations tool moves, copies and deletes in place. That authority is real and durable, but it lives under none of the app-owned roots, so before 909 it could not be written down at all: the register named the undo JOURNAL and not the thing the journal is about.",
   "catalog": {
     "file": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/encryption/StoreCatalog.java"
   },
@@ -40,12 +40,16 @@
       "encryptionNote": "Plaintext JSON holding the user's UI preferences, including the configured local model path and other machine-local settings. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["ui/settings.json"],
+      "ownedPaths": [
+        "ui/settings.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON envelope v1 around legacy UiSettings object",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
       "writeMode": "FULL_REWRITE",
@@ -102,12 +106,16 @@
       "encryptionNote": "Plaintext JSON recording which capability families the user durably granted the agent. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["ui/durable-grants.json"],
+      "ownedPaths": [
+        "ui/durable-grants.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON grant envelope v1",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/intent/DurableGrantStore.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/intent/DurableGrantStoreTest.java",
       "writeMode": "FULL_REWRITE",
@@ -132,12 +140,16 @@
       "encryptionNote": "Plaintext JSON of the SHA-256 hashes of plugin artifacts an operator explicitly trusted. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["ui/plugin-allowlist.json"],
+      "ownedPaths": [
+        "ui/plugin-allowlist.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON allowlist envelope v1",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/PluginAllowlistStore.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PluginAllowlistStoreTest.java",
       "writeMode": "FULL_REWRITE",
@@ -163,12 +175,16 @@
       "encryptionNote": "A single on/off capture preference. No user content, no path, nothing that discloses anything about the machine.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["feedback-capture.json"],
+      "ownedPaths": [
+        "feedback-capture.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON preference object v1",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/FeedbackCaptureSettings.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/FeedbackCaptureSettingsTest.java",
       "writeMode": "FULL_REWRITE",
@@ -192,7 +208,9 @@
       "encryptionNote": "An inventory of the AI packs the app itself installed under AI Home - pack ids, versions, and the files each pack owns. Every value is app-distributed asset metadata; no user content, no user-chosen path.",
       "owner": "HEAD",
       "root": "AI_HOME",
-      "ownedPaths": ["installed-packs.v1.json"],
+      "ownedPaths": [
+        "installed-packs.v1.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "JSON envelope v1",
@@ -221,7 +239,9 @@
       "encryptionNote": "The install bill of materials: model package ids, the variant/precision chosen per model, the detected hardware profile, and the app's own models directory (InstallContract.java:33-40). Machine and app-install facts only - no user content and no user-chosen path.",
       "owner": "HEAD",
       "root": "AI_HOME",
-      "ownedPaths": ["install-contract.v2.json"],
+      "ownedPaths": [
+        "install-contract.v2.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "JSON record v2",
@@ -250,7 +270,9 @@
       "encryption": "UNSEALED_KEY_ROOT",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["encryption/keystore.json"],
+      "ownedPaths": [
+        "encryption/keystore.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON KeystoreRecord v1",
@@ -279,7 +301,9 @@
       "encryption": "UNSEALED_EXTERNAL_AUTHORITY",
       "owner": "EXTERNAL",
       "root": "PROGRAM_DATA_OR_DATA_DIR",
-      "ownedPaths": ["policy.v1.json"],
+      "ownedPaths": [
+        "policy.v1.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON policy envelope v1",
@@ -308,12 +332,16 @@
       "catalogDirName": "memories",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["memories/*.json"],
+      "ownedPaths": [
+        "memories/*.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "encrypted JSON envelope v1 around legacy record arrays",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java",
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/FileMemoryStoreTest.java",
       "writeMode": "FULL_REWRITE",
@@ -337,12 +365,17 @@
       "catalogDirName": "conversations",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["conversations/*/meta.json", "conversations/*/messages.jsonl"],
+      "ownedPaths": [
+        "conversations/*/meta.json",
+        "conversations/*/messages.jsonl"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "schema-v1 encrypted meta.json plus legacy-compatible append-only messages.jsonl",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
@@ -366,12 +399,20 @@
       "catalogDirName": "agent-runs",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["agent-runs/*/meta.json", "agent-runs/last-session.txt"],
+      "ownedPaths": [
+        "agent-runs/*/meta.json",
+        "agent-runs/last-session.txt"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "meta/checkpoint JSON v4 plus append-only events",
       "currentVersion": 4,
-      "readableLegacyVersions": [0, 1, 2, 3],
+      "readableLegacyVersions": [
+        0,
+        1,
+        2,
+        3
+      ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/AgentRunStore.java",
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/AgentRunStoreSchemaUpcasterTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
@@ -399,12 +440,16 @@
       "encryption": "SEALED_BY_STORE_CIPHER",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["agent-runs/*/events.ndjson"],
+      "ownedPaths": [
+        "agent-runs/*/events.ndjson"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "append-only NDJSON event envelope v1",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/RunEventStore.java",
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/RunEventStoreTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
@@ -428,12 +473,17 @@
       "encryptionNote": "Plaintext JSON transaction log of agent file mutations, including the absolute source and destination paths it moved or rewrote. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["file-operations/*.json"],
+      "ownedPaths": [
+        "file-operations/*.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON transaction log v2 (v2 adds executed[].destinationDigest for COPY)",
       "currentVersion": 2,
-      "readableLegacyVersions": [0, 1],
+      "readableLegacyVersions": [
+        0,
+        1
+      ],
       "versionAuthority": "modules/app-agent/src/main/java/io/justsearch/agent/tools/FileOperationLog.java",
       "futureVersionRefusalTest": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogTest.java",
       "versionNote": "v2 (tempdoc 909 items 7/8) added executed[].destinationDigest - the content identity a COPY-undo must match before it deletes the file. Purely additive: no field was removed or re-shaped, so v0 and v1 journals still read (FileOperationLogTest.legacyV1JournalRemainsReadable). A v1 entry's ABSENT digest is load-bearing rather than a gap: it is what tells the undo it cannot prove identity, so it preserves the file instead of deleting it. The bump exists so an OLDER app refuses a v2 journal loudly instead of undoing it under v1's weaker guarantee.",
@@ -459,12 +509,16 @@
       "catalogDirName": "feedback",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["feedback/*.ndjson"],
+      "ownedPaths": [
+        "feedback/*.ndjson"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "encrypted append-only NDJSON record envelope v1",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/NdjsonAppendStore.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/NdjsonAppendStoreTest.java",
       "writeMode": "APPEND_ONLY",
@@ -488,7 +542,9 @@
       "encryptionNote": "Plaintext NDJSON of query/passage training triples mined from the user's own corpus - each row carries a synthetic_query generated from one of the user's documents plus that document's id (GplTrainingTripleStore.java:369-371). Derived and regenerable from the source documents, so it is deliberately unsealed and covered by OS disk encryption only.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["gpl-training-triples.ndjson"],
+      "ownedPaths": [
+        "gpl-training-triples.ndjson"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "append-only NDJSON with documented legacy and extended rows",
@@ -515,12 +571,16 @@
       "encryptionNote": "Plaintext JSON naming every filesystem root the user indexes - absolute paths that describe the user's disk layout. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["watched_roots.json"],
+      "ownedPaths": [
+        "watched_roots.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON envelope v1 around legacy list or unversioned object; each root entry carries an optional `collection` label (tempdoc 885 §UD open item 4). Additive within v1 and forward-compatible in one direction only: an older build READS a newer file (it ignores the field), but persistRoots is a FULL_REWRITE, so if an older build then writes the file the labels are dropped and every root falls back to the default collection.",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsStore.java",
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStoreTest.java",
       "writeMode": "FULL_REWRITE",
@@ -530,44 +590,11 @@
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsStore.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteKnowledgeClient.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStoreTest.java"
-      ],
-      "fixtures": []
-    },
-    {
-      "id": "worker-config-snapshot",
-      "pathVerification": "LITERAL",
-      "encryption": "NOT_APPLICABLE",
-      "encryptionNote": "The resolved justsearch.* configuration map handed to the Worker at spawn, plus the app's own directories - data dir, AI home, models dir, model/runtime executable paths (ResolvedConfig.java:127-141). App-install layout and settings only: no user document content and none of the user's chosen index roots, which live in watched_roots.json instead.",
-      "owner": "HEAD",
-      "root": "DATA_DIR",
-      "ownedPaths": ["runtime/worker-config-snapshot.json"],
-      "recoverability": "DERIVED",
-      "upgradeHandling": "REBUILD",
-      "format": "JSON configuration map, currently unversioned",
-      "currentVersion": 0,
-      "readableLegacyVersions": [],
-      "writeMode": "FULL_REWRITE",
-      "atomicity": "ATOMIC_REPLACE",
-      "corruptionPolicy": "REGENERATE_BEFORE_CONSUMPTION",
-      "reconciliation": "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START",
-      "status": "READY",
-      "implementationSources": [
-        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfig.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/WorkerSpawner.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
-      ],
-      "tests": [
-        "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerSpawnerConfigForwardingTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWorkerSnapshotOrderingTest.java"
       ],
       "fixtures": []
     },
@@ -581,12 +608,34 @@
       "catalogDirName": "jobs.db",
       "owner": "WORKER",
       "root": "DATA_DIR",
-      "ownedPaths": ["jobs.db", "jobs.db-wal", "jobs.db-shm", "jobs.db.bak"],
+      "ownedPaths": [
+        "jobs.db",
+        "jobs.db-wal",
+        "jobs.db-shm",
+        "jobs.db.bak"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v12",
-      "currentVersion": 12,
-      "readableLegacyVersions": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      "format": "SQLite WAL schema v16",
+      "currentVersion": 16,
+      "readableLegacyVersions": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
       "writeMode": "TRANSACTIONAL",
@@ -619,12 +668,20 @@
       "catalogDirName": "index",
       "owner": "WORKER",
       "root": "DATA_DIR",
-      "ownedPaths": ["index/*/indices/**", "index/*/state.json", "index/*/state.json.prev", "index/*/indices/*.rebuild-pending", "index/*/indices/*.clean-shutdown"],
+      "ownedPaths": [
+        "index/*/indices/**",
+        "index/*/state.json",
+        "index/*/state.json.prev",
+        "index/*/indices/*.rebuild-pending",
+        "index/*/indices/*.clean-shutdown"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "Lucene generations plus state v2 and generation manifest v1",
       "currentVersion": 2,
-      "readableLegacyVersions": [1],
+      "readableLegacyVersions": [
+        1
+      ],
       "versionAuthority": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java",
       "futureVersionRefusalTest": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java",
       "writeMode": "GENERATION_SWAP",
@@ -655,7 +712,9 @@
       "encryptionNote": "Mostly counters, but the snapshot also writes last_path - the absolute path of the last user file the enumerator walked (MigrationProgressStore.java:89) - so it holds one user document path in the clear. Derived from the in-flight migration and deleted-and-recomputed on any problem, so it is deliberately unsealed and covered by OS disk encryption only.",
       "owner": "WORKER",
       "root": "DATA_DIR",
-      "ownedPaths": ["index/*/migration_progress.json"],
+      "ownedPaths": [
+        "index/*/migration_progress.json"
+      ],
       "recoverability": "EPHEMERAL",
       "upgradeHandling": "RESET",
       "format": "JSON status v1",
@@ -684,12 +743,18 @@
       "encryptionNote": "Plaintext SQLite. entity_overrides records the user's own merge/split decisions and entity_clusters holds entity surface forms mined from the user's documents (EntityClusterSchema.java:8,15,41). Worker-owned, but the Worker is a JVM - unlike the Rust shell rows there is no reachability bar, only that nothing seals it today.",
       "owner": "WORKER",
       "root": "DATA_DIR",
-      "ownedPaths": ["entity-clusters.db", "entity-clusters.db-wal", "entity-clusters.db-shm"],
+      "ownedPaths": [
+        "entity-clusters.db",
+        "entity-clusters.db-wal",
+        "entity-clusters.db-shm"
+      ],
       "recoverability": "MIXED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "SQLite WAL schema v1",
       "currentVersion": 1,
-      "readableLegacyVersions": [0],
+      "readableLegacyVersions": [
+        0
+      ],
       "versionAuthority": "modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/EntityClusterStore.java",
       "futureVersionRefusalTest": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/EntityClusterStoreTest.java",
       "writeMode": "TRANSACTIONAL",
@@ -714,7 +779,9 @@
       "encryptionNote": "Which inference runtime variant is active and whether it came up: variant name, health, an activation error code from a closed vocabulary, and timestamps (RuntimeActivationService.java:1434-1441). No user content.",
       "owner": "HEAD",
       "root": "AI_HOME",
-      "ownedPaths": ["ai/runtime-activation-state.json"],
+      "ownedPaths": [
+        "ai/runtime-activation-state.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "RESET",
       "format": "JSON runtime status, currently unversioned",
@@ -741,7 +808,9 @@
       "encryptionNote": "Progress of an AI-pack import: which pack id is staging or installed and how far it got. App asset-management state only; no user content.",
       "owner": "HEAD",
       "root": "AI_HOME",
-      "ownedPaths": ["pack-import-state.json"],
+      "ownedPaths": [
+        "pack-import-state.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "RESET",
       "format": "JSON import status, currently unversioned",
@@ -768,12 +837,17 @@
       "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). Process bookkeeping only; no user content.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["runtime/manifest.json", "runtime/instances/**"],
+      "ownedPaths": [
+        "runtime/manifest.json",
+        "runtime/instances/**"
+      ],
       "recoverability": "EPHEMERAL",
       "upgradeHandling": "RESET",
       "format": "atomic current manifest plus append-only instance history",
-      "currentVersion": 1,
-      "readableLegacyVersions": [],
+      "currentVersion": 2,
+      "readableLegacyVersions": [
+        1
+      ],
       "versionAuthority": "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java",
       "futureVersionRefusalTest": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
       "writeMode": "MIXED_APPEND_AND_FULL_REWRITE",
@@ -797,7 +871,9 @@
       "encryptionNote": "Round-robin numeric time series, one datasource per curated low-cardinality metric (RrdMetricStore.java:45,183). Numbers against fixed metric names - no free text, no paths, no user content; the high-cardinality streams that can carry a document path go to telemetry/*.ndjson instead.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["telemetry/*.rrd"],
+      "ownedPaths": [
+        "telemetry/*.rrd"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "RRD metric files derived from catalog",
@@ -824,7 +900,10 @@
       "encryptionNote": "Model weights and runtime binaries the app downloaded or bundled - and only those, since the ownership rule limits this row to files a verified managed manifest names. Publicly distributed artifacts identical on every install; nothing user-derived to protect (files NOT claimed by a manifest are the byo-ai-assets row).",
       "owner": "HEAD",
       "root": "AI_HOME",
-      "ownedPaths": ["models/**", "native-bin/**"],
+      "ownedPaths": [
+        "models/**",
+        "native-bin/**"
+      ],
       "ownershipRule": "Only files named by a verified managed manifest are app-owned.",
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
@@ -860,7 +939,10 @@
       "encryption": "UNSEALED_EXTERNAL_AUTHORITY",
       "owner": "EXTERNAL",
       "root": "AI_HOME",
-      "ownedPaths": ["models/**", "native-bin/**"],
+      "ownedPaths": [
+        "models/**",
+        "native-bin/**"
+      ],
       "ownershipRule": "Files not named by a verified managed manifest remain user-owned.",
       "recoverability": "AUTHORED",
       "upgradeHandling": "PRESERVE_EXTERNAL",
@@ -888,7 +970,10 @@
       "encryption": "UNSEALED_EXTERNAL_AUTHORITY",
       "owner": "EXTERNAL",
       "root": "DATA_DIR",
-      "ownedPaths": ["plugins/*/manifest.json", "plugins/*/plugin.js"],
+      "ownedPaths": [
+        "plugins/*/manifest.json",
+        "plugins/*/plugin.js"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "PRESERVE_EXTERNAL",
       "format": "user-managed plugin manifest and JavaScript source",
@@ -899,8 +984,12 @@
       "corruptionPolicy": "SKIP_INVALID_PLUGIN_AND_PRESERVE_BYTES",
       "reconciliation": "RESCAN_AND_VALIDATE_WITHOUT_REWRITING",
       "status": "READY",
-      "implementationSources": ["modules/shell/src-tauri/src/lib.rs"],
-      "tests": ["modules/shell/src-tauri/src/lib.rs"],
+      "implementationSources": [
+        "modules/shell/src-tauri/src/lib.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/lib.rs"
+      ],
       "fixtures": []
     },
     {
@@ -909,7 +998,9 @@
       "encryption": "UNSEALED_NO_JVM_CIPHER",
       "owner": "SHELL",
       "root": "DATA_DIR",
-      "ownedPaths": ["upgrade/intent.v1.json"],
+      "ownedPaths": [
+        "upgrade/intent.v1.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON upgrade intent v1",
@@ -922,8 +1013,12 @@
       "corruptionPolicy": "FAIL_CLOSED_REPAIR_REQUIRED",
       "reconciliation": "RECONCILE_SOURCE_TARGET_AND_DURABLE_PHASE_BEFORE_NEW_UPDATE",
       "status": "READY",
-      "implementationSources": ["modules/shell/src-tauri/src/updater.rs"],
-      "tests": ["modules/shell/src-tauri/src/updater.rs"],
+      "implementationSources": [
+        "modules/shell/src-tauri/src/updater.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/updater.rs"
+      ],
       "fixtures": []
     },
     {
@@ -932,7 +1027,9 @@
       "encryption": "UNSEALED_NO_JVM_CIPHER",
       "owner": "SHELL",
       "root": "DATA_DIR",
-      "ownedPaths": ["upgrade/sequence.v1.json"],
+      "ownedPaths": [
+        "upgrade/sequence.v1.json"
+      ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON anti-rollback sequence v1",
@@ -945,8 +1042,12 @@
       "corruptionPolicy": "FAIL_CLOSED",
       "reconciliation": "PRESERVE_HIGHEST_ACCEPTED_SEQUENCE",
       "status": "READY",
-      "implementationSources": ["modules/shell/src-tauri/src/updater.rs"],
-      "tests": ["modules/shell/src-tauri/src/updater.rs"],
+      "implementationSources": [
+        "modules/shell/src-tauri/src/updater.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/updater.rs"
+      ],
       "fixtures": []
     },
     {
@@ -956,7 +1057,9 @@
       "encryptionNote": "A one-shot handshake token: the preparation id the Shell asked for, the receipt nonce, and whether the Head shut down cleanly. Nothing but the nonce pair, which is meaningless after the upgrade it gates.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["upgrade/head-shutdown-receipt.v1.json"],
+      "ownedPaths": [
+        "upgrade/head-shutdown-receipt.v1.json"
+      ],
       "recoverability": "EPHEMERAL",
       "upgradeHandling": "RESET",
       "format": "nonce-bound JSON shutdown receipt v1",
@@ -968,13 +1071,15 @@
       "reconciliation": "SHELL_ACCEPTS_ONLY_CURRENT_PREPARATION_ID_AND_RECEIPT_NONCE",
       "status": "READY",
       "implementationSources": [
-        "modules/ui/src/main/java/io/justsearch/ui/HeadShutdownCoordinator.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineShutdownSequence.java",
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
       ],
       "tests": [
-        "modules/ui/src/test/java/io/justsearch/ui/HeadShutdownCoordinatorTest.java"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSequenceTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppUpgradeShutdownWiringTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "note": "Lane F stage B item B4 moved the writer from HeadShutdownCoordinator (modules/ui) to EngineShutdownSequence (app-engine): design 7.3 puts the ordered close in the composition root. The receipt CONTRACT is unchanged - same filename, same schemaVersion 1, same nonce and preparation binding - only its owner moved."
     },
     {
       "id": "inference-runtime-projections",
@@ -983,7 +1088,10 @@
       "encryptionNote": "The id of the loaded model, plus a transition log of fromMode/toMode/reason/success/durationMs/generation (NdjsonInferenceTransitionLog.java:161-172). A closed vocabulary of lifecycle phases and reason codes - no prompt text, no completion text, no user content.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["inference-model-id.txt", "telemetry/inference-transitions.ndjson"],
+      "ownedPaths": [
+        "inference-model-id.txt",
+        "telemetry/inference-transitions.ndjson"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "RESET",
       "format": "runtime identity cache plus bounded transition telemetry",
@@ -1011,7 +1119,11 @@
       "encryptionNote": "Plaintext diagnostics that do carry user-derived content: the exported span attributes include doc.path and http.target (NdjsonSpanExporter.java:45,59), so indexed document paths and request query strings land in telemetry/*.ndjson, and crashes/*.json records the raw exception message plus stack trace (CrashReporter.java:101-102), which for an indexing failure names the file being read. Derived, bounded, and pruned rather than recovered, so it is deliberately unsealed and covered by OS disk encryption only.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["telemetry/*.ndjson", "crashes/*.json", "diagnostics/slow-*.json"],
+      "ownedPaths": [
+        "telemetry/*.ndjson",
+        "crashes/*.json",
+        "diagnostics/slow-*.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "RESET",
       "format": "bounded diagnostic NDJSON and JSON artifacts",
@@ -1045,7 +1157,11 @@
       "encryptionNote": "Signal files, not data files: the two index markers carry meaning by existing, and worker-fatal-reason holds one reason code - its only production writer passes the INDEX_CORRUPT constant (KnowledgeServer.java:758-759; WorkerFatalReasonMarker.java:27). No message text, no path, no user content.",
       "owner": "WORKER",
       "root": "DATA_DIR",
-      "ownedPaths": ["worker-fatal-reason", "index/*/indices/*.rebuild-pending", "index/*/indices/*.clean-shutdown"],
+      "ownedPaths": [
+        "worker-fatal-reason",
+        "index/*/indices/*.rebuild-pending",
+        "index/*/indices/*.clean-shutdown"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "RESET",
       "format": "single-use worker recovery and clean-shutdown marker files",
@@ -1075,7 +1191,9 @@
       "encryptionNote": "Owner metadata for an OS file lock: the holding process's PID and its start timestamp, written so a later process can tell a live owner from a dead one (AppInstanceLock.java:121-122,157-172). PID and timestamp only; no user content.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["*.lock"],
+      "ownedPaths": [
+        "*.lock"
+      ],
       "recoverability": "EPHEMERAL",
       "upgradeHandling": "RESET",
       "format": "process ownership lock and PID marker files",
@@ -1087,13 +1205,13 @@
       "reconciliation": "REACQUIRE_FOR_CURRENT_PROCESS",
       "status": "READY",
       "implementationSources": [
-        "modules/app-util/src/main/java/io/justsearch/app/util/AppInstanceLock.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/worker/MainSignalBus.java",
-        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/coordination/MmfWorkerSignalBus.java"
+        "modules/app-util/src/main/java/io/justsearch/app/util/AppInstanceLock.java"
       ],
-      "tests": ["modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockTest.java"],
+      "tests": [
+        "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockTest.java"
+      ],
       "fixtures": [],
-      "mmapNote": "worker_signal.lock matches this row's *.lock glob exactly, but it is not a PID marker: it is a memory-mapped Head<->Worker IPC region (MainSignalBus.java:63-73, MmfWorkerSignalBus.java:98-103) holding port, heartbeat and PID bytes, recreated each launch. Same lifecycle, different thing; named here so the row's format line is not read as covering more than it says."
+      "mmapNote": "HISTORICAL. worker_signal.lock matched this row's *.lock glob exactly without being a PID marker: it was the memory-mapped Head<->Worker IPC region holding port, heartbeat and PID bytes, recreated each launch. Lane F stage A item A10 deleted both ends of it (MainSignalBus, MmfWorkerSignalBus) when the two processes became one JVM, so no such file is written any more. The note is kept because the *.lock glob is unchanged and a reader still has to know the row does not cover a mapped region."
     },
     {
       "id": "agent-history-transcripts",
@@ -1102,7 +1220,9 @@
       "encryptionNote": "Plaintext Markdown holding the agent's final answer to the user plus the title, path and excerpt of every document it grounded that answer in (AgentHistoryIndexer.java:141-164) - user-derived content in the clear. It is a DERIVED projection of the sealed agent-runs terminal event and is re-derivable from it, and it must stay readable as an ordinary file because the Worker process ingests it BY PATH over the explicit-collection ingest API (:124) - sealing it would break the only thing it exists for. Covered by OS disk encryption only.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["agent-history/*.md"],
+      "ownedPaths": [
+        "agent-history/*.md"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "one Markdown transcript per finished agent run, keyed by session id",
@@ -1130,7 +1250,9 @@
       "encryptionNote": "Per-file download history for the AI install: the target path inside the app's own models directory, the registry URL it was fetched from, attempt and failed-pass counts, the last transport error string, a timestamp, and the transport tier that pass started at (InstallAttemptMemory.java:54-60). App-install and registry facts only - no user content and no user-chosen path.",
       "owner": "HEAD",
       "root": "AI_HOME",
-      "ownedPaths": ["install-attempts.json"],
+      "ownedPaths": [
+        "install-attempts.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "READ_IN_PLACE",
       "format": "JSON record v1: {version, files: {targetPath -> Attempt}}",
@@ -1161,7 +1283,9 @@
       "encryptionNote": "Four aggregate numbers about the corpus at the last GPL evaluation: document count, triple count, an ISO timestamp, and a MIME-type histogram (GplEvalSnapshot.java:38-42). MIME TYPES and counts, never file names, paths or text - nothing here identifies a document.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["gpl-eval-snapshot.json"],
+      "ownedPaths": [
+        "gpl-eval-snapshot.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "JSON snapshot of corpus state at the last GPL evaluation",
@@ -1189,7 +1313,10 @@
       "encryptionNote": "Aggregate GPL calibration statistics: per-bucket triple counts and contribution rates, a numeric parameter sweep, the selected configuration and a generated-at timestamp (GplStage3aAnalysisReport.java:31-46, GplStage3bBranchFusionReport.java:41-76). Counts, rates and sweep parameters only - no query text, no document id, no path.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["gpl-stage3a-analysis.json", "gpl-stage3b-branch-fusion.json"],
+      "ownedPaths": [
+        "gpl-stage3a-analysis.json",
+        "gpl-stage3b-branch-fusion.json"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "write-only JSON diagnostic reports written beside the triple store",
@@ -1217,7 +1344,10 @@
       "encryptionNote": "The child llama-server process's stdout AND stderr, redirected wholesale (LlamaServerOps.java:942-943). Its verbosity is llama-server's choice, not the app's: at higher verbosities the server prints request-shaped diagnostics, so prompt-derived text can land here, and the app reads the tail back for startup diagnostics. Named honestly rather than filed as NOT_APPLICABLE - it is a derived, bounded, rotated diagnostic that can hold user-derived text in the clear, covered by OS disk encryption only.",
       "owner": "HEAD",
       "root": "DATA_DIR",
-      "ownedPaths": ["logs/llama-server.log", "logs/llama-server.log.*"],
+      "ownedPaths": [
+        "logs/llama-server.log",
+        "logs/llama-server.log.*"
+      ],
       "recoverability": "DERIVED",
       "upgradeHandling": "RESET",
       "format": "plain-text process log, rotated on each launch, 3 generations retained",
@@ -1226,7 +1356,7 @@
       "writeMode": "APPEND_ONLY",
       "atomicity": "BEST_EFFORT",
       "corruptionPolicy": "ROTATE_OR_PRUNE_DIAGNOSTIC_ARTIFACT",
-      "corruptionNote": "Nothing recovers this file: each launch rotates it to .1 (and .1 to .2, deleting .2) and starts a fresh one, so an unreadable, truncated or interleaved log is aged out by the next start rather than repaired. Before tempdoc 909 it had NO retention at all - appendTo across every launch for the life of the install. Retention is a constant (RETAINED_LOG_GENERATIONS = 3), not a config key, and matches WorkerSpawner's worker.log policy so the app has one retention story for its supervised process logs. Ordering is load-bearing: the live file is renamed aside FIRST and nothing is pruned until that succeeds, because on Windows the rename fails while a handle is open (a llama-server past the 5s kill timeout, an orphan, a handle not yet released) - pruning first would delete the oldest generation and shift the rest before discovering it cannot move the live file, leaving FEWER retained logs and a still-growing live file in exactly the crash-restart loop where retention matters. A .rotating file left by a failure between the two renames is bounded (the next launch replaces it) and is covered by the ownedPaths glob.",
+      "corruptionNote": "Nothing recovers this file: each launch rotates it to .1 (and .1 to .2, deleting .2) and starts a fresh one, so an unreadable, truncated or interleaved log is aged out by the next start rather than repaired. Before tempdoc 909 it had NO retention at all - appendTo across every launch for the life of the install. Retention is a constant (RETAINED_LOG_GENERATIONS = 3), not a config key, and matched WorkerSpawner's worker.log policy, which is where the app's one retention story for supervised-process logs came from; lane F stage A item A11 deleted that spawner and item A16 folded the Head's own log into <dataDir>/logs/engine.log (rolled by Logback's SizeAndTimeBasedRollingPolicy, a different policy entirely), so llama-server.log is now the only log THIS policy governs (RETAINED_LOG_GENERATIONS = 3 is unchanged). No worker.log is written any more, and it never had a row here. Ordering is load-bearing: the live file is renamed aside FIRST and nothing is pruned until that succeeds, because on Windows the rename fails while a handle is open (a llama-server past the 5s kill timeout, an orphan, a handle not yet released) - pruning first would delete the oldest generation and shift the rest before discovering it cannot move the live file, leaving FEWER retained logs and a still-growing live file in exactly the crash-restart loop where retention matters. A .rotating file left by a failure between the two renames is bounded (the next launch replaces it) and is covered by the ownedPaths glob.",
       "reconciliation": "START_NEW_LOG_AND_RETAIN_BOUNDED_GENERATIONS",
       "status": "READY",
       "implementationSources": [
@@ -1245,7 +1375,9 @@
       "encryptionNote": "The user's own documents, in the user's own folders. The app moves, copies and deletes them on request; it does not own their bytes and must never re-encode or seal them.",
       "owner": "HEAD",
       "root": "USER_INDEXED_ROOTS",
-      "ownedPaths": ["**"],
+      "ownedPaths": [
+        "**"
+      ],
       "ownershipRule": "The app owns NONE of these bytes. It may only mutate a path inside a currently-configured indexed root, on an approved WRITE-safety tool call, and it may DELETE one only to undo a COPY it can prove it made (see corruptionPolicy).",
       "recoverability": "AUTHORED",
       "upgradeHandling": "PRESERVE_EXTERNAL",
@@ -1268,16 +1400,159 @@
         "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationExecutorTest.java"
       ],
       "fixtures": []
+    },
+    {
+      "id": "help-ingested-version",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "A single version token (\"v2\") recording which generation of the app's own bundled help documents has been ingested. App-distributed content only: no user document content, no user-chosen path, no credential.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        ".help-ingested-version"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "A bare version token, unversioned by construction",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "NON_ATOMIC",
+      "corruptionPolicy": "REGENERATE_BEFORE_CONSUMPTION",
+      "reconciliation": "UNCONDITIONALLY_REINGEST_HELP_ON_MISMATCH",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java"
+      ],
+      "tests": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java"
+      ],
+      "fixtures": [],
+      "note": "Added at lane F item A19, and the reason it did not exist before is worth recording rather than quietly fixing: this write site was only ever COVERED by accident. KnowledgeServerBootstrap.java appeared in the retired worker-config-snapshot row's implementationSources (it was one of the files that handled the snapshot), so the coverage check saw the file as classified and never asked what ELSE it wrote. Removing that row exposed a genuine, unrelated durable artifact at KnowledgeServerBootstrap.java:867,901. The gate was right both times; the register was carrying a false negative. Deliberately NON_ATOMIC and untested: it is a one-token marker whose worst failure is re-ingesting a handful of bundled help files, so hardening it would cost more than the outcome it prevents — but that is now a stated judgement rather than an unexamined gap."
+    },
+    {
+      "id": "engine-shutdown-request",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "ShutdownRequest.pathIn resolves the literal \"shutdown-request.v1.json\" against an injected <dataDir>/runtime directory; the dataDir prefix is configuration-resolved, not a literal in this component.",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Host-owned schema version, reason, deadline and issuer fields contain no user content. Legacy nonce/preparation fields are parsed only for explicit refusal; acknowledged upgrades dispatch locally and never write this channel.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "runtime/shutdown-request.v1.json"
+      ],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "RESET",
+      "format": "JSON request v1",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java",
+      "futureVersionRefusalTest": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "DELETE_AND_RECOMPUTE",
+      "reconciliation": "There is nothing to reconcile: the file is a request, not a record. The owning host keeps request intent and its deadline in memory; the Engine deletes the file on consumption. No host reads it back to classify death, and the Engine does not write it. A malformed or unknown-reason file is logged and IGNORED rather than guessed at, because guessing a reason from a file caught mid-write could stop the product; the supervisor’s own deadline-then-kill covers the case where ignoring it was wrong.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java",
+        "modules/shell/src-tauri/src/lib.rs",
+        "scripts/dev/dev-runner.cjs"
+      ],
+      "tests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "engine-supervisor-state",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "The supervisor resolves the literal \"supervisor.v1.json\" against a <dataDir>/runtime directory it composes from the resolved data dir (scripts/dev/dev-runner.cjs supervisorStatePath). The dataDir prefix is configuration-resolved, not a literal, and the writer is JavaScript, so the register's literal check — which reads double-quoted strings only — could not speak about it either way.",
+      "encryption": "UNSEALED_NO_JVM_CIPHER",
+      "encryptionNote": "There is no JVM anywhere near this file by design: the Engine's supervisor is deliberately not a JVM (design 7.1's `never` clause), so the store cipher is not available to either writer. The content is a state name, a restart count, an exit code with its reason label and the run's own ids — no user content and no secret.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "runtime/supervisor.v1.json",
+        "runtime/instances/supervisor-history.v1.jsonl"
+      ],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "RESET",
+      "format": "JSON supervisor state v1, plus an append-only JSONL mirror of the terminal record",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "DELETE_AND_RECOMPUTE",
+      "reconciliation": "The live file is a claim about a process that may no longer exist, so it is never trusted across a supervisor's own lifetime: a supervisor rewrites it from `starting` on its first transition and every reader treats an absent file as UNSUPERVISED rather than as an error (stage B checklist Q7 (a) — the bare app-launcher shape of design 3.1 has no supervisor and must still boot). A corrupt file is deleted and rewritten by the next transition; nothing is recovered from it, because everything in it is re-derivable from the run that is happening now. The JSONL mirror is the exception and the reason it exists: the terminal `exhausted` record has to survive the moment the Engine and its supervisor are both gone, because the reader that needs it — the updater's dead-Engine path — arrives afterwards.",
+      "status": "READY",
+      "implementationSources": [
+        "scripts/dev/dev-runner.cjs",
+        "modules/shell/src-tauri/src/lib.rs",
+        "modules/shell/src-tauri/src/engine_host.rs"
+      ],
+      "tests": [
+        "scripts/dev/test-dev-runner-supervisor.mjs",
+        "scripts/supervisor-conformance/adapters/tauri.mjs"
+      ],
+      "fixtures": [],
+      "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
+    },
+    {
+      "id": "operations-db",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "HeadlessApp and LauncherEnvironment resolve operations.db under DATA_DIR; SqliteOperationStore composes SQLite sidecars and timestamped preservation directories.",
+      "encryption": "UNSEALED_GAP",
+      "encryptionNote": "Plaintext metadata contains canonical public identities, grant references, checkpoints and bounded receipts. V3 adds separate bounded preparation payloads and five-minute pending preparation storage. The application codec requires content-bearing envelopes to use the existing data-key cipher; metadata preparations remain plaintext. Prepared producer activation and approval wiring follow the store prerequisite in C2-3.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "operations.db",
+        "operations.db-wal",
+        "operations.db-shm",
+        "operations.db.corrupt-*"
+      ],
+      "recoverability": "MIXED",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "SQLite WAL schema v3",
+      "currentVersion": 3,
+      "readableLegacyVersions": [1, 2],
+      "versionAuthority": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
+      "futureVersionRefusalTest": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+      "writeMode": "TRANSACTIONAL",
+      "atomicity": "TRANSACTIONAL",
+      "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
+      "corruptionNote": "Preserve the main file and WAL/SHM before recreating the store; report loss of outcome history through OperationRecoveryNotice. history_since_ms advances to recovery time plus five minutes admitted future skew plus one millisecond. The preservation directory witnesses interrupted recovery until that fence commits. Failed preservation refuses startup. External file-level rollback is outside this contract.",
+      "reconciliation": "RUN_OPERATIONS_SQLITE_MIGRATIONS_AND_RECONCILE_ACCEPTED_WORK",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+        "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/operations/OperationRecoveryNotice.java"
+      ],
+      "tests": [
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java"
+      ],
+      "fixtures": ["modules/app-observability/src/test/resources/operations-v1.sql", "modules/app-observability/src/test/resources/operations-v2.sql"]
     }
   ],
   "nonDurableWriteSites": [
     {
-      "path": "modules/app-util/src/main/java/io/justsearch/app/util/TempFileManager.java",
-      "reason": "JVM/OS temp scratch: allocates and reaps files under java.io.tmpdir for in-flight work."
+      "path": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "reason": "Included only under cfg(test). The updater coordinator fixtures write staged artifacts, intents, witnesses and manifests in test-owned temporary directories; this module cannot write from a production binary. Production updater stores retain their existing classifications."
     },
     {
-      "path": "modules/system-tests/src/main/java/io/justsearch/systemtests/chaos/WorkerProcessManager.java",
-      "reason": "JVM/OS temp scratch: per-test data dirs the chaos harness creates and discards."
+      "path": "modules/shell/src-tauri/src/bin/supervisor_conformance.rs",
+      "reason": "A conformance driver, not a product path: it writes the supervisor state file and the shutdown request into a THROWAWAY data directory the harness creates per case and deletes after (scripts/supervisor-conformance/adapters/tauri.mjs). The artifacts it produces are the ones `engine-supervisor-state` and `engine-shutdown-request` already classify; what this binary owns is the temp directory around them, and nothing in it survives the case that made it. It is discovered by the write-site scan because the scan reads modules/**/*.rs by construction — which is right, and the honest answer is this row rather than an exclusion."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBus.java",
+      "reason": "Dev-only signal file, not a store: it deletes <dataDir>/runtime/dev-reload.request to consume a hot-reload poke written by an external dev tool. Nothing is ever written here (existence IS the signal) and nothing survives a restart, so there is no format, no version and nothing to recover. This is what is left of the memory-mapped signal bus lane F stage A item A10 deleted — the one signal that genuinely crossed a process boundary, re-homed from a byte onto a file."
+    },
+    {
+      "path": "modules/app-util/src/main/java/io/justsearch/app/util/TempFileManager.java",
+      "reason": "JVM/OS temp scratch: allocates and reaps files under java.io.tmpdir for in-flight work."
     },
     {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactory.java",
@@ -1356,10 +1631,6 @@
       "reason": "Repo build artifact: SSOT/manifests/repro/repro.v1.json (:202-204), regenerated by rerunning validation. Every other path it touches is a read."
     },
     {
-      "path": "modules/system-tests/src/main/java/io/justsearch/systemtests/chaos/MmfTestHarness.java",
-      "reason": "Test-harness peer of the worker signal MMF, opened against a per-test temp data dir that WorkerProcessManager (already classified here) owns and discards."
-    },
-    {
       "path": "modules/system-tests/src/main/java/io/justsearch/systemtests/corpus/CorpusVectorGenerator.java",
       "reason": "Writes build/rag-eval-vectors.json for its single caller (RagEvalVectorGeneratorTest:105); the vectors are seeded and deterministic, so rerunning regenerates them byte for byte."
     },
@@ -1386,6 +1657,10 @@
     {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PdfOcrEngine.java",
       "reason": "Per-document JVM temp dirs (justsearch-ocr-*) holding rendered page PNGs and tesseract output, swept by deleteRecursively in the same call's finally (:201, :326, :353)."
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/persistence/SqliteStoreSnapshot.java",
+      "reason": "Private JVM temp inspection copies of a quiescent SQLite main file and WAL. The original database remains the only authority; these copies are never resumed or read by product paths and are removed after inspection. They prevent SQLite read-only preflight from modifying original SHM bytes."
     }
   ],
   "constructionSites": [

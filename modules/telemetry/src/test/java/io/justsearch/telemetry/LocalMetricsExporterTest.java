@@ -67,7 +67,7 @@ class LocalMetricsExporterTest {
   void writesRequiredSeriesWithTags() throws Exception {
     Path tmp = Files.createTempDirectory("telemetry-test");
     try (var t =
-        new LocalTelemetry(tmp, 500, "test", "0", "metrics.ndjson", List.of(pipelineCatalog()))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "test", "0", "metrics.ndjson", List.of(pipelineCatalog()))) {
       t.registry()
           .<MapTags>buildHistogram("pipeline.stage_ms")
           .record(
@@ -103,7 +103,7 @@ class LocalMetricsExporterTest {
     try {
       Path tmp = Files.createTempDirectory("telemetry-exemplars");
       try (var t =
-          new LocalTelemetry(
+          new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
               tmp, 500, "test", "0", "metrics.ndjson", List.of(pipelineCatalog()))) {
         var hist = t.registry().<MapTags>buildHistogram("pipeline.stage_ms");
         hist.record(
@@ -152,7 +152,7 @@ class LocalMetricsExporterTest {
     Set<String> allowed =
         new LinkedHashSet<>(List.of("route", "http_method", "http_status", "http_status_class"));
     try (var t =
-        new LocalTelemetry(tmp, 200, "test", "0", "metrics.ndjson", List.of(apiCatalog()))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 200, "test", "0", "metrics.ndjson", List.of(apiCatalog()))) {
       var hist = t.registry().<MapTags>buildHistogram("api.request_ms");
       hist.record(
           12,
@@ -178,7 +178,7 @@ class LocalMetricsExporterTest {
     Set<String> allowed =
         new LinkedHashSet<>(List.of("route", "http_method", "http_status", "http_status_class"));
     try (var t =
-        new LocalTelemetry(tmp, 200, "test", "0", "metrics.ndjson", List.of(apiCatalog()))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 200, "test", "0", "metrics.ndjson", List.of(apiCatalog()))) {
       var hist = t.registry().<MapTags>buildHistogram("api.request_ms");
       hist.record(
           7,
@@ -199,7 +199,7 @@ class LocalMetricsExporterTest {
     try {
       Path tmp = Files.createTempDirectory("telemetry-rotate");
       try (var t =
-          new LocalTelemetry(
+          new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
               tmp, 100, "test", "0", "metrics.ndjson", List.of(pipelineCatalog()))) {
         var counter = t.registry().<MapTags>buildCounter("pipeline.skipped");
         MapTags tags =

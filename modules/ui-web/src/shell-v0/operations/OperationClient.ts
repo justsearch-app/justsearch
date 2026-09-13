@@ -9,9 +9,8 @@
  * {@link OperationError} so consumers don't branch on HTTP status codes.
  *
  * Used by:
- *   - The React `useOperation()` hook (slice 3a-1-2 Phase 4).
- *   - The `wireActionButton(...)` helper (slice 3a-1-2 Phase 4).
- *   - Future Lit reactive controllers in slice 3a.2+ surfaces.
+ *   - Lit shell controls, the operation button and `wireActionButton(...)`.
+ *   - Plugin operation invocations and the pending authorization bridge.
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
@@ -23,6 +22,7 @@ export type Risk = 'LOW' | 'MEDIUM' | 'HIGH';
 export interface OperationInvocationRequest {
   args?: Record<string, unknown>;
   idempotencyKey?: string;
+  preparationNonce?: string;
   confirmationToken?: string;
   /**
    * Slice 489 §17.5 — transport hint sent as the `X-JustSearch-Transport`
@@ -31,6 +31,13 @@ export interface OperationInvocationRequest {
    * (preserves prior behavior).
    */
   transport?: string;
+}
+
+/** One approval capability and its optional server-owned invocation reference. */
+export interface OperationApproval {
+  capsule: string;
+  operationKey?: string;
+  preparationNonce?: string;
 }
 
 /** Wire shape of a successful invocation result. */
@@ -144,6 +151,8 @@ interface WireResponseShape {
   // Tempdoc 550 C3 — id of the PendingAuthorization + computed gate on a 428.
   pendingId?: string;
   gateBehavior?: string;
+  operationKey?: string;
+  preparationNonce?: string;
   // Tempdoc 550 P1 — decision context on a 428: the op's risk, reversibility, and a short
   // args summary, so the ceremony shows what's being approved (not just the op id).
   riskTier?: string;
@@ -191,6 +200,7 @@ export class OperationClient {
     const body = JSON.stringify({
       args: request.args ?? {},
       idempotencyKey: request.idempotencyKey,
+      preparationNonce: request.preparationNonce,
       confirmationToken: request.confirmationToken,
     });
 
@@ -237,6 +247,8 @@ export class OperationClient {
               riskTier: parsed.riskTier,
               undoSupported: parsed.undoSupported,
               argsSummary: parsed.argsSummary,
+              operationKey: parsed.operationKey,
+              preparationNonce: parsed.preparationNonce,
             }
           : parsed.errorDetails;
       throw new OperationError(
@@ -302,8 +314,11 @@ export class OperationClient {
       }) => Promise<{ approved: boolean; allowAlways: boolean }>;
     } = {},
   ): Promise<OperationInvocationSuccess> {
+    // Preserve the exact JSON input sent before the asynchronous ceremony. A caller can
+    // keep editing its own request while the prompt is open; that cannot change this retry.
+    const original = JSON.parse(JSON.stringify(request)) as OperationInvocationRequest;
     try {
-      return await this.invoke(operationId, request);
+      return await this.invoke(operationId, original);
     } catch (err: unknown) {
       if (
         err instanceof OperationError &&
@@ -329,10 +344,13 @@ export class OperationClient {
           allowAlways = decision.allowAlways; // tempdoc 550 thesis IV: "allow always" → durable grant
         }
         if (approved) {
-          const capsule = await this.approveByPendingId(err.pendingId, allowAlways);
-          // Re-invoke with the SAME request args; the capsule binds to the backend-stored
-          // args, captured from this same request on the gating invoke.
-          return await this.invoke(operationId, { ...request, confirmationToken: capsule });
+          const approval = await this.approveGate(err, allowAlways);
+          return await this.invoke(operationId, {
+            ...original,
+            idempotencyKey: approval.operationKey ?? original.idempotencyKey,
+            preparationNonce: approval.preparationNonce ?? original.preparationNonce,
+            confirmationToken: approval.capsule,
+          });
         }
       }
       throw err;
@@ -342,10 +360,10 @@ export class OperationClient {
   /**
    * Tempdoc 550 C3: approve a backend-created PendingAuthorization by id, minting a consent
    * capsule bound to its stored (operationId, args). POST /api/authorizations/approve
-   * {@code {pendingId}}. Returns the opaque capsule token. The approve gesture references
+   * {@code {pendingId}}. Returns the capsule and server key/nonce together. The approve gesture references
    * only the id — it cannot substitute a different op/args (that is the hardening).
    */
-  async approveByPendingId(pendingId: string, allowAlways = false): Promise<string> {
+  async approveByPendingId(pendingId: string, allowAlways = false): Promise<OperationApproval> {
     if (!pendingId) {
       throw new OperationError('pendingId required', 'BAD_REQUEST');
     }
@@ -365,9 +383,9 @@ export class OperationClient {
         'NETWORK_ERROR',
       );
     }
-    let parsed: { capsule?: string };
+    let parsed: Partial<OperationApproval>;
     try {
-      parsed = (await res.json()) as { capsule?: string };
+      parsed = (await res.json()) as Partial<OperationApproval>;
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new OperationError(
@@ -376,14 +394,29 @@ export class OperationClient {
         res.status,
       );
     }
-    if (!res.ok || !parsed.capsule) {
+    if (!res.ok || typeof parsed?.capsule !== 'string' || !parsed.capsule
+        || (parsed.operationKey !== undefined && (typeof parsed.operationKey !== 'string' || !parsed.operationKey))
+        || (parsed.preparationNonce !== undefined && (typeof parsed.preparationNonce !== 'string'
+            || !parsed.preparationNonce || !parsed.operationKey))) {
       throw new OperationError(
         `Failed to approve pending ${pendingId} (HTTP ${res.status})`,
         'CAPSULE_MINT_FAILED',
         res.status,
       );
     }
-    return parsed.capsule;
+    return { capsule: parsed.capsule,
+      ...(parsed.operationKey ? { operationKey: parsed.operationKey } : {}),
+      ...(parsed.preparationNonce ? { preparationNonce: parsed.preparationNonce } : {}) };
+  }
+
+  private async approveGate(gate: OperationError, allowAlways: boolean): Promise<OperationApproval> {
+    const approval = await this.approveByPendingId(gate.pendingId!, allowAlways);
+    const expected = gate.errorDetails ?? {};
+    if ((expected.operationKey !== undefined && expected.operationKey !== approval.operationKey)
+        || (expected.preparationNonce !== undefined && expected.preparationNonce !== approval.preparationNonce)) {
+      throw new OperationError('Approval no longer refers to the displayed invocation', 'CAPSULE_MINT_FAILED');
+    }
+    return approval;
   }
 
   /**
@@ -495,7 +528,7 @@ export class OperationClient {
   async undo(
     operationId: string,
     executionId: string,
-    opts: { confirmationToken?: string; transport?: string } = {},
+    opts: { confirmationToken?: string; transport?: string; idempotencyKey?: string; preparationNonce?: string } = {},
   ): Promise<OperationInvocationSuccess> {
     if (!operationId) throw new OperationError('operationId required', 'BAD_REQUEST');
     if (!executionId) throw new OperationError('executionId required', 'BAD_REQUEST');
@@ -509,7 +542,8 @@ export class OperationClient {
       res = await this.fetchImpl(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ executionId, confirmationToken: opts.confirmationToken }),
+        body: JSON.stringify({ executionId, confirmationToken: opts.confirmationToken,
+          idempotencyKey: opts.idempotencyKey, preparationNonce: opts.preparationNonce }),
       });
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -534,6 +568,8 @@ export class OperationClient {
               riskTier: parsed.riskTier,
               undoSupported: parsed.undoSupported,
               argsSummary: parsed.argsSummary,
+              operationKey: parsed.operationKey,
+              preparationNonce: parsed.preparationNonce,
             }
           : parsed.errorDetails;
       throw new OperationError(
@@ -575,6 +611,8 @@ export class OperationClient {
     executionId: string,
     opts: {
       transport?: string;
+      idempotencyKey?: string;
+      preparationNonce?: string;
       consented?: boolean;
       requestConsent?: (prompt: {
         pendingId: string;
@@ -587,9 +625,9 @@ export class OperationClient {
       }) => Promise<{ approved: boolean; allowAlways: boolean }>;
     } = {},
   ): Promise<OperationInvocationSuccess> {
-    const { transport } = opts;
+    const { transport, idempotencyKey, preparationNonce } = opts;
     try {
-      return await this.undo(operationId, executionId, { ...(transport ? { transport } : {}) });
+      return await this.undo(operationId, executionId, { transport, idempotencyKey, preparationNonce });
     } catch (err: unknown) {
       if (
         err instanceof OperationError &&
@@ -615,9 +653,11 @@ export class OperationClient {
           allowAlways = decision.allowAlways;
         }
         if (approved) {
-          const capsule = await this.approveByPendingId(err.pendingId, allowAlways);
+          const approval = await this.approveGate(err, allowAlways);
           return await this.undo(operationId, executionId, {
-            confirmationToken: capsule,
+            confirmationToken: approval.capsule,
+            idempotencyKey: approval.operationKey ?? idempotencyKey,
+            preparationNonce: approval.preparationNonce ?? preparationNonce,
             ...(transport ? { transport } : {}),
           });
         }

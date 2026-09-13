@@ -27,7 +27,7 @@ node scripts/architecture/module-deps.mjs --check-canonical
 ### A1. Gradle project inventory
 
 **Included in `settings.gradle.kts`:**
-- `:modules:*` (34 JVM projects)
+- `:modules:*` (35 JVM projects)
 
 **Not Gradle projects (invoked by the build):**
 - `modules/ui-web` (Lit/Vite/TailwindCSS frontend)
@@ -46,32 +46,33 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:infra-core`
 - `:modules:prompt-support`
 - `:modules:ssot-tools`
-- `:modules:telemetry`
 - `:modules:test-support`
 
 **With dependencies**
 - `:modules:adapters-lucene` -> `:modules:configuration`, `:modules:core`, `:modules:indexing`
 - `:modules:ai-backend` -> `:modules:app-api`
 - `:modules:app-agent` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:configuration`, `:modules:core`, `:modules:telemetry`
-- `:modules:app-agent-api` -> `:modules:extension-substrate`
-- `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`
+- `:modules:app-agent-api` -> `:modules:core`, `:modules:extension-substrate`
+- `:modules:app-api` -> `:modules:api-contract-projection-java`, `:modules:app-agent-api`, `:modules:configuration`, `:modules:core`
 - `:modules:app-api-tck` -> `:modules:ai-backend`
 - `:modules:app-config` -> `:modules:configuration`
-- `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
-- `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
+- `:modules:app-engine` -> `:modules:app-api`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
+- `:modules:app-inference` -> `:modules:app-api`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:telemetry`
+- `:modules:app-launcher` -> `:modules:app-agent`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:indexer-worker`, `:modules:telemetry`, `:modules:ui`
 - `:modules:app-observability` -> `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-util`, `:modules:configuration`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:prompt-support`
 - `:modules:app-services` -> `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:infra-core`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`
 - `:modules:app-util` -> `:modules:configuration`
 - `:modules:benchmarks` -> `:modules:adapters-lucene`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:reranker`
 - `:modules:configuration` -> `:modules:core-contracts`
 - `:modules:gpu-bridge` -> `:modules:configuration`
-- `:modules:indexer-worker` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:core-contracts`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
+- `:modules:indexer-worker` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:indexing` -> `:modules:adapters-lucene`, `:modules:core`
 - `:modules:ipc-common` -> `:modules:app-api`
 - `:modules:ort-common` -> `:modules:configuration`
 - `:modules:reranker` -> `:modules:configuration`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:system-tests` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:ipc-common`
-- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`
+- `:modules:telemetry` -> `:modules:core`
+- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`, `:modules:worker-services`
 - `:modules:worker-core` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:worker-services` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:extension-substrate`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`
 
@@ -100,20 +101,33 @@ graph TD
   app-agent --> configuration
   app-agent --> core
   app-agent --> telemetry
+  app-agent-api --> core
   app-agent-api --> extension-substrate
   app-api --> api-contract-projection-java
   app-api --> app-agent-api
   app-api --> configuration
+  app-api --> core
   app-api-tck --> ai-backend
   app-config --> configuration
+  app-engine --> app-api
+  app-engine --> app-services
+  app-engine --> configuration
+  app-engine --> core
+  app-engine --> indexer-worker
+  app-engine --> indexing
+  app-engine --> telemetry
+  app-engine --> worker-core
+  app-engine --> worker-services
   app-inference --> app-api
   app-inference --> configuration
+  app-inference --> core
   app-inference --> core-contracts
   app-inference --> gpu-bridge
   app-inference --> telemetry
   app-launcher --> app-agent
   app-launcher --> app-api
   app-launcher --> app-config
+  app-launcher --> app-engine
   app-launcher --> app-services
   app-launcher --> app-util
   app-launcher --> configuration
@@ -156,6 +170,7 @@ graph TD
   gpu-bridge --> configuration
   indexer-worker --> adapters-lucene
   indexer-worker --> ai-backend
+  indexer-worker --> app-api
   indexer-worker --> configuration
   indexer-worker --> core-contracts
   indexer-worker --> indexing
@@ -175,6 +190,7 @@ graph TD
   system-tests --> adapters-lucene
   system-tests --> ai-backend
   system-tests --> ipc-common
+  telemetry --> core
   ui --> adapters-lucene
   ui --> ai-backend
   ui --> api-contract-projection-java
@@ -182,6 +198,7 @@ graph TD
   ui --> app-agent-api
   ui --> app-api
   ui --> app-config
+  ui --> app-engine
   ui --> app-inference
   ui --> app-observability
   ui --> app-services
@@ -194,6 +211,7 @@ graph TD
   ui --> ipc-common
   ui --> ort-common
   ui --> telemetry
+  ui --> worker-services
   worker-core --> adapters-lucene
   worker-core --> ai-backend
   worker-core --> configuration
@@ -220,10 +238,10 @@ graph TD
 
 | Module | Direct deps | Notes |
 |--------|-------------|-------|
-| `ui` | 19 | Head REST API + orchestration bridge |
+| `ui` | 21 | Head REST API + orchestration bridge |
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
+| `indexer-worker` | 12 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `worker-services` | 12 |  |
-| `indexer-worker` | 11 | Worker process runtime, includes AI bridge + Lucene + gRPC |
-| `app-launcher` | 9 | CLI/distribution wiring; pulls in most runtime modules |
-| `app-observability` | 8 |  |
+| `app-launcher` | 10 | CLI/distribution wiring; pulls in most runtime modules |
+| `app-engine` | 9 |  |
 <!-- GENERATED:MODULE_DEPS:END -->

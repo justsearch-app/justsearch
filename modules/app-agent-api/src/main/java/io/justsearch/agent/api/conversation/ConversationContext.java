@@ -23,6 +23,9 @@ import java.util.Map;
  */
 public interface ConversationContext {
 
+  /** Immutable request attribution, carried independently of the model-visible body. */
+  io.justsearch.core.context.EngineContext engineContext();
+
   /**
    * The current message list (OpenAI shape — role/content/tool_call_id maps). Includes the
    * system prompt as message[0] when the engine has assembled one; SPIs that need to know

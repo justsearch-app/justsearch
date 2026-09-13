@@ -78,6 +78,9 @@ import org.slf4j.LoggerFactory;
 @Tag("ai")
 @DisplayName("RAG Quality Evaluation")
 class RagQualityEvalTest {
+  private static final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
+  private static final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+
   private static final Logger log = LoggerFactory.getLogger(RagQualityEvalTest.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -165,44 +168,49 @@ class RagQualityEvalTest {
 
   @AfterAll
   static void cleanup() throws Exception {
-    log.info("Cleaning up RAG eval resources...");
+    try {
+      log.info("Cleaning up RAG eval resources...");
 
-    if (citationScorer != null) {
-      citationScorer.close();
-    }
-    if (similarityChecker != null) {
-      similarityChecker.close();
-    }
-    if (llmBackend != null) {
-      llmBackend.close();
-    }
-    if (runtime != null) {
-      runtime.close();
-    }
-    if (previousConfig == null) {
-      System.clearProperty("justsearch.config");
-    } else {
-      System.setProperty("justsearch.config", previousConfig);
-    }
-    if (previousUserDir == null) {
-      System.clearProperty("user.dir");
-    } else {
-      System.setProperty("user.dir", previousUserDir);
-    }
-    if (tempDir != null && Files.exists(tempDir)) {
-      try (var walk = Files.walk(tempDir)) {
-        walk.sorted(java.util.Comparator.reverseOrder())
-            .forEach(
-                p -> {
-                  try {
-                    Files.deleteIfExists(p);
-                  } catch (IOException e) {
-                    log.warn("Failed to delete: {}", p);
-                  }
-                });
+      if (citationScorer != null) {
+        citationScorer.close();
       }
+      if (similarityChecker != null) {
+        similarityChecker.close();
+      }
+      if (llmBackend != null) {
+        llmBackend.close();
+      }
+      if (runtime != null) {
+        runtime.close();
+      }
+      if (previousConfig == null) {
+        System.clearProperty("justsearch.config");
+      } else {
+        System.setProperty("justsearch.config", previousConfig);
+      }
+      if (previousUserDir == null) {
+        System.clearProperty("user.dir");
+      } else {
+        System.setProperty("user.dir", previousUserDir);
+      }
+      if (tempDir != null && Files.exists(tempDir)) {
+        try (var walk = Files.walk(tempDir)) {
+          walk.sorted(java.util.Comparator.reverseOrder())
+              .forEach(
+                  p -> {
+                    try {
+                      Files.deleteIfExists(p);
+                    } catch (IOException e) {
+                      log.warn("Failed to delete: {}", p);
+                    }
+                  });
+        }
+      }
+      log.info("Cleanup complete");
+
+    } finally {
+      try { luceneExecutors.close(); } finally { executors.close(); }
     }
-    log.info("Cleanup complete");
   }
 
   @Test
@@ -403,7 +411,7 @@ class RagQualityEvalTest {
     try {
       float[] queryVector = getQueryVector(queryText);
       LuceneRuntimeTypes.SearchResult hybridResult =
-          runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, topK, null);
+          runtime.hybridSearchOps().searchHybridFiltered(queryText, queryVector, topK, null, io.justsearch.core.context.EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
       List<String> hybridDocIds =
           hybridResult.hits().stream()
@@ -1001,7 +1009,7 @@ class RagQualityEvalTest {
     Integer dim = catalog.vectorDimension();
     vectorDimension = (dim != null) ? dim : 768;
 
-    runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(catalog).ephemeral().open();
+    runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(catalog).ephemeral().withExecutorRegistrations(luceneExecutors).open();
     log.info("Lucene runtime started (vector dim: {})", vectorDimension);
   }
 

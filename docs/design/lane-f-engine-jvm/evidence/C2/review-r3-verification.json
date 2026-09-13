@@ -1,0 +1,33 @@
+{
+  "revision": "90aea57bb + R3 ignored-transition correction",
+  "command": "gradlew.bat :modules:app-observability:test --tests *OperationAttemptRunnerTest --tests *OperationChildAcceptanceTest :modules:app-services:test --tests *OperationExecutorImplTest :modules:ui:compileIntegrationTestJava :modules:app-observability:pmdMain :modules:app-observability:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 106,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 8
+  },
+  "tasks": [
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 83,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    }
+  ]
+}

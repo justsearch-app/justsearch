@@ -17,11 +17,14 @@ import io.justsearch.agent.api.conversation.ConversationStore;
 import io.justsearch.agent.api.interaction.InteractionEvent;
 import io.justsearch.agent.api.interaction.InteractionEventKind;
 import io.justsearch.agent.api.interaction.ThreadProjection;
+import io.justsearch.app.engine.DefaultEngineExecutorRegistry;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +39,21 @@ import tools.jackson.databind.json.JsonMapper;
 final class InteractionThreadControllerTest {
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+  private final DefaultEngineExecutorRegistry executors = new DefaultEngineExecutorRegistry();
+  private final List<InteractionThreadController> controllers = new ArrayList<>();
+
+  @AfterEach
+  void closeFixtures() {
+    controllers.forEach(InteractionThreadController::shutdown);
+    executors.close();
+  }
+
+  private InteractionThreadController newController(
+      ConversationStore conversationStore, AgentService agentService) {
+    var controller = new InteractionThreadController(mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), conversationStore, agentService, executors);
+    controllers.add(controller);
+    return controller;
+  }
 
   private JsonNode invokeGet(InteractionThreadController controller, String id) {
     Context ctx = mock(Context.class);
@@ -85,7 +103,7 @@ final class InteractionThreadControllerTest {
                     "",
                     Map.of("callId", "c1", "toolName", "core_search_index", "status", "completed")))));
 
-    JsonNode body = invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-1");
+    JsonNode body = invokeGet(newController(conversationStore, agentService), "conv-1");
 
     assertEquals("conv-1", body.get("conversationId").asString());
     JsonNode events = body.get("events");
@@ -126,7 +144,7 @@ final class InteractionThreadControllerTest {
                     Map.of("callId", "c1", "toolName", "core_search_index", "status", "completed")))));
 
     JsonNode body =
-        invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-stamped");
+        invokeGet(newController(conversationStore, agentService), "conv-stamped");
     JsonNode events = body.get("events");
 
     assertEquals(3, events.size());
@@ -164,7 +182,7 @@ final class InteractionThreadControllerTest {
         .thenReturn(ThreadProjection.of(List.of()));
 
     JsonNode storePlane =
-        invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-stamped")
+        invokeGet(newController(conversationStore, agentService), "conv-stamped")
             .get("events")
             .get(0)
             .get("attributes");
@@ -215,7 +233,7 @@ final class InteractionThreadControllerTest {
                 Map.of("run-1", List.of(Map.of("text", "the results are thin", "durationMs", 1000)))));
 
     JsonNode events =
-        invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-chrono")
+        invokeGet(newController(conversationStore, agentService), "conv-chrono")
             .get("events");
 
     assertEquals(3, events.size());
@@ -258,7 +276,7 @@ final class InteractionThreadControllerTest {
                 Map.of("run-9", List.of(Map.of("text", "homeless", "durationMs", 1)))));
 
     JsonNode events =
-        invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-orphan")
+        invokeGet(newController(conversationStore, agentService), "conv-orphan")
             .get("events");
 
     for (JsonNode e : events) {
@@ -324,7 +342,7 @@ final class InteractionThreadControllerTest {
     when(agentService.threadProjection(eq("nope"), any()))
         .thenReturn(ThreadProjection.of(List.of()));
 
-    JsonNode body = invokeGet(new InteractionThreadController(conversationStore, agentService), "nope");
+    JsonNode body = invokeGet(newController(conversationStore, agentService), "nope");
     assertEquals(0, body.get("events").size());
   }
 
@@ -353,7 +371,7 @@ final class InteractionThreadControllerTest {
         .thenReturn(ThreadProjection.of(List.of()));
 
     JsonNode body =
-        invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-e");
+        invokeGet(newController(conversationStore, agentService), "conv-e");
     JsonNode ev = body.get("events").get(0);
     assertEquals("ASSISTANT_MESSAGE", ev.get("kind").asString());
     JsonNode cites = ev.get("attributes").get("citations");
@@ -395,7 +413,7 @@ final class InteractionThreadControllerTest {
         .thenReturn(ThreadProjection.of(List.of()));
 
     JsonNode body =
-        invokeGet(new InteractionThreadController(conversationStore, agentService), "conv-r");
+        invokeGet(newController(conversationStore, agentService), "conv-r");
     JsonNode blocks = body.get("events").get(0).get("attributes").get("reasoning");
     assertEquals(1, blocks.size());
     assertEquals("weighed the options", blocks.get(0).get("text").asString());
@@ -479,7 +497,7 @@ final class InteractionThreadControllerTest {
         .when(ctx)
         .result(any(byte[].class));
 
-    new InteractionThreadController(conversationStore, agentService).handleGet(ctx);
+    newController(conversationStore, agentService).handleGet(ctx);
 
     assertEquals(200, status.get(), "a locked conversation store must not 500 the whole unified thread");
     JsonNode body;
@@ -529,7 +547,7 @@ final class InteractionThreadControllerTest {
     AtomicInteger status = new AtomicInteger(-1);
     JsonNode body =
         invokePostEvent(
-            new InteractionThreadController(conversationStore, agentService),
+            newController(conversationStore, agentService),
             "conv-1",
             "{\"kind\":\"SEARCH\",\"query\":\"invoices\",\"mode\":\"hybrid\","
                 + "\"matchCount\":42,\"resultCount\":10,\"docIds\":[\"a.pdf\",\"b.pdf\"],"
@@ -563,7 +581,7 @@ final class InteractionThreadControllerTest {
 
     AtomicInteger status = new AtomicInteger(-1);
     invokePostEvent(
-        new InteractionThreadController(conversationStore, agentService),
+        newController(conversationStore, agentService),
         "conv-1",
         "{\"kind\":\"BOGUS\"}",
         status);
@@ -579,7 +597,7 @@ final class InteractionThreadControllerTest {
 
     AtomicInteger status = new AtomicInteger(-1);
     invokePostEvent(
-        new InteractionThreadController(conversationStore, agentService),
+        newController(conversationStore, agentService),
         "conv-1",
         "{\"kind\":\"SEARCH\",\"query\":\"invoices\"}",
         status);
@@ -596,7 +614,7 @@ final class InteractionThreadControllerTest {
 
     AtomicInteger status = new AtomicInteger(-1);
     invokePostEvent(
-        new InteractionThreadController(conversationStore, agentService),
+        newController(conversationStore, agentService),
         "conv-1",
         "{\"kind\":\"SEARCH\",\"query\":\"invoices\",\"mode\":\"hybrid\","
             + "\"matchCount\":42,\"resultCount\":10,\"docIds\":[]}",

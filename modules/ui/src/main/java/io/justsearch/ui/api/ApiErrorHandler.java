@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.inference.LlmServerException;
@@ -79,7 +80,39 @@ public final class ApiErrorHandler {
      */
     public static Map<String, Object> toResponse(ApiErrorCode code, Exception e) {
         String message = sanitizeMessage(e != null ? e.getMessage() : null);
-        return buildTypedResponse(message, code);
+        var response = buildTypedResponse(message, code);
+        if (executorRefusal(e) != null) response.put("retrySafe", false);
+        return response;
+    }
+
+    /** Unwrap asynchronous transport wrappers without treating arbitrary nested failures as refusal. */
+    public static io.justsearch.core.execution.EngineExecutorRejectedException executorRefusal(Throwable failure) {
+        var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while ((failure instanceof java.util.concurrent.CompletionException
+                || failure instanceof java.util.concurrent.ExecutionException)
+                && failure.getCause() != null && seen.add(failure)) {
+            failure = failure.getCause();
+        }
+        return failure instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused
+            ? refused : null;
+    }
+
+    /** Common HTTP status/header projection, also used by the JSON-RPC envelope writer. */
+    public static void executorRefusalStatus(io.javalin.http.Context ctx,
+            io.justsearch.core.execution.EngineExecutorRejectedException failure) {
+        ctx.status(httpStatusFor(resolve(failure)));
+        if (failure.reason() != io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+            ctx.header("Retry-After", Integer.toString(failure.retryAfterSeconds()));
+        }
+    }
+
+    public static boolean writeExecutorRefusal(io.javalin.http.Context ctx, Exception failure,
+            Telemetry telemetry) {
+        var refused = executorRefusal(failure);
+        if (refused == null) return false;
+        executorRefusalStatus(ctx, refused);
+        ctx.json(toResponse(resolve(refused), refused, telemetry, routeOf(ctx)));
+        return true;
     }
 
     /**
@@ -143,8 +176,7 @@ public final class ApiErrorHandler {
         }
         ApiErrorCode code = resolve(e);
         recordError(telemetry, code, route);
-        String message = sanitizeMessage(e.getMessage());
-        return buildTypedResponse(message, code);
+        return toResponse(code, e);
     }
 
     /**
@@ -224,6 +256,16 @@ public final class ApiErrorHandler {
             return ApiErrorCode.INTERNAL_ERROR;
         }
 
+        if ((e instanceof java.util.concurrent.CompletionException
+                || e instanceof java.util.concurrent.ExecutionException)
+                && e.getCause() instanceof Exception cause) {
+            return resolve(cause);
+        }
+        if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused) {
+            return refused.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED
+                ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+        }
+
         // IndexRuntimeIOException: surface the specific reason
         if (e instanceof IndexRuntimeIOException ire) {
             return switch (ire.reason()) {
@@ -236,13 +278,14 @@ public final class ApiErrorHandler {
             };
         }
 
-        // gRPC StatusRuntimeException: map status codes
-        if (e instanceof io.grpc.StatusRuntimeException sre) {
-            io.grpc.Status.Code code = sre.getStatus().getCode();
-            return switch (code) {
+        // Port failure: map the client status. Lane F review B1 — this replaced the
+        // io.grpc.StatusRuntimeException branch, which became unreachable at item A6 (the client
+        // stopped being a gRPC stub) and silently sent every worker error to INTERNAL_ERROR/500.
+        // The mapping is carried across unchanged, minus NOT_FOUND, which no worker service emits.
+        if (e instanceof KnowledgeClientException kce) {
+            return switch (kce.status()) {
                 case DEADLINE_EXCEEDED -> ApiErrorCode.TIMEOUT;
                 case UNAVAILABLE -> ApiErrorCode.SERVICE_UNAVAILABLE;
-                case NOT_FOUND -> ApiErrorCode.NOT_FOUND;
                 case INVALID_ARGUMENT -> ApiErrorCode.INVALID_REQUEST;
                 case RESOURCE_EXHAUSTED -> ApiErrorCode.SERVICE_UNAVAILABLE;
                 default -> ApiErrorCode.INTERNAL_ERROR;
@@ -319,8 +362,7 @@ public final class ApiErrorHandler {
             return buildTypedResponse("An error occurred", ApiErrorCode.INTERNAL_ERROR);
         }
         ApiErrorCode code = resolve(e);
-        String message = sanitizeMessage(e.getMessage());
-        return buildTypedResponse(message, code);
+        return toResponse(code, e);
     }
 
     /**
@@ -333,7 +375,9 @@ public final class ApiErrorHandler {
     public static Map<String, Object> toResponse(Exception e, String customMessage) {
         ApiErrorCode code = resolve(e);
         String message = sanitizeMessage(customMessage);
-        return buildTypedResponse(message, code);
+        var response = buildTypedResponse(message, code);
+        if (executorRefusal(e) != null) response.put("retrySafe", false);
+        return response;
     }
 
     // ── Message sanitization ────────────────────────────────────────────────
@@ -374,9 +418,20 @@ public final class ApiErrorHandler {
      * @param code the gRPC status code (nullable — returns 500 if null)
      * @return the corresponding HTTP status code
      */
-    public static int mapGrpcToHttp(io.grpc.Status.Code code) {
-        if (code == null) return 500;
-        return switch (code) {
+    /**
+     * Maps a port failure onto its HTTP status.
+     *
+     * <p>Lane F review B1: this replaces {@code mapGrpcToHttp(io.grpc.Status.Code)}, which the
+     * controllers called from catch blocks that stopped being reachable at item A6. The mapping is
+     * <b>identical</b>, deliberately — the point of the fix is that the same failures get the same
+     * answers again, not that the answers improve. So {@code ABORTED}, {@code UNIMPLEMENTED} and
+     * {@code CANCELLED} fall to 500 exactly as they fell through the old {@code default} arm; if any
+     * of them deserves a better status, that is a contract change with its own reasoning, not a
+     * side effect of deleting a transport.
+     */
+    public static int mapClientStatusToHttp(KnowledgeClientException.Status status) {
+        if (status == null) return 500;
+        return switch (status) {
             case INVALID_ARGUMENT -> 400;
             case FAILED_PRECONDITION -> 409;
             case RESOURCE_EXHAUSTED -> 429;
@@ -401,6 +456,7 @@ public final class ApiErrorHandler {
         if (code == null) return 500;
         return switch (code) {
             case TIMEOUT -> 504;
+            case ADMISSION_CONTEXT_LIMIT, ADMISSION_ENGINE_LIMIT -> 429;
             case SERVICE_UNAVAILABLE, INDEX_UNAVAILABLE, AI_STARTING,
                  LLM_OVERLOADED, MANIFEST_UNAVAILABLE, SETTINGS_UNAVAILABLE -> 503;
             case NOT_FOUND -> 404;

@@ -90,10 +90,18 @@ public final class RunStreamWriter {
 
   private final SseClient client;
   private final RunChannel run;
+  private final Runnable onClientClose;
+  private final java.util.concurrent.CompletableFuture<Void> connectionClosed = new java.util.concurrent.CompletableFuture<>();
+  private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+  private final java.util.concurrent.atomic.AtomicReference<SseStreamChannel.Subscription> subscription =
+      new java.util.concurrent.atomic.AtomicReference<>();
+  private final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> heartbeat =
+      new java.util.concurrent.atomic.AtomicReference<>();
 
-  private RunStreamWriter(SseClient client, RunChannel run) {
+  private RunStreamWriter(SseClient client, RunChannel run, Runnable onClientClose) {
     this.client = Objects.requireNonNull(client, "client");
     this.run = Objects.requireNonNull(run, "run");
+    this.onClientClose = Objects.requireNonNull(onClientClose, "onClientClose");
   }
 
   /**
@@ -107,37 +115,86 @@ public final class RunStreamWriter {
       RunChannel run,
       ScheduledExecutorService heartbeatScheduler,
       long heartbeatSeconds) {
+    return attach(client, run, heartbeatScheduler, heartbeatSeconds, () -> {});
+  }
+
+  /** The creating run supplies its waiting-client transition; observers supply cleanup only. */
+  public static Optional<RunStreamWriter> attach(
+      SseClient client,
+      RunChannel run,
+      ScheduledExecutorService heartbeatScheduler,
+      long heartbeatSeconds,
+      Runnable onClientClose) {
     Objects.requireNonNull(run, "run");
     Objects.requireNonNull(heartbeatScheduler, "heartbeatScheduler");
     SseEnvelopeWriter.forceSseHeaders(client);
-    RunStreamWriter writer = new RunStreamWriter(client, run);
-
+    RunStreamWriter writer = new RunStreamWriter(client, run, onClientClose);
+    try {
     OptionalCursor cursor = writer.readCursor();
     if (cursor.rejected()) {
+      // No operation has started. A malformed cursor's error is not a lost waiting client.
       writer.sendError(cursor.rejection(), ApiErrorCode.INVALID_REQUEST);
       return Optional.empty();
     }
 
+    // Javalin 6.7 keepAlive creates its future after registering it and close is one-shot.
+    // Own the future before installing the callback, so even a close before future registration
+    // supplies an already-completed future instead of resurrecting a dead connection.
+    client.onClose(writer::clientClosed);
+    if (client.terminated()) {
+      writer.clientClosed();
+      return Optional.of(writer);
+    }
+    client.ctx().future(() -> writer.connectionClosed);
+
     writer.sendRunStarted();
+    if (writer.closed.get()) return Optional.of(writer);
     run.snapshot().ifPresent(writer::sendSnapshot);
+    if (writer.closed.get()) return Optional.of(writer);
 
-    SseStreamChannel.Subscription subscription = writer.subscribeFrom(cursor.sinceSeq());
+    writer.subscription.set(writer.subscribeFrom(cursor.sinceSeq()));
+    if (writer.closed.get()) {
+      writer.releaseResources();
+      return Optional.of(writer);
+    }
 
-    var heartbeat =
+    writer.heartbeat.set(
         heartbeatScheduler.scheduleAtFixedRate(
-            writer::sendHeartbeat, heartbeatSeconds, heartbeatSeconds, TimeUnit.SECONDS);
+            writer::sendHeartbeat, heartbeatSeconds, heartbeatSeconds, TimeUnit.SECONDS));
 
-    client.onClose(
-        () -> {
-          subscription.unsubscribe();
-          heartbeat.cancel(false);
-        });
+    if (writer.closed.get()) {
+      writer.releaseResources();
+      return Optional.of(writer);
+    }
     // The run being over is not the client's decision to notice: without this the connection would
     // hang open on a retired run until the socket happened to fail a write.
     run.onRetire(client::close);
 
-    client.keepAlive();
     return Optional.of(writer);
+    } catch (RuntimeException | Error failure) {
+      try { writer.clientClosed(); }
+      finally { client.close(); }
+      throw failure;
+    }
+  }
+
+  private void clientClosed() {
+    if (!closed.compareAndSet(false, true)) return;
+    try { onClientClose.run(); }
+    finally {
+      try { releaseResources(); }
+      finally { connectionClosed.complete(null); }
+    }
+  }
+
+  private void releaseResources() {
+    var activeSubscription = subscription.getAndSet(null);
+    try {
+      if (activeSubscription != null) activeSubscription.unsubscribe();
+    } finally {
+      var activeHeartbeat = heartbeat.getAndSet(null);
+      if (activeHeartbeat != null) activeHeartbeat.cancel(false);
+    }
   }
 
   /**
@@ -227,6 +284,7 @@ public final class RunStreamWriter {
   }
 
   private void sendEnvelope(SseEnvelope envelope) {
+    if (closed.get()) return;
     RunFrame frame =
         RunFrame.from(envelope)
             .orElseThrow(

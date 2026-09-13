@@ -1,0 +1,69 @@
+{
+  "revision": "227bcc001 plus final prepared ingress diff",
+  "command": "gradlew.bat :modules:ui:test --tests '*OperationsControllerTest' --tests '*AuthorizationControllerTest' --tests '*McpOperationKeyTest' --tests '*PreparedDispatchAdmissionTest' :modules:app-api:test :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-api:pmdMain :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 284,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 47
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 80,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "reuse": "app-api204 unchanged successful987; UI80 execute988",
+  "rawEvidence": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-preparation-ingress{987,988} and -negative{985,986}: .txt, -counts.json, -xml/",
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/registry/OperationInvocationRequest.java",
+      "sha256": "b3d41c5a5da8e9494903ebb4a64de30d02c948c819e32a5de1f773a27f543cb2"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/registry/OperationInvocationResponse.java",
+      "sha256": "4eb1f1733f436a983270a4006fa05991120d90a72b62a68987d3dd512fd1abe6"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/AuthorizationController.java",
+      "sha256": "2c9f9da02a3dc8f2def83900d2b3832c1fc2e14e4d9d13ded1c4342b0fa33a15"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationsController.java",
+      "sha256": "eb275c5d4b0e84c2ab41e059c4101e27e969442ce37668319bf98e6cd72558a5"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "sha256": "28d1726c85fd7bde5825ec029f062d2e05a78b43376f8df8f403ff27209e43df"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/AuthorizationControllerTest.java",
+      "sha256": "46bc52bed1b6cffe98d1343f4e30604dc85daa2d28d5a0725b46d8da0765e9a1"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/OperationsControllerTest.java",
+      "sha256": "0eb83ff7123c51ca8ce7e0996a4f458e1fb47ad63da280557a72e46a6bff0160"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java",
+      "sha256": "5d532ef3d341d438c8d1063fd34642a47f6a967b374826d3749ee9d1a7c6ff89"
+    }
+  ]
+}

@@ -1,7 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+
+import static io.justsearch.agent.api.registry.OperationExecution.finished;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.BrainInstallService;
 import java.util.Map;
@@ -31,7 +38,13 @@ public final class StartAiInstallHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return executeRecorded(argumentsJson, null, engineContext, null).response();
+  }
+
+  @Override
+  public OperationExecution executeRecorded(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext, OperationRecordHandle record) {
     boolean acceptTerms = BrainInstallHandlerSupport.parseAcceptTerms(argumentsJson);
 
     BrainInstallService svc;
@@ -39,26 +52,22 @@ public final class StartAiInstallHandler implements OperationHandler {
       svc = supplier.get();
     } catch (RuntimeException e) {
       log.warn("StartAiInstallHandler: supplier threw", e);
-      return OperationResult.failure("Brain install service unavailable: " + e.getMessage());
+      return finished(OperationResult.failure("Brain install service unavailable: " + e.getMessage()));
     }
     if (svc == null) {
-      return OperationResult.failure("Brain install service unavailable");
+      return finished(OperationResult.failure("Brain install service unavailable"));
     }
 
     try {
-      Map<String, Object> status = svc.startInstall(acceptTerms);
-      return OperationResult.success("AI install started", status);
+      return BrainInstallHandlerSupport.execution("AI install started", svc.startInstall(acceptTerms));
     } catch (Exception e) {
-      // NOTE: AiInstallException (modules/ui) carries a finer-grained
-      // ApiErrorCode + httpStatus; lifted to app-api in Phase D. Until then
-      // generic INSTALL_START_FAILED is the substrate-side wire code.
       log.error("StartAiInstallHandler: startInstall threw", e);
-      return OperationResult.failure(
+      return finished(OperationResult.failure(
           "AI install failed: "
               + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()),
           "INSTALL_START_FAILED",
           Map.of("acceptTerms", acceptTerms),
-          true);
+          true));
     }
   }
 }

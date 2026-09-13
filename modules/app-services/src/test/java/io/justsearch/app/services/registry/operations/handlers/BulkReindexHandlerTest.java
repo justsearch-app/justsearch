@@ -28,20 +28,20 @@ final class BulkReindexHandlerTest {
    */
   private static class FakeIndexingService implements IndexingService {
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return List.of();
     }
 
     @Override
-    public void addWatchedPath(Path path) {}
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
   }
 
   @Test
@@ -51,15 +51,16 @@ final class BulkReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public boolean startMigration(String reason) {
-                    return true;
+                  public MigrationOutcome startMigration(String reason, io.justsearch.core.context.EngineContext engineContext) {
+                    return new MigrationOutcome(true, true);
                   }
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{\"corpusIds\":[\"a\",\"b\"]}");
+    OperationResult result = handler.execute("{\"corpusIds\":[\"a\",\"b\"]}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertTrue(result.message().contains("started"));
+    assertEquals(true, result.structuredData().get("restartRequired"));
   }
 
   @Test
@@ -69,13 +70,13 @@ final class BulkReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public boolean startMigration(String reason) {
-                    return false;
+                  public MigrationOutcome startMigration(String reason, io.justsearch.core.context.EngineContext engineContext) {
+                    return new MigrationOutcome(false, false);
                   }
                 },
             LEASE);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("could not be started"));
   }
@@ -83,7 +84,7 @@ final class BulkReindexHandlerTest {
   @Test
   void executeReturnsFailureWhenIndexingServiceUnavailable() {
     BulkReindexHandler handler = new BulkReindexHandler(() -> null, LEASE);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Indexing service unavailable"));
   }
@@ -92,7 +93,7 @@ final class BulkReindexHandlerTest {
   void executeReturnsFailureWhenStartMigrationThrowsUnsupported() {
     BulkReindexHandler handler =
         new BulkReindexHandler(IndexingService::unavailable, LEASE);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Bulk reindex failed"));
   }
@@ -104,12 +105,12 @@ final class BulkReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public boolean startMigration(String reason) {
-                    return true;
+                  public MigrationOutcome startMigration(String reason, io.justsearch.core.context.EngineContext engineContext) {
+                    return new MigrationOutcome(true, true);
                   }
                 },
             LEASE);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertEquals(java.util.Optional.empty(), result.executionId());
   }
 }

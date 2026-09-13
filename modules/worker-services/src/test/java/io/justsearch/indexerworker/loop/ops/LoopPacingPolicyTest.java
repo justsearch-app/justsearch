@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.loop.ops;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -78,6 +79,35 @@ final class LoopPacingPolicyTest {
     assertFalse(LoopPacingPolicy.shouldInterruptBackfill(true, false, false, CPU));
     // not running ⇒ interrupt.
     assertTrue(LoopPacingPolicy.shouldInterruptBackfill(false, false, false, CPU));
+  }
+
+  @Test
+  @DisplayName("flipping the in-process gauge changes shouldRunBackfill (lane F item A5)")
+  void gaugeDrivesTheBackfillGate() {
+    // The gate's two inputs are exactly the gauge's two signals. This is the A5 acceptance:
+    // whatever writes main_gpu_active / energy_reduced — the MMF byte today, the gauge in the
+    // merged Engine — the pacing decision must follow it with no change in meaning.
+    GpuSchedulingGauge gauge = new GpuSchedulingGauge();
+
+    assertTrue(shouldRunBackfill(gauge, GPU), "idle gauge ⇒ backfill runs");
+
+    gauge.setMainGpuActive(true);
+    assertFalse(shouldRunBackfill(gauge, GPU), "GPU claimed + GPU embeddings ⇒ VRAM conflict");
+    assertTrue(shouldRunBackfill(gauge, CPU), "GPU claimed + CPU embeddings ⇒ no conflict");
+
+    gauge.setMainGpuActive(false);
+    gauge.setEnergyReduced(true);
+    assertFalse(shouldRunBackfill(gauge, CPU), "energy reduced defers regardless of GPU/CPU");
+    assertFalse(shouldRunBackfill(gauge, GPU));
+
+    gauge.setEnergyReduced(false);
+    assertTrue(shouldRunBackfill(gauge, CPU), "both reasons cleared ⇒ backfill resumes");
+    assertTrue(shouldRunBackfill(gauge, GPU));
+  }
+
+  private static boolean shouldRunBackfill(GpuSchedulingGauge gauge, EmbeddingProvider provider) {
+    return LoopPacingPolicy.shouldRunBackfill(
+        gauge.isMainGpuActive(), gauge.isEnergyReduced(), provider);
   }
 
   @Test

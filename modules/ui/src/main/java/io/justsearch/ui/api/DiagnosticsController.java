@@ -47,7 +47,7 @@ public final class DiagnosticsController {
 
   public void handleExport(Context ctx) {
     try {
-      Path outZip = diagnosticsService.exportDiagnostics(extractFeTelemetry(ctx));
+      Path outZip = diagnosticsService.exportDiagnostics(extractFeTelemetry(ctx), RequestEngineContext.get(ctx));
       ctx.json(Map.of("success", true, "path", outZip.toAbsolutePath().toString()));
     } catch (Exception e) {
       log.error("Diagnostics export failed", e);

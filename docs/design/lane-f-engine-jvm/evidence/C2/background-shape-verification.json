@@ -1,0 +1,408 @@
+{
+  "revision": "b8b458567 + final background shape propagation",
+  "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowBackgroundDelegationTest' --tests '*WorkflowPreparedContinuationTest' --tests '*WorkflowShapeRunnerTest' --tests '*WorkflowToolRunnerImplTest' --tests '*ConversationEngineTest' --tests '*ToolIteratingShapeRunnerTest' :modules:app-agent:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 747,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 61
+  },
+  "tasks": [
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 685,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 51
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 62,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 10
+    }
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-background-shape-negative1028",
+    "c2-3-background-shape1029"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowBackgroundDelegationTest.java",
+      "sha256": "ca58bca529f3355d90a071de9ec3af16ab313ac18191682c29e132898d2e1daf"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java",
+      "sha256": "5a50e294f0710672c41fb6a536befff7b78e5cdf1866cbf35941b3638a824976"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/ToolIteratingShapeRunner.java",
+      "sha256": "4bccd1cceb6928d0c16293cc4064a9ea266f625dbd2c3800154756450217ca24"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowShapeRunner.java",
+      "sha256": "87fe128719bffda192b4f70faed5873393d27ae6bd6f2178b7bb60bf179ba43d"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-3-background-shape-negative1028-counts.json",
+      "bytes": 492,
+      "sha256": "ff0a9863f3719788e3b4bfa2598f803820b712bec28ccdb0e0b5bd8391ca9ba8"
+    },
+    {
+      "path": "tmp/c2-3-background-shape-negative1028-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowBackgroundDelegationTest.xml",
+      "bytes": 6925,
+      "sha256": "86ab2552dde0ffed9f54f639db7d54b3aa092ed3e784c01114322f454ec51cff"
+    },
+    {
+      "path": "tmp/c2-3-background-shape-negative1028-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "3d62984e7b74177af5159d3fec5faa6b7c0f7a3c0603f10cfd43543eaf0d1380"
+    },
+    {
+      "path": "tmp/c2-3-background-shape-negative1028-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "c74edd5ff565268bd7383764dd405abf18a05646adc93a9478d38777d41ab428"
+    },
+    {
+      "path": "tmp/c2-3-background-shape-negative1028-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "5cfcb17fada25cc216d7924b831d05c1ae639b3fbbb79e5b5b4f4dd374337eb4"
+    },
+    {
+      "path": "tmp/c2-3-background-shape-negative1028-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "05ff97e8a2adbaa321d09b55c5ef1ecb991cd9831864a4714e3d0c32c564914c"
+    },
+    {
+      "path": "tmp/c2-3-background-shape-negative1028.txt",
+      "bytes": 38356,
+      "sha256": "a7def0f3346691957f6bb4ba5d450b04ad86187ff75e9fbde36e9014121b022d"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-counts.json",
+      "bytes": 677,
+      "sha256": "c6c4b565a54984bc79d007c9d02fc354c5663a81ce788f86cab4e8e06ca9bb1f"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentApprovalPreviewTest.xml",
+      "bytes": 842,
+      "sha256": "8518b3d0136a26c3463fe1f09c298625c3b24aac3222480d0034a44c88a8734a"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentBudgetPolicyTest.xml",
+      "bytes": 2191,
+      "sha256": "0d1c614ba24e5baa7404ccd48156bacd570867ff0bcd446f801a3a8e7b2fabd5"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationResolverNumberingTest.xml",
+      "bytes": 701,
+      "sha256": "118905866bcf78e4116697261fda6ea5cd2138339ca6bf5a171297c28f3ba634"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationResolverThresholdTest.xml",
+      "bytes": 1813,
+      "sha256": "9898ea53cbd1565a0336619dcf4f9ffc4bff83417a933e238becac5650b1ab46"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationScorerPropagationTest.xml",
+      "bytes": 1407,
+      "sha256": "070cef4f6adc312cde0eee3792f762fb4a3c1205e61ac7dd4a2c9d0ff204d9b5"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentContextBudgetsTest.xml",
+      "bytes": 1893,
+      "sha256": "fe9216b316a360ca64c2c5e35e91c963de003978cb8445ee0b8ef2e3b116683f"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentGroundingInclusionTest.xml",
+      "bytes": 3287,
+      "sha256": "97e2d4dd11007342a81addd566238bade045bf6cad1b2891f2a83752e0601431"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentGroundingSeamAuditTest.xml",
+      "bytes": 221769,
+      "sha256": "1cfffff5007349c215eab3d60a70f96af94d6f0973148527f4124eb8e89aceca"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentInteractionMapperTest.xml",
+      "bytes": 6721,
+      "sha256": "b21fcfddda3e603a4df6946d15fc7b8e5776204312051647c115f16bc307756d"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentLifecycleConsistencyTest.xml",
+      "bytes": 526,
+      "sha256": "eab9f41b98a03b0b389ebb321f9186f087eaadb8c0e5dd8cfee4f8cbb9eba753"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentLifecycleProjectionTest.xml",
+      "bytes": 1281,
+      "sha256": "924697585a6c922b6030c25e259c45d6370c51760c41cecf7c29528d8dbf6fb4"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentLlmCallerTest.xml",
+      "bytes": 13744,
+      "sha256": "79a4f32a7c20679ba9ff33dc6b3c0696ccad8bd81c78ef8145ac6278e4d15234"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceAuditTest.xml",
+      "bytes": 220925,
+      "sha256": "0124cd9344733efe1c8b24ca05e98a8f449b1fed6816bae0436b72ba7b488e0f"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceTest.xml",
+      "bytes": 214549,
+      "sha256": "d3abd732cff5b98bfff3c26678bf5d10d2a38ec4c5ab1a96ca62089ad0c9ce4b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentMetricCatalogSmokeTest.xml",
+      "bytes": 595,
+      "sha256": "3fae2d3f33d7dacf0687df2100b4b045b6b148ef28af33455693985f2ac4bcff"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentMetricWireFormatRegressionTest.xml",
+      "bytes": 1813,
+      "sha256": "4d636e4d47ceb87310a0233e5d7848ff57717387babc245ca1d6f76d03bd7565"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentPreparedContinuationTest.xml",
+      "bytes": 11695,
+      "sha256": "ff2adc57420a7161b7a4d3abe22b3d366f58b2862bff3f3dc9645e1f76f99c80"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRetryPolicyTest.xml",
+      "bytes": 853,
+      "sha256": "132d521359f53196d0d5e542b750000de4ab2d56fa6ebdb8ef6bbab59ae3e8d1"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunQueryServiceForkTest.xml",
+      "bytes": 805,
+      "sha256": "4def34a6e62ff5dc59749696a801a20892c6202f89a28cb6893d3ce2542b66d3"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunQueryServiceThreadEventsTest.xml",
+      "bytes": 1298,
+      "sha256": "ad200e71c9b8df134be1c3ba7e6f110cf0607332d49bfd69e63b119e93d73aa4"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunReconcilerTest.xml",
+      "bytes": 12861,
+      "sha256": "d1ecf340f0ac63ac0b26d2a3becdb15b62790f1163f5c822c3bff272bb00a0fc"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreConversationsTest.xml",
+      "bytes": 1335,
+      "sha256": "f89cc86f371e2958fb521d35d8055a2e41fc6723c6f3a0e58430bbd7d4ad0d07"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreSchemaUpcasterTest.xml",
+      "bytes": 899,
+      "sha256": "e8cb83df67c8c3ebb0992c320d32e3ad5254c15672144ecfc5bf81e4af063541"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreTest.xml",
+      "bytes": 2890,
+      "sha256": "26510e9bcfd75b8cbe89df7486e91d09916eb3fc26c0834a62c1a0dbdbcc395d"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionBudgetTest.xml",
+      "bytes": 3313,
+      "sha256": "676ab125e9d0e496b3b4b28e97cfd3cdff7138ad7ed3db040de33bf4bab440d4"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionGroundingTest.xml",
+      "bytes": 3909,
+      "sha256": "499a6f3c3fd45cbff7bbccd73c86d8ac10900854a559dd9737aa257a9b828a6e"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionVirtualToolTest.xml",
+      "bytes": 1204,
+      "sha256": "74ff868e131b691d90a53ab54148c2df5b18e3ad3883b5848e59b92676caca6f"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentTelemetryTest.xml",
+      "bytes": 1209,
+      "sha256": "042886e17cf99c5b67a01d8fc09ea8f65b1e1f8e7dff6aaf9cb549015e6a9895"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentTimeoutsTest.xml",
+      "bytes": 3252,
+      "sha256": "ec3dbd7d1201954f5edef3b6ae328b0a4af46fd4a37a288371579b37f4b6830c"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolAuthorityBoundaryTest.xml",
+      "bytes": 3440,
+      "sha256": "105d778bd2dcf05f3f8f3cb1fdbaac001736d00d63a426b51e29c74795a41b8b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolDispatcherRetryTest.xml",
+      "bytes": 75107,
+      "sha256": "5c396933080b77da85cbb794ff4f887978e8d2de346f1b2f9331d79013b193cb"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolStructuredDataKeysTest.xml",
+      "bytes": 1378,
+      "sha256": "c118be5aabdc86060fb6dc9221ebfbb05f7235b947dd2225ba754174af91f2f3"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.BackgroundRunServiceTest.xml",
+      "bytes": 25027,
+      "sha256": "697927aa17439e4219214a4dadfa6e4a56890706910eee0ee8254a2810da7b2b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.FileMemoryStoreTest.xml",
+      "bytes": 1932,
+      "sha256": "e0c6c0107af6c2ea439ff207f4d76eb7bc59aeb75b5019acac33115af30d619b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.GenAiMetricCatalogSmokeTest.xml",
+      "bytes": 581,
+      "sha256": "721f42b9a66887d3603089b143418f0ff8b4b0173129ee97374d732c0f499185"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.ReadDocumentToolTest.xml",
+      "bytes": 4621,
+      "sha256": "74910d53ac83d525797a783e93eae829c07ffb4a13761cb451b24a4ac8501cda"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.RunEventStoreTest.xml",
+      "bytes": 1135,
+      "sha256": "12e88b2c071e0cb552f0608a6e38680be4cd26fee12fd3c9e4e68a44b8d81c0d"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.SearchToolResultBudgetTest.xml",
+      "bytes": 695,
+      "sha256": "e83a7867b3164879612bd350dddf35af9706a23e11f46b67b905e7103f85083b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.ToolCallParserTest.xml",
+      "bytes": 1005,
+      "sha256": "d1a050e2ba45b74fc4badb218872ddf461a97772385a056710b7031e8cc39691"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolErrorsTest.xml",
+      "bytes": 43848,
+      "sha256": "1f7da03c268bf2b40acc193f4c01957c8e08ee127d96cea863948e9aedca123d"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolPathRoundTripTest.xml",
+      "bytes": 836,
+      "sha256": "de0ee7646db190fddbe05ba2bef53800a1b904ef4af1166b95984d5c504ebd7b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolPathsTest.xml",
+      "bytes": 1450,
+      "sha256": "0574426a3f0971c1dc59e93a3194415721af2c45652ab5a13bacfa4d1c50e3ff"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolRootsDegradeTest.xml",
+      "bytes": 43073,
+      "sha256": "8020699b740d991948e8196397e19adbbd7fb76ca546b85d3ffc6a42618b631e"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.BrowseToolTest.xml",
+      "bytes": 4514,
+      "sha256": "fc65d37410670f9a3755b4465a48b9712a113cccdbfc6d9d11dbddbc38aba6d6"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileContentDigestTest.xml",
+      "bytes": 1292,
+      "sha256": "b11e83c59acd001b0bf1e414551a88f85c7a156e2542677f2b75d71671212f46"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationExecutorTest.xml",
+      "bytes": 27769,
+      "sha256": "b28ec17eba26042526d2564b7df5cac9866f2fa5219e2e7b1987f5255f12a1ba"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationLogTest.xml",
+      "bytes": 15522,
+      "sha256": "e0007640b4ad9118c681905132a54ab623d371f0bffab798f60380a704097bd9"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationsToolTest.xml",
+      "bytes": 18103,
+      "sha256": "70ace685fddcced92c2b5154146195fd38db8629919f7f239b329d878d77641c"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.IngestToolTest.xml",
+      "bytes": 2953,
+      "sha256": "ec257b64d5b438a42b0e0630a3072a7c04a81fb48bd84ce94c17279169d1b72b"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.SearchToolTest.xml",
+      "bytes": 8141,
+      "sha256": "b1517492c8d4cff5b3c0b8d68479669a3dffdc315adb884693c5286a0f242fb3"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-agent/test/TEST-io.justsearch.agent.tools.ToolArgsTest.xml",
+      "bytes": 1705,
+      "sha256": "3a1499d95f5b9705fc468092c625af2c84bda2ebf2cf1b8c63a564a3fa8057ec"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.conversation.ConversationEngineTest.xml",
+      "bytes": 18811,
+      "sha256": "507d09b73472c3f4b1def5c765b2b3ed7033cfb02d189bcbcbbbd665dd94ebc9"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.conversation.ToolIteratingShapeRunnerTest.xml",
+      "bytes": 3154,
+      "sha256": "075b6faec2a9382b65621a1130dd2608c9a350979a135fad87d92ac68ea9c483"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowBackgroundDelegationTest.xml",
+      "bytes": 2918,
+      "sha256": "dce0ffe4769a2658c4a180e272230e911a6f611930b50307a1bb72801410b7f7"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowPreparedContinuationTest.xml",
+      "bytes": 1199,
+      "sha256": "c8ddce3571164288ae2963c1a2e4878f6a1b20779f31d02077a06aecf8c583fc"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowShapeRunnerTest.xml",
+      "bytes": 2588,
+      "sha256": "f1cae137c0b797282713697431564bc8c0cd8b1cee71c97e568d2a9c64257a27"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowToolRunnerImplTest.xml",
+      "bytes": 1250,
+      "sha256": "7efabb0123a0ee62de4b79844714def3aadde1443bcd537697d50189a762ca9f"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "7dfcff207e7da6f04dcf80fde3974091a420ffa317bd1e59fe3d50b947c8c5bb"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "e3cdf2340eece7a39f1dbe24006443d2fb8497f842e4e7ade28965b95f6f730e"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "5e01936c02680d8852138e8e39934d858403ca6b90aece4b00cc16d6f5ffd729"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "0ddf2418347fd237a86e29f25008166ddab588e225edacc369095172ad24daba"
+    },
+    {
+      "path": "tmp/c2-3-background-shape1029.txt",
+      "bytes": 39593,
+      "sha256": "448737a7123c418070caf80bef91c8b9888b693ebf6696bb0cd50ee22d507e7e"
+    }
+  ]
+}

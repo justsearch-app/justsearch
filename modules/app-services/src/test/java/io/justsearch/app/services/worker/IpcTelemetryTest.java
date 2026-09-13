@@ -44,7 +44,6 @@ class IpcTelemetryTest {
       noop.recordPidMismatch();
       noop.recordShutdownTimeout();
       noop.recordForcibleKill();
-      noop.recordReconnect();
       var sample = noop.startPortDiscovery();
       try (sample) {
         // timer sample closes without error
@@ -86,7 +85,6 @@ class IpcTelemetryTest {
     ipc.recordPidMismatch();
     ipc.recordShutdownTimeout();
     ipc.recordForcibleKill();
-    ipc.recordReconnect();
 
     assertEquals(
         1L, registry.counterValue(IpcMetricCatalog.PORT_DISCOVERY_TIMEOUT, EmptyTags.INSTANCE));
@@ -98,7 +96,6 @@ class IpcTelemetryTest {
     assertEquals(1L, registry.counterValue(IpcMetricCatalog.SHUTDOWN_TIMEOUT, EmptyTags.INSTANCE));
     assertEquals(
         1L, registry.counterValue(IpcMetricCatalog.SHUTDOWN_FORCIBLE_KILL, EmptyTags.INSTANCE));
-    assertEquals(1L, registry.counterValue(IpcMetricCatalog.GRPC_RECONNECT, EmptyTags.INSTANCE));
   }
 
   @Test

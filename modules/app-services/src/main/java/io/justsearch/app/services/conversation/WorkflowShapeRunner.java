@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.agent.api.registry.ConfirmStrategy;
@@ -60,6 +62,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   private final Supplier<OperationCatalog> coreOperationsSupplier;
   private final GatedOperationExecutor gatedExecutor;
   private final WorkflowGateRegistry gateRegistry;
+  private final io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator;
   // Tempdoc 565 §15.C — the shared, shape-agnostic run event log: the workflow run persists + indexes
   // through it (same space as agent runs), so the unified thread projects it as a mode of the one
   // window. noop() on the test-only path (the run still streams; it just isn't persisted).
@@ -71,7 +74,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
       Supplier<OperationCatalog> agentToolsSupplier,
       Supplier<OperationCatalog> coreOperationsSupplier,
       GatedOperationExecutor gatedExecutor,
-      WorkflowGateRegistry gateRegistry) {
+      WorkflowGateRegistry gateRegistry, io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator) {
     this(
         engineSupplier,
         workflowCatalog,
@@ -79,7 +82,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
         coreOperationsSupplier,
         gatedExecutor,
         gateRegistry,
-        io.justsearch.agent.RunEventStore.noop());
+        io.justsearch.agent.RunEventStore.noop(), gateEvaluator);
   }
 
   public WorkflowShapeRunner(
@@ -89,7 +92,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
       Supplier<OperationCatalog> coreOperationsSupplier,
       GatedOperationExecutor gatedExecutor,
       WorkflowGateRegistry gateRegistry,
-      io.justsearch.agent.RunEventStore runEvents) {
+      io.justsearch.agent.RunEventStore runEvents,
+      io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator) {
     this.engineSupplier = Objects.requireNonNull(engineSupplier, "engineSupplier");
     this.workflowCatalog = Objects.requireNonNull(workflowCatalog, "workflowCatalog");
     this.agentToolsSupplier = Objects.requireNonNull(agentToolsSupplier, "agentToolsSupplier");
@@ -98,6 +102,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     this.gatedExecutor = Objects.requireNonNull(gatedExecutor, "gatedExecutor");
     this.gateRegistry = Objects.requireNonNull(gateRegistry, "gateRegistry");
     this.runEvents = Objects.requireNonNull(runEvents, "runEvents");
+    this.gateEvaluator = Objects.requireNonNull(gateEvaluator, "gateEvaluator");
   }
 
   @Override
@@ -106,7 +111,14 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   }
 
   @Override
-  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink) {
+  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext incomingContext) {
+    run(body, audience, sink, incomingContext,
+        body != null && Boolean.TRUE.equals(body.get(ConversationEngine.BACKGROUND_RUN_KEY)));
+  }
+
+  /** Background is supplied by the enclosing server run, never parsed from public workflow arguments. */
+  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink,
+      EngineContext incomingContext, boolean background) {
     WorkflowRef workflowId = resolveWorkflowId(body);
     Workflow workflow = workflowCatalog.findById(workflowId).orElse(null);
     if (workflow == null) {
@@ -126,6 +138,9 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     }
 
     String sessionId = UUID.randomUUID().toString();
+    EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.rebase(
+        incomingContext, Optional.of(sessionId), io.justsearch.agent.api.registry.TransportTag.WORKFLOW,
+        incomingContext.survival(), incomingContext.urgency());
     // Tempdoc 565 §15.C — persist + index this workflow run in the shared run-event space so the
     // unified thread projects it as a mode of the one window (not a bespoke surface). `psink` mirrors
     // every streamed event to the durable log; the meta carries the conversation link the thread scans
@@ -141,7 +156,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     runMeta.put("startedAt", startedAt);
     runMeta.put("updatedAt", startedAt);
     runMeta.put("state", "RUNNING");
-    runMeta.put("background", false);
+    runMeta.put("background", background);
     // Tempdoc 565 §15.C fix — a synthetic opening "user" turn so the RECORD-side thread projection
     // (AgentLoopService.firstUserMessage) yields the trigger row, matching the live FE turn.
     runMeta.put(
@@ -160,90 +175,109 @@ public final class WorkflowShapeRunner implements ShapeRunner {
             runEvents.writeRunMeta(sessionId, runMeta);
           }
         };
-    psink.accept(new SseEvent("session_started", Map.of("sessionId", sessionId)));
-    psink.accept(
-        new SseEvent(
-            "workflow_started",
-            Map.of("workflowId", workflowId.value(), "nodeCount", workflow.nodes().size())));
-
-    String lastOutput = "";
-    int index = 0;
-    for (WorkflowNode node : workflow.nodes()) {
+    Throwable executionFailure = null;
+    try {
+      psink.accept(new SseEvent("session_started", Map.of("sessionId", sessionId)));
       psink.accept(
           new SseEvent(
-              "node_started",
-              Map.of("nodeId", node.nodeId(), "kind", kindOf(node), "index", index)));
-      try {
-        switch (node) {
-          case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink);
-          case WorkflowNode.GateStep step -> {
-            if (!runGateStep(step, psink)) {
-              // User declined at the gate — terminate the workflow cleanly.
-              psink.accept(
-                  new SseEvent(
-                      "done",
-                      Map.of(
-                          "finalResponse",
-                          "Workflow cancelled by the user at gate '" + step.nodeId() + "'.",
-                          "nodesExecuted",
-                          index,
-                          "cancelled",
-                          true)));
-              return;
-            }
-          }
-          case WorkflowNode.ToolStep step -> {
-            ToolOutcome outcome = runToolStep(step, psink);
-            if (outcome.cancelled()) {
-              psink.accept(
-                  new SseEvent(
-                      "done",
-                      Map.of(
-                          "finalResponse",
-                          "Workflow cancelled by the user at tool step '" + step.nodeId() + "'.",
-                          "nodesExecuted",
-                          index,
-                          "cancelled",
-                          true)));
-              return;
-            }
-            lastOutput = outcome.output();
-          }
-        }
-      } catch (WorkflowAbortedException aborted) {
-        emitError(psink, aborted.getMessage(), "WORKFLOW_FAILED");
-        return;
-      }
-      // Tempdoc 565 §26.I (Fix A) — an LlmStep's text output is streamed live (chunks) but otherwise
-      // persisted nowhere durable, so a RELOADED workflow run bracketed empty nodes. Emit the node's
-      // FULL output as a durable `node_output` event INSIDE the start/end bracket (before node_completed,
-      // so its timestamp sorts within); the record-side mapper projects it as the node's ASSISTANT_MESSAGE,
-      // making reload identical to live. ToolStep output already persists (tool_exec_completed); GateStep
-      // has none. The live view ignores `node_output` (no dispatch handler) — it already shows the chunks.
-      if (node instanceof WorkflowNode.LlmStep && !lastOutput.isEmpty()) {
+              "workflow_started",
+              Map.of("workflowId", workflowId.value(), "nodeCount", workflow.nodes().size())));
+
+      String lastOutput = "";
+      int index = 0;
+      for (WorkflowNode node : workflow.nodes()) {
         psink.accept(
             new SseEvent(
-                "node_output",
+                "node_started",
+                Map.of("nodeId", node.nodeId(), "kind", kindOf(node), "index", index)));
+        try {
+          switch (node) {
+            case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext, background);
+            case WorkflowNode.GateStep step -> {
+              if (!runGateStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background)) {
+                // User declined at the gate — terminate the workflow cleanly.
+                psink.accept(
+                    new SseEvent(
+                        "done",
+                        Map.of(
+                            "finalResponse",
+                            "Workflow cancelled by the user at gate '" + step.nodeId() + "'.",
+                            "nodesExecuted",
+                            index,
+                            "cancelled",
+                            true)));
+                return;
+              }
+            }
+            case WorkflowNode.ToolStep step -> {
+              ToolOutcome outcome = runToolStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background);
+              if (outcome.cancelled()) {
+                psink.accept(
+                    new SseEvent(
+                        "done",
+                        Map.of(
+                            "finalResponse",
+                            "Workflow cancelled by the user at tool step '" + step.nodeId() + "'.",
+                            "nodesExecuted",
+                            index,
+                            "cancelled",
+                            true)));
+                return;
+              }
+              lastOutput = outcome.output();
+            }
+          }
+        } catch (WorkflowAbortedException aborted) {
+          emitError(psink, aborted.getMessage(), "WORKFLOW_FAILED");
+          return;
+        }
+        // Tempdoc 565 §26.I (Fix A) — an LlmStep's text output is streamed live (chunks) but otherwise
+        // persisted nowhere durable, so a RELOADED workflow run bracketed empty nodes. Emit the node's
+        // FULL output as a durable `node_output` event INSIDE the start/end bracket (before node_completed,
+        // so its timestamp sorts within); the record-side mapper projects it as the node's ASSISTANT_MESSAGE,
+        // making reload identical to live. ToolStep output already persists (tool_exec_completed); GateStep
+        // has none. The live view ignores `node_output` (no dispatch handler) — it already shows the chunks.
+        if (node instanceof WorkflowNode.LlmStep && !lastOutput.isEmpty()) {
+          psink.accept(
+              new SseEvent(
+                  "node_output",
+                  Map.of(
+                      "nodeId", node.nodeId(),
+                      "kind", kindOf(node),
+                      "index", index,
+                      "output", lastOutput)));
+        }
+        psink.accept(
+            new SseEvent(
+                "node_completed",
                 Map.of(
                     "nodeId", node.nodeId(),
                     "kind", kindOf(node),
                     "index", index,
-                    "output", lastOutput)));
+                    "output", preview(lastOutput))));
+        index++;
       }
+
       psink.accept(
           new SseEvent(
-              "node_completed",
-              Map.of(
-                  "nodeId", node.nodeId(),
-                  "kind", kindOf(node),
-                  "index", index,
-                  "output", preview(lastOutput))));
-      index++;
+              "done", Map.of("finalResponse", lastOutput, "nodesExecuted", workflow.nodes().size())));
+    } catch (RuntimeException | Error failure) {
+      executionFailure = failure;
+      throw failure;
+    } finally {
+      // Keep the original exception and existing transport error handling. The durable run
+      // must nevertheless leave RUNNING when a node or observer aborts this invocation.
+      if ("RUNNING".equals(runMeta.get("state"))) {
+        runMeta.put("state", "ERROR");
+        runMeta.put("updatedAt", java.time.Instant.now().toString());
+        try {
+          runEvents.writeRunMeta(sessionId, runMeta);
+        } catch (RuntimeException | Error cleanupFailure) {
+          if (executionFailure == null) throw cleanupFailure;
+          executionFailure.addSuppressed(cleanupFailure);
+        }
+      }
     }
-
-    psink.accept(
-        new SseEvent(
-            "done", Map.of("finalResponse", lastOutput, "nodesExecuted", workflow.nodes().size())));
   }
 
   // ---- node executors ----
@@ -255,7 +289,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
    * single terminal {@code done}; a sub-shape {@code error} aborts the workflow.
    */
   private String runLlmStep(
-      WorkflowNode.LlmStep step, String priorOutput, Audience audience, Consumer<SseEvent> sink) {
+      WorkflowNode.LlmStep step, String priorOutput, Audience audience, Consumer<SseEvent> sink,
+      EngineContext engineContext, boolean background) {
     String seed = step.prompt() != null ? step.prompt() : priorOutput;
     // Pass the seed under both body contracts a conversation shape may read: `prompt` (single-turn
     // shapes — free-chat / ask / summarize via UserPromptInjector) and `messages` (the agent /
@@ -289,7 +324,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
           }
         };
 
-    engineSupplier.get().run(step.shape(), subBody, audience, filtered);
+    engineSupplier.get().run(step.shape(), subBody, audience, filtered, engineContext, background);
     if (errorMessage[0] != null) {
       throw new WorkflowAbortedException(
           "LLM step '" + step.nodeId() + "' failed: " + errorMessage[0]);
@@ -298,16 +333,21 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   }
 
   /** GateStep — surface a consent prompt and block on the user. Returns true iff approved. */
-  private boolean runGateStep(WorkflowNode.GateStep step, Consumer<SseEvent> sink) {
+  private boolean runGateStep(WorkflowNode.GateStep step, Consumer<SseEvent> sink,
+      EngineContext context, String enclosingSessionId, boolean background) {
     if (step.confirm() instanceof ConfirmStrategy.None) {
       return true; // no confirmation required
     }
     RiskTier risk = riskOf(step.confirm());
-    return awaitApproval(sink, UUID.randomUUID().toString(), "(confirm)", "{}", risk);
+    var behavior = gateEvaluator.agentGate(risk, io.justsearch.agent.api.registry.AutonomyLevel.ASSIST,
+        false, step.confirm());
+    return awaitApproval(sink, UUID.randomUUID().toString(), "(confirm)", "{}", risk,
+        behavior, Optional.empty(), context, enclosingSessionId, background);
   }
 
   /** ToolStep — resolve the op, gate it if required, then route the approved call. */
-  private ToolOutcome runToolStep(WorkflowNode.ToolStep step, Consumer<SseEvent> sink) {
+  private ToolOutcome runToolStep(WorkflowNode.ToolStep step, Consumer<SseEvent> sink,
+      EngineContext engineContext, String enclosingSessionId, boolean background) {
     Operation op = resolveOperation(step.operation().value());
     if (op == null) {
       // Validation passed against the live catalog, so absence here is a race (server disconnected
@@ -321,16 +361,28 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     String toolName = op.id().value();
     String args = step.argumentsJson();
 
-    if (gatedExecutor.requiresApproval(op)) {
-      if (!awaitApproval(sink, callId, toolName, args, op.policy().risk())) {
-        return ToolOutcome.cancelledOutcome();
-      }
+    var behavior = gateEvaluator.agentGate(op.policy().risk(),
+        io.justsearch.agent.api.registry.AutonomyLevel.ASSIST,
+        op.policy().undoSupported() || op.policy().inverseOperationRef().isPresent(), op.policy().confirm());
+    if (behavior == io.justsearch.agent.api.registry.GateBehavior.DENY
+        || (background && behavior != io.justsearch.agent.api.registry.GateBehavior.AUTO)) {
+      awaitApproval(sink, callId, toolName, args, op.policy().risk(), behavior, Optional.empty(),
+          engineContext, enclosingSessionId, background);
+      return ToolOutcome.cancelledOutcome();
+    }
+    var plan = gatedExecutor.prepare(op, args, engineContext, null,
+        behavior != io.justsearch.agent.api.registry.GateBehavior.AUTO);
+    if (!(plan instanceof io.justsearch.agent.api.registry.OperationDispatchPlan.Recorded)
+        && behavior != io.justsearch.agent.api.registry.GateBehavior.AUTO) {
+      var preview = ((io.justsearch.agent.api.registry.OperationDispatchPlan.Ready) plan).approvalPreview();
+      if (!awaitApproval(sink, callId, toolName, args, op.policy().risk(), behavior, preview,
+          engineContext, enclosingSessionId, background)) return ToolOutcome.cancelledOutcome();
     }
 
     sink.accept(new SseEvent("tool_exec_started", Map.of("callId", callId, "toolName", toolName)));
     OperationResult result;
     try {
-      result = gatedExecutor.routeApproved(op, args);
+      result = gatedExecutor.routePrepared(op, args, plan, engineContext);
     } catch (RuntimeException e) {
       LOG.warn("Workflow tool step '{}' dispatch failed", step.nodeId(), e);
       result = OperationResult.failure("Execution error: " + e.getMessage());
@@ -350,28 +402,46 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   // ---- gate helper (shared by GateStep + ToolStep) ----
 
   /**
-   * Emit a {@code tool_call_pending} event, register a gate, and block until the user decides (or
+   * Register a gate, emit {@code tool_call_pending}, and block until the user decides (or
    * the timeout elapses → declined). Emits {@code tool_call_approved} / {@code tool_call_rejected}
    * to mirror the agent surface's authorization vocabulary so the FE can reuse its approval flow.
    */
   private boolean awaitApproval(
-      Consumer<SseEvent> sink, String callId, String toolName, String argsJson, RiskTier risk) {
-    sink.accept(
-        new SseEvent(
-            "tool_call_pending",
-            Map.of(
-                "callId", callId,
-                "toolName", toolName,
-                "arguments", argsJson,
-                "risk", risk.name().toLowerCase(java.util.Locale.ROOT))));
-    CompletableFuture<Boolean> gate = gateRegistry.create(callId);
+      Consumer<SseEvent> sink, String callId, String toolName, String argsJson, RiskTier risk,
+      io.justsearch.agent.api.registry.GateBehavior behavior,
+      Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview,
+      EngineContext context, String enclosingSessionId, boolean background) {
+    if (behavior == io.justsearch.agent.api.registry.GateBehavior.DENY || background) {
+      sink.accept(new SseEvent("tool_call_rejected", Map.of("callId", callId, "reason",
+          background ? "Background workflow cannot wait for human approval" : "Operation denied by current policy")));
+      return false;
+    }
+    var detail = new io.justsearch.agent.api.AgentEvent.PendingApproval(callId, toolName, argsJson,
+        risk.name().toLowerCase(java.util.Locale.ROOT), behavior.name().toLowerCase(java.util.Locale.ROOT));
+    CompletableFuture<Boolean> gate = gateRegistry.create(callId,
+        new io.justsearch.agent.api.PendingToolApproval(detail, preview),
+        context.sessionId().orElseThrow(), enclosingSessionId);
     boolean approved;
     try {
-      approved = gate.get(GATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    } catch (Exception e) {
+      // Announcing the call can synchronously deliver its reply; the future must already exist.
+      sink.accept(
+          new SseEvent(
+              "tool_call_pending",
+              Map.of(
+                  "callId", callId,
+                  "toolName", toolName,
+                  "arguments", argsJson,
+                  "risk", risk.name().toLowerCase(java.util.Locale.ROOT),
+                  "gateBehavior", behavior.name().toLowerCase(java.util.Locale.ROOT))));
+      try {
+        approved = gate.get(GATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      } catch (Exception e) {
+        LOG.warn("Workflow approval gate timed out/failed for call {}", callId, e);
+        approved = false;
+      }
+    } finally {
+      // Also retire an announced gate if the sink throws; never swallow that announcement failure.
       gateRegistry.discard(callId);
-      LOG.warn("Workflow approval gate timed out/failed for call {}", callId, e);
-      approved = false;
     }
     if (approved) {
       sink.accept(new SseEvent("tool_call_approved", Map.of("callId", callId)));

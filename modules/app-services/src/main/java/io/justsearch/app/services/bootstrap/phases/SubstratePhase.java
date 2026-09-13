@@ -19,7 +19,7 @@ import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
 import io.justsearch.app.services.mcphost.McpHostService;
 import io.justsearch.app.services.mcphost.McpServerConfig;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +59,7 @@ public final class SubstratePhase {
       // Tempdoc 560 §10.4: the composed plugin-contributed DiagnosticChannels (snapshot of the shared
       // ContributionRegistry's diagnosticChannels axis after all installs). Empty in the common case;
       // the example plugin (dev-gated) is the first contributor. Threaded to the ChannelSubstrate so
-      // RegistryController serves plugin channels alongside core.head-log.
+      // RegistryController serves plugin channels alongside core.engine-log.
       List<DiagnosticChannel> pluginDiagnosticChannels,
       // Tempdoc 560 §10.4: likewise the composed plugin Surfaces + ConversationShapes — served alongside
       // the core catalogs at /api/registry/{surfaces,shapes} (a plugin RAIL surface renders in the rail).
@@ -76,9 +76,12 @@ public final class SubstratePhase {
    * otherwise Ready. No clear Degraded scenario at the surface today.
    */
   public static io.justsearch.app.services.bootstrap.PhaseOutcome<Output> runWithOutcome(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
       Supplier<io.justsearch.app.api.SettingsService> settingsServiceSupplier,
@@ -93,10 +96,11 @@ public final class SubstratePhase {
       AgentToolFactory.Output agentTools,
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
-      List<McpServerConfig> mcpServers) {
+      List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     try {
       return new io.justsearch.app.services.bootstrap.PhaseOutcome.Ready<>(
           runInternal(
+              attempts, admission, executors,
               telemetry,
               knowledgeServerSupplier,
               knowledgeClientSupplier,
@@ -114,7 +118,7 @@ public final class SubstratePhase {
               agentTools,
               capabilityResolver,
               operationLeaseService,
-              mcpServers));
+              mcpServers, preparationCipher));
     } catch (RuntimeException e) {
       return io.justsearch.app.services.bootstrap.PhaseOutcome.Failed.of(e);
     }
@@ -125,9 +129,12 @@ public final class SubstratePhase {
    * the single entry point is the sealed-sum {@code runWithOutcome(...)} above.
    */
   private static Output runInternal(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
       Supplier<io.justsearch.app.api.SettingsService> settingsServiceSupplier,
@@ -142,7 +149,7 @@ public final class SubstratePhase {
       AgentToolFactory.Output agentTools,
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
-      List<McpServerConfig> mcpServers) {
+      List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher) {
     // Operation registry inputs (consumed by OperationSubstrateInit).
     HandlerRegistry operationHandlers = new HandlerRegistry();
     OperationHandlerRegistrations.registerWorker(
@@ -217,24 +224,25 @@ public final class SubstratePhase {
     // Resource + Metric substrates (no cross-deps; independent).
     ResourceSubstrateInit.Output resourceOut =
         ResourceSubstrateInit.run(BootstrapHelpers.initialRuntimeContext());
-    MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(telemetry);
+    MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(executors, telemetry);
 
     // Operation substrate — needs handlers + 2 catalogs + capability resolver.
     // Runs BEFORE the indexing-jobs bridge so its ActionLedgerChangeRegistry is available to the
     // bridge's terminal-outcome translator (tempdoc 550 thesis I); neither depends on the other.
     OperationSubstrateInit.Output operationOut =
-        OperationSubstrateInit.run(
+        OperationSubstrateInit.run(attempts, admission, executors,
             operationHandlers,
             operationCatalog,
             agentToolsCatalog,
             capabilityResolver,
             // Tempdoc 550 WA-4: surface catalog (built above) keys navigation gating.
-            resourceOut.coreSurfaceCatalog());
+            resourceOut.coreSurfaceCatalog(), preparationCipher);
 
     // Indexing-jobs bridge — needs Worker client (lazy) + resource change registry + the unified
     // action-ledger registry (terminal indexing outcomes fan into the ONE log; tempdoc 550 thesis I).
     var bridgeOut =
         IndexingJobsBridgeWiring.wire(
+            executors,
             knowledgeClientSupplier,
             resourceOut.indexingJobsChangeRegistry(),
             operationOut.actionLedgerChangeRegistry());
@@ -242,7 +250,7 @@ public final class SubstratePhase {
     // Health substrate — needs healthRecoveryProjector + advisoryChangeRegistry + advisoryLogs
     // (from operationOut) + conditionRecoveryIndexChangeRegistry (from resourceOut).
     HealthSubstrateInit.Output healthOut =
-        HealthSubstrateInit.run(
+        HealthSubstrateInit.run(executors,
             BootstrapHelpers.resolveOccurrenceBufferSize(),
             operationOut.healthRecoveryProjector(),
             operationOut.advisoryChangeRegistry(),
@@ -251,7 +259,7 @@ public final class SubstratePhase {
 
     // Rule runner — needs telemetry + health condition store/registry/source.
     RuleRunner ruleRunner =
-        RuleRunnerBuilder.build(
+        RuleRunnerBuilder.build(executors,
             telemetry,
             healthOut.conditionStore(),
             healthOut.healthEventChangeRegistry(),

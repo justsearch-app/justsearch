@@ -521,8 +521,10 @@ try {
   # 3) Validate expected sidecar files exist
   # ---------------------------------------------------------------------------
   $javaBin = Join-Path -Path $headlessDir -ChildPath "runtime\\bin\\java.exe"
-  # Worker is shipped via installDist (tempdoc 226) -- flat `lib/worker/*.jar`, not a fat `lib/worker.jar`.
-  $workerLibDir = Join-Path -Path $headlessDir -ChildPath "lib\\worker"
+  # Lane F stage A item A13: ONE classpath. The bundle used to carry the Engine JARs in `lib/` plus
+  # a whole second copy of the index half in `lib/worker/` (the Worker distribution, tempdoc 226).
+  # The Engine composes the index half in-process, so `lib/` is the only classpath dir now.
+  $engineLibDir = Join-Path -Path $headlessDir -ChildPath "lib"
   $configPath = Join-Path -Path $headlessDir -ChildPath "config\\application.yaml"
   $ssotPath = Join-Path -Path $headlessDir -ChildPath "SSOT"
   $manifestPath = Join-Path -Path $ssotPath -ChildPath "manifest.v1.json"
@@ -557,10 +559,16 @@ try {
   }
 
   Assert (Test-Path -LiteralPath $javaBin) "Missing bundled java runtime: $javaBin"
-  Assert (Test-Path -LiteralPath $workerLibDir) "Missing worker classpath dir in bundle: $workerLibDir (expected installDist layout `lib/worker/*.jar` per tempdoc 226)"
-  $workerJarCount = (Get-ChildItem -LiteralPath $workerLibDir -Filter "*.jar" -File -ErrorAction SilentlyContinue | Measure-Object).Count
-  # installDist layout produced 176 JARs at 2026-04-24; 50 is a safe floor that would still catch a broken bundle while tolerating dependency churn.
-  Assert ($workerJarCount -ge 50) "Worker classpath dir has only $workerJarCount JARs at $workerLibDir (expected >= 50 -- installDist layout per tempdoc 226)"
+  Assert (Test-Path -LiteralPath $engineLibDir) "Missing Engine classpath dir in bundle: $engineLibDir"
+  $engineJarCount = (Get-ChildItem -LiteralPath $engineLibDir -Filter "*.jar" -File -ErrorAction SilentlyContinue | Measure-Object).Count
+  # The pre-A13 lib/worker/ layout produced 176 JARs at 2026-04-24; the merged lib/ is a superset.
+  # 50 is a safe floor that still catches a broken bundle while tolerating dependency churn.
+  Assert ($engineJarCount -ge 50) "Engine classpath dir has only $engineJarCount JARs at $engineLibDir (expected >= 50)"
+  # The index half must be ON that one classpath -- the A13 collapse is only real if these are here.
+  foreach ($indexHalfJar in @("indexer-worker-*.jar", "worker-services-*.jar")) {
+    $found = Get-ChildItem -LiteralPath $engineLibDir -Filter $indexHalfJar -File -ErrorAction SilentlyContinue
+    Assert ($null -ne $found) "Missing $indexHalfJar in $engineLibDir -- the Engine cannot open an index without the index half on its classpath"
+  }
   Assert (Test-Path -LiteralPath $configPath) "Missing config/application.yaml in bundle: $configPath"
   Assert (Test-Path -LiteralPath $manifestPath) "Missing SSOT/manifest.v1.json in bundle: $manifestPath"
   # The plugins manifest has NEVER shipped in the NSIS bundle (verified against the round-8,

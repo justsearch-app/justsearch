@@ -38,6 +38,7 @@ export async function buildReleaseAssets(options) {
     artifactSignaturePath,
     metadataPrivateKeyPath,
     compatibilityRegisterPath,
+    compatibilityBaselinePath,
     outDir,
     version,
     sequence,
@@ -74,7 +75,7 @@ export async function buildReleaseAssets(options) {
       `compatibility register is not release-ready: ${register.knownCompatibilityGaps.join(', ')}`,
     );
   }
-  const compatibility = (register.durableStores ?? []).map((store) => {
+  let compatibility = (register.durableStores ?? []).map((store) => {
     if (store.status !== 'READY') {
       throw new Error(`durable store ${store.id} is not READY`);
     }
@@ -101,6 +102,35 @@ export async function buildReleaseAssets(options) {
       reconciliationStrategy: store.reconciliation,
     };
   });
+
+  const currentById = new Map(compatibility.map((row) => [row.ownerId, row]));
+  if (currentById.size !== compatibility.length) {
+    throw new Error('compatibility register contains duplicate durable store ids');
+  }
+  if (compatibilityBaselinePath) {
+    const baseline = JSON.parse(await readFile(compatibilityBaselinePath, 'utf8'));
+    if (!Array.isArray(baseline.durableStores) || baseline.durableStores.length === 0) {
+      throw new Error('compatibility baseline must contain its installed durable stores');
+    }
+    const seen = new Set();
+    compatibility = baseline.durableStores.map((store) => {
+      requireNonBlank('compatibility baseline store id', store.id);
+      if (seen.has(store.id)) {
+        throw new Error(`compatibility baseline repeats durable store ${store.id}`);
+      }
+      seen.add(store.id);
+      const current = currentById.get(store.id);
+      if (!current) {
+        throw new Error(`compatibility baseline store ${store.id} is missing from current register`);
+      }
+      if (store.owner !== current.owner
+          || store.recoverability !== current.role
+          || store.reconciliation !== current.reconciliationStrategy) {
+        throw new Error(`compatibility baseline store ${store.id} changes identity`);
+      }
+      return current;
+    });
+  }
 
   const descriptor = {
     schemaVersion: 1,
@@ -365,6 +395,7 @@ async function main() {
       artifactSignaturePath: args['artifact-signature'],
       metadataPrivateKeyPath: args['metadata-private-key'],
       compatibilityRegisterPath: args.compatibility,
+      compatibilityBaselinePath: args['compat-baseline'],
       outDir: args['out-dir'],
       version: args.version,
       sequence: Number(args.sequence),

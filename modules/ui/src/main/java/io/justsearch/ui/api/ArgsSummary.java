@@ -10,7 +10,9 @@ package io.justsearch.ui.api;
  * <p><b>Privacy boundary (tempdoc 550 F3, deliberate).</b> This rides on a transient consent
  * surface shown to the human deciding the action right now, who has a legitimate need to see WHAT
  * they are approving. It is NOT logging: the action ledger still omits args, and nothing here is
- * persisted beyond the pending record's own TTL. Bounded to 200 chars to cap exposure.
+ * persisted beyond the pending record's own TTL. Raw-argument fallback is bounded to 200 chars.
+ * Prepared invocations instead use the explicit OperationApprovalPreview from the frozen value;
+ * its byte bound refuses oversize targets rather than truncating their identity.
  */
 public final class ArgsSummary {
 

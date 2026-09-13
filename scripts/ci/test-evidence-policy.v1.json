@@ -30,51 +30,6 @@
       "cadence": "local before changing structured extraction, PDF handling, or parser fixture resources"
     },
     {
-      "path": "modules/app-services/src/integrationTest/java/io/justsearch/app/services/worker/RichDocumentIntegrationTest.java",
-      "element": "class RichDocumentIntegrationTest",
-      "tier": "local-worker-process-integration",
-      "owner": "app-services worker integration",
-      "reason": "Spawns real worker processes and depends on local installDist/environment setup outside the public unit-test lane.",
-      "replacementEvidence": "Local :modules:app-services:integrationTest after worker process or rich-document ingestion changes.",
-      "cadence": "local before changing worker spawn, rich document ingestion, or integration wiring"
-    },
-    {
-      "path": "modules/app-services/src/integrationTest/java/io/justsearch/app/services/worker/KnowledgeServerIntegrationTest.java",
-      "element": "method config_loadsSuccessfully",
-      "tier": "local-worker-process-integration",
-      "owner": "app-services worker integration",
-      "reason": "Requires worker distribution/environment setup and is not part of hosted unit-test evidence.",
-      "replacementEvidence": "Local :modules:app-services:integrationTest after KnowledgeServerConfig or worker distribution changes.",
-      "cadence": "local before changing worker config loading or distribution layout"
-    },
-    {
-      "path": "modules/app-services/src/integrationTest/java/io/justsearch/app/services/worker/KnowledgeServerIntegrationTest.java",
-      "element": "method workerSpawner_canBeCreated",
-      "tier": "local-worker-process-integration",
-      "owner": "app-services worker integration",
-      "reason": "Requires worker distribution/environment setup and is not part of hosted unit-test evidence.",
-      "replacementEvidence": "Local :modules:app-services:integrationTest after worker spawning changes.",
-      "cadence": "local before changing WorkerSpawner or worker distribution layout"
-    },
-    {
-      "path": "modules/app-services/src/integrationTest/java/io/justsearch/app/services/worker/KnowledgeServerIntegrationTest.java",
-      "element": "method fullE2E_spawnConnectIngestAndSearch",
-      "tier": "local-worker-process-integration",
-      "owner": "app-services worker integration",
-      "reason": "Spawns a real worker JVM, connects over gRPC, ingests, and searches; this is heavier than hosted unit-test evidence.",
-      "replacementEvidence": "Local :modules:app-services:integrationTest after worker lifecycle, ingestion, or search wiring changes.",
-      "cadence": "local before changing worker lifecycle, ingestion, or search wiring"
-    },
-    {
-      "path": "modules/app-services/src/integrationTest/java/io/justsearch/app/services/worker/KnowledgeServerIntegrationTest.java",
-      "element": "method fullE2E_indexMultipleFilesAndSearchVaried",
-      "tier": "local-worker-process-integration",
-      "owner": "app-services worker integration",
-      "reason": "Spawns a real worker JVM and indexes/searches multiple files; this is heavier than hosted unit-test evidence.",
-      "replacementEvidence": "Local :modules:app-services:integrationTest after worker lifecycle, ingestion, or search wiring changes.",
-      "cadence": "local before changing worker lifecycle, ingestion, or search wiring"
-    },
-    {
       "path": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/SchemaMismatchStatusContractTest.java",
       "element": "class SchemaMismatchStatusContractTest",
       "tier": "local-server-integration",
@@ -96,7 +51,7 @@
       "tag": "systemTest",
       "tier": "opt-in-system-evidence",
       "owner": "system-tests end-to-end coverage",
-      "reason": "System tests exercise multi-process behavior and are not part of default hosted unit-test evidence.",
+      "reason": "System tests exercise behaviour across a real external boundary the Engine still has (llama-server, the extraction sandbox child pool) and are not part of default hosted unit-test evidence. Until lane F stage A this tier also carried the Head/Worker multi-process cases; item A12 retired those whose subject was the process pair and moved the surviving product cases into the app-engine unit suite, where they run every build.",
       "cadence": "manual or release-oriented verification before changing system lifecycle behavior"
     },
     {
@@ -123,9 +78,16 @@
     {
       "tag": "windows",
       "tier": "windows-native-evidence",
-      "owner": "app-util / Windows OS integration (single-instance lock, job objects, power status)",
-      "reason": "Windows-specific product behavior. Excluded from the Linux-migrated lanes (tempdoc 668 option B) and run on the dedicated windows-native-tests lane so the coverage is preserved.",
+      "owner": "app-util / Windows OS integration (single-instance lock, power status)",
+      "reason": "Windows-specific product behavior. Excluded from the Linux-migrated lanes (tempdoc 668 option B) and run on the dedicated windows-native-tests lane so the coverage is preserved. Job-object containment was in this set until lane F stage A item A11 deleted WindowsJobObject with the child process it contained.",
       "cadence": "runs every CI on the windows-native lane; touch when changing Windows OS-integration behavior"
+    },
+    {
+      "tag": "load-sensitive",
+      "tier": "local-timing-evidence",
+      "owner": "search/GPL ranking owners (LambdaMartBenchmarkTest); app-services power owners (EnergyStatePollerTest); app-engine (EngineExtractionSandboxChaosTest is the sibling stress tag)",
+      "reason": "Tests whose assertion is a claim about the MACHINE rather than about the code - wall-clock latency, or that a background thread made progress inside a window. A concurrent build on the same host fails them without the measured code changing, so a failure of this shape says nothing about the subject. Two subjects under this tag, each with the same evidence: LambdaMartBenchmarkTest p50 (four failures in one session under a sibling-worktree Gradle build, green on every isolated re-run) and EnergyStatePollerTest restartability (three failures, every one under concurrent load, green on every isolated re-run). Both quarantined at FULL assertion strength into their own runner rather than given a looser threshold: widening the budget hides the instrument limit instead of naming it.",
+      "cadence": "local, on an otherwise idle machine, before changing scoring/inference hot paths"
     }
   ],
   "stressSuitePolicy": "scripts/ci/stress-suite-policy.v1.json"

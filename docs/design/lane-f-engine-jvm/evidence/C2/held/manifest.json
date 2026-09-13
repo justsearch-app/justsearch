@@ -1,0 +1,48 @@
+{
+  "base": "41d0ab86da181a7bba7656f28bf4f7445c27c283",
+  "patch": "root-replay-retirement.patch",
+  "sha256": "52795138301ea0af49d8f232142d076d33fc404f2e8b17c9d577eaed16dd5f1e",
+  "files": [
+    "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RootPlanReplayProjection.java",
+    "modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java",
+    "modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java",
+    "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java",
+    "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+    "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+    "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+    "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java",
+    "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+    "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+    "modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java",
+    "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java",
+    "modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java"
+  ],
+  "owners": [
+    "C2-3",
+    "C2-8",
+    "C2-10"
+  ],
+  "retirementRevision": "6b109c27ca33ec72bcb2ae444a84b74e84648d43",
+  "supplements": [
+    {
+      "base": "33e54dfcde19a205e3e6a5f3d7e2a30a24bf5f93",
+      "patch": "root-snapshot-retirement.patch",
+      "sha256": "e357c6adc0cbe5b675f2463c60b084540355e71998cdc50bc4dd7c333e6bb9f3",
+      "files": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java"
+      ],
+      "retirementRevision": "d9c80a64658a5f5476642ebaca4e1a91f7e987f0",
+      "format": "Git unified diff with zero context; apply with --unidiff-zero"
+    }
+  ],
+  "format": "Git unified diff with zero context; apply with --unidiff-zero"
+}

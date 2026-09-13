@@ -166,11 +166,13 @@ export function stripJavaComments(src) {
  * ever naming the enum — the shape `TikaOcrRuntime` / `VduCapabilityState` already have on
  * their producing side.
  *
- * HONEST LIMIT — a reference is not an emission. `WORKER_RESTART_EXHAUSTED.code().equals(…)`
- * is a *consumer* reference and satisfies this check; `LifecycleSnapshotTap` references many
- * codes as map keys. Syntactic emit-shape detection was considered and rejected as brittle.
- * This direction catches the ZERO-reference class, which is the class that actually occurred
- * (4/4 of the real phantoms). Do not mistake it for stronger than it is.
+ * SCOPE — this direction catches the ZERO-REFERENCE class (4/4 of the real phantoms). It does
+ * NOT distinguish a producer from a consumer; that is now `checkEmissions`, added at the lane-F
+ * stage-A checkpoint after this file's own "HONEST LIMIT" note came true. The note used
+ * `WORKER_RESTART_EXHAUSTED.code().equals(…)` as its example of a consumer reference that
+ * satisfies this check, and `WORKER_RESTART_EXHAUSTED` turned out to be exactly the code with no
+ * producer — two passes of a design document disagreed about whether it had one and this gate
+ * had no opinion. Both directions run; they answer different questions.
  *
  * @param enumRows      `{ name, code }[]` from `extractEnumRows`
  * @param mainSources   `{ path, text }[]` — raw Java sources; comments stripped here
@@ -202,6 +204,125 @@ export function checkProducers({ enumRows, mainSources, feDerived }) {
     );
   }
   return failures;
+}
+
+/**
+ * A mention that is a COMPARISON or a LOG ARGUMENT, not a production of the code.
+ *
+ * <p>Derived from the shapes actually present in this tree, not invented: `.equals(…)` /
+ * `.equalsIgnoreCase(…)` / `Objects.equals(…)` receivers and arguments, `case` labels, and
+ * SLF4J-style `log.warn/info/debug/error/trace(…)` arguments. Measuring against these leaves
+ * exactly one enum member with no production site, which is the independently-reported answer —
+ * a predicate tuned to produce a desired result would not have landed on the same one.
+ */
+const CONSUMER_BEFORE = [
+  /\.equals\s*\(\s*$/,
+  /\.equalsIgnoreCase\s*\(\s*$/,
+  /Objects\.equals\s*\(\s*$/,
+  /\bcase\s+$/,
+  /\blog\.(warn|info|debug|error|trace)\s*\([^;]*$/,
+];
+const CONSUMER_AFTER = [/^\s*\.code\(\)\s*\.equals/, /^\s*\.code\(\)\s*==/, /^\s*\.equals\s*\(/, /^\s*==/];
+
+/**
+ * EMISSION — every non-feDerived code must appear at least once in a VALUE position: assigned,
+ * returned, or passed as an argument to something other than a comparison or a logger.
+ *
+ * <p><b>Why this exists.</b> {@link checkProducers} asks whether a code is *mentioned*, which is a
+ * strictly weaker question, and this file's own comment said so — it named
+ * `WORKER_RESTART_EXHAUSTED.code().equals(…)` as the example of a mention that is not a producer.
+ * At the lane-F stage-A checkpoint that example turned out to be the live case: all four of that
+ * code's main-source sites are `.equals(...)` comparisons or log arguments
+ * (`KnowledgeServerBootstrap.java:444-447, 729-732`, `KnowledgeServerHealthMonitor.java:342-344,
+ * 498-500`), nothing transitions to it, and `supervisionActive()` is hard-coded `false`
+ * (`KnowledgeServerBootstrap.java:460-462`). Two passes of a design document reached opposite
+ * conclusions about whether it had a producer and this gate certified both.
+ *
+ * <p><b>Honest limits, so nobody reads this as stronger than it is.</b> It is a syntactic
+ * heuristic over comment-stripped source, not a dataflow analysis. It cannot prove the emission is
+ * *reachable* — only that a value-position use exists. Three specific false-GREEN shapes, named
+ * because a limit nobody can picture is not a limit anyone respects:
+ *
+ * <ol>
+ *   <li><b>Collection literals and lookup tables.</b> A code listed in a {@code Set.of(...)},
+ *       {@code Map.of(...)}, an array initialiser or a switch-expression ARM counts as a
+ *       value-position use, because syntactically it is one. But a table entry is only an emission
+ *       if something emits what the table returns, and this check never looks. A vocabulary
+ *       enumerated in a registry-style constant would pass wholesale while nothing emits any of it.
+ *       That is the likeliest way this gate goes quietly vacuous, and it is the shape to suspect
+ *       first if a code turns out to be a phantom despite a green.
+ *   <li><b>Logger detection is receiver-dependent.</b> The consumer pattern matches
+ *       {@code log.warn|info|debug|error|trace(...)}, i.e. a receiver literally named {@code log}.
+ *       A class using {@code LOG}, {@code logger}, {@code LOGGER}, a wrapped/structured logger, or
+ *       a static import would have its log arguments counted as EMISSIONS. This repo happens to be
+ *       uniform on {@code log}, which is why the predicate lands on one un-produced code rather
+ *       than none — the uniformity is load-bearing and undefended. A new logging convention
+ *       weakens this gate silently.
+ *   <li><b>Helper indirection.</b> A code passed to a project-specific emit helper, or returned
+ *       from a method whose result is emitted elsewhere, reads as an emission here without this
+ *       check knowing whether the helper emits anything.
+ * </ol>
+ *
+ * <p>All three fail toward GREEN, so this direction under-reports rather than over-reports: it
+ * catches codes nothing puts in a value position at all. What it buys is the specific class that
+ * occurred — a vocabulary member every reader treats as producible while nothing produces it.
+ *
+ * <p>`awaitingProducer` is the deliberate escape hatch: a code whose producer is scheduled but not
+ * yet written stays declared, with an owner, so the debt is visible and dated instead of silently
+ * indistinguishable from a live code.
+ */
+export function checkEmissions({ enumRows, mainSources, feDerived, awaitingProducer }) {
+  const fe = new Set(feDerived);
+  const awaiting = new Map((awaitingProducer ?? []).map((e) => [e.code, e]));
+  const haystacks = mainSources.map((s) => stripJavaComments(s.text));
+  const failures = [];
+  const stillAwaiting = [];
+
+  for (const { name, code } of enumRows) {
+    if (fe.has(code)) continue;
+    const re = new RegExp(
+      `LifecycleReasonCode\\.${name}\\b|"${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`,
+      'g',
+    );
+    let emissions = 0;
+    for (const h of haystacks) {
+      for (const m of h.matchAll(re)) {
+        const before = h.slice(Math.max(0, m.index - 200), m.index);
+        const after = h.slice(m.index + m[0].length, m.index + m[0].length + 60);
+        const consumer =
+          CONSUMER_BEFORE.some((r) => r.test(before)) || CONSUMER_AFTER.some((r) => r.test(after));
+        if (!consumer) emissions++;
+      }
+    }
+
+    const declared = awaiting.get(code);
+    if (emissions > 0) {
+      if (declared) {
+        failures.push(
+          `emission: reason code \`${code}\` (${name}) is declared in ${REGISTER} ` +
+            `\`awaitingProducer\` (owner: ${declared.owner}) but now HAS a production site. The ` +
+            `debt is paid — delete the awaitingProducer entry so the list keeps meaning ` +
+            `"nothing produces this yet".`,
+        );
+      }
+      continue;
+    }
+
+    if (declared) {
+      stillAwaiting.push(`${code} (owner: ${declared.owner})`);
+      continue;
+    }
+
+    failures.push(
+      `emission: reason code \`${code}\` (${name}) is REFERENCED but never PRODUCED — every ` +
+        `main-source mention is a comparison (\`.equals\`, \`case\`) or a log argument. A code only ` +
+        `ever compared against is one nothing can put the system into: the branches that read it ` +
+        `are unreachable, and any document claiming it "has a producer" is wrong. Either add the ` +
+        `production site, or declare it in ${REGISTER} \`awaitingProducer\` with an \`owner\` ` +
+        `naming who lands the producer — so it is visible debt rather than a silent phantom.`,
+    );
+  }
+  return { failures, stillAwaiting };
 }
 
 /**
@@ -295,6 +416,20 @@ function main() {
     process.exit(1);
   }
 
+  const { failures: emissionFailures, stillAwaiting } = checkEmissions({
+    enumRows,
+    mainSources,
+    feDerived,
+    awaitingProducer: reg.awaitingProducer ?? [],
+  });
+  if (emissionFailures.length > 0) {
+    console.error(
+      '✗ readiness-reason-codes gate FAILED (emission direction, lane-F stage-A checkpoint):\n' +
+        emissionFailures.map((x) => '  - ' + x).join('\n'),
+    );
+    process.exit(1);
+  }
+
   const exemptCount = enumRows.filter((r) => feDerived.includes(r.code)).length;
   console.log(
     `✓ readiness-reason-codes gate OK — producer↔CAUSE_ROWS correspond ` +
@@ -302,6 +437,14 @@ function main() {
       `degradation banner. Producer direction OK — all ${enumRows.length - exemptCount} codes have ≥1 ` +
       `emit-site reference across ${mainSources.length} modules/**/src/main sources; ` +
       `${exemptCount} exempt.`,
+  );
+  console.log(
+    stillAwaiting.length === 0
+      ? `  emission direction OK — every non-exempt code has a production site (not merely a ` +
+          `reference), and nothing is awaiting a producer.`
+      : `  emission direction OK — every non-exempt code has a production site, except ` +
+          `${stillAwaiting.length} declared as awaiting one: ${stillAwaiting.join(', ')}. These are ` +
+          `tracked debt, not phantoms; the gate reds if a producer appears and the entry is not removed.`,
   );
 }
 

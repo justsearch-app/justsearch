@@ -353,16 +353,17 @@ def test_floor_is_union_not_sum_when_root_already_watched(
 @patch("jseval.ingest.add_watched_root")
 @patch("jseval.ingest._root_already_watched")
 @patch("jseval.ingest._get_indexed_doc_count")
+@pytest.mark.parametrize("watcher_active", [True, False])
 def test_floor_stays_additive_for_a_genuinely_new_larger_root(
     mock_doc_count, mock_already, mock_add_root, mock_watcher,
-    mock_wait_pipeline, mock_settle, tmp_path,
+    mock_wait_pipeline, mock_settle, tmp_path, watcher_active,
 ):
     """A DIFFERENT root (not yet watched) added on top of an existing index
     keeps the additive floor -- the union fix must not weaken the gate for a
     genuinely larger corpus (a partially-built index cannot pass early)."""
     mock_doc_count.return_value = 1001        # index already holds corpus A (1001)
     mock_already.return_value = False          # corpus B is a NEW root
-    mock_watcher.return_value = True
+    mock_watcher.return_value = watcher_active
     mock_wait_pipeline.return_value = ReadinessResult(
         passed=True, snapshot={"indexedDocuments": 3001, "indexSizeBytes": 1000},
     )

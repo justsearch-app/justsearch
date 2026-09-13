@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services;
 
-import io.grpc.Server;
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.AgentRunStore;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.tools.FileOperationLog;
@@ -21,13 +22,12 @@ import io.justsearch.app.services.gpl.GplJobCoordinator;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.app.observability.CapabilitiesController;
 import io.justsearch.app.observability.CapabilitiesService;
 import io.justsearch.app.observability.InfraDiagnosticsService;
 import io.justsearch.app.observability.InfraHealthBootstrap;
-import io.justsearch.app.observability.InfraHealthGrpcService;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -53,6 +53,13 @@ import org.slf4j.LoggerFactory;
  * {@link #close}. §31 Phase 3 dissolved the registerLateBoundHandlers hook.
  */
 public final class HeadAssembly implements AutoCloseable {
+  private final io.justsearch.app.api.operations.OperationStore operations;
+  private final io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+  public io.justsearch.app.api.operations.OperationAttemptRunner operationAttempts() { return attempts; }
+
+  /** Borrowed process-lifetime store; this assembly never closes it. */
+  public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
+
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
 
   // §10 endpoint: bootstrap holds typed phase records (capabilities/services/substrateGraph/
@@ -60,7 +67,7 @@ public final class HeadAssembly implements AutoCloseable {
   // few cross-phase intermediates (Worker connection state, inference handles, pre-substrate
   // operation registry, GPL/LambdaMART, indexing-jobs bridge).
   private volatile SearchPort searchPort;
-  private volatile RemoteKnowledgeClient knowledgeClient;
+  private volatile KnowledgeClient knowledgeClient;
   private volatile KnowledgeServerBootstrap knowledgeServerBootstrap;
   // §31 Phase 3: LateBoundServices DELETED. The 7 controller-services are constructed by
   // ServicePhase and held via this.serviceOut. The 3 controller back-refs (settings reset
@@ -76,11 +83,27 @@ public final class HeadAssembly implements AutoCloseable {
   private final io.justsearch.app.api.ModeChangeListener gpuBroadcastListener;
   // Tempdoc 737 Phase 1 — the single-writer runtime authority; closed on teardown with the manager.
   private final io.justsearch.app.services.runtimestate.RuntimeReconciler runtimeReconciler;
-  // §10 Phase A: InfraPhase.Output holds the gRPC server + capabilities handler.
+  // §10 Phase A: InfraPhase.Output holds the capabilities handler. Item A14 removed the second
+  // Netty server it used to hold alongside it (the infra-health gRPC endpoint).
   private io.justsearch.app.services.bootstrap.phases.InfraPhase.Output infraOut;
   private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final List<io.justsearch.app.services.encryption.UnlockDeferredScan> unlockScans =
+      new java.util.ArrayList<>();
   private final io.justsearch.app.services.vdu.OfflineCoordinator offlineCoordinator;
   private final Telemetry telemetry;
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration foregroundDocumentOwner;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundDocumentOwner;
+  private final java.util.concurrent.ExecutorService foregroundDocuments;
+  private final java.util.concurrent.ExecutorService backgroundDocuments;
+  private final AutoCloseable operationsRetentionTimer;
+
+
+  public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+  private final io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch;
+  public io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch() {
+    return perSourceSearch; // Absent only in the search-port-only fixture.
+  }
   private final KnowledgeHttpApiAdapter agentSearchAdapter;
   // Tempdoc 913 D5: the ONE file-operation journal for the process. Held for the same reason
   // agentSearchAdapter is — connectKnowledgeServer hands it to AgentToolHandlers.registerLateBound
@@ -129,7 +152,7 @@ public final class HeadAssembly implements AutoCloseable {
 
   /** Tempdoc 629 (LAYER): the data-at-rest key manager (owns the DEK lifecycle for AUTHORED stores). */
   private final io.justsearch.app.services.encryption.DataKeyManager dataKeyManager;
-  private volatile Thread gplAutoTriggerThread;
+  private volatile AutoCloseable gplAutoTrigger;
 
   // §31 Phase 2 — late-bindings holder for SettingsController::resetToDefaults +
   // DebugStateProvider SPI + StatusSnapshotProvider SPI. Set by LocalApiServer after it
@@ -285,17 +308,57 @@ public final class HeadAssembly implements AutoCloseable {
     return serviceOut;
   }
 
-  /** Create a bootstrap that wires the shared pipeline-backed search runtime. */
+  /**
+   * Configures whether closing this assembly also stops its managed generative backend.
+   *
+   * <p>The ordered Engine shutdown calls this immediately before {@link #close()}. Restart and
+   * hang shutdowns leave llama-server alive for adoption; quit and upgrade shutdowns stop it.
+   */
+  public void setStopGenerativeBackendOnClose(boolean stop) {
+    if (inferenceManager != null) {
+      inferenceManager.setStopServerOnClose(stop);
+    }
+  }
+
+  /**
+   * Constructs the head with the one Engine admission owner shared by the API and agent paths.
+   * The separate parameter keeps the existing operation-lease compatibility seam while making
+   * the admission dependency explicit at the composition root.
+   */
   public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       ConfigManagerBootstrap configManager,
       KnowledgeServerBootstrap knowledgeServer,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
-      // Tempdoc 627 Deliverable 10: the one shared WorkerCapability created before the async
-      // worker-start fork. Null on the standalone/test paths (CapabilityPhase then builds its own).
-      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability) {
+      io.justsearch.app.services.lifecycle.WorkerCapability sharedWorkerCapability,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
+      io.justsearch.app.api.OperationLeaseService operationLeases,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this.operations = Objects.requireNonNull(operations, "operations");
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     Objects.requireNonNull(telemetry, "telemetry");
+    Objects.requireNonNull(engineAdmission, "engineAdmission");
+    List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
+    try {
+    this.perSourceSearch = new io.justsearch.app.services.worker.SearchPerSourceExecutor(executors, engineAdmission);
+    acquiredOwners.add(perSourceSearch);
+    this.executors = Objects.requireNonNull(executors, "executors");
+    this.foregroundDocumentOwner = documentExecutorOwner(executors,
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND, "foreground");
+    acquiredOwners.add(foregroundDocumentOwner);
+    this.backgroundDocumentOwner = documentExecutorOwner(executors,
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, "background");
+    acquiredOwners.add(backgroundDocumentOwner);
+    this.foregroundDocuments = foregroundDocumentOwner.open(
+        Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
+    this.backgroundDocuments = backgroundDocumentOwner.open(
+        Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
+    this.operationsRetentionTimer = startOperationsRetentionTimer(this.operations, this.executors);
+    acquiredOwners.add(this.operationsRetentionTimer);
     this.telemetry = telemetry;
+    Objects.requireNonNull(managedChildRegistry, "managedChildRegistry");
     Objects.requireNonNull(configManager, "configManager");
     ConfigSnapshot snapshot = configManager.currentSnapshot();
     ResolvedConfig rc = ConfigStore.global().get();
@@ -336,7 +399,7 @@ public final class HeadAssembly implements AutoCloseable {
     IndexingService indexingService = this.knowledgeClient;
     DocumentService documentService =
         io.justsearch.app.services.bootstrap.phases.BootstrapDocumentService.create(
-            () -> this.knowledgeClient, telemetry);
+            foregroundDocuments, backgroundDocuments, () -> this.knowledgeClient, telemetry);
     this.searchPort =
         this.knowledgeClient != null
             ? this.knowledgeClient
@@ -366,7 +429,8 @@ public final class HeadAssembly implements AutoCloseable {
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
         inferenceConfigured
-            ? io.justsearch.app.services.bootstrap.phases.InferenceDecision.createInferenceManager(telemetry)
+            ? io.justsearch.app.services.bootstrap.phases.InferenceDecision.createInferenceManager(
+                executors, telemetry, managedChildRegistry)
             : null;
     this.inferenceManager = manager;
     // Tempdoc 518 Wave B + Slice 2 (ported from main 17545ad2a + 3a5355216) — install the
@@ -377,6 +441,7 @@ public final class HeadAssembly implements AutoCloseable {
       try {
         this.asyncTransitionLog =
             new io.justsearch.app.inference.AsyncInferenceTransitionLog(
+                executors,
                 new io.justsearch.app.inference.NdjsonInferenceTransitionLog(getJustSearchHome()));
         manager.installTransitionLog(this.asyncTransitionLog);
       } catch (Exception e) {
@@ -397,6 +462,9 @@ public final class HeadAssembly implements AutoCloseable {
                 () ->
                     io.justsearch.app.services.bootstrap.phases.ServicePhase.runWithOutcome(
                         new io.justsearch.app.services.bootstrap.phases.ServicePhase.Input(
+                            executors,
+                            engineAdmission,
+                            this.perSourceSearch,
                             knowledgeServerForService,
                             this.knowledgeClient,
                             indexingServiceFinal,
@@ -410,10 +478,11 @@ public final class HeadAssembly implements AutoCloseable {
                             settingsStoreFinal,
                             this.lateBindings,
                             () -> this.knowledgeClient,
-                            this::currentKnowledgeServer)))
+                            this::currentKnowledgeServer, operationLeases)))
             .orThrow();
     long t_service_1 = System.currentTimeMillis();
     this.serviceOut = serviceOut;
+    if (serviceOut.offlineCoordinator() != null) acquiredOwners.add(serviceOut.offlineCoordinator());
     // Tempdoc 541 §5.1 — project Brain composition root from the service phase window. ILM
     // is constructed earlier (just above, into `manager`); BrainAssembly wraps it as the
     // single Phase Output of process=brain.
@@ -509,9 +578,9 @@ public final class HeadAssembly implements AutoCloseable {
     // (834 R5). UnlockDeferredScan owns the two DataKeyManager constraints — listeners run under
     // the key monitor, and `fire` swallows their throws — so the scan lands off-monitor and cannot
     // vanish. The pass is idempotent, so boot + unlock + re-unlock are all safe.
-    new io.justsearch.app.services.encryption.UnlockDeferredScan(
-            "agent-run-reconciler", agentRunReconciler::reconcile)
-        .attachTo(this.dataKeyManager);
+    unlockScans.add(new io.justsearch.app.services.encryption.UnlockDeferredScan(
+            executors, "agent-run-reconciler", agentRunReconciler::reconcile)
+        .attachTo(this.dataKeyManager));
 
     // §4 Phase 4 — SubstratePhase: composes operation registry + catalogs + resource/metric/
     // operation/health substrate init + indexing-jobs bridge + rule runner.
@@ -522,6 +591,7 @@ public final class HeadAssembly implements AutoCloseable {
                 "substrate",
                 () ->
                     io.justsearch.app.services.bootstrap.phases.SubstratePhase.runWithOutcome(
+                        attempts, engineAdmission, executors,
             telemetry,
             () -> this.knowledgeServerBootstrap,
             () -> this.knowledgeClient,
@@ -546,7 +616,8 @@ public final class HeadAssembly implements AutoCloseable {
                     // MCP-host servers (tempdoc 560 §6): resolved by the config authority here at
                     // the allowlisted entrypoint, parsed downstream (app-services may not read env).
                     io.justsearch.app.services.mcphost.McpHostConfig.fromPath(
-                        io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath())))
+                        io.justsearch.configuration.EnvRegistry.MCP_HOST_CONFIG.getPath()),
+                    new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager)))
             .orThrow();
 
     // Tempdoc 560 Phase 1 — wire the host LLM as the MCP sampling answerer (an external MCP server
@@ -562,10 +633,10 @@ public final class HeadAssembly implements AutoCloseable {
         io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.loadRegistryMessages();
     this.operationMessageResolver = key -> registryMessages.getProperty(key, key);
 
-    Supplier<List<String>> agentRootPaths =
+    java.util.function.Function<EngineContext, List<String>> agentRootPaths =
         this.knowledgeClient != null
-            ? () ->
-                this.services.worker().indexing().getWatchedRoots().stream()
+            ? engineContext ->
+                this.services.worker().indexing().getWatchedRoots(engineContext).stream()
                     .map(r -> r.path().toAbsolutePath().normalize().toString())
                     .toList()
             : null;
@@ -635,6 +706,7 @@ public final class HeadAssembly implements AutoCloseable {
     if (agentRunStore != null) {
       this.agentHistoryIndexer =
           io.justsearch.app.services.agenthistory.AgentHistoryIndexer.register(
+              executors,
               agentRunStore::addEventListener,
               dataDir.resolve("agent-history"),
               () -> this.knowledgeClient);
@@ -658,9 +730,9 @@ public final class HeadAssembly implements AutoCloseable {
                           .toList(),
                   sessionId -> runStoreForHistory.runEvents().readEvents(sessionId));
       reindexMissingTranscripts.run();
-      new io.justsearch.app.services.encryption.UnlockDeferredScan(
-              "agent-history-reconciler", reindexMissingTranscripts)
-          .attachTo(this.dataKeyManager);
+      unlockScans.add(new io.justsearch.app.services.encryption.UnlockDeferredScan(
+              executors, "agent-history-reconciler", reindexMissingTranscripts)
+          .attachTo(this.dataKeyManager));
     }
 
     // §4 Phase 5 — OrchestrationPhase: composes CapabilityHealthBridge + AgentLoopWiring +
@@ -669,13 +741,14 @@ public final class HeadAssembly implements AutoCloseable {
     final IndexingService indexingForOrchestration = indexingService;
     final DocumentService documentForOrchestration = documentService;
     final FileOperationLog fileOperationLogFinal = this.fileOperationLog;
-    final Supplier<List<String>> agentRootPathsFinal = agentRootPaths;
+    final java.util.function.Function<EngineContext, List<String>> agentRootPathsFinal = agentRootPaths;
     var orchestrationOut =
         tracedPhase(
                 "orchestration",
                 () ->
                     io.justsearch.app.services.bootstrap.phases.OrchestrationPhase.runWithOutcome(
                     new io.justsearch.app.services.bootstrap.phases.OrchestrationPhase.Input(
+                        executors,
                         dataDir,
                         telemetry,
                         () -> this.searchPort,
@@ -689,8 +762,8 @@ public final class HeadAssembly implements AutoCloseable {
                         this.gpuBroadcastListener,
                         this.substrateOut,
                         this.capabilities,
-                        this.infraOut == null ? null : this.infraOut.infraHealthGrpcServer(),
                         this.operationMessageResolver,
+                        engineAdmission,
                         fileOperationLogFinal,
                         agentRunStore,
                         agentRootPathsFinal,
@@ -707,12 +780,22 @@ public final class HeadAssembly implements AutoCloseable {
                         feedbackCipher)))
             .orThrow();
     this.services = orchestrationOut.initialServices();
-    this.orchestration = orchestrationOut.orchestrationHandles();
+    this.orchestration =
+        orchestrationOut.orchestrationHandles().withOperationsRetention(this.operationsRetentionTimer);
     this.gplJobCoordinator = orchestrationOut.gplJobCoordinator();
-    this.gplAutoTriggerThread = orchestrationOut.gplAutoTriggerThread();
+    this.gplAutoTrigger = orchestrationOut.gplAutoTrigger();
     this.gplSnapshotFile = orchestrationOut.gplSnapshotFile();
     this.lambdaMartModelFile = orchestrationOut.lambdaMartModelFile();
     this.substrateGraph = assembleSubstrateGraph();
+    io.justsearch.app.services.operations.OperationRecoveryNotice.observePersistenceFailures(
+        attempts, this.substrateGraph.health().conditionStore(), this.substrateGraph.health().changes(),
+        this.substrateGraph.health().headSource(), java.time.Clock.systemUTC());
+    operations.recovery().ifPresent(recovery -> {
+      var health = this.substrateGraph.health();
+      io.justsearch.app.services.operations.OperationRecoveryNotice.publish(
+          health.conditionStore(), health.changes(), recovery, health.headSource(),
+          java.time.Clock.systemUTC());
+    });
     // Tempdoc 541 §5.2 + fix-pass A.1: wrap the agent-tool late-bind registration in a
     // Memoized<Boolean>. Body invokes AgentToolHandlers.registerLateBound at first resolve;
     // result is whether the prerequisites were met (true — including the case where every ref
@@ -813,13 +896,14 @@ public final class HeadAssembly implements AutoCloseable {
                 operationOut
                     .durableGrantScope()
                     .bindIndexedRoots(
-                        () ->
-                            indexing.getWatchedRoots().stream()
+                        engineContext ->
+                            indexing.getWatchedRoots(engineContext).stream()
                                 .filter(r -> r != null && r.path() != null)
                                 .map(r -> r.path().toAbsolutePath().normalize())
                                 .toList());
               }
               return io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.registerLateBound(
+                  this.perSourceSearch,
                   this.substrateOut.operationHandlers(),
                   this.knowledgeServerBootstrap,
                   this.knowledgeClient,
@@ -848,19 +932,22 @@ public final class HeadAssembly implements AutoCloseable {
         sealedTrace.totalDurationMs().orElse(0L));
     io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.logAiServicesConfiguration(
         onlineAiService, inferenceManager, knowledgeClient, orchestrationOut.agentService());
+    } catch (RuntimeException | Error failure) {
+      closeFailedOwners(acquiredOwners, failure);
+      throw failure;
+    }
   }
 
   /** F5 Phase 4: delegates to OrchestrationAssembly.build. */
   private io.justsearch.app.services.bootstrap.OrchestrationHandles buildOrchestrationHandles(
       AutoCloseable indexingJobsBridge, AutoCloseable agentToolHandlers) {
     return io.justsearch.app.services.bootstrap.phases.OrchestrationAssembly.build(
-        this.gplAutoTriggerThread,
+        this.gplAutoTrigger,
         this.lambdaMartReranker,
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().jobQueueDepthMetricProducer(),
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().documentsIndexedRateMetricProducer(),
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().gpuUtilizationMetricProducer(),
         this.substrateOut.metricsOut() == null ? null : this.substrateOut.metricsOut().gpuMemoryUtilizationMetricProducer(),
-        this.infraOut == null ? null : this.infraOut.infraHealthGrpcServer(),
         this.inferenceManager,
         this.gpuBroadcastListener,
         this.runtimeReconciler,
@@ -885,16 +972,39 @@ public final class HeadAssembly implements AutoCloseable {
    * public secondary constructor. Same behavior; the name documents intent (test-only,
    * narrow search path) and keeps the surface symmetric with the primary boot path.
    */
-  public static HeadAssembly bootForSearchPortOnly(SearchPort searchPort, Telemetry telemetry) {
-    return new HeadAssembly(searchPort, telemetry);
+  public static HeadAssembly bootForSearchPortOnly(
+      io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      SearchPort searchPort, Telemetry telemetry, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    return new HeadAssembly(operations, attempts, executors, searchPort, telemetry, engineAdmission);
   }
 
   /**
    * Internal constructor for {@link #bootForSearchPortOnly}. Not called directly outside this
    * class — the static factory is the public surface.
    */
-  private HeadAssembly(SearchPort searchPort, Telemetry telemetry) {
+  private HeadAssembly(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      SearchPort searchPort, Telemetry telemetry, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this.operations = Objects.requireNonNull(operations, "operations");
+    this.attempts = Objects.requireNonNull(attempts, "attempts");
     Objects.requireNonNull(searchPort, "searchPort");
+    List<AutoCloseable> acquiredOwners = new java.util.ArrayList<>();
+    try {
+    this.perSourceSearch = null;
+    this.executors = Objects.requireNonNull(executors, "executors");
+    this.foregroundDocumentOwner = documentExecutorOwner(executors,
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND, "foreground");
+    acquiredOwners.add(foregroundDocumentOwner);
+    this.backgroundDocumentOwner = documentExecutorOwner(executors,
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, "background");
+    acquiredOwners.add(backgroundDocumentOwner);
+    this.foregroundDocuments = foregroundDocumentOwner.open(
+        Thread.ofPlatform().daemon().name("head-documents-foreground-", 0).factory());
+    this.backgroundDocuments = backgroundDocumentOwner.open(
+        Thread.ofPlatform().daemon().name("head-documents-background-", 0).factory());
+    this.operationsRetentionTimer = startOperationsRetentionTimer(this.operations, this.executors);
+    acquiredOwners.add(this.operationsRetentionTimer);
     this.telemetry = telemetry;
     this.searchPort = searchPort;
     this.knowledgeClient = null;
@@ -923,23 +1033,26 @@ public final class HeadAssembly implements AutoCloseable {
     var resourceOut =
         io.justsearch.app.services.bootstrap.phases.ResourceSubstrateInit.run(
             io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext());
-    var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(telemetry);
+    var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(executors, telemetry);
     var operationOut =
-        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(
+        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(attempts, engineAdmission,
+            executors,
             handlers,
             operationCatalog,
             agentToolsCatalog,
             buildCapabilityResolver(),
-            resourceOut.coreSurfaceCatalog());
+            resourceOut.coreSurfaceCatalog(), io.justsearch.agent.api.encryption.StoreCipher.disabled());
     // Bridge wired after operationOut so its ActionLedgerChangeRegistry feeds the terminal-outcome
     // translator (tempdoc 550 thesis I); neither phase depends on the other.
     var bridgeOut =
         io.justsearch.app.services.bootstrap.phases.IndexingJobsBridgeWiring.wire(
+            executors,
             () -> this.knowledgeClient,
             resourceOut.indexingJobsChangeRegistry(),
             operationOut.actionLedgerChangeRegistry());
     var healthOut =
         io.justsearch.app.services.bootstrap.phases.HealthSubstrateInit.run(
+            executors,
             io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.resolveOccurrenceBufferSize(),
             operationOut.healthRecoveryProjector(),
             operationOut.advisoryChangeRegistry(),
@@ -971,6 +1084,13 @@ public final class HeadAssembly implements AutoCloseable {
     // surfaces "skipped: no worker" if any caller queries it.
     this.agentToolsRegistration =
         io.justsearch.app.services.bootstrap.Memoized.of(() -> Boolean.FALSE);
+    this.orchestration =
+        io.justsearch.app.services.bootstrap.OrchestrationHandles.empty()
+            .withOperationsRetention(this.operationsRetentionTimer);
+    } catch (RuntimeException | Error failure) {
+      closeFailedOwners(acquiredOwners, failure);
+      throw failure;
+    }
   }
 
   /** §5/F1 snapshot accessor — projects the live inference manager into a status record. */
@@ -1133,6 +1253,11 @@ public final class HeadAssembly implements AutoCloseable {
     this.authoredStores.add(descriptor);
   }
 
+  /** Shared metadata-only query for the HTTP and MCP history surfaces; never dispatches an effect. */
+  public io.justsearch.app.api.operations.OperationOutcomeView operationOutcome(String key) {
+    return operations.outcome(key);
+  }
+
   /** The aggregated AUTHORED store list, read by the backup export/import. */
   public List<io.justsearch.agent.api.encryption.StoreDescriptor> authoredStores() {
     return List.copyOf(this.authoredStores);
@@ -1266,14 +1391,16 @@ public final class HeadAssembly implements AutoCloseable {
     // the connect window + outcome reasonCode so downstream consumers (FE panel, observability
     // exporters) can see post-boot substrate mutations that the sealed BootTrace can't.
     long t_rebuild_0 = System.currentTimeMillis();
-    RemoteKnowledgeClient client = ks.client();
+    KnowledgeClient client = ks.client();
     this.knowledgeClient = client;
     this.knowledgeServerBootstrap = ks;
+    io.justsearch.app.services.bootstrap.phases.InferenceWiring.refreshGpuStatus(
+        this.inferenceManager, ks);
     this.searchPort = client;
     IndexingService newIndexing = client;
     DocumentService newDocuments =
         io.justsearch.app.services.bootstrap.phases.BootstrapDocumentService.create(
-            () -> this.knowledgeClient, telemetry);
+            foregroundDocuments, backgroundDocuments, () -> this.knowledgeClient, telemetry);
     if (this.substrateOut.indexingJobsBridge() != null) {
       try {
         this.substrateOut.indexingJobsBridge().start();
@@ -1293,7 +1420,9 @@ public final class HeadAssembly implements AutoCloseable {
     var localCap = this.capabilities.worker();
     AutoCloseable bridgeHandle =
         this.substrateOut.indexingJobsBridge() == null ? null : (AutoCloseable) this.substrateOut.indexingJobsBridge()::stop;
-    this.orchestration = buildOrchestrationHandles(bridgeHandle, null);
+    this.orchestration =
+        buildOrchestrationHandles(bridgeHandle, null)
+            .withOperationsRetention(this.operationsRetentionTimer);
     io.justsearch.app.api.SearchService newSearch =
         new io.justsearch.app.services.search.SearchServiceImpl(() -> this.searchPort);
     this.services =
@@ -1384,18 +1513,29 @@ public final class HeadAssembly implements AutoCloseable {
     return substrateOut == null ? null : substrateOut.operationOut().capabilitiesChangeRegistry();
   }
 
+  /** Whether the drain barrier passed and dependency teardown began, even if cleanup then failed. */
+  public boolean isDependencyTeardownStarted() {
+    return closed.get();
+  }
+
   /** §4 F4 LIFO teardown via the typed OrchestrationHandles record. */
   @Override
   public void close() {
+    // Repeatable termination barrier: an unfinished procedure must leave a later close able to
+    // finish dependency teardown. Never claim the one-shot closed state before this succeeds.
+    if (offlineCoordinator != null) offlineCoordinator.close();
+    io.justsearch.app.services.bootstrap.OrchestrationHandles handles = this.orchestration;
+    if (!closed.get() && handles != null && handles.operationsRetention() != null) {
+      try { handles.operationsRetention().close(); }
+      catch (RuntimeException failure) { throw failure; }
+      catch (Exception failure) { throw new IllegalStateException("Operations retention did not drain", failure); }
+    }
     if (!closed.compareAndSet(false, true)) return;
-    // Tempdoc 518 Wave A-E defect Fix-3 (ported from main 3a5355216): drain pending
-    // transition-log writes before closing the manager (the manager's close path may emit
-    // one final transition).
-    if (asyncTransitionLog != null) {
+    if (serviceOut != null) {
       try {
-        asyncTransitionLog.close();
-      } catch (Exception e) {
-        log.warn("Failed to close AsyncInferenceTransitionLog", e);
+        serviceOut.runtimeActivationHelper().close();
+      } catch (RuntimeException e) {
+        log.warn("Failed to close RuntimeActivationService", e);
       }
     }
     // Tempdoc 812 D2: stop the scan-rollup quiescence sweeper (symmetric with its construction in
@@ -1416,8 +1556,135 @@ public final class HeadAssembly implements AutoCloseable {
         log.warn("Failed to close ReadinessReconciliationTrigger", e);
       }
     }
-    io.justsearch.app.services.bootstrap.OrchestrationHandles handles = this.orchestration;
-    if (handles != null) handles.close();
+    try {
+      RuntimeException failure = null;
+      for (var scan : unlockScans) {
+        try { scan.close(); }
+        catch (RuntimeException closeFailure) {
+          if (failure == null) failure = closeFailure;
+          else failure.addSuppressed(closeFailure);
+        }
+      }
+      try { if (handles != null) handles.withOperationsRetention(null).close(); }
+      catch (RuntimeException closeFailure) {
+        if (failure == null) failure = closeFailure;
+        else failure.addSuppressed(closeFailure);
+      }
+      if (failure != null) throw failure;
+    } finally {
+      try {
+        try {
+          if (agentHistoryIndexer != null) agentHistoryIndexer.close();
+        } finally {
+          // The manager emits its final SHUTDOWN transition while closing above. Drain afterwards.
+          if (asyncTransitionLog != null) asyncTransitionLog.close();
+        }
+      } finally {
+        try {
+          if (perSourceSearch != null) perSourceSearch.close();
+        } finally {
+          try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
+        }
+      }
+    }
+  }
+
+  private static void closeFailedOwners(List<AutoCloseable> owners, Throwable failure) {
+    for (int i = owners.size() - 1; i >= 0; i--) {
+      try { owners.get(i).close(); }
+      catch (Exception | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
+      }
+    }
+  }
+
+  private static io.justsearch.core.execution.EngineExecutorRegistry.Registration documentExecutorOwner(
+      io.justsearch.core.execution.EngineExecutorRegistry registry,
+      io.justsearch.core.execution.EngineExecutorSpec.Kind kind, String suffix) {
+    var limits = registry.limits(kind);
+    return registry.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.documents." + suffix, kind,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+        limits.maxThreads(), limits.maxQueue(), 1));
+  }
+
+  static AutoCloseable startOperationsRetentionTimer(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.core.execution.EngineExecutorRegistry executors) {
+    Objects.requireNonNull(operations, "operations");
+    Objects.requireNonNull(executors, "executors");
+    var limits = executors.limits(
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    var registration = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.operations-retention",
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED,
+        1,
+        limits.maxQueue(),
+        1));
+    java.util.concurrent.ScheduledExecutorService scheduler;
+    try {
+      scheduler = registration.openScheduled(
+          Thread.ofPlatform().daemon().name("operations-retention-", 0).factory());
+      var task = scheduler.scheduleWithFixedDelay(
+          () -> pruneOperationsHistory(operations), 1, 1, java.util.concurrent.TimeUnit.HOURS);
+      return new OperationsRetentionHandle(registration, scheduler, task);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  static void pruneOperationsHistory(io.justsearch.app.api.operations.OperationStore operations) {
+    try {
+      operations.pruneHistory();
+    } catch (RuntimeException failure) {
+      log.error("Operations history retention failed; will retry on the next hourly tick", failure);
+    }
+  }
+
+  private static final class OperationsRetentionHandle implements AutoCloseable {
+    private final io.justsearch.core.execution.EngineExecutorRegistry.Registration registration;
+    private final java.util.concurrent.ScheduledExecutorService scheduler;
+    private final java.util.concurrent.ScheduledFuture<?> task;
+    private boolean closed;
+
+    private OperationsRetentionHandle(
+        io.justsearch.core.execution.EngineExecutorRegistry.Registration registration,
+        java.util.concurrent.ScheduledExecutorService scheduler,
+        java.util.concurrent.ScheduledFuture<?> task) {
+      this.registration = registration;
+      this.scheduler = scheduler;
+      this.task = task;
+    }
+
+    @Override
+    public synchronized void close() {
+      if (closed) {
+        return;
+      }
+      try {
+        task.cancel(true);
+        scheduler.shutdownNow();
+        if (!scheduler.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+          throw new IllegalStateException(
+              "Operations retention scheduler did not terminate within 5s");
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(
+            "Interrupted while waiting for operations retention scheduler termination",
+            interrupted);
+      }
+      // Keep the registration live after a failed termination wait so a later close can finish
+      // the same owner. It is released only after the scheduler has actually terminated.
+      registration.close();
+      closed = true;
+    }
   }
 
   /** Helper for resolving the JustSearch home directory. */

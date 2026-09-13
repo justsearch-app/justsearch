@@ -126,7 +126,7 @@ class MetricCatalogSmokeTest {
     AtomicLong opsAdder = new AtomicLong();
 
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog))) {
 
       MetricRegistry reg = telemetry.registry();
       CounterMetric<ReasonTags> commits = reg.buildCounter("test.runtime.commits_total");
@@ -185,7 +185,7 @@ class MetricCatalogSmokeTest {
   @Test
   void unknownMetricNameThrows() throws Exception {
     Path tmp = Files.createTempDirectory("metric-catalog-unknown");
-    try (LocalTelemetry telemetry = new LocalTelemetry(tmp, 500, "t", "0")) {
+    try (LocalTelemetry telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "t", "0")) {
       MetricRegistry reg = telemetry.registry();
       try {
         reg.buildCounter("test.runtime.unknown");
@@ -202,7 +202,7 @@ class MetricCatalogSmokeTest {
     Path tmp = Files.createTempDirectory("metric-catalog-wrongkind");
     TestCatalog catalog = new TestCatalog();
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(tmp, 500, "t", "0", "metrics.ndjson", List.of(catalog))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "t", "0", "metrics.ndjson", List.of(catalog))) {
       MetricRegistry reg = telemetry.registry();
       try {
         // commits_total is a counter, not a histogram
@@ -244,7 +244,7 @@ class MetricCatalogSmokeTest {
           }
         };
     try {
-      new LocalTelemetry(tmp, 500, "t", "0", "metrics.ndjson", List.of(cat1, cat2)).close();
+      new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "t", "0", "metrics.ndjson", List.of(cat1, cat2)).close();
     } catch (IllegalArgumentException expected) {
       assertTrue(expected.getMessage().contains("Duplicate"));
       return;
@@ -268,7 +268,7 @@ class MetricCatalogSmokeTest {
           }
         };
     try {
-      new LocalTelemetry(tmp, 500, "t", "0", "metrics.ndjson", List.of(bad)).close();
+      new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "t", "0", "metrics.ndjson", List.of(bad)).close();
     } catch (IllegalArgumentException expected) {
       assertTrue(expected.getMessage().contains("does not match catalog namespace"));
       return;

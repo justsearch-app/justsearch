@@ -461,8 +461,13 @@ public sealed interface AgentEvent {
       String errorClass,
       String retryAction,
       Integer retryAttempt,
-      TraceContext trace)
+      TraceContext trace,
+      String reasonCode)
       implements AgentEvent {
+    public AgentError(String error, String errorCode, String errorClass, String retryAction,
+        Integer retryAttempt, TraceContext trace) {
+      this(error, errorCode, errorClass, retryAction, retryAttempt, trace, null);
+    }
     public AgentError(String error, String errorCode) {
       this(error, errorCode, null, null, null, TraceContext.none());
     }

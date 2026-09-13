@@ -11,12 +11,14 @@
  * three configuration authorities (EnvRegistry, ConfigKey, ResolvedConfigBuilder)
  * and reports `yamlKeyCount`, `envSyspropPairCount` and `configKeyCount`.
  *
- * HONEST LIMIT: configuration reaches the Worker by three parallel paths (the
- * worker-config snapshot, blanket JUSTSEARCH_* env forwarding, and the explicit
- * WorkerSpawner forwarded-props list), and the post-handshake divergence check
- * only WARNs. A count over the declared authorities can therefore read complete
- * while an undeclared path grows. This gate ratchets what is *declared*; it does
- * not claim to see every effective knob.
+ * HONEST LIMIT: at the time this was written, configuration reached the Worker by three
+ * parallel paths (the worker-config snapshot, blanket JUSTSEARCH_* env forwarding, and the
+ * explicit WorkerSpawner forwarded-props list), and the post-handshake divergence check only
+ * WARNed. Item A11 has since deleted WorkerSpawner along with the Worker child process, so that
+ * third path no longer exists as described here; whether an equivalent undeclared path exists
+ * for the current, merged process has not been verified. A count over the declared authorities
+ * can therefore read complete while an undeclared path grows. This gate ratchets what is
+ * *declared*; it does not claim to see every effective knob.
  *
  * Baseline format (TSV, per line): `<metric> <count> <date>` — merge-friendly,
  * mirroring gates/module-deps/baseline.txt.

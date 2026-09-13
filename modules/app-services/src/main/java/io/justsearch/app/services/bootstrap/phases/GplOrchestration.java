@@ -1,55 +1,97 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.bootstrap.phases;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.gpl.GplEvalSnapshot;
 import io.justsearch.app.services.gpl.GplJobCoordinator;
 import io.justsearch.app.services.gpl.GplRevalidationTrigger;
 import io.justsearch.app.services.gpl.GplTrainingTripleStore;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 519 §7 / Step 7: GPL training-triple orchestration helpers extracted from
- * {@code HeadAssembly}. Static utility class — no state. Encapsulates the auto-trigger
- * Thread lifecycle, MIME facet fetch, eval snapshot capture, and coordinator construction
+ * {@code HeadAssembly}. Static utility class — no state. Encapsulates the
+ * auto-trigger lifecycle, MIME facet fetch, eval snapshot capture, and coordinator construction
  * (about 150 LOC of orchestration that doesn't belong in the bootstrap's body).
  */
 public final class GplOrchestration {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "gpl-orchestration", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
 
   private static final Logger log = LoggerFactory.getLogger(GplOrchestration.class);
 
   private GplOrchestration() {}
 
   /**
-   * Starts a virtual-thread auto-trigger loop that polls the Worker every 30s. When the Worker
+   * Starts a bounded platform-thread auto-trigger loop that polls the Worker every 30s. When the Worker
    * state is IDLE and the doc count is stable across two consecutive polls, fires
    * {@code coordinator.runAsync()} via the trigger's evaluate logic. Returns null if either
    * {@code coordinator} or {@code client} is null.
    */
-  public static Thread startAutoTrigger(
+  public static AutoCloseable startAutoTrigger(
+      EngineExecutorRegistry processExecutors,
       GplJobCoordinator coordinator,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       Path snapshotFile,
       GplRevalidationTrigger trigger) {
-    if (coordinator == null || clientSupplier == null) {
+    if (coordinator == null || clientSupplier == null || aiService == null) {
       return null;
     }
-    return Thread.ofVirtual()
-        .name("gpl-auto-trigger")
-        .start(() -> autoTriggerLoop(coordinator, clientSupplier, aiService, snapshotFile, trigger));
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.gpl-auto-trigger",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    ExecutorService executor;
+    try {
+      executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "gpl-auto-trigger");
+                thread.setDaemon(true);
+                return thread;
+              });
+      Future<?> task =
+          executor.submit(
+              () -> autoTriggerLoop(coordinator, clientSupplier, aiService, snapshotFile, trigger));
+      return new AutoTriggerHandle(registration, executor, task);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   private static void autoTriggerLoop(
       GplJobCoordinator coordinator,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       Path snapshotFile,
       GplRevalidationTrigger trigger) {
@@ -63,11 +105,11 @@ public final class GplOrchestration {
         break;
       }
       try {
-        RemoteKnowledgeClient client = clientSupplier.get();
+        KnowledgeClient client = clientSupplier.get();
         if (client == null) {
           continue;
         }
-        io.justsearch.ipc.StatusResponse status = client.getStatus();
+        io.justsearch.ipc.StatusResponse status = client.getStatus(ENGINE_CONTEXT);
         String state = status.getCore().getState();
         long docCount = status.getCore().getDocCount();
         long uptimeMs = status.getCore().getUptimeMs();
@@ -104,7 +146,7 @@ public final class GplOrchestration {
   }
 
   /** Fetches MIME-type distribution via a facet-only search. Returns null on failure. */
-  public static Map<String, Long> fetchMimeFacets(RemoteKnowledgeClient client) {
+  public static Map<String, Long> fetchMimeFacets(KnowledgeClient client) {
     try {
       io.justsearch.ipc.SearchRequest req =
           io.justsearch.ipc.SearchRequest.newBuilder()
@@ -126,7 +168,7 @@ public final class GplOrchestration {
                               .build())
                       .build())
               .build();
-      io.justsearch.ipc.SearchResponse resp = client.search(req);
+      io.justsearch.ipc.SearchResponse resp = client.search(req, ENGINE_CONTEXT);
       io.justsearch.ipc.FacetCounts counts = resp.getFacetsMap().get("mime");
       return counts != null ? new HashMap<>(counts.getCountsMap()) : Map.of();
     } catch (Exception e) {
@@ -137,9 +179,9 @@ public final class GplOrchestration {
 
   /** Captures + persists a GPL eval snapshot after a successful job completion. Best-effort. */
   public static void captureSnapshot(
-      RemoteKnowledgeClient client, GplJobCoordinator coordinator, Path snapshotFile) {
+      KnowledgeClient client, GplJobCoordinator coordinator, Path snapshotFile) {
     try {
-      io.justsearch.ipc.StatusResponse status = client.getStatus();
+      io.justsearch.ipc.StatusResponse status = client.getStatus(ENGINE_CONTEXT);
       Map<String, Long> mimeCounts = fetchMimeFacets(client);
       long triples = coordinator.getStatus().tripleCount();
       GplEvalSnapshot.capture(status, mimeCounts, triples).save(snapshotFile);
@@ -157,15 +199,16 @@ public final class GplOrchestration {
    * Tempdoc 519 F5 step 4: encapsulates the holder-array + snapshot-callback + auto-trigger
    * wiring previously inlined in {@code HeadAssembly}. Constructs the snapshot file path,
    * the coordinator (with the holder pattern that lets the snapshot callback reach the
-   * coordinator after createCoordinator returns), and the auto-trigger thread. Returns a
+   * coordinator after createCoordinator returns), and the auto-trigger lifecycle. Returns a
    * record bundling all three.
    *
    * @param onAfterSnapshot callback fired after a snapshot is captured (used by the bootstrap
    *     to optionally fire {@code startLambdaMartTrainingAsync} when LambdaMART is enabled).
    */
   public static Wired wire(
+      EngineExecutorRegistry processExecutors,
       Path dataDir,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       KnowledgeHttpApiAdapter agentSearchAdapter,
       Runnable onAfterSnapshot) {
@@ -173,31 +216,48 @@ public final class GplOrchestration {
     GplJobCoordinator[] coordinatorHolder = new GplJobCoordinator[1];
     GplJobCoordinator coordinator =
         createCoordinator(
+            processExecutors,
             dataDir,
             clientSupplier,
             aiService,
             agentSearchAdapter,
             () -> {
-              RemoteKnowledgeClient client = clientSupplier.get();
+              KnowledgeClient client = clientSupplier.get();
               if (client != null) {
                 captureSnapshot(client, coordinatorHolder[0], snapshotFile);
               }
               onAfterSnapshot.run();
             });
     coordinatorHolder[0] = coordinator;
-    Thread autoTriggerThread =
+    try {
+    AutoCloseable autoTrigger =
         startAutoTrigger(
-            coordinator, clientSupplier, aiService, snapshotFile, new GplRevalidationTrigger());
-    return new Wired(coordinator, autoTriggerThread, snapshotFile);
+            processExecutors,
+            coordinator,
+            clientSupplier,
+            aiService,
+            snapshotFile,
+            new GplRevalidationTrigger());
+    AutoCloseable ownedWork = () -> {
+      try { autoTrigger.close(); } finally { coordinator.close(); }
+    };
+    return new Wired(coordinator, ownedWork, snapshotFile);
+    } catch (RuntimeException | Error failure) {
+      try { coordinator.close(); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /** Bundle returned by {@link #wire}. */
-  public record Wired(GplJobCoordinator coordinator, Thread autoTriggerThread, Path snapshotFile) {}
+  public record Wired(
+      GplJobCoordinator coordinator, AutoCloseable autoTrigger, Path snapshotFile) {}
 
   /** Constructs the GPL job coordinator. Returns null if dependencies are unavailable. */
   public static GplJobCoordinator createCoordinator(
+      EngineExecutorRegistry processExecutors,
       Path dataDir,
-      Supplier<RemoteKnowledgeClient> clientSupplier,
+      Supplier<KnowledgeClient> clientSupplier,
       OnlineAiService aiService,
       KnowledgeHttpApiAdapter adapter,
       Runnable onJobCompleted) {
@@ -209,10 +269,45 @@ public final class GplOrchestration {
       GplTrainingTripleStore tripleStore = new GplTrainingTripleStore(dataDir);
       boolean rerankerAvailable = adapter != null && adapter.isRerankerConfigured();
       return new GplJobCoordinator(
-          clientSupplier, aiService, rerankerAvailable, tripleStore, onJobCompleted);
+          processExecutors, clientSupplier, aiService, rerankerAvailable, tripleStore, onJobCompleted);
     } catch (Exception e) {
       log.warn("Failed to create GplJobCoordinator; GPL features unavailable", e);
       return null;
+    }
+  }
+
+  private static final class AutoTriggerHandle implements AutoCloseable {
+    private final EngineExecutorRegistry.Registration registration;
+    private final ExecutorService executor;
+    private final Future<?> task;
+    private boolean closed;
+
+    private AutoTriggerHandle(
+        EngineExecutorRegistry.Registration registration,
+        ExecutorService executor,
+        Future<?> task) {
+      this.registration = registration;
+      this.executor = executor;
+      this.task = task;
+    }
+
+    @Override
+    public synchronized void close() {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      task.cancel(true);
+      executor.shutdownNow();
+      try {
+        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+          log.warn("GPL auto-trigger executor did not terminate within 5s");
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+      } finally {
+        registration.close();
+      }
     }
   }
 }

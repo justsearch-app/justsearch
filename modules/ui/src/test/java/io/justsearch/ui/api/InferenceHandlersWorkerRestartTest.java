@@ -13,8 +13,9 @@ import static org.mockito.Mockito.when;
 import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.ErrorClass;
+import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.RestartRequiredException;
 import io.justsearch.app.services.worker.WorkerRecoveryAuthority;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
@@ -97,55 +98,37 @@ final class InferenceHandlersWorkerRestartTest {
   }
 
   @Test
-  @DisplayName("a vetoed or exhausted recovery keeps 503 — the state will not change by itself")
+  @DisplayName("an exhausted local recovery keeps 503")
   void declinedRecoveryKeeps503() {
-    for (WorkerRecoveryAuthority.Verdict verdict :
-        List.of(
-            WorkerRecoveryAuthority.Verdict.VETOED_SUPERVISION,
-            WorkerRecoveryAuthority.Verdict.VETOED_RESTART_EXHAUSTED,
-            WorkerRecoveryAuthority.Verdict.EXHAUSTED)) {
-      InferenceHandlers handlers = handlersWithNoWorker();
-      handlers.setWorkerRecovery(new StubAuthority(verdict));
-      Context ctx = mockContext();
-
-      handlers.handleRestartWorker(ctx);
-
-      verify(ctx).status(503);
-    }
+    InferenceHandlers handlers = handlersWithNoWorker();
+    handlers.setWorkerRecovery(new StubAuthority(WorkerRecoveryAuthority.Verdict.EXHAUSTED));
+    Context ctx = mockContext();
+    handlers.handleRestartWorker(ctx);
+    verify(ctx).status(503);
   }
 
   @Test
-  @DisplayName("a TERMINAL decline is not advertised as retryable (live leg, run 2)")
+  @DisplayName("an exhausted local budget is permanent until the application restarts")
   void terminalDeclineIsNotRetryable() {
-    for (WorkerRecoveryAuthority.Verdict verdict :
-        List.of(
-            WorkerRecoveryAuthority.Verdict.EXHAUSTED,
-            WorkerRecoveryAuthority.Verdict.VETOED_RESTART_EXHAUSTED)) {
-      Map<String, Object> body = declineBody(verdict);
-
-      // The live run measured errorClass=TRANSIENT / retryable=true on a state where the next
-      // request provably returns the same answer until the application is restarted.
-      assertEquals(ApiErrorCode.WORKER_RECOVERY_EXHAUSTED.name(), body.get("errorCode"), verdict.name());
-      assertEquals(ErrorClass.PERMANENT.name(), body.get("errorClass"), verdict.name());
-      assertEquals(false, body.get("retryable"), verdict.name());
-      assertEquals("errors." + ApiErrorCode.WORKER_RECOVERY_EXHAUSTED.name(), body.get("i18nKey"));
-      assertTrue(
-          String.valueOf(body.get("error")).contains("restart the application"),
-          "the message must name the one remedy that works: " + body.get("error"));
-    }
+    Map<String, Object> body = declineBody(WorkerRecoveryAuthority.Verdict.EXHAUSTED);
+    assertEquals(ApiErrorCode.WORKER_RECOVERY_EXHAUSTED.name(), body.get("errorCode"));
+    assertEquals(ErrorClass.PERMANENT.name(), body.get("errorClass"));
+    assertEquals(false, body.get("retryable"));
+    assertEquals("errors." + ApiErrorCode.WORKER_RECOVERY_EXHAUSTED.name(), body.get("i18nKey"));
+    assertTrue(String.valueOf(body.get("error")).contains("restart the application"));
   }
 
   @Test
-  @DisplayName("a still-supervised decline stays retryable — that one really can change")
-  void supervisedDeclineStaysRetryable() {
-    Map<String, Object> body = declineBody(WorkerRecoveryAuthority.Verdict.VETOED_SUPERVISION);
-
-    assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE.name(), body.get("errorCode"));
-    assertEquals(ErrorClass.TRANSIENT.name(), body.get("errorClass"));
-    assertEquals(true, body.get("retryable"));
-    assertTrue(
-        String.valueOf(body.get("error")).contains("retry shortly"),
-        "…and says so: " + body.get("error"));
+  @DisplayName("an already-running local recovery reports accepted without another attempt")
+  void alreadyRunningRecoveryAnswers202() {
+    InferenceHandlers handlers = handlersWithNoWorker();
+    StubAuthority authority = new StubAuthority(WorkerRecoveryAuthority.Verdict.ALREADY_RUNNING);
+    handlers.setWorkerRecovery(authority);
+    Context ctx = mockContext();
+    handlers.handleRestartWorker(ctx);
+    verify(ctx).status(202);
+    assertEquals(1, authority.calls.get());
+    assertEquals("ALREADY_RUNNING", capturedBody(ctx).get("recovery"));
   }
 
   @Test
@@ -186,6 +169,51 @@ final class InferenceHandlersWorkerRestartTest {
     ArgumentCaptor<Object> json = ArgumentCaptor.forClass(Object.class);
     verify(ctx).json(json.capture());
     return (Map<String, Object>) json.getValue();
+  }
+
+  /**
+   * The restart-as-reload answer itself, which nothing asserted until now. Every case above pins
+   * the pre-bind states — no bootstrap, no client — and each ends before the handler's last
+   * statement, so the ONE arm an operator hits on a healthy Engine ran untested: index half up,
+   * client bound, request arrives, answer is 409 + {@code restart_required}.
+   *
+   * <p>Both halves matter and neither implies the other. The STATUS is what a caller branches on
+   * before it parses anything, and 409 (not 503, not 200) says "your request conflicts with the
+   * state, and no retry changes that". The CODE is what a caller keys off once it has the body —
+   * {@link RestartRequiredException#CODE} exists as a constant precisely so a consumer is not
+   * matching on wording, and asserting the constant rather than the literal is what keeps this
+   * test from passing while the wire value drifts.
+   */
+  @Test
+  @DisplayName("with the index half bound, restart answers 409 restart_required")
+  void boundIndexHalfAnswers409RestartRequired() {
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    when(bootstrap.hasClient()).thenReturn(true);
+    InferenceHandlers handlers =
+        new InferenceHandlers(
+            mock(io.justsearch.app.api.OnlineAiService.class),
+            bootstrap,
+            mock(io.justsearch.gpu.GpuCapabilitiesService.class),
+            mock(io.justsearch.app.api.EnterprisePolicyService.class),
+            mock(io.justsearch.app.services.settings.UiSettingsStore.class),
+            null,
+            null,
+            null);
+    Context ctx = mockContext();
+
+    handlers.handleRestartWorker(ctx);
+
+    verify(ctx).status(409);
+    Map<String, Object> body = capturedBody(ctx);
+    assertEquals(
+        RestartRequiredException.CODE,
+        body.get("code"),
+        "the machine-readable handle a caller keys off must be on the body, not only in the prose");
+    assertEquals(ErrorClass.PERMANENT.name(), body.get("errorClass"));
+    assertEquals(false, body.get("retryable"), "no number of retries reloads an in-process index");
+    assertTrue(
+        String.valueOf(body.get("error")).contains("restart JustSearch"),
+        "the message must name the one remedy that works: " + body.get("error"));
   }
 
   @Test

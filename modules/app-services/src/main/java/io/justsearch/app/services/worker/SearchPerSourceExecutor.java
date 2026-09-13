@@ -1,6 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.app.api.EngineAdmissionService;
+import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineFutures;
+import io.justsearch.core.execution.EngineTaskGroup;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.SearchResult;
@@ -8,91 +15,171 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Tempdoc 556 (F-C4.2): 385 per-source (federated) retrieval — extracted verbatim from {@code
- * KnowledgeHttpApiAdapter}. Issues N parallel meta_source-filtered gRPC calls and round-robin
- * interleaves the results, backfilling from unfiltered retrieval when insufficient. Stateless statics.
- */
-final class SearchPerSourceExecutor {
-
+/** Owns bounded per-source search fanout and its exact admitted-work lifetime. */
+public final class SearchPerSourceExecutor implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(SearchPerSourceExecutor.class);
+  private static final int CHILD_WAIT_SECONDS = 10;
 
-  /** 385: Virtual-thread executor for per-source parallel gRPC calls. */
-  private static final ExecutorService PER_SOURCE_EXECUTOR =
-      Executors.newVirtualThreadPerTaskExecutor();
+  private final EngineExecutorRegistry.Registration foregroundRegistration;
+  private final EngineExecutorRegistry.Registration backgroundRegistration;
+  private final EngineAdmissionService admission;
+  private boolean closed;
 
-  private SearchPerSourceExecutor() {}
-
-  /**
-   * Executes per-source retrieval for multi-source queries (#6 + #1). Uses the original query text
-   * with a {@code meta_source} hard filter per source (FeB4RAG: the filter does the work, BM25 is
-   * robust to source tokens). Falls back to unfiltered retrieval if all per-source calls fail.
-   */
-  static SearchResponse execute(
-      RemoteKnowledgeClient client, SearchRequest baseReq, List<String> sources, int totalLimit) {
-
-    int perSourceLimit = Math.max(1, (int) Math.ceil((double) totalLimit / sources.size()));
-
-    // Fire parallel gRPC calls — one per source
-    List<CompletableFuture<SearchResponse>> futures = new ArrayList<>();
-    for (String source : sources) {
-      futures.add(CompletableFuture.supplyAsync(() -> {
-        SearchRequest perSourceReq = baseReq.toBuilder()
-            .setLimit(perSourceLimit)
-            // Proto3: getFilters() returns default instance (never null) — safe to toBuilder()
-            .setFilters(baseReq.getFilters().toBuilder()
-                .addMetaSource(source.toLowerCase(Locale.ROOT))
-                .build())
-            .build();
-        return client.search(perSourceReq);
-      }, PER_SOURCE_EXECUTOR));
-    }
-
-    // Collect results
-    List<SearchResponse> responses = new ArrayList<>();
-    for (var future : futures) {
-      try {
-        responses.add(future.get(10, TimeUnit.SECONDS));
-      } catch (Exception e) {
-        log.debug("385: Per-source retrieval failed for one source: {}", e.getMessage());
+  /** Creates stable foreground and background virtual executor registrations. */
+  public SearchPerSourceExecutor(
+      EngineExecutorRegistry executors, EngineAdmissionService admission) {
+    Objects.requireNonNull(executors, "executors");
+    this.admission = Objects.requireNonNull(admission, "admission");
+    EngineExecutorRegistry.Registration foreground = null;
+    try {
+      int maxInstances = executors.maxConcurrentWork();
+      foreground = Objects.requireNonNull(executors.register(EngineExecutorSpec.virtual(
+          "head.search-per-source.foreground", EngineExecutorSpec.Kind.FOREGROUND, maxInstances)));
+      EngineExecutorRegistry.Registration background = Objects.requireNonNull(
+          executors.register(EngineExecutorSpec.virtual(
+              "head.search-per-source.background", EngineExecutorSpec.Kind.BACKGROUND, maxInstances)),
+          "background registration");
+      this.foregroundRegistration = foreground;
+      this.backgroundRegistration = background;
+    } catch (RuntimeException | Error failure) {
+      if (foreground != null) {
+        try {
+          foreground.close();
+        } catch (RuntimeException | Error cleanupFailure) {
+          failure.addSuppressed(cleanupFailure);
+        }
       }
+      throw failure;
     }
-
-    if (responses.isEmpty()) {
-      // All per-source calls failed — fall back to unfiltered
-      log.debug("385: All per-source calls failed, falling back to unfiltered retrieval");
-      return client.search(baseReq);
-    }
-
-    // Round-robin interleave hits from each source
-    return mergeSearchResponses(responses, totalLimit, baseReq, client::search);
   }
 
-  /**
-   * 385: Merge N per-source SearchResponses into one via round-robin interleaving. Backfills from
-   * unfiltered retrieval if per-source results are insufficient. Package-private static for
-   * testability — the backfill function is injected to decouple from the gRPC client.
-   */
+  /** Executes one filtered search per source and round-robin merges the responses. */
+  public SearchResponse execute(
+      KnowledgeClient client,
+      SearchRequest baseReq,
+      List<String> sources,
+      int totalLimit,
+      EngineContext engineContext) {
+    Objects.requireNonNull(client, "client");
+    Objects.requireNonNull(baseReq, "baseReq");
+    Objects.requireNonNull(sources, "sources");
+    Objects.requireNonNull(engineContext, "engineContext");
+
+    EngineWorkHandle work = admission.attach(engineContext);
+    List<EngineWorkHandle.Registration> cancellationRegistrations = new ArrayList<>();
+    Throwable bodyFailure = null;
+    try {
+      EngineExecutorRegistry.Registration registration = registrationFor(work.context().urgency());
+      int perSourceLimit = Math.max(1, (int) Math.ceil((double) totalLimit / sources.size()));
+      List<SearchResponse> responses = new ArrayList<>();
+      try (EngineTaskGroup group = EngineTaskGroup.open(
+          () -> io.opentelemetry.context.Context.taskWrapping(registration.openVirtual()),
+          () -> work.retain()::close)) {
+        List<CompletableFuture<SearchResponse>> futures = new ArrayList<>();
+        for (String source : sources) {
+          SearchRequest perSourceReq = baseReq.toBuilder()
+              .setLimit(perSourceLimit)
+              .setFilters(baseReq.getFilters().toBuilder()
+                  .addMetaSource(source.toLowerCase(Locale.ROOT))
+                  .build())
+              .build();
+          CompletableFuture<SearchResponse> future = group.submit(
+              () -> client.search(perSourceReq, work.context()));
+          futures.add(future);
+          cancellationRegistrations.add(work.onCancel(reason -> future.cancel(true)));
+        }
+
+        for (CompletableFuture<SearchResponse> future : futures) {
+          try {
+            responses.add(future.get(CHILD_WAIT_SECONDS, TimeUnit.SECONDS));
+          } catch (TimeoutException timeout) {
+            try {
+              group.close();
+            } catch (RuntimeException | Error cleanupFailure) {
+              timeout.addSuppressed(cleanupFailure);
+            }
+            throw new CompletionException(timeout);
+          } catch (Exception failure) {
+            EngineFutures.rethrowExecutorRefusal(failure);
+            EngineFutures.rethrowCancellation(failure);
+            rethrowFatal(failure);
+            log.debug("385: Per-source retrieval failed for one source: {}", failure.getMessage());
+          }
+        }
+
+        if (responses.isEmpty()) {
+          log.debug("385: All per-source calls failed, falling back to unfiltered retrieval");
+          return client.search(baseReq, work.context());
+        }
+        return mergeSearchResponses(
+            responses, totalLimit, baseReq, request -> client.search(request, work.context()));
+      }
+    } catch (RuntimeException | Error failure) {
+      bodyFailure = failure;
+      throw failure;
+    } finally {
+      Throwable cleanupFailure = null;
+      for (EngineWorkHandle.Registration registration : cancellationRegistrations) {
+        try {
+          registration.close();
+        } catch (RuntimeException | Error registrationFailure) {
+          cleanupFailure = aggregate(cleanupFailure, registrationFailure);
+        }
+      }
+      try {
+        work.close();
+      } catch (RuntimeException | Error closeFailure) {
+        cleanupFailure = aggregate(cleanupFailure, closeFailure);
+      }
+      if (cleanupFailure != null) {
+        if (bodyFailure != null) bodyFailure.addSuppressed(cleanupFailure);
+        else rethrow(cleanupFailure);
+      }
+    }
+  }
+
+  private static void rethrowFatal(Throwable failure) {
+    Throwable cause = failure;
+    while (cause instanceof CompletionException || cause instanceof ExecutionException) {
+      cause = cause.getCause();
+    }
+    if (cause instanceof Error error) throw error;
+  }
+
+  private static Throwable aggregate(Throwable aggregate, Throwable failure) {
+    if (aggregate == null) return failure;
+    if (aggregate != failure) aggregate.addSuppressed(failure);
+    return aggregate;
+  }
+
+  private static void rethrow(Throwable failure) {
+    if (failure instanceof RuntimeException runtimeFailure) throw runtimeFailure;
+    if (failure instanceof Error errorFailure) throw errorFailure;
+  }
+
+  private EngineExecutorRegistry.Registration registrationFor(EngineContext.Urgency urgency) {
+    return urgency == EngineContext.Urgency.FOREGROUND
+        ? foregroundRegistration : backgroundRegistration;
+  }
+
+  /** Merges source responses, with optional unfiltered backfill. */
   static SearchResponse mergeSearchResponses(
       List<SearchResponse> responses,
       int totalLimit,
       SearchRequest backfillReq,
       java.util.function.Function<SearchRequest, SearchResponse> backfillFn) {
-
-    // Collect per-source hit lists
     List<List<SearchResult>> perSourceHits = new ArrayList<>();
     long totalHits = 0;
-    // Tempdoc 597: matchCount sums across sources — distinct corpora ⇒ disjoint match sets, so
-    // the true matched total of the merged response is the sum of the per-source matched totals
-    // (mirrors the totalHits sum directly above it).
     long matchCount = 0;
     long maxTookMs = 0;
     for (SearchResponse r : responses) {
@@ -102,11 +189,9 @@ final class SearchPerSourceExecutor {
       maxTookMs = Math.max(maxTookMs, r.getTookMs());
     }
 
-    // Round-robin interleave
     List<SearchResult> interleaved = new ArrayList<>();
     Set<String> seen = new HashSet<>();
     int maxRank = perSourceHits.stream().mapToInt(List::size).max().orElse(0);
-
     for (int rank = 0; rank < maxRank && interleaved.size() < totalLimit; rank++) {
       for (var hits : perSourceHits) {
         if (rank < hits.size()) {
@@ -119,7 +204,6 @@ final class SearchPerSourceExecutor {
       }
     }
 
-    // Backfill from unfiltered retrieval if per-source results are insufficient
     if (interleaved.size() < totalLimit) {
       log.debug("385: Per-source retrieval returned {} of {} requested, backfilling",
           interleaved.size(), totalLimit);
@@ -127,19 +211,18 @@ final class SearchPerSourceExecutor {
         SearchResponse backfill = backfillFn.apply(backfillReq);
         for (SearchResult hit : backfill.getResultsList()) {
           if (interleaved.size() >= totalLimit) break;
-          if (seen.add(hit.getId())) {
-            interleaved.add(hit);
-          }
+          if (seen.add(hit.getId())) interleaved.add(hit);
         }
         totalHits = Math.max(totalHits, backfill.getTotalHits());
         matchCount = Math.max(matchCount, backfill.getMatchCount());
-      } catch (Exception e) {
-        log.debug("385: Backfill retrieval failed: {}", e.getMessage());
+      } catch (Exception failure) {
+        EngineFutures.rethrowExecutorRefusal(failure);
+        EngineFutures.rethrowCancellation(failure);
+        rethrowFatal(failure);
+        log.debug("385: Backfill retrieval failed: {}", failure.getMessage());
       }
     }
 
-    // Tempdoc 549 Phase E5: OR-merge the per-sub-query trace degradation; QPP is per-query
-    // (meaningless merged) so clear it on the merged trace.
     boolean anySpladeExecuted = false;
     boolean anyVectorBlocked = false;
     boolean anyHybridFallback = false;
@@ -167,7 +250,7 @@ final class SearchPerSourceExecutor {
         .setTotalHits(totalHits)
         .setMatchCount(matchCount)
         .setTookMs(maxTookMs)
-        .clearFacets();                           // facets from a filtered sub-query are misleading
+        .clearFacets();
     if (template.hasSearchTrace()) {
       io.justsearch.ipc.SearchTrace.Builder mt = template.getSearchTrace().toBuilder();
       mt.setDegradation(
@@ -179,13 +262,31 @@ final class SearchPerSourceExecutor {
               .setHybridFallbackReason(hybridFallbackReason)
               .setSpladeSkipReason(spladeSkipReason)
               .build());
-      mt.clearQpp(); // per-query, meaningless when merged across sub-queries
+      mt.clearQpp();
       merged.setSearchTrace(mt.build());
     }
-    for (SearchResult hit : interleaved) {
-      merged.addResults(hit);
-    }
-
+    for (SearchResult hit : interleaved) merged.addResults(hit);
     return merged.build();
+  }
+
+  /** Closes both stable registrations, attempting the second even if the first fails. */
+  @Override
+  public synchronized void close() {
+    if (closed) return;
+    closed = true;
+    Throwable failure = null;
+    try {
+      foregroundRegistration.close();
+    } catch (RuntimeException | Error closeFailure) {
+      failure = closeFailure;
+    }
+    try {
+      backgroundRegistration.close();
+    } catch (RuntimeException | Error closeFailure) {
+      if (failure == null) failure = closeFailure;
+      else if (failure != closeFailure) failure.addSuppressed(closeFailure);
+    }
+    if (failure instanceof RuntimeException runtimeFailure) throw runtimeFailure;
+    if (failure instanceof Error errorFailure) throw errorFailure;
   }
 }

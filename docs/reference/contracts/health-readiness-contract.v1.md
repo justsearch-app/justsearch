@@ -125,9 +125,9 @@ Head-local dimensions read head-side supervisor, capability, or monitor state th
 response-build time. They always report `stale=false`, `stalenessMs=0`, and the response-build
 `observedAt` — a Worker outage does not make them stale.
 
-Worker-observed dimensions are those whose verdict reads the Worker's gRPC status view. That view
+Worker-observed dimensions are those whose verdict reads the index half's status view. That view
 is **not** fetched on the request thread: an internal sampler on the Head's health-monitor schedule
-performs the `IndexStatus` unary (10 s while idle, 2 s while indexing/backfill/AI activation is in
+performs the `indexStatus` port call (10 s while idle, 2 s while indexing/backfill/AI activation is in
 flight, plus one sample on every capability transition), and a request reports what the last sample
 found. Consequently `meta.workerRpcAtMs` is the **sample's** observation time, not a per-request
 timestamp, and successive responses within one sampling period carry the same value by design.

@@ -1,0 +1,37 @@
+{
+  "revision": "429115fec + R1 persistence observability correction",
+  "command": "gradlew.bat :modules:app-observability:test --tests *OperationAttemptRunnerTest :modules:app-services:test --tests *OperationExecutorImplTest --tests *OperationRecoveryNoticeTest :modules:ui:compileIntegrationTestJava :modules:app-api:pmdMain :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 92,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 8
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 84,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    }
+  ],
+  "additionalChecks": [
+    "node scripts/ci/check-readiness-reason-codes.mjs: PASS"
+  ],
+  "environment": "Windows, Java25"
+}

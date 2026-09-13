@@ -65,7 +65,7 @@ export { resourceWireSchema };
  * Information-shape axis on a Resource. Mirrors `Category.java`.
  *
  * Slice 448 phase 6 (2026-05-07) retired LOG_TAIL per CONFLICT-LEDGER C-012 path-b.
- * Operator-trace surfaces (head-log, worker-log, etc.) are modeled as the sibling
+ * Operator-trace surfaces (engine-log, etc.) are modeled as the sibling
  * DiagnosticChannel primitive — see `api/types/diagnostic.ts`.
  */
 export type Category =

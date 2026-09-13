@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.diagnostics;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.DebugStateProvider;
 import io.justsearch.app.api.DiagnosticsService;
 import io.justsearch.app.api.EnterprisePolicyService;
@@ -91,12 +93,12 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
   }
 
   @Override
-  public Path exportDiagnostics() throws Exception {
-    return exportDiagnostics(null);
+  public Path exportDiagnostics(EngineContext engineContext) throws Exception {
+    return exportDiagnostics(null, engineContext);
   }
 
   @Override
-  public Path exportDiagnostics(String feTelemetryJson) throws Exception {
+  public Path exportDiagnostics(String feTelemetryJson, EngineContext engineContext) throws Exception {
     Path aiHome = PlatformPaths.resolveAiHome();
     Path dataDir = PlatformPaths.resolveDataDir();
     Path outDir = aiHome.resolve("diagnostics");
@@ -144,7 +146,7 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
 
       addTelemetryFiles(zos, dataDir);
       addCrashReports(zos, dataDir);
-      addRuntimeSnapshots(zos);
+      addRuntimeSnapshots(zos, engineContext);
 
       if (feTelemetryJson != null && !feTelemetryJson.isBlank()) {
         addBytesRedacted(
@@ -239,11 +241,11 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     }
   }
 
-  private void addRuntimeSnapshots(ZipOutputStream zos) {
+  private void addRuntimeSnapshots(ZipOutputStream zos, EngineContext engineContext) {
     if (debugStateProviderSupplier != null && debugStateProviderSupplier.get() != null) {
       try {
         byte[] data =
-            MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(debugStateProviderSupplier.get().buildDebugState());
+            MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(debugStateProviderSupplier.get().buildDebugState(engineContext));
         addBytesRedacted(zos, data, "runtime/debug-state.json");
       } catch (Exception e) {
         log.warn("Failed to include debug state in diagnostics export", e);

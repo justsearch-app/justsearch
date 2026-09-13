@@ -4,9 +4,6 @@ package io.justsearch.app.services.worker;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.Server;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
@@ -15,12 +12,6 @@ import io.justsearch.ipc.RetrieveContextResponse;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.SearchResult;
-import io.justsearch.ipc.SearchServiceGrpc;
-import io.justsearch.ipc.mmf.MmfWorkerSignalLayoutV1;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.lang.reflect.Field;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -33,19 +24,22 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tempdoc 821 §3-C2 — the Head-side half of RAG collection scoping, over a real gRPC wire (harness
- * mirrors {@link RemoteDocumentServicePreSearchPipelineTest}). Two hops are pinned, because both
- * dropped the scope before this change: {@code SearchRpcOps#retrieveContext}'s param→proto mapping,
- * and {@code RemoteDocumentService}'s open-retrieval pre-search, whose discovered doc universe the
- * downstream {@code RetrieveContextRequest} is scoped to — an unscoped pre-search would resolve an
- * agent-history ASK to zero parents, since the DEFAULT scope excludes exactly that collection.
+ * Tempdoc 821 §3-C2 — the Head-side half of RAG collection scoping. Two hops are pinned, because
+ * both dropped the scope before that change: {@code SearchRpcOps#retrieveContext}'s param→proto
+ * mapping, and {@code RemoteDocumentService}'s open-retrieval pre-search, whose discovered doc
+ * universe the downstream {@code RetrieveContextRequest} is scoped to — an unscoped pre-search
+ * would resolve an agent-history ASK to zero parents, since the DEFAULT scope excludes exactly that
+ * collection.
+ *
+ * <p>Lane F stage A item A10: the harness was a real Netty server plus a memory-mapped signal bus,
+ * and it is now {@link TestKnowledgeClient}. The assertions are unchanged and still on the
+ * <em>request objects the Head produces</em>, which is what "reaches the Worker" always meant — the
+ * socket in between was never the subject. Reverting either mapping still fails here.
  */
-@DisplayName("RemoteDocumentService — collection scope reaches the wire (821 §3-C2)")
+@DisplayName("RemoteDocumentService — collection scope reaches the Worker (821 §3-C2)")
 final class RemoteDocumentServiceCollectionScopeTest {
 
-  private Server server;
-  private MainSignalBus signalBus;
-  private RemoteKnowledgeClient client;
+  private KnowledgeClient client;
   private String prevDataDir;
   private Path tempDataDir;
   private ConfigStore prevConfigStore;
@@ -62,32 +56,16 @@ final class RemoteDocumentServiceCollectionScopeTest {
     tempDataDir = Files.createTempDirectory("justsearch-821-collection-scope-test-");
     System.setProperty("justsearch.data.dir", tempDataDir.toString());
 
-    CapturingSearchService service =
-        new CapturingSearchService(capturedSearchRequest, capturedRetrieveContextRequest);
-    server = NettyServerBuilder.forPort(0).addService(service).build().start();
-
-    Path signalPath = tempDataDir.resolve("signals").resolve("worker-signal.mmf");
-    signalBus = new MainSignalBus(signalPath);
-    signalBus.open();
-    writePortForTests(signalBus, server.getPort());
-
-    client = new RemoteKnowledgeClient(signalBus, /*deadlineMs=*/ 5000, /*maxRetries=*/ 1);
-    client.connect(server.getPort());
+    client =
+        new TestKnowledgeClient(
+            new io.justsearch.core.execution.TestEngineExecutors(), new CapturingSearchCalls());
   }
 
   @AfterEach
-  void tearDown() throws Exception {
+  void tearDown() {
     if (client != null) {
       client.close();
       client = null;
-    }
-    if (signalBus != null) {
-      signalBus.close();
-      signalBus = null;
-    }
-    if (server != null) {
-      server.shutdownNow().awaitTermination();
-      server = null;
     }
     if (prevDataDir == null) {
       System.clearProperty("justsearch.data.dir");
@@ -98,10 +76,10 @@ final class RemoteDocumentServiceCollectionScopeTest {
   }
 
   private void retrieve(List<String> collection, Set<String> docIds) throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
     RetrieveContextParams params =
         RetrieveContextParams.of("what did the agent do?", 5, 4096, docIds, List.of(), collection);
-    service.retrieveContext(params).toCompletableFuture().get(6, TimeUnit.SECONDS);
+    service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
   }
 
   @Test
@@ -141,8 +119,8 @@ final class RemoteDocumentServiceCollectionScopeTest {
   }
 
   @Test
-  @DisplayName("no scope leaves the wire fields empty (pre-821 behavior, byte-identical)")
-  void absentScopeLeavesTheWireUntouched() throws Exception {
+  @DisplayName("no scope leaves the request fields empty (pre-821 behavior, byte-identical)")
+  void absentScopeLeavesTheRequestUntouched() throws Exception {
     retrieve(List.of(), Set.of());
 
     assertEquals(
@@ -155,51 +133,25 @@ final class RemoteDocumentServiceCollectionScopeTest {
         "and the pre-search must be unscoped exactly as before");
   }
 
-  private static void writePortForTests(MainSignalBus bus, int port) throws Exception {
-    Field f = MainSignalBus.class.getDeclaredField("segment");
-    f.setAccessible(true);
-    MemorySegment segment = (MemorySegment) f.get(bus);
-    segment.set(
-        ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
-        MmfWorkerSignalLayoutV1.OFFSET_WORKER_GRPC_PORT,
-        port);
-    segment.force();
-    assertEquals(port, bus.readPort());
-  }
+  /** Captures both request shapes the Head produces. */
+  private final class CapturingSearchCalls extends TestKnowledgeClient.SearchCalls {
 
-  /** Fake Worker {@code SearchService}: captures both request shapes the Head sends. */
-  private static final class CapturingSearchService
-      extends SearchServiceGrpc.SearchServiceImplBase {
-    private final AtomicReference<SearchRequest> searchCapture;
-    private final AtomicReference<RetrieveContextRequest> retrieveContextCapture;
-
-    private CapturingSearchService(
-        AtomicReference<SearchRequest> searchCapture,
-        AtomicReference<RetrieveContextRequest> retrieveContextCapture) {
-      this.searchCapture = searchCapture;
-      this.retrieveContextCapture = retrieveContextCapture;
+    @Override
+    public SearchResponse search(SearchRequest request) {
+      capturedSearchRequest.set(request);
+      return SearchResponse.newBuilder()
+          .addResults(
+              SearchResult.newBuilder()
+                  .setId("d:/agent/session-1.md")
+                  .putFields("path", "d:/agent/session-1.md")
+                  .build())
+          .build();
     }
 
     @Override
-    public void search(SearchRequest request, StreamObserver<SearchResponse> responseObserver) {
-      searchCapture.set(request);
-      SearchResponse.Builder resp = SearchResponse.newBuilder();
-      resp.addResults(
-          SearchResult.newBuilder()
-              .setId("d:/agent/session-1.md")
-              .putFields("path", "d:/agent/session-1.md")
-              .build());
-      responseObserver.onNext(resp.build());
-      responseObserver.onCompleted();
-    }
-
-    @Override
-    public void retrieveContext(
-        RetrieveContextRequest request,
-        StreamObserver<RetrieveContextResponse> responseObserver) {
-      retrieveContextCapture.set(request);
-      responseObserver.onNext(RetrieveContextResponse.newBuilder().build());
-      responseObserver.onCompleted();
+    public RetrieveContextResponse retrieveContext(RetrieveContextRequest request) {
+      capturedRetrieveContextRequest.set(request);
+      return RetrieveContextResponse.newBuilder().build();
     }
   }
 }

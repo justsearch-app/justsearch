@@ -40,8 +40,8 @@ import org.slf4j.LoggerFactory;
  *   <li>No prune phase (callers ask for a focused walk; pruning remains a separate concern).</li>
  *   <li>No user-activity throttling — scan intent is operator-driven, not periodic-sync.</li>
  *   <li>Optional caller-supplied glob excludes layered on top of the standard skip set.</li>
- *   <li>Streams progress to a {@link Consumer} so the gRPC handler can map onto
- *       {@code StreamObserver.onNext}.</li>
+ *   <li>Streams progress to a {@link Consumer} sink supplied by the caller, which decides where
+ *       each frame goes.</li>
  * </ul>
  */
 final class WorkerScanOps {
@@ -81,8 +81,8 @@ final class WorkerScanOps {
 
   /**
    * Constructor with cancellation + backpressure hooks but the real cloud-placeholder
-   * detector. Used by {@link GrpcIngestService} so the Worker-owned scan honours
-   * {@link io.grpc.stub.ServerCallStreamObserver#isCancelled()} and the live queue depth.
+   * detector. Used by {@link WorkerIngestService} so the Worker-owned scan honours the call's
+   * cancellation signal ({@link CallContext#cancelled()}) and the live queue depth.
    */
   WorkerScanOps(
       JobQueue jobQueue,
@@ -175,7 +175,7 @@ final class WorkerScanOps {
     String collection = request.collection();
     // Tempdoc 821 §3-C3: a FORCE_REINDEX scan marks every path it admits forced, so the batch
     // extractor bypasses its unchanged-check and actually re-runs extraction + enrichment.
-    // Same sink GrpcIngestService#submitBatch already uses for ForceReindex on the batch API —
+    // Same sink WorkerIngestService#submitBatch already uses for ForceReindex on the batch API —
     // no new mechanism, just the arm that never consulted request.mode().
     boolean forceReindex = request.mode() == ScanMode.FORCE_REINDEX;
     // Tempdoc 812 D2: every job this walk admits remembers the scan that admitted it, so the Head
@@ -187,6 +187,17 @@ final class WorkerScanOps {
         new SimpleFileVisitor<Path>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+            // Review S5. Before this, the ONLY cancel poll in the whole walk was inside the
+            // batch-flush branch below — so a scan only noticed a cancel once it had admitted a
+            // full batch of files. Over a tree whose files are all excluded, skipped, or cloud
+            // placeholders, no batch ever fills, so the walk was not cancellable at all: the user
+            // pressed stop, the flow closed, and the walker kept traversing the disk to the end.
+            // Two polls fix it, and this is the one that bounds the pathological case, because a
+            // directory is the unit of work that has no other exit.
+            if (isCancelled.getAsBoolean()) {
+              cancelled[0] = true;
+              return FileVisitResult.TERMINATE;
+            }
             String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
             if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
               return FileVisitResult.SKIP_SUBTREE;
@@ -197,6 +208,14 @@ final class WorkerScanOps {
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+            // Review S5, the second poll: a directory of a million files is one preVisitDirectory
+            // call, so the per-directory poll alone still leaves a long uncancellable stretch. The
+            // read is a volatile load against per-file work that already includes an isReadable
+            // syscall and a skip-policy match, so it is not measurable here.
+            if (isCancelled.getAsBoolean()) {
+              cancelled[0] = true;
+              return FileVisitResult.TERMINATE;
+            }
             counters[0]++; // walked
             if (!attrs.isRegularFile() || !Files.isReadable(file)) {
               counters[2]++;
@@ -207,7 +226,7 @@ final class WorkerScanOps {
               return FileVisitResult.CONTINUE;
             }
             if (isCloudPlaceholder.test(file)) {
-              cloudPlaceholderRecorder.record(file);
+              cloudPlaceholderRecorder.record(file, collection, request.provenance());
               counters[2]++;
               return FileVisitResult.CONTINUE;
             }
@@ -215,13 +234,11 @@ final class WorkerScanOps {
               counters[2]++;
               return FileVisitResult.CONTINUE;
             }
-            counters[1]++;
-            bytes[0] += attrs.size();
             // 813 Slice B: the walk already holds the size — no extra stat.
-            batch.add(new JobQueue.EnqueueEntry(file, attrs.size()));
+            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance()));
             if (batch.size() >= ENQUEUE_BATCH_SIZE) {
               awaitQueueBelowThreshold();
-              flushBatch(batch, collection, enqueueScanId, forceReindex);
+              flushBatch(batch, collection, enqueueScanId, forceReindex, counters, bytes);
               if (isCancelled.getAsBoolean()) {
                 cancelled[0] = true;
                 return FileVisitResult.TERMINATE;
@@ -247,7 +264,7 @@ final class WorkerScanOps {
 
     if (!batch.isEmpty()) {
       awaitQueueBelowThreshold();
-      flushBatch(batch, collection, enqueueScanId, forceReindex);
+      flushBatch(batch, collection, enqueueScanId, forceReindex, counters, bytes);
       if (isCancelled.getAsBoolean()) {
         cancelled[0] = true;
       }
@@ -261,10 +278,16 @@ final class WorkerScanOps {
   }
 
   private void flushBatch(
-      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, boolean forceReindex) {
+      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, boolean forceReindex,
+      long[] counters, long[] bytes) {
     String coll = collection == null || collection.isBlank() ? null : collection;
-    jobQueue.enqueueEntries(
+    int accepted = jobQueue.enqueueEntries(
         List.copyOf(batch), coll, scanId == null || scanId.isBlank() ? null : scanId);
+    if (accepted != batch.size()) {
+      throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
+    }
+    counters[1] += accepted;
+    for (JobQueue.EnqueueEntry entry : batch) bytes[0] += entry.sizeBytes();
     if (forceReindex && !batch.isEmpty()) {
       // Mark per batch rather than once at the end: a long walk's early batches are already
       // being extracted while later directories are still being visited, so a deferred mark
@@ -280,7 +303,7 @@ final class WorkerScanOps {
 
   /**
    * Sink for paths a FORCE_REINDEX scan admits (tempdoc 821 §3-C3). Production wiring is {@code
-   * IndexingLoop::markForced} — the same set {@code GrpcIngestService#submitBatch} feeds for the
+   * IndexingLoop::markForced} — the same set {@code WorkerIngestService#submitBatch} feeds for the
    * batch API's {@code force_reindex} flag.
    */
   @FunctionalInterface
@@ -394,20 +417,28 @@ final class WorkerScanOps {
   /**
    * Caller-side request DTO so this class doesn't depend on the proto types.
    *
-   * <p>Tempdoc 419 / T2: {@code scanId} is allocated by the gRPC entry point ({@link
-   * GrpcIngestService#scanRoot}) and stamped on every emitted {@link ScanRootProgress}. The
-   * worker {@link WorkerScanOps} reads it but does not generate it.
+   * <p>Tempdoc 419 / T2: {@code scanId} is allocated by {@link WorkerIngestService#scanRoot} and
+   * stamped on every emitted {@link ScanRootProgress}. The worker {@link WorkerScanOps} reads it
+   * but does not generate it.
    */
   record ScanRequest(
-      Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId) {
+      Path root, String collection, ScanMode mode, List<String> excludeGlobs, String scanId,
+      JobQueue.EnqueueProvenance provenance) {
     public ScanRequest {
       Objects.requireNonNull(root, "root");
+      Objects.requireNonNull(provenance, "provenance");
       excludeGlobs = excludeGlobs == null ? List.of() : List.copyOf(excludeGlobs);
       mode = mode == null ? ScanMode.INITIAL : mode;
       scanId = scanId == null ? "" : scanId;
     }
 
-    /** Back-compat constructor for callers that don't supply a scanId. */
+    /** Internal maintenance scan without a caller's admission attribution. */
+    public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs,
+        String scanId) {
+      this(root, collection, mode, excludeGlobs, scanId, CallContext.none().provenance());
+    }
+
+    /** Internal maintenance scan without an externally allocated scan id. */
     public ScanRequest(Path root, String collection, ScanMode mode, List<String> excludeGlobs) {
       this(root, collection, mode, excludeGlobs, "");
     }

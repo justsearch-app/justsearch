@@ -1,14 +1,20 @@
 mod binding;
+mod engine_host;
+mod engine_probe;
 mod platform_paths;
+// Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
+// function over the register the dev-runner also reads; only the actuator lives in this file.
+mod supervisor;
 mod updater;
 
-use binding::{apply_manifest_observation, read_manifest_if_present, Binding, ManifestFields};
+use binding::{read_manifest_if_present, Binding, ManifestFields};
+use engine_host::{EngineHost, PreparedCommand};
 
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -28,6 +34,28 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const RESET_MARKER_FILE: &str = ".justsearch-reset-requested";
 
+/// The webview's signal that a NEW Engine incarnation is answering: everything it cached about the
+/// old one — above all the per-boot session token — is dead (tempdoc 805 G.1).
+///
+/// Lane F stage B item B10 explicitly does NOT touch it. Same emit site (`watch_manifest`, on an
+/// instanceId change), same `Option<u16>` payload, same subscriber
+/// (`modules/ui-web/src/api/backendRestart.ts`). The supervisor's own state is a SEPARATE event
+/// below, because the two answer different questions — "your binding is stale" and "here is what
+/// the supervisor is doing" — and folding them would make a webview that only wants the first
+/// re-resolve its binding on every cooldown tick. `backend_restart_event_is_untouched` pins it.
+pub(crate) const EVENT_BACKEND_RESTART: &str = "justsearch://backend-restart";
+
+/// The supervisor's state, forwarded to the webview (design 7.1's "visible state" row). Carries the
+/// contents of `<dataDir>/runtime/supervisor.v1.json`.
+pub(crate) const EVENT_SUPERVISOR_STATE: &str = "justsearch://supervisor-state";
+
+/// The `backend-restart` payload, as a function so a test can pin it. It is the new incarnation's
+/// port and nothing else: the webview re-resolves everything else from the manifest, and widening
+/// this payload would make the event a second discovery channel (tempdoc 501 §6).
+pub(crate) fn backend_restart_payload(manifest: &ManifestFields) -> Option<u16> {
+    manifest.api_port
+}
+
 #[derive(serde::Serialize)]
 struct FileMetadata {
     #[serde(rename = "isDir")]
@@ -41,17 +69,14 @@ struct JustSearchPaths {
     llama_server_dir: String,
     logs_dir: String,
     llama_log: String,
-    headless_backend_log: String,
+    engine_log: String,
 }
 
 #[derive(Default)]
 struct BackendState {
-    binding: Mutex<Binding>,
+    host: Arc<EngineHost>,
     port_ready: Arc<Notify>,
     session_token_ready: Arc<Notify>,
-    child: Mutex<Option<Child>>,
-    spawn_error: Mutex<Option<String>>,
-    killed: Mutex<bool>,
     /// Single-use token for confirming destructive operations (factory reset).
     delete_token: Mutex<Option<String>>,
     /// Tempdoc 501 Phase 17: the tray icon's registered id. The manifest watcher
@@ -78,63 +103,56 @@ impl BackendState {
     /// Tempdoc 805 G.1: replacement with an empty record — the same move a new instance makes,
     /// with nothing observed yet.
     fn reset_for_restart(&self) -> Result<(), String> {
-        if self.child.lock().expect("child mutex poisoned").is_some() {
-            return Err("Cannot reset backend state while Head is still running".into());
-        }
-        *self.binding.lock().expect("binding mutex poisoned") = Binding::default();
-        *self.spawn_error.lock().expect("spawn_error mutex poisoned") = None;
-        *self.killed.lock().expect("killed mutex poisoned") = false;
-        Ok(())
+        self.host.reset_for_successor()
     }
 
     fn binding_snapshot(&self) -> Binding {
-        self.binding.lock().expect("binding mutex poisoned").clone()
+        self.host.binding_snapshot()
     }
 
     fn get_port(&self) -> Option<u16> {
-        self.binding.lock().expect("binding mutex poisoned").port
+        self.host.binding_snapshot().port
     }
 
     fn get_session_token(&self) -> Option<String> {
-        self.binding
-            .lock()
-            .expect("binding mutex poisoned")
-            .token
-            .clone()
+        self.host.binding_snapshot().token
     }
 
     /// Tempdoc 805 G.1: apply a manifest observation under the provenance rule (`binding.rs`),
     /// then fire the notifies for whatever became available. Returns true iff the binding was
     /// replaced because a different instance succeeded a known one — the caller's restart signal.
-    fn observe_manifest(&self, manifest: &ManifestFields, child_pid: Option<u32>) -> bool {
-        let change = {
-            let mut guard = self.binding.lock().expect("binding mutex poisoned");
-            apply_manifest_observation(&mut guard, manifest, child_pid)
-        };
-        if change.port_available {
-            self.port_ready.notify_waiters();
+    fn observe_manifest(&self, manifest: &ManifestFields) -> Option<binding::BindingChange> {
+        let payload = backend_restart_payload(manifest);
+        let change = self.host.observe_manifest_with_sinks(
+            manifest,
+            |port| {
+                debug_assert_eq!(port, payload);
+                if let Some(app) = TRAY_CONTEXT.get() {
+                    let _ = app.emit(EVENT_BACKEND_RESTART, payload);
+                }
+            },
+            |tooltip| update_tray_tooltip(self, tooltip),
+        );
+        if let Some(change) = change {
+            if change.port_available {
+                self.port_ready.notify_waiters();
+            }
+            if change.token_available {
+                self.session_token_ready.notify_waiters();
+            }
+            Some(change)
+        } else {
+            None
         }
-        if change.token_available {
-            self.session_token_ready.notify_waiters();
-        }
-        change.restarted
     }
 
     fn has_spawn_error(&self) -> bool {
-        self.spawn_error
-            .lock()
-            .expect("spawn_error mutex poisoned")
-            .is_some()
+        self.host.has_spawn_error()
     }
 
     fn kill_child(&self) {
-        // Prevent double kill (event handler + Drop race)
-        {
-            let mut killed = self.killed.lock().expect("killed mutex poisoned");
-            if *killed {
-                return;
-            }
-            *killed = true;
+        if !self.host.begin_close() {
+            return;
         }
 
         // Tempdoc 805 G.1: normal termination traverses Head's ordered shutdown; force-kill is the
@@ -142,7 +160,7 @@ impl BackendState {
         // stops leaving the residue that strands the next boot's binding. `taskkill /T` without /F
         // posts WM_CLOSE, which a windowless `javaw` never receives — that step (and its 2s sleep)
         // never ran a JVM shutdown hook, so it is gone.
-        if self.child.lock().expect("child mutex poisoned").is_some() {
+        if self.host.child_pid().is_some() {
             let binding = self.binding_snapshot();
             if let (Some(port), Some(token)) = (binding.port, binding.token) {
                 if request_head_shutdown(port, &token)
@@ -153,24 +171,16 @@ impl BackendState {
             }
         }
 
-        let mut guard = self.child.lock().expect("child mutex poisoned");
-        let mut child = match guard.take() {
-            Some(c) => c,
-            None => return,
-        };
-
         #[cfg(windows)]
         {
-            let pid = child.id();
-            let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .creation_flags(CREATE_NO_WINDOW)
-                .status();
+            if let Some(pid) = self.host.child_pid() {
+                let _ = Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/F"])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .status();
+            }
         }
-
-        // Fallback (also used on non-Windows): kill the direct child.
-        let _ = child.kill();
-        let _ = child.wait();
+        self.host.kill_and_reap();
     }
 
     /// Wait for Head to complete its own ordered shutdown. This path never terminates the child:
@@ -179,17 +189,8 @@ impl BackendState {
         let deadline = std::time::Instant::now() + timeout;
         loop {
             {
-                let mut guard = self.child.lock().expect("child mutex poisoned");
-                match guard.as_mut() {
-                    None => return true,
-                    Some(child) => match child.try_wait() {
-                        Ok(Some(_)) => {
-                            guard.take();
-                            return true;
-                        }
-                        Ok(None) => {}
-                        Err(_) => return false,
-                    },
+                if self.host.wait_for_exit(Duration::from_millis(0)) {
+                    return true;
                 }
             }
             if std::time::Instant::now() >= deadline {
@@ -200,11 +201,16 @@ impl BackendState {
     }
 
     fn child_pid(&self) -> Option<u32> {
-        self.child
-            .lock()
-            .expect("child mutex poisoned")
-            .as_ref()
-            .map(Child::id)
+        self.host.child_pid()
+    }
+
+    /// Lane F stage B item B10: the supervisor's death observation.
+    ///
+    /// Non-blocking, and it TAKES the handle when the child has exited — `reset_for_restart` refuses
+    /// to run while a child is recorded, so a supervisor that observed an exit without clearing the
+    /// slot could never start the replacement it just decided on.
+    fn try_reap_child(&self) -> Option<i32> {
+        self.host.try_reap()
     }
 }
 
@@ -496,46 +502,53 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .map_err(|e| format!("Failed to create logs dir {}: {e}", logs_dir.display()))?;
 
     // Persist backend stdout/stderr to a log file for release builds (no console).
-    let headless_log_path = logs_dir.join("headless-backend.log");
+    //
+    // Lane F stage A item A16: this is the SAME path the Engine's own Logback FILE appender
+    // writes (modules/ui/src/main/resources/logback.xml) — the shell opens it before spawning
+    // Java so a JVM that dies before Logback configures itself still leaves evidence. It was
+    // `headless-backend.log`; A16 renamed it to `engine.log` on both sides, because there is one
+    // process and one log now. Rename BOTH or the merged process grows a second log file, which
+    // is the exact thing A16 exists to remove.
+    let engine_log_path = logs_dir.join("engine.log");
 
     // Rotate the previous boot's log on every launch so post-mortem evidence
     // survives a single restart (tempdoc 374 sandbox round 4 issue F: install
     // crash lines were unrecoverable after the next boot under the previous
-    // size-based rotation policy). Move headless-backend.log → .log.1, then
+    // size-based rotation policy). Move engine.log → .log.1, then
     // .log.1 → .log.2 for one extra generation before discarding.
-    if headless_log_path.exists() {
-        let log1 = logs_dir.join("headless-backend.log.1");
-        let log2 = logs_dir.join("headless-backend.log.2");
+    if engine_log_path.exists() {
+        let log1 = logs_dir.join("engine.log.1");
+        let log2 = logs_dir.join("engine.log.2");
         if log1.exists() {
             let _ = std::fs::remove_file(&log2);
             let _ = std::fs::rename(&log1, &log2);
         }
-        let _ = std::fs::rename(&headless_log_path, &log1);
+        let _ = std::fs::rename(&engine_log_path, &log1);
     }
 
-    let headless_log_file = OpenOptions::new()
+    let engine_log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&headless_log_path)
+        .open(&engine_log_path)
         .map_err(|e| {
             format!(
-                "Failed to open headless log {}: {e}",
-                headless_log_path.display()
+                "Failed to open engine log {}: {e}",
+                engine_log_path.display()
             )
         })?;
-    let headless_log = Arc::new(Mutex::new(headless_log_file));
+    let engine_log = Arc::new(Mutex::new(engine_log_file));
 
     let headless_dir = match resolve_headless_dir(app) {
         Ok(p) => p,
         Err(err) => {
-            if let Ok(mut f) = headless_log.lock() {
+            if let Ok(mut f) = engine_log.lock() {
                 let _ = writeln!(f, "[shell] Failed to resolve headless bundle dir: {err}");
             }
             return Err(err);
         }
     };
     if !headless_dir.is_dir() {
-        if let Ok(mut f) = headless_log.lock() {
+        if let Ok(mut f) = engine_log.lock() {
             let _ = writeln!(
                 f,
                 "[shell] headless dir not found or not a directory: {}",
@@ -603,7 +616,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             .filter(|s| !s.is_empty());
         let force_update = bundled_version.is_some() && bundled_version != installed_version;
         if force_update {
-            if let Ok(mut f) = headless_log.lock() {
+            if let Ok(mut f) = engine_log.lock() {
                 let _ = writeln!(
                     f,
                     "[shell] llama-server runtime version changed (installed={:?}, bundled={:?}); overwriting AI Home payload",
@@ -627,7 +640,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
                     match copy_dir_recursive(&p, &dest, force_update) {
                         Ok(n) => copied += n,
                         Err(e) => {
-                            if let Ok(mut f) = headless_log.lock() {
+                            if let Ok(mut f) = engine_log.lock() {
                                 let _ = writeln!(
                                     f,
                                     "[shell] Failed to restore llama-server subdirectory ({} -> {}): {e}",
@@ -648,7 +661,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
                         continue;
                     }
                     if let Err(e) = std::fs::copy(&p, &dest) {
-                        if let Ok(mut f) = headless_log.lock() {
+                        if let Ok(mut f) = engine_log.lock() {
                             let _ = writeln!(
                                 f,
                                 "[shell] Failed to restore llama-server payload file ({} -> {}): {e}",
@@ -663,7 +676,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             }
         }
         if copied > 0 {
-            if let Ok(mut f) = headless_log.lock() {
+            if let Ok(mut f) = engine_log.lock() {
                 let _ = writeln!(
                     f,
                     "[shell] Restored llama-server payload into AI Home (copied {copied} file(s)) to {}",
@@ -672,7 +685,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             }
         }
     } else {
-        if let Ok(mut f) = headless_log.lock() {
+        if let Ok(mut f) = engine_log.lock() {
             let _ = writeln!(
                 f,
                 "[shell] Bundled llama-server dir not found at {} (AI runtime restore skipped)",
@@ -699,7 +712,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         let force_update = bundled_version.is_some() && bundled_version != installed_version;
         match copy_dir_recursive(&bundled_tesseract_dir, &native_tesseract_dir, force_update) {
             Ok(copied) if copied > 0 => {
-                if let Ok(mut f) = headless_log.lock() {
+                if let Ok(mut f) = engine_log.lock() {
                     let _ = writeln!(
                         f,
                         "[shell] Restored Tesseract OCR payload into AI Home (copied {copied} file(s)) to {}",
@@ -709,7 +722,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             }
             Ok(_) => {}
             Err(e) => {
-                if let Ok(mut f) = headless_log.lock() {
+                if let Ok(mut f) = engine_log.lock() {
                     let _ = writeln!(
                         f,
                         "[shell] Failed to restore Tesseract OCR payload ({} -> {}): {e}",
@@ -735,19 +748,46 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
     cmd.current_dir(&headless_dir)
-        // Cap Head heap — the UI host is lightweight (REST API + SSE + static files).
-        // Without this, the JVM defaults to 1/4 physical RAM which is excessive.
-        .arg("-Xmx512m")
+        // ==== The packaged Engine flag set (lane F stage A item A13 follow-up) ====
+        //
+        // This block spawns ONE process that is now both halves of the product. Item A13 deleted
+        // the Worker distribution and its spawner but never revisited these flags, so until this
+        // change the packaged Engine ran on the Head-only set: a 512 MiB heap sized for "REST API
+        // + SSE + static files" while Lucene, the job queue, the indexing loop and the ONNX
+        // session cache lived in the same heap, and no -Dfile.encoding, which WorkerSpawner used
+        // to set for the index half (WorkerSpawner.java:457 before A11).
+        //
+        // -Xmx2g: the old Head 512m plus the Worker's 1g, with headroom, because there is one
+        // heap now instead of two. The Worker's larger working set was OFF-heap (ORT arenas and
+        // Lucene mmap), which -Xmx does not govern, so this is not 512m + 4g. The gate run at
+        // stage E re-sizes this against measurement; 2g is the safe interim, not a tuned value.
+        //
+        // -XX:+UseCompactObjectHeaders: one heap holding the index half's object population wants
+        // it, and it was absent here.
+        //
+        // -Dfile.encoding=UTF-8: carried over from the deleted spawner. Document extraction reads
+        // untrusted bytes, and on Windows the platform default is not UTF-8, so losing this
+        // changes how text is decoded — silently, and only for non-ASCII content.
+        //
         // SerialGC: small heap, no throughput need (the Head heap is >= 85 % empty at every
         // phase, 917 Derisk 1). Lane F PR 0: TieredStopAtLevel=1 dropped and MetaspaceSize=128m
         // added, because every full GC in the measured run was a Metaspace or CodeCache
         // threshold (the C1-only 48 MiB code cache), not heap pressure, and C1-only also
-        // conflicted with the AOT cache below. Both spawn sites (this and dev-runner.cjs) carry
-        // the same set; the test in scripts/dev/test-dev-runner-head-java-opts.mjs pins it.
+        // conflicted with the AOT cache below.
         // -XX:-UsePerfData: skip hsperfdata temp file (avoids Defender scan on Windows).
+        //
+        // This set is pinned from BOTH sides: scripts/dev/test-dev-runner-head-java-opts.mjs
+        // asserts the dev-runner's set exactly (deepEqual, so an addition fails), and reads THIS
+        // FILE's source to assert each shared flag appears here exactly once. The dev-runner
+        // deliberately carries no default -Xmx (tempdoc 730) — that is the one documented
+        // divergence, because a dev machine's JVM default is fine and a packaged one's is not.
+        .arg("-Xmx2g")
         .arg("-XX:+UseSerialGC")
         .arg("-XX:MetaspaceSize=128m")
+        .arg("-XX:MaxDirectMemorySize=256m")
+        .arg("-XX:+UseCompactObjectHeaders")
         .arg("-XX:-UsePerfData")
+        .arg("-Dfile.encoding=UTF-8")
         .arg("--sun-misc-unsafe-memory-access=warn")
         // FFM downcalls (NVML, the Windows job object, the GPU driver probe); JDK 25 warns without this, a later JDK (JEP 472) refuses.
         .arg("--enable-native-access=ALL-UNNAMED");
@@ -762,6 +802,17 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         ))
         .arg("-XX:+HeapDumpOnOutOfMemoryError")
         .arg(format!("-XX:HeapDumpPath={}/", crash_dir.to_string_lossy()))
+        // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
+        // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so the
+        // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
+        // (Measured on Temurin 25.0.2: 3 with the flag, 1 without.) EngineExit classifies 3 as
+        // TRANSIENT, so it is retried under cooldown rather than going straight to exhausted.
+        .arg("-XX:+ExitOnOutOfMemoryError")
+        // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
+        // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so
+        // the supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
+        // (Measured on Temurin 25.0.2: 3 with the flag, 1 without.) EngineExit classifies 3 as
+        // TRANSIENT, so it is retried under cooldown rather than going straight to exhausted.
         // The packaged shell is the production trust boundary: Head must mint a per-boot
         // session token and enforce it on every mutating loopback request. Browser development
         // uses the separate dev-stack launch path and does not pass through this command.
@@ -833,12 +884,13 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let mut child = cmd.spawn().map_err(|e| format!("spawn java failed: {e}"))?;
+    let admitted = state.host.admit(PreparedCommand { command: cmd })?;
+    let generation = admitted.generation;
 
     // Drain stdout/stderr to avoid pipe backpressure.
-    if let Some(stdout) = child.stdout.take() {
+    if let Some(stdout) = admitted.stdout {
         let state_clone = state.clone();
-        let log_clone = headless_log.clone();
+        let log_clone = engine_log.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().flatten() {
@@ -868,26 +920,15 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             // Stdout pipe closed — process exited. If no port was ever set and
             // this isn't a graceful shutdown, signal an error so waiters unblock
             // immediately instead of blocking until the timeout expires.
-            let killed = *state_clone.killed.lock().expect("killed mutex poisoned");
-            if !killed && state_clone.get_port().is_none() {
-                {
-                    let mut guard = state_clone
-                        .spawn_error
-                        .lock()
-                        .expect("spawn_error mutex poisoned");
-                    if guard.is_none() {
-                        *guard =
-                            Some("Backend process exited before reporting API port".to_string());
-                    }
-                }
+            if state_clone.host.stdout_closed(generation) {
                 state_clone.port_ready.notify_waiters();
                 state_clone.session_token_ready.notify_waiters();
             }
         });
     }
 
-    if let Some(stderr) = child.stderr.take() {
-        let log_clone = headless_log.clone();
+    if let Some(stderr) = admitted.stderr {
+        let log_clone = engine_log.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().flatten() {
@@ -898,11 +939,6 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         });
     }
 
-    {
-        let mut guard = state.child.lock().expect("child mutex poisoned");
-        *guard = Some(child);
-    }
-
     // Tempdoc 501 Phase 7: manifest-watcher thread reads <dataDir>/runtime/manifest.json — the
     // producer's self-published runtime identity — and feeds the binding.
     //
@@ -910,34 +946,358 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     // manifest's `pid` against our live child from the very first poll. Started earlier, the first
     // polls ran with an unknown child pid and could adopt a previous boot's residue as the
     // establishing observation.
-    {
-        let state_clone = state.clone();
-        let manifest_path = app_data_dir.join("runtime").join("manifest.json");
-        thread::spawn(move || watch_manifest(state_clone, manifest_path));
-    }
+    let weak_state = Arc::downgrade(&state);
+    let manifest_path = app_data_dir.join("runtime").join("manifest.json");
+    state.host.ensure_watcher(move || {
+        if let Some(state) = weak_state.upgrade() {
+            watch_manifest_tick(&state, &manifest_path);
+        }
+    })?;
 
     Ok(())
 }
 
-/// Restart Head after an updater handoff fails after orderly shutdown.
+/// The **requested-restart leg** (design 7.1, lane F stage B item B10).
 ///
-/// This is intentionally crate-visible rather than a Tauri command: only the shell lifecycle
-/// coordinator may replace Head, never untrusted webview code.
+/// This was the updater's private helper — "restart Head after an updater handoff fails after
+/// orderly shutdown", one caller. It is now the one way this process replaces the Engine, shared by
+/// that caller and by the supervisor's restart path ([`ShellActuator::spawn_engine`]). The
+/// distinction the design draws is between a restart the supervisor ASKED for and a crash it
+/// observed; both end up here, and only the crash is charged to the budget.
+///
+/// Still intentionally crate-visible rather than a Tauri command: only the shell lifecycle
+/// coordinator may replace the Engine, never untrusted webview code.
 pub(crate) fn restart_headless_backend(
     app: &tauri::AppHandle,
     state: Arc<BackendState>,
 ) -> Result<(), String> {
     state.reset_for_restart()?;
     if let Err(error) = spawn_headless_backend(app, state.clone()) {
-        *state
-            .spawn_error
-            .lock()
-            .expect("spawn_error mutex poisoned") = Some(error.clone());
+        state.host.record_spawn_error(error.clone());
         state.port_ready.notify_waiters();
         state.session_token_ready.notify_waiters();
         return Err(error);
     }
     Ok(())
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagedChildRecord {
+    pid: u32,
+    started_at: String,
+    executable: String,
+}
+
+/// Terminal fallback reports incomplete ownership; recoverable supervision never calls it.
+fn cleanup_registered_children_for_terminal(data_dir: &std::path::Path) {
+    if let Err(error) = reconcile_registered_children(data_dir) {
+        eprintln!("Registered child cleanup incomplete: {error}");
+    }
+}
+
+/// Shared terminal/update edge. Read and validate the entire ownership projection before killing
+/// anything. The Engine remains the manifest writer; a host never edits this child register.
+fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), String> {
+    let path = data_dir.join("runtime").join("manifest.json");
+    let raw = match std::fs::read(&path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("Cannot read child ownership: {error}")),
+    };
+    let root: serde_json::Value = serde_json::from_slice(&raw)
+        .map_err(|error| format!("Malformed child ownership manifest: {error}"))?;
+    let version = root.get("schemaVersion").and_then(|value| value.as_u64());
+    if !matches!(version, Some(1 | 2)) {
+        return Err("Unknown child ownership manifest schema".into());
+    }
+    let values = match root.get("children") {
+        Some(serde_json::Value::Array(children)) => children,
+        None if version == Some(1) => return Ok(()),
+        _ => return Err("Malformed or missing managed children array".into()),
+    };
+    let children: Vec<ManagedChildRecord> = values.iter().map(|value| {
+        let child: ManagedChildRecord = serde_json::from_value(value.clone())
+            .map_err(|error| format!("Malformed managed child identity: {error}"))?;
+        if child.pid == 0 || child.started_at.trim().is_empty()
+            || !std::path::Path::new(&child.executable).is_absolute() {
+            return Err("Incomplete managed child identity".into());
+        }
+        Ok(child)
+    }).collect::<Result<_, String>>()?;
+    for child in children { terminal_kill_if_identity_matches(&child)?; }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
+    // Capture the OS process handle before checking identity, and terminate through that object.
+    // A PID reused between validation and termination cannot redirect the destructive operation.
+    // Values cross the process boundary as environment variables, never interpolated command text.
+    let script = r#"
+$ErrorActionPreference='Stop'
+try { $p=[Diagnostics.Process]::GetProcessById([int]$env:JUSTSEARCH_CHILD_PID) }
+catch [ArgumentException] { exit 0 }
+try {
+  $null=$p.Handle
+  $expected=[DateTimeOffset]::Parse($env:JUSTSEARCH_CHILD_STARTED).ToUnixTimeMilliseconds()
+  $actual=([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds()
+  if ($actual -ne $expected) { exit 10 }
+  $want=[IO.Path]::GetFullPath($env:JUSTSEARCH_CHILD_EXE).TrimEnd('\').ToLowerInvariant()
+  $got=[IO.Path]::GetFullPath($p.Path).TrimEnd('\').ToLowerInvariant()
+  if ($want -ne $got) { exit 11 }
+  if (!$p.HasExited) { $p.Kill() }
+  if (!$p.WaitForExit(5000)) { exit 12 }
+  exit 0
+} catch { exit 20 } finally { $p.Dispose() }
+"#;
+    let mut process = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .env("JUSTSEARCH_CHILD_PID", child.pid.to_string())
+        .env("JUSTSEARCH_CHILD_STARTED", &child.started_at)
+        .env("JUSTSEARCH_CHILD_EXE", &child.executable)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn().map_err(|error| format!("Child identity check could not start: {error}"))?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        match process.try_wait() {
+            Ok(Some(status)) => return match status.code() {
+                // Already dead, confirmed terminated, or positively a different process.
+                Some(0 | 10 | 11) => Ok(()),
+                _ => Err(format!("Managed child {} could not be safely reconciled ({status})", child.pid)),
+            },
+            Ok(None) if std::time::Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = process.kill();
+                let _ = process.wait();
+                return Err(format!("Managed child {} identity/termination deadline elapsed", child.pid));
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) -> Result<(), String> {
+    Err("Registered child termination is unsupported on this installer platform".into())
+}
+
+/// The production [`supervisor::Actuator`] (lane F stage B item B10).
+///
+/// The DECISIONS are `supervisor.rs`'s, and the loop is `supervisor::run_supervision` — the same
+/// loop the `supervisor-conformance` binary runs against the harness's fake engine. What is here is
+/// only the binding of each abstract step to this process's own child, its own manifest and its own
+/// webview.
+struct ShellActuator {
+    app: tauri::AppHandle,
+    state: Arc<BackendState>,
+    data_dir: PathBuf,
+}
+
+impl ShellActuator {
+    /// The runtime directory's artifacts are joined LITERALLY at each site rather than through a
+    /// `runtime_dir()` helper. That is not style: `check-runtime-manifest-closure` matches
+    /// `.join("runtime").join("<artifact>")`, and item B10 removes this file from that check's
+    /// SKIP_PATHS. A helper would hide both writes from the check the same commit stopped exempting
+    /// them from — an exemption replaced by an indirection is not a narrowing.
+    fn supervisor_state_path(&self) -> PathBuf {
+        self.data_dir.join("runtime").join("supervisor.v1.json")
+    }
+
+    fn shutdown_request_path(&self) -> PathBuf {
+        self.data_dir.join("runtime").join("shutdown-request.v1.json")
+    }
+
+    fn write_atomic(path: &std::path::Path, bytes: &str) -> Result<(), String> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+    }
+}
+
+fn publish_terminal_spawn_failure(
+    app: &tauri::AppHandle,
+    state: &BackendState,
+    data_dir: Option<&std::path::Path>,
+    error: &str,
+) {
+    let path = data_dir.map(|d| d.join("runtime").join("supervisor.v1.json"));
+    state.host.publish_initial_spawn_failure(
+        path.as_deref(),
+        state.binding_snapshot().instance_id,
+        error,
+        |record| {
+            let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
+        },
+    );
+}
+
+impl supervisor::Actuator for ShellActuator {
+    fn spawn_engine(&mut self) -> Result<u32, String> {
+        // Through the requested-restart leg, not through a private path of its own: one way to
+        // replace the Engine in this process, shared with the updater's handoff.
+        restart_headless_backend(&self.app, self.state.clone())?;
+        Ok(self.state.child_pid().unwrap_or(0))
+    }
+
+    fn await_ready(&mut self, deadline_ms: u64) -> Result<supervisor::Ready, String> {
+        loop {
+            if self.state.has_spawn_error() {
+                return Err("the incarnation reported a spawn error".into());
+            }
+            if let Some(binding) = self.state.host.observe_current_binding(|port| {
+                engine_probe::responds(port, "/api/health", Duration::from_millis(800))
+            }) {
+                return Ok(supervisor::Ready {
+                    pid: self.state.child_pid(),
+                    api_port: binding.port,
+                    instance_id: binding.instance_id,
+                });
+            }
+            if self.now_ms() >= deadline_ms {
+                return Err("the incarnation did not publish a port and answer in time".into());
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    fn poll_exit(&mut self) -> Option<i32> {
+        self.state.try_reap_child()
+    }
+
+    fn probe_health(&mut self) -> bool {
+        self.state.host.observe_current_binding(|port| {
+            engine_probe::responds(port, "/api/health", Duration::from_millis(1500))
+        }).is_some()
+    }
+
+    fn probe_essential_ready(&mut self) -> bool {
+        self.state.host.observe_current_binding(|port| {
+            engine_probe::essential_ready(port, Duration::from_millis(1500))
+        }).is_some()
+    }
+
+    fn observed_shutdown_reason(&mut self, current: &supervisor::Ready) -> Option<String> {
+        let raw = std::fs::read_to_string(self.data_dir.join("runtime").join("manifest.json")).ok()?;
+        let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        self.state.host.observed_shutdown_reason(&parsed, current)
+    }
+
+    fn write_shutdown_request(
+        &mut self,
+        reason: &str,
+        deadline_epoch_ms: u64,
+    ) -> Result<(), String> {
+        let body = serde_json::json!({
+            "schemaVersion": 1,
+            "reason": reason,
+            "deadlineEpochMs": deadline_epoch_ms,
+            "issuedBy": "tauri-shell",
+        });
+        Self::write_atomic(
+            &self.shutdown_request_path(),
+            &format!("{body}\n"),
+        )
+    }
+
+    fn force_kill(&mut self) {
+        let Some(pid) = self.state.child_pid() else { return };
+        #[cfg(windows)]
+        {
+            // Engine-only kill: registered children survive recoverable death/hang and are
+            // reconciled by PID + start instant + executable identity on the next boot.
+            let _ = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/F"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = pid;
+        }
+        // Kill WITHOUT taking the handle, and without waiting on it. The supervision loop learns
+        // about the death the same way it learns about every other one — the next `poll_exit` —
+        // and a `force_kill` that reaped the child here would leave the loop in `stopping` forever,
+        // waiting for an exit that had already been consumed. (The conformance binary's actuator
+        // gets this right for the same reason; this is the divergence between the two that the
+        // shared loop cannot catch, because the loop is shared and the actuators are not.)
+        self.state.host.with_child_mut(|child| {
+            let _ = child.kill();
+        });
+    }
+
+    fn wait_for_handle_release(&mut self) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let child_gone = self.state.child_pid().is_none();
+            let log = self.data_dir.join("logs").join("engine.log");
+            let log_free = !log.exists()
+                || std::fs::OpenOptions::new().append(true).open(&log).is_ok();
+            if child_gone && log_free {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    fn sleep(&mut self, ms: u64) {
+        if ms > 0 {
+            thread::sleep(Duration::from_millis(ms));
+        }
+    }
+
+    fn now_ms(&mut self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }
+
+    fn publish_state(&mut self, record: &supervisor::StateRecord) {
+        self.state.host.publish_state(Some(&self.supervisor_state_path()), record, |record| {
+            let _ = self.app.emit(EVENT_SUPERVISOR_STATE, record);
+        });
+    }
+
+    fn should_continue(&mut self) -> bool {
+        // Host closing is monotonic and is set by the explicit quit path (with Drop as fallback).
+        // A supervisor that restarted while the shell was closing would resurrect the Engine.
+        self.state.host.should_continue()
+    }
+}
+
+/// Start supervising the Engine on an OS thread.
+///
+/// An OS thread, following the split this file already uses for the stdout drain and the manifest
+/// watcher: the loop blocks on sockets and on `try_wait`, and it must keep running while the async
+/// runtime is busy or winding down.
+pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>) -> Result<(), String> {
+    let Ok(data_dir) = resolve_app_data_dir(app) else {
+        return Err("supervisor: no app data dir; the Engine will not be supervised".into());
+    };
+    let host = state.host.clone();
+    let mut actuator = ShellActuator { app: app.clone(), state, data_dir };
+    host.start_supervisor(move || {
+        let policy = supervisor::load_policy();
+        let mut sup = supervisor::Supervisor::new(policy);
+        let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
+        match outcome {
+            supervisor::Outcome::Exhausted { reason, .. } => {
+                // The current host state already carries the terminal result. B13 uses owned
+                // child/binding state under its replacement hold, even before an API exists.
+                eprintln!("supervisor: {reason}");
+            }
+            supervisor::Outcome::Stopped { reason, .. } => {
+                eprintln!("supervisor: the Engine stopped ({reason}); not restarting");
+            }
+            supervisor::Outcome::Cancelled => {}
+        }
+    })
 }
 
 /// Tempdoc 501 Phase 7: poll the runtime manifest and feed port + session
@@ -953,51 +1313,15 @@ pub(crate) fn restart_headless_backend(
 /// tokio-rt-multi-thread without a notify dep, (b) the manifest write is a
 /// single atomic rename so any poll catches it on the next tick, and (c) 100ms
 /// granularity beats the JVM warmup by ~5 orders of magnitude.
-fn watch_manifest(state: Arc<BackendState>, manifest_path: PathBuf) {
-    let initial_deadline = std::time::Instant::now() + Duration::from_secs(60);
-    let mut last_tooltip: Option<String> = None;
-    // Tempdoc 501 Phase 17: after the initial port-acquisition window, keep polling at a
-    // slower cadence so the tray tooltip stays current as lifecycle transitions land
-    // (worker ready, AI ready, degraded, etc.). The fast 100ms cadence drops to 1s once
-    // the initial phase is over.
-    let mut fast_phase = true;
-    loop {
-        if state.has_spawn_error() {
-            return;
-        }
-        let now = std::time::Instant::now();
-        if fast_phase && now >= initial_deadline {
-            fast_phase = false;
-        }
-        if let Some(manifest) = read_manifest_if_present(&manifest_path) {
-            // Tempdoc 805 G.1: one provenance-checked application. A new instanceId replaces the
-            // whole binding (port AND token are per-boot facts of one incarnation) and emits the
-            // restart event so the webview re-resolves instead of failing silently against a dead
-            // port with the previous boot's token.
-            if state.observe_manifest(&manifest, state.child_pid()) {
-                if let Some(app) = TRAY_CONTEXT.get() {
-                    let _ = app.emit("justsearch://backend-restart", manifest.api_port);
-                }
+fn watch_manifest_tick(state: &BackendState, manifest_path: &std::path::Path) {
+    if let Some(manifest) = read_manifest_if_present(manifest_path) {
+        // Tempdoc 805 G.1: one provenance-checked application. A new instanceId replaces the
+        // whole binding (port AND token are per-boot facts of one incarnation) and emits the
+        // restart event so the webview re-resolves instead of failing silently against a dead
+        // port with the previous boot's token.
+            if state.observe_manifest(&manifest).is_none() {
+                return;
             }
-            // Tempdoc 501 Phase 17: drive the tray tooltip from the manifest's lifecycle
-            // projection. Format: "JustSearch · <LIFECYCLE>". Skips writes when unchanged
-            // to avoid flicker.
-            let next_tooltip = match manifest.lifecycle.as_deref() {
-                Some(l) => format!("JustSearch · {l}"),
-                None => "JustSearch".to_string(),
-            };
-            if last_tooltip.as_deref() != Some(next_tooltip.as_str()) {
-                update_tray_tooltip(&state, &next_tooltip);
-                last_tooltip = Some(next_tooltip);
-            }
-            if fast_phase && state.get_port().is_some() {
-                // Port is the only mandatory field for the initial-acquisition phase;
-                // drop to slow polling for tray-tooltip updates.
-                fast_phase = false;
-            }
-        }
-        let sleep_ms = if fast_phase { 100 } else { 1000 };
-        thread::sleep(Duration::from_millis(sleep_ms));
     }
 }
 
@@ -1020,6 +1344,11 @@ fn update_tray_tooltip(state: &BackendState, tooltip: &str) {
     if let Some(tray) = app.tray_by_id(&id) {
         let _ = tray.set_tooltip(Some(tooltip));
     }
+}
+
+#[tauri::command]
+fn supervisor_state(state: tauri::State<'_, Arc<BackendState>>) -> Option<supervisor::StateRecord> {
+    state.host.latest_record()
 }
 
 #[tauri::command]
@@ -1189,8 +1518,8 @@ async fn justsearch_paths(app: tauri::AppHandle) -> Result<JustSearchPaths, Stri
             .join("llama-server.log")
             .to_string_lossy()
             .to_string(),
-        headless_backend_log: logs_dir
-            .join("headless-backend.log")
+        engine_log: logs_dir
+            .join("engine.log")
             .to_string_lossy()
             .to_string(),
     })
@@ -1338,6 +1667,7 @@ pub fn run() {
         .manage(state.clone())
         .manage(update_coordinator.clone())
         .invoke_handler(tauri::generate_handler![
+            supervisor_state,
             api_port,
             session_token,
             smoke_run_id,
@@ -1356,6 +1686,7 @@ pub fn run() {
         ])
         .setup(move |app| {
             update_coordinator.initialize(app.handle());
+            let launch_data_dir = resolve_app_data_dir(app.handle()).ok();
             // Best-effort: spawn the bundled headless backend.
             // If this fails in dev, the UI can still be pointed at an external backend via ?api_port=...
             if let Err(err) = maybe_run_factory_reset(app.handle()) {
@@ -1363,16 +1694,28 @@ pub fn run() {
             }
             if let Err(err) = spawn_headless_backend(app.handle(), state.clone()) {
                 {
-                    let mut guard = state
-                        .spawn_error
-                        .lock()
-                        .expect("spawn_error mutex poisoned");
-                    *guard = Some(err.clone());
+                    state.host.record_spawn_error(err.clone());
                 }
                 // Notify waiters so they don't block forever on spawn error
                 state.port_ready.notify_waiters();
                 state.session_token_ready.notify_waiters();
+                publish_terminal_spawn_failure(
+                    app.handle(),
+                    &state,
+                    launch_data_dir.as_deref(),
+                    &err,
+                );
                 eprintln!("Failed to spawn headless backend: {err}");
+            } else {
+                // Lane F stage B item B10: from here the Engine is SUPERVISED (design 7.1). Before
+                // this, the shell spawned it once and only noticed a death that happened before a
+                // port was bound — a crash after startup left a dead product and a live window.
+                //
+                // Only on a successful spawn: a spawn that failed has no child to supervise, and the
+                // failure is already reported through `spawn_error` to everything waiting on it.
+                if let Err(error) = start_supervision(app.handle(), state.clone()) {
+                    publish_terminal_spawn_failure(app.handle(), &state, launch_data_dir.as_deref(), &error);
+                }
             }
             let reconciliation_app = app.handle().clone();
             let reconciliation_state = state.clone();
@@ -1537,9 +1880,12 @@ pub fn run() {
         .expect("error while building tauri application")
         // Explicit cleanup on app exit — kill backend to prevent orphan processes.
         // This fires when app.exit() is called (e.g., from tray menu "Quit").
-        .run(move |_app, event| {
+        .run(move |app, event| {
             if let tauri::RunEvent::Exit = event {
                 state_for_close.kill_child();
+                if let Ok(data_dir) = resolve_app_data_dir(app) {
+                    cleanup_registered_children_for_terminal(&data_dir);
+                }
             }
         });
 }
@@ -1549,6 +1895,118 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    #[cfg(windows)]
+    pub(super) fn owned_sleep_child() -> (std::process::Child, ManagedChildRecord) {
+        let child = Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 30",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .unwrap();
+        let query = format!(
+            "$p=Get-Process -Id {}; [pscustomobject]@{{started=$p.StartTime.ToUniversalTime().ToString('o'); executable=$p.Path}} | ConvertTo-Json -Compress",
+            child.id()
+        );
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &query])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .unwrap();
+        let identity: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let record = ManagedChildRecord {
+            pid: child.id(),
+            started_at: identity["started"].as_str().unwrap().to_string(),
+            executable: identity["executable"].as_str().unwrap().to_string(),
+        };
+        (child, record)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn terminal_child_cleanup_kills_only_matching_identity() {
+        let (mut matched, record) = owned_sleep_child();
+        terminal_kill_if_identity_matches(&record).unwrap();
+        assert!(matched.try_wait().unwrap().is_some());
+
+        let (mut unrelated, mut mismatch) = owned_sleep_child();
+        mismatch.executable.push_str(".unrelated");
+        terminal_kill_if_identity_matches(&mismatch).unwrap();
+        assert!(unrelated.try_wait().unwrap().is_none());
+        unrelated.kill().unwrap();
+        let _ = unrelated.wait();
+    }
+
+    #[test]
+    fn terminal_cleanup_refuses_malformed_or_future_ownership_before_any_action() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("runtime")).unwrap();
+        let path = dir.path().join("runtime/manifest.json");
+        for bad in ["null", "{}", r#"{"schemaVersion":3,"children":[]}"#,
+            r#"{"schemaVersion":2}"#, r#"{"schemaVersion":2,"children":null}"#,
+            r#"{"schemaVersion":2,"children":{}}"#, r#"{"schemaVersion":2,"children":[{}]}"#] {
+            fs::write(&path, bad).unwrap();
+            assert!(reconcile_registered_children(dir.path()).is_err(), "{bad}");
+        }
+        for good in [r#"{"schemaVersion":1}"#, r#"{"schemaVersion":2,"children":[]}"#] {
+            fs::write(&path, good).unwrap();
+            reconcile_registered_children(dir.path()).unwrap();
+        }
+    }
+
+    /// Lane F stage B item B10 adds a SECOND shell event and this pins the first one against it.
+    ///
+    /// `justsearch://backend-restart` is a contract with the webview (tempdoc 805 G.1): it fires on
+    /// a new instanceId, carries the new port, and its subscriber drops the dead session token. The
+    /// hazard the supervisor introduces is not that someone breaks it deliberately — it is that a
+    /// later edit FOLDS the two events together, reasoning that "the supervisor already knows about
+    /// restarts". That would make every cooldown tick look like a stale binding to the webview and
+    /// every real rebind indistinguishable from a state update.
+    ///
+    /// Three things are pinned, because the event is three things: the NAME, the PAYLOAD, and the
+    /// SUBSCRIBER. The subscriber is checked by reading the TypeScript as text — the same move
+    /// `EngineExitTest` makes against `HeadlessApp.java` — since nothing else in this crate can see
+    /// across that boundary.
+    #[test]
+    fn backend_restart_event_is_untouched_by_the_supervisor() {
+        assert_eq!(EVENT_BACKEND_RESTART, "justsearch://backend-restart");
+        assert_eq!(EVENT_SUPERVISOR_STATE, "justsearch://supervisor-state");
+        assert_ne!(
+            EVENT_BACKEND_RESTART, EVENT_SUPERVISOR_STATE,
+            "the two events must stay distinct: one says the binding is stale, the other says what \
+             the supervisor is doing"
+        );
+
+        // The payload is the new incarnation's port and nothing else. Widening it would make the
+        // event a second discovery channel, which tempdoc 501 §6 closed.
+        let manifest = ManifestFields {
+            api_port: Some(40404),
+            session_token: Some("t".into()),
+            lifecycle: Some("READY".into()),
+            instance_id: Some("abc".into()),
+            pid: Some(7),
+        };
+        let payload: Option<u16> = backend_restart_payload(&manifest);
+        assert_eq!(payload, Some(40404));
+        assert_eq!(backend_restart_payload(&ManifestFields::default()), None);
+
+        let consumer = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../ui-web/src/api/backendRestart.ts");
+        let source = fs::read_to_string(&consumer)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", consumer.display()));
+        assert!(
+            source.contains(EVENT_BACKEND_RESTART),
+            "the webview subscriber no longer names {EVENT_BACKEND_RESTART}"
+        );
+        assert!(
+            source.contains("invalidateSessionToken"),
+            "the subscriber must still drop the dead per-boot token; that is what the event is FOR"
+        );
+    }
 
     #[test]
     fn test_validate_path_rejects_traversal() {
@@ -1608,157 +2066,6 @@ mod tests {
         assert_eq!(m.api_port, Some(40404));
     }
 
-    fn manifest_of(
-        instance_id: Option<&str>,
-        port: Option<u16>,
-        token: Option<&str>,
-        pid: Option<u32>,
-    ) -> ManifestFields {
-        ManifestFields {
-            api_port: port,
-            session_token: token.map(str::to_string),
-            lifecycle: None,
-            instance_id: instance_id.map(str::to_string),
-            pid,
-        }
-    }
-
-    #[test]
-    fn test_detect_restart_on_instance_id_change() {
-        // Tempdoc 637 #1 / 805 G.1: first observation establishes (not a restart); an unchanged id
-        // is not a restart; a changed id IS a restart (a new Head incarnation on a new port).
-        let state = BackendState::default();
-        assert!(
-            !state.observe_manifest(&manifest_of(Some("id-1"), Some(1111), None, None), None),
-            "first observation is establishment, not a restart"
-        );
-        assert!(
-            !state.observe_manifest(&manifest_of(Some("id-1"), Some(1111), None, None), None),
-            "unchanged id is not a restart"
-        );
-        assert!(
-            state.observe_manifest(&manifest_of(Some("id-2"), Some(2222), None, None), None),
-            "changed id is a restart"
-        );
-        assert!(
-            !state.observe_manifest(&manifest_of(Some("id-2"), Some(2222), None, None), None),
-            "stabilized at the new id"
-        );
-    }
-
-    #[test]
-    fn binding_fills_gaps_within_one_instance() {
-        // Tempdoc 805 G.1: within one instance an observation may only FILL what is missing —
-        // never overwrite. This is the correct half of the old first-write-wins policy.
-        let state = BackendState::default();
-        state.observe_manifest(&manifest_of(Some("id-1"), Some(11111), None, None), None);
-        assert_eq!(state.get_port(), Some(11111));
-        assert_eq!(state.get_session_token(), None);
-
-        state.observe_manifest(
-            &manifest_of(Some("id-1"), Some(22222), Some("tok-1"), None),
-            None,
-        );
-        assert_eq!(
-            state.get_port(),
-            Some(11111),
-            "port must not be overwritten within one instance"
-        );
-        assert_eq!(
-            state.get_session_token().as_deref(),
-            Some("tok-1"),
-            "the missing token is filled"
-        );
-    }
-
-    #[test]
-    fn binding_replacement_on_new_instance_replaces_port_and_token_together() {
-        // Tempdoc 805 G.1 (R11-F2): port and token are per-boot facts of ONE incarnation. The old
-        // per-field policies could keep a previous boot's token beside a new boot's port, which
-        // 401s every mutating call for the app's lifetime.
-        let state = BackendState::default();
-        state.observe_manifest(
-            &manifest_of(Some("id-1"), Some(11111), Some("tok-old"), None),
-            None,
-        );
-        assert!(state.observe_manifest(
-            &manifest_of(Some("id-2"), Some(22222), Some("tok-new"), None),
-            None,
-        ));
-        assert_eq!(
-            state.binding_snapshot(),
-            Binding {
-                instance_id: Some("id-2".into()),
-                port: Some(22222),
-                token: Some("tok-new".into()),
-            }
-        );
-    }
-
-    #[test]
-    fn manifest_with_mismatched_pid_is_ignored_when_a_child_pid_is_known() {
-        // Tempdoc 805 G.1: when the shell spawned the child, a manifest naming a different pid was
-        // written by another process — crash residue, not our backend.
-        let state = BackendState::default();
-        state.observe_manifest(
-            &manifest_of(Some("id-1"), Some(11111), Some("tok-1"), Some(4242)),
-            Some(4242),
-        );
-
-        assert!(!state.observe_manifest(
-            &manifest_of(
-                Some("id-residue"),
-                Some(9999),
-                Some("tok-residue"),
-                Some(1717)
-            ),
-            Some(4242),
-        ));
-        assert_eq!(
-            state.binding_snapshot(),
-            Binding {
-                instance_id: Some("id-1".into()),
-                port: Some(11111),
-                token: Some("tok-1".into()),
-            },
-            "a pid-mismatched manifest must not touch the binding"
-        );
-    }
-
-    #[test]
-    fn manifest_without_instance_id_is_ignored() {
-        // Tempdoc 805 U8: every v0.1.0+ manifest carries instanceId, so its absence is residue
-        // from something else. Defensive, and it keeps an unattributable observation out.
-        let state = BackendState::default();
-        assert!(!state.observe_manifest(&manifest_of(None, Some(11111), Some("t"), None), None));
-        assert_eq!(state.binding_snapshot(), Binding::default());
-    }
-
-    #[test]
-    fn stale_manifest_reannouncing_the_old_instance_replaces_nothing_silently() {
-        // Tempdoc 805 G.1 / R11-F2: after id-2 was observed, a re-read of a stale id-1 manifest
-        // (same file, previous boot's contents) must not resurrect the dead token. It IS a
-        // different instanceId, so the record is replaced wholesale — never merged, which is what
-        // produced "new port + previous boot's token".
-        let state = BackendState::default();
-        state.observe_manifest(
-            &manifest_of(Some("id-1"), Some(11111), Some("tok-old"), None),
-            None,
-        );
-        state.observe_manifest(
-            &manifest_of(Some("id-2"), Some(22222), Some("tok-new"), None),
-            None,
-        );
-        // Same shell, live child: the stale manifest's pid cannot match the live child, so it is
-        // rejected outright and the live binding survives untouched.
-        assert!(!state.observe_manifest(
-            &manifest_of(Some("id-1"), Some(11111), Some("tok-old"), Some(1717)),
-            Some(4242),
-        ));
-        assert_eq!(state.get_session_token().as_deref(), Some("tok-new"));
-        assert_eq!(state.get_port(), Some(22222));
-    }
-
     #[test]
     fn test_read_manifest_parses_top_level_pid() {
         // Tempdoc 805 G.1: the pid the provenance rule keys on is a TOP-LEVEL manifest field.
@@ -1771,24 +2078,6 @@ mod tests {
         .unwrap();
         let m = read_manifest_if_present(&path).expect("manifest parses");
         assert_eq!(m.pid, Some(4242));
-    }
-
-    #[test]
-    fn backend_reset_clears_process_scoped_discovery_for_updater_restart() {
-        // Tempdoc 805 G.1: the updater's reset is binding replacement with an empty record.
-        let state = BackendState::default();
-        state.observe_manifest(
-            &manifest_of(Some("old-instance"), Some(11111), Some("old-token"), None),
-            None,
-        );
-        *state.spawn_error.lock().unwrap() = Some("old failure".into());
-        *state.killed.lock().unwrap() = true;
-
-        state.reset_for_restart().unwrap();
-
-        assert_eq!(state.binding_snapshot(), Binding::default());
-        assert!(!state.has_spawn_error());
-        assert!(!*state.killed.lock().unwrap());
     }
 
     #[test]

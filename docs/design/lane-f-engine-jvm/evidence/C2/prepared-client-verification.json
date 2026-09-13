@@ -1,0 +1,41 @@
+{
+  "revision": "47ebd09c5 + final prepared frontend continuation diff",
+  "commands": [
+    "npm run typecheck",
+    "npm run test:unit:run -- --reporter=json --outputFile=../../tmp/c2-3-preparation-client992.json",
+    "npx --no-install eslint src/shell-v0/operations/OperationClient.ts src/shell-v0/operations/OperationClient.test.ts",
+    "python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/operations/OperationClient.ts",
+    "node scripts/ci/check-ui-step-coverage.mjs"
+  ],
+  "summary": {
+    "success": true,
+    "numTotalTests": 6480,
+    "numPassedTests": 6480,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0
+  },
+  "testFiles": 483,
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-preparation-client-negative989",
+    "c2-3-preparation-client990",
+    "c2-3-preparation-client-negative991",
+    "c2-3-preparation-client992",
+    "c2-3-preparation-client-typecheck992",
+    "c2-3-preparation-client-eslint993",
+    "c2-3-preparation-client-coverage993"
+  ],
+  "visualAffected": "No steps affected by this file; observed tool result at 2026-09-13T07:52:54 local",
+  "consoleLimit": "24 AbortError messages in happy-dom Fetch onAsyncTaskManagerAbort during teardownWindow; zero unhandled/test failures reported. No claim that these messages were absent.",
+  "sources": [
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/OperationClient.ts",
+      "sha256": "d50dcdd2bba5493c9ea7428e61d39d36ac540181e8b5dcea37856be21d6f94db"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/OperationClient.test.ts",
+      "sha256": "001eed9178f6e3c13b9850b371cacae79e09c54036876fbab2a98bbdfed2f988"
+    }
+  ]
+}

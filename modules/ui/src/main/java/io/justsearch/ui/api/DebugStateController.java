@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import io.javalin.http.Context;
@@ -68,17 +70,19 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
   }
 
   public void handleGetState(Context ctx) {
-    ctx.json(buildDebugState());
+    var engineContext = RequestEngineContext.get(ctx);
+    ctx.json(buildDebugState(engineContext));
   }
 
   /** Returns the raw Lucene commit user data map from the Worker. */
   public void handleGetCommitMetadata(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     if (knowledgeServer == null || !knowledgeServer.isReady()) {
       ctx.status(503).json(Map.of("error", "Worker not available"));
       return;
     }
     try {
-      Map<String, String> commitMetadata = knowledgeServer.client().getCommitMetadata();
+      Map<String, String> commitMetadata = knowledgeServer.client().getCommitMetadata(engineContext);
       ctx.json(commitMetadata);
     } catch (Exception e) {
       log.debug("Failed to fetch commit metadata: {}", e.getMessage());
@@ -88,7 +92,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
 
   /** Builds the debug state snapshot as a Jackson ObjectNode (reusable outside HTTP context). */
   @Override
-  public ObjectNode buildDebugState() {
+  public ObjectNode buildDebugState(EngineContext engineContext) {
     ObjectNode root = mapper.createObjectNode();
 
     // System
@@ -108,14 +112,16 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
     ObjectNode worker = root.putObject("worker");
     if (knowledgeServer != null && knowledgeServer.isReady()) {
       try {
-        var snapshot = knowledgeServer.client().getDebugWorkerState();
+        var snapshot = knowledgeServer.client().getDebugWorkerState(engineContext);
         ObjectNode snapNode = (ObjectNode) mapper.valueToTree(snapshot);
         worker.setAll(snapNode);
-        // Add worker process info
-        if (knowledgeServer.spawner() != null) {
-          worker.put("pid", knowledgeServer.spawner().getWorkerPid());
-          worker.put("port", knowledgeServer.spawner().getPort());
-        }
+        // Lane F stage A item A11 deleted the Worker process: the index half now runs inside this
+        // JVM, so the only pid there is to report is ours. `port` is gone rather than zeroed —
+        // there is no port at all now, and a debug surface emitting -1/0 for one would be stating
+        // a fact that no longer exists. `inProcess` says why it vanished instead of leaving a
+        // reader of /api/debug/state to guess.
+        worker.put("pid", ProcessHandle.current().pid());
+        worker.put("inProcess", true);
 
       } catch (Exception e) {
         worker.put("error", "Failed to fetch worker status: " + e.getMessage());
@@ -127,17 +133,24 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
           worker.put("reason", "Not configured");
       } else {
           worker.put("reason", "Not ready");
-          // Still try to get PID/port if spawner exists
-          if (knowledgeServer.spawner() != null) {
-            worker.put("pid", knowledgeServer.spawner().getWorkerPid());
-            worker.put("port", knowledgeServer.spawner().getPort());
+          // Item A11: the "if a spawner exists" guard becomes "if a client is bound" — the same
+          // question ("is there an index half at all?") now that the half is composed in-process.
+          // Same reasoning as the ready arm: our pid, and no `port` key.
+          if (knowledgeServer.hasClient()) {
+            worker.put("pid", ProcessHandle.current().pid());
+            worker.put("inProcess", true);
           }
       }
     }
 
-    // Worker log path (best-effort): WorkerSpawner redirects to <dataDir>/logs/worker.log
+    // Engine log path (best-effort): <dataDir>/logs/engine.log. Item A11 deleted WorkerSpawner,
+    // which is what used to redirect the Worker child's stdio to <dataDir>/logs/worker.log, and
+    // item A16 renamed the surviving log: there is one process, so there is one log, and it is
+    // the one this JVM's Logback FILE appender writes
+    // (modules/ui/src/main/resources/logback.xml). Between A11 and A16 this key advertised a path
+    // nothing wrote; it now names a real file again.
     try {
-      Path logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("worker.log");
+      Path logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("engine.log");
       worker.put("log_path", logPath.toString());
     } catch (Exception e) {
       worker.put("log_path", "");
@@ -246,16 +259,23 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
   }
 
   /**
-   * GET /api/debug/worker-log
-   * Returns the last N bytes of the worker log file.
+   * GET /api/debug/engine-log
+   * Returns the last N bytes of the Engine's log file (<dataDir>/logs/engine.log).
+   *
+   * <p>Lane F stage A item A17.2: this was {@code GET /api/debug/worker-log} over
+   * {@code <dataDir>/logs/worker.log}. It was RENAMED rather than retired because its subject
+   * survived the merge and only changed name — the on-disk log tail is a capability the live
+   * {@code core.engine-log} SSE channel cannot supply (an SSE subscriber only sees events emitted
+   * after it subscribes; this reads what was already written, including a boot that failed before
+   * anyone could subscribe).
    *
    * Query params:
    * - bytes: max bytes to return (default 100000)
    */
-  public void handleGetWorkerLog(Context ctx) {
+  public void handleGetEngineLog(Context ctx) {
     Path logPath;
     try {
-      logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("worker.log");
+      logPath = PlatformPaths.resolveDataDir().resolve("logs").resolve("engine.log");
     } catch (Exception e) {
       Map<String, Object> logErr = ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND, "Log path not available", telemetry, ApiErrorHandler.routeOf(ctx));
       logErr.put("details", e.getMessage());
@@ -302,7 +322,7 @@ public class DebugStateController implements io.justsearch.app.api.DebugStatePro
       ctx.contentType("text/plain");
       ctx.result(content);
     } catch (Exception e) {
-      log.error("Failed to read worker log", e);
+      log.error("Failed to read engine log", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(ApiErrorCode.IO_ERROR, "Failed to read log: " + e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
     }
   }

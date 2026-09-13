@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,13 +35,13 @@ final class RetrieveContextControllerCoverageTest {
   /** A result carrying the §10.7 gap-2 shape: one examined source, one starved. */
   private static final class StubDocs implements DocumentService {
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-        String answerText, List<VerificationSource> sources, double threshold) {
+        String answerText, List<VerificationSource> sources, double threshold, EngineContext engineContext) {
       return CompletableFuture.completedFuture(
           new CitationMatchResult(
               List.of(
@@ -62,6 +63,7 @@ final class RetrieveContextControllerCoverageTest {
 
     AtomicReference<Map<String, Object>> captured = new AtomicReference<>();
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/knowledge/retrieve-context");
     when(ctx.bodyAsClass(Map.class))
         .thenReturn(
             Map.of(

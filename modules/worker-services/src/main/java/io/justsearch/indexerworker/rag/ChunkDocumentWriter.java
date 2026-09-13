@@ -12,8 +12,6 @@ import io.justsearch.indexing.chunking.ChunkSplitter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Canonical writer for chunk documents (RAG).
@@ -22,8 +20,6 @@ import org.slf4j.LoggerFactory;
  * VDU replay) produce consistent chunks (offsets, sizing, metadata).
  */
 public final class ChunkDocumentWriter {
-
-  private static final Logger log = LoggerFactory.getLogger(ChunkDocumentWriter.class);
 
   public static final int CHUNK_THRESHOLD_CHARS = ChunkSplitter.CHUNK_THRESHOLD_CHARS;
   public static final int CHUNK_TARGET_TOKENS = ChunkSplitter.DEFAULT_CHUNK_TOKENS;
@@ -94,7 +90,8 @@ public final class ChunkDocumentWriter {
   /**
    * Regenerates chunk docs for a parent doc with explicit metadata.
    *
-   * <p>Deletion is best-effort; worst-case is stale chunks remain rather than failing the caller.
+   * <p>Existing chunks are deleted before replacement. A deletion failure propagates so the caller
+   * cannot report successful regeneration while stale chunks remain searchable.
    *
    * @param chunkSpladeEnabled {@code rag.chunk_splade.enabled} (tempdoc 712 / 931 §E item 8). When
    *     false the chunk carries NO {@code splade_status} at all rather than PENDING: every backfill
@@ -112,7 +109,7 @@ public final class ChunkDocumentWriter {
     }
 
     if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
-      deleteExistingChunks(indexingCoordinator, parentDocId);
+      indexingCoordinator.deleteChunksForParentDocId(parentDocId);
       return 0;
     }
 
@@ -123,7 +120,7 @@ public final class ChunkDocumentWriter {
     List<ChunkSplitter.Chunk> chunks =
         ChunkSplitter.splitWithMetadata(content, CHUNK_TARGET_TOKENS, CHUNK_OVERLAP_TOKENS, mode);
     if (chunks.size() <= 1) {
-      deleteExistingChunks(indexingCoordinator, parentDocId);
+      indexingCoordinator.deleteChunksForParentDocId(parentDocId);
       return 0;
     }
     if (meta == null || meta.parentDocUid == null || meta.parentDocUid.isBlank()) {
@@ -133,7 +130,7 @@ public final class ChunkDocumentWriter {
 
     // Validate every prerequisite for replacement before deleting the currently searchable
     // chunks. A transient parent-identity read failure must fail closed without data loss.
-    deleteExistingChunks(indexingCoordinator, parentDocId);
+    indexingCoordinator.deleteChunksForParentDocId(parentDocId);
 
     // ChunkSplitter offsets are now relative to the original content (including leading whitespace).
     // Tempdoc 931 §C.1: every chunk carries the identity of the parent revision it was cut from, so
@@ -227,15 +224,6 @@ public final class ChunkDocumentWriter {
     }
 
     return indexed;
-  }
-
-  private static void deleteExistingChunks(
-      IndexingCoordinator indexingCoordinator, String parentDocId) {
-    try {
-      indexingCoordinator.deleteChunksForParentDocId(parentDocId);
-    } catch (RuntimeException e) {
-      log.debug("Failed to delete existing chunks for {}: {}", parentDocId, e.getMessage());
-    }
   }
 
   // ========== F8 Tier 2: Line Number & Heading Extraction ==========

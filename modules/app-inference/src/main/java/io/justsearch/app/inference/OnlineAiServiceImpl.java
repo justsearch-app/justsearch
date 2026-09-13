@@ -41,14 +41,17 @@ public final class OnlineAiServiceImpl
   private static final Logger LOG = LoggerFactory.getLogger(OnlineAiServiceImpl.class);
 
   private final InferenceLifecycleManager manager;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   /**
    * Creates a new OnlineAiServiceImpl.
    *
    * @param manager the inference lifecycle manager to delegate to
    */
-  public OnlineAiServiceImpl(InferenceLifecycleManager manager) {
-    this.manager = manager;
+  public OnlineAiServiceImpl(
+      io.justsearch.app.api.EngineAdmissionService admission, InferenceLifecycleManager manager) {
+    this.admission = Objects.requireNonNull(admission, "admission");
+    this.manager = Objects.requireNonNull(manager, "manager");
     LOG.info("OnlineAiServiceImpl created");
   }
 
@@ -275,14 +278,28 @@ public final class OnlineAiServiceImpl
   @Override
   public CompletableFuture<OnlineAiService.VisionCompletionResult> visionCompletionDetailed(
       String prompt, byte[] imageBytes, int maxTokens) {
-    return manager.visionCompletionDetailed(prompt, imageBytes, maxTokens);
+    return missingContext("visionCompletionDetailed");
   }
 
   /** Tempdoc 677 Stage 2: sampling/seed-override overload — see {@link InferenceLifecycleManager}. */
   @Override
   public CompletableFuture<OnlineAiService.VisionCompletionResult> visionCompletionDetailed(
       String prompt, byte[] imageBytes, int maxTokens, SamplingParams sampling, Long seed) {
-    return manager.visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed);
+    return missingContext("visionCompletionDetailed");
+  }
+
+  @Override
+  public CompletableFuture<OnlineAiService.VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.core.context.EngineContext engineContext) {
+    int resolved = maxTokens <= 0 ? DEFAULT_QA_TOKENS : maxTokens;
+    try (var work = admission.attach(engineContext)) {
+      return manager.visionCompletionDetailed(prompt, imageBytes, resolved, sampling, seed, work);
+    }
   }
 
   @Override
@@ -411,6 +428,11 @@ public final class OnlineAiServiceImpl
 
   @Override
   public void stream(StreamRequest request, StreamSink sink) {
+    if (request.work() == null) {
+      sink.onError().accept(
+          new IllegalArgumentException("OnlineAiService stream requires an Engine work owner"));
+      return;
+    }
     int resolved = request.maxTokens() <= 0 ? DEFAULT_QA_TOKENS : request.maxTokens();
     LOG.debug(
         "stream(maxTokens={}, tools={}, sentinel={}) called, messages={}",
@@ -423,12 +445,14 @@ public final class OnlineAiServiceImpl
         node -> {
           try {
             sink.onToolCallDelta().accept(node.toString());
+          } catch (java.util.concurrent.CancellationException cancelled) {
+            throw cancelled;
           } catch (Exception e) {
             LOG.debug("Tool call delta callback error", e);
           }
         },
         sink.onUsage(), sink.onComplete(), sink.onError(),
-        request.sampling(), request.requireSentinel());
+        request.sampling(), request.requireSentinel(), request.work());
   }
 
   // ==================== Non-Streaming Methods ====================
@@ -436,36 +460,64 @@ public final class OnlineAiServiceImpl
   @Override
   public CompletableFuture<String> chatCompletion(
       List<Map<String, Object>> messages, int maxTokens, SamplingParams sampling) {
+    return missingContext("chatCompletion");
+  }
+
+  @Override
+  public CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.core.context.EngineContext engineContext) {
     int resolved = maxTokens <= 0 ? DEFAULT_QA_TOKENS : maxTokens;
     LOG.debug(
         "chatCompletion(maxTokens={}, sampling={}) called, messages={}",
         resolved,
         sampling,
         messages != null ? messages.size() : 0);
-    return manager.chatCompletion(messages, resolved, sampling);
+    try (var work = admission.attach(engineContext)) {
+      return manager.chatCompletion(messages, resolved, sampling, work);
+    }
   }
 
   @Override
   public CompletableFuture<String> summarize(String content) {
-    LOG.debug("summarize called, content length: {}", content != null ? content.length() : 0);
-    return manager.summarize(content, DEFAULT_SUMMARY_TOKENS);
+    return missingContext("summarize");
   }
 
   @Override
   public CompletableFuture<String> summarize(String content, int maxTokens) {
+    return missingContext("summarize");
+  }
+
+  @Override
+  public CompletableFuture<String> summarize(
+      String content, int maxTokens, io.justsearch.core.context.EngineContext engineContext) {
     int resolved = maxTokens <= 0 ? DEFAULT_SUMMARY_TOKENS : maxTokens;
     LOG.debug(
         "summarize(maxTokens={}) called, content length: {}",
         resolved,
         content != null ? content.length() : 0);
-    return manager.summarize(content, resolved);
+    try (var work = admission.attach(engineContext)) {
+      return manager.summarize(content, resolved, work);
+    }
   }
 
   @Override
   public CompletableFuture<String> askQuestion(String question, String context) {
+    return missingContext("askQuestion");
+  }
+
+  @Override
+  public CompletableFuture<String> askQuestion(
+      String question,
+      String context,
+      io.justsearch.core.context.EngineContext engineContext) {
     LOG.debug("askQuestion called, question: {}, context length: {}",
         question, context != null ? context.length() : 0);
-    return manager.askQuestion(context, question, DEFAULT_QA_TOKENS);
+    try (var work = admission.attach(engineContext)) {
+      return manager.askQuestion(context, question, DEFAULT_QA_TOKENS, work);
+    }
   }
 
   // ==================== Status Methods ====================
@@ -492,18 +544,41 @@ public final class OnlineAiServiceImpl
 
   @Override
   public java.util.Optional<Integer> countTokens(String text) {
-    return manager.countTokens(text);
+    throw new IllegalStateException("OnlineAiService countTokens requires EngineContext");
+  }
+
+  @Override
+  public java.util.Optional<Integer> countTokens(
+      String text, io.justsearch.core.context.EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return manager.countTokens(text, work);
+    }
   }
 
   @Override
   public java.util.Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
-    return manager.countPromptTokens(messages);
+    throw new IllegalStateException("OnlineAiService countPromptTokens requires EngineContext");
   }
 
   @Override
   public java.util.Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return manager.countPromptTokens(messages, tools);
+    throw new IllegalStateException("OnlineAiService countPromptTokens requires EngineContext");
+  }
+
+  @Override
+  public java.util.Optional<Integer> countPromptTokens(
+      List<Map<String, Object>> messages,
+      List<Map<String, Object>> tools,
+      io.justsearch.core.context.EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return manager.countPromptTokens(messages, tools, work);
+    }
+  }
+
+  private static <T> CompletableFuture<T> missingContext(String operation) {
+    return CompletableFuture.failedFuture(
+        new IllegalStateException("OnlineAiService " + operation + " requires EngineContext"));
   }
 
   // ==================== Mode Control Methods ====================

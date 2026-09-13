@@ -1,0 +1,149 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
+index 42ddc054b..da590cb63 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
+@@ -106,9 +105,0 @@ final class WatchedRootsState {
+-  /** Membership and labels share one observation; no filesystem availability work is scheduled. */
+-  synchronized java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>
+-      snapshotBindings() {
+-    return watchedRoots.keySet().stream()
+-        .map(root -> new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(
+-            root, collections.get(root)))
+-        .toList();
+-  }
+-
+diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
+index 4ec293fc4..aa48a535f 100644
+--- a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
++++ b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
+@@ -7 +6,0 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
+-import static org.junit.jupiter.api.Assertions.assertThrows;
+@@ -39,77 +37,0 @@ final class RecordedRootPreparationTest {
+-  @Test
+-  @DisplayName("snapshot bindings is immutable")
+-  void snapshotBindingsIsImmutable() throws Exception {
+-    Path root = Files.createDirectories(tempDir.resolve("notes")).toAbsolutePath().normalize();
+-    Fixture fixture = new Fixture(() -> ExcludeMatcher.empty(), null);
+-
+-    fixture.state.register(root, "my-notes", false);
+-
+-    List<IngestCollectionPolicy.RootBinding> snapshot = fixture.state.snapshotBindings();
+-    assertEquals(List.of(new IngestCollectionPolicy.RootBinding(root, "my-notes")), snapshot);
+-    assertThrows(
+-        UnsupportedOperationException.class,
+-        () -> snapshot.add(new IngestCollectionPolicy.RootBinding(tempDir, "late")));
+-  }
+-
+-  @Test
+-  @DisplayName("snapshot cannot observe membership before its collection label")
+-  void registerPublishesLabelAtomicallyAgainstSnapshot() throws Exception {
+-    Path root = tempDir.resolve("paused-registration").toAbsolutePath().normalize();
+-    CountDownLatch membershipInserted = new CountDownLatch(1);
+-    CountDownLatch releaseRegistration = new CountDownLatch(1);
+-    PausingMap watchedRoots = new PausingMap(membershipInserted, releaseRegistration);
+-    WatchedRootsState state = new WatchedRootsState(watchedRoots, new WatchedRootsStore(null, null));
+-    AtomicReference<List<IngestCollectionPolicy.RootBinding>> observed = new AtomicReference<>();
+-    AtomicReference<Throwable> threadFailure = new AtomicReference<>();
+-    CountDownLatch snapshotFinished = new CountDownLatch(1);
+-    Thread registrar =
+-        new Thread(
+-            () -> {
+-              try {
+-                state.register(root, "labelled", false);
+-              } catch (Throwable failure) {
+-                threadFailure.compareAndSet(null, failure);
+-              }
+-            },
+-            "recorded-root-registration");
+-    Thread snapshotter =
+-        new Thread(
+-            () -> {
+-              try {
+-                observed.set(state.snapshotBindings());
+-              } catch (Throwable failure) {
+-                threadFailure.compareAndSet(null, failure);
+-              } finally {
+-                snapshotFinished.countDown();
+-              }
+-            },
+-            "recorded-root-snapshot");
+-    try {
+-      registrar.start();
+-      assertTrue(membershipInserted.await(10, TimeUnit.SECONDS));
+-      snapshotter.start();
+-
+-      // The registrar holds the state monitor while the map has membership but not its label.
+-      // A completed snapshot here would prove that register is not atomic with snapshotBindings.
+-      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+-      while (snapshotFinished.getCount() != 0 && snapshotter.getState() != Thread.State.BLOCKED
+-          && System.nanoTime() < deadline) Thread.sleep(5);
+-      if (snapshotFinished.getCount() == 0) {
+-        assertEquals(null, threadFailure.get(), "snapshot thread must not fail");
+-        assertEquals(List.of(new IngestCollectionPolicy.RootBinding(root, "labelled")), observed.get(),
+-            "snapshot must never publish membership without its collection");
+-      }
+-      assertEquals(Thread.State.BLOCKED, snapshotter.getState());
+-    } finally {
+-      releaseRegistration.countDown();
+-      if (registrar.getState() != Thread.State.NEW) registrar.join(10_000);
+-      if (snapshotter.getState() != Thread.State.NEW) snapshotter.join(10_000);
+-    }
+-
+-    assertFalse(registrar.isAlive(), "registration thread must be released");
+-    assertFalse(snapshotter.isAlive(), "snapshot thread must be released");
+-    assertEquals(null, threadFailure.get(), "worker threads must complete without failure");
+-    assertEquals(
+-        List.of(new IngestCollectionPolicy.RootBinding(root, "labelled")), observed.get());
+-  }
+-
+@@ -151,2 +73,2 @@ final class RecordedRootPreparationTest {
+-    assertEquals(1, fixture.state.snapshotBindings().size());
+-    assertEquals("same-label", fixture.state.snapshotBindings().get(0).collection());
++    assertEquals(1, fixture.watchedRoots.size());
++    assertEquals("same-label", fixture.state.getCollection(root));
+@@ -192 +114 @@ final class RecordedRootPreparationTest {
+-    assertTrue(fixture.state.snapshotBindings().isEmpty());
++    assertEquals(null, fixture.state.getCollection(root));
+@@ -252 +174,2 @@ final class RecordedRootPreparationTest {
+-                bindingsAtSubmission.set(state.snapshotBindings());
++                bindingsAtSubmission.set(watchedRoots.keySet().stream()
++                    .map(root -> new IngestCollectionPolicy.RootBinding(root, state.getCollection(root))).toList());
+@@ -258,30 +180,0 @@ final class RecordedRootPreparationTest {
+-  /** Pauses the first membership put after it is visible but before register can publish its label. */
+-  private static final class PausingMap extends java.util.concurrent.ConcurrentHashMap<Path, Instant> {
+-    private static final long serialVersionUID = 1L;
+-    private final CountDownLatch membershipInserted;
+-    private final CountDownLatch releaseRegistration;
+-    private final java.util.concurrent.atomic.AtomicBoolean pause =
+-        new java.util.concurrent.atomic.AtomicBoolean(true);
+-
+-    private PausingMap(CountDownLatch membershipInserted, CountDownLatch releaseRegistration) {
+-      this.membershipInserted = membershipInserted;
+-      this.releaseRegistration = releaseRegistration;
+-    }
+-
+-    @Override
+-    public Instant put(Path key, Instant value) {
+-      Instant prior = super.put(key, value);
+-      if (pause.compareAndSet(true, false)) {
+-        membershipInserted.countDown();
+-        try {
+-          if (!releaseRegistration.await(10, TimeUnit.SECONDS)) {
+-            throw new AssertionError("registration was not released");
+-          }
+-        } catch (InterruptedException e) {
+-          Thread.currentThread().interrupt();
+-          throw new AssertionError("registration was interrupted", e);
+-        }
+-      }
+-      return prior;
+-    }
+-  }
+diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java
+index 199a88fa2..ac1a689ec 100644
+--- a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java
++++ b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RootCompletionMembershipTest.java
+@@ -68 +68,2 @@ final class RootCompletionMembershipTest {
+-      assertTrue(state.snapshotBindings().isEmpty());
++      assertTrue(roots.isEmpty());
++      assertNull(state.getCollection(path));

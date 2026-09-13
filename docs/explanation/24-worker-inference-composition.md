@@ -2,7 +2,7 @@
 title: Worker Inference Composition
 type: explanation
 status: stable
-description: "How the Worker process builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline."
+description: "How the index half builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline."
 ---
 
 # Worker Inference Composition
@@ -270,7 +270,7 @@ consumes without reshaping the pipeline.
 
 `GET /api/debug/session-policies` returns the resolved `RuntimePolicy`
 and every `ModelSessionPolicy` as JSON. The Head proxies to the
-Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC rpc
+index half's live `InferenceSurface` via the `getSessionPolicies` port call
 (tempdoc 397 §14.28 U4) — Head does not re-resolve. Response shape:
 
 ```json
@@ -283,7 +283,7 @@ Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC rpc
 
 `config-unavailable` = Head has no `ResolvedConfig` (e.g., boot hasn't
 loaded settings yet); `surface-unavailable` = Worker hasn't composed yet;
-`worker-unreachable` = gRPC failed or Head has no client.
+`worker-unreachable` = the port call failed or Head has no client.
 
 Because the applier reads the same record the endpoint serialises,
 diffing two runs' snapshots is equivalent to diffing the applied
@@ -300,7 +300,7 @@ consumers:
   files so the `IndexingLoop` does not process docs before SPLADE /
   embedding exist.
 - The **query handlers** (tempdoc 397 §14.28 U3) —
-  `GrpcSearchService.awaitModelsReady(...)` — block `search` /
+  `WorkerSearchService.awaitModelsReady(...)` — block `search` /
   `retrieveContext` / `rerank` / `matchCitations` until the latch
   releases, closing a boot-race where queries arriving during init
   silently missed the reranker + citation wiring.
@@ -308,6 +308,12 @@ consumers:
 Both release at the same moment: after
 `KnowledgeServer.initDeferredModels()` has wired every model (success
 or failure). Both fall through to a degraded path on 120 s timeout.
+
+Shutdown has a different obligation: `KnowledgeServer.close()` awaits completion
+of the existing deferred-model initializer before it releases the model fields.
+A readiness timeout does not establish that native initialization has stopped.
+The Engine's terminal-writer fault path completes its ordered close before JVM
+exit, because ORT also has an independent environment shutdown hook.
 
 ---
 

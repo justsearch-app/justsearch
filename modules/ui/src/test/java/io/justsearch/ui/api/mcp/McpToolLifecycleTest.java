@@ -82,7 +82,7 @@ class McpToolLifecycleTest {
     var surface =
         new McpToolSurface(List.of(), null, () -> null, () -> null, java.time.Clock.systemUTC());
 
-    assertEquals(6, listedTools(surface).size());
+    assertEquals(7, listedTools(surface).size());
     assertTrue(
         listedTools(surface).stream().noneMatch(tool -> tool.containsKey("_meta")),
         "no production tool is deprecated");
@@ -93,6 +93,7 @@ class McpToolLifecycleTest {
     var surface = new McpToolSurface(List.of(fakeTool("fake_tool")), List.of());
     var handler = new McpProtocolHandler(surface, List.of());
     Context context = mock(Context.class);
+    when(context.path()).thenReturn("/mcp");
     when(context.body())
         .thenReturn("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
     ArgumentCaptor<String> resultCaptor = ArgumentCaptor.forClass(String.class);

@@ -73,7 +73,7 @@ The dev MCP surface exposes exactly these **12** tools:
 | `justsearch.dev.search_query` | Execute `POST /api/knowledge/search`. |
 | `justsearch.dev.ingest` | Execute `POST /api/knowledge/ingest`. |
 | `justsearch.dev.ai_activate` | Activate the online AI runtime. |
-| `justsearch.dev.reload` | Hot-reload the running stack's Worker: compile from the tree that stack was launched from, push method-body changes over identity-checked JDWP, reconstruct services with the ONNX encoders still loaded. Ownership-gated. |
+| `justsearch.dev.reload` | Hot-reload the running stack's Engine: compile from the tree that stack was launched from, push method-body changes over identity-checked JDWP, reconstruct services with the ONNX encoders still loaded. Ownership-gated. |
 
 Legacy underscore-style dev tool names and standalone readiness/listing/suggestion/cleanup tools are obsolete. Agents should use the dotted names above.
 
@@ -109,7 +109,7 @@ The **EvidenceBundle format itself is live and load-bearing** — only the two M
    - `waitTimeoutMs` may need to be higher than the default on cold machines or after clean builds.
    - `chatProfile?: "compact" | "standard"` (tempdoc 842) selects the llama-server chat model pair delivered as `JUSTSEARCH_CHAT_PROFILE` in the spawn env. Defaults to `compact` — dev stacks run the small dev-tier model unless told otherwise.
    - On `OWNER_CONFLICT`, `justsearch.dev.acquire_when_free` waits for the stack instead of a conflict → ask → manual-retry loop.
-   - `hotReload` **defaults true** (tempdoc 844): the Worker gets a JDWP listener on a per-run port, recorded in `run.json`. Pass `hotReload: false` to opt out; `reload` then refuses with `HOT_RELOAD_NOT_ENABLED` rather than reporting a push it could not make.
+   - `hotReload` **defaults true** (tempdoc 844): the Engine gets a JDWP listener on a per-run port, recorded in `run.json`. Pass `hotReload: false` to opt out; `reload` then refuses with `HOT_RELOAD_NOT_ENABLED` rather than reporting a push it could not make.
 4. Use `justsearch.dev.fetch_api_json` for common read-only diagnostics.
 5. Use `justsearch.dev.api_call` only when the endpoint is in the explicit allowlist.
 6. Use `justsearch.dev.stop` when the run should be shut down. It cleans up only processes whose
@@ -122,11 +122,13 @@ Starting the required MCP itself needs only the tracked checkout, Git, and Node.
 root npm installation is still required to regenerate its third-party runtime or run repository
 JavaScript development checks; it is not a task-creation prerequisite.
 
-Build the Worker distribution and UI assets before relying on the dev stack:
+Build the Engine distribution and UI assets before relying on the dev stack:
 
 ```bash
-./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist
+./gradlew.bat :modules:ui:installDist
 ```
+
+(One task, one distribution: lane F stage A item A13 deleted the separate Worker distribution — the index half is now jars inside the Engine's own `lib/`.)
 
 If AI runtime behavior is part of the investigation, also verify model files, native runtime availability, and GPU/runtime prerequisites with the project-specific preflight scripts before drawing conclusions from failures.
 
@@ -134,7 +136,7 @@ Operational checks that are still worth doing before longer investigations:
 
 | Area | Check |
 |------|-------|
-| Worker distribution | `modules/indexer-worker/build/install/indexer-worker/` should exist after the Gradle command above. |
+| Engine distribution | `modules/ui/build/install/ui/` should exist after the Gradle command above, and its `lib/` should contain `indexer-worker-*.jar`. |
 | UI assets | `modules/ui-web/dist/` should exist when testing packaged/static UI behavior. |
 | Models | Online LLM paths and Worker ONNX encoder assets must match the current settings/model manifest. Do not assume old GGUF embedding paths. |
 | Runtime variant | CPU-only online runtime is valid but slow; GPU behavior requires a GPU-capable runtime variant and matching configuration. |
@@ -217,7 +219,7 @@ Both `fetch_api_json` and `api_call` accept `jsonPath`, sharing one implementati
 | `/api/knowledge/status` | GET |
 | `/api/schemas/{name}` | GET |
 | `/api/debug/events` | GET |
-| `/api/debug/worker-log` | GET |
+| `/api/debug/engine-log` | GET |
 | `/api/telemetry/health` | GET |
 | `/api/action-ledger` | GET |
 
@@ -285,7 +287,7 @@ leaves the run merely *observed*, never failing the eval run.
 | `repoRoot` / `dataDir` | Which tree it was launched from, and which data dir it holds. |
 | `workload` | `"eval-backend"` (`:modules:ui:runHeadlessEval`). |
 | `inferenceRequested` | Whether `-Pllm=true` was asked for. |
-| `gpuBound` | `"unverified"` — the producer does **not** measure GPU residency, so it declines to claim it either way. Treat a live eval backend as GPU contention anyway: its Worker loads the ONNX encoder stack and this repo has no CPU fallback. |
+| `gpuBound` | `"unverified"` — the producer does **not** measure GPU residency, so it declines to claim it either way. Treat a live eval backend as GPU contention anyway: its Engine loads the ONNX encoder stack and this repo has no CPU fallback. |
 | `sessionId` | The agent session that owns it, from `tmp/agent-telemetry/current-session-id`, or `null`. |
 | `startedAt` | UTC ISO-8601, second precision. |
 
@@ -299,8 +301,10 @@ this surface is supposed to have stopped making. The entry names `recordFile` so
 The reader keeps the same distinction about *itself*: `foreignRuns: []` means "I listed the register
 and it was empty", and only a genuinely absent directory (`ENOENT`/`ENOTDIR`) produces it. Any other
 directory-read failure — a permission denial, a handle exhaustion — propagates and the field becomes
-`null`, "I did not look". `stop_backend` also sweeps for an orphan Worker JVM **before** retiring the
-record, so a GPU-holding survivor of the process-tree kill is never running with nothing declaring it.
+`null`, "I did not look". Lane F stage A removed a clause here that claimed `stop_backend` also sweeps for an orphan Worker
+JVM before retiring the record. There is no second JVM to be orphaned, and there is no such sweep in
+the code (`grep -n orphan scripts/dev/dev-runner.cjs scripts/dev/justsearch-dev-mcp/server.mjs`
+returns nothing). The process-tree kill covers the one process.
 
 **Scope.** This is one producer, one consumer and one small record — not a general run registry
 (tempdoc 844 §12.4 rules that out). Registration is not enforced anywhere; a bare
@@ -310,7 +314,7 @@ fallback that keeps the register honest about what it does not cover.
 ## Hot Reload
 
 `justsearch.dev.reload` compiles a module, pushes the changed **method bodies** into the running
-Worker over JDWP, and signals `DevReloadManager` to reconstruct the Worker's services — carrying
+Engine over JDWP, and signals `DevReloadManager` to reconstruct the Engine's index-half services — carrying
 `ModelContext` (embedding, SPLADE, NER, compat controller) across the reconstruction. Keeping the
 ONNX encoders loaded is the capability; a warm restart reloads them and costs ~40s to worker-ready.
 
@@ -321,7 +325,7 @@ never staged or half-applied — restart the stack for those.
 Parameters: `module` (restricted to the module the run recorded — see below), `skipCompile`,
 `takeover`, `debugPort` (a diagnostics-only override of the recorded port), `sessionId`.
 
-**The classpath guarantee, and what `skipBuild` does to it.** The Worker's classpath carries the
+**The classpath guarantee, and what `skipBuild` does to it.** The Engine's classpath carries the
 hot-reload classes dir **first**, ahead of the installDist jars, so the classes a push redefines and
 the classes loaded afterwards come from one build. That only holds when the classes dir and the jars
 *are* one build. `start` establishes it two ways and never assumes it:
@@ -357,8 +361,9 @@ Three properties are load-bearing, and each replaces a measured silent failure (
   under `distFrom` — 125 of 162 measured starts — a worktree agent's classes were redefined into
   another agent's JVM and reported as success.
 - **The target VM proves its identity before anything is redefined.** The dev-runner records the
-  Worker's classes dir in `run.json`; `WorkerSpawner` puts that same absolute path first on the
-  Worker's classpath; `HotSwapPush` reads the attached VM's own classpath back over JDI and refuses
+  hot-reload classes dir in `run.json` and puts that same absolute path first on the Engine's
+  classpath itself (`assessHotReloadClasspath`, `dev-runner.cjs:901`) — `WorkerSpawner` did this
+  until lane F stage A item A11 deleted it along with the process it spawned; `HotSwapPush` reads the attached VM's own classpath back over JDI and refuses
   unless the entry is there. Attaching to "whatever listens on 5005" is no longer possible.
 - **Success is confirmed, not assumed.** A push that redefined zero classes is not success, the
   marker file is not advanced, and the reload signal is **not** written — a failed push no longer
@@ -376,10 +381,10 @@ Three properties are load-bearing, and each replaces a measured silent failure (
 | `RUN_ROOT_UNRESOLVED` | The active run record does not say which checkout it was launched from, or that checkout is gone. | Stop and start the stack again. `reload` refuses rather than falling back to the caller's tree — that fallback was the defect. |
 | `HOT_RELOAD_NOT_ENABLED` | The stack was started with `hotReload: false` (no JDWP listener exists); or its run record predates the per-run hot-reload record; or hot reload **was** requested and the dev-runner turned it off at start, in which case the message quotes its recorded `reason` and `classpathVerdict` (`CLASSES_NEWER_THAN_DIST`, `CLASSES_DIR_EMPTY`, `DIST_JAR_UNREADABLE`, `DEBUG_PORT_UNAVAILABLE`). | Restart the stack; `hotReload` defaults true. For a classpath verdict, restart **without** `skipBuild`. For `DEBUG_PORT_UNAVAILABLE`, free a port in 5005-5024 or set `JUSTSEARCH_DEV_DEBUG_PORT`. |
 | `RELOAD_MODULE_NOT_ON_CLASSPATH` | `module` named something other than the module the run recorded as its hot-reload classes dir. Pushing it would redefine classes from a directory the target VM does not load from — reported as success while the module kept loading from its stale jar (tempdoc 844 M5). | Nothing was pushed. Omit `module`, or restart the stack to pick up a change in that module. |
-| `HOTSWAP_TIMED_OUT` | The pusher was killed by its own timeout. Whether bytecode was redefined is **unknown** — the kill may have landed on either side of the JVM's `redefineClasses` call — so `classesRedefined` is `null` and no reconstruction signal was written. | Do **not** assume the Worker is unchanged. Restart the stack to get back to a known state. |
+| `HOTSWAP_TIMED_OUT` | The pusher was killed by its own timeout. Whether bytecode was redefined is **unknown** — the kill may have landed on either side of the JVM's `redefineClasses` call — so `classesRedefined` is `null` and no reconstruction signal was written. | Do **not** assume the Engine is unchanged. Restart the stack to get back to a known state. |
 | `COMPILE_FAILED` | Gradle `compileJava` failed in the run's tree. | Fix the compile error; the tail of the Gradle output is in the message. |
 | `TARGET_IDENTITY_MISMATCH` | The JVM on the run's JDWP port was not launched from the tree the run record names — **none** of its classpath entries lie under that tree. | Nothing was pushed. Re-orient with `quick_health` — a foreign or stale backend is holding that port. |
-| `HOT_RELOAD_CLASSPATH_ABSENT` | The JVM **was** launched from the run record's tree, but without the hot-reload classes dir on its classpath — a distribution built before that classpath existed. Distinct from the cross-tree case above, which it used to be misreported as (tempdoc 844 F3). | Nothing was pushed. Rebuild the dist in that tree (`./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist`) and restart the stack. |
+| `HOT_RELOAD_CLASSPATH_ABSENT` | The JVM **was** launched from the run record's tree, but without the hot-reload classes dir on its classpath — a distribution built before that classpath existed. Distinct from the cross-tree case above, which it used to be misreported as (tempdoc 844 F3). | Nothing was pushed. Rebuild the dist in that tree (`./gradlew.bat :modules:ui:installDist`) and restart the stack. |
 | `TARGET_IDENTITY_UNVERIFIED` | The push tool did not confirm the target's identity (e.g. an older `HotSwapPush` copy). | Treated as not-confirmed rather than success; rebuild/refresh the checkout. |
 | `NO_CLASSES_REDEFINED` | Changed classes existed, but none is loaded in the target VM, so no bytecode was replaced. | Not a success and not a signal-worthy event. Exercise the code path first, or restart. |
 | `STRUCTURAL_CHANGE` | Added/removed methods or fields — standard HotSwap cannot apply it. Detected from the JVM's own wording too (`HotSwap not supported by target VM: add method not implemented` and the rest of that JDI family), which is what a real structural change actually prints; matching only the pusher's phrasing made this code unreachable until tempdoc 844 F1. | Restart the dev stack. |
@@ -398,7 +403,7 @@ and writes no signal — distinct from a push that failed.
 | `HANDSHAKE_REQUIRED` | The holder is running a `MUST_COMPLETE` op-lease (migration, bulk-reindex, index GC, etc.); `warn` takeover is upgraded to a sync handshake. Response includes `criticalOps[]`. | Wait for the op to complete (use the per-op `expectedDurationSec` to estimate), or escalate to `takeover: "force"` with user approval (records a `forcibly_interrupted_critical_op` disposition in the stop-report). |
 | `REQUIRES_CONFIRMATION` | A `force` takeover hit an `UNSAFE_TO_INTERRUPT` op-lease. | Pass `--confirm-interrupt=<opId>` matching one of the `criticalOps[].opId` values in the response. The typed token guards against typo'd reclaims of unsafe-to-interrupt ops. |
 | `RUN_NOT_FOUND` / `NO_API_URL` | The active run record references a runId that no longer exists or has no `apiBaseUrl`. | Call `quick_health` to re-orient; the run may have partially failed. |
-| `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
+| `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `./gradlew.bat :modules:ui:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
 | `START_TIMED_OUT` | The dev-runner start subprocess did not report a result inside `startTimeoutMs`. **Readiness was not confirmed and it is not established that this call started anything.** Whatever could be read off disk afterwards is under `observed` (active runId, recorded ports/URLs, and one `/api/health` status code) — observations, not a started stack. Before tempdoc 844 this branch synthesized `ok: true` from any runId in `active.json`, so a start that died mid-boot, or a run that was already there, was reported as a successful start. | Call `quick_health { probe: true }` to find out what is actually running, and `tail_log { kind: "backend_stderr" }` if the boot failed. |
 | `INVALID_DIST_FROM` | `distFrom` is neither the main repo nor a sibling worktree under `.claude/worktrees`, or that checkout has no `scripts/dev/dev-runner.cjs`. A **bare worktree name** (`"round14"`) is resolved against `.claude/worktrees/<name>`; when no such directory exists the message lists the names that do. | Pass a worktree name, a path to a sibling worktree, or the main repo root. |
 

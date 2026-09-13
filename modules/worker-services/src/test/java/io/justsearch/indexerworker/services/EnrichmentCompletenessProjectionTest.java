@@ -46,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
  * be pointed at, and a projection that mis-sums is worse than none.
  */
 @DisplayName("enrichment completeness projection (/api/status)")
-final class EnrichmentCompletenessProjectionTest {
+final class EnrichmentCompletenessProjectionTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final float[] VEC = {0.1f, 0.2f, 0.3f, 0.4f};
 
@@ -295,7 +295,7 @@ final class EnrichmentCompletenessProjectionTest {
         new FieldCatalogDef.FieldDef(
             SchemaFields.NER_STATUS, "keyword", true, true, List.of("filter"), null, null, false));
     return IndexSchema.fromCatalog(new FieldCatalogDef(base.version() + "+status", fields))
-        .atPath(tempDir.resolve(name))
+        .atPath(tempDir.resolve(name)).withExecutorRegistrations(testLuceneExecutors())
         .open();
   }
 

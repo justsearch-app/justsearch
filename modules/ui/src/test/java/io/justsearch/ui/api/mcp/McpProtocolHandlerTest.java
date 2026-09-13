@@ -1,4 +1,6 @@
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -6,6 +8,7 @@ import static org.mockito.Mockito.*;
 import io.javalin.http.Context;
 import io.justsearch.agent.api.registry.ConfirmStrategy;
 import io.justsearch.agent.api.registry.ConfirmationRequiredException;
+import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.GateBehavior;
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.OperationCatalog;
@@ -40,6 +43,41 @@ import tools.jackson.databind.json.JsonMapper;
 
 class McpProtocolHandlerTest {
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void wrappedExecutorRefusalKeepsRpcIdentityAndExplicitlyDisallowsAutomaticReplay() throws Exception {
+    for (var reason : List.of(
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+        io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED)) {
+      var adapter = mock(KnowledgeHttpApiAdapter.class);
+      when(adapter.search(any(), any(EngineContext.class))).thenThrow(
+          new java.util.concurrent.CompletionException(
+              new io.justsearch.core.execution.EngineExecutorRejectedException(reason, "test.search", 7)));
+      var ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/mcp");
+      when(ctx.body()).thenReturn("""
+          {"jsonrpc":"2.0","id":"refused-7","method":"tools/call",
+           "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+          """);
+      when(ctx.contentType(anyString())).thenReturn(ctx);
+      when(ctx.status(anyInt())).thenReturn(ctx);
+      var response = ArgumentCaptor.forClass(String.class);
+      when(ctx.result(response.capture())).thenReturn(ctx);
+      handlerOver(adapter).handlePost(ctx);
+      var wire = MAPPER.readValue(response.getValue(), Map.class);
+      assertEquals("refused-7", wire.get("id"));
+      assertFalse(wire.containsKey("result"));
+      var error = (Map<String, Object>) wire.get("error");
+      var data = (Map<String, Object>) error.get("data");
+      assertEquals(false, data.get("retrySafe"));
+      boolean closed = reason == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED;
+      assertEquals(closed ? "SERVICE_UNAVAILABLE" : "ADMISSION_ENGINE_LIMIT", data.get("errorCode"));
+      verify(ctx).status(closed ? 503 : 429);
+      if (closed) verify(ctx, never()).header(eq("Retry-After"), anyString());
+      else verify(ctx).header("Retry-After", "7");
+    }
+  }
+
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-05-16T12:00:00Z"), ZoneId.of("UTC"));
@@ -67,6 +105,7 @@ class McpProtocolHandlerTest {
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":null}",
         "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{}}")) {
       Context ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/mcp");
       when(ctx.body()).thenReturn(body);
       when(ctx.contentType(anyString())).thenReturn(ctx);
       ArgumentCaptor<String> response = ArgumentCaptor.forClass(String.class);
@@ -93,6 +132,7 @@ class McpProtocolHandlerTest {
   @Test
   void initialize_returnsCapabilities() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body())
         .thenReturn(
@@ -170,6 +210,7 @@ class McpProtocolHandlerTest {
     System.setProperty("justsearch.app.version", "9.9.9-contract-probe");
     try {
       Context ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/mcp");
       when(ctx.header("Mcp-Session-Id")).thenReturn(null);
       when(ctx.body())
           .thenReturn("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
@@ -218,7 +259,8 @@ class McpProtocolHandlerTest {
         surface.instructions().contains(marker),
         "instructions() must carry the single-sourced comparative guidance");
     String promptJson =
-        MAPPER.writeValueAsString(surface.getPrompt("search_files", Map.of("topic", "x")));
+        MAPPER.writeValueAsString(
+            surface.getPrompt("search_files", Map.of("topic", "x"), TestRequestContexts.mcp("s1")));
     assertTrue(
         promptJson.contains(marker),
         "the user-invoked prompt path must read the SAME single-sourced guidance (no fork)");
@@ -276,6 +318,7 @@ class McpProtocolHandlerTest {
   @Test
   void toolsList_returnsCuratedFiveTools() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(
@@ -293,14 +336,15 @@ class McpProtocolHandlerTest {
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> tools = (List<Map<String, Object>>) result.get("tools");
 
-    // Tempdoc 501 Phase 15 added justsearch_runtime_manifest as the sixth tool.
-    assertEquals(6, tools.size());
+    // Lane F C2 adds the recorded-outcome read as the seventh tool.
+    assertEquals(7, tools.size());
     assertEquals("justsearch_answer", tools.get(0).get("name"));
     assertEquals("justsearch_search", tools.get(1).get("name"));
     assertEquals("justsearch_browse", tools.get(2).get("name"));
     assertEquals("justsearch_ingest", tools.get(3).get("name"));
     assertEquals("justsearch_status", tools.get(4).get("name"));
     assertEquals("justsearch_runtime_manifest", tools.get(5).get("name"));
+    assertEquals("justsearch_operation_outcome", tools.get(6).get("name"));
 
     String answerDesc = (String) tools.get(0).get("description");
     assertTrue(answerDesc.contains("primary tool for question-answering"));
@@ -343,7 +387,7 @@ class McpProtocolHandlerTest {
     Map<String, Object> ingestProps =
         (Map<String, Object>) ingestInputSchema.get("properties");
     assertEquals(
-        List.of("paths", "collection"),
+        List.of("paths", "collection", "operationKey"),
         List.copyOf(ingestProps.keySet()),
         "ingest inputSchema properties must serialize in declared source order");
     assertEquals(
@@ -424,7 +468,7 @@ class McpProtocolHandlerTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> browseProps = (Map<String, Object>) browseInputSchema.get("properties");
     assertEquals(
-        List.of("parent_path", "list_files"),
+        List.of("parent_path", "list_files", "operationKey"),
         List.copyOf(browseProps.keySet()),
         "browse inputSchema properties must serialize in declared source order");
 
@@ -443,6 +487,7 @@ class McpProtocolHandlerTest {
     // defect already fixed for tool()/schema()/propStringArray()/propEnum() via orderedMap(...).
     // Mirrors the tools/list order assertion above for the resources/list response.
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(
@@ -494,7 +539,7 @@ class McpProtocolHandlerTest {
             1L, 1L, 5L, List.of(hit), null, null, null, null, null, null, null, trace, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     var surface =
@@ -507,6 +552,8 @@ class McpProtocolHandlerTest {
     var localHandler = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
 
     Context ctx = mock(Context.class);
+
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(
@@ -604,7 +651,7 @@ class McpProtocolHandlerTest {
     // entry point — JSON arg parsing, schema validation, callSearch's Boolean unwrap, and the
     // projection call site — because every other detail=true test calls the projection directly.
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(cannedSearchResponse());
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
     McpProtocolHandler h = handlerOver(adapter);
 
     Map<String, Object> withDetail =
@@ -634,7 +681,7 @@ class McpProtocolHandlerTest {
     // — NOT silently coerced to false (which would be a costly silent trap: the agent asks for
     // provenance, gets none, and is told nothing).
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(cannedSearchResponse());
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
     McpProtocolHandler h = handlerOver(adapter);
 
     for (String badDetail : List.of("\"true\"", "1")) {
@@ -662,22 +709,22 @@ class McpProtocolHandlerTest {
     // so the restored SEARCH_DESC sentence is true only if the value actually reaches the
     // request — callSearch passed a hard-coded null before this fix.
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(cannedSearchResponse());
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
     McpProtocolHandler h = handlerOver(adapter);
 
     callTool(h, 34, "justsearch_search", "{\"query\":\"\\\"exact phrase\\\"\",\"query_syntax\":\"lucene\"}");
     ArgumentCaptor<KnowledgeSearchRequest> req =
         ArgumentCaptor.forClass(KnowledgeSearchRequest.class);
-    verify(adapter).search(req.capture());
+    verify(adapter).search(req.capture(), any(EngineContext.class));
     assertEquals("lucene", req.getValue().querySyntax(), "querySyntax must reach the request");
 
     // Omitted → null, so the engine applies its SIMPLE default.
     reset(adapter);
-    when(adapter.search(any())).thenReturn(cannedSearchResponse());
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
     callTool(h, 35, "justsearch_search", "{\"query\":\"plain\"}");
     ArgumentCaptor<KnowledgeSearchRequest> defaulted =
         ArgumentCaptor.forClass(KnowledgeSearchRequest.class);
-    verify(adapter).search(defaulted.capture());
+    verify(adapter).search(defaulted.capture(), any(EngineContext.class));
     assertNull(defaulted.getValue().querySyntax(), "omitted querySyntax leaves the engine default");
   }
 
@@ -686,7 +733,7 @@ class McpProtocolHandlerTest {
     // The schema declares an enum, so a value the engine would silently fold to SIMPLE is a clean
     // error instead — the exact failure mode (silently ignored querySyntax) this lane is fixing.
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(cannedSearchResponse());
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(cannedSearchResponse());
     String raw =
         callTool(
             handlerOver(adapter), 36, "justsearch_search",
@@ -701,6 +748,7 @@ class McpProtocolHandlerTest {
   @Test
   void toolsCall_unknownTool_returnsError() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(
@@ -722,6 +770,7 @@ class McpProtocolHandlerTest {
   @Test
   void toolsCall_statusWithoutKnowledge_returnsUnavailable() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(
@@ -743,6 +792,7 @@ class McpProtocolHandlerTest {
   @Test
   void promptsList_returnsThreeTemplates() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body())
         .thenReturn(
@@ -769,6 +819,7 @@ class McpProtocolHandlerTest {
   @Test
   void promptsGet_expandsSearchTemplate() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body())
         .thenReturn(
@@ -795,6 +846,7 @@ class McpProtocolHandlerTest {
   @Test
   void ping_returnsEmptyResult() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body()).thenReturn("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"ping\"}");
     ArgumentCaptor<String> resultCaptor = ArgumentCaptor.forClass(String.class);
@@ -817,6 +869,7 @@ class McpProtocolHandlerTest {
   private String callTool(McpProtocolHandler h, int id, String toolName, String argumentsJson)
       throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn("s1");
     when(ctx.body())
         .thenReturn(
@@ -835,9 +888,29 @@ class McpProtocolHandlerTest {
   }
 
   @Test
+  void toolsCall_keyCrossesJsonRpcBoundaryOutsidePublicArguments() throws Exception {
+    String key = "019940e2-3400-7000-8000-000000000001";
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(), eq(key)))
+        .thenReturn(OperationResult.success("recorded", Map.of("operationKey", key)));
+    var surface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+        () -> null, () -> null, FIXED_CLOCK);
+    var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
+    String raw = callTool(protocol, 51, "justsearch_ingest",
+        "{\"paths\":[\"C:/notes\"],\"operationKey\":\"" + key + "\"}");
+    var wire = MAPPER.readTree(raw);
+    assertEquals(51, wire.path("id").asInt());
+    assertFalse(wire.path("result").path("isError").asBoolean());
+    assertTrue(raw.contains(key));
+    var publicJson = ArgumentCaptor.forClass(String.class);
+    verify(dispatcher).dispatch(any(), publicJson.capture(), any(), eq(java.util.Optional.empty()),
+        any(), eq(key));
+    assertEquals(MAPPER.readTree("{\"paths\":[\"C:/notes\"]}"), MAPPER.readTree(publicJson.getValue()));
+  }
+
+  @Test
   void toolsCall_gatedIngest_createsPendingAndReturnsTruthfulMessage() throws Exception {
     OperationDispatcher gatedDispatcher = mock(OperationDispatcher.class);
-    when(gatedDispatcher.dispatch(any(), any(), any()))
+    when(gatedDispatcher.dispatch(any(), any(), any(), any()))
         .thenThrow(
             new ConfirmationRequiredException(
                 AgentToolsOperationCatalog.INGEST_FILES,
@@ -885,7 +958,7 @@ class McpProtocolHandlerTest {
   @Test
   void initialize_capturesClientInfo_surfacesAsRequestedByOnGatedPending() throws Exception {
     OperationDispatcher gatedDispatcher = mock(OperationDispatcher.class);
-    when(gatedDispatcher.dispatch(any(), any(), any()))
+    when(gatedDispatcher.dispatch(any(), any(), any(), any()))
         .thenThrow(
             new ConfirmationRequiredException(
                 AgentToolsOperationCatalog.INGEST_FILES,
@@ -909,6 +982,7 @@ class McpProtocolHandlerTest {
 
     // initialize with clientInfo — capture the minted session id off the response header setter.
     Context initCtx = mock(Context.class);
+    when(initCtx.path()).thenReturn("/mcp");
     when(initCtx.header("Mcp-Session-Id")).thenReturn(null);
     when(initCtx.body())
         .thenReturn(
@@ -928,6 +1002,7 @@ class McpProtocolHandlerTest {
         new java.util.concurrent.atomic.AtomicReference<>();
     pendingChanges.subscribeTyped(event -> pendingId.set(event.pendingId()));
     Context callCtx = mock(Context.class);
+    when(callCtx.path()).thenReturn("/mcp");
     when(callCtx.header("Mcp-Session-Id")).thenReturn(sessionId);
     when(callCtx.body())
         .thenReturn(
@@ -945,6 +1020,36 @@ class McpProtocolHandlerTest {
         "Claude Code",
         pending.get().requestedBy(),
         "the MCP client's self-reported clientInfo.name must flow through to the pending record");
+
+    // The protocol handler resolved the MCP transport and session into the actual tool dispatch;
+    // the pending record must retain both projections for the later approval handoff.
+    EngineContext pendingContext = pending.get().engineContext();
+    assertEquals(EngineContext.ClientKind.MCP_CLIENT, pendingContext.clientKind());
+    assertEquals(sessionId, pendingContext.clientId());
+    assertEquals(java.util.Optional.of(sessionId), pendingContext.sessionId());
+    assertEquals(java.util.Optional.empty(), pendingContext.grantReference());
+    assertEquals("UNTRUSTED", pendingContext.sourceTier());
+    assertEquals("MCP", pendingContext.transport());
+    assertEquals(EngineContext.Survival.INTERACTIVE, pendingContext.survival());
+    assertEquals(EngineContext.Urgency.FOREGROUND, pendingContext.urgency());
+
+    InvocationProvenance pendingProvenance = pending.get().provenance();
+    assertEquals(io.justsearch.agent.api.registry.TransportTag.MCP, pendingProvenance.transport());
+    assertEquals(ExecutorTag.UI, pendingProvenance.executor());
+    assertEquals(java.util.Optional.of(sessionId), pendingProvenance.initiator());
+    assertEquals(FIXED_CLOCK.instant(), pendingProvenance.occurredAt());
+    assertEquals(java.util.Optional.empty(), pendingProvenance.signedIntentToken());
+    assertEquals(java.util.Optional.of(sessionId), pendingProvenance.correlationId());
+
+    // Capture the exact values crossing McpToolSurface into the dispatcher as an integration proof
+    // of the handler -> surface -> dispatch context/provenance path.
+    ArgumentCaptor<EngineContext> contextCaptor = ArgumentCaptor.forClass(EngineContext.class);
+    ArgumentCaptor<InvocationProvenance> provenanceCaptor =
+        ArgumentCaptor.forClass(InvocationProvenance.class);
+    verify(gatedDispatcher)
+        .dispatch(any(), any(), provenanceCaptor.capture(), contextCaptor.capture());
+    assertEquals(pendingContext, contextCaptor.getValue());
+    assertEquals(pendingProvenance, provenanceCaptor.getValue());
   }
 
   @Test
@@ -952,7 +1057,7 @@ class McpProtocolHandlerTest {
     // A client that omits clientInfo (or never calls initialize with a session at all) must not
     // fabricate a requester name — requestedBy stays null, not "" or "unknown".
     OperationDispatcher gatedDispatcher = mock(OperationDispatcher.class);
-    when(gatedDispatcher.dispatch(any(), any(), any()))
+    when(gatedDispatcher.dispatch(any(), any(), any(), any()))
         .thenThrow(
             new ConfirmationRequiredException(
                 AgentToolsOperationCatalog.INGEST_FILES,
@@ -989,6 +1094,16 @@ class McpProtocolHandlerTest {
         pending.get().requestedBy(),
         "requestedBy must stay null (not a fabricated placeholder) when the session has no"
             + " captured clientInfo");
+
+    // An unregistered session remains correlation metadata, but cannot create a quota identity.
+    // The missing display name and the shared anonymous identity are independent.
+    assertEquals("mcp-anonymous", pending.get().engineContext().clientId());
+    assertEquals(java.util.Optional.of("s1"), pending.get().engineContext().sessionId());
+    assertEquals("UNTRUSTED", pending.get().engineContext().sourceTier());
+    assertEquals("MCP", pending.get().engineContext().transport());
+    assertEquals(io.justsearch.agent.api.registry.TransportTag.MCP, pending.get().provenance().transport());
+    assertEquals(java.util.Optional.of("mcp-anonymous"), pending.get().provenance().initiator());
+    assertEquals(java.util.Optional.of("s1"), pending.get().provenance().correlationId());
   }
 
   @Test
@@ -998,7 +1113,7 @@ class McpProtocolHandlerTest {
     // dispatch just succeeds. Proves the new pending-authorization wiring only activates on an
     // actual gate firing, not on every ingest call.
     OperationDispatcher successDispatcher = mock(OperationDispatcher.class);
-    when(successDispatcher.dispatch(any(), any(), any()))
+    when(successDispatcher.dispatch(any(), any(), any(), any()))
         .thenReturn(OperationResult.success("Indexed 1 item", Map.of()));
     PendingAuthorizationStore pendingStore = new PendingAuthorizationStore(FIXED_CLOCK, java.time.Duration.ofMinutes(5));
     PendingAuthorizationChangeRegistry pendingChanges = new PendingAuthorizationChangeRegistry();
@@ -1065,7 +1180,7 @@ class McpProtocolHandlerTest {
     cyclic.put("query", "x");
     cyclic.put("self", cyclic);
 
-    Map<String, Object> result = surface.callTool("justsearch_search", cyclic, "s1", null);
+    Map<String, Object> result = surface.callTool("justsearch_search", cyclic, "s1", null, TestRequestContexts.mcp("s1"));
 
     assertEquals(Boolean.TRUE, result.get("isError"), "must fail closed: " + result);
     @SuppressWarnings("unchecked")
@@ -1075,7 +1190,7 @@ class McpProtocolHandlerTest {
         text.contains("validation could not run") && text.contains("not dispatched"),
         "must be the validator-unavailable error, not a downstream failure: " + text);
     assertTrue(text.contains("INTERNAL_ERROR"), "typed as a substrate error: " + text);
-    verify(adapter, never()).search(any());
+    verify(adapter, never()).search(any(), any(EngineContext.class));
     verifyNoInteractions(dispatcher);
   }
 
@@ -1114,6 +1229,7 @@ class McpProtocolHandlerTest {
   @Test
   void notificationsInitialized_noErrorBody_noResponsePayload() throws Exception {
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body())
         .thenReturn("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
@@ -1135,6 +1251,7 @@ class McpProtocolHandlerTest {
     // checked "is this a notification" before deciding to reply. JSON-RPC 2.0 §4.1's "MUST NOT
     // reply to a Notification" applies independently of whether the method is known.
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body())
         .thenReturn("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/some_future_thing\"}");
@@ -1152,6 +1269,7 @@ class McpProtocolHandlerTest {
     // member) must keep getting a real JSON-RPC error reply — the notification short-circuit must
     // key off "id" member presence, not off any-unrecognized-method, or this would go silent too.
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
     when(ctx.header("Mcp-Session-Id")).thenReturn(null);
     when(ctx.body())
         .thenReturn("{\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"totally/unknown\"}");

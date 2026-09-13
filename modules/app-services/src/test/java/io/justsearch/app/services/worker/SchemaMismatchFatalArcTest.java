@@ -42,8 +42,8 @@ final class SchemaMismatchFatalArcTest {
 
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 1_000L, 3, "256m", 1_000L, 1_000L, 300_000L, 100, 0L, 0);
+        false, dir, dir, dir,
+        5_000L, 1_000L, 3, 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 
   private static final BootRecoveryPolicy NO_WAIT = new BootRecoveryPolicy(2, 0, 0);
@@ -60,7 +60,7 @@ final class SchemaMismatchFatalArcTest {
    */
   private static KnowledgeServerBootstrap refusedBoot(Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
     assertFalse(bootstrap.hasClient(), "the fixture must leave no client bound");
     return bootstrap;
@@ -101,7 +101,7 @@ final class SchemaMismatchFatalArcTest {
   void theLadderShortCircuitsInsteadOfSpendingTheBudget(@TempDir Path tempDir) {
     var bootstrap = refusedBoot(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     List<String> seen = recordTransitions(bootstrap);
 
     // More ticks than the budget: a ladder that ran would have narrated worker.recovering per
@@ -145,27 +145,23 @@ final class SchemaMismatchFatalArcTest {
 
   @Test
   @Timeout(180)
-  @DisplayName("the refusal is not discarded to protect supervision's terminal verdict")
-  void theRefusalOutranksTheSupervisionGuard(@TempDir Path tempDir) {
+  @DisplayName("the specific refusal supersedes a generic local-recovery failure")
+  void theRefusalOutranksGenericRecoveryFailure(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
-    // The producer's own call, in the order that makes it real: supervision's verdict is in the slot
-    // BEFORE startWithRetry's final catch runs over it (KnowledgeServerBootRecoveryTest's
-    // brickedAfterSupervisionGaveUp shape).
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    // A generic failure cannot hide the more specific cause discovered on the next attempt.
     bootstrap
         .workerCapability()
         .transition(
             CapabilityHealth.DEGRADED,
-            LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(),
-            "restart budget exhausted");
+            LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
+            "local recovery budget exhausted");
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
     assertEquals(
         MISMATCH,
         bootstrap.workerCapability().pendingReason(),
-        "the guard's carve-out covered worker.index_corrupt only, so the refusal was logged as"
-            + " 'not overwriting supervision's verdict' and thrown away — it explains WHY"
-            + " supervision exhausted itself and is strictly better information");
+        "the fatal index cause is more specific than the previous generic failure");
   }
 
   @Test
@@ -173,7 +169,7 @@ final class SchemaMismatchFatalArcTest {
   @DisplayName("a refusal nobody was allowed to narrate is still narrated by the ladder's give-up")
   void theGiveUpNarratesACauseTheBootArcSwallowed(@TempDir Path tempDir) throws Exception {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     // startForRecovery suppresses EVERY transition for the whole arc, so this is the shape where the
     // cause is known to the Head and has never been said out loud. Nothing else will say it.
     assertThrows(Exception.class, bootstrap::startForRecovery);
@@ -184,7 +180,7 @@ final class SchemaMismatchFatalArcTest {
         "precondition: the suppressed arc narrated nothing, so the wire does not have it yet");
 
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     monitor.tick();
 
     assertEquals(MISMATCH, bootstrap.workerCapability().pendingReason());
@@ -198,7 +194,7 @@ final class SchemaMismatchFatalArcTest {
   void anOperatorRetryThatReRefusesReLatchesTheVerdict(@TempDir Path tempDir) throws Exception {
     var bootstrap = refusedBoot(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     monitor.tick();
     assertEquals(MISMATCH, bootstrap.workerCapability().pendingReason(), "precondition: latched");
 
@@ -256,7 +252,7 @@ final class SchemaMismatchFatalArcTest {
   @Timeout(180)
   @DisplayName("a boot with no marker is unaffected — the generic code still means what it says")
   void aPlainSpawnFailureStillNarratesSpawnFailed(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
     assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());

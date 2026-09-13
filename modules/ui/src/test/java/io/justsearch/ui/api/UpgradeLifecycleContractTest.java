@@ -32,7 +32,7 @@ final class UpgradeLifecycleContractTest {
     var leases = new OperationLeaseServiceImpl();
     var shutdown = new CountDownLatch(1);
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -104,7 +104,7 @@ final class UpgradeLifecycleContractTest {
     var active =
         leases.register("indexing.migration", OpCriticality.MUST_COMPLETE, 60, Map.of());
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -143,7 +143,7 @@ final class UpgradeLifecycleContractTest {
     var active =
         leases.register("agent.answer", OpCriticality.INTERRUPTIBLE, 60, Map.of());
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -197,7 +197,7 @@ final class UpgradeLifecycleContractTest {
             });
     ownerHandle.set(active);
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .operationLeaseService(leases)
@@ -242,6 +242,29 @@ final class UpgradeLifecycleContractTest {
       assertEquals(ProcessHandle.current().pid(), body.get("headPid").asLong());
       assertTrue(body.get("owners").size() > 0);
       body.get("owners").forEach(owner -> assertTrue(owner.get("healthy").asBoolean()));
+    } finally {
+      server.stop();
+    }
+  }
+
+  @Test
+  void reconciliationStillRequiresNewStoresAfterBaselineCompatibleUpgrade(@TempDir Path tmp) throws Exception {
+    writeReconcilingIntent(tmp);
+    var request = reconciliationRequest();
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> owners = (List<Map<String, Object>>) request.get("owners");
+    assertTrue(owners.removeIf(row -> "operations-db".equals(row.get("ownerId"))));
+    var server = reconciliationServer(tmp, true, true);
+    try (var client = HttpClient.newHttpClient()) {
+      var rejected = post(client, server, "/api/upgrade/reconcile", JSON.writeValueAsString(request));
+      assertEquals(409, rejected.statusCode());
+      var accepted = post(client, server, "/api/upgrade/reconcile",
+          JSON.writeValueAsString(reconciliationRequest()));
+      assertEquals(200, accepted.statusCode());
+      var body = JSON.readTree(accepted.body());
+      assertTrue(body.get("ready").asBoolean());
+      assertTrue(java.util.stream.StreamSupport.stream(body.get("owners").spliterator(), false)
+          .anyMatch(row -> "operations-db".equals(row.get("ownerId").asText()) && row.get("healthy").asBoolean()));
     } finally {
       server.stop();
     }
@@ -307,9 +330,97 @@ final class UpgradeLifecycleContractTest {
     }
   }
 
+  @Test
+  void deadEngineReconciliationAttestsAttemptWithoutInventingNonce(@TempDir Path tmp)
+      throws Exception {
+    Map<String, Object> request = deadEngineReconciliationRequest();
+    writeDeadEngineIntent(tmp, request);
+    LocalApiServer server = reconciliationServer(tmp, true, true);
+    try {
+      HttpResponse<String> response = post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(request));
+      assertEquals(200, response.statusCode());
+      var body = JSON.readTree(response.body());
+      assertTrue(body.get("ready").asBoolean());
+      assertEquals("ENGINE_UNRECOVERABLE", body.get("stopEvidenceKind").asText());
+      assertEquals("attempt-1", body.get("attemptId").asText());
+      assertTrue(body.get("shutdownNonce") == null);
+      assertEquals(ProcessHandle.current().pid(), body.get("headPid").asLong());
+    } finally {
+      server.stop();
+    }
+  }
+
+  @Test
+  void deadEngineReconciliationRejectsMixedEvidenceAndDifferentIdentity(@TempDir Path tmp)
+      throws Exception {
+    Map<String, Object> request = deadEngineReconciliationRequest();
+    LocalApiServer server = reconciliationServer(tmp, true, true);
+    try {
+      for (String field : List.of("preparationId", "shutdownNonce", "shutdownReceipt",
+          "headShutdownReceipt", "headPid")) {
+        Map<String, Object> intent = writeDeadEngineIntent(tmp, request);
+        intent.put(field, field.equals("headPid") ? 42 : "mixed");
+        Files.writeString(tmp.resolve("upgrade/intent.v1.json"), JSON.writeValueAsString(intent));
+        HttpResponse<String> response = post(HttpClient.newHttpClient(), server,
+            "/api/upgrade/reconcile", JSON.writeValueAsString(request));
+        assertEquals(409, response.statusCode(), field);
+      }
+      writeDeadEngineIntent(tmp, request);
+      request.put("attemptId", "another-attempt");
+      assertEquals(409, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(request)).statusCode());
+      request.put("attemptId", "attempt-1");
+      request.put("shutdownNonce", "invented-nonce");
+      assertEquals(400, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(request)).statusCode());
+    } finally {
+      server.stop();
+    }
+  }
+
+  @Test
+  void reconciliationCannotSwitchBetweenPreparedAndDeadEngineEvidence(@TempDir Path tmp)
+      throws Exception {
+    LocalApiServer server = reconciliationServer(tmp, true, true);
+    try {
+      writeReconcilingIntent(tmp);
+      assertEquals(409, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(deadEngineReconciliationRequest()))
+          .statusCode());
+      writeDeadEngineIntent(tmp, deadEngineReconciliationRequest());
+      assertEquals(409, post(HttpClient.newHttpClient(), server,
+          "/api/upgrade/reconcile", JSON.writeValueAsString(reconciliationRequest())).statusCode());
+    } finally {
+      server.stop();
+    }
+  }
+
+  private static Map<String, Object> deadEngineReconciliationRequest() throws Exception {
+    Map<String, Object> request = reconciliationRequest();
+    request.remove("shutdownNonce");
+    request.put("stopEvidenceKind", "ENGINE_UNRECOVERABLE");
+    return request;
+  }
+
+  private static Map<String, Object> writeDeadEngineIntent(
+      Path dataDir, Map<String, Object> request) throws Exception {
+    Map<String, Object> intent = new LinkedHashMap<>(request);
+    intent.remove("headPid");
+    intent.remove("owners");
+    intent.remove("stopEvidenceKind");
+    intent.put("phase", "RECONCILING");
+    intent.put("stopEvidence", Map.of("kind", "ENGINE_UNRECOVERABLE",
+        "attemptId", "attempt-1", "enginePid", 42, "confirmedGoneAtEpochMs", 1000));
+    Path path = dataDir.resolve("upgrade/intent.v1.json");
+    Files.createDirectories(path.getParent());
+    Files.writeString(path, JSON.writeValueAsString(intent));
+    return intent;
+  }
+
   private static LocalApiServer reconciliationServer(
       Path dataDir, boolean headReady, boolean workerReady) {
-    return LocalApiServer.builder(
+    return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
             dataDir.resolve("index"))
         .upgradeReconciliation(dataDir, () -> "2.0.0", () -> headReady, () -> workerReady)

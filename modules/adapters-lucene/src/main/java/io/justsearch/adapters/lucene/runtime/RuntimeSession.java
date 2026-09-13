@@ -16,12 +16,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.store.AlreadyClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +66,7 @@ final class RuntimeSession implements AutoCloseable {
   // ==========================================================================
 
   final IndexSchema schema;
+  final LuceneExecutorRegistrations executorRegistrations;
   final FieldMapper fieldMapper;
   final Supplier<CommitMetadataSource> metadataSourceSupplier;
   final CommitMetadataValidator metadataValidator;
@@ -169,7 +175,7 @@ final class RuntimeSession implements AutoCloseable {
    * Monotonic counter of BULK deletions submitted to the writer — {@code deleteByPathPrefix} and
    * {@code deleteAll} (tempdoc 809 finding 3). Removing a watched root lands here as a
    * {@code deleteByPathPrefix} on the worker (Head {@code RootLifecycleOps.removeWatchedPath} →
-   * {@code deleteByPath} RPC → {@code GrpcIngestService.deleteByPath} →
+   * {@code deleteByPath} RPC → {@code WorkerIngestService.deleteByPath} →
    * {@link IndexingCoordinator#deleteByPathPrefix}), so this is the removal signal itself rather
    * than a parallel flag mirroring it.
    *
@@ -203,6 +209,17 @@ final class RuntimeSession implements AutoCloseable {
   final PruneOps pruneOps; // null in READ_ONLY / DEFERRED / test ctor
 
   private volatile boolean closed;
+  static final long CLOSE_WAIT_NANOS = TimeUnit.SECONDS.toNanos(5);
+  private final ReentrantLock closeLock = new ReentrantLock();
+  private NrtReopenThreads.CloseAttempt nrtCloseAttempt;
+  private int taskOwners;
+
+  /** Linearizes one terminal-writer notification against this runtime's intentional retirement. */
+  private final Object terminalWriterFailureLock = new Object();
+
+  private Consumer<Throwable> terminalWriterFailureListener;
+  private boolean terminalWriterFailureClaimed;
+  private boolean terminalWriterFailureRetired;
 
   /**
    * Tempdoc 406 Gap G: write-side drain flag. When true, {@link WritePathOps#guardWritable()}
@@ -225,6 +242,79 @@ final class RuntimeSession implements AutoCloseable {
    * never touches dispatchLock — so no deadlock potential.
    */
   final ReentrantReadWriteLock writeBarrier = new ReentrantReadWriteLock();
+
+  void onTerminalWriterFailure(Consumer<Throwable> listener) {
+    synchronized (terminalWriterFailureLock) {
+      terminalWriterFailureListener = Objects.requireNonNull(listener, "listener");
+    }
+    reportTerminalWriterFailureIfPresent();
+  }
+
+  void retireTerminalWriterFailureNotifications() {
+    synchronized (terminalWriterFailureLock) {
+      terminalWriterFailureRetired = true;
+    }
+  }
+
+  /**
+   * Claims and reports this runtime's terminal writer once.
+   *
+   * <p>An absent listener never consumes the one-shot; installation rechecks a writer that became
+   * terminal before its owner was bound.
+   *
+   * <p>A listener {@link RuntimeException} remains diagnostic so it cannot replace the Lucene
+   * operation failure whose release path discovered the tragedy. {@link Error}s still propagate:
+   * an inability to create the process-fault thread (for example, VM exhaustion) is itself a JVM
+   * failure and must reach the uncaught-exception owner.
+   */
+  boolean reportTerminalWriterFailureIfPresent() {
+    Consumer<Throwable> listener;
+    Throwable cause;
+    synchronized (terminalWriterFailureLock) {
+      if (terminalWriterFailureRetired || terminalWriterFailureClaimed) return true;
+      listener = terminalWriterFailureListener;
+      LifecycleSnapshot snap = snapshot;
+      org.apache.lucene.index.IndexWriter writer = snap != null ? snap.writer() : null;
+      if (writer == null) return false;
+      Throwable tragic = writer.getTragicException();
+      if (tragic == null && writer.isOpen()) {
+        return false;
+      }
+      // NRT starts during construction, before the enclosing owner can bind its listener.
+      // Keep the one-shot available for installation's recheck without falling into raw JVM exit.
+      if (listener == null) return true;
+      terminalWriterFailureClaimed = true;
+      cause =
+          tragic != null
+              ? tragic
+              : new IllegalStateException("Lucene IndexWriter is permanently closed");
+    }
+    try {
+      listener.accept(cause);
+    } catch (RuntimeException listenerFailure) {
+      log.error("Terminal writer failure listener failed", listenerFailure);
+    }
+    return true;
+  }
+
+  void routeTerminalWriterFailuresFrom(Thread thread) {
+    Thread.UncaughtExceptionHandler fallback = thread.getUncaughtExceptionHandler();
+    thread.setUncaughtExceptionHandler(
+        (failedThread, failure) -> {
+          if (!observedTerminalWriterFailure(failure) || !reportTerminalWriterFailureIfPresent()) {
+            fallback.uncaughtException(failedThread, failure);
+          }
+        });
+  }
+
+  private static boolean observedTerminalWriterFailure(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof AlreadyClosedException) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // ==========================================================================
   // Test-only constructor — barebones, does not open Lucene or construct ops
@@ -251,8 +341,14 @@ final class RuntimeSession implements AutoCloseable {
    * <p>Production code MUST use {@link #RuntimeSession(LuceneRuntimeBuilder, Mode)}.
    */
   RuntimeSession(IndexSchema schema) {
+    this(schema, null);
+  }
+
+  /** Test-only ops session with an explicit owner for tests that exercise scheduled work. */
+  RuntimeSession(IndexSchema schema, LuceneExecutorRegistrations executorRegistrations) {
     // Schema-derived
     this.schema = schema;
+    this.executorRegistrations = executorRegistrations;
     this.fieldMapper = schema.fieldMapper();
     this.metadataSourceSupplier = schema.metadataSourceSupplier();
     this.metadataValidator = schema.metadataValidator();
@@ -311,6 +407,7 @@ final class RuntimeSession implements AutoCloseable {
 
   RuntimeSession(LuceneRuntimeBuilder builder, Mode mode) {
     this.schema = builder.schema();
+    this.executorRegistrations = Objects.requireNonNull(builder.executorRegistrations(), "executorRegistrations");
     this.fieldMapper = schema.fieldMapper();
     this.metadataSourceSupplier = schema.metadataSourceSupplier();
     this.metadataValidator = schema.metadataValidator();
@@ -386,6 +483,9 @@ final class RuntimeSession implements AutoCloseable {
             components.ephemeralPath(),
             components.indexAnalyzer());
     this.crtrt = components.crtrt();
+    if (crtrt != null) {
+      routeTerminalWriterFailuresFrom(crtrt);
+    }
     this.indexPath = components.indexPath();
     this.softDeleteField = components.softDeleteField();
     this.knnVectorsFormat = components.knnVectorsFormat();
@@ -436,11 +536,6 @@ final class RuntimeSession implements AutoCloseable {
     this.chunkSearchOps =
         new ChunkSearchOps(this, bridge, this.hybridSearchOps, this.readPathOps, components.idField());
 
-    // 5. Start NRT refresh thread if components produced one (read+write mode).
-    if (crtrt != null) {
-      crtrt.start();
-    }
-
     // 6. Capture openTimeCommitUserData snapshot. Must happen before any writes.
     if (openTimeCommitUserData == null) {
       this.openTimeCommitUserData = latestCommitUserDataBestEffort();
@@ -460,9 +555,20 @@ final class RuntimeSession implements AutoCloseable {
     this.validationMode =
         "warn".equalsIgnoreCase(vm) ? ValidationMode.WARN : ValidationMode.FAIL;
 
-    // 8. Start commit timer for RUNNING mode only. READ_ONLY/DEFERRED have no writer.
+    // Activate the timer before NRT: timer refusal must not strand a live reopen thread in a
+    // constructor whose runtime never reaches a caller. No writes are pending during activation.
     if (mode == Mode.RUNNING) {
-      commitOps.startCommitTimer();
+      try {
+        commitOps.startCommitTimer();
+        if (crtrt != null) crtrt.start();
+      } catch (RuntimeException | Error failure) {
+        // No runtime reaches the caller, so this constructor must retire its opened resources.
+        try { close(); }
+        catch (RuntimeException | Error cleanup) {
+          if (cleanup != failure) failure.addSuppressed(cleanup);
+        }
+        throw failure;
+      }
     }
   }
 
@@ -618,78 +724,163 @@ final class RuntimeSession implements AutoCloseable {
   // Close — mirrors LLM.close ordering verbatim
   // ==========================================================================
 
+  /** One generation lease per fanout group, retained before any child can be accepted. */
+  Runnable retainTaskLifetime() {
+    if (closed) throw new IllegalStateException("Lucene runtime is closing");
+    synchronized (this) {
+      if (closed) throw new IllegalStateException("Lucene runtime is closing");
+      taskOwners++;
+    }
+    var released = new java.util.concurrent.atomic.AtomicBoolean();
+    return () -> {
+      if (!released.compareAndSet(false, true)) return;
+      synchronized (RuntimeSession.this) {
+        taskOwners--;
+        RuntimeSession.this.notifyAll();
+      }
+    };
+  }
+
+  boolean isClosing() { return closed; }
+
+  void stopNrtUntil(long deadlineNanos) {
+    ControlledRealTimeReopenThread<IndexSearcher> thread;
+    NrtReopenThreads.CloseAttempt attempt;
+    synchronized (this) {
+      thread = crtrt;
+      if (thread == null) return;
+      if (nrtCloseAttempt == null) {
+        if (!thread.isAlive()) {
+          // Constructor rollback (including registration refusal) has no live NRT owner to join.
+          thread.close();
+          crtrt = null;
+          return;
+        }
+        nrtCloseAttempt = new NrtReopenThreads.CloseAttempt(thread, executorRegistrations);
+      }
+      attempt = nrtCloseAttempt;
+      if (!attempt.owns(thread)) throw new IllegalStateException("NRT close owner does not match thread");
+    }
+    try {
+      attempt.awaitUntil(deadlineNanos);
+    } catch (RuntimeException | Error failure) {
+      synchronized (this) {
+        // A failed task can be retried only once its executor really exited. Preserve the NRT
+        // thread and snapshot: a completed exceptional Future alone never proves NRT exit.
+        if (nrtCloseAttempt == attempt && attempt.isTerminated()) nrtCloseAttempt = null;
+      }
+      throw failure;
+    }
+    synchronized (this) {
+      if (crtrt == thread) {
+        crtrt = null;
+        nrtCloseAttempt = null;
+      }
+    }
+  }
+
   @Override
   public void close() {
-    if (closed) return;
-    closed = true;
-
-    // Capture snapshot before nulling — close from the captured copy.
-    LifecycleSnapshot snap = snapshot;
-    snapshot = null; // atomic — all ops fail-fast on subsequent calls
-
-    if (commitOps != null) {
-      try {
-        commitOps.stopCommitTimer();
-      } catch (RuntimeException e) {
-        log.warn("commit timer stop error: {}", e.getMessage());
+    retireTerminalWriterFailureNotifications();
+    synchronized (this) { closed = true; }
+    long deadlineNanos = System.nanoTime() + CLOSE_WAIT_NANOS;
+    boolean interrupted = Thread.interrupted();
+    boolean acquired = false;
+    try {
+      while (!acquired) {
+        long remaining = deadlineNanos - System.nanoTime();
+        if (remaining <= 0) {
+          log.warn("Lucene close deadline exceeded waiting for another close owner");
+          throw new IllegalStateException("Lucene close already in progress");
+        }
+        try { acquired = closeLock.tryLock(remaining, TimeUnit.NANOSECONDS); }
+        catch (InterruptedException expected) { interrupted = true; }
       }
+      if (commitOps != null) commitOps.requestCommitTimerStop();
+      // Accepted children may not have acquired their searcher yet. Keep the snapshot live until
+      // every actual-exit callback releases its generation owner; cancellation alone is insufficient.
+      synchronized (this) {
+        while (taskOwners != 0) {
+          long remaining = deadlineNanos - System.nanoTime();
+          if (remaining <= 0) {
+            log.warn("Lucene close deadline exceeded with {} generation owners outstanding", taskOwners);
+            throw new IllegalStateException("Lucene generation owners still active: " + taskOwners);
+          }
+          try { TimeUnit.NANOSECONDS.timedWait(this, remaining); }
+          catch (InterruptedException expected) { interrupted = true; }
+        }
+      }
+      closeResources(deadlineNanos);
+    } finally {
+      if (acquired) closeLock.unlock();
+      if (interrupted) Thread.currentThread().interrupt();
     }
-    if (crtrt != null) {
-      try {
-        crtrt.close();
-      } catch (Exception e) {
-        log.warn("crtrt close error: {}", e.getMessage());
-      }
-      crtrt = null;
-    }
-    if (snap != null) {
-      if (snap.searcherManager() != null) {
-        try {
-          snap.searcherManager().close();
-        } catch (IOException e) {
-          log.warn("searcherManager close error: {}", e.getMessage());
+  }
+
+  private void closeResources(long deadlineNanos) {
+    boolean interrupted = Thread.interrupted();
+    try {
+      if (commitOps != null) commitOps.stopCommitTimerUntil(deadlineNanos);
+      interrupted |= Thread.interrupted();
+      stopNrtUntil(deadlineNanos);
+      interrupted |= Thread.interrupted();
+      // Only actual owner exit permits invalidating the snapshot and releasing Lucene resources.
+      LifecycleSnapshot snap = snapshot;
+      snapshot = null;
+      if (snap != null) {
+        if (snap.searcherManager() != null) {
+          try {
+            snap.searcherManager().close();
+          } catch (IOException e) {
+            log.warn("searcherManager close error: {}", e.getMessage());
+          }
+        }
+        if (snap.writer() != null) {
+          boolean writerWasTerminal =
+              snap.writer().getTragicException() != null || !snap.writer().isOpen();
+          boolean writerClosedCleanly = false;
+          try {
+            snap.writer().close();
+            writerClosedCleanly =
+                !writerWasTerminal && snap.writer().getTragicException() == null;
+          } catch (IOException e) {
+            log.warn("writer close error: {}", e.getMessage());
+          }
+          // tempdoc 628 Gap 1: record a clean shutdown only when the writer committed + closed cleanly
+          // and this is a persistent (non-ephemeral) index. An absent marker on the next open means the
+          // previous shutdown was unclean (a crash) → escalate to a FULL integrity scan.
+          if (writerClosedCleanly && !snap.ephemeralPath() && snap.indexPath() != null) {
+            CleanShutdownMarker.write(snap.indexPath());
+          }
+        }
+        if (snap.directory() != null) {
+          try {
+            snap.directory().close();
+          } catch (IOException e) {
+            log.warn("directory close error: {}", e.getMessage());
+          }
+        }
+        if (snap.ephemeralPath()
+            && snap.indexPath() != null
+            && Files.exists(snap.indexPath())) {
+          try (var stream = Files.walk(snap.indexPath())) {
+            stream
+                .sorted(java.util.Comparator.reverseOrder())
+                .forEach(
+                    p -> {
+                      try {
+                        Files.deleteIfExists(p);
+                      } catch (IOException ex) {
+                        log.warn("delete error: {}", ex.getMessage());
+                      }
+                    });
+          } catch (IOException ex) {
+            log.debug("walk error during ephemeral cleanup: {}", ex.getMessage());
+          }
         }
       }
-      if (snap.writer() != null) {
-        boolean writerClosedCleanly = false;
-        try {
-          snap.writer().close();
-          writerClosedCleanly = true;
-        } catch (IOException e) {
-          log.warn("writer close error: {}", e.getMessage());
-        }
-        // tempdoc 628 Gap 1: record a clean shutdown only when the writer committed + closed cleanly
-        // and this is a persistent (non-ephemeral) index. An absent marker on the next open means the
-        // previous shutdown was unclean (a crash) → escalate to a FULL integrity scan.
-        if (writerClosedCleanly && !snap.ephemeralPath() && snap.indexPath() != null) {
-          CleanShutdownMarker.write(snap.indexPath());
-        }
-      }
-      if (snap.directory() != null) {
-        try {
-          snap.directory().close();
-        } catch (IOException e) {
-          log.warn("directory close error: {}", e.getMessage());
-        }
-      }
-      if (snap.ephemeralPath()
-          && snap.indexPath() != null
-          && Files.exists(snap.indexPath())) {
-        try (var stream = Files.walk(snap.indexPath())) {
-          stream
-              .sorted(java.util.Comparator.reverseOrder())
-              .forEach(
-                  p -> {
-                    try {
-                      Files.deleteIfExists(p);
-                    } catch (IOException ex) {
-                      log.warn("delete error: {}", ex.getMessage());
-                    }
-                  });
-        } catch (IOException ex) {
-          log.debug("walk error during ephemeral cleanup: {}", ex.getMessage());
-        }
-      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
     // ==========================================================================
     // Field-by-field audit (critical-analysis fix item 3): every per-session field is
@@ -699,6 +890,7 @@ final class RuntimeSession implements AutoCloseable {
     // === Released above ===
     //   snapshot       — nulled (atomic publish; ops fail-fast on subsequent calls)
     //   crtrt          — closed and nulled (NRT thread joined)
+    //   nrtCloseAttempt — retained on timeout; cleared after its executor exits (retry on failure)
     //   commitOps      — timer stopped (executor shutdown)
     //   snap.{searcherManager, writer, directory} — closed
     //   snap.indexPath (when ephemeral) — recursive delete
@@ -722,6 +914,7 @@ final class RuntimeSession implements AutoCloseable {
     //
     // === Not released — synchronization primitive (final, no resources) ===
     //   writeBarrier (ReentrantReadWriteLock — held only during normal ops)
+    //   closeLock (ReentrantLock — serializes close attempts outside the admission monitor)
     //
     // === Not released — ops collaborators ===
     //   readPathOps, writePathOps, hybridSearchOps, textQueryOps, chunkSearchOps,

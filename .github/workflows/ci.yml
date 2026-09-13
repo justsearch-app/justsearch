@@ -136,6 +136,18 @@ jobs:
       - name: Test agent-analytics instrument (node)
         run: node scripts/agent-analytics/run-all-tests.mjs
 
+      # Lane F stage B item B7. The DECISION half of design 7.1's supervisor contract: the register's
+      # exit table is checked against the Java that produces those integers, every declared case runs
+      # through the JS decision seam, the per-run policy overrides are proven inert without their
+      # flag, and the fake engine is proven to really exit, hang and answer as its modes claim. Pure
+      # Node, no child of the product, so it belongs in this cross-platform lane; the ACTUATOR halves
+      # need real children and run on the Windows lanes (dev-runner: Windows-native tests; Tauri:
+      # Shell crate tests).
+      - name: Supervisor conformance self-test (contract + decision table)
+        run: |
+          node scripts/supervisor-conformance/run.mjs --self-test
+          node --test scripts/supervisor-conformance/*.test.mjs
+
       - name: Verify Codex agent parity
         run: node scripts/ci/check-codex-agent-parity.mjs
 
@@ -187,6 +199,9 @@ jobs:
       - name: Screenshot-step coverage matches the reachable UI catalog
         run: node scripts/ci/check-ui-step-coverage.mjs
 
+      - name: Release asset compatibility tests
+        run: node --test scripts/release/app-release-assets.test.mjs
+
       - name: Release metadata projection tests
         run: |
           node --test scripts/release/release-changelog.test.mjs
@@ -200,6 +215,9 @@ jobs:
 
       - name: Test evidence policy guard
         run: node scripts/ci/verify-test-evidence-policy.mjs
+
+      - name: Stress suite policy guard
+        run: node scripts/ci/verify-stress-suite-policy.mjs
 
       - name: Root README entrypoint guard
         run: node scripts/ci/check-root-readme.mjs
@@ -398,6 +416,17 @@ jobs:
           npm run lint:scripts
           npm run test:lint-ps1
           npm run lint:ps1
+
+      # The Engine launch-flag pins (scripts/dev/test-dev-runner-{runtime-resolution,head-java-opts}).
+      # These ran in NO per-PR lane: the only caller of `npm run test:dev-runner` was
+      # onramp-smoke.yml, which is `workflow_dispatch:` only (manual, heavy — it starts the full
+      # stack). So the check that the dev-runner's and lib.rs's JVM flag sets have not drifted, which
+      # exists BECAUSE they silently drifted at item A13, was itself only run when someone remembered
+      # to press a button. Here instead: pure Node, no stack, no models, no Gradle — dev-runner.cjs
+      # already loads in this ubuntu job (the dev-MCP step below requires it), so the lane is proven.
+      # onramp-smoke keeps its copy; it runs the same command as a fail-fast before its heavy smoke.
+      - name: Dev-runner launch-flag pins (Engine JVM flag sets, both spawn sites)
+        run: npm run test:dev-runner
 
       # Required dev-MCP contract: generated runtime freshness/licensing, exact dependency-free
       # launcher topology, typed observation truth, canonical inventory sync, pure helper logic,
@@ -765,6 +794,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+      - name: Prepare APT sources for Playwright Chromium
+        # Google Chrome is a separate distribution. Its unrelated repository must not block
+        # Ubuntu dependency installation; retain signature/hash verification for every source.
+        run: |
+          node --test scripts/ci/test-prepare-playwright-apt.mjs
+          sudo "$(command -v node)" scripts/ci/prepare-playwright-apt.mjs
+
       - name: Install headless Chromium
         # `--with-deps` installs the shared libraries Chromium needs; those are apt packages,
         # not part of the cached browser directory, so this step runs on a cache hit too.
@@ -1103,6 +1139,19 @@ jobs:
       - name: Evidence capture exits cleanly after Windows fetch teardown
         run: node --test scripts/release/evidence-capture-exit.test.mjs
 
+      # Lane F stage B item B9. These nine files previously ran in CI NOWHERE: `test:dev-runner`
+      # named TWO of them by hand and was invoked from `onramp-smoke.yml` alone, whose trigger is
+      # `workflow_dispatch` only — manual, i.e. only when someone remembered. That is the exact
+      # failure mode tempdoc 745 D6 names for the agent-analytics suite ("a layer nothing invokes is
+      # dead regardless of its quality"), and item B8 has just put a supervisor state machine behind
+      # them. The runner auto-discovers `test-dev-runner-*.mjs`, so a new test is covered the moment
+      # it lands.
+      #
+      # HERE and not in `public-claims`, which is what stages/B.md's B9 proposed: that lane is
+      # ubuntu, and dev-runner.cjs is Windows-first by its own header — the paths these tests
+      # exercise (cuda12 resolution, taskkill, the handle-release cooldown) either do not exist or
+      # do not mean the same thing on Linux. The trigger coverage B9 asked for is unchanged: this
+      # job runs on the same `pull_request` and `push` as that one. Recorded in B.md §0.1.
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -1111,11 +1160,31 @@ jobs:
             21
             ${{ env.JAVA_VERSION }}
 
+      - name: Dev-runner suite (auto-discovered)
+        run: npm ci --audit=false && npm run test:dev-runner
+
+      # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
+      # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
+      # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
+      # process handle closing — is a real constraint rather than a no-op.
+      - name: Supervisor conformance (dev-runner adapter)
+        run: node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
       - name: Windows-only tests (@Tag windows) for the Linux-migrated modules
-        run: ./gradlew.bat :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:adapters-lucene:test :modules:app-inference:test -PwindowsOnly=true --console=plain
+        run: ./gradlew.bat :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test -PwindowsOnly=true --console=plain
+
+      - name: Preserve Windows-native test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-native-test-results
+          path: |
+            modules/**/build/test-results/test/TEST-*.xml
+            modules/**/build/reports/tests/test/**
+          retention-days: 30
 
       - name: Release signing contract tests
         shell: pwsh
@@ -1177,6 +1246,29 @@ jobs:
         working-directory: modules/shell/src-tauri
         run: cargo test --lib --locked
 
+      # Lane F stage B item B10 (stages/B.md Q2, answer (a)). `cargo test --lib` above proves the
+      # supervisor's DECISIONS — supervisor.rs's table, read from the same register the Node harness
+      # reads. It cannot prove the actuator: this crate has no `tests/` directory, so `--lib` sees
+      # `#[cfg(test)] mod tests` only, and the one thing stage B §2 re-cut for Windows — a cooldown
+      # floored on the process handle closing rather than on a number — is invisible to any fake
+      # spawner. So the actuator ships as a [[bin]] the harness drives against a real child.
+      #
+      # One step in THIS lane rather than a job of its own, because the fact it proves is this job's:
+      # "the shell crate does what it says". A contract with one implementation's actuator never run
+      # is not one contract (ci.yml's own 745 lesson, two jobs down: a layer nothing invokes is dead
+      # regardless of quality).
+      - name: Setup Node (for the conformance harness)
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build the supervisor conformance driver
+        working-directory: modules/shell/src-tauri
+        run: cargo build --bin supervisor-conformance --locked
+
+      - name: Supervisor conformance (Tauri adapter)
+        run: node scripts/supervisor-conformance/run.mjs --adapter tauri
+
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone
   # (modules/system-tests/build.gradle.kts:297). The tier rotted unobserved as a result —
@@ -1188,10 +1280,10 @@ jobs:
   # only, small + fast", and this file's header requires each job be named after the fact it
   # proves rather than becoming "one opaque Windows bucket".
   #
-  # Windows, not ubuntu: the tier spawns a real Head child JVM (HeadlessApp), which in turn
-  # spawns the Worker from `:modules:indexer-worker:installDist` — process spawn, argfile
-  # classpath quoting, and worker-lib path resolution are exactly the surfaces that differ per
-  # OS, and Windows is the OS the product ships on. The tier has never been validated on Linux;
+  # Windows, not ubuntu: the tier spawns a real Engine child JVM (HeadlessApp) — process spawn
+  # and argfile classpath quoting are exactly the surfaces that differ per OS, and Windows is the
+  # OS the product ships on. (Before lane F stage A item A13 that child spawned a Worker of its
+  # own from `:modules:indexer-worker:installDist`; there is one process and one dist now.) The tier has never been validated on Linux;
   # moving it there is a separate exercise with its own evidence, not an assumption to make here.
   #
   # ADVISORY (continue-on-error + deliberately absent from workflow-signal-policy.v1.json's
@@ -1224,6 +1316,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Setup Node (for the real Engine supervisor regression)
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       # No model blobs on a public checkout, so the model-dependent cases self-skip via their
       # own assumeTrue guards; the Golden Corpus cases use frozen vectors and need no model.
       - name: Integration tier (Golden Corpus, relevance, isolated-backend E2E)
@@ -1250,6 +1347,7 @@ jobs:
             modules/system-tests/build/test-results/integrationTest/TEST-*.xml
             modules/system-tests/build/reports/tests/integrationTest/**
             modules/system-tests/build/reports/isolated-backend/**
+            tmp/lane-f-takeover/writer-junit-*/**
             build/ci/integration-test-attribution.json
             build/ci/integration-test-attribution.md
           if-no-files-found: warn

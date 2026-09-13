@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -71,7 +71,7 @@ class AgentHistoryIndexerTest {
   void reindexRestoredRunWritesTranscriptFromTerminalEvent() throws Exception {
     Path historyDir = tempDir.resolve("agent-history");
     // null client → the .md is still written; submitBatch (the only client-gated step) is skipped.
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null);
     var events =
         List.of(
             Map.of(
@@ -124,7 +124,7 @@ class AgentHistoryIndexerTest {
   @DisplayName("909: a MISSING transcript is re-derived from the run's terminal event")
   void reconcileRebuildsAMissingTranscript() throws Exception {
     Path historyDir = tempDir.resolve("h-missing");
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null);
 
     int rebuilt =
         indexer.reconcileNow(() -> List.of("sess-gone"), id -> doneEvents("REBUILT-ZQX-1"));
@@ -144,7 +144,7 @@ class AgentHistoryIndexerTest {
     // rename but before the bytes land leaves a zero-filled prefix, which is the second shape
     // a torn transcript takes on disk.
     Files.writeString(historyDir.resolve("sess-garbage.md"), "\0\0not a transcript");
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null);
 
     int rebuilt =
         indexer.reconcileNow(
@@ -168,7 +168,7 @@ class AgentHistoryIndexerTest {
     Path historyDir = Files.createDirectories(tempDir.resolve("h-locked"));
     Path unreadable = historyDir.resolve("sess-locked.md");
     Files.writeString(unreadable, "\0\0not a transcript");
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null);
 
     // A locked store: sessions list, but reading their events yields nothing.
     int rebuilt = indexer.reconcileNow(() -> List.of("sess-locked"), id -> List.of());
@@ -187,7 +187,7 @@ class AgentHistoryIndexerTest {
     Path historyDir = Files.createDirectories(tempDir.resolve("h-healthy"));
     Path good = historyDir.resolve("sess-good.md");
     Files.writeString(good, AgentHistoryIndexer.TRANSCRIPT_HEADER + "\n\nthe original answer\n");
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null);
 
     int rebuilt =
         indexer.reconcileNow(
@@ -217,7 +217,7 @@ class AgentHistoryIndexerTest {
   @DisplayName("909: a transcript written with NO client leaves a pending marker (nothing submitted)")
   void transcriptWrittenWithoutAClientIsMarkedPending() throws Exception {
     Path historyDir = tempDir.resolve("h-pending");
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null); // the Worker is down
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null); // the Worker is down
 
     indexer.reconcileNow(() -> List.of("sess-down"), id -> doneEvents("WROTE-WHILE-DOWN"));
 
@@ -236,14 +236,13 @@ class AgentHistoryIndexerTest {
   @DisplayName("909: the same write WITH a client submits and leaves no marker")
   void transcriptWrittenWithAClientIsNotMarkedPending() throws Exception {
     Path historyDir = tempDir.resolve("h-up");
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    var indexer = new AgentHistoryIndexer(historyDir, () -> client);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> client);
 
     indexer.reconcileNow(() -> List.of("sess-up"), id -> doneEvents("WROTE-WHILE-UP"));
 
     verify(client, times(1))
-        .submitBatch(
-            List.of(historyDir.resolve("sess-up.md")), true, AgentHistoryIndexer.COLLECTION);
+        .submitBatch(org.mockito.ArgumentMatchers.eq(List.of(historyDir.resolve("sess-up.md"))), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(AgentHistoryIndexer.COLLECTION), org.mockito.ArgumentMatchers.any());
     assertFalse(
         Files.exists(marker(historyDir, "sess-up")),
         "a submitted transcript carries no pending marker");
@@ -261,19 +260,19 @@ class AgentHistoryIndexerTest {
     Path historyDir = tempDir.resolve("h-recover");
 
     // Boot 1: the Worker is down.
-    new AgentHistoryIndexer(historyDir, () -> null)
+    new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null)
         .reconcileNow(() -> List.of("sess-r"), id -> doneEvents("RECOVER-ZQX"));
     assertTrue(Files.exists(marker(historyDir, "sess-r")), "precondition: pending after boot 1");
 
     // Boot 2: a NEW indexer over the same directory, Worker up. The marker is the only carrier of
     // state between the two — there is no in-memory queue to inherit.
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    var rebooted = new AgentHistoryIndexer(historyDir, () -> client);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    var rebooted = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> client);
     int rebuilt = rebooted.reconcileNow(() -> List.of("sess-r"), id -> doneEvents("RECOVER-ZQX"));
 
     assertEquals(0, rebuilt, "a re-submit derives nothing — the healthy bytes are reused as-is");
     verify(client, times(1))
-        .submitBatch(List.of(historyDir.resolve("sess-r.md")), true, AgentHistoryIndexer.COLLECTION);
+        .submitBatch(org.mockito.ArgumentMatchers.eq(List.of(historyDir.resolve("sess-r.md"))), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(AgentHistoryIndexer.COLLECTION), org.mockito.ArgumentMatchers.any());
     assertFalse(Files.exists(marker(historyDir, "sess-r")), "the marker is cleared after the submit");
     assertTrue(
         Files.readString(historyDir.resolve("sess-r.md")).contains("RECOVER-ZQX"),
@@ -296,8 +295,8 @@ class AgentHistoryIndexerTest {
     Path historyDir = Files.createDirectories(tempDir.resolve("h-skip"));
     Path good = historyDir.resolve("sess-ok.md");
     Files.writeString(good, AgentHistoryIndexer.TRANSCRIPT_HEADER + "\n\nthe original answer\n");
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    var indexer = new AgentHistoryIndexer(historyDir, () -> client);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> client);
 
     int rebuilt =
         indexer.reconcileNow(
@@ -320,13 +319,13 @@ class AgentHistoryIndexerTest {
   @DisplayName("909: a FAILING submit leaves the marker for the next pass")
   void aFailingSubmitLeavesTheMarkerInPlace() throws Exception {
     Path historyDir = tempDir.resolve("h-rpcfail");
-    new AgentHistoryIndexer(historyDir, () -> null)
+    new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
 
-    RemoteKnowledgeClient failing = mock(RemoteKnowledgeClient.class);
-    when(failing.submitBatch(anyList(), anyBoolean(), anyString()))
+    KnowledgeClient failing = mock(KnowledgeClient.class);
+    when(failing.submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any()))
         .thenThrow(new IllegalStateException("worker RPC failed"));
-    new AgentHistoryIndexer(historyDir, () -> failing)
+    new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> failing)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
 
     assertTrue(
@@ -334,11 +333,11 @@ class AgentHistoryIndexerTest {
         "a throwing submit is not a successful one — the marker must survive it");
 
     // …and the pass after that, with a working client, still recovers the transcript.
-    RemoteKnowledgeClient ok = mock(RemoteKnowledgeClient.class);
-    new AgentHistoryIndexer(historyDir, () -> ok)
+    KnowledgeClient ok = mock(KnowledgeClient.class);
+    new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> ok)
         .reconcileNow(() -> List.of("sess-f"), id -> doneEvents("RPC-FAIL-ZQX"));
     verify(ok, times(1))
-        .submitBatch(List.of(historyDir.resolve("sess-f.md")), true, AgentHistoryIndexer.COLLECTION);
+        .submitBatch(org.mockito.ArgumentMatchers.eq(List.of(historyDir.resolve("sess-f.md"))), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(AgentHistoryIndexer.COLLECTION), org.mockito.ArgumentMatchers.any());
     assertFalse(Files.exists(marker(historyDir, "sess-f")));
   }
 
@@ -346,7 +345,7 @@ class AgentHistoryIndexerTest {
   @DisplayName("629: a restored run with no terminal event indexes nothing (the self-filter holds)")
   void reindexRestoredRunWithNoTerminalEventWritesNothing() throws Exception {
     Path historyDir = tempDir.resolve("agent-history-2");
-    var indexer = new AgentHistoryIndexer(historyDir, () -> null);
+    var indexer = new AgentHistoryIndexer(new io.justsearch.core.execution.TestEngineExecutors(), historyDir, () -> null);
     indexer.reindexRestoredRun(
         "sess-partial", List.of(Map.of("eventType", "session_started", "payload", Map.of())));
     Thread.sleep(100); // give the (would-be) executor time; a terminal-less run must write nothing

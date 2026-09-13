@@ -4,13 +4,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import io.justsearch.app.engine.EngineRoot;
 import io.justsearch.app.services.vdu.ImagePreparer;
+import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.ipc.SearchResponse;
+import io.justsearch.ipc.StatusResponse;
 import io.justsearch.ipc.VduUpdateOutcome;
 import io.justsearch.systemtests.chaos.ExternalLlamaServerClient;
-import io.justsearch.systemtests.chaos.GrpcTestClient;
-import io.justsearch.systemtests.chaos.MmfTestHarness;
-import io.justsearch.systemtests.chaos.WorkerProcessManager;
 import io.justsearch.systemtests.provisioning.TestEnvironmentProvisioner;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -26,24 +32,80 @@ import org.slf4j.LoggerFactory;
 /**
  * End-to-end system tests for VDU batch processing.
  *
- * <p>Tests the full VDU pipeline: Real Worker + Real LLM (llama-server).
+ * <p>Tests the full VDU pipeline: real index + real LLM (llama-server).
  *
  * <p><b>Prerequisites:</b>
  * <ul>
  *   <li>llama-server running at localhost:8080 with a vision-capable model</li>
- *   <li>Worker distribution built (./gradlew :modules:indexer-worker:installDist)</li>
  * </ul>
  *
  * <p><b>Note:</b> Tests will FAIL if llama-server is not available.
  * This is intentional - silent skipping hides untested code paths.
+ *
+ * <p><b>Lane F stage A item A12 — this class now composes the Engine in-process.</b> The subject
+ * was never the second process: it is what VDU does to an index. A document with no extractable
+ * text must route to {@code vdu_status=PENDING}; a vision pass over it must yield non-blank text
+ * containing what the image actually says; the enrichment pass must yield parseable JSON; the
+ * document must leave the pending list afterwards; and the extracted text must become
+ * <em>searchable</em>, which is the only reason any of it exists. An invalid image must reach a
+ * recorded failure with a non-blank reason rather than failing silently. Every one of those is
+ * index state plus LLM output, and both survive the collapse untouched.
+ *
+ * <p>What is gone is how the test reached the index. It used to spawn a Worker JVM
+ * ({@code WorkerProcessManager}), read the gRPC port that process published into a memory-mapped
+ * signal file ({@code MmfTestHarness}), and dial it ({@code GrpcTestClient}). The index half is now
+ * built in this JVM by {@link EngineRoot}, and every index call — including all five VDU
+ * operations — goes through the {@link KnowledgeClient} it returns. Those five have identical
+ * signatures on {@code KnowledgeClient} (KnowledgeClient.java:1564-1593), so the calls translate
+ * one-for-one. The class stays in {@code systemTest} rather than moving to the {@code app-engine}
+ * unit tier (where the other A12 conversions landed) for one reason only: it is {@code @Tag("ai")}
+ * and needs an external llama-server with a vision model.
+ *
+ * <p><b>What changed meaning, stated rather than smoothed over.</b>
+ *
+ * <ol>
+ *   <li><b>What was dropped, and why.</b> {@code worker.spawnWorker()}'s returned PID (logged,
+ *       never asserted), the {@code mmf.keepAlive()} heartbeat that kept a spawned Worker from
+ *       honouring the suicide pact, and the {@code mmf.awaitPort(30_000, 100)} handshake. All
+ *       three were about the second process; there is no process, no watchdog and no port. The
+ *       "worker should be healthy" gate survives as {@code client.isHealthy()}.
+ *   <li><b>{@code grpcClient.awaitIndexing(n, timeoutMs, pollMs)} is inlined here</b> as
+ *       {@link #awaitIndexed}, condition-for-condition with the retired implementation
+ *       (GrpcTestClient.java:410-434): the queue has drained AND the index holds at least
+ *       {@code n} documents.
+ *   <li><b>{@code TestableVduBatchProcessor} now drives a {@link KnowledgeClient}.</b> Only the
+ *       field's type changed; the two-pass extract-then-enrich flow, the retry guard, the
+ *       file-existence check, the outcome codes and the captured-result record are untouched.
+ *   <li><b>The class-level {@link Timeout} is new.</b> {@code conventions.jvm-base} applies
+ *       {@code junit.jupiter.execution.timeout.default=30s} to every {@code Test} task
+ *       (JvmBaseConventionsPlugin.kt:118) and the {@code systemTest} task does not override it, so
+ *       every method here ran under a 30s cap that its own 60s indexing waits and a real vision
+ *       round trip cannot fit inside. That is a pre-existing condition, not something the collapse
+ *       caused, but leaving it in place would mean shipping a converted test that still cannot
+ *       pass. Flagged because it is an addition, not a translation.
+ * </ol>
+ *
+ * <p><b>{@link TestEnvironmentProvisioner} is kept for its system properties, not its
+ * fail-fast.</b> It points {@code justsearch.repo.root} / {@code justsearch.ssot.path} /
+ * {@code justsearch.config} at the real project directories — the same values the spawned Worker
+ * used to receive as {@code -D} JVM args, and which the Engine now needs in <em>this</em> JVM. Its
+ * {@code verifyWorkerDist()} precondition is gone: item A13 deleted it, and the
+ * {@code justsearch.worker.dist.dir} property it demanded, with the Worker distribution itself.
  */
 @DisplayName("VDU Batch Processor E2E Tests")
 @Tag("systemTest")
 @Tag("ai")
+@Timeout(900)
 class VduBatchProcessorE2ETest {
   private static final Logger log = LoggerFactory.getLogger(VduBatchProcessorE2ETest.class);
   private static final int LLAMA_SERVER_PORT = 8080;
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final EngineContext TEST_ENGINE_CONTEXT =
+      EngineProvenance.internal(
+          "vdu-system-test", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+  private static final EngineContext VDU_ENGINE_CONTEXT =
+      EngineProvenance.internal(
+          "vdu-batch-processor", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
 
   // Expected text content from test images (used for output quality verification)
   private static final String EXPECTED_TEXT_KEYWORD = "TEST";  // Must appear in extracted text
@@ -54,9 +116,9 @@ class VduBatchProcessorE2ETest {
   private static ExternalLlamaServerClient llamaClient;
   private static boolean llamaServerAvailable;
 
-  private WorkerProcessManager worker;
-  private MmfTestHarness mmf;
-  private GrpcTestClient grpcClient;
+  private EngineRoot engine;
+  private io.justsearch.app.api.operations.OperationStore operations;
+  private KnowledgeClient client;
   private Path testImageDir;
   private TestableVduBatchProcessor vduProcessor;
 
@@ -87,42 +149,28 @@ class VduBatchProcessorE2ETest {
     testImageDir = dataDir.resolve("test-images");
     Files.createDirectories(testImageDir);
 
-    // Spawn worker
-    worker = WorkerProcessManager.fromDistribution(env.getWorkerDistDir(), env.getTempDir());
-    worker.withJvmArgs(env.getWorkerJvmArgs());
-    long pid = worker.spawnWorker();
-    log.info("Worker spawned with PID: {}", pid);
-
-    // Open MMF for port discovery
-    mmf = new MmfTestHarness(worker.getSignalFilePath());
-    mmf.open();
-    mmf.keepAlive();
-
-    // Wait for worker to be ready
-    int grpcPort = mmf.awaitPort(30_000, 100);
-    log.info("Worker gRPC port: {}", grpcPort);
-
-    grpcClient = new GrpcTestClient(grpcPort);
-    assertTrue(grpcClient.isHealthy(), "Worker should be healthy");
+    // Compose the Engine's index half in this JVM. This replaces spawn + port discovery +
+    // channel: there is no second process to spawn, no signal file to read a port out of, and no
+    // channel to open. startEngine() either hands back a working client or throws.
+    startEngine(dataDir);
+    assertTrue(client.isHealthy(TEST_ENGINE_CONTEXT), "Engine should be healthy");
 
     // Create testable VDU processor
-    vduProcessor = new TestableVduBatchProcessor(llamaClient, grpcClient);
+    vduProcessor = new TestableVduBatchProcessor(llamaClient, client);
   }
 
   @AfterEach
-  void cleanup() throws Exception {
-    if (grpcClient != null) {
-      grpcClient.close();
-      grpcClient = null;
+  void cleanup() throws java.io.IOException {
+    // EngineRoot.close() closes the KnowledgeClient it handed out, so the client is released by
+    // dropping the reference rather than by a second close.
+    if (engine != null) {
+      engine.close();
+      operations.close();
+      operations = null;
+      engine = null;
     }
-    if (worker != null) {
-      worker.close();
-      worker = null;
-    }
-    if (mmf != null) {
-      mmf.close();
-      mmf = null;
-    }
+    client = null;
+    vduProcessor = null;
   }
 
   @Test
@@ -135,11 +183,11 @@ class VduBatchProcessorE2ETest {
     String docId = normalizeDocId(testImage);
     log.info("Created test image: {} (docId: {})", filePath, docId);
 
-    int accepted = grpcClient.submitBatch(List.of(filePath));
+    int accepted = client.submitBatch(List.of(testImage), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(1, accepted, "Should accept 1 file");
 
     // 2. Wait for indexing
-    assertTrue(grpcClient.awaitIndexing(1, 30_000, 200), "Should index within 30s");
+    assertTrue(awaitIndexed(1, 30_000, 200), "Should index within 30s");
 
     // 3. Verify document is pending VDU (poll to handle searcher refresh)
     assertTrue(awaitPending(docId, 5_000), "Document should be pending VDU");
@@ -191,11 +239,11 @@ class VduBatchProcessorE2ETest {
     String docId = normalizeDocId(pdf);
     log.info("Copied scanned PDF fixture: {} (docId: {})", filePath, docId);
 
-    int accepted = grpcClient.submitBatch(List.of(filePath));
+    int accepted = client.submitBatch(List.of(pdf), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(1, accepted, "Should accept 1 file");
 
     // 2. Wait for indexing
-    assertTrue(grpcClient.awaitIndexing(1, 60_000, 200), "Should index within 60s");
+    assertTrue(awaitIndexed(1, 60_000, 200), "Should index within 60s");
 
     // 3. Verify pending VDU (image-only PDF => no text layer)
     assertTrue(awaitPending(docId, 10_000), "Scanned PDF should be pending VDU");
@@ -229,13 +277,11 @@ class VduBatchProcessorE2ETest {
     String docId2 = normalizeDocId(img2);
 
     // 2. Submit all for indexing (use actual paths)
-    int accepted = grpcClient.submitBatch(List.of(
-        img1.toAbsolutePath().toString(),
-        img2.toAbsolutePath().toString()));
+    int accepted = client.submitBatch(List.of(img1, img2), TEST_ENGINE_CONTEXT).getAcceptedCount();
     assertEquals(2, accepted);
 
     // 3. Wait for indexing
-    assertTrue(grpcClient.awaitIndexing(2, 60_000, 200));
+    assertTrue(awaitIndexed(2, 60_000, 200));
 
     // 4. Verify all pending (poll to handle searcher refresh)
     assertTrue(awaitPending(docId1, 5_000), "Doc 1 should be pending");
@@ -283,13 +329,12 @@ class VduBatchProcessorE2ETest {
     // 1. Create an invalid "image" (text file with .png extension)
     Path invalidImage = testImageDir.resolve("invalid.png");
     Files.writeString(invalidImage, "This is not a valid PNG image - just random text");
-    String filePath = invalidImage.toAbsolutePath().toString();
     // Worker normalizes paths (lowercase on Windows)
     String docId = normalizeDocId(invalidImage);
 
     // 2. Submit for indexing
-    grpcClient.submitBatch(List.of(filePath));
-    assertTrue(grpcClient.awaitIndexing(1, 30_000, 200));
+    client.submitBatch(List.of(invalidImage), TEST_ENGINE_CONTEXT);
+    assertTrue(awaitIndexed(1, 30_000, 200));
 
     // 3. Verify pending (poll to handle searcher refresh)
     assertTrue(awaitPending(docId, 5_000), "Invalid image should be pending VDU initially");
@@ -322,6 +367,67 @@ class VduBatchProcessorE2ETest {
   // =========================================================================
   // Helper Methods
   // =========================================================================
+
+  /**
+   * Publishes the resolved config the Engine reads and composes the index half in-process.
+   *
+   * <p>{@code WorkerConfig.load()} reads {@code ConfigStore.global()} (WorkerConfig.java:44-58),
+   * so the data directory and index base path have to be published before {@link EngineRoot#start}
+   * builds the {@code KnowledgeServer}. This is the whole of what
+   * {@code WorkerProcessManager.fromDistribution(...).withJvmArgs(...).spawnWorker()} plus
+   * {@code MmfTestHarness.awaitPort} plus {@code new GrpcTestClient(port)} collapse to.
+   *
+   * @param dataDir the Engine's data directory — the same directory the spawned Worker used to
+   *     receive as {@code -Djustsearch.data.dir}
+   */
+  private void startEngine(Path dataDir) throws Exception {
+    Path indexBase = dataDir.resolve("index");
+    Files.createDirectories(dataDir);
+    Files.createDirectories(indexBase);
+    ConfigStore.setGlobal(new ConfigStore(new ResolvedConfigBuilder()
+        .contributeBaseSources()
+        .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
+        .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
+        .build()));
+
+    operations = new io.justsearch.app.observability.operations.SqliteOperationStore(dataDir.resolve("operations.db"));
+    var attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+        operations, java.time.Clock.systemUTC(), java.util.Set.of(
+            io.justsearch.agent.api.registry.OperationKind.INGEST,
+            io.justsearch.agent.api.registry.OperationKind.REINDEX,
+            io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
+            io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+            io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
+            io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
+    engine = new EngineRoot(operations, attempts, 30_000L, 5_000);
+    client = engine.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+  }
+
+  /**
+   * Waits until the queue has drained and the index holds at least {@code expectedDocCount}
+   * documents.
+   *
+   * <p>The condition is the retired {@code GrpcTestClient.awaitIndexing} verbatim
+   * (GrpcTestClient.java:410-434); only the transport under {@code getStatus()} changed.
+   */
+  private boolean awaitIndexed(long expectedDocCount, long timeoutMs, long pollIntervalMs)
+      throws InterruptedException {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        StatusResponse status = client.getStatus(TEST_ENGINE_CONTEXT);
+        if (status.getCore().getQueueDepth() == 0
+            && status.getCore().getDocCount() >= expectedDocCount) {
+          return true;
+        }
+      } catch (RuntimeException e) {
+        // A status call can fail while the index half swaps a writer; the loop re-reads.
+        log.debug("Status check failed: {}", e.getMessage());
+      }
+      Thread.sleep(pollIntervalMs);
+    }
+    return false;
+  }
 
   private Path createTestImage(String filename) throws Exception {
     return createTestImageWithText(filename, "TEST DOCUMENT\nVDU E2E Test");
@@ -380,7 +486,7 @@ class VduBatchProcessorE2ETest {
   private boolean awaitPending(String docId, long timeoutMs) throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
-      List<String> pending = grpcClient.queryPendingVduDocIds(100);
+      List<String> pending = client.queryPendingVduDocIds(100, TEST_ENGINE_CONTEXT);
       if (pending.contains(docId)) {
         return true;
       }
@@ -392,11 +498,22 @@ class VduBatchProcessorE2ETest {
   /**
    * Waits until a document is no longer in the pending VDU list.
    * Handles searcher refresh latency.
+   *
+   * <p>A12: not converted with full fidelity — the failure mode is weaker here, and there is no
+   * in-process call that restores it. {@code GrpcTestClient.queryPendingVduDocIds} propagated a
+   * {@code StatusRuntimeException} (GrpcTestClient.java:584-586), so a broken query blew this
+   * method up. {@code KnowledgeClient} delegates to {@code VduOps.queryPendingVduDocIds}, which
+   * catches everything and returns an empty list (VduOps.java:119-125). An empty list satisfies
+   * "not pending", so a query that is failing rather than answering now reads as success HERE
+   * (it reads as a timeout in {@link #awaitPending}, which is still correct). No non-error path
+   * changed; this only affects what a broken query looks like. Left as-is rather than papered
+   * over with a substitute check: {@code countPendingVdu()} swallows the same way
+   * (VduOps.java:45-53), so it would confirm nothing.
    */
   private boolean awaitNotPending(String docId, long timeoutMs) throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
-      List<String> pending = grpcClient.queryPendingVduDocIds(100);
+      List<String> pending = client.queryPendingVduDocIds(100, TEST_ENGINE_CONTEXT);
       if (!pending.contains(docId)) {
         return true;
       }
@@ -413,7 +530,7 @@ class VduBatchProcessorE2ETest {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        SearchResponse response = grpcClient.searchText(query, 10);
+        SearchResponse response = client.search(query, 10, TEST_ENGINE_CONTEXT);
         if (response.getTotalHits() > 0) {
           log.debug("Search '{}' returned {} hits", query, response.getTotalHits());
           return true;
@@ -481,10 +598,30 @@ class VduBatchProcessorE2ETest {
   // =========================================================================
 
   /**
-   * Test-friendly VDU batch processor that uses GrpcTestClient and ExternalLlamaServerClient.
+   * Test-friendly VDU batch processor that uses {@link KnowledgeClient} and
+   * {@link ExternalLlamaServerClient}.
    *
    * <p>Mirrors the real VduBatchProcessor logic but works with test infrastructure.
    * <p>ENHANCED: Returns detailed results for test verification of AI output quality.
+   *
+   * <p>Lane F stage A item A12: the index-side collaborator used to be {@code GrpcTestClient}
+   * (a raw gRPC stub over a spawned Worker's port). It is now the Engine's in-process
+   * {@link KnowledgeClient}. The four VDU calls this class makes —
+   * {@code queryPendingVduDocIds(int)}, {@code markVduProcessing(String, int)} and both
+   * {@code updateVduResult(...)} sites — carry the same signatures and the same success-path
+   * return values on {@code KnowledgeClient} (KnowledgeClient.java:1570-1589) as they did on the
+   * retired stub (GrpcTestClient.java:584-686), so the processing logic below is unchanged.
+   *
+   * <p><b>The error path is not identical, and the difference is stated rather than hidden.</b>
+   * The retired stub let a transport failure escape as a {@code StatusRuntimeException};
+   * {@code VduOps} catches everything and returns a sentinel instead — {@code -1} from
+   * {@code markVduProcessing} (VduOps.java:150-157) and {@code false} from
+   * {@code updateVduResult} (VduOps.java:90-96). Both sentinels still land in a
+   * {@code failed++} branch here with a non-blank {@code lastFailureReason}, so no assertion in
+   * this class flips; what changes is that a genuine call failure now takes the "max retries
+   * exceeded" / "failed to update result in index" branch instead of the {@code catch (Exception)}
+   * branch, and therefore no longer writes {@code VDU_UPDATE_OUTCOME_FAILED} back to the index
+   * via {@link #markFailed}.
    */
   static class TestableVduBatchProcessor {
     private static final Logger log = LoggerFactory.getLogger(TestableVduBatchProcessor.class);
@@ -509,12 +646,13 @@ class VduBatchProcessorE2ETest {
     private static final int MAX_RETRIES = 3;
 
     private final ExternalLlamaServerClient llamaClient;
-    private final GrpcTestClient grpcClient;
+    private final KnowledgeClient knowledgeClient;
     private final ImagePreparer imagePreparer;
 
-    TestableVduBatchProcessor(ExternalLlamaServerClient llamaClient, GrpcTestClient grpcClient) {
+    TestableVduBatchProcessor(
+        ExternalLlamaServerClient llamaClient, KnowledgeClient knowledgeClient) {
       this.llamaClient = llamaClient;
-      this.grpcClient = grpcClient;
+      this.knowledgeClient = knowledgeClient;
       this.imagePreparer = new ImagePreparer();
     }
 
@@ -536,7 +674,7 @@ class VduBatchProcessorE2ETest {
      * @return ProcessingResult containing counts and captured outputs
      */
     ProcessingResult processPendingFilesWithResults() {
-      List<String> pending = grpcClient.queryPendingVduDocIds(100);
+      List<String> pending = knowledgeClient.queryPendingVduDocIds(100, VDU_ENGINE_CONTEXT);
       log.info("Processing {} pending VDU files", pending.size());
 
       int processed = 0;
@@ -550,7 +688,7 @@ class VduBatchProcessorE2ETest {
       for (String docId : pending) {
         try {
           // Mark as PROCESSING (with retry protection)
-          int retryCount = grpcClient.markVduProcessing(docId, MAX_RETRIES);
+          int retryCount = knowledgeClient.markVduProcessing(docId, MAX_RETRIES, VDU_ENGINE_CONTEXT);
           if (retryCount < 0) {
             log.warn("Skipping {} - max retries exceeded", docId);
             lastFailureReason = "Max retries exceeded";
@@ -578,12 +716,13 @@ class VduBatchProcessorE2ETest {
           enrichments.add(lastEnrichment);
 
           // Update result
-          boolean updated = grpcClient.updateVduResult(
+          boolean updated = knowledgeClient.updateVduResult(
               docId,
               result.extractedText(),
               VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT,
               result.enrichment(),
-              result.pageCount());
+              result.pageCount(),
+              VDU_ENGINE_CONTEXT);
 
           if (updated) {
             processed++;
@@ -635,12 +774,13 @@ class VduBatchProcessorE2ETest {
 
     private void markFailed(String docId, String reason) {
       String safeReason = reason.replace("\"", "'");
-      grpcClient.updateVduResult(
+      knowledgeClient.updateVduResult(
           docId,
           null,
           VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED,
           "{\"error\": \"" + safeReason + "\"}",
-          0);
+          0,
+          VDU_ENGINE_CONTEXT);
     }
 
     record VduResult(String extractedText, String enrichment, int pageCount) {}

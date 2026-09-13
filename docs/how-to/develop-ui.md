@@ -142,12 +142,13 @@ top of that file).
 
 ## Relationship to the backend
 
-The UI talks to the Head process via REST (`/api/*`). The Head routes to
-the Worker via gRPC. When the Worker is busy (indexing), search API responses
-slow down — that's why MSW mock mode exists for UI development.
+The UI talks to the Engine via REST (`/api/*`). The API layer routes to the
+index half through in-process port calls (ADR-0049 — one JVM, no IPC). When the
+index half is busy (indexing), search API responses slow down — that's why MSW
+mock mode exists for UI development.
 
 ```text
-Browser → Vite proxy → Head (Javalin) → Worker (gRPC) → Lucene
+Browser → Vite proxy → Engine (Javalin) → index-half port call → Lucene
                 ↑
          MSW intercepts here in mock mode
 ```

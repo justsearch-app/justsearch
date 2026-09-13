@@ -174,7 +174,7 @@ final class ChatControllerTitleTest {
 
   private static Captured invoke(
       FakeStore store, HandlerPick pick, String sessionId, String body) {
-    ChatController controller = new ChatController(null, new SseWriter(null), null, store);
+    ChatController controller = new ChatController(new io.justsearch.core.execution.TestEngineExecutors(), null, new SseWriter(null), null, store);
     AtomicInteger status = new AtomicInteger(200);
     AtomicReference<Object> json = new AtomicReference<>();
     Context ctx = mockContext(sessionId, body, status, json);

@@ -1,0 +1,162 @@
+{
+  "revision": "e47275e59 + journal retry and torn-line correction",
+  "command": "./gradlew.bat :modules:app-observability:test --tests '*ActionEventJournalRetryTest' --tests '*ActionEventJournalTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-observability:spotlessCheck :modules:ui:test --tests '*ActionLedgerControllerTest' :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 38,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 6
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    }
+  ],
+  "sources": [
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEventJournal.java",
+      "bytes": 14190,
+      "sha256": "52b052328d0eec8098ac260157abc3dbd1f757e48b0cc10fbe297a07a619cd1a"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java",
+      "bytes": 6743,
+      "sha256": "4f5a49896163b83debe3dc904631d4dcacec4183ff3e24161add009ddd7dfdcd"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ActionEventJournalRetryTest.java",
+      "bytes": 4039,
+      "sha256": "8bbdca1f033102ba7da7345162538ebc4f5ff59c11c22741614bf1908a58db60"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-4-journal-checks1107.mjs",
+      "bytes": 574,
+      "sha256": "51bf32636fae8c51875936f3f3b088368f4d8394760aa248eec1bb90cf27cbcf"
+    },
+    {
+      "path": "tmp/c2-4-journal-checks1107.txt",
+      "bytes": 839,
+      "sha256": "7cc696b2e0f56ac6ef49d00dca46a4fd1493293832e3cd8e2cda74a7ffd5fd89"
+    },
+    {
+      "path": "tmp/c2-4-journal-gates1107.sarif",
+      "bytes": 914,
+      "sha256": "1ae0ef506e546529c41bd1b4b589811da0f55b075453cd02666da94f2efab9c9"
+    },
+    {
+      "path": "tmp/c2-4-journal-negative1104-counts.json",
+      "bytes": 465,
+      "sha256": "9c2e08b1083fab72adb87fda1e3ec9add63bacc6950c492420bb434029fadafd"
+    },
+    {
+      "path": "tmp/c2-4-journal-negative1104-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "f5f22b42de3b385ed6b7db85fb51822f4d10e878ecd744ee678fedffe3eaeb73"
+    },
+    {
+      "path": "tmp/c2-4-journal-negative1104-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalRetryTest.xml",
+      "bytes": 26322,
+      "sha256": "587c1e332efd0140178d857e0f964c544d0e60f26bde8f8f1e10d437d10bf4dd"
+    },
+    {
+      "path": "tmp/c2-4-journal-negative1104.txt",
+      "bytes": 35540,
+      "sha256": "d61fb03150449ad6ecc0bb30ac42cc37b1867919bc883a77dc5184c2d3879b9f"
+    },
+    {
+      "path": "tmp/c2-4-journal1105-counts.json",
+      "bytes": 486,
+      "sha256": "63192e41b02f2810f3c1488345788780da173f903cfdc972d2aa13744a41b61d"
+    },
+    {
+      "path": "tmp/c2-4-journal1105-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54187,
+      "sha256": "c8e9a2278c966acb9f641e2ff9552037fd53188afe17d1f45bf11c5a5e7d22c2"
+    },
+    {
+      "path": "tmp/c2-4-journal1105-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalRetryTest.xml",
+      "bytes": 48323,
+      "sha256": "7e7147918920566426d1131718f7178a770594a589557ce11428bc3ce1d6f764"
+    },
+    {
+      "path": "tmp/c2-4-journal1105-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalTest.xml",
+      "bytes": 14806,
+      "sha256": "a54cbca5f0a75df7b81f917faa1ca1d56412189bebbfbcc9e7e92134d347617b"
+    },
+    {
+      "path": "tmp/c2-4-journal1105-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1504,
+      "sha256": "b4c8b9307325c9de3d2930845a994bb21df62e7bc59e038a0db221be8f663446"
+    },
+    {
+      "path": "tmp/c2-4-journal1105.txt",
+      "bytes": 35417,
+      "sha256": "cd927caa4e43e19c5ecbb5e3bb01e1a68e98600091dd1f517217333c9680c1c1"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-counts.json",
+      "bytes": 1019,
+      "sha256": "e39d48112a4f96a5d16713e1bb86af481c9762e128e7ad57ca53a8ff07555ca9"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "4ba72723561d032b1848e552bfc16d73a153fca8afcefe03664b412152bfa039"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalRetryTest.xml",
+      "bytes": 47489,
+      "sha256": "52c98e4b2b2fd30d82fcdc4a8fd0b887c45125981c2c9e54c32613553b23e75c"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalTest.xml",
+      "bytes": 14808,
+      "sha256": "7cb3d4250c4949490b1594ff70a9e31151791c19a82f9c793c7576c3988ef467"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1504,
+      "sha256": "15a92e6ee540ba73d6a281133b1a358186770f0c745a892ffa1352e030d37af5"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3387,
+      "sha256": "578f37f4d4f9f7316433bb271d0440a7ebe065dc93e87c6e2fd175096ccc478e"
+    },
+    {
+      "path": "tmp/c2-4-journal1106-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "f941b8cececb546f9c93f6c18e00f4a60c03c427a0ded724749a026cf7cdc50b"
+    },
+    {
+      "path": "tmp/c2-4-journal1106.txt",
+      "bytes": 44078,
+      "sha256": "ca3c148dc13d6d85afb66b2583bc559255df7e8b46a6f1d2197c585b56eb4f55"
+    }
+  ],
+  "negative": {
+    "1104": "4 represented cases,3 expected failures: unwritten tail entry, ring-suppressed persistence retry, retained duplicate appended after reopen.",
+    "1105": "23 represented cases,1 expected torn-line failure: next row missing on reopen; original3 regressions and rotation pass."
+  },
+  "limits": "Sink prerequisite only. Source-row replay across distinct retention windows, acceptance-time visibility and durable-history/SSE swap remain open. No fresh hosted/model/platform acceptance."
+}

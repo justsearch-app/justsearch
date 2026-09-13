@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.DocumentService;
@@ -71,7 +73,7 @@ public final class ReadDocumentTool implements OperationHandler {
    * derivation at exactly the caps it was added for: under a cap of ~500 the floor wins, the page
    * exceeds the cap, and Layer-2 clips it — the silent failure this value exists to prevent,
    * reintroduced by the guard meant to bound it. So the arithmetic is allowed to go small and
-   * {@link #execute(JsonNode)} refuses out loud when it lands under {@link #MIN_PAGE_CHARS}.
+   * {@link #execute(JsonNode, EngineContext)} refuses out loud when it lands under {@link #MIN_PAGE_CHARS}.
    */
   public static int readPageChars(ContextBudget budget) {
     return Math.max(
@@ -92,11 +94,11 @@ public final class ReadDocumentTool implements OperationHandler {
   private final Supplier<ContextBudget> budget;
 
   public ReadDocumentTool(SliceFetcher sliceFetcher) {
-    this(sliceFetcher, (Supplier<List<BrowseTool.RootInfo>>) null);
+    this(sliceFetcher, (java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>>) null);
   }
 
   public ReadDocumentTool(
-      SliceFetcher sliceFetcher, Supplier<List<BrowseTool.RootInfo>> rootsSupplier) {
+      SliceFetcher sliceFetcher, java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier) {
     this(sliceFetcher, AgentToolPaths.RootsView.of(rootsSupplier));
   }
 
@@ -121,13 +123,13 @@ public final class ReadDocumentTool implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     if (argumentsJson == null || argumentsJson.isBlank()) {
       return OperationResult.failure("No arguments provided");
     }
     try {
       JsonNode args = ToolArgs.parse(argumentsJson);
-      return execute(args);
+      return execute(args, engineContext);
     } catch (Exception e) {
       return AgentToolErrors.classify("core_read_document", "Read error", e);
     }
@@ -137,7 +139,7 @@ public final class ReadDocumentTool implements OperationHandler {
    * The parsed-arguments arm. {@code docId} IS the absolute path in this index (see {@code
    * PreviewController}: "Treat docId as opaque"), so one {@code path} argument addresses both.
    */
-  OperationResult execute(JsonNode args) {
+  OperationResult execute(JsonNode args, EngineContext engineContext) {
     ContextBudget currentBudget = budget.get();
     int pageChars = readPageChars(currentBudget);
     if (pageChars < MIN_PAGE_CHARS) {
@@ -170,12 +172,12 @@ public final class ReadDocumentTool implements OperationHandler {
     // Same resolve-then-validate shape as SearchTool's path_prefix (SearchTool.java:222-236), with
     // the same degrade-open semantics: no roots configured / roots unavailable ⇒ do not reject.
     if (!AgentToolPaths.looksAbsolute(path)) {
-      String resolved = rootsView.resolveRelative(path);
+      String resolved = rootsView.resolveRelative(path, engineContext);
       if (resolved != null) {
         path = resolved;
       }
     }
-    String rejection = rootsView.validate(path, "path");
+    String rejection = rootsView.validate(path, "path", engineContext);
     if (rejection != null) {
       return OperationResult.failure(rejection);
     }
@@ -186,7 +188,7 @@ public final class ReadDocumentTool implements OperationHandler {
     DocumentService.DocumentSlice slice;
     try {
       CompletionStage<DocumentService.DocumentSlice> stage =
-          sliceFetcher.fetchSlice(path, offsetChars, maxChars);
+          sliceFetcher.fetchSlice(path, offsetChars, maxChars, engineContext);
       if (stage == null) {
         return notFound(path);
       }
@@ -318,7 +320,7 @@ public final class ReadDocumentTool implements OperationHandler {
 
   /**
    * The carrier line is ONE line by contract; a page's newlines collapse into it. Called exactly
-   * once per read, at the seam — see {@link #execute(JsonNode)} for why the flattened form, not the
+   * once per read, at the seam — see {@link #execute(JsonNode, EngineContext)} for why the flattened form, not the
    * raw slice, is what the evidence carries.
    */
   private static String flatten(String text) {
@@ -386,6 +388,6 @@ public final class ReadDocumentTool implements OperationHandler {
   @FunctionalInterface
   public interface SliceFetcher {
     CompletionStage<DocumentService.DocumentSlice> fetchSlice(
-        String docId, int offsetChars, int maxChars);
+        String docId, int offsetChars, int maxChars, EngineContext engineContext);
   }
 }

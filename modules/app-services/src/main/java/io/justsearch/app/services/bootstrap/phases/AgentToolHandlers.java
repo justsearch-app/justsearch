@@ -12,7 +12,7 @@ import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,9 +145,10 @@ public final class AgentToolHandlers {
    *     prerequisite (worker capability, knowledge server, or data dir) was missing.
    */
   public static boolean registerLateBound(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       HandlerRegistry operationHandlers,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
+      KnowledgeClient knowledgeClient,
       WorkerCapability workerCapability,
       Path dataDir,
       IndexingService indexingService,
@@ -187,6 +188,7 @@ public final class AgentToolHandlers {
     // copies. Registration is this method's job; composition is the factory's.
     AgentToolFactory.Output tools =
         AgentToolFactory.assemble(
+            perSourceSearch,
             dataDir,
             knowledgeServer,
             knowledgeClient,

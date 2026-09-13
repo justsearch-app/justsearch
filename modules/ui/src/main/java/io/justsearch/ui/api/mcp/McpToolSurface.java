@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.app.api.registry.OperationInvocationResponse;
+
 import io.justsearch.agent.api.registry.ConfirmationRequiredException;
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.Operation;
@@ -263,7 +267,7 @@ public final class McpToolSurface {
   }
 
   // =========================================================================
-  // tools/list — 6 curated tools, position-bias ordered
+  // tools/list — 7 curated tools, position-bias ordered
   // =========================================================================
 
   public Map<String, Object> listTools() {
@@ -369,9 +373,18 @@ public final class McpToolSurface {
               "response_format", RESPONSE_FORMAT_SCHEMA),
           List.of("query"));
 
+  // Transport metadata is removed before validating the Operation-owned public input schema.
+  private static final Map<String, Object> OPERATION_KEY_SCHEMA =
+      prop("string", "Optional UUIDv7 operation key. Reuse with identical input to obtain the"
+          + " recorded receipt; changed input conflicts. Omit for a server-minted key.");
+
   private static final Map<String, Object> STATUS_SCHEMA = schema(Map.of(), List.of());
 
   private static final Map<String, Object> RUNTIME_MANIFEST_SCHEMA = schema(Map.of(), List.of());
+
+  private static final Map<String, Object> OUTCOME_SCHEMA = schema(
+      Map.of("operationKey", prop("string", "The original UUIDv7 operation key, never an executionId")),
+      List.of("operationKey"));
 
   private static final String TOOL_LIFECYCLE_EXTENSION_VERSION = "1.0";
 
@@ -388,7 +401,8 @@ public final class McpToolSurface {
                   orderedMap(
                       "parent_path",
                           prop("string", "Folder path to browse (empty for top-level roots)"),
-                      "list_files", prop("boolean", "List individual files instead of subfolders")),
+                      "list_files", prop("boolean", "List individual files instead of subfolders"),
+                      "operationKey", OPERATION_KEY_SCHEMA),
                   List.of()),
               Map.of("readOnlyHint", true)),
           new ToolDefinition(
@@ -406,7 +420,8 @@ public final class McpToolSurface {
                                   + " the containing indexed root's collection, or 'mcp-ingest'"
                                   + " for paths outside every indexed root. The app-internal"
                                   + " collections 'justsearch-help' and 'agent-history' are"
-                                  + " rejected.")),
+                                  + " rejected."),
+                      "operationKey", OPERATION_KEY_SCHEMA),
                   List.of("paths")),
               orderedMap("readOnlyHint", false, "idempotentHint", true)),
           new ToolDefinition(
@@ -415,6 +430,17 @@ public final class McpToolSurface {
               "justsearch_runtime_manifest",
               RUNTIME_MANIFEST_DESC,
               RUNTIME_MANIFEST_SCHEMA,
+              Map.of("readOnlyHint", true)),
+          new ToolDefinition(
+              "justsearch_operation_outcome",
+              "Read the recorded outcome for an operation key after a lost response or restart. "
+                  + "Returns accepted, running, complete, failed, unknown or expired with the retained "
+                  + "history boundary and available unit counts. Unknown means no acceptance record "
+                  + "and no effect; expired means the retained history cannot answer. This read never "
+                  + "starts or retries work. Use the original UUIDv7 operationKey, not executionId. "
+                  + "Timestamps are UTC epoch milliseconds. The answer matches "
+                  + "GET /api/operation-history/{operationKey} and contains metadata only.",
+              OUTCOME_SCHEMA,
               Map.of("readOnlyHint", true)));
 
   /** No production tool is deprecated; fake lifecycle rows are injected only by focused tests. */
@@ -425,8 +451,8 @@ public final class McpToolSurface {
   // =========================================================================
 
   @SuppressWarnings("unchecked")
-  public Map<String, Object> callTool(String name, Map<String, Object> arguments, String sessionId) {
-    return callTool(name, arguments, sessionId, null);
+  public Map<String, Object> callTool(String name, Map<String, Object> arguments, String sessionId, EngineContext engineContext) {
+    return callTool(name, arguments, sessionId, null, engineContext);
   }
 
   /**
@@ -438,7 +464,7 @@ public final class McpToolSurface {
    */
   @SuppressWarnings("unchecked")
   public Map<String, Object> callTool(
-      String name, Map<String, Object> arguments, String sessionId, String requestedBy) {
+      String name, Map<String, Object> arguments, String sessionId, String requestedBy, EngineContext engineContext) {
     // Tempdoc 655: validate every tool's arguments against its declared schema at the MCP
     // boundary, before dispatch — independent of which backend path (direct in-process call vs.
     // Operation dispatch) ultimately serves the tool. Previously only browse/ingest (the two
@@ -451,6 +477,7 @@ public final class McpToolSurface {
           case "justsearch_search" -> SEARCH_SCHEMA;
           case "justsearch_status" -> STATUS_SCHEMA;
           case "justsearch_runtime_manifest" -> RUNTIME_MANIFEST_SCHEMA;
+          case "justsearch_operation_outcome" -> OUTCOME_SCHEMA;
           default -> null;
         };
     if (schemaForDirectDispatch != null) {
@@ -460,14 +487,15 @@ public final class McpToolSurface {
       }
     }
     return switch (name) {
-      case "justsearch_answer" -> callAnswer(arguments);
-      case "justsearch_search" -> callSearch(arguments);
+      case "justsearch_answer" -> callAnswer(arguments, engineContext);
+      case "justsearch_search" -> callSearch(arguments, engineContext);
       case "justsearch_browse" ->
-          callOperation("core.browse-folders", arguments, sessionId, requestedBy);
+          callOperation("core.browse-folders", arguments, requestedBy, engineContext);
       case "justsearch_ingest" ->
-          callOperation("core.ingest-files", arguments, sessionId, requestedBy);
-      case "justsearch_status" -> callStatus();
+          callOperation("core.ingest-files", arguments, requestedBy, engineContext);
+      case "justsearch_status" -> callStatus(engineContext);
       case "justsearch_runtime_manifest" -> callRuntimeManifest();
+      case "justsearch_operation_outcome" -> callOperationOutcome(arguments);
       default -> unknownToolWithSuggestions(name);
     };
   }
@@ -516,6 +544,23 @@ public final class McpToolSurface {
   // GET /api/runtime/manifest — sessionToken stripped.
   // =========================================================================
 
+  private Map<String, Object> callOperationOutcome(Map<String, Object> arguments) {
+    HeadAssembly facade = appFacadeLookup.get();
+    if (facade == null) return errorContent("Operation history is unavailable", ApiErrorCode.SERVICE_UNAVAILABLE);
+    try {
+      var outcome = facade.operationOutcome((String) arguments.get("operationKey"));
+      return Map.of("content", List.of(Map.of("type", "text", "text", MAPPER.writeValueAsString(outcome))),
+          "structuredContent", outcome);
+    } catch (OperationStoreException e) {
+      var failure = OperationInvocationResponse.fromStoreFailure(e);
+      return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
+          "errorClass", failure.errorClass(), "retryable", failure.retryable()));
+    } catch (Exception e) {
+      log.warn("MCP operation outcome query failed", e);
+      return toolFailureContent("Operation outcome query", e);
+    }
+  }
+
   private Map<String, Object> callRuntimeManifest() {
     io.justsearch.ui.runtime.RuntimeManifestPublisher publisher = manifestPublisherLookup.get();
     if (publisher == null) {
@@ -558,7 +603,7 @@ public final class McpToolSurface {
   // =========================================================================
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> callAnswer(Map<String, Object> args) {
+  private Map<String, Object> callAnswer(Map<String, Object> args, EngineContext engineContext) {
     HeadAssembly facade = appFacadeLookup.get();
     if (facade == null || facade.workers().documents() == null) {
       return errorContent(KNOWLEDGE_SERVER_UNAVAILABLE_MESSAGE, ApiErrorCode.SERVICE_UNAVAILABLE);
@@ -604,7 +649,7 @@ public final class McpToolSurface {
           facade
               .workers()
               .documents()
-              .retrieveContext(params)
+              .retrieveContext(params, engineContext)
               .toCompletableFuture()
               .get(RETRIEVE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
@@ -614,7 +659,7 @@ public final class McpToolSurface {
       // Tempdoc 789 Phase 2: framing flags resolved once per call, defaulting to OFF when the
       // config store is not initialized — an unconfigured process delivers exactly the pre-789 text.
       McpDeliveryFraming.Settings framing = McpDeliveryFraming.resolveSettings();
-      McpAnswerResponseContent content = buildAnswerContent(result, query, framing);
+      McpAnswerResponseContent content = buildAnswerContent(result, query, framing, engineContext);
       String text = renderAnswerText(result, content, concise, query);
 
       // Tempdoc 658/735: the citation provenance + quality signals, PLUS the tier-equivalence
@@ -652,7 +697,7 @@ public final class McpToolSurface {
    * to the text StringBuilder, invisible to structuredContent).
    */
   McpAnswerResponseContent buildAnswerContent(
-      DocumentService.ContextResult result, String query, McpDeliveryFraming.Settings framing) {
+      DocumentService.ContextResult result, String query, McpDeliveryFraming.Settings framing, EngineContext engineContext) {
     // Tempdoc 725 W2a: N/M come from the in-hand result: N is the citation count (== chunksUsed;
     // both are derived from the same worker-reported chunk list —
     // RemoteDocumentService.mapRetrieveContextResponse), which equals the number of rendered
@@ -699,7 +744,7 @@ public final class McpToolSurface {
     // Tempdoc 655: comparative response hint, keyed on DISTINCT cited documents — see
     // comparativeAnswerHint for why chunksFound cannot back a "multiple documents" claim.
     String comparativeHint = comparativeAnswerHint(result.citations());
-    String enrichmentHintText = enrichmentHint(ANSWER_ENRICHMENT_MESSAGE);
+    String enrichmentHintText = enrichmentHint(ANSWER_ENRICHMENT_MESSAGE, engineContext);
     String zeroResultHint =
         result.chunksFound() == 0
             ? "No results. Try different terms or check justsearch_status."
@@ -885,7 +930,7 @@ public final class McpToolSurface {
   // =========================================================================
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> callSearch(Map<String, Object> args) {
+  private Map<String, Object> callSearch(Map<String, Object> args, EngineContext engineContext) {
     KnowledgeSearchController ctrl = knowledgeLookup.get();
     if (ctrl == null) return errorContent(KNOWLEDGE_SERVER_UNAVAILABLE_MESSAGE, ApiErrorCode.SERVICE_UNAVAILABLE);
     try {
@@ -924,7 +969,7 @@ public final class McpToolSurface {
           new KnowledgeSearchRequest(
               query, Math.min(limit, 50), mode, null, null, null, filters, null, facets,
               querySyntax, Boolean.TRUE, detail, null);
-      KnowledgeSearchResponse resp = adapter.search(req);
+      KnowledgeSearchResponse resp = adapter.search(req, engineContext);
 
       // Tempdoc 775 §E/§C: the delivery governor degrades the WHOLE assembled tool result (the
       // human-readable text block + the structuredContent channel + envelope) deterministically at
@@ -942,7 +987,7 @@ public final class McpToolSurface {
       // under the same framing decision. The index doc count backing F3's coverage clause is read
       // once, and only when F3 is enabled — an unconfigured or F3-off process makes no extra call.
       McpDeliveryFraming.Settings framing = McpDeliveryFraming.resolveSettings();
-      long indexedDocs = framing.calibratedAbsenceEnabled() ? indexedDocCount() : -1L;
+      long indexedDocs = framing.calibratedAbsenceEnabled() ? indexedDocCount(engineContext) : -1L;
       // Tempdoc 771 item (b): carriage settings resolved once per call, outside the governor's view
       // lambda for the same reason the framing flags are — every degradation step renders under one
       // carriage decision, so the governor's re-renders cannot disagree about delivered content.
@@ -951,7 +996,7 @@ public final class McpToolSurface {
           (keep, includeProvenance) -> {
             KnowledgeSearchResponse sub =
                 keep >= resp.results().size() ? resp : truncateResults(resp, keep);
-            McpSearchResponseContent c = buildSearchContent(sub, args, framing, indexedDocs, carriage);
+            McpSearchResponseContent c = buildSearchContent(sub, args, framing, indexedDocs, carriage, engineContext);
             String t = renderSearchText(sub, c, concise);
             Map<String, Object> structured =
                 McpEvidenceProjection.searchEvidence(sub, c, includeProvenance);
@@ -968,7 +1013,7 @@ public final class McpToolSurface {
     } catch (Exception e) {
       // The AGENT-facing message (below) keeps the query — the agent sent it. This SERVER log does
       // not: a rejected LUCENE-syntax search surfaces a Lucene ParseException whose message quotes
-      // the query verbatim, and the Head log is bundled into the diagnostics export. Full detail
+      // the query verbatim, and the Engine log is bundled into the diagnostics export. Full detail
       // stays available at TRACE, matching SearchExecutor:160-168's deliberate split.
       log.warn("MCP search failed: {}: {}", e.getClass().getSimpleName(), withoutQuotedQuery(e.getMessage()));
       log.trace("MCP search failure detail", e);
@@ -1053,7 +1098,7 @@ public final class McpToolSurface {
       Map<String, Object> args,
       McpDeliveryFraming.Settings framing,
       long indexedDocs,
-      McpEntityCarriage.Settings carriage) {
+      McpEntityCarriage.Settings carriage, EngineContext engineContext) {
     // Tempdoc 789 Phase 2 (F1): the entity vocabulary comes from the facet snapshot this response
     // already carries — no new query path, no query-time NER (charter: prefer existing fields).
     // Empty (so F1 emits nothing) when the framing is off or the response carries no entity facets.
@@ -1144,7 +1189,7 @@ public final class McpToolSurface {
           "Searched the index in one call. For conceptual or cross-document questions,"
               + " justsearch_answer returns assembled cited passages directly.");
     }
-    String enrichmentHintText = enrichmentHint(SEARCH_ENRICHMENT_MESSAGE);
+    String enrichmentHintText = enrichmentHint(SEARCH_ENRICHMENT_MESSAGE, engineContext);
     if (enrichmentHintText != null) {
       hints.add(enrichmentHintText);
     }
@@ -1191,13 +1236,13 @@ public final class McpToolSurface {
    * the coverage clause rather than guess a number. Called at most once per search, and only when
    * the F3 framing is enabled.
    */
-  private long indexedDocCount() {
+  private long indexedDocCount(EngineContext engineContext) {
     try {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) {
         return -1L;
       }
-      return ctrl.getAdapter().status().docCount();
+      return ctrl.getAdapter().status(engineContext).docCount();
     } catch (Exception e) {
       log.debug("MCP framing: index doc count unavailable", e);
       return -1L;
@@ -1412,12 +1457,12 @@ public final class McpToolSurface {
   // Status: formatted text
   // =========================================================================
 
-  private Map<String, Object> callStatus() {
+  private Map<String, Object> callStatus(EngineContext engineContext) {
     KnowledgeSearchController ctrl = knowledgeLookup.get();
     if (ctrl == null) return errorContent(KNOWLEDGE_SERVER_UNAVAILABLE_MESSAGE, ApiErrorCode.SERVICE_UNAVAILABLE);
     try {
       KnowledgeHttpApiAdapter adapter = ctrl.getAdapter();
-      var status = adapter.status();
+      var status = adapter.status(engineContext);
       var sb = new StringBuilder();
       sb.append("state: ").append(status.state()).append("\n");
       sb.append("ready: ").append(status.ready()).append("\n");
@@ -1456,16 +1501,17 @@ public final class McpToolSurface {
   // =========================================================================
 
   private Map<String, Object> callOperation(
-      String opIdValue, Map<String, Object> arguments, String sessionId) {
-    return callOperation(opIdValue, arguments, sessionId, null);
-  }
-
-  private Map<String, Object> callOperation(
-      String opIdValue, Map<String, Object> arguments, String sessionId, String requestedBy) {
+      String opIdValue, Map<String, Object> arguments, String requestedBy, EngineContext engineContext) {
     try {
       Operation op = resolveOperation(opIdValue);
       if (op == null) return errorContent("Operation not available: " + opIdValue);
-      String argsJson = MAPPER.writeValueAsString(arguments);
+      var publicArguments = new LinkedHashMap<String, Object>(arguments == null ? Map.of() : arguments);
+      Object rawKey = publicArguments.remove("operationKey");
+      if (arguments != null && arguments.containsKey("operationKey") && !(rawKey instanceof String)) {
+        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+      }
+      String operationKey = (String) rawKey;
+      String argsJson = MAPPER.writeValueAsString(publicArguments);
       // Tempdoc 655: validate against the Operation's OWN declared schema — the real enforcement
       // schema, not a second MCP-authored literal — before dispatch, so a malformed call gets a
       // clean MCP error here instead of surfacing however the executor happens to fail later.
@@ -1481,12 +1527,15 @@ public final class McpToolSurface {
         return invalid;
       }
       InvocationProvenance provenance =
-          InvocationProvenance.mcp(clock.instant(), Optional.ofNullable(sessionId));
+          io.justsearch.app.services.intent.EngineProvenance.invocation(engineContext,
+              io.justsearch.agent.api.registry.ExecutorTag.UI, clock.instant(), Optional.empty());
       OperationResult opResult;
       try {
-        opResult = dispatcher.dispatch(op, argsJson, provenance);
+        opResult = operationKey == null
+            ? dispatcher.dispatch(op, argsJson, provenance, engineContext)
+            : dispatcher.dispatch(op, argsJson, provenance, Optional.empty(), engineContext, operationKey);
       } catch (ConfirmationRequiredException e) {
-        return handleConfirmationRequired(op, argsJson, e, requestedBy);
+        return handleConfirmationRequired(op, argsJson, e, requestedBy, engineContext, provenance, operationKey);
       }
       if (opResult.success()) {
         var content = new ArrayList<Map<String, Object>>();
@@ -1501,10 +1550,24 @@ public final class McpToolSurface {
         failure.put("error", ApiErrorHandler.sanitizeMessage(opResult.message()));
         opResult.errorCode().ifPresent(code -> failure.put("errorCode", code));
         opResult.retryable().ifPresent(retryable -> failure.put("retryable", retryable));
+        if (opResult.structuredData().get("operationKey") instanceof String key) {
+          failure.put("operationKey", key);
+        }
+        if (opResult.structuredData().get("operationRecordId") instanceof Long id) {
+          failure.put("operationRecordId", id);
+        }
         // OperationResult carries no API error class. Preserve its optional facts without
         // guessing a classification for a handler-specific or absent code.
         return errorContent(failure);
       }
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      var failure = OperationInvocationResponse.fromLockedStore();
+      return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
+          "errorClass", failure.errorClass(), "retryable", failure.retryable(), "locked", true));
+    } catch (OperationStoreException e) {
+      var failure = OperationInvocationResponse.fromStoreFailure(e);
+      return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
+          "errorClass", failure.errorClass(), "retryable", failure.retryable()));
     } catch (Exception e) {
       log.warn("MCP operation dispatch error for {}", opIdValue, e);
       return toolFailureContent("Operation " + opIdValue, e);
@@ -1524,7 +1587,7 @@ public final class McpToolSurface {
    * human approval, sidestepping MCP hosts' inconsistent/short tool-call timeouts entirely.
    */
   private Map<String, Object> handleConfirmationRequired(
-      Operation op, String argsJson, ConfirmationRequiredException e, String requestedBy) {
+      Operation op, String argsJson, ConfirmationRequiredException e, String requestedBy, EngineContext engineContext, InvocationProvenance provenance, String operationKey) {
     String message;
     if (pendingAuthorizationStore == null) {
       // Legacy/test wiring with no store — fail closed, but say so plainly rather than
@@ -1541,7 +1604,8 @@ public final class McpToolSurface {
           pendingAuthorizationStore.create(
               op.id().value(), argsJson, e.sourceTier(), op.policy().risk(), e.gateBehavior(),
               e.getMessage(), requestedBy,
-              io.justsearch.agent.api.registry.TransportTag.MCP);
+              io.justsearch.agent.api.registry.TransportTag.MCP, engineContext, provenance,
+              e.operationKey() == null ? operationKey : e.operationKey(), false, e.preparationNonce(), e.approvalPreview());
       if (pendingAuthorizationChanges != null) {
         // Tempdoc 655 fix pass: routing info only — no argsSummary/rationale on the broadcast
         // (see PendingAuthorizationEvent's doc comment for why). A subscriber fetches the
@@ -1607,8 +1671,8 @@ public final class McpToolSurface {
   }
 
   @SuppressWarnings("unchecked")
-  public Map<String, Object> getPrompt(String name, Map<String, String> arguments) {
-    String statusContext = getStatusContext();
+  public Map<String, Object> getPrompt(String name, Map<String, String> arguments, EngineContext engineContext) {
+    String statusContext = getStatusContext(engineContext);
     return switch (name != null ? name : "") {
       case "search_files" ->
           promptMessages(
@@ -1639,11 +1703,11 @@ public final class McpToolSurface {
     return TOOL_SELECTION_GUIDANCE;
   }
 
-  private String getStatusContext() {
+  private String getStatusContext(EngineContext engineContext) {
     try {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) return "JustSearch index status unknown. " + TOOL_SELECTION_GUIDANCE;
-      var status = ctrl.getAdapter().status();
+      var status = ctrl.getAdapter().status(engineContext);
       var sb = new StringBuilder("JustSearch has ");
       sb.append(status.docCount()).append(" documents indexed.");
       Map<String, Object> extras = status.extras();
@@ -1718,28 +1782,28 @@ public final class McpToolSurface {
   }
 
   @SuppressWarnings("unchecked")
-  public Map<String, Object> readResource(String uri) {
+  public Map<String, Object> readResource(String uri, EngineContext engineContext) {
     if (uri == null) return Map.of("contents", List.of());
     return switch (uri) {
-      case "justsearch://index/summary" -> readIndexSummary(uri);
-      case "justsearch://index/roots" -> readIndexRoots(uri);
-      case "justsearch://index/top-sources" -> readTopFacet(uri, "meta_source", 10);
+      case "justsearch://index/summary" -> readIndexSummary(uri, engineContext);
+      case "justsearch://index/roots" -> readIndexRoots(uri, engineContext);
+      case "justsearch://index/top-sources" -> readTopFacet(uri, "meta_source", 10, engineContext);
       case "justsearch://index/top-entities" ->
-          readTopEntities(uri);
+          readTopEntities(uri, engineContext);
       default -> {
         if (uri.startsWith("justsearch://resource/")) {
-          yield readIndexSummary(uri);
+          yield readIndexSummary(uri, engineContext);
         }
         yield Map.of("contents", List.of());
       }
     };
   }
 
-  private Map<String, Object> readIndexSummary(String uri) {
+  private Map<String, Object> readIndexSummary(String uri, EngineContext engineContext) {
     try {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) return resourceError(uri, "Knowledge server not available");
-      var status = ctrl.getAdapter().status();
+      var status = ctrl.getAdapter().status(engineContext);
       var sb = new StringBuilder();
       sb.append("documents: ").append(status.docCount()).append("\n");
       sb.append("ready: ").append(status.ready()).append("\n");
@@ -1757,10 +1821,10 @@ public final class McpToolSurface {
     }
   }
 
-  private Map<String, Object> readIndexRoots(String uri) {
+  private Map<String, Object> readIndexRoots(String uri, EngineContext engineContext) {
     try {
       // Use the browse tool to list roots
-      var result = callOperation("core.browse-folders", Map.of(), null);
+      var result = callOperation("core.browse-folders", Map.of(), null, engineContext);
       @SuppressWarnings("unchecked")
       var content = (List<Map<String, Object>>) result.get("content");
       String text = content != null && !content.isEmpty() ? (String) content.get(0).get("text") : "No roots";
@@ -1771,7 +1835,7 @@ public final class McpToolSurface {
     }
   }
 
-  private Map<String, Object> readTopFacet(String uri, String field, int size) {
+  private Map<String, Object> readTopFacet(String uri, String field, int size, EngineContext engineContext) {
     try {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) return resourceError(uri, "Knowledge server not available");
@@ -1780,7 +1844,7 @@ public final class McpToolSurface {
           new KnowledgeSearchRequest.Facets(true, null,
               List.of(new KnowledgeSearchRequest.FieldSpec(field, size))),
           null, null, null, null);
-      var resp = ctrl.getAdapter().search(req);
+      var resp = ctrl.getAdapter().search(req, engineContext);
       String text = resp.facets() != null ? MAPPER.writeValueAsString(resp.facets()) : "{}";
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "application/json", "text", text)));
@@ -1789,7 +1853,7 @@ public final class McpToolSurface {
     }
   }
 
-  private Map<String, Object> readTopEntities(String uri) {
+  private Map<String, Object> readTopEntities(String uri, EngineContext engineContext) {
     try {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) return resourceError(uri, "Knowledge server not available");
@@ -1800,7 +1864,7 @@ public final class McpToolSurface {
               new KnowledgeSearchRequest.FieldSpec("entity_organizations_raw", 10),
               new KnowledgeSearchRequest.FieldSpec("entity_locations_raw", 10))),
           null, null, null, null);
-      var resp = ctrl.getAdapter().search(req);
+      var resp = ctrl.getAdapter().search(req, engineContext);
       String text = resp.facets() != null ? MAPPER.writeValueAsString(resp.facets()) : "{}";
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "application/json", "text", text)));
@@ -1820,11 +1884,11 @@ public final class McpToolSurface {
    * low, {@code null} otherwise) so each caller can both render its own pre-existing text
    * formatting AND surface the same fact on structuredContent's {@code hints}.
    */
-  private String enrichmentHint(String message) {
+  private String enrichmentHint(String message, EngineContext engineContext) {
     try {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) return null;
-      var status = ctrl.getAdapter().status();
+      var status = ctrl.getAdapter().status(engineContext);
       Map<String, Object> extras = status.extras();
       boolean lowEmbedding = extras.get("embeddingCoveragePercent") instanceof Number n && n.doubleValue() < 100;
       boolean lowSplade = extras.get("spladeCoveragePercent") instanceof Number n && n.doubleValue() < 100;
@@ -2064,6 +2128,9 @@ public final class McpToolSurface {
         text.append(" Automatic retry is not recommended.");
       }
     }
+    for (String field : List.of("operationKey", "operationRecordId")) {
+      if (failure.containsKey(field)) text.append("\n").append(field).append(": ").append(failure.get(field));
+    }
     return Map.of(
         "content", List.of(Map.of("type", "text", "text", text.toString())),
         "structuredContent", failure,
@@ -2077,6 +2144,8 @@ public final class McpToolSurface {
 
   /** Project the existing API classification and sanitizer, without a parallel retry policy. */
   private static Map<String, Object> toolFailureContent(String tool, Exception e) {
+    var executorRefusal = ApiErrorHandler.executorRefusal(e);
+    if (executorRefusal != null) throw executorRefusal;
     // Future.get/join transport the cause in wrappers with no failure policy of their own.
     // Use the same cause for wording and classification, retaining the fallback for absent
     // or non-Exception causes. Identity tracking also bounds malformed cyclic cause chains.

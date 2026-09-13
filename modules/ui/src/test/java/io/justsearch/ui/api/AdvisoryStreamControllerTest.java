@@ -16,6 +16,8 @@ import io.justsearch.app.observability.advisory.AdvisoryRecord;
 import io.justsearch.app.observability.advisory.PendingAuthorizationAdvisoryProjector;
 import io.justsearch.app.services.intent.PendingAuthorizationStore;
 import io.justsearch.telemetry.Telemetry;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,6 +25,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +39,13 @@ import org.junit.jupiter.api.Test;
  */
 @DisplayName("AdvisoryStreamController — snapshot liveness")
 final class AdvisoryStreamControllerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static final Instant T0 = Instant.parse("2026-07-15T10:00:00Z");
 
@@ -91,7 +101,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     log.append(advisoryFor(consumedId));
     assertTrue(store.consume(consumedId).isPresent(), "precondition: pending was consumed");
 
@@ -99,7 +111,8 @@ final class AdvisoryStreamControllerTest {
     // operation.completed / health.recoverable controllers, which have no live-store notion).
     AdvisoryStreamController controller =
         new AdvisoryStreamController(
-            PendingAuthorizationAdvisoryProjector.CLASS_ID, log, changeRegistry(), mock(Telemetry.class));
+            processExecutors,
+              PendingAuthorizationAdvisoryProjector.CLASS_ID, log, changeRegistry(), mock(Telemetry.class));
     try {
       List<AdvisoryRecord> advisories = advisoriesFrom(controller.snapshotExtras());
       // Confirms the failure mode this whole test class exists to fix: the accept-all default
@@ -134,7 +147,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     String liveId =
         store.create(
             "core.reindex-library",
@@ -144,7 +159,9 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     log.append(advisoryFor(consumedId));
     log.append(advisoryFor(liveId));
     assertTrue(store.consume(consumedId).isPresent(), "precondition: pending was consumed");
@@ -153,7 +170,8 @@ final class AdvisoryStreamControllerTest {
     // against the live store.
     AdvisoryStreamController controller =
         new AdvisoryStreamController(
-            PendingAuthorizationAdvisoryProjector.CLASS_ID,
+            processExecutors,
+              PendingAuthorizationAdvisoryProjector.CLASS_ID,
             log,
             changeRegistry(),
             mock(Telemetry.class),
@@ -207,13 +225,16 @@ final class AdvisoryStreamControllerTest {
             GateBehavior.TYPED_CONFIRM,
             "test",
             null,
-            TransportTag.MCP);
+            TransportTag.MCP,
+            TestRequestContexts.mcp("advisory"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("advisory"), io.justsearch.agent.api.registry.ExecutorTag.AGENT));
     log.append(advisoryFor(expiredId));
     now.set(createdAt.plus(ttl).plusSeconds(1));
 
     AdvisoryStreamController controller =
         new AdvisoryStreamController(
-            PendingAuthorizationAdvisoryProjector.CLASS_ID,
+            processExecutors,
+              PendingAuthorizationAdvisoryProjector.CLASS_ID,
             log,
             changeRegistry(),
             mock(Telemetry.class),

@@ -11,6 +11,7 @@ import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.runtime.CommitMetadataSource;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -31,7 +32,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>Reading the answer and invalidating it are now separate acts, and only the writer does the
  * second.
  */
-final class CleanShutdownMarkerLifecycleTest {
+final class CleanShutdownMarkerLifecycleTest extends LuceneExecutorTestBase {
 
   private static final CommitMetadataSource META = () -> new SsotCommitMetadataSource().build();
 
@@ -90,13 +91,31 @@ final class CleanShutdownMarkerLifecycleTest {
     writable.close();
   }
 
-  private static LuceneRuntimeBuilder builder(Path index) {
-    return IndexSchema.fromCatalog(
-            FieldCatalogDef.forTesting(768), () -> META, new JsonSchemaCommitMetadataValidator())
-        .atPath(index);
+  @Test
+  void terminalWriterCannotEarnACleanShutdownMarker(@TempDir Path tempDir) throws Exception {
+    Path index = tempDir.resolve("terminal");
+    seedAndCloseCleanly(index);
+
+    RunningRuntime writable = builder(index).open();
+    var writer = writable.session().snapshot.writer();
+    writer.onTragicEvent(new IOException("forced terminal writer"), "test");
+    writer.rollback();
+    assertFalse(writer.isOpen(), "precondition: Lucene permanently closed the writer");
+
+    writable.close();
+
+    assertFalse(
+        CleanShutdownMarker.wasClean(index),
+        "a normally-returning close cannot relabel an already-terminal writer as clean");
   }
 
-  private static void seedAndCloseCleanly(Path index) throws Exception {
+  private LuceneRuntimeBuilder builder(Path index) {
+    return IndexSchema.fromCatalog(
+            FieldCatalogDef.forTesting(768), () -> META, new JsonSchemaCommitMetadataValidator())
+        .atPath(index).withExecutorRegistrations(testLuceneExecutors());
+  }
+
+  private void seedAndCloseCleanly(Path index) throws Exception {
     Files.createDirectories(index);
     try (RunningRuntime r = builder(index).open()) {
       r.indexingCoordinator()

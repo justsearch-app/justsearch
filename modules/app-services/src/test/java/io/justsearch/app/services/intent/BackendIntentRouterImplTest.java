@@ -43,6 +43,7 @@ import io.justsearch.agent.api.registry.SurfaceRef;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.stream.SseEnvelope;
 import io.justsearch.app.api.stream.SseFrameKind;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.observability.intent.IntentEnvelopeChangeRegistry;
 import io.justsearch.app.observability.intent.IntentEnvelopeEvent;
 import io.justsearch.app.observability.navigation.NavigationHistoryEntry;
@@ -66,8 +67,14 @@ import org.junit.jupiter.api.Test;
  */
 final class BackendIntentRouterImplTest {
 
+  private static final EngineContext UI_CONTEXT =
+      io.justsearch.app.services.TestEngineContexts.ui();
   private static final InvocationProvenance UI_PROV =
-      InvocationProvenance.uiButton(Instant.parse("2026-05-13T10:00:00.000Z"));
+      InvocationProvenance.fromEngineContext(
+          UI_CONTEXT,
+          ExecutorTag.UI,
+          Instant.parse("2026-05-13T10:00:00.000Z"),
+          Optional.empty());
 
   private static Operation makeOp(String id) {
     return new Operation(
@@ -117,13 +124,18 @@ final class BackendIntentRouterImplTest {
             Optional.empty());
 
     @Override
-    public OperationResult dispatch(Operation op, String argumentsJson) {
+    public OperationResult dispatch(
+        Operation op, String argumentsJson, EngineContext engineContext) {
       throw new UnsupportedOperationException("Use provenance overload");
     }
 
     @Override
     public OperationResult dispatch(
-        Operation op, String argumentsJson, InvocationProvenance provenance) {
+        Operation op,
+        String argumentsJson,
+        InvocationProvenance provenance,
+        Optional<String> confirmationToken,
+        EngineContext engineContext) {
       this.lastOp = op;
       this.lastArgs = argumentsJson;
       this.lastProvenance = provenance;
@@ -131,7 +143,18 @@ final class BackendIntentRouterImplTest {
     }
 
     @Override
-    public OperationResult undo(Operation op, String executionId) {
+    public OperationResult undo(
+        Operation op, String executionId, EngineContext engineContext) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public OperationResult undo(
+        Operation op,
+        String executionId,
+        InvocationProvenance provenance,
+        Optional<String> confirmationToken,
+        EngineContext engineContext) {
       throw new UnsupportedOperationException();
     }
   }
@@ -150,13 +173,64 @@ final class BackendIntentRouterImplTest {
             ShellAddress.Invocation.of(new OperationRef("core.ping-backend"), "{}"),
             TransportTag.AGENT_LOOP);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     var dispatched = assertInstanceOf(IntentDispatchResult.Dispatched.class, result);
     assertTrue(dispatched.result().success(), "underlying dispatcher result is propagated");
     assertSame(UI_PROV, dispatcher.lastProvenance, "provenance is threaded through");
     assertEquals("core.ping-backend", dispatcher.lastOp.id().value());
     assertEquals("{}", dispatcher.lastArgs);
+  }
+
+  @Test
+  void preparedInvocationPlansWithoutDispatchAndCarriesThePrivateReference() {
+    var op = makeOp("core.prepared-router");
+    var dispatcher = org.mockito.Mockito.mock(OperationDispatcher.class);
+    var registry = new IntentEnvelopeChangeRegistry();
+    var forwarded = new AtomicReference<SseEnvelope>(); registry.subscribe(forwarded::set);
+    var router = new BackendIntentRouterImpl(OperationCatalog.of("core", List.of(op)), dispatcher,
+        IntentSourceCatalog.of("core", List.of()), registry);
+    var intent = new Intent(ShellAddress.Invocation.of(op.id(), "{\"public\":true}"),
+        TransportTag.valueOf(UI_CONTEXT.transport()));
+    var nonce = java.util.UUID.randomUUID();
+    var plan = new io.justsearch.agent.api.registry.OperationDispatchPlan.Ready("stable-key", nonce,
+        Optional.of(new io.justsearch.agent.api.registry.OperationApprovalPreview("Selected target")));
+    org.mockito.Mockito.when(dispatcher.prepare(op, "{\"public\":true}", UI_PROV, UI_CONTEXT, null, true)).thenReturn(plan);
+    assertSame(plan, router.prepare(intent, UI_PROV, UI_CONTEXT, null, true));
+    org.mockito.Mockito.verify(dispatcher).prepare(op, "{\"public\":true}", UI_PROV, UI_CONTEXT, null, true);
+    org.mockito.Mockito.verifyNoMoreInteractions(dispatcher);
+    var approved = new Intent(new ShellAddress.Invocation(op.id(), "{\"public\":true}", Optional.of("capsule")),
+        intent.transport());
+    var receipt = OperationResult.success("recorded");
+    org.mockito.Mockito.when(dispatcher.dispatch(op, "{\"public\":true}", UI_PROV, Optional.of("capsule"),
+        UI_CONTEXT, plan.operationKey(), nonce)).thenReturn(receipt);
+    assertSame(receipt, assertInstanceOf(IntentDispatchResult.Dispatched.class,
+        router.dispatch(approved, UI_PROV, UI_CONTEXT, plan.operationKey(), nonce)).result());
+    org.mockito.Mockito.verify(dispatcher).dispatch(op, "{\"public\":true}", UI_PROV, Optional.of("capsule"),
+        UI_CONTEXT, plan.operationKey(), nonce);
+    org.mockito.Mockito.verifyNoMoreInteractions(dispatcher);
+    org.junit.jupiter.api.Assertions.assertNull(forwarded.get(), "Planning and continuation never broadcast display or intent");
+  }
+
+  @Test
+  void preparationRejectsNavigationAndInconsistentTransportWithoutForwarding() {
+    var op = makeOp("core.prepared-router");
+    var dispatcher = org.mockito.Mockito.mock(OperationDispatcher.class);
+    var registry = new IntentEnvelopeChangeRegistry();
+    var forwarded = new AtomicReference<SseEnvelope>(); registry.subscribe(forwarded::set);
+    var router = new BackendIntentRouterImpl(OperationCatalog.of("core", List.of(op)), dispatcher,
+        IntentSourceCatalog.of("core", List.of()), registry);
+    var navigation = new Intent(new ShellAddress.Navigation(new SurfaceRef("core.library"), new StateSnapshot(Map.of())),
+        TransportTag.valueOf(UI_CONTEXT.transport()));
+    assertThrows(IllegalArgumentException.class, () -> router.prepare(navigation, UI_PROV, UI_CONTEXT, null, true));
+    assertThrows(IllegalArgumentException.class, () -> router.dispatch(navigation, UI_PROV, UI_CONTEXT, "key", null));
+    var wrongTransport = new Intent(ShellAddress.Invocation.of(op.id(), "{}"), TransportTag.MCP);
+    assertThrows(IllegalArgumentException.class, () -> router.prepare(wrongTransport, UI_PROV, UI_CONTEXT, null, true));
+    var invocation = new Intent(ShellAddress.Invocation.of(op.id(), "{}"), TransportTag.valueOf(UI_CONTEXT.transport()));
+    assertThrows(IllegalArgumentException.class,
+        () -> router.dispatch(invocation, UI_PROV, UI_CONTEXT, null, java.util.UUID.randomUUID()));
+    org.mockito.Mockito.verifyNoInteractions(dispatcher);
+    org.junit.jupiter.api.Assertions.assertNull(forwarded.get());
   }
 
   @Test
@@ -173,7 +247,7 @@ final class BackendIntentRouterImplTest {
             ShellAddress.Invocation.of(new OperationRef("core.does-not-exist"), "{}"),
             TransportTag.AGENT_LOOP);
 
-    assertThrows(IllegalArgumentException.class, () -> router.dispatch(intent, UI_PROV));
+    assertThrows(IllegalArgumentException.class, () -> router.dispatch(intent, UI_PROV, UI_CONTEXT));
   }
 
   @Test
@@ -199,7 +273,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), new StateSnapshot(state)),
             TransportTag.LLM_EMISSION);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     var forwarded = assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     assertEquals("ie-test-nav-001", forwarded.envelopeId());
@@ -245,7 +319,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.LLM_EMISSION);
 
-    router.dispatch(intent, UI_PROV);
+    router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     List<NavigationHistoryEntry> recorded = navHistory.recent();
     assertEquals(1, recorded.size(), "one navigation entry recorded");
@@ -283,7 +357,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.LLM_EMISSION);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
   }
 
@@ -305,7 +379,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.LLM_EMISSION);
 
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     var payload = assertInstanceOf(IntentEnvelopeEvent.class, captured.get().payload());
@@ -370,7 +444,7 @@ final class BackendIntentRouterImplTest {
             new ShellAddress.Navigation(
                 new SurfaceRef("core.danger-surface"), StateSnapshot.empty()),
             TransportTag.URL_BAR);
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     assertNotNull(
@@ -391,7 +465,7 @@ final class BackendIntentRouterImplTest {
         new Intent(
             new ShellAddress.Navigation(new SurfaceRef("core.library"), StateSnapshot.empty()),
             TransportTag.URL_BAR);
-    IntentDispatchResult result = router.dispatch(intent, UI_PROV);
+    IntentDispatchResult result = router.dispatch(intent, UI_PROV, UI_CONTEXT);
 
     assertInstanceOf(IntentDispatchResult.Forwarded.class, result);
     assertNotNull(

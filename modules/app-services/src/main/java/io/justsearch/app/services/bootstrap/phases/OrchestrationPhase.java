@@ -15,7 +15,7 @@ import io.justsearch.app.services.gpl.GplJobCoordinator;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
 import io.justsearch.app.services.search.SearchServiceImpl;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.core.search.SearchPort;
 import io.justsearch.telemetry.Telemetry;
@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import io.grpc.Server;
 
 /**
  * Tempdoc 519 §4 Phase 5 — orchestration. Composes AgentLoopWiring + GplOrchestration +
@@ -44,12 +43,13 @@ public final class OrchestrationPhase {
 
   /** Bundled inputs. */
   public record Input(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Path dataDir,
       Telemetry telemetry,
       Supplier<SearchPort> searchPortSupplier,
       InferenceLifecycleManager inferenceManager,
       OnlineAiService onlineAiService,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       KnowledgeHttpApiAdapter agentSearchAdapter,
       LambdaMartReranker lambdaMartReranker,
       IndexingService indexingService,
@@ -57,11 +57,12 @@ public final class OrchestrationPhase {
       io.justsearch.app.api.ModeChangeListener gpuBroadcastListener,
       SubstratePhase.Output substrateOut,
       CapabilityGraph capabilities,
-      Server infraHealthGrpcServer,
       Function<String, String> operationMessageResolver,
+      // The one Engine admission owner shared with LocalApiServer and the agent loop.
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
       FileOperationLog fileOperationLog,
       AgentRunStore agentRunStore,
-      Supplier<List<String>> agentRootPaths,
+      Function<io.justsearch.core.context.EngineContext, List<String>> agentRootPaths,
       Runnable startLambdaMartTrainingAsync,
       io.justsearch.app.api.ExcludesService excludes,
       io.justsearch.app.api.SettingsService settings,
@@ -83,7 +84,7 @@ public final class OrchestrationPhase {
       ServiceGraph initialServices,
       OrchestrationHandles orchestrationHandles,
       GplJobCoordinator gplJobCoordinator,
-      Thread gplAutoTriggerThread,
+      AutoCloseable gplAutoTrigger,
       Path gplSnapshotFile,
       Path lambdaMartModelFile) {}
 
@@ -164,7 +165,8 @@ public final class OrchestrationPhase {
                     in.substrateOut().healthOut().conditionStore())
                 .asPredicate(),
             // Tempdoc 565 §3.A: back the answer↔source citation matcher with the document service.
-            in.documentService());
+            in.documentService(),
+            in.engineAdmission());
 
     // Initial ServiceGraph (LateBoundServices = null at this point).
     io.justsearch.app.api.SearchService initialSearch =
@@ -188,6 +190,7 @@ public final class OrchestrationPhase {
     // GPL training + auto-trigger.
     var gplWired =
         GplOrchestration.wire(
+            in.executors(),
             in.dataDir(),
             in.knowledgeClientSupplier(),
             in.onlineAiService(),
@@ -209,7 +212,7 @@ public final class OrchestrationPhase {
     // OrchestrationHandles — LIFO teardown bundle.
     OrchestrationHandles orchestrationHandles =
         OrchestrationAssembly.build(
-            gplWired.autoTriggerThread(),
+            gplWired.autoTrigger(),
             in.lambdaMartReranker(),
             in.substrateOut().metricsOut() == null
                 ? null
@@ -223,7 +226,6 @@ public final class OrchestrationPhase {
             in.substrateOut().metricsOut() == null
                 ? null
                 : in.substrateOut().metricsOut().gpuMemoryUtilizationMetricProducer(),
-            in.infraHealthGrpcServer(),
             in.inferenceManager(),
             in.gpuBroadcastListener(),
             in.runtimeReconciler(),
@@ -242,7 +244,7 @@ public final class OrchestrationPhase {
         initialServices,
         orchestrationHandles,
         gplWired.coordinator(),
-        gplWired.autoTriggerThread(),
+        gplWired.autoTrigger(),
         gplWired.snapshotFile(),
         lambdaMartModelFile);
   }

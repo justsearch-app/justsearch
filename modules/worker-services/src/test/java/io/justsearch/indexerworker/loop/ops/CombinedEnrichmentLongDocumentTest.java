@@ -607,7 +607,10 @@ class CombinedEnrichmentLongDocumentTest {
     double norm = Math.sqrt(13.0);
     assertEquals(2.0 / norm, pooled[0], 1e-5);
     assertEquals(3.0 / norm, pooled[1], 1e-5);
-    assertEquals(0, progress.trackedDocuments(), "completing must release the entry");
+    assertEquals(1, progress.trackedDocuments(), "pooling alone must retain the entry until RMW");
+    assertEquals(3, progress.nextWindow("doc", content));
+    progress.forget("doc");
+    assertEquals(0, progress.trackedDocuments(), "successful RMW owns accumulator release");
   }
 
   /** PINS: a partial belonging to different content is discarded, never blended. */

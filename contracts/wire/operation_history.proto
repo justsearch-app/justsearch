@@ -39,7 +39,7 @@ message OperationHistoryEntry {
   string start_time = 4 [json_name = "startTime", (buf.validate.field).string.min_len = 1];
   string end_time = 5 [json_name = "endTime", (buf.validate.field).string.min_len = 1];
 
-  // Outcome discriminator. Per Java OperationOutcome: SUCCESS / FAILURE.
+  // Outcome discriminator. Per Java OperationOutcome: SUCCESS / FAILURE / UNDONE.
   // Future variants (CANCELLED, PARTIAL) admitted via forward-compat:
   // no `enum.defined_only` constraint per ADR-09a's "Future Agents Must Not".
   OperationOutcome outcome = 6 [json_name = "outcome"];
@@ -86,4 +86,5 @@ enum OperationOutcome {
   OPERATION_OUTCOME_UNSPECIFIED = 0;
   OPERATION_OUTCOME_SUCCESS = 1;
   OPERATION_OUTCOME_FAILURE = 2;
+  OPERATION_OUTCOME_UNDONE = 3;
 }

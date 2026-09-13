@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.adapters.lucene.runtime;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
@@ -27,6 +32,62 @@ final class NrtReopenThreads {
   private static final Logger log = LoggerFactory.getLogger(NrtReopenThreads.class);
 
   private NrtReopenThreads() {}
+
+  /** One retained close attempt: retries wait on the same owner instead of spawning more tasks. */
+  static final class CloseAttempt {
+    private final ControlledRealTimeReopenThread<IndexSearcher> thread;
+    private final ExecutorService executor;
+    private final Future<?> completion;
+
+    CloseAttempt(ControlledRealTimeReopenThread<IndexSearcher> thread,
+        LuceneExecutorRegistrations registrations) {
+      this.thread = thread;
+      executor = registrations.openNrtClose();
+      try {
+        // Lucene exposes only close(), which signals finish and then joins without a timeout.
+        // Interrupt alone does not stop its zero-delay loop. Keep this registered task owned
+        // until public close has also finalized the generation waiters after actual NRT exit.
+        completion = executor.submit(thread::close);
+      } finally {
+        executor.shutdown();
+      }
+    }
+
+    void awaitUntil(long deadlineNanos) {
+      boolean interrupted = Thread.interrupted();
+      try {
+        while (!executor.isTerminated()) {
+          long remaining = deadlineNanos - System.nanoTime();
+          if (remaining <= 0) {
+            log.warn("NRT close deadline exceeded; head.lucene.nrt-close owns thread {} state={}",
+                thread.getName(), thread.getState());
+            throw new IllegalStateException("NRT reopen close still pending after deadline");
+          }
+          try { executor.awaitTermination(remaining, TimeUnit.NANOSECONDS); }
+          catch (InterruptedException expected) { interrupted = true; }
+        }
+        try { completion.get(0, TimeUnit.NANOSECONDS); }
+        catch (InterruptedException expected) {
+          interrupted = true;
+          throw new IllegalStateException("Interrupted reading completed NRT close", expected);
+        } catch (ExecutionException failure) {
+          if (failure.getCause() instanceof Error error) throw error;
+          throw new IllegalStateException("NRT reopen close failed", failure.getCause());
+        } catch (TimeoutException failure) {
+          throw new IllegalStateException("NRT executor terminated before close completed", failure);
+        }
+        if (thread.isAlive()) throw new IllegalStateException("NRT close returned with a live thread");
+      } finally {
+        if (interrupted) Thread.currentThread().interrupt();
+      }
+    }
+
+    boolean isTerminated() { return executor.isTerminated(); }
+
+    boolean owns(ControlledRealTimeReopenThread<IndexSearcher> candidate) {
+      return thread == candidate;
+    }
+  }
 
   /**
    * Builds a named daemon reopen thread from the configured staleness bounds. The caller starts it.

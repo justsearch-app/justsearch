@@ -1,0 +1,63 @@
+{
+  "revision": "a97a03510 + final runner scope",
+  "command": "gradlew.bat :modules:app-api:test :modules:app-observability:test --tests '*OperationPreparationRunnerTest' --tests '*OperationPreparationStoreTest' --tests '*OperationAttemptRunnerTest' --tests '*OperationKeyLookupTest' :modules:app-services:test --tests '*OperationExecutorImplTest' :modules:app-api:pmdMain :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 336,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 52
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 94,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "reuseOrigins": {
+    "app-api:test": "963 executed204; overall run failed test compilation elsewhere",
+    "app-services:test": "963 executed94; overall run failed test compilation elsewhere",
+    "app-observability:test": "964 executed38; successful run, identical restored source inputs"
+  },
+  "sourceHashes": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "sha256": "93149e6502da4ff2cf645686339f9a69db55497057b132443f1a8989d94cb4e1"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "sha256": "d5a2b8368f53d4573d57d39ca0b79f31283a78ed1fb5634be2fd4db1a5b0f494"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationPreparationRunnerTest.java",
+      "sha256": "68109595eeb26f8835d133989fcc1b589761084fc4df51fd72451291b6fcc815"
+    }
+  ]
+}

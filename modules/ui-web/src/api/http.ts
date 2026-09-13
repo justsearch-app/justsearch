@@ -9,6 +9,7 @@
  */
 
 import { isTauriRuntime as isProbablyTauriRuntime } from '../utils/tauriRuntime';
+import { fetchWithAdmissionWait } from './admissionFetch.js';
 
 // ==================== Constants ====================
 
@@ -24,6 +25,8 @@ interface ApiError extends Error {
   requestId?: string;
   errorClass?: string;
   retryable?: boolean;
+  /** Backend admission contract: true only when replaying the request is safe. */
+  retrySafe?: boolean;
 }
 
 export interface ApiEndpoint {
@@ -163,7 +166,8 @@ export function createApiError(
   status?: number,
   requestId?: string,
   errorClass?: string,
-  retryable?: boolean
+  retryable?: boolean,
+  retrySafe?: boolean,
 ): ApiError {
   const error = new Error(message) as ApiError;
   if (code !== undefined) error.code = code;
@@ -171,6 +175,7 @@ export function createApiError(
   if (requestId !== undefined) error.requestId = requestId;
   if (errorClass !== undefined) error.errorClass = errorClass;
   if (retryable !== undefined) error.retryable = retryable;
+  if (retrySafe !== undefined) error.retrySafe = retrySafe;
   return error;
 }
 
@@ -385,7 +390,7 @@ export async function request<T>(
       if (signal) {
         fetchInit.signal = signal;
       }
-      const response = await fetch(url, fetchInit);
+      const response = await fetchWithAdmissionWait(fetch, url, fetchInit);
 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -395,6 +400,7 @@ export async function request<T>(
           requestId?: string;
           errorClass?: string;
           retryable?: boolean;
+          retrySafe?: boolean;
         } | null = null;
 
         try {
@@ -409,18 +415,26 @@ export async function request<T>(
           response.status,
           errorData?.requestId,
           errorData?.errorClass,
-          errorData?.retryable
+          errorData?.retryable,
+          errorData?.retrySafe,
         );
       }
 
       return (await response.json()) as T;
     } catch (err: unknown) {
       // Don't retry if aborted
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
         throw err;
       }
 
       lastError = err as ApiError;
+
+      // The admission helper already handled every explicitly safe replay. A refusal returned
+      // from it must never fall through to the generic server-error retry loop.
+      if (['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'UPGRADE_PREPARING']
+        .includes((err as ApiError).code ?? '') || (err as ApiError).retrySafe === false) {
+        throw err;
+      }
 
       // Don't retry 4xx errors
       const status = (err as ApiError).status;
@@ -521,8 +535,10 @@ export async function resolveApiEndpoint(): Promise<ApiEndpoint> {
         } else if (
           (import.meta as unknown as Record<string, unknown>).env &&
           ((import.meta as unknown as Record<string, unknown>).env as Record<string, unknown>)?.DEV
+          && !isProbablyTauriRuntime()
         ) {
-          // In Vite dev mode, the dev server proxies /api/* to the backend.
+          // In browser Vite dev mode, the dev server proxies /api/* to the backend.
+          // A desktop host with no bound Engine must remain unresolved, including Tauri dev.
           // Use window.location.origin so relative API paths route through the proxy.
           resolved = { port: null, baseUrl: window.location.origin, source: 'proxy' };
         } else {
@@ -542,4 +558,3 @@ export async function resolveApiEndpoint(): Promise<ApiEndpoint> {
   }
   return resolved;
 }
-

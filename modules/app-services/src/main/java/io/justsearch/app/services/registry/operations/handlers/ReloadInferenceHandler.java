@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.BrainRuntimeService;
@@ -38,7 +40,7 @@ public final class ReloadInferenceHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     BrainRuntimeService brainRuntime;
     try {
       brainRuntime = brainRuntimeSupplier.get();

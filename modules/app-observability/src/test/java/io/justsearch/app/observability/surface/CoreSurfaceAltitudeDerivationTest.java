@@ -63,7 +63,7 @@ final class CoreSurfaceAltitudeDerivationTest {
     final Map<ResourceRef, Role> roles = roleIndex();
     // The only non-PRODUCT surfaces; everything else derives PRODUCT (the benign default).
     // Tempdoc 571 §11 / 578 — core.system-surface (the hub) has EMPTY consumes ⟹ PRODUCT (composes, does
-    // not fuse; post-review honesty fix — it no longer fake-consumes the head-log channel). Its members
+    // not fuse; post-review honesty fix — it no longer fake-consumes the engine-log channel). Its members
     // (Health/Logs DIAGNOSTIC, Activity TRUST) are separate surfaces that derive their own altitude.
     final Map<String, Altitude> expected =
         Map.of(
@@ -126,7 +126,7 @@ final class CoreSurfaceAltitudeDerivationTest {
           + " PRODUCT, and members never change a surface's derived altitude")
   void membersDoNotAffectAltitudeDerivation() {
     final Map<ResourceRef, Role> roles =
-        Map.of(new ResourceRef("core.head-log-events"), Role.DIAGNOSTIC);
+        Map.of(new ResourceRef("core.engine-log-events"), Role.DIAGNOSTIC);
 
     // A host that declares members but consumes NOTHING derives PRODUCT — it does not inherit or
     // aggregate its members' altitudes (the load-bearing cross-altitude-composition invariant: a
@@ -159,7 +159,7 @@ final class CoreSurfaceAltitudeDerivationTest {
             Set.of(),
             Set.of(),
             Set.of(),
-            Set.of(new io.justsearch.agent.api.registry.DiagnosticChannelRef("core.head-log")));
+            Set.of(new io.justsearch.agent.api.registry.DiagnosticChannelRef("core.engine-log")));
     final Surface withoutMembers =
         new Surface(
             new SurfaceRef("core.diag-host"),

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * dropped, the document is written and stays lexically searchable, its embedding status is
  * corrected to FAILED, and the drop is counted.
  */
-class NonFiniteVectorDropTest {
+class NonFiniteVectorDropTest extends LuceneExecutorTestBase {
 
   private static final float[] GOOD_A = {1.0f, 0.0f, 0.0f, 0.0f};
   private static final float[] GOOD_C = {0.0f, 1.0f, 0.0f, 0.0f};
@@ -59,7 +59,7 @@ class NonFiniteVectorDropTest {
 
     RunningRuntime runtime =
         IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4))
-            .ephemeral()
+            .ephemeral().withExecutorRegistrations(testLuceneExecutors())
             .withTelemetry(spy)
             .open();
     try {

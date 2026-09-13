@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
@@ -30,15 +32,17 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
   /** The single behavior this bridge needs from {@code WorkflowShapeRunner} — its {@code run}. */
   @FunctionalInterface
   public interface WorkflowExecutor {
-    void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink);
+    void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext, boolean background);
   }
 
   private final WorkflowCatalog workflowCatalog;
   private final WorkflowExecutor executor;
+  private final WorkflowGateRegistry gateRegistry;
 
-  public WorkflowToolRunnerImpl(WorkflowCatalog workflowCatalog, WorkflowExecutor executor) {
+  public WorkflowToolRunnerImpl(WorkflowCatalog workflowCatalog, WorkflowExecutor executor, WorkflowGateRegistry gateRegistry) {
     this.workflowCatalog = Objects.requireNonNull(workflowCatalog, "workflowCatalog");
     this.executor = Objects.requireNonNull(executor, "executor");
+    this.gateRegistry = Objects.requireNonNull(gateRegistry, "gateRegistry");
   }
 
   @Override
@@ -50,9 +54,21 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
   }
 
   @Override
-  public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink) {
+  public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink, EngineContext engineContext) {
+    return run(ref, argumentsJson, sink, engineContext, false);
+  }
+
+  @Override
+  public java.util.List<AgentEvent.PendingApproval> pendingApprovals(String sessionId) {
+    return gateRegistry.pendingApprovals(sessionId);
+  }
+
+  @Override
+  public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink,
+      EngineContext engineContext, boolean background) {
     WorkflowRef workflowRef = WorkflowOperationProjection.workflowRefFor(ref).orElse(null);
-    if (workflowRef == null || workflowCatalog.findById(workflowRef).isEmpty()) {
+    var workflow = workflowRef == null ? null : workflowCatalog.findById(workflowRef).orElse(null);
+    if (workflow == null) {
       return OperationResult.failure("Not a projected workflow tool: " + ref.value());
     }
     // Mutable capture cells for the terminal outcome the workflow streams.
@@ -74,6 +90,9 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
               if (fr != null) {
                 finalResponse[0] = fr.toString();
               }
+              if (Boolean.TRUE.equals(ev.payload().get("cancelled"))) {
+                errorMessage[0] = finalResponse[0].isBlank() ? "Workflow cancelled" : finalResponse[0];
+              }
             }
             case "error" -> {
               Object err = ev.payload().get("error");
@@ -83,15 +102,17 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
               // node_started / node_completed / session_started → live progress into the agent stream.
             }
           }
-          sink.accept(toProgress(ev, nodeCount[0]));
+          sink.accept(toAgentEvent(ev, nodeCount[0]));
         };
 
     try {
       // Workflows take no model-supplied arguments today; the runner sets the body itself. The
       // model's argumentsJson is intentionally not threaded through (an empty-object schema is
       // projected) — see WorkflowOperationProjection.
+      // The projected operation's AGENT exposure does not replace the source workflow's
+      // declared composition audience. The engine still validates every delegated shape.
       executor.run(
-          Map.of("workflowId", workflowRef.value()), Audience.AGENT, sseSink);
+          Map.of("workflowId", workflowRef.value()), workflow.audience(), sseSink, engineContext, background);
     } catch (RuntimeException e) {
       // Host owns truth (§4.5): a runner failure becomes a result the model can recover from, never
       // an exception that tears down the agent loop.
@@ -107,7 +128,37 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
         finalResponse[0], Map.of("workflow", workflowRef.value(), "finalResponse", finalResponse[0]));
   }
 
-  /** Map a workflow {@link SseEvent} onto the agent loop's generic progress event. */
+  /** Preserve reply-bearing controls; their call id is owned by the existing workflow registry. */
+  private static AgentEvent toAgentEvent(SseEvent event, int nodeCount) {
+    return switch (event.name()) {
+      case "tool_call_pending" -> {
+        var risk = io.justsearch.agent.api.registry.RiskTier.valueOf(
+            requiredText(event, "risk").toUpperCase(java.util.Locale.ROOT));
+        // The workflow explicitly waits for confirmation. An outer AUTO dial cannot remove it.
+        var declaredGate = event.payload().get("gateBehavior");
+        var gate = declaredGate instanceof String value
+            ? io.justsearch.agent.api.registry.GateBehavior.valueOf(value.toUpperCase(java.util.Locale.ROOT))
+            : risk == io.justsearch.agent.api.registry.RiskTier.HIGH
+            ? io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM
+            : io.justsearch.agent.api.registry.GateBehavior.INLINE_CONFIRM;
+        yield new AgentEvent.ToolCallPendingApproval(requiredText(event, "callId"),
+            requiredText(event, "toolName"), requiredText(event, "arguments"), risk, gate);
+      }
+      case "tool_call_approved" -> new AgentEvent.ToolCallApproved(requiredText(event, "callId"));
+      case "tool_call_rejected" -> new AgentEvent.ToolCallRejected(
+          requiredText(event, "callId"), requiredText(event, "reason"));
+      default -> toProgress(event, nodeCount);
+    };
+  }
+
+  private static String requiredText(SseEvent event, String field) {
+    if (!(event.payload().get(field) instanceof String value) || value.isBlank()) {
+      throw new IllegalArgumentException("Workflow approval event requires " + field);
+    }
+    return value;
+  }
+
+  /** Map other workflow {@link SseEvent}s onto the agent loop's generic progress event. */
   private static AgentEvent toProgress(SseEvent ev, int nodeCount) {
     int index = 0;
     Object idx = ev.payload().get("index");

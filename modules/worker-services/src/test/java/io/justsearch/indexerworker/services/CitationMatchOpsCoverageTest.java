@@ -32,7 +32,7 @@ import org.junit.jupiter.api.io.TempDir;
  * facts the Worker already knows; the tests pin that it now says them.
  */
 @DisplayName("CitationMatchOps — per-source examination facts")
-class CitationMatchOpsCoverageTest {
+class CitationMatchOpsCoverageTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String DOC_A = "d:/docs/a.md";
 
@@ -42,7 +42,7 @@ class CitationMatchOpsCoverageTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

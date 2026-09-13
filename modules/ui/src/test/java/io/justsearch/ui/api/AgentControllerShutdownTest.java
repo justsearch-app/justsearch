@@ -18,7 +18,7 @@ final class AgentControllerShutdownTest {
 
   @Test
   void shutdownStopsHeartbeatScheduler() {
-    AgentController controller = new AgentController(() -> null, null, null, null);
+    AgentController controller = new AgentController(new io.justsearch.core.execution.TestEngineExecutors(), () -> null, null, null, null);
     assertFalse(
         controller.isHeartbeatSchedulerShutdown(), "scheduler should be running before shutdown");
 

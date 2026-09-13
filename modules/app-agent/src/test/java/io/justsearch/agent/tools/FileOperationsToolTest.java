@@ -1,5 +1,7 @@
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.agent.api.registry.OperationResult;
@@ -33,8 +35,8 @@ class FileOperationsToolTest {
     indexedRoots = new AtomicReference<>(List.of(root));
     tool =
         new FileOperationsTool(
-            () -> indexedRoots.get(),
-            pathMappings -> {
+            context -> indexedRoots.get(),
+            (pathMappings, context) -> {
               capturedMappings.set(pathMappings);
               return pathMappings.size();
             },
@@ -59,7 +61,7 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Move should succeed: " + result.message());
     assertNotNull(result.executionId(), "Batch ID should be set");
     assertTrue(result.message().contains("successfully"));
@@ -78,7 +80,7 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(Files.isDirectory(dest));
     assertNull(capturedMappings.get(), "MKDIR should not trigger index update");
@@ -96,7 +98,7 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(Files.isDirectory(dest));
   }
@@ -105,7 +107,7 @@ class FileOperationsToolTest {
   void executeMissingDestinationReturnsCleanValidationError() {
     // Untrusted agent input — a missing field must yield a clear, self-correcting
     // message, NEVER a NullPointerException ("Cannot invoke ... because ... is null").
-    OperationResult result = tool.execute("{\"operations\": [{\"op\": \"MKDIR\"}]}");
+    OperationResult result = tool.execute("{\"operations\": [{\"op\": \"MKDIR\"}]}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(
         result.message().contains("missing required field 'destination'"), result.message());
@@ -121,7 +123,7 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("unknown op 'FROBNICATE'"), result.message());
     assertFalse(result.message().contains("No enum constant"), result.message());
@@ -134,7 +136,7 @@ class FileOperationsToolTest {
     // IllegalArgumentException, from Path.of on a NUL-bearing path) must fall through to
     // the logged "Execution error" handler, NOT be relabeled as a clean validation error.
     String json = "{\"operations\": [{\"op\": \"MKDIR\", \"destination\": \"bad\\u0000path\"}]}";
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("Execution error"), result.message());
     assertFalse(result.message().contains("missing required field"), result.message());
@@ -142,21 +144,21 @@ class FileOperationsToolTest {
 
   @Test
   void executeEmptyOperationsReturnsFailure() {
-    OperationResult result = tool.execute("{\"operations\": []}");
+    OperationResult result = tool.execute("{\"operations\": []}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("No operations"));
   }
 
   @Test
   void executeMissingOperationsReturnsFailure() {
-    OperationResult result = tool.execute("{}");
+    OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("No operations"));
   }
 
   @Test
   void executeInvalidJsonReturnsFailure() {
-    OperationResult result = tool.execute("not json");
+    OperationResult result = tool.execute("not json", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("Execution error") || result.message().contains("error"));
   }
@@ -174,7 +176,7 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("Validation failed"));
     assertTrue(result.message().contains("SOURCE_MISSING"));
@@ -202,7 +204,7 @@ class FileOperationsToolTest {
                 src.toString().replace("\\", "\\\\"),
                 dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(Files.exists(dest));
     assertEquals("hello", Files.readString(dest));
@@ -218,7 +220,7 @@ class FileOperationsToolTest {
     }
     sb.append("]}");
 
-    OperationResult result = tool.execute(sb.toString());
+    OperationResult result = tool.execute(sb.toString(), EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("exceeds limit"), result.message());
     assertTrue(result.message().contains(String.valueOf(FileOperationsTool.MAX_BATCH_SIZE)));
@@ -234,7 +236,7 @@ class FileOperationsToolTest {
     }
     sb.append("]}");
 
-    OperationResult result = tool.execute(sb.toString());
+    OperationResult result = tool.execute(sb.toString(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Exactly MAX_BATCH_SIZE should succeed: " + result.message());
   }
 
@@ -266,13 +268,13 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult moveResult = tool.execute(json);
+    OperationResult moveResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(moveResult.success(), "Move should succeed: " + moveResult.message());
     assertFalse(Files.exists(src));
     assertTrue(Files.exists(dest));
 
     // Now undo
-    OperationResult undoResult = tool.undo(moveResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(moveResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo should succeed: " + undoResult.message());
     assertTrue(Files.exists(src), "Source should be restored after undo");
     assertFalse(Files.exists(dest), "Destination should be removed after undo");
@@ -292,11 +294,11 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult copyResult = tool.execute(json);
+    OperationResult copyResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(copyResult.success(), copyResult.message());
     assertTrue(Files.exists(dest));
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo COPY should succeed: " + undoResult.message());
     assertTrue(Files.exists(src), "Original source should remain");
     assertFalse(Files.exists(dest), "Copied file should be deleted");
@@ -318,7 +320,7 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult copyResult = tool.execute(json);
+    OperationResult copyResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(copyResult.success(), copyResult.message());
     assertTrue(Files.exists(dest));
 
@@ -328,7 +330,7 @@ class FileOperationsToolTest {
     Files.setLastModifiedTime(
         dest, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(120)));
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo should still succeed (partial): " + undoResult.message());
     assertTrue(
         Files.exists(dest), "A since-edited copy must NOT be blindly deleted by undo");
@@ -354,10 +356,10 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult copyResult = tool.execute(json);
+    OperationResult copyResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(copyResult.success(), copyResult.message());
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), undoResult.message());
     assertFalse(
         Files.exists(dest), "An untouched copy reverts normally (no false conflict)");
@@ -383,7 +385,7 @@ class FileOperationsToolTest {
         """
             .formatted(
                 source.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
-    OperationResult copyResult = tool.execute(json);
+    OperationResult copyResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(copyResult.success(), copyResult.message());
     assertTrue(Files.isDirectory(dest), "Precondition: the directory copy exists");
     return copyResult;
@@ -392,7 +394,7 @@ class FileOperationsToolTest {
   @Test
   void undoOfACopiedDirectoryOutsideTheRootsIsSkippedNotDeleted() throws IOException {
     // Undoing a COPY is a RECURSIVE DELETE. The MOVE/RENAME arm re-validates through
-    // executor.validate(...); before 875 the COPY arm deleted with no containment check at all, so
+    // executor.validate(..., EngineContextTestFixtures.AGENT_LOOP); before 875 the COPY arm deleted with no containment check at all, so
     // a root removed between the operation and the undo left undo deleting outside the sandbox.
     Path source = createSourceTree();
     Path dest = root.resolve("tree-copy");
@@ -402,7 +404,7 @@ class FileOperationsToolTest {
     Path otherRoot = Files.createDirectories(tempDir.resolve("other-indexed"));
     indexedRoots.set(List.of(otherRoot));
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo should still succeed (partial): " + undoResult.message());
     assertTrue(
         Files.isDirectory(dest),
@@ -429,7 +431,7 @@ class FileOperationsToolTest {
     Files.setLastModifiedTime(
         nested, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(120)));
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo should still succeed (partial): " + undoResult.message());
     assertTrue(
         Files.isDirectory(dest),
@@ -448,7 +450,7 @@ class FileOperationsToolTest {
     Path dest = root.resolve("tree-copy");
     OperationResult copyResult = copyTreeTo(source, dest);
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), undoResult.message());
     assertFalse(Files.exists(dest), "An untouched in-root copied directory reverts: " + undoResult.message());
     assertTrue(Files.isDirectory(source), "The original tree must remain");
@@ -470,11 +472,11 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult mkdirResult = tool.execute(json);
+    OperationResult mkdirResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(mkdirResult.success(), mkdirResult.message());
     assertTrue(Files.isDirectory(dest));
 
-    OperationResult undoResult = tool.undo(mkdirResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(mkdirResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo MKDIR should succeed: " + undoResult.message());
     assertFalse(Files.exists(dest), "Empty directory should be removed");
   }
@@ -489,13 +491,13 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult mkdirResult = tool.execute(json);
+    OperationResult mkdirResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(mkdirResult.success(), mkdirResult.message());
 
     // Put a file inside so it's non-empty
     Files.writeString(dest.resolve("child.txt"), "can't delete parent");
 
-    OperationResult undoResult = tool.undo(mkdirResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(mkdirResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undoResult.success(), "Undo should succeed (skipping non-empty dir): " + undoResult.message());
     assertTrue(Files.isDirectory(dest), "Non-empty directory should remain");
     assertTrue(undoResult.message().contains("skipped"), "Output should mention skipped: " + undoResult.message());
@@ -520,7 +522,7 @@ class FileOperationsToolTest {
     Files.writeString(dest, "the user's own edits, written with the original timestamp");
     Files.setLastModifiedTime(dest, asCopied); // the mtime guard now sees nothing
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(undoResult.success(), "undo still succeeds (partial): " + undoResult.message());
     assertTrue(Files.exists(dest), "a copy whose CONTENT changed must not be deleted");
@@ -547,7 +549,7 @@ class FileOperationsToolTest {
     Files.writeString(copiedNote, "the user's own edit inside the copied tree");
     Files.setLastModifiedTime(copiedNote, asCopied);
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(Files.isDirectory(dest), "the tree must not be recursively deleted");
     assertEquals("the user's own edit inside the copied tree", Files.readString(copiedNote));
@@ -569,7 +571,7 @@ class FileOperationsToolTest {
     String batchId = copyResult.executionId().orElseThrow();
     downgradeJournalToV1(batchId);
 
-    OperationResult undoResult = tool.undo(batchId);
+    OperationResult undoResult = tool.undo(batchId, EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(undoResult.success(), "undo still succeeds (partial): " + undoResult.message());
     assertTrue(Files.exists(dest), "an unverifiable copy must be preserved, not deleted");
@@ -592,7 +594,7 @@ class FileOperationsToolTest {
         String.valueOf(executed.get(0).get("destinationDigest")).startsWith("sha256:"),
         "the forward COPY must record what it left at the destination: " + executed);
 
-    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow());
+    OperationResult undoResult = tool.undo(copyResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(undoResult.success(), undoResult.message());
     assertFalse(Files.exists(dest), "an unchanged copy reverts normally");
@@ -608,7 +610,7 @@ class FileOperationsToolTest {
         """
             .formatted(
                 source.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
-    OperationResult copyResult = tool.execute(json);
+    OperationResult copyResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(copyResult.success(), copyResult.message());
     assertTrue(Files.exists(dest), "precondition: the copy exists");
     return copyResult;
@@ -639,7 +641,7 @@ class FileOperationsToolTest {
 
   @Test
   void undoMissingBatchReturnsFailure() {
-    OperationResult result = tool.undo("nonexistent-batch-id");
+    OperationResult result = tool.undo("nonexistent-batch-id", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("No operation log"));
   }
@@ -658,7 +660,7 @@ class FileOperationsToolTest {
     log.recordSuccess("unfin-batch", 0, null);
     // Note: no log.finalizeBatch()
 
-    OperationResult result = tool.undo("unfin-batch");
+    OperationResult result = tool.undo("unfin-batch", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("unfinalized"), result.message());
   }
@@ -677,19 +679,19 @@ class FileOperationsToolTest {
                 src.toString().replace("\\", "\\\\"),
                 dest.toString().replace("\\", "\\\\"));
 
-    OperationResult moveResult = tool.execute(json);
+    OperationResult moveResult = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(moveResult.success(), moveResult.message());
     assertTrue(Files.exists(dest));
 
     // First undo — restores file
-    OperationResult undo1 = tool.undo(moveResult.executionId().orElseThrow());
+    OperationResult undo1 = tool.undo(moveResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(undo1.success(), "First undo should succeed: " + undo1.message());
     assertTrue(Files.exists(src), "Source should be restored");
     assertFalse(Files.exists(dest), "Dest should be removed");
 
     // Second undo — dest no longer exists so the reverse MOVE fails.
     // This is correct: undo is not idempotent, the files have already been restored.
-    OperationResult undo2 = tool.undo(moveResult.executionId().orElseThrow());
+    OperationResult undo2 = tool.undo(moveResult.executionId().orElseThrow(), EngineContextTestFixtures.AGENT_LOOP);
     // Should not crash (no exception), but may report failures for individual operations
     assertNotNull(undo2, "Second undo should return a result, not crash");
   }
@@ -713,7 +715,7 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("skipped"), "Output should mention skipped: " + result.message());
     assertTrue(Files.exists(src), "Source should remain (skipped)");
@@ -737,7 +739,7 @@ class FileOperationsToolTest {
             .formatted(
                 src.toString().replace("\\", "\\\\"), dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertFalse(Files.exists(src), "Source should be moved");
     assertEquals("existing content", Files.readString(dest), "Original dest unchanged");
@@ -759,7 +761,7 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("Invalid conflict_strategy"));
   }
@@ -774,7 +776,7 @@ class FileOperationsToolTest {
         """
             .formatted(dest.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(Files.isDirectory(dest));
   }

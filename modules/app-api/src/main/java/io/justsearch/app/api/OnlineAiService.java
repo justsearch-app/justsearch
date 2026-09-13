@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
 import java.util.concurrent.CompletableFuture;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +83,14 @@ public interface OnlineAiService {
       int maxTokens,
       List<Map<String, Object>> tools,
       SamplingParams sampling,
-      boolean requireSentinel) {
+      boolean requireSentinel,
+      EngineWorkHandle work) {
+
+    /** Unattached compatibility caller; request owners pass their explicit work handle. */
+    public StreamRequest(List<Map<String, Object>> messages, int maxTokens,
+        List<Map<String, Object>> tools, SamplingParams sampling, boolean requireSentinel) {
+      this(messages, maxTokens, tools, sampling, requireSentinel, null);
+    }
 
     public StreamRequest(List<Map<String, Object>> messages, int maxTokens) {
       this(messages, maxTokens, null, null, true);
@@ -264,6 +272,15 @@ public interface OnlineAiService {
         new UnsupportedOperationException("OnlineAiService.chatCompletion unsupported"));
   }
 
+  /** Context-bearing non-streaming completion. Production implementations require this overload. */
+  default CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      EngineContext engineContext) {
+    return chatCompletion(messages, maxTokens, sampling);
+  }
+
   /**
    * Confidence/diagnostic signals accompanying a vision completion, alongside the extracted text.
    * Tempdoc 677 S1: plumbing only — nothing consumes these fields for gating yet.
@@ -305,6 +322,13 @@ public interface OnlineAiService {
   default CompletableFuture<String> visionCompletion(
       String prompt, byte[] imageBytes, int maxTokens) {
     return visionCompletionDetailed(prompt, imageBytes, maxTokens)
+        .thenApply(VisionCompletionResult::content);
+  }
+
+  default CompletableFuture<String> visionCompletion(
+      String prompt, byte[] imageBytes, int maxTokens, EngineContext engineContext) {
+    return visionCompletionDetailed(prompt, imageBytes, maxTokens, SamplingParams.VDU, null,
+            engineContext)
         .thenApply(VisionCompletionResult::content);
   }
 
@@ -354,6 +378,16 @@ public interface OnlineAiService {
             "OnlineAiService.visionCompletionDetailed unsupported"));
   }
 
+  default CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      EngineContext engineContext) {
+    return visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed);
+  }
+
   /**
    * Generate a summary of the content (non-streaming).
    *
@@ -373,6 +407,11 @@ public interface OnlineAiService {
     return summarize(content);
   }
 
+  default CompletableFuture<String> summarize(
+      String content, int maxTokens, EngineContext engineContext) {
+    return summarize(content, maxTokens);
+  }
+
   /**
    * Answer a question based on context (non-streaming).
    *
@@ -383,6 +422,11 @@ public interface OnlineAiService {
    * @return future containing the answer
    */
   CompletableFuture<String> askQuestion(String question, String context);
+
+  default CompletableFuture<String> askQuestion(
+      String question, String context, EngineContext engineContext) {
+    return askQuestion(question, context);
+  }
 
   // ==================== Status Methods ====================
 
@@ -429,6 +473,10 @@ public interface OnlineAiService {
     return java.util.Optional.empty();
   }
 
+  default java.util.Optional<Integer> countTokens(String text, EngineContext engineContext) {
+    return countTokens(text);
+  }
+
   /**
    * Counts prompt tokens for OpenAI-style chat messages using llama-server's chat template.
    *
@@ -450,6 +498,13 @@ public interface OnlineAiService {
   default java.util.Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
     return countPromptTokens(messages);
+  }
+
+  default java.util.Optional<Integer> countPromptTokens(
+      List<Map<String, Object>> messages,
+      List<Map<String, Object>> tools,
+      EngineContext engineContext) {
+    return countPromptTokens(messages, tools);
   }
 
   // ==================== Mode Control Methods ====================

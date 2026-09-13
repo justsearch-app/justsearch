@@ -5,6 +5,8 @@ plugins {
 }
 
 dependencies {
+  api(project(":modules:core"))
+  testImplementation(testFixtures(project(":modules:core")))
   // External module dependencies
   implementation(project(":modules:gpu-bridge"))
   api(project(":modules:app-api"))  // Exposes API types in public interface
