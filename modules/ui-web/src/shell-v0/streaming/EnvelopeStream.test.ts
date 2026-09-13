@@ -8,7 +8,7 @@
  * real network connection.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { EnvelopeStream } from './EnvelopeStream.js';
 import type { SseEnvelope } from './envelope-types.js';
 import {
@@ -480,13 +480,23 @@ describe('EnvelopeStream re-establishment (tempdoc 604)', () => {
   });
 
   it('reconnects when the heartbeat-absence watchdog expires (silent wedge, no error fired)', async () => {
+    vi.useFakeTimers();
     const { stream, sources } = reconnectingStream();
-    stream.start();
-    sources[0]!.emitOpen();
-    // No frames at all — the channel is silently dead. The watchdog (40ms) must force a reconnect.
-    await wait(70);
-    expect(sources.length).toBeGreaterThanOrEqual(2);
-    stream.stop();
+    try {
+      stream.start();
+      sources[0]!.emitOpen();
+      // No frames at all: expire the watchdog, then its bounded reconnect backoff.
+      await vi.advanceTimersByTimeAsync(39);
+      expect(sources[0]!.closed).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sources[0]!.closed).toBe(true);
+      expect(sources).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(sources).toHaveLength(2);
+    } finally {
+      stream.stop();
+      vi.useRealTimers();
+    }
   });
 
   it('a frame resets the watchdog, so a steadily-beating stream never reconnects', async () => {
