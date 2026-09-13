@@ -26,6 +26,11 @@ Latest hosted checkpoint ae46f6919: CI34778431996 all13 jobs and CLA34778430639 
 The queue delay has cleared and public-claims/app-ui corrections are hosted green. This
 predates the fixed reset schema diff and does not satisfy installed-v5 recovery proof.
 
+Full1340 exposed a settings owner public-entry self-call. The [correction](evidence/C2/settings-owner-entry.md)
+now uses private shared reservation checks and guards both reset methods; focused1344
+and the intended negative1343 pass their respective contracts. Corrected full-suite and
+successor publication proof are next, before continuing production migration.
+
 **Immediate next items (2026-09-13): integrate main privacy safeguards and repair PR1 publication lineage, then C2-6 producer/Health migration.**
 The [fixed reset owner](evidence/C2/settings-reset-owner.md) implements reserve/apply/recovery
 and durable clear/restart ordering.1334 executes155 settings cases plus41 unchanged runner/UI

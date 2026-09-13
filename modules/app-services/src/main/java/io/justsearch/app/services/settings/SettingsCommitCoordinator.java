@@ -92,43 +92,46 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   public Reservation reserve(long id, String key, SettingsWitness expected) {
     if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
     try {
-      if (!inspected || blocked) throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
-      if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
-      if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
-      OperationKeys.timestampMillis(key);
-      Objects.requireNonNull(expected, "expected settings witness");
-      if (id <= 0 || expected.acceptedRevision() == Long.MAX_VALUE) {
-        throw new IllegalArgumentException("Invalid settings reservation");
-      }
-      final SettingsWitness prior;
-      try { prior = store.inspect().witness(); }
-      catch (RuntimeException failure) {
-        block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, id));
-        throw refused("SETTINGS_RECOVERY_REQUIRED", "The settings revision cannot be verified", Map.of());
-      }
-      if (!prior.equals(expected)) {
-        throw refused("VERSION_CONFLICT", "Settings changed since this candidate was read",
-            Map.of("currentRevision", prior.acceptedRevision()));
-      }
-      var reserved = new SettingsCommitFence(id, key, prior);
-      fence = reserved;
-      return reserved;
+      return reserveOwned(id, key, expected, false);
     } finally {
       mutex.unlock();
       publishIssue();
     }
   }
 
+  /** Shared reservation checks; both public entry points hold the physical mutex. */
+  private SettingsCommitFence reserveOwned(long id, String key, SettingsWitness expected, boolean reset) {
+    if (!inspected || blocked) throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
+    if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
+    OperationKeys.timestampMillis(key);
+    Objects.requireNonNull(expected, "expected settings witness");
+    if (id <= 0 || expected.acceptedRevision() == Long.MAX_VALUE) {
+      throw new IllegalArgumentException("Invalid settings reservation");
+    }
+    final SettingsWitness prior;
+    try { prior = store.inspect().witness(); }
+    catch (RuntimeException failure) {
+      block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, id));
+      throw refused("SETTINGS_RECOVERY_REQUIRED", "The settings revision cannot be verified", Map.of());
+    }
+    if (!prior.equals(expected)) {
+      throw refused("VERSION_CONFLICT", "Settings changed since this candidate was read",
+          Map.of("currentRevision", prior.acceptedRevision()));
+    }
+    var reserved = new SettingsCommitFence(id, key, prior, null, reset);
+    fence = reserved;
+    return reserved;
+  }
+
   @Override
   public Reservation reserveReset(OperationRecord row, OperationStore.Preparation accepted) {
     var intent = SettingsResetPreparation.decode(row, accepted);
     if (!intent.recovery()) {
-      // Reserve through the same full-witness comparison, then retain its fixed reset purpose.
+      // The common checks create the final reset fence once under this mutex.
       if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
       try {
-        var normal = (SettingsCommitFence) reserve(row.id(), row.key(), intent.expected());
-        fence = new SettingsCommitFence(normal.id, normal.key, normal.prior, null, true);
-        return fence;
+        return reserveOwned(row.id(), row.key(), intent.expected(), true);
       } finally { mutex.unlock(); publishIssue(); }
     }
     if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());

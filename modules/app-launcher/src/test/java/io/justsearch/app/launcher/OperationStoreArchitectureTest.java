@@ -74,7 +74,7 @@ class OperationStoreArchitectureTest {
       for (var call : item.getCodeUnitAccessesFromSelf()) {
         boolean ownerEntry = call.getTargetOwner().isAssignableTo(
             io.justsearch.app.api.settings.SettingsCommitOwner.class)
-            && java.util.Set.of("reserve", "apply", "releaseAfterTerminal", "retainForRestart",
+            && java.util.Set.of("reserve", "reserveReset", "apply", "applyReset", "releaseAfterTerminal", "retainForRestart",
                 "inspectRecovery", "reconcile").contains(call.getName());
         boolean commitment = call.getTargetOwner().isAssignableTo(
             io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl.class)
@@ -93,17 +93,36 @@ class OperationStoreArchitectureTest {
   @Test
   void settingsRuleRejectsProducerReservationAndForgedReceipt() {
     var imported = new ClassFileImporter().importClasses(UnauthorizedSettingsOwner.class,
-        UnauthorizedSettingsReceipt.class, io.justsearch.app.api.settings.SettingsCommitOwner.class,
+        UnauthorizedSettingsReceipt.class, UnauthorizedResetReservation.class, UnauthorizedResetApply.class,
+        io.justsearch.app.api.settings.SettingsCommitOwner.class,
         io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl.class);
     var result = SETTINGS_COMMIT_OWNER.evaluate(imported);
     assertTrue(result.hasViolation());
     assertTrue(result.getFailureReport().getDetails().stream().anyMatch(line -> line.contains("UnauthorizedSettingsOwner")));
     assertTrue(result.getFailureReport().getDetails().stream().anyMatch(line -> line.contains("UnauthorizedSettingsReceipt")));
+    assertTrue(result.getFailureReport().getDetails().stream().anyMatch(line -> line.contains("UnauthorizedResetReservation")));
+    assertTrue(result.getFailureReport().getDetails().stream().anyMatch(line -> line.contains("UnauthorizedResetApply")));
   }
 
   static final class UnauthorizedSettingsOwner {
     void reserve(io.justsearch.app.api.settings.SettingsCommitOwner owner) {
       owner.reserve(1, "foreign", new SettingsWitness(0, null));
+    }
+  }
+
+  static final class UnauthorizedResetReservation {
+    void reserve(io.justsearch.app.api.settings.SettingsCommitOwner owner,
+        io.justsearch.app.api.operations.OperationRecord row,
+        OperationStore.Preparation preparation) {
+      owner.reserveReset(row, preparation);
+    }
+  }
+
+  static final class UnauthorizedResetApply {
+    void apply(io.justsearch.app.api.settings.SettingsCommitOwner owner,
+        io.justsearch.app.api.settings.SettingsCommitOwner.Reservation reservation,
+        io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl control) {
+      owner.applyReset(reservation, control);
     }
   }
 
