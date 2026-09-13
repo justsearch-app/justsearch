@@ -785,6 +785,15 @@
       "note": "Bounded SQL read plus the retained listener API. Live append cannot write a fictitious terminal result or own retention."
     },
     {
+      "id": "operation-history-projector",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjector.java",
+      "guard": "test:OperationHistoryProjectorTest",
+      "consumesProjection": "operation-history-projection",
+      "note": "Sole pending-row ack owner after forced journal acceptance or agent-row ownership exclusion. Source hook supplies immediate live updates; bounded one-shot startup paging and idle retry use no new durable marker. MEMORY/NOTE include agent-loop producers."
+    },
+    {
       "id": "operation-history-changes",
       "kind": "projection",
       "lang": "java",

@@ -697,6 +697,23 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
+  public long historyProjectionUpperId() {
+    return locked(() -> {
+      try (var query = connection.createStatement();
+          var result = query.executeQuery("SELECT coalesce(max(id), 0) FROM operations")) {
+        result.next();
+        return result.getLong(1);
+      }
+    });
+  }
+
+  @Override
+  public List<OperationHistoryRow> pendingHistoryProjectionAfter(int limit, long completedAt, long id, long maximumId) {
+    if (id < 0 || maximumId < 0) throw new IllegalArgumentException("History cursor ids must be non-negative");
+    return historyRows(limit, true, id == 0 ? null : completedAt, id, maximumId);
+  }
+
+  @Override
   public boolean acknowledgeHistoryProjection(String key) {
     Objects.requireNonNull(key, "key");
     return locked(() -> {
@@ -709,6 +726,10 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   private List<OperationHistoryRow> historyRows(int limit, boolean pending) {
+    return historyRows(limit, pending, null, 0, null);
+  }
+
+  private List<OperationHistoryRow> historyRows(int limit, boolean pending, Long completedAfter, long idAfter, Long maximumId) {
     if (limit < 0) throw new IllegalArgumentException("History limit must be non-negative");
     return locked(() -> {
       if (limit == 0) return List.of();
@@ -718,11 +739,21 @@ public final class SqliteOperationStore implements OperationStore {
             session_id, grant_ref, source_tier, transport, executor, initiator, correlation_id,
             state, history_mode, accepted_at, completed_at, provenance_occurred_at, failure_reason, result_json
           FROM operations WHERE history_mode != 'NONE' AND
-          """ + TERMINAL + (pending
+          """ + TERMINAL
+          + (completedAfter == null ? "" : " AND (completed_at > ? OR (completed_at = ? AND id > ?))")
+          + (maximumId == null ? "" : " AND id <= ?")
+          + (pending
               ? " AND history_pending = 1 ORDER BY completed_at, id LIMIT ?"
               : " ORDER BY completed_at DESC, id DESC LIMIT ?");
       try (var query = connection.prepareStatement(sql)) {
-        query.setInt(1, Math.min(limit, pending ? HISTORY_PROJECTION_BATCH_LIMIT : RECENT_HISTORY_LIMIT));
+        int parameter = 1;
+        if (completedAfter != null) {
+          query.setLong(parameter++, completedAfter);
+          query.setLong(parameter++, completedAfter);
+          query.setLong(parameter++, idAfter);
+        }
+        if (maximumId != null) query.setLong(parameter++, maximumId);
+        query.setInt(parameter, Math.min(limit, pending ? HISTORY_PROJECTION_BATCH_LIMIT : RECENT_HISTORY_LIMIT));
         var rows = new java.util.ArrayList<OperationHistoryRow>();
         try (var result = query.executeQuery()) {
           while (result.next()) {

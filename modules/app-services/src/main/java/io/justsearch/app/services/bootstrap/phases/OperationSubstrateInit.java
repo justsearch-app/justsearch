@@ -170,9 +170,9 @@ public final class OperationSubstrateInit {
     // (operation history, navigation, gate firings) fan in here; the controller's /stream
     // endpoint subscribes once so the receipt/timeline/undo/trust-audit are live read-views.
     // Tempdoc 812 D1: the durable audit journal for the actor kinds (grant / gate / operation),
-    // written synchronously beside the ring at this one fan-in point. Mode-aware exactly like
-    // DurableGrantStore above — READ_WRITE persists under <dataDir>/audit, IN_MEMORY (prod/CI
-    // isolation, tests) creates no files at all. The ledger's READ path then serves ring ∪
+    // accepted by the operation drainer after immediate live publication; other sources keep
+    // synchronous fan-in. READ_WRITE persists under <dataDir>/audit; explicit IN_MEMORY creates
+    // no journal files. The ledger's READ path then serves ring ∪
     // journal-tail, so Activity is not empty after a restart.
     io.justsearch.app.observability.ledger.ActionEventJournal actionEventJournal =
         io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.resolveMode()
@@ -227,29 +227,22 @@ public final class OperationSubstrateInit {
           consentCapsuleService.revokeNonUser();
           durableGrantStore.revokeNonUser();
         });
-    // Tempdoc 550 F5: the per-kind stores fan every append into the one action-event log via an
-    // append-listener — so an emit site cannot append-without-feeding-the-ledger (the divergence
-    // the separate broadcast calls risked). The ledger is now downstream of the store, structurally.
-    // Tempdoc 561 P-A/P-B: AGENT_LOOP operations are NOT fanned into the unified ledger here — their
-    // ledger rows are projected from the ONE durable agent record (AgentRunStore) by
-    // AgentRunLedgerProjector (wired in HeadAssembly), so the thread + History + Timeline derive from
-    // one source and cannot disagree. OperationHistoryStore still APPENDS the agent entry (undo /
-    // operation-detail stay whole); only its fan-in into the unified log is suppressed for agent rows.
-    operationHistoryStore.addAppendListener(
-        entry -> {
-          if (entry.provenance().transport() != TransportTag.AGENT_LOOP) {
-            actionLedgerChangeRegistry.broadcastOperation(entry);
-          }
-        });
+    // Committed operation fan-in is attached from the durable source after Head acquires the
+    // completed substrate. Navigation and authorization keep their existing source listeners.
     navigationHistoryStore.addAppendListener(actionLedgerChangeRegistry::broadcastNavigation);
     authorizationOutcomeStore.addAppendListener(actionLedgerChangeRegistry::broadcastGate);
     OperationExecutorImpl operationExecutorImpl =
         new OperationExecutorImpl(attempts, admission,
             operationHandlers,
             entry -> {
-              // F5: append fans into the one log via the store's listener — no separate call here.
+              // The source subscription owns keyed completions, including non-dispatched rows.
+              // Preserve only uncommitted STORAGE_FAILED observations from the dispatcher.
+              if (entry.operationKey().isPresent()) return;
               operationHistoryStore.append(entry);
               operationHistoryChangeRegistry.broadcast(entry);
+              if (entry.provenance().transport() != TransportTag.AGENT_LOOP) {
+                actionLedgerChangeRegistry.broadcastOperation(entry);
+              }
             },
             Map.of(
                 new ResourceRef("core.advisory-operation-completed"),
@@ -334,5 +327,14 @@ public final class OperationSubstrateInit {
         durableGrantScope,
         pendingAuthorizationStore,
         pendingAuthorizationChangeRegistry);
+  }
+
+  /** Attach only after the complete substrate is acquired, so later bootstrap failures own cleanup. */
+  public static io.justsearch.app.observability.operations.OperationHistoryProjector attachHistoryProjection(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.core.execution.EngineExecutorRegistry executors, Output output) {
+    return new io.justsearch.app.observability.operations.OperationHistoryProjector(operations,
+        output.operationHistoryStore(), output.operationHistoryChangeRegistry(),
+        output.actionLedgerChangeRegistry(), executors);
   }
 }

@@ -10,7 +10,20 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next item after effect identity (2026-09-13):** ingress rejects server
+**Immediate next item (2026-09-13): atomic SSE and frontend keyed merge.** The completion
+consumer now attaches at the end of both Head constructors, publishes memory/note
+completions through the source hook, and owns bounded forced-append/ack retry and
+startup catch-up. Independent review corrected failed-bootstrap ownership and
+unbounded startup replay (including clock regression). Focused1191 executes98 passing
+cases; final1194 reuses those successful inputs with PMD/format/integration checks green.
+Negative1192/1193 catch unbounded replay and acknowledgement after rejected append.
+Live1198 passes15 checks with a blocked sink, repair/restart, HTTP/MCP parity and a
+durable pending1-to0 transition. Both owned stacks are stopped. [Consumer proof](evidence/C2/history-consumer.md).
+Live1195 was stale because only app-launcher:installDist was refreshed: the dev runner
+uses **:modules:ui:installDist**. UI install1197 and matched installed jar hashes correct
+the witness. Full green/installed-v5/hosted remain owed; C2-4 and the lane stay open.
+
+**Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep
 their prior wire identity. Final1172 passes33 represented cases (21 execute), live1173
 passes14 exchanges across restart, full UI1175 passes6511,27 UI gates pass and
@@ -24,8 +37,8 @@ and correction](evidence/C2/integrated1180.md). A new full green boundary remain
 The pending-source review found no defects. Journal force/retry is now verified:
 negative1155/1157, final1158 passes47 represented cases (32 execute), independent
 review clear after adding rotated-generation proof. [Sink proof](evidence/C2/journal-force.md).
-No completion consumer is active yet; continue its append/ack/retry/shutdown path
-and atomic SSE after the identity correction. Full/installed-v5/hosted remain owed.
+The completion consumer above supersedes this cut's former next item. Atomic SSE
+and full/installed-v5/hosted remain owed.
 
 **Latest C2-4 pending-source cut (2026-09-13):** schema v5 atomically marks visible
 completions and pre-start refusals as pending projection. Bounded reads and keyed

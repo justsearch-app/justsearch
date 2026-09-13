@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
   testImplementation(testFixtures(project(":modules:core")))
+  testImplementation(libs.mockito.core)
   // Configuration - app-config exposes types in public API
   implementation(project(":modules:configuration"))
   api(project(":modules:app-config"))

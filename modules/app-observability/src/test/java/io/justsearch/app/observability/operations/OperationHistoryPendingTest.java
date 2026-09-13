@@ -60,6 +60,41 @@ final class OperationHistoryPendingTest {
   }
 
   @Test
+  void startupPagesRemainBoundedAndDoNotSkipRowsWhenAcknowledgementsShiftPositions() throws Exception {
+    try (var store = open()) {
+      for (int i = 0; i < 258; i++) {
+        var row = accept(store, OperationKind.NOTE, OperationHistoryMode.STANDARD);
+        store.finish(row.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null));
+      }
+      var first = store.pendingHistoryProjection(1000);
+      assertEquals(256, first.size());
+      var cursor = first.getLast();
+      for (var row : first) assertTrue(store.acknowledgeHistoryProjection(row.key()));
+      var next = store.pendingHistoryProjectionAfter(1000, cursor.completedAt(), cursor.id(), store.historyProjectionUpperId());
+      assertEquals(2, next.size(), "keyset paging cannot skip rows when earlier pending positions disappear");
+      assertTrue(store.pendingHistoryProjectionAfter(0, cursor.completedAt(), cursor.id(), store.historyProjectionUpperId()).isEmpty());
+      assertThrows(IllegalArgumentException.class, () -> store.pendingHistoryProjectionAfter(-1, cursor.completedAt(), cursor.id(), store.historyProjectionUpperId()));
+      assertThrows(IllegalArgumentException.class, () -> store.pendingHistoryProjectionAfter(1, cursor.completedAt(), -1, store.historyProjectionUpperId()));
+    }
+  }
+
+  @Test
+  void startupCursorUsesCompletionTimeBeforeIdAndDoesNotIncludeAcknowledgedRows() throws Exception {
+    try (var store = open()) {
+      var older = accept(store, OperationKind.NOTE, OperationHistoryMode.STANDARD);
+      var first = accept(store, OperationKind.NOTE, OperationHistoryMode.STANDARD);
+      store.finish(first.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null));
+      var cursor = store.pendingHistoryProjection(1).getFirst();
+      clock.setMillis(clock.millis() + 1);
+      store.finish(older.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null));
+      assertEquals(List.of(older.key()), store.pendingHistoryProjectionAfter(256, cursor.completedAt(), cursor.id(), store.historyProjectionUpperId())
+          .stream().map(OperationHistoryRow::key).toList());
+      assertTrue(store.acknowledgeHistoryProjection(older.key()));
+      assertTrue(store.pendingHistoryProjectionAfter(256, cursor.completedAt(), cursor.id(), store.historyProjectionUpperId()).isEmpty());
+    }
+  }
+
+  @Test
   void pendingSurvivesRestartAndAgePruningUntilKeyScopedAcknowledgement() throws Exception {
     String key;
     try (var store = open()) {

@@ -102,15 +102,24 @@ runner request, including non-dispatched memory mutations; the dispatcher suppli
 note/undo modes from the catalog declaration. The first accepted policy is durable,
 and a retry cannot opt an existing NONE row into history. Background producers with
 their own ledger retain NONE. Scope event identity with the accepted UUIDv7 key:
-the numeric database-local id can be reused after quarantine/recovery. The source
-acknowledgement/drain mechanism remains the next C2-4 cut, not completed delivery.
+the numeric database-local id can be reused after quarantine/recovery.
 
 2026-09-13: schema v5 now supplies bounded pending completion reads, keyed
-acknowledgement and retention protection. The next single projection consumer owns
+acknowledgement and retention protection. The implemented single projection consumer owns
 durable append before acknowledgement;955 adapts that consumer for ActionEvent.Memory
 and typed metadata rather than adding a competing acknowledgement owner. Earlier
 terminal v4 rows keep their prior best-effort ledger guarantee and recent-history
 visibility; open rows acquire the obligation when they complete after migration.
+
+2026-09-13 consumer cut: OperationHistoryProjector attaches at the end of both Head
+constructors and includes MEMORY/NOTE before generic AGENT_LOOP exclusion. Actual
+non-dispatched producer tests cover acceptance, completion and pre-start refusal;
+source callbacks remain immediate while the registered timer owns forced append,
+acknowledgement and idle retry. Startup SQL is bounded by a transient accepted-id
+ceiling, with completion-time/id paging; this is not a completion watermark.
+[Consumer proof](history-consumer.md) records98 focused cases and live repaired-sink
+restart evidence.955 adapts this sole consumer for its typed event; atomic SSE remains
+the next lane F mechanism.
 
 C2-4's history authority exposes terminal-row catch-up plus completion subscription
 after the SQLite commit returns. Capture the bounded stream token before the durable

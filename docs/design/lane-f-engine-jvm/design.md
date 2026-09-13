@@ -28,6 +28,7 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 ## 0. Provenance
 
 - 2026-09-13: independent C2-4 reader review requires reserving frontend effect IDs at ingress so clients cannot shadow keyed operation history; [correction and scope](evidence/C2/C2-4-plan.md#client-effect-identity-boundary).
+- 2026-09-13: C2-4 completion delivery uses one Head-owned projector, immediate live hook and bounded scheduled append-before-ack retry; [ownership, exclusions, lifecycle and proof](evidence/C2/C2-4-plan.md#completion-consumer-ownership).
 
 - 2026-09-13: C2-4 requires the existing journal durability barrier before source acknowledgement, including retained retries; [mechanism and proof](evidence/C2/C2-4-plan.md#journal-barrier-before-acknowledgement).
 

@@ -97,6 +97,7 @@ public final class HeadAssembly implements AutoCloseable {
   private final java.util.concurrent.ExecutorService foregroundDocuments;
   private final java.util.concurrent.ExecutorService backgroundDocuments;
   private final AutoCloseable operationsRetentionTimer;
+  private final AutoCloseable operationsHistoryProjector;
 
 
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
@@ -620,6 +621,7 @@ public final class HeadAssembly implements AutoCloseable {
                     new io.justsearch.agent.api.encryption.StoreCipher(this.dataKeyManager)))
             .orThrow();
 
+
     // Tempdoc 560 Phase 1 — wire the host LLM as the MCP sampling answerer (an external MCP server
     // may ask the host to run a completion). Set post-substrate now that OnlineAiService is in hand.
     if (this.substrateOut.mcpHostService() != null) {
@@ -932,6 +934,10 @@ public final class HeadAssembly implements AutoCloseable {
         sealedTrace.totalDurationMs().orElse(0L));
     io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.logAiServicesConfiguration(
         onlineAiService, inferenceManager, knowledgeClient, orchestrationOut.agentService());
+    // Last acquisition: no later bootstrap phase can strand a retryable live projector.
+    this.operationsHistoryProjector =
+        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
+            operations, executors, this.substrateOut.operationOut());
     } catch (RuntimeException | Error failure) {
       closeFailedOwners(acquiredOwners, failure);
       throw failure;
@@ -1087,6 +1093,10 @@ public final class HeadAssembly implements AutoCloseable {
     this.orchestration =
         io.justsearch.app.services.bootstrap.OrchestrationHandles.empty()
             .withOperationsRetention(this.operationsRetentionTimer);
+    // Last acquisition: no later bootstrap phase can strand a retryable live projector.
+    this.operationsHistoryProjector =
+        io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
+            operations, executors, this.substrateOut.operationOut());
     } catch (RuntimeException | Error failure) {
       closeFailedOwners(acquiredOwners, failure);
       throw failure;
@@ -1524,6 +1534,11 @@ public final class HeadAssembly implements AutoCloseable {
     // Repeatable termination barrier: an unfinished procedure must leave a later close able to
     // finish dependency teardown. Never claim the one-shot closed state before this succeeds.
     if (offlineCoordinator != null) offlineCoordinator.close();
+    if (!closed.get() && operationsHistoryProjector != null) {
+      try { operationsHistoryProjector.close(); }
+      catch (RuntimeException failure) { throw failure; }
+      catch (Exception failure) { throw new IllegalStateException("Operations history did not drain", failure); }
+    }
     io.justsearch.app.services.bootstrap.OrchestrationHandles handles = this.orchestration;
     if (!closed.get() && handles != null && handles.operationsRetention() != null) {
       try { handles.operationsRetention().close(); }

@@ -284,3 +284,93 @@ not promise retroactive repair of old-client collisions. No new journal version,
 store, or per-kind ledger dedup fork is needed.
 Reject before publication, prove forged-effect-first/operation-second and valid
 frontend retries, and verify the product endpoint on the current Engine.
+
+## Completion consumer ownership
+
+Decision,2026-09-13, grounded at73b100dec: one OperationHistoryProjector in
+app-observability.operations owns pending-row delivery and acknowledgement. It reuses
+OperationHistoryProjection, the existing history/listener facade and the one ledger
+journal. HeadAssembly attaches it as the final fallible operation in both bootstrap
+paths. Earlier attachment followed by acquiredOwners cleanup is insufficient: a
+later bootstrap failure could lose the retryable owner after a cleanup timeout.
+Starting inside OperationSubstrateInit likewise precedes fallible substrate work.
+Final placement avoids that failed-construction ownership gap without a new lifecycle
+registry or a two-phase public start API.
+OperationSubstrateInit exposes the same wiring for both paths and retires its old
+committed dispatcher fan-in. Empty-key STORAGE_FAILED observations and the separate
+advisory path remain live; they cannot create a fictitious committed completion.
+
+Subscribe before the initial scheduled pending read. The durable pending bit closes
+that race. Each newly committed visible row publishes live history exactly through
+this hook, including non-dispatched producers and pre-start refusals. The ledger
+gets a live-only operation projection; MEMORY and NOTE are included before applying
+the generic AGENT_LOOP exclusion (whose operation ledger owner remains AgentRunStore).
+The single drainer uses the same kind decision and explicitly acknowledges excluded
+rows. NONE rows never enter this pending projection.
+
+Use one registered BACKGROUND scheduled owner, one fixed-delay task (initial0,
+one-second retry), at most256 rows per query/arm (512 total during startup). Immediate live publication removes the
+need for another wakeup queue or coalescer. The existing hourly retention owner is
+too slow and has different shutdown/maintenance responsibilities. Attempt journal
+append before acknowledgement, publish the replay into the existing live ring even
+when that sink is unavailable, and stop the pass at the first append or ack failure.
+The SQL pending row remains the only durable retry authority; disabled persistence never
+counts as acknowledgement. Live-only updates preserve the existing IN_MEMORY/disk
+failure behavior. A successful source ack can follow only the sink's forced append
+or retained-id force barrier, including the uncertain-append/retry path.
+
+Independent design review identified a startup liveness gap: stopping at an old
+failed append also hides every newer pending row from a restarted live ledger.
+Continuing only the first256 rows still starves a larger disabled-sink backlog.
+Add one-shot bounded startup live enumeration independent of the durable arm,
+using a transient lexicographic (completed_at,id) cursor over pending rows. The
+source exposes the after-cursor metadata query; no new persisted marker or row DTO.
+Advance only after a row is live-published or deliberately excluded. Stop enumeration
+at the first empty page. Immediately after subscription, capture the source's
+maximum accepted row id and apply id <= that ceiling in every startup SQL page.
+A completion-time upper bound alone is insufficient when the wall clock regresses:
+newly accepted rows could keep filling pages below it. The id ceiling defines a
+finite cohort even then, while older accepted rows terminalizing later are covered
+by the live hook. Capture after subscribe needs no combined lock: interval rows may
+be seen by both paths and use the existing dedup; rows beyond the captured id are
+only the live hook's responsibility. Neither id ceiling nor cursor is persisted or
+used for acknowledgement/pruning. Retain the subscription for later completions. Those
+callbacks cover newer completions even when their timestamp/id sorts behind the
+startup cursor. The durable arm always starts at the oldest pending row and must
+live-publish before ack, so removal/pruning before startup reaches it cannot lose
+live visibility. Run both bounded arms per tick to avoid starving either.
+
+Reject OFFSET (acknowledgement shifts positions), full100k loading (unbounded batch),
+and recentHistory200 replay (resurrects already acknowledged rows outside journal
+retention). Reject cyclic enumeration: it would continually evict/reinsert a backlog
+larger than the500-event ring. The transient startup cursor is enumeration only,
+never a completion or durable-delivery watermark. Restart begins enumeration again;
+no progress across repeated restarts with an unavailable sink is claimed.
+
+The ring's dedup window remains500 events; durable identities cover retained journal
+generations. Do not claim unbounded exactly-once SSE delivery or add another pending
+identity set: after ring eviction a replay can publish an UPDATE again, and C2-4's
+frontend keyed merge must handle that. The actual typed runtime listener is the
+Index-only ScanRollupLedger, which also deduplicates document identities; an operation
+double-counting failure was not established. Preserve this limit in the proof.
+
+Close first rejects/quiesces completion callbacks and unsubscribes, then cancels and
+awaits the scheduled owner before releasing its executor registration. A timeout
+leaves registration and dependency teardown retryable. Head closes this barrier
+before its one-shot closed flag and before operations/ledger dependencies. The sole-ack ArchUnit rule lands with this consumer
+and a deliberate unauthorized caller proves that it fires.
+Creation must also unwind a partially acquired callback/scheduler before throwing:
+Head can acquire the returned owner only after creation succeeds. Subscription
+close alone is insufficient because an already captured callback may still run.
+Hold the delivery gate across construction acquisitions, subscription, accepted-id ceiling
+capture and scheduling. Callbacks and the timer's initial handshake wait behind
+that gate; failure marks stopping before release and self-unwinds. The timer releases
+the handshake before SQL/journal work, preserving immediate producer visibility.
+
+Verify direct producer completion, pre-start failure, NONE/excluded-agent behavior,
+memory/note agent fan-in, bounded catch-up after reopen, append-success/ack-failure
+retry without duplicate journal bytes, disabled/failed sink live visibility with
+pending retained, idle recovery, callback/scheduler shutdown and timeout/retry,
+both bootstrap paths, and no duplicate committed dispatcher history. This adds no
+schema version, watermark, second durable store or new effect implementation. The
+955 typed Memory event adapter remains within this sole projector's ownership.

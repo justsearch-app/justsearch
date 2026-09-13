@@ -19,6 +19,15 @@ public interface OperationStore extends AutoCloseable {
   /** Unacknowledged visible completions, oldest completion first; no private payload SELECT. */
   java.util.List<OperationHistoryRow> pendingHistoryProjection(int limit);
 
+  /** Highest accepted row id at capture; bounds startup enumeration, never durable progress. */
+  long historyProjectionUpperId();
+
+  /**
+   * Pending startup rows with id <= maximumId, after (completedAt,id); id=0 starts the first page.
+   * The finite accepted-id cohort remains bounded even when completion clocks move backwards.
+   */
+  java.util.List<OperationHistoryRow> pendingHistoryProjectionAfter(int limit, long completedAt, long id, long maximumId);
+
   /**
    * The single history projector calls this only after durable sink acceptance or an explicit
    * ownership exclusion. Key-scoped and idempotent; never changes outcome, identity or timestamps.

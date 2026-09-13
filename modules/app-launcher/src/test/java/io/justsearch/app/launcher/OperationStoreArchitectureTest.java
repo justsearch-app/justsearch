@@ -25,6 +25,31 @@ class OperationStoreArchitectureTest {
       "io.justsearch.app.observability.operations.OperationAttemptRunnerImpl";
 
   @ArchTest
+  static final ArchRule HISTORY_ACK_OWNER = classes().should(new ArchCondition<JavaClass>(
+      "acknowledge history delivery only through the single source projector") {
+    @Override public void check(JavaClass item, ConditionEvents events) {
+      for (var call : item.getCodeUnitAccessesFromSelf()) {
+        if (call.getTargetOwner().isAssignableTo(OperationStore.class)
+            && call.getName().equals("acknowledgeHistoryProjection")
+            && !item.getFullName().equals("io.justsearch.app.observability.operations.OperationHistoryProjector")) {
+          events.add(SimpleConditionEvent.violated(item,
+              item.getFullName() + " acknowledges history outside its projector at " + call.getSourceCodeLocation()));
+        }
+      }
+    }
+  });
+
+  @Test
+  void historyAckRuleRejectsASecondProjectionOwner() {
+    var imported = new ClassFileImporter().importClasses(UnauthorizedHistoryAck.class, OperationStore.class);
+    assertTrue(HISTORY_ACK_OWNER.evaluate(imported).hasViolation());
+  }
+
+  static final class UnauthorizedHistoryAck {
+    void acknowledge(OperationStore store) { store.acknowledgeHistoryProjection("foreign"); }
+  }
+
+  @ArchTest
   static final ArchRule ATTEMPT_WRITER = classes().should(new ArchCondition<JavaClass>(
       "change attempt lifecycle only through the shared runner") {
     @Override public void check(JavaClass item, ConditionEvents events) {
@@ -79,6 +104,10 @@ class OperationStoreArchitectureTest {
       return java.util.List.of();
     }
     @Override public boolean acknowledgeHistoryProjection(String key) { return false; }
+    @Override public long historyProjectionUpperId() { return 0; }
+    @Override public java.util.List<io.justsearch.app.api.operations.OperationHistoryRow> pendingHistoryProjectionAfter(int limit, long completedAt, long id, long maximumId) {
+      return java.util.List.of();
+    }
     @Override public AutoCloseable subscribeCompletions(java.util.function.Consumer<io.justsearch.app.api.operations.OperationRecord> listener) {
       throw new UnsupportedOperationException();
     }

@@ -335,8 +335,29 @@ bit after sink acceptance or an explicit projection ownership exclusion. Existin
 terminal v4 rows retain their prior best-effort ledger guarantee and durable recent
 visibility; open rows acquire the obligation when they finish after migration.
 Migration does not replay old legacy ledger identities or invent past delivery.
-The source bit is implemented; completion-source attachment/catch-up and atomic SSE
-replay remain the next C2-4 mechanisms.
+One `OperationHistoryProjector` attaches at the end of Head bootstrap. Its completion
+subscription publishes committed history and live ledger entries without journal I/O
+on the producer thread. Memory and note rows remain visible on agent-loop transport;
+generic agent-loop operation entries are explicitly excluded because the agent-run
+source owns their ledger projection.
+
+The registered `head.operations-history` timer retries every second. Its durable arm
+reads at most256 oldest pending rows, forces journal acceptance, publishes live, then
+acknowledges; it stops at the first append or acknowledgement failure. Disabled or
+failed persistence keeps rows pending. A separate startup arm reads at most256 rows
+per tick through a transient completion-time/id cursor, with SQL restricted to row
+ids at or below the maximum accepted id captured after subscription. That finite
+cohort remains bounded when completion clocks regress. This lets a restarted live ledger expose a larger
+backlog despite a failed oldest append, without continually replaying new arrivals.
+The pending bit remains the only durable progress authority. The live ring holds500
+events, so replay after eviction can repeat an update; this is not unbounded exactly-once
+stream delivery. Atomic SSE snapshot/reconnect remains a separate mechanism.
+
+Construction gates callbacks and timer activation until all acquisitions succeed.
+Close unsubscribes and quiesces callbacks, cancels and awaits the timer, then releases
+its registration. A timeout preserves the owner for retry and prevents Head dependency
+teardown. Failed construction marks the inactive owner stopping before releasing its
+activation gate and unwinds its acquired resources.
 
 Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.
 SQLite reads that copy, including uncheckpointed committed versions, so refusing a future format
