@@ -111,6 +111,131 @@ final class IndexingJobsChangeStreamTest {
     }
   }
 
+  @Test
+  void errorAfterSqlWriteRollsBackWithoutAnImplicitCommit() throws Exception {
+    transactionWorkFailure(false, false);
+  }
+
+  @Test
+  void failedRollbackClosesConnectionWithoutRestoringAutoCommit() throws Exception {
+    transactionWorkFailure(true, false);
+  }
+
+  @Test
+  void failedRollbackAndCloseRefuseFurtherQueueUseUntilCleanup() throws Exception {
+    transactionWorkFailure(true, true);
+  }
+
+  private void transactionWorkFailure(boolean rollbackFails, boolean closeFails) throws Exception {
+    Path jobPath = tempDir.resolve("transaction-failure.txt");
+    jobQueue.enqueue(List.of(jobPath));
+    Connection original = readField("connection", Connection.class);
+    Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+        org.mockito.AdditionalAnswers.delegatesTo(original));
+    Throwable primary = rollbackFails ? new IllegalStateException("ledger preparation failed after job update")
+        : new AssertionError("ledger preparation failed after job update");
+    org.mockito.Mockito.doAnswer(call -> {
+      String sql = call.getArgument(0);
+      if (sql.contains("INSERT INTO ingestion_ledger")) throw primary;
+      return original.prepareStatement(sql);
+    }).when(intercepted).prepareStatement(org.mockito.ArgumentMatchers.anyString());
+    var rollback = new java.sql.SQLException("rollback unavailable");
+    var close = new java.sql.SQLException("connection close unavailable");
+    if (rollbackFails) doThrow(rollback).when(intercepted).rollback();
+    if (closeFails) doThrow(close).when(intercepted).close();
+    List<IndexingJobChangeFeed.Delta> deltas = new java.util.ArrayList<>();
+    var stream = jobQueue.changeStream();
+    stream.subscribe(deltas::add);
+    writeField("connection", intercepted);
+    try {
+      Class<? extends Throwable> expected = rollbackFails ? IllegalStateException.class : AssertionError.class;
+      assertSame(primary, assertThrows(expected,
+          () -> jobQueue.markDone(jobPath, successOutcome(), null)));
+      assertEquals("PENDING", observedJobState(), "an independent connection must not see a partial DONE write");
+      verify(intercepted).rollback();
+      if (rollbackFails) {
+        verify(intercepted, never()).setAutoCommit(true);
+        verify(intercepted).close();
+        assertSame(rollback, primary.getSuppressed()[0]);
+        if (closeFails) {
+          assertSame(close, primary.getSuppressed()[1]);
+          assertSame(close, assertThrows(java.io.IOException.class, jobQueue::close).getCause());
+          assertSame(intercepted, readField("connection", Connection.class), "failed close retains its handle");
+        }
+        assertThrows(IllegalStateException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+        assertThrows(IllegalStateException.class, () -> stream.subscribeWithSnapshot(delta -> {}));
+        assertThrows(java.sql.SQLException.class, jobQueue::open,
+            "reopening cannot discard an unresolved transaction owner");
+      }
+      assertTrue(deltas.isEmpty(), "a rolled-back or uncertain update cannot be projected");
+      assertEquals("PENDING", observedJobState(), "an independent connection must not see a partial DONE write");
+    } finally {
+      writeField("connection", original);
+    }
+    jobQueue.close();
+    jobQueue.open();
+    assertEquals("PENDING", observedJobState());
+  }
+
+  @Test
+  void failedRestoreAfterCommitStillProjectsTheConfirmedRow() throws Exception {
+    failedRestoreAfterCommit(false);
+  }
+
+  @Test
+  void failedRestoreKeepsPrimaryCauseWhenASubscriberThrowsError() throws Exception {
+    failedRestoreAfterCommit(true);
+  }
+
+  private void failedRestoreAfterCommit(boolean subscriberFails) throws Exception {
+    Path jobPath = tempDir.resolve("restore-failure.txt");
+    jobQueue.enqueue(List.of(jobPath));
+    Connection original = readField("connection", Connection.class);
+    Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+        org.mockito.AdditionalAnswers.delegatesTo(original));
+    var restore = new java.sql.SQLException("auto-commit restore unavailable");
+    doThrow(restore).when(intercepted).setAutoCommit(true);
+    List<IndexingJobChangeFeed.Delta> deltas = new java.util.ArrayList<>();
+    jobQueue.changeStream().subscribe(deltas::add);
+    var subscriberFailure = new AssertionError("subscriber failed after confirmed commit");
+    if (subscriberFails) jobQueue.changeStream().subscribe(delta -> { throw subscriberFailure; });
+    var projection = spy(jobQueue.changeStream());
+    writeField("connection", intercepted);
+    writeField("changeStream", projection);
+    try {
+      var failure = assertThrows(OutcomeWriteException.class,
+          () -> jobQueue.markDone(jobPath, successOutcome(), null));
+      assertSame(restore, failure.getCause());
+      if (subscriberFails) assertSame(subscriberFailure, restore.getSuppressed()[0]);
+      verify(intercepted).commit();
+      verify(intercepted, never()).rollback();
+      assertEquals("DONE", observedJobState());
+      assertEquals(1, deltas.size(), "confirmed commit must still reach its projection");
+      verify(projection).commitSucceeded();
+      assertEquals("DONE", ((IndexingJobChangeFeed.Delta.Update) deltas.getFirst()).row().state());
+      assertFalse(failure.getMessage().contains("transaction rolled back"));
+      assertThrows(IllegalStateException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+    } finally {
+      writeField("connection", original);
+    }
+  }
+
+  private String observedJobState() throws Exception {
+    try (var observer = DriverManager.getConnection("jdbc:sqlite:" + tempDir.resolve("jobs.db"));
+        var statement = observer.createStatement();
+        var rows = statement.executeQuery("SELECT state FROM jobs")) {
+      assertTrue(rows.next());
+      String state = rows.getString(1);
+      assertFalse(rows.next());
+      return state;
+    }
+  }
+
+  private static IngestionOutcome successOutcome() {
+    return IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+        io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE);
+  }
+
   /**
    * Tempdoc 812 D2 — the capture-side rollup key round-trips: the scan that enqueued a job is
    * persisted on the row and rides every delta the Head reads, so the Head can group per-document

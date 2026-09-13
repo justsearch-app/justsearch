@@ -88,6 +88,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private final ReentrantLock lock = new ReentrantLock();
   private final int maxAttempts;
   private Connection connection;
+  private Throwable transactionFailure;
   // Only live processing capabilities: object identity prevents an older commit from finishing
   // a replacement claim for the same path. Dead JVMs cannot deliver callbacks after restart.
   private final Map<String, IndexJob> activeClaims = new HashMap<>();
@@ -239,6 +240,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public void open() throws SQLException, IOException {
     lock.lock();
     try {
+      if (transactionFailure != null) throw new SQLException(
+          "Queue transaction cleanup requires successful close before open", transactionFailure);
       Files.createDirectories(dbPath.getParent());
 
       // Capture whether DB existed BEFORE opening (JDBC will create empty file if missing)
@@ -267,7 +270,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // Slice 445: attach change-stream after schema is up so the rowId cache
       // sees the post-migration row set.
-      changeStream = new IndexingJobsChangeStream(connection, lock);
+      changeStream = new IndexingJobsChangeStream(connection, lock, this::ensureOpen);
 
       log.info("SqliteJobQueue opened: {}", dbPath);
     } finally {
@@ -772,7 +775,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.debug("Marked job done with outcome {}: {}", outcomeClassName(outcome), path);
     } catch (SQLException e) {
       throw new OutcomeWriteException(
-          "Outcome-aware markDone failed for " + path + " (transaction rolled back)", e);
+          "Outcome-aware markDone failed for " + path + " (completion could not be confirmed)", e);
     } finally {
       unlockAfterChanges();
     }
@@ -886,7 +889,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new OutcomeWriteException(
           "markDoneTransitions failed for "
               + transitions.size()
-              + " path(s) (transaction rolled back)",
+              + " path(s) (completion could not be confirmed)",
           e);
     } finally {
       unlockAfterChanges();
@@ -986,7 +989,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       logIfNoRows(updated, "recordOutcome", path);
     } catch (SQLException e) {
       throw new OutcomeWriteException(
-          "recordOutcome failed for " + path + " (transaction rolled back)", e);
+          "recordOutcome failed for " + path + " (completion could not be confirmed)", e);
     } finally {
       unlockAfterChanges();
     }
@@ -1040,7 +1043,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.debug("Deferred job without incrementing attempts: {}", path);
     } catch (SQLException e) {
       throw new OutcomeWriteException(
-          "defer failed for " + path + " (transaction rolled back)", e);
+          "defer failed for " + path + " (completion could not be confirmed)", e);
     } finally {
       unlockAfterChanges();
     }
@@ -1176,7 +1179,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
     } catch (SQLException e) {
       throw new OutcomeWriteException(
-          "markFailed failed for " + path + " (transaction rolled back)", e);
+          "markFailed failed for " + path + " (completion could not be confirmed)", e);
     } finally {
       unlockAfterChanges();
     }
@@ -1219,7 +1222,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private void unlockAfterChanges() {
     try {
-      if (lock.getHoldCount() == 1 && changeStream != null) changeStream.drainCommitted();
+      if (lock.getHoldCount() == 1 && changeStream != null) {
+        try { changeStream.drainCommitted(); }
+        catch (RuntimeException | Error deliveryFailure) {
+          if (transactionFailure == null) throw deliveryFailure;
+          if (transactionFailure != deliveryFailure) transactionFailure.addSuppressed(deliveryFailure);
+        } finally {
+          if (transactionFailure != null) {
+            // Xerial listener removal needs the native connection alive. Freeze/deliver confirmed
+            // deltas first, detach capture next, and only then close the failed connection.
+            try { changeStream.close(); }
+            catch (RuntimeException | Error feedFailure) {
+              if (transactionFailure != feedFailure) transactionFailure.addSuppressed(feedFailure);
+            } finally {
+              changeStream = null;
+              closeFailedTransactionConnection();
+            }
+          }
+        }
+      }
     } finally {
       lock.unlock();
     }
@@ -1227,21 +1248,58 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private <T> T inTransaction(SqlWork<T> work) throws SQLException {
     boolean wasAutoCommit = connection.getAutoCommit();
-    connection.setAutoCommit(false);
-    T result;
+    boolean ended = false;
+    boolean committed = false;
+    Throwable failure = null;
+    T result = null;
     try {
+      connection.setAutoCommit(false);
       result = work.run();
       connection.commit();
-    } catch (SQLException | RuntimeException e) {
-      connection.rollback();
-      throw e;
-    } finally {
-      connection.setAutoCommit(wasAutoCommit);
+      committed = true;
+      ended = true;
+    } catch (SQLException | RuntimeException | Error primary) {
+      failure = primary;
+      try { connection.rollback(); ended = true; }
+      catch (SQLException | RuntimeException | Error rollbackFailure) {
+        if (primary != rollbackFailure) primary.addSuppressed(rollbackFailure);
+      }
     }
-    // Projection failure cannot roll back an already committed mutation. Preserve the failure
-    // for the caller, without executing the SQL failure/rollback path after commit succeeded.
-    if (changeStream != null) changeStream.commitSucceeded();
+    if (ended) {
+      try { connection.setAutoCommit(wasAutoCommit); }
+      catch (SQLException | RuntimeException | Error restoreFailure) {
+        if (failure == null) failure = restoreFailure;
+        else if (failure != restoreFailure) failure.addSuppressed(restoreFailure);
+        transactionFailure = failure;
+      }
+    } else {
+      // Restoring auto-commit here could commit work whose rollback was never confirmed.
+      transactionFailure = failure;
+    }
+    // Materialize confirmed rows while the connection is still available. A reset failure
+    // cannot turn a successful commit into rollback or silently omit its projection.
+    if (committed && changeStream != null) {
+      try { changeStream.commitSucceeded(); }
+      catch (RuntimeException | Error projectionFailure) {
+        if (failure == null) failure = projectionFailure;
+        else if (failure != projectionFailure) failure.addSuppressed(projectionFailure);
+      }
+    }
+    if (transactionFailure != null) {
+      recordDbError();
+      if (changeStream == null) closeFailedTransactionConnection();
+    }
+    if (failure instanceof SQLException sql) throw sql;
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    if (failure instanceof Error error) throw error;
     return result;
+  }
+
+  private void closeFailedTransactionConnection() {
+    try { connection.close(); }
+    catch (SQLException | RuntimeException | Error closeFailure) {
+      if (transactionFailure != closeFailure) transactionFailure.addSuppressed(closeFailure);
+    }
   }
 
   @Override
@@ -2116,6 +2174,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private void ensureOpen() {
+    if (transactionFailure != null) throw new IllegalStateException(
+        "SqliteJobQueue transaction cleanup remains unresolved", transactionFailure);
     if (connection == null) {
       throw new IllegalStateException("SqliteJobQueue is not open");
     }
@@ -2274,12 +2334,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           // that exited any other way left frames for the next start to replay.
           checkpointWalBestEffort();
           connection.close();
+          connection = null;
+          transactionFailure = null;
+          activeClaims.clear();
           log.info("SqliteJobQueue closed");
         } catch (SQLException e) {
           throw new IOException("Failed to close SqliteJobQueue", e);
-        } finally {
-          connection = null;
-          activeClaims.clear();
         }
       }
     } finally {

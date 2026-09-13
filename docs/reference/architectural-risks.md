@@ -296,6 +296,8 @@ both parser and native child alive before forcibly killing an isolated Engine.
 
 **Trade-off:** `SqliteJobQueue` holds one JDBC `Connection` guarded by one `ReentrantLock`. Queue writes, snapshot reads, and subscriptions share that lock. SQLite hooks collect provisional row identities; the queue materializes deltas only after JDBC commit returns and delivers them after claim bookkeeping. Rollback discards provisional changes, and subscriber-triggered writes are delivered after the current batch. This projects committed queue state; it does not prove a Lucene commit. Every enqueue, dequeue, and synchronous subscriber callback serializes through the same lock.
 
+**Failure boundary:** SQL/runtime errors and `Error` roll back before auto-commit can be restored. An uncertain rollback or failed reset makes the queue unavailable until successful close; the primary cause retains cleanup failures. A confirmed commit still attempts its projection after reset failure. Under the queue lock, frozen committed deltas drain, native listeners detach, and the failed connection closes in that order. Queue writes and captured feed subscriptions reject reuse while cleanup is unresolved. A failed close retains the connection handle for retry.
+
 **Impact:** Structural, not load-dependent: the single connection is a single point of failure and a hard serialization point. One slow statement blocks every other queue caller, and a connection-level fault takes the whole queue down rather than one caller's work.
 
 **Reassess when:** Lane C's job-queue work lands, or a queue stall is traced to lock hold time rather than to SQLite write contention.
@@ -304,7 +306,7 @@ both parser and native child alive before forcibly killing an isolated Engine.
 
 **Owner tempdoc:** tempdoc 885 item 21 (decision review, lane C).
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-09-13
 
 **Notes:** New row, 2026-09-02. **Distinct from [RISK-002](#risk-002-sqlite-job-queue-write-contention-under-high-throughput-ingestion):** that row is about SQLite *write contention under load* (a throughput property, measured by a metric that does not exist yet); this row is about the *structural single-connection design* (a shape property, true at zero load). A throughput metric would not detect this one, and moving off SQLite would not by itself fix that one.
 

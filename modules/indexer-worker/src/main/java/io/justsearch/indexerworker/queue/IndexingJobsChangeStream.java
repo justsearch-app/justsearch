@@ -52,6 +52,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private final Connection conn;
   private final SQLiteConnection sqliteConn;
   private final ReentrantLock ownerLock;
+  private final Runnable ensureOwnerOpen;
 
   /** rowId → pathHash mapping; required for DELETE notifications (the row is gone post-commit). */
   private final ConcurrentHashMap<Long, String> rowIdToPathHash = new ConcurrentHashMap<>();
@@ -91,8 +92,9 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
    * Per {@link SqliteJobQueue} architecture (single-connection model verified
    * checkpoint {@code 044b21ab3}), attaching once captures every mutation.
    */
-  IndexingJobsChangeStream(Connection conn, ReentrantLock ownerLock) throws SQLException {
+  IndexingJobsChangeStream(Connection conn, ReentrantLock ownerLock, Runnable ensureOwnerOpen) throws SQLException {
     this.ownerLock = Objects.requireNonNull(ownerLock, "ownerLock");
+    this.ensureOwnerOpen = Objects.requireNonNull(ensureOwnerOpen, "ensureOwnerOpen");
     this.conn = Objects.requireNonNull(conn, "conn");
     this.sqliteConn = conn.unwrap(SQLiteConnection.class);
     populateRowIdCache();
@@ -125,6 +127,8 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     Objects.requireNonNull(subscriber, "subscriber");
     ownerLock.lock();
     try {
+      ensureOwnerOpen.run();
+      if (closed) throw new IllegalStateException("Indexing jobs feed is closed");
       long snapshotSeq = seq.get();
       List<JobRow> rows = readAllRows();
       return new SnapshotAndSubscription(snapshotSeq, rows, addSubscriber(subscriber));
@@ -138,6 +142,8 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     Objects.requireNonNull(subscriber, "subscriber");
     ownerLock.lock();
     try {
+      ensureOwnerOpen.run();
+      if (closed) throw new IllegalStateException("Indexing jobs feed is closed");
       return addSubscriber(subscriber);
     } finally {
       ownerLock.unlock();
