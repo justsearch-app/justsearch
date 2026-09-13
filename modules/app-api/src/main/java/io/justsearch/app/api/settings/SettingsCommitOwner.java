@@ -11,6 +11,14 @@ import java.util.Objects;
 
 /** Fixed settings collaborator of the attempt runner; never a producer's terminal writer. */
 public interface SettingsCommitOwner {
+  enum RecoveryReason { UNREADABLE_WITNESS, CONTRADICTORY_WITNESS, MULTIPLE_ARMED_ROWS, PERSISTENCE_DISABLED }
+
+  /** Bounded Health projection of the first unresolved recovery; settings bytes stay in the store. */
+  record RecoveryIssue(RecoveryReason reason, Long operationRecordId) {}
+
+  /** Sticky first recovery issue, published outside the apply mutex; no restart loop at boot. */
+  java.util.concurrent.CompletionStage<RecoveryIssue> recoveryIssue();
+
   /** Opaque identity issued by this owner after durable revision validation, before SQL arming. */
   interface Reservation {}
 

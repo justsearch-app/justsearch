@@ -15,7 +15,21 @@ requires typed witness comparison and confirmed reset with exact frozen quaranti
 It is design authority, not implemented recovery proof. Root owns the remaining migration;
 no owner input is pending and no armed ambiguous operation may be guessed FAILED.
 
-**Immediate next items (2026-09-13): C2-6 physical file/config owner and reconciliation, then producer migration.**
+Hosted availability recovered: CI34774278228 at eec44cad1 ran all13jobs;12passed, while
+Public claims failed on the missing SettingsCommitOwner operation-surface registration.
+CLA34774277424 passed. The owner cut declares both port/coordinator consumers and local1290
+passes all three register gates; fresh hosted success remains required. Windows-native success
+is not installed-v5 recovery proof. [Evidence](evidence/C2/settings-owner.md#hosted-register-correction).
+
+**Immediate next items (2026-09-13): C2-6 typed witness/recovery reset, then producer and Health migration.**
+The [physical file/config owner foundation](evidence/C2/settings-owner.md) passes Owner1286:
+100 cases/23 suites (71 executed,29 reused), no failures/errors/skips, PMD/format and independent
+source review clear. A real concurrent regression exposed blocking cleanup of an unrelated
+refused attempt in1285; the owner now returns promptly for mismatched fence ids. Negative1287
+fails at all four intended assertions; restored1288 passes via unchanged/cache reuse with the
+same source hashes. This owner remains uncomposed; its current scalar expected revision must
+be upgraded to the reviewed witness-pair protocol before all producers migrate. No full/live/
+installed/hosted or recovery-genesis proof is claimed by this local foundation slice.
 Atomic snapshot/reconnect and retirement production is at e7edaf503. Live1238 passes17
 protocol checks; full UI1248 passes6520/typecheck. Full1249 now passes10403 represented
 cases (1310 in executed tasks,9093 reused), zero failures/errors and35 inherited skips,
@@ -36,8 +50,8 @@ all executed, no failures/errors/skips), with PMD and format checks. The runner 
 passes Final1281 (91 cases/19 suites, all execute, no failures/errors/skips), with PMD/format
 and independent source/evidence review. Negative1280 fails at three intended assertions;
 failed1277 and earlier passing snapshots remain retained. [Runner proof](evidence/C2/settings-runner.md).
-Next is the concrete file/config owner and witness reconciliation, then producer migration;
-no actual file-owner/composition or public wire-outcome proof is claimed by the runner slice. Activity corrections now pass
+The subsequent concrete owner is summarized above; composition and public wire-outcome proof
+remain absent from the runner slice. Activity corrections now pass
 Browser1266/light and1267/dark (nine checks each, zero axe/console findings and no page overflow).
 Typecheck1273 and full unit1276 pass6521 cases/485 files; the full unit log retains inherited
 connection/abort warnings. Focused Shell fixtures pass36 cases without AggregateError.

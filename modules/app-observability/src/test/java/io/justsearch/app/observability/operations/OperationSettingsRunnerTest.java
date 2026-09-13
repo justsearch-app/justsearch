@@ -586,6 +586,11 @@ final class OperationSettingsRunnerTest {
     }
 
     @Override
+    public java.util.concurrent.CompletionStage<RecoveryIssue> recoveryIssue() {
+      return new CompletableFuture<RecoveryIssue>().minimalCompletionStage();
+    }
+
+    @Override
     public Reservation reserve(long id, String key, long expectedRevision) {
       events.add("reserve");
       keys.put(id, key);

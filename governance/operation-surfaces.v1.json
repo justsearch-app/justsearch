@@ -819,6 +819,24 @@
       "guard": "test:OperationOutcomeTransportTest",
       "consumesProjection": "operation-history-reader",
       "note": "Existing GET/SSE snapshots read the durable facade. Atomic SSE reconnect is the following C2-4 cut."
+    },
+    {
+      "id": "settings-commit-owner-port",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java",
+      "guard": "test:OperationStoreArchitectureTest",
+      "consumesProjection": "operation-record-type",
+      "note": "Lane F C2-6 fixed collaborator consumes the existing operation row for settings commitment and boot verdicts. The runner retains sole terminal-write authority; this port adds no operation lifecycle store."
+    },
+    {
+      "id": "settings-commit-coordinator",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java",
+      "guard": "test:SettingsCommitCoordinatorTest",
+      "consumesProjection": "settings-commit-owner-port",
+      "note": "Lane F C2-6 serializes the settings-file witness and projects recovery verdicts from the existing operation row. It never writes operation state; the runner terminalizes before releasing the fence."
     }
   ]
 }

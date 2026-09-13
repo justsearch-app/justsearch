@@ -217,3 +217,17 @@ postcommit corruption/quarantine cannot become precommit FAILED; exact live witn
 with invalid/missing preparation; future/inaccessible file refusal; ordinary fresh absencezero.
 No runtime or verification claim is made by this design amendment. Update ADR0008 and canonical
 configuration behavior with the producer implementation, not ahead of its shipped behavior.
+
+## 2026-09-13 owner foundation checkpoint
+
+The concrete coordinator and recovery classification now have
+[local proof](settings-owner.md): Owner1286 passes100 represented cases, independent source
+review is clear, negative1287 fails at four intended assertions and1288 restores identical
+sources. Failed1282 PMD and1285 actual concurrent cleanup failure remain recorded. The latter
+required an unrelated-id fast return before locking during terminal cleanup; prompt reserve
+alone was insufficient to make the caller's refusal prompt. Callback lock probes now use a
+side-effect-free reconciliation read, since unrelated cleanup intentionally no longer locks.
+
+Continue directly with the typed witness and confirmed recovery-reset amendment above, then
+all-producer/Health composition and wire consumers. The current scalar-only owner foundation
+is not production-composed and does not discharge the amended recovery or all-producer contract.
