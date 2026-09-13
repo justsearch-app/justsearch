@@ -44,8 +44,11 @@ Long-target wrapping and control reachability pass four measured UI cases at1007
 Full1009 at852916d16 passes10252 represented cases (8178 executed), zero failures/errors
 and35 inherited skips, with PMD/integration compilation. Preparation-only dispatcher/router
 entry points pass358 cases at1011 after the route-first LOW-effect negative; [planning proof](evidence/C2/prepared-planning.md).
+Workflow gate registration-before-announcement and nested live approval delivery pass32
+represented cases at1014 after four intended negative1012 failures;
+[delivery proof](evidence/C2/workflow-approval-delivery.md).
 Next: connect agent/workflow preparation-reference carry-through and private preview lookup,
-including workflow registration-before-announcement and nested approval delivery/reattach,
+including nested approval snapshot reattachment,
 then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.

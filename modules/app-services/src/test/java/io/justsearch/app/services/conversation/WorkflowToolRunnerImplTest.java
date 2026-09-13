@@ -81,6 +81,32 @@ final class WorkflowToolRunnerImplTest {
     assertTrue(result.message().contains("node n1 blew up"));
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"medium", "high"})
+  void nestedWorkflowApprovalControlsRemainAnswerable(String risk) {
+    WorkflowToolRunnerImpl.WorkflowExecutor fake = (body, audience, sink, context) -> {
+      sink.accept(new SseEvent("tool_call_pending", Map.of("callId", "inner-call", "toolName", "core.test",
+          "arguments", "{\"public\":true}", "risk", risk)));
+      sink.accept(new SseEvent("tool_call_approved", Map.of("callId", "inner-call")));
+      sink.accept(new SseEvent("tool_call_rejected", Map.of("callId", "inner-call", "reason", "declined")));
+      sink.accept(new SseEvent("done", Map.of("finalResponse", "done")));
+    };
+    List<AgentEvent> events = new ArrayList<>();
+    assertTrue(runnerWith(fake).run(DEMO_OP, "{}", events::add,
+        io.justsearch.app.services.TestEngineContexts.internal()).success());
+    var pending = org.junit.jupiter.api.Assertions.assertInstanceOf(AgentEvent.ToolCallPendingApproval.class, events.get(0));
+    assertEquals("inner-call", pending.callId()); assertEquals("core.test", pending.toolName());
+    assertEquals("{\"public\":true}", pending.arguments());
+    assertEquals(risk.toUpperCase(java.util.Locale.ROOT), pending.risk().name());
+    assertEquals(risk.equals("high") ? io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM
+        : io.justsearch.agent.api.registry.GateBehavior.INLINE_CONFIRM, pending.gateBehavior(),
+        "An explicit workflow wait cannot become AUTO under the enclosing agent's dial");
+    assertEquals("inner-call", org.junit.jupiter.api.Assertions.assertInstanceOf(
+        AgentEvent.ToolCallApproved.class, events.get(1)).callId());
+    var rejected = org.junit.jupiter.api.Assertions.assertInstanceOf(AgentEvent.ToolCallRejected.class, events.get(2));
+    assertEquals("inner-call", rejected.callId()); assertEquals("declined", rejected.reason());
+  }
+
   @Test
   void executorThrowBecomesAFailureResult() {
     WorkflowToolRunnerImpl.WorkflowExecutor throwing =

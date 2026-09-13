@@ -85,7 +85,7 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
               // node_started / node_completed / session_started → live progress into the agent stream.
             }
           }
-          sink.accept(toProgress(ev, nodeCount[0]));
+          sink.accept(toAgentEvent(ev, nodeCount[0]));
         };
 
     try {
@@ -109,7 +109,34 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
         finalResponse[0], Map.of("workflow", workflowRef.value(), "finalResponse", finalResponse[0]));
   }
 
-  /** Map a workflow {@link SseEvent} onto the agent loop's generic progress event. */
+  /** Preserve reply-bearing controls; their call id is owned by the existing workflow registry. */
+  private static AgentEvent toAgentEvent(SseEvent event, int nodeCount) {
+    return switch (event.name()) {
+      case "tool_call_pending" -> {
+        var risk = io.justsearch.agent.api.registry.RiskTier.valueOf(
+            requiredText(event, "risk").toUpperCase(java.util.Locale.ROOT));
+        // The workflow explicitly waits for confirmation. An outer AUTO dial cannot remove it.
+        var gate = risk == io.justsearch.agent.api.registry.RiskTier.HIGH
+            ? io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM
+            : io.justsearch.agent.api.registry.GateBehavior.INLINE_CONFIRM;
+        yield new AgentEvent.ToolCallPendingApproval(requiredText(event, "callId"),
+            requiredText(event, "toolName"), requiredText(event, "arguments"), risk, gate);
+      }
+      case "tool_call_approved" -> new AgentEvent.ToolCallApproved(requiredText(event, "callId"));
+      case "tool_call_rejected" -> new AgentEvent.ToolCallRejected(
+          requiredText(event, "callId"), requiredText(event, "reason"));
+      default -> toProgress(event, nodeCount);
+    };
+  }
+
+  private static String requiredText(SseEvent event, String field) {
+    if (!(event.payload().get(field) instanceof String value) || value.isBlank()) {
+      throw new IllegalArgumentException("Workflow approval event requires " + field);
+    }
+    return value;
+  }
+
+  /** Map other workflow {@link SseEvent}s onto the agent loop's generic progress event. */
   private static AgentEvent toProgress(SseEvent ev, int nodeCount) {
     int index = 0;
     Object idx = ev.payload().get("index");

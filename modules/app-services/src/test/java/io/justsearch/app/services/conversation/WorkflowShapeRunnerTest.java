@@ -2,6 +2,8 @@ package io.justsearch.app.services.conversation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.conversation.ExecutionMode;
@@ -303,6 +305,42 @@ class WorkflowShapeRunnerTest {
     SseEvent done = events.get(events.size() - 1);
     assertEquals("done", done.name());
     assertEquals(Boolean.TRUE, done.payload().get("cancelled"), done.payload().toString());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void synchronousApprovalReplyFindsTheGateBeforeItIsAnnounced(boolean approve) {
+    var wf = workflow("core.t-immediate-gate",
+        List.of(new WorkflowNode.GateStep("confirm", ConfirmStrategy.Inline.INSTANCE)));
+    var runner = runner(wf, OperationResult.success("x"));
+    List<SseEvent> events = new java.util.ArrayList<>();
+    runner.run(Map.of("workflowId", wf.id().value()), Audience.USER, event -> {
+      events.add(event);
+      if (event.name().equals("tool_call_pending")) {
+        assertTrue(runner.resolveGate((String) event.payload().get("callId"), approve),
+            "A synchronous reply to the announcement must find its registered gate");
+      }
+    }, io.justsearch.app.services.TestEngineContexts.ui());
+    assertTrue(names(events).contains(approve ? "tool_call_approved" : "tool_call_rejected"));
+    var done = events.getLast(); assertEquals("done", done.name());
+    assertEquals(!approve, Boolean.TRUE.equals(done.payload().get("cancelled")));
+  }
+
+  @Test
+  void failedApprovalAnnouncementDoesNotLeaveAnAnswerableGate() {
+    var wf = workflow("core.t-failed-gate",
+        List.of(new WorkflowNode.GateStep("confirm", ConfirmStrategy.Inline.INSTANCE)));
+    var runner = runner(wf, OperationResult.success("x"));
+    var callId = new AtomicReference<String>();
+    var failure = assertThrows(IllegalStateException.class,
+        () -> runner.run(Map.of("workflowId", wf.id().value()), Audience.USER, event -> {
+      if (event.name().equals("tool_call_pending")) {
+        callId.set((String) event.payload().get("callId"));
+        throw new IllegalStateException("fixture announcement failed");
+      }
+    }, io.justsearch.app.services.TestEngineContexts.ui()));
+    assertNotNull(callId.get()); assertFalse(runner.resolveGate(callId.get(), true));
+    assertEquals("fixture announcement failed", failure.getMessage());
   }
 
   /**

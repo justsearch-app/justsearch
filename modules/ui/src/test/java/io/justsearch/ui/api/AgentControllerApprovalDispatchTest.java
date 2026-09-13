@@ -142,6 +142,18 @@ final class AgentControllerApprovalDispatchTest {
     assertFalse(gate.get()); // rejected=false delivered
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void nestedWorkflowGateResolvesWithTheOuterAgentSession(boolean approved) throws Exception {
+    var service = new GateStubService("sess-a", "call-agent");
+    var registry = new WorkflowGateRegistry();
+    var gate = registry.create("call-wf");
+    assertTrue(controller(service, registry).resolveApprovalGate("sess-a", "call-wf", approved, "declined"));
+    assertEquals(approved, gate.get());
+    assertNull(service.lastApprovedCallId); assertNull(service.lastRejectedCallId);
+    assertFalse(registry.complete("call-wf", approved), "A repeated reply cannot resolve another gate");
+  }
+
   @Test
   void returnsFalseForAnUnknownCallId() {
     GateStubService svc = new GateStubService("sess-a", "call-agent");

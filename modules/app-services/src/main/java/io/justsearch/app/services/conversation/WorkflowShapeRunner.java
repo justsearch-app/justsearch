@@ -355,28 +355,33 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   // ---- gate helper (shared by GateStep + ToolStep) ----
 
   /**
-   * Emit a {@code tool_call_pending} event, register a gate, and block until the user decides (or
+   * Register a gate, emit {@code tool_call_pending}, and block until the user decides (or
    * the timeout elapses → declined). Emits {@code tool_call_approved} / {@code tool_call_rejected}
    * to mirror the agent surface's authorization vocabulary so the FE can reuse its approval flow.
    */
   private boolean awaitApproval(
       Consumer<SseEvent> sink, String callId, String toolName, String argsJson, RiskTier risk) {
-    sink.accept(
-        new SseEvent(
-            "tool_call_pending",
-            Map.of(
-                "callId", callId,
-                "toolName", toolName,
-                "arguments", argsJson,
-                "risk", risk.name().toLowerCase(java.util.Locale.ROOT))));
     CompletableFuture<Boolean> gate = gateRegistry.create(callId);
     boolean approved;
     try {
-      approved = gate.get(GATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    } catch (Exception e) {
+      // Announcing the call can synchronously deliver its reply; the future must already exist.
+      sink.accept(
+          new SseEvent(
+              "tool_call_pending",
+              Map.of(
+                  "callId", callId,
+                  "toolName", toolName,
+                  "arguments", argsJson,
+                  "risk", risk.name().toLowerCase(java.util.Locale.ROOT))));
+      try {
+        approved = gate.get(GATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      } catch (Exception e) {
+        LOG.warn("Workflow approval gate timed out/failed for call {}", callId, e);
+        approved = false;
+      }
+    } finally {
+      // Also retire an announced gate if the sink throws; never swallow that announcement failure.
       gateRegistry.discard(callId);
-      LOG.warn("Workflow approval gate timed out/failed for call {}", callId, e);
-      approved = false;
     }
     if (approved) {
       sink.accept(new SseEvent("tool_call_approved", Map.of("callId", callId)));
