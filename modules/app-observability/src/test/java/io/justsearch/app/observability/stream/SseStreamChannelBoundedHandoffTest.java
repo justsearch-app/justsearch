@@ -60,11 +60,14 @@ final class SseStreamChannelBoundedHandoffTest {
     listenersField.setAccessible(true);
     for (Object listener : (Set<?>) listenersField.get(channel)) {
       try {
-        if (Queue.class.isAssignableFrom(listener.getClass().getDeclaredField("buffered").getType())) {
+        var draining = listener.getClass().getDeclaredField("draining");
+        draining.setAccessible(true);
+        if (draining.getBoolean(listener)
+            && Queue.class.isAssignableFrom(listener.getClass().getDeclaredField("buffered").getType())) {
           return listener;
         }
       } catch (NoSuchFieldException ignored) {
-        // The ordinary subscriber has no handoff queue.
+        // Only the active replay owner is the test's blocked handoff.
       }
     }
     throw new AssertionError("blocked replay must have registered its handoff listener");
@@ -246,6 +249,20 @@ final class SseStreamChannelBoundedHandoffTest {
       subscriber.interrupt();
       subscriber.join(2_000);
     }
+  }
+
+  @Test
+  void numericZeroStillAttachesAfterRetainedHistoryWasEvicted() {
+    SseStreamChannel channel = channel(2);
+    publish(channel, 1);
+    publish(channel, 2);
+    publish(channel, 3);
+    List<SseEnvelope> received = new ArrayList<>();
+    var subscription = channel.subscribeAndReplay(received::add, 0L);
+    assertTrue(subscription.isPresent(), "zero is a fresh run attachment, not a strong cursor");
+    subscription.orElseThrow().unsubscribe();
+    assertEquals(List.of(2, 3), received.stream().map(SseStreamChannelBoundedHandoffTest::marker).toList());
+    assertEquals(0, channel.listenerCount());
   }
 
   @Test

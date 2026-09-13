@@ -27,6 +27,13 @@ PMD and UI integration checks pass. [Integrated proof](evidence/C2/integrated120
 Installed-v5/hosted remain owed; C2-4 and the lane stay open. The next mechanism
 and its required regressions are settled in the [SSE plan](evidence/C2/C2-4-sse-plan.md).
 
+The first SSE sub-item now serializes publication and gives each listener one bounded
+drainer outside channel locks. Negative1204 exposes the prior ordering/fan-out races;
+final1210 and compatibility1213 pass, including actual-eviction numeric run-zero proof.
+Independent channel review is clear. [Ordering proof](evidence/C2/sse-ordering.md).
+Continue the bounded snapshot/replay attachment and incarnation/checkpoint work in the
+SSE plan; ordering alone does not close the durable snapshot race.
+
 **Prior effect identity cut (2026-09-13):** ingress rejects server
 namespaces, and new frontend effects persist UUID identities while old entries keep
 their prior wire identity. Final1172 passes33 represented cases (21 execute), live1173
