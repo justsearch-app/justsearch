@@ -210,7 +210,22 @@ final class EngineIndexingWorkflowTest {
     long countBeforeModify = docCount();
     harness.client().submitBatch(List.of(testFile), TestEngineContexts.FOREGROUND);
 
-    // 6. Verify the UPDATED content is searchable.
+    // 6. Verify the UPDATED content is indexed before deleting its source. The unquoted
+    // marker search also matches tokens shared with marker1, so it cannot prove this alone.
+    long modifiedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    boolean modifiedIndexed = false;
+    String docId = PathNormalizer.normalizeKey(testFile);
+    while (System.nanoTime() < modifiedDeadline) {
+      modifiedIndexed =
+          harness.client().fetchDocuments(List.of(docId), TestEngineContexts.FOREGROUND)
+              .getDocumentsList().stream()
+              .anyMatch(doc -> doc.getFound() && doc.getContent().contains(marker2));
+      if (modifiedIndexed) {
+        break;
+      }
+      Thread.sleep(200);
+    }
+    assertTrue(modifiedIndexed, "the indexed lifecycle document must contain the modified marker");
     assertSearchableByMarker(marker2);
 
     // 7. The retired test deliberately did not assert that the OLD content disappeared, on the
