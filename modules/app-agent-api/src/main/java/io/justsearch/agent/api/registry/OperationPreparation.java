@@ -8,19 +8,27 @@ import java.util.Objects;
  *
  * <p>{@code argumentsJson} is the raw invocation input and is transient: callers must not persist
  * it in an operation row. A replay payload is optional, but when present its schema and payload are
- * both required and bounded. The payload is reserved for safe replay data such as paths, roots,
- * generation, collection, and policy; it must not contain prompts or document content.
+ * both required and bounded in UTF-8 bytes. METADATA is for paths, roots, generation, collection
+ * and policy. A server handler with prompts or document content must declare CONTENT, which
+ * requires the whole persisted preparation to be sealed using the existing data-key authority.
  * The current dispatcher refuses non-null replay schemas until C2-3 provides separate persisted
  * preparation and public-input key comparison; this value alone does not activate replay.
  */
 public record OperationPreparation(
-    String argumentsJson, String replaySchema, String replayPayloadJson) {
+    String argumentsJson, String replaySchema, String replayPayloadJson, Content content) {
 
-  private static final int MAX_REPLAY_SCHEMA_CHARS = 128;
-  private static final int MAX_REPLAY_PAYLOAD_CHARS = 200_000;
+  public enum Content { METADATA, CONTENT }
+
+  public OperationPreparation(String argumentsJson, String replaySchema, String replayPayloadJson) {
+    this(argumentsJson, replaySchema, replayPayloadJson, Content.METADATA);
+  }
+
+  private static final int MAX_REPLAY_SCHEMA_BYTES = 128;
+  private static final int MAX_REPLAY_PAYLOAD_BYTES = 200_000;
 
   public OperationPreparation {
     Objects.requireNonNull(argumentsJson, "argumentsJson");
+    Objects.requireNonNull(content, "content");
 
     boolean schemaAbsent = replaySchema == null;
     boolean payloadAbsent = replayPayloadJson == null;
@@ -36,13 +44,18 @@ public record OperationPreparation(
         throw new IllegalArgumentException(
             "replayPayloadJson, when present, must be non-blank");
       }
-      if (replaySchema.length() > MAX_REPLAY_SCHEMA_CHARS) {
-        throw new IllegalArgumentException("replaySchema exceeds 128 characters");
+      if (replaySchema.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_REPLAY_SCHEMA_BYTES) {
+        throw new IllegalArgumentException("replaySchema exceeds 128 UTF-8 bytes");
       }
-      if (replayPayloadJson.length() > MAX_REPLAY_PAYLOAD_CHARS) {
-        throw new IllegalArgumentException("replayPayloadJson exceeds 200000 characters");
+      if (replayPayloadJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_REPLAY_PAYLOAD_BYTES) {
+        throw new IllegalArgumentException("replayPayloadJson exceeds 200000 UTF-8 bytes");
       }
     }
+  }
+
+  @Override
+  public String toString() {
+    return "OperationPreparation[content=" + content + ", replay=" + (replaySchema != null) + "]";
   }
 
   /** Creates a preparation that carries raw arguments without a replay payload. */

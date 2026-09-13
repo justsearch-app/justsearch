@@ -130,3 +130,29 @@ Do not introduce a generalized workflow engine. Remove the dispatcher's blanket
 replay-schema rejection only when the persisted mechanism and its negative proofs
 are connected. Replace raw-JSON approval redispatch for prepared calls in the same
 change, and preserve the held source packet until its owning stage adapts it.
+
+## Prepared-envelope implementation cut (September13)
+
+The first C2-3b commit owns only the bounded value/codec prerequisite; the dispatcher
+continues to refuse replay schemas until the store transaction and approval binding
+are connected. The following store commit adds accepted payload columns and a pending
+preparation table to operations.db v3, with rollback and retention proofs.
+
+The envelope binds format version, operation key, server preparation nonce, existing
+public descriptor, full server preparation, original unattached EngineContext, executor
+and occurrence time. Do not persist a process-local workId or signed intent capsule;
+neither is restart authority. The nonce binds a pending approval to this exact
+preparation even after a pending entry expires or is evicted. Content classification
+is a handler-produced enum. The existing three-argument preparation constructor means
+metadata; content producers must explicitly select CONTENT. The full content envelope,
+including public arguments and original attribution, is sealed with StoreCipher.
+Plaintext metadata is allowed only for server-declared metadata preparation.
+
+UTF-8 limits are128 bytes for handler schema and200000 bytes for replay payload,
+524288 bytes for the full envelope and750000 bytes for stored ciphertext. The latter
+covers base64/GCM overhead. Port values hide payloads in toString. A content seal must
+produce a sealed result even if key configuration changes during the call; disabled
+or locked state never permits a plaintext fallback. Decode checks envelope version,
+key/nonce/public identity, classification, and the public-argument digest. Terminal
+receipt lookup continues to bypass decode. Unknown data and malformed payloads refuse
+without returning stored content in an exception.

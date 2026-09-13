@@ -28,8 +28,10 @@ at913 after negative910/912. HTTP invoke/undo key delivery, typed failures and a
 and approved-result key/error projection now pass265 represented cases at923.
 MCP key delivery, pending approval and failure receipt projection pass278 represented cases at936;
 numeric row-id correction passes74 cases at942 after negative941.
-See [MCP key proof](evidence/C2/mcp-key.md). Next: prepared persistence and frozen
-approval payloads, then remaining ingress and integrated acceptance.
+See [MCP key proof](evidence/C2/mcp-key.md). The bounded prepared-envelope codec
+prerequisite passes548 represented cases at950; [codec proof](evidence/C2/prepared-codec.md).
+Next: operations.db v3 persistence, runner serialization and frozen approval
+transfer, then remaining ingress and integrated acceptance.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
 
 The following paragraphs retain the pre-review correction checkpoints; current
