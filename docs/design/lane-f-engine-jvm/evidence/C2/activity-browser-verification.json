@@ -1,0 +1,282 @@
+{
+  "date": "2026-09-13",
+  "revision": "6db0fd2b1be67adb2f65e4f03d45ec4cd27becd5 + ActivitySurface description change; installed Java reused with skipBuild=true, no campaign binary fingerprint",
+  "retention": "Through lane acceptance plus30days; export before worktree release",
+  "command": "node tmp/c2-4-browser1252-managed.mjs",
+  "result": "FUNCTIONAL_PASS_WITH_MEASUREMENT_FINDINGS",
+  "checks": [
+    "real-activity-surface-empty-snapshot",
+    "live-completion-visible",
+    "controlled-native-source-detach-holds-first-row",
+    "browser-reconnect-renders-second-row-once",
+    "reload-default-system-tab-then-select-activity",
+    "browser-reload-renders-durable-snapshot",
+    "keyed-retry-keeps-two-visible-rows",
+    "instrumented-browser-capture"
+  ],
+  "measurement": {
+    "violations": [
+      {
+        "id": "aria-prohibited-attr",
+        "impact": "serious"
+      },
+      {
+        "id": "aria-required-parent",
+        "impact": "critical"
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious"
+      }
+    ],
+    "consoleErrors": [],
+    "document": {
+      "scrollWidth": 1568,
+      "clientWidth": 1568,
+      "scrollHeight": 900,
+      "clientHeight": 900,
+      "overflowX": false,
+      "overflowY": false
+    },
+    "themeMetadataDisagreesWithVisibleLightTheme": true
+  },
+  "artifacts": [
+    {
+      "path": "modules/ui-web/src/shell-v0/views/ActivitySurface.ts",
+      "sha256": "a6e9f07ee3df4ab27b7cd625c323e6c124511f96fcce547830063bbdadb1ba69",
+      "bytes": 4379
+    },
+    {
+      "path": "tmp/c2-4-activity-affected1248.txt",
+      "sha256": "fb7488b7d6218bd650cf85d8236a41d481c9f6b7014ba73c42a51d42227b566e",
+      "bytes": 179
+    },
+    {
+      "path": "tmp/c2-4-activity-coverage1248.txt",
+      "sha256": "37ab0713d91bbaeef27c95a93fdd6ab89781859fac214352447faba36a5c239c",
+      "bytes": 430
+    },
+    {
+      "path": "tmp/c2-4-activity-typecheck1248.txt",
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100",
+      "bytes": 63
+    },
+    {
+      "path": "tmp/c2-4-activity-ui1248.txt",
+      "sha256": "8e24346f59ad7e215df4ddc8c5b1e19ed68bd1532e763f15bff926972351b577",
+      "bytes": 689911
+    },
+    {
+      "path": "tmp/c2-4-browser1244/checks.json",
+      "sha256": "c560f64be58bbdfb985aaf7671a8bf436b401bc121e7c90a04f3cfbf18322fcc",
+      "bytes": 286
+    },
+    {
+      "path": "tmp/c2-4-browser1244/failure.png",
+      "sha256": "7122af946a7993cdf22dd1814a71aaf7262f7a535d313a960db8a39e5a0d5552",
+      "bytes": 63348
+    },
+    {
+      "path": "tmp/c2-4-browser1244/result.json",
+      "sha256": "45676a4db965dd6f1af1d7562f4f4006c8aef15215652777a786f71bd3c5ceab",
+      "bytes": 5352
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed-FAILED-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed-FAILED-stop.json",
+      "sha256": "7c3a20bae51e7bde6dc617c5a9c36f40a154148d63283ac1af0cbe221f9a9beb",
+      "bytes": 291
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed-initial-start.json",
+      "sha256": "2ce746341b6d58ccb970ca4f4e110aebc86860f2d9bb143c50de9d86c0ba2b16",
+      "bytes": 427
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed-result.json",
+      "sha256": "22117c4f9cc7e527921acf390df3e4c42be46c012d6ab27a61d7880ae958e660",
+      "bytes": 1038
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed.mjs",
+      "sha256": "3cc45e68e344e268729a9bd0dcefdcf080d811b69021b41860b81c2c2110b744",
+      "bytes": 4113
+    },
+    {
+      "path": "tmp/c2-4-browser1244-managed.txt",
+      "sha256": "e5347efe481e1ce2bba4d343ce692325953b2a2f90fa260b6b85b6bbb10d7b90",
+      "bytes": 2440
+    },
+    {
+      "path": "tmp/c2-4-browser1244.py",
+      "sha256": "b4815583fe4f001516b8c91a5d572bbbc25a4935f9db83334fc702170e8804e3",
+      "bytes": 5329
+    },
+    {
+      "path": "tmp/c2-4-browser1247/before-reload-streams.json",
+      "sha256": "d2b13178cb3c7e00ab965d5d895f3a57adcd9f929351a04099c6216e73d88395",
+      "bytes": 14945
+    },
+    {
+      "path": "tmp/c2-4-browser1247/checks.json",
+      "sha256": "29acb31efbf465ebcbb3662195bfce27be07745bd85017de519aca63c7f7e511",
+      "bytes": 667
+    },
+    {
+      "path": "tmp/c2-4-browser1247/failure.png",
+      "sha256": "c755ac45047e68c337881bca62b55f516add45d73fd2664ea8011881781d955e",
+      "bytes": 83869
+    },
+    {
+      "path": "tmp/c2-4-browser1247/result.json",
+      "sha256": "9070aff187d610dcd6890872818a005ce1c6ad31768d23663dc03e1ae7f16944",
+      "bytes": 2028
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed-FAILED-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed-FAILED-stop.json",
+      "sha256": "04b4d1d456c7cde6eeb606319237f0fd852aa0f06d4dd98d7698703a373955c2",
+      "bytes": 290
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed-initial-start.json",
+      "sha256": "3e88564e36c31cd77f6ca4e4aa71045a379033ba60b50df91a2f1ca6bf8fc357",
+      "bytes": 427
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed-result.json",
+      "sha256": "c196b0ea2be2998ed95019e410967e02c41c7edad91cfa9f572fcdce81175700",
+      "bytes": 1037
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed.mjs",
+      "sha256": "1997c392da79a3fbfc73640c02bbb5f5ee146058578581292bb7b2129c2571f3",
+      "bytes": 4113
+    },
+    {
+      "path": "tmp/c2-4-browser1247-managed.txt",
+      "sha256": "b0627db97fc421e08ff080b228c38c209baa5285a0bbfda830642cd96525b75a",
+      "bytes": 3917
+    },
+    {
+      "path": "tmp/c2-4-browser1247.py",
+      "sha256": "fc7b83d03a4911fae1eec079fbc654294181362441af757bea99ab4cda156535",
+      "bytes": 5366
+    },
+    {
+      "path": "tmp/c2-4-browser1252/activity.measure.json",
+      "sha256": "83556240b53e42dd38c8662ac90ae8e8d01aa2ede59ac13e0fc84651a5a8626a",
+      "bytes": 22058
+    },
+    {
+      "path": "tmp/c2-4-browser1252/activity.png",
+      "sha256": "0934459448178e5c477d6ea76cb95d1c1f28450969c458be2d50bd6b755af9eb",
+      "bytes": 68721
+    },
+    {
+      "path": "tmp/c2-4-browser1252/after-reload-streams.json",
+      "sha256": "d8348f09d4cb83a43720614b709a6526397e90ec375be5909fe5db93189980ef",
+      "bytes": 17035
+    },
+    {
+      "path": "tmp/c2-4-browser1252/before-reload-streams.json",
+      "sha256": "d539083e0b0835d5c572d0fd95e6cd9cb3e8ea340327a96ca521e1f7acfd3466",
+      "bytes": 14951
+    },
+    {
+      "path": "tmp/c2-4-browser1252/checks.json",
+      "sha256": "0e9e62eb22d74838dbda8b582e4c212660950b667dd8c891bd431d9d2d18e4f6",
+      "bytes": 1604
+    },
+    {
+      "path": "tmp/c2-4-browser1252/result.json",
+      "sha256": "c01ab90cc1b19e03d7d1e48a45ae828150e9cbeec8bbc6788381930d39090845",
+      "bytes": 64
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed-initial-start.json",
+      "sha256": "9b96957bf9be89bdadbdda4619c85351d2e7bf67672349be4dfc695fd56b39b3",
+      "bytes": 427
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed-initial-stop.json",
+      "sha256": "d908ee631e36c52a937e891a1b36fd846df653f53e0d6e5caaf2312be1482578",
+      "bytes": 291
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed-PASS-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed-result.json",
+      "sha256": "5a4ca1cff335dc604549d5556b2be5673b9be21eaf65e4b1068205e8843cb043",
+      "bytes": 781
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed.mjs",
+      "sha256": "113b07476fa30d453bf0768c44b961d75ed69f35393e35876b5cdfd2d8b7005b",
+      "bytes": 4113
+    },
+    {
+      "path": "tmp/c2-4-browser1252-managed.txt",
+      "sha256": "3905e1c525d4a4cdfaaa96f2063b5bdffa816a8698e39af723327d94be226d8a",
+      "bytes": 585
+    },
+    {
+      "path": "tmp/c2-4-browser1252.py",
+      "sha256": "2603481242880a07eca3272e8b587391357351a62e9dce081f991798cb3decd2",
+      "bytes": 5746
+    },
+    {
+      "path": "tmp/c2-4-browser1252/stop-report.json",
+      "sha256": "839c13c0de3e398795f8c3d7108edb8cfdbd94440556c0a25d91a3285662ebc1",
+      "bytes": 1162
+    }
+  ],
+  "limitations": [
+    "No campaign binary fingerprint; previous install evidence is not an in-campaign hash",
+    "UI1248 reports6520 passes but has teardown AggregateError and no retained exit code",
+    "Connected lifecycle seq5 precedes replay UPDATE seq4; no monotonic-frame-order claim",
+    "Connected status is a visual observation only"
+  ],
+  "checkDetails": "tmp/c2-4-browser1252/checks.json (hashed below; contains the generated test operation identities and checkpoints)"
+}

@@ -10,7 +10,7 @@ the R10 boundary; C2 is open. R7's installed operations-row foundation witness
 and R9's later schema reproof are accepted with the correction batch. C2-3 is
 in progress; the six keyed C2-11 recovery scenarios and later producers remain required.
 
-**Immediate next item (2026-09-13): finish Activity browser proof, then implement C2-6.**
+**Immediate next items (2026-09-13): C2-6 preparation/storage and measured Activity corrections.**
 Atomic snapshot/reconnect and retirement production is at e7edaf503. Live1238 passes17
 protocol checks; full UI1248 passes6520/typecheck. Full1249 now passes10403 represented
 cases (1310 in executed tasks,9093 reused), zero failures/errors and35 inherited skips,
@@ -18,10 +18,12 @@ including PMD and UI integration tests. Full1242 remains FAILED on three stale k
 assertions; their replacements verify request-future lifetime, and real Javalin now proves
 SseConnection retains admission until close. Negative1250 catches premature completion;
 1245's wrong-reason fixture failure remains recorded. [Integrated proof](evidence/C2/integrated1249.md).
-Browser1247 renders the second row once after a controlled native-source disconnect and
-real checkpoint replay. Reload selects System Health by the current routing contract;
-the next harness selects Activity again before asserting the retained snapshot. Browser1244's ineffective offline toggle attempt remains FAILED. Both owned stacks
-are stopped. Installed-v5 and hosted proof remain owed; no C2-4/stage closure is claimed.
+Browser1252 passes eight functional checks: actual checkpoint reconnect, durable reload
+snapshot after selecting Activity, and same-key retry without duplicate rows. Its measured
+capture has three existing but unbaselined accessibility rules and inaccurate theme metadata;
+[the browser record](evidence/C2/activity-browser.md) assigns the next corrections. Failed1244
+and1247 remain retained. All owned stacks are stopped. Integrated tests are pushed at478a41c41.
+Installed-v5 and hosted proof remain owed; no C2-4/stage closure is claimed.
 C2-6's independently refuted [implementation plan](evidence/C2/C2-6-plan.md) and owning
 protocol are committed at6db0fd2b1, including the SQL marker, preparation guard, strict atomic
 replace, schema-v3 witness and explicit fatal/corrupt recovery. No owner input is pending.
