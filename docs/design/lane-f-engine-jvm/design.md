@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-13: C2-6 reserves and validates the durable settings revision before SQL arming; this prevents refused/stale contenders from leaving ambiguous armed rows after a crash. Boot evaluates the whole open settings set and blocks multiple armed rows. [Owning protocol](evidence/C2/operations-store-design.md#18-the-accepted-settings-revision-port-amended-2026-09-12), [counterexamples and required regressions](evidence/C2/C2-6-plan.md#2026-09-13-reservation-order-correction). Mechanism amendment only; stage/merge placement unchanged.
+
 - 2026-09-13: C2-6 grounds the settings commit boundary in a pre-preparation guard, the existing SQL expected-revision marker, strict atomic replacement and a schema-v3 witness; corruption stays unresolved when commitment cannot be proved. [Owning protocol](evidence/C2/operations-store-design.md#18-the-accepted-settings-revision-port-amended-2026-09-12) and [implementation plan](evidence/C2/C2-6-plan.md). No stage or merge placement changes.
 
 - 2026-09-13: C2-4 makes snapshot/replay and checkpoints source-owned and propagates listener retirement to existing connection owners; [bounded mechanism and connection scope](evidence/C2/C2-4-sse-plan.md#retirement-and-connection-scope). Numeric run replay remains a separate contract; no stage or merge placement changes.

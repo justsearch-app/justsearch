@@ -35,6 +35,9 @@ connection/abort warnings. Focused Shell fixtures pass36 cases without Aggregate
 Independent source/evidence review is clear. [Correction proof](evidence/C2/activity-accessibility.md)
 retains failed intermediates and binds browser binaries to868ca9f85 plus the listed UI source;
 the later SQL-marker commit is outside that browser proof.
+The next runner cut must reserve and validate the durable revision before arming SQL;
+[the reviewed correction](evidence/C2/C2-6-plan.md#2026-09-13-reservation-order-correction)
+closes refused/stale-contender crash ambiguity and requires whole-set boot classification.
 C2-6's independently refuted [implementation plan](evidence/C2/C2-6-plan.md) and owning
 protocol are committed at6db0fd2b1, including the SQL marker, preparation guard, strict atomic
 replace, schema-v3 witness and explicit fatal/corrupt recovery. No owner input is pending.

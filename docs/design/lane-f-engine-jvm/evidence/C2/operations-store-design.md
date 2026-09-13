@@ -224,9 +224,13 @@ C2-6 is an app-api port owning the serialization of every production settings wr
 including install/import and runtime-spec writers. Its apply accepts expected revision,
 operation key and target UiSettings; D1 supplies already-prepared component installation.
 The implementation owns one apply mutex and a typed `SettingsCommitFence`. Install its
-attempt-scoped PREPARING guard before any copy, builder or preparation callback (the
-mutex is reentrant); read the persisted revision, compare, prepare, commit and publish
-under the mutex, promoting the same guard to COMMITTED at the replacement boundary.
+attempt-scoped PREPARING guard during reservation, before SQL arming and before any copy,
+builder or preparation callback (the mutex is reentrant). Under the mutex, reservation
+refuses an active or unresolved fence, validates the durable witness and expected revision,
+and installs an opaque attempt-bound token; it performs no settings effect or arbitrary
+callback. Refuse concurrent contenders promptly rather than waiting. Release the mutex
+before SQL arming; owner and SQL locks never overlap. Preparation, commit and publication
+then require that same active token, promoting it to COMMITTED at replacement.
 Release the physical mutex after publishing; the logical fence refuses further settings
 mutations until the runner durably records the result. Reject nested applies, including
 preparation callbacks that attempt to save settings. Holding only a controller lock
@@ -261,9 +265,11 @@ any Error after the SQL marker or PREPARING guard is installed, since an Error o
 request thread need not terminate the process. Retain the guard until boot reconciliation.
 Restart reads the committed file and reconciles the row. D1 must prove its handle installation has this same property.
 
-The runner validates its own live handle and conditionally writes the existing
-accepted_settings_revision column on a RUNNING SETTINGS_APPLY/RECONFIGURE row before
-calling the fixed owner; this nonterminal marker emits no completion callbacks. No
+The runner validates its own live RUNNING SETTINGS_APPLY/RECONFIGURE handle, reserves
+with the fixed owner (including durable revision comparison), then conditionally writes
+the existing accepted_settings_revision column before owner preparation. This nonterminal
+marker emits no completion callbacks. A refused contender or stale revision never arms
+a row; a reservation token cannot be reused for another attempt, key or revision. No
 generic OperationPreparation extension or second acceptance is required. Catalog reset
 overrides executeRecorded and reuses its dispatcher handle. Null marker at boot proves
 no settings preparation/effect. Derive the next revision with Math.addExact(storedExpected,1).
@@ -273,8 +279,9 @@ Only a committed receipt is an effect witness; arming the fence alone is not com
 After the handler returns, the runner completes from that receipt and invokes the fixed
 settings coordinator's `releaseAfterTerminal(receipt)` outside every mutex. Even a later
 RuntimeException must complete from the committed receipt rather than report FAILED.
-Precommit failure has no committed receipt: the runner fails the attempt and clears its
-fence outside the mutex. Fatal process failure is reconciled from the file at boot.
+Precommit failure has no committed receipt: the runner durably fails the attempt before
+clearing its matching fence outside the mutex. If terminal persistence fails even before
+file commitment, retain the fence and request ordered restart. Fatal process failure is reconciled from the file at boot.
 No handler-visible complete/fail method, arbitrary callback under the apply mutex, or
 second terminal writer is permitted.
 
@@ -283,7 +290,10 @@ mutation, so the single bounded witness cannot be overwritten while still needed
 that completion write fails after file replacement, retain RUNNING, refuse further
 settings mutation and request the existing ordered restart; never report FAILED or
 attempt a cross-file rollback of a committed apply. On boot the settings owner runs
-before the generic interactive-row rule: matching key and expectedRevision+1 completes
+before the generic interactive-row rule and classifies the complete open settings-row
+set first. Multiple armed open rows violate the single-fence invariant: keep settings
+blocked and surface recovery Health, without sequentially normalizing them. Null-marker
+rows remain safe precommit failures. With exactly one armed row, matching key and expectedRevision+1 completes
 the row; unchanged revision means interrupted before commitment and fails it; an advanced
 revision with another witness is an invariant violation and fails closed. Armed rows
 whose settings were quarantined or have contradictory metadata remain unresolved,

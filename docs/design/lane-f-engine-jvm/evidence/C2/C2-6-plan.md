@@ -37,7 +37,8 @@ Root owns shared lifecycle, schema and runner changes. No owner decision is pend
   Reset must reuse its dispatcher-issued attempt and declare SETTINGS_APPLY.
 - OperationSchema:36 already has accepted_settings_revision, explicitly defined by
   the design as the expected revision. It is currently unused. Populate this existing
-  column through a runner-owned conditional RUNNING transition before settings preparation;
+  column through a runner-owned conditional RUNNING transition after owner reservation
+  and durable revision comparison, before settings preparation;
   no completion listener is emitted. Do not widen generic OperationPreparation or invent
   another durable expected-revision authority. COMPLETE for a committed settings apply determines next revision as
   expected+1. OperationReceipt currently persists only safe code/executionId.
@@ -61,11 +62,13 @@ settings owner. Only that call supplies runner-owned AttemptControl to the owner
 handlers cannot fabricate a committed receipt or write a terminal state themselves.
 This avoids a circular service lookup, a second writer and a registry of attempts.
 
-Before any copy, builder or preparation callback, install the attempt-scoped PREPARING
-guard under the apply mutex; a Java mutex alone is reentrant. Compare expected revision,
-copy and prepare serialized bytes and ResolvedConfig, then perform strict atomic replacement.
+Before SQL arming or any copy, builder or preparation callback, reserve under the apply
+mutex: refuse active/unresolved fences, inspect the durable witness, compare expected
+revision and install an attempt-bound PREPARING token. Fail fast on occupied reservation.
+Release the mutex before the runner arms SQL; the locks never overlap. Then validate the
+same token, copy and prepare serialized bytes and ResolvedConfig, and perform strict atomic replacement.
 Promote the same guard to COMMITTED and mark its prebuilt immutable receipt on AttemptControl
-immediately after success. Only matching-attempt precommit cleanup may clear the guard. Swap the prepared config snapshot under the
+immediately after success. Only matching-attempt cleanup after durable terminal persistence may clear the guard. Swap the prepared config snapshot under the
 mutex; release the physical mutex before notifications. Keep the logical fence through
 durable row completion and release it through the fixed owner outside locks. Nested
 apply is refused, including an apply triggered by a notification. A post-commit ordinary
@@ -138,8 +141,9 @@ The decisions above incorporate the corrections; no execution proof is claimed.
 
 Reset's executeRecorded override receives its existing dispatcher-issued handle and calls
 SettingsService with expectedRevision. The service calls runner.applySettings; the runner
-validates live ownership/kind, conditionally sets the existing SQL expected-revision column,
-then invokes its fixed owner. Null marker at boot proves no settings preparation/effect;
+validates live ownership/kind, obtains a revision-validated reservation from the fixed
+owner, conditionally sets the existing SQL expected-revision column, then invokes preparation
+using the same opaque token. Null marker at boot proves no settings preparation/effect;
 armed marker plus exact key/expected+1 witness completes; unchanged valid prior witness fails
 precommit. Armed rows with quarantine or contradictory metadata stay unresolved and block
 settings mutation with a recovery Health condition. Do not loop restarts against missing
@@ -149,3 +153,18 @@ never caller-supplied. Internal writers enter exactly the same path with a serve
 The native-property preparation seam remains root implementation investigation within cut3.
 No operator question or external approval is required to settle it; no direct writer is
 waived from C2-6 acceptance. The existing D1 component-installation boundary is unchanged.
+
+## 2026-09-13 reservation-order correction
+
+Independent read-only review at9534c3330 refuted marker-before-reservation. While A holds
+revision R, B could arm R, be refused at the owner, then survive a crash after A writes
+R+1/keyA. B would falsely present an ambiguous armed witness. Merely reserving first is
+insufficient: stale B can reserve after A releases unless reservation compares the durable
+revision before SQL arming. The order above fixes both traces without another durable store.
+Do not reinterpret advanced different-key witnesses as precommit; corruption or bypass can
+violate the very invariant that inference assumes. Boot examines the complete open settings
+set before per-row reconciliation: more than one armed row blocks settings with recovery
+Health; one uses the existing witness rules; null-marker rows safely fail precommit.
+Required regressions add occupied/stale reservation leaves a null marker, reservation-to-arm
+failure retains the guard until durable failure, and multiple armed boot rows fail closed.
+This is a reviewed mechanism decision, not executable proof; no stage/merge cut changes.
