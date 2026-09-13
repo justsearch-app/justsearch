@@ -151,18 +151,21 @@ final class EngineGenerationCaptureTest {
           reads.incrementAndGet();
           return services;
         }, new ForegroundLoadGate(load), 5_000, 100, IpcTelemetry.noop(), () -> {}, admission)) {
-      assertUnavailable(() -> client.search("replacement", 1, TestEngineContexts.FOREGROUND));
-      assertUnavailable(() -> client.captureServingGeneration(TestEngineContexts.FOREGROUND));
-      assertUnavailable(() -> client.executeHealthRpc("replacement-health", 5_000,
-          service -> fail("absent health service reached body"), TestEngineContexts.FOREGROUND));
-      assertUnavailable(() -> client.executeScanRoot(io.justsearch.ipc.ScanRootRequest.getDefaultInstance(),
-          null, event -> fail("absent scan service emitted progress"), TestEngineContexts.FOREGROUND));
       var observed = new CompletableFuture<Throwable>();
       var completed = new CompletableFuture<Void>();
+      // All five calls retain the same request owner. A closed scan handoff can still be
+      // exiting after the port returns; waiting only for the later stream misses that owner.
       try (var owner = admission.admit(TestEngineContexts.FOREGROUND, false)) {
         owner.onCompletion(() -> completed.complete(null));
+        var context = owner.context();
+        assertUnavailable(() -> client.search("replacement", 1, context));
+        assertUnavailable(() -> client.captureServingGeneration(context));
+        assertUnavailable(() -> client.executeHealthRpc("replacement-health", 5_000,
+            service -> fail("absent health service reached body"), context));
+        assertUnavailable(() -> client.executeScanRoot(io.justsearch.ipc.ScanRootRequest.getDefaultInstance(),
+            null, event -> fail("absent scan service emitted progress"), context));
         try (var _ = client.subscribeIndexingJobs(frame -> fail("absent service emitted frame"),
-            observed::complete, () -> fail("absent service completed stream"), owner.context())) {
+            observed::complete, () -> fail("absent service completed stream"), context)) {
           var failure = assertInstanceOf(KnowledgeClientException.class, observed.get(3, TimeUnit.SECONDS));
           assertEquals(KnowledgeClientException.Status.UNAVAILABLE, failure.status());
         }
