@@ -1,5 +1,30 @@
 # C2 hosted verification
 
+## September13 R10 outcome reconciliation
+
+Re-read final API metadata for all four review-named runs. CI34700660160 completed
+**failure** (the documentation encoding job); its green orphan case is only a
+job-level proof. CI34696855256 completed **cancelled**, with the UI integration-test
+constructor failure retained in its completed build job. Neither is unresolved.
+[CI34720523685](https://github.com/justsearch-app/justsearch/actions/runs/34720523685)
+at04716d41e and
+[CI34721364763](https://github.com/justsearch-app/justsearch/actions/runs/34721364763)
+atc6556fa02 completed **success**, all13 jobs. These historical successes do not
+certify the later R1–R10 source. Exact metadata:
+`tmp/c2-review-r10-hosted-{34700660160,34696855256,34720523685,34721364763}.json`.
+
+Later CI34727822388 at41d0ab86d fails app-ui: the unchanged launcher-exclusion test
+fails all three attempts on Linux, because metadata-based stale-lock recovery
+can unlink the live lock. R10 removes that authority and preserves OS exclusion
+through a same-JVM refusal. The corresponding index-root lock has the same defect
+and is corrected with matching process probes. Local evidence and fresh hosted
+success are required before closure. Raw failed job log:
+`tmp/c2-review-r10-hosted-r8-failure.txt`; XML:
+`tmp/c2-review-r10-hosted-r8-app-ui/`.
+
+The following dated records retain what was known at each original checkpoint.
+
+
 September12: [CI34702144423](https://github.com/justsearch-app/justsearch/actions/runs/34702144423)
 at3b425cebb (guard cleanup) and
 [CI34703161196](https://github.com/justsearch-app/justsearch/actions/runs/34703161196)
@@ -18,7 +43,7 @@ fails in the all-source-set static-analysis step: ui compileIntegrationTestJava,
 SchemaMismatchStatusContractTest.java:107 still calls EngineRoot without the now
 required OperationAttemptRunner. The focused unit compilation missed this source
 set. CI34696855256 at4e800f61d repeats that exact failure in completed build job
-103561729483; the overall run was still active when inspected. These are required
+103561729483; the overall run was still active when originally inspected and finally completed cancelled. These are required
 red checks, not PMD violations or waived platform limits.
 
 Correction supplies the explicit mocked runner alongside the existing mocked store

@@ -199,6 +199,9 @@ jobs:
       - name: Screenshot-step coverage matches the reachable UI catalog
         run: node scripts/ci/check-ui-step-coverage.mjs
 
+      - name: Release asset compatibility tests
+        run: node --test scripts/release/app-release-assets.test.mjs
+
       - name: Release metadata projection tests
         run: |
           node --test scripts/release/release-changelog.test.mjs

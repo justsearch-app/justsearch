@@ -208,7 +208,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * deserialization fragile, and a parse failure here silently classifies clean (the live-validation
    * miss this fix resolves). The crashed predecessor's PID is all this needs.
    *
-   * <p><b>Conservative + reuse-aware (mirrors {@code AppInstanceLock.tryRecoverStaleLock}):</b> flag
+   * <p><b>Conservative + reuse-aware:</b> flag
    * unclean when the PID is dead, OR alive but its start-instant differs from the manifest's
    * {@code startedAt} (the PID was recycled — the predecessor is gone). A genuinely-alive same process,
    * our own PID, an absent manifest, or any read failure all classify clean, so no coincidental PID

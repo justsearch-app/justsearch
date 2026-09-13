@@ -10,19 +10,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Global process lock for a JustSearch data directory.
+ * Process-lifetime exclusion for a JustSearch data directory.
  *
- * <p>Why: JustSearch uses a multi-process architecture (Head + Worker) and stores mutable state under
- * a shared {@code dataDir} (Lucene index, jobs.db, logs, etc.). Running two app instances against the
- * same {@code dataDir} is unsafe, especially on Windows where file locking is strict.
- *
- * <p>This lock is intended to be acquired by the Main process early (before spawning the Worker) and
- * held for the lifetime of the app instance.
+ * <p>The Engine acquires this before opening mutable stores. OS locks are authoritative and the
+ * lock file is never deleted during refusal or release; PID metadata is diagnostic only.
  */
 public final class AppInstanceLock implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(AppInstanceLock.class);
@@ -45,11 +40,17 @@ public final class AppInstanceLock implements AutoCloseable {
    * {@link OverlappingFileLockException}.
    */
   public static boolean isHeldByThisJvm(Path dataDir) {
-    return HELD_IN_JVM.contains(dataDir.toAbsolutePath().normalize());
+    synchronized (HELD_IN_JVM) {
+      try {
+        return HELD_IN_JVM.contains(dataDir.toRealPath());
+      } catch (IOException unavailable) {
+        return false;
+      }
+    }
   }
 
-  private final Path lockPath;
-  private final Path canonicalDataDir;
+  private Path lockPath;
+  private Path canonicalDataDir;
   private FileChannel channel;
   private FileLock lock;
 
@@ -65,25 +66,24 @@ public final class AppInstanceLock implements AutoCloseable {
     return lock != null && lock.isValid();
   }
 
-  /**
-   * Acquire an exclusive lock for this dataDir.
-   *
-   * <p>If the lock is held by a dead process (detectable via PID metadata), the stale lock file is
-   * deleted and acquisition is retried once. This handles the case where a previous JVM crashed
-   * without releasing its OS file lock (possible on some platforms or after forced process kill).
-   *
-   * @throws AppInstanceLockException if another process already holds the lock
-   */
+  /** Acquire an exclusive lock; process exit releases it without deleting the lock file. */
   public void acquire() throws IOException {
-    acquireInner(false);
+    synchronized (HELD_IN_JVM) {
+      acquireExclusive();
+    }
   }
 
-  private void acquireInner(boolean isRetry) throws IOException {
-    if (isHeld()) {
-      return;
+  private void acquireExclusive() throws IOException {
+    if (isHeld()) return;
+    Files.createDirectories(canonicalDataDir);
+    canonicalDataDir = canonicalDataDir.toRealPath();
+    lockPath = canonicalDataDir.resolve("app.lock");
+    // Never open/close a second channel for a locally held file: on POSIX that can release
+    // this JVM's existing native lock, even though its FileLock object remains valid.
+    if (HELD_IN_JVM.contains(canonicalDataDir)) {
+      throw new AppInstanceLockException("Another JustSearch instance is already running for dataDir="
+          + canonicalDataDir);
     }
-
-    Files.createDirectories(lockPath.getParent());
 
     // Open/create lock file. Keep channel open for lifetime of the lock.
     channel =
@@ -96,19 +96,11 @@ public final class AppInstanceLock implements AutoCloseable {
       lock = channel.tryLock(); // Exclusive lock
       if (lock == null) {
         closeChannelQuietly();
-        if (!isRetry && tryRecoverStaleLock()) {
-          acquireInner(true);
-          return;
-        }
         throw new AppInstanceLockException(
             "Another JustSearch instance is already running for dataDir=" + lockPath.getParent());
       }
     } catch (OverlappingFileLockException e) {
       closeChannelQuietly();
-      if (!isRetry && tryRecoverStaleLock()) {
-        acquireInner(true);
-        return;
-      }
       throw new AppInstanceLockException(
           "Another JustSearch instance is already running for dataDir=" + lockPath.getParent(), e);
     } catch (IOException e) {
@@ -140,102 +132,11 @@ public final class AppInstanceLock implements AutoCloseable {
     }
   }
 
-  /**
-   * Attempt to recover from a stale lock by checking whether the holding process is dead.
-   *
-   * <p>Reads PID and start timestamp from the lock file metadata. If the PID no longer exists, or
-   * has been reused by a different process (start time mismatch), deletes the lock file so the
-   * caller can retry acquisition.
-   *
-   * @return true if the lock file was deleted (caller should retry), false otherwise
-   */
-  private boolean tryRecoverStaleLock() {
-    try {
-      if (!Files.exists(lockPath)) {
-        return false;
-      }
-      String content = Files.readString(lockPath);
-      Long pid = parsePidFromMetadata(content);
-      if (pid == null) {
-        return false;
-      }
-
-      var handleOpt = ProcessHandle.of(pid);
-      if (handleOpt.isEmpty()) {
-        // PID is dead — safe to recover.
-        log.warn("Recovering stale app lock: PID {} is dead, deleting {}", pid, lockPath);
-        Files.deleteIfExists(lockPath);
-        return true;
-      }
-
-      // PID exists — check if it's the same process that wrote the lock.
-      Long metadataStartMs = parseStartedAtFromMetadata(content);
-      if (metadataStartMs != null) {
-        var actualStart = handleOpt.get().info().startInstant();
-        if (actualStart.isPresent()) {
-          long actualMs = actualStart.get().toEpochMilli();
-          if (Math.abs(actualMs - metadataStartMs) > 1000) {
-            // PID was reused by a different process — safe to recover.
-            log.warn(
-                "Recovering stale app lock: PID {} reused (metadata start={}, actual start={}), deleting {}",
-                pid, metadataStartMs, actualMs, lockPath);
-            Files.deleteIfExists(lockPath);
-            return true;
-          }
-        }
-      }
-
-      // Holder is genuinely alive — cannot recover.
-      return false;
-    } catch (Exception e) {
-      log.debug("Stale lock recovery failed (will throw original error): {}", e.getMessage());
-      return false;
-    }
-  }
-
-  static Long parsePidFromMetadata(String content) {
-    if (content == null) {
-      return null;
-    }
-    for (String line : content.split("\\R")) {
-      if (line.startsWith("pid=")) {
-        try {
-          return Long.parseLong(line.substring(4).trim());
-        } catch (NumberFormatException ignored) {
-          // malformed
-        }
-      }
-    }
-    return null;
-  }
-
-  static Long parseStartedAtFromMetadata(String content) {
-    if (content == null) {
-      return null;
-    }
-    for (String line : content.split("\\R")) {
-      if (line.startsWith("started_at=")) {
-        String value = line.substring(11).trim();
-        try {
-          return Instant.parse(value).toEpochMilli();
-        } catch (Exception ignored) {
-          // Try as raw epoch millis
-          try {
-            return Long.parseLong(value);
-          } catch (NumberFormatException ignored2) {
-            // malformed
-          }
-        }
-      }
-    }
-    return null;
-  }
-
   private void writeOwnerMetadataBestEffort() {
     try {
       long pid = ProcessHandle.current().pid();
-      String content =
-          "pid=" + pid + "\nstarted_at=" + Instant.now() + "\n";
+      String content = "pid=" + pid + "\n" + ProcessHandle.current().info().startInstant()
+          .map(start -> "started_at=" + start + "\n").orElse("");
       channel.truncate(0);
       channel.position(0);
       channel.write(ByteBuffer.wrap(content.getBytes(StandardCharsets.UTF_8)));
@@ -248,6 +149,12 @@ public final class AppInstanceLock implements AutoCloseable {
 
   @Override
   public void close() {
+    synchronized (HELD_IN_JVM) {
+      closeExclusive();
+    }
+  }
+
+  private void closeExclusive() {
     boolean wasHeld = (lock != null);
     // Release lock first, then close channel.
     if (lock != null) {

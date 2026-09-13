@@ -1012,7 +1012,7 @@ public class HeadlessApp {
 
       // Tempdoc 501 Phase 3: acquire AppInstanceLock at the Head BEFORE binding HTTP or
       // spawning the Worker. The lock is OS-level (FileChannel.tryLock) with PID+startedAt
-      // metadata and stale recovery via ProcessHandle.of() — see AppInstanceLock.java.
+      // diagnostic metadata; only the OS lock decides exclusion — see AppInstanceLock.java.
       // Acquiring here lifts the invariant from the Worker-only path into the producer,
       // catching duplicate launches regardless of who started them (dev-runner, bare
       // gradle run, manual java -cp, production launcher). KnowledgeServerBootstrap

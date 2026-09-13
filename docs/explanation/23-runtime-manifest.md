@@ -179,7 +179,9 @@ site, not at a single static helper.
 ### Multi-instance enforcement
 
 `<dataDir>/app.lock` — OS-level `FileChannel.tryLock` with PID +
-start-timestamp metadata and stale recovery. Held by HeadlessApp for
+actual process-start metadata (when available). Metadata is diagnostic only; OS
+locks release on process exit and refusal never deletes the lock file. Same-JVM
+contenders are refused before a second channel can disturb the native lock. Held by HeadlessApp for
 the life of the process; a second Head against the same dataDir exits
 with a structured diagnostic and code 2.
 
