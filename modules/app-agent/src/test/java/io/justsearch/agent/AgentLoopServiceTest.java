@@ -774,6 +774,51 @@ class AgentLoopServiceTest {
   // ---------------------------------------------------------------------------
 
   @Test
+  void reattachmentFindsNestedWorkflowGateWithoutAPendingEventInTheReplayRing() throws Exception {
+    var ai = new ScriptedAiService(List.of(
+        ScriptedResponse.toolCall("wrapper", "core_workflow_fixture", "{}"),
+        ScriptedResponse.textOnly("done")));
+    var service = buildService(ai, new StubTool("workflow_fixture", RiskTier.LOW, "unused"));
+    var entered = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    var runId = new java.util.concurrent.atomic.AtomicReference<String>();
+    var detail = new AgentEvent.PendingApproval("inner-call", "core.inner", "{}", "low", "typed_confirm");
+    service.setWorkflowToolRunner(new io.justsearch.agent.api.registry.WorkflowToolRunner() {
+      @Override public boolean handles(OperationRef ref) { return true; }
+      @Override public OperationResult run(OperationRef ref, String args, Consumer<AgentEvent> sink, EngineContext context) {
+        runId.set(context.sessionId().orElseThrow()); entered.countDown();
+        try {
+          if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS)) return OperationResult.failure("fixture timeout");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt(); return OperationResult.failure("fixture interrupted");
+        }
+        return OperationResult.success("workflow done");
+      }
+      @Override public List<AgentEvent.PendingApproval> pendingApprovals(String sessionId) {
+        return sessionId.equals(runId.get()) && release.getCount() > 0 ? List.of(detail) : List.of();
+      }
+    });
+    var loop = new Thread(() -> service.runAgent(new AgentRequest(userMessage("workflow"), List.of(), 3),
+        event -> {}, EngineContextTestFixtures.AGENT_LOOP));
+    loop.setDaemon(true); loop.start();
+    assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+    var primer = new CompletableFuture<Map<String, Object>>();
+    var attached = new Thread(() -> service.attachToRun(runId.get(), frame -> {
+      if (frame.name().equals("state_snapshot")) primer.complete(frame.payload());
+    }));
+    attached.setDaemon(true); attached.start();
+    try {
+      var snapshot = primer.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      var gates = (List<?>) snapshot.get("pendingApprovals");
+      assertEquals(1, gates.size()); assertTrue(gates.toString().contains("inner-call"));
+      assertTrue(gates.toString().contains("typed_confirm"));
+    } finally {
+      release.countDown(); loop.join(5000); attached.join(5000);
+    }
+    assertFalse(loop.isAlive()); assertFalse(attached.isAlive());
+  }
+
+  @Test
   void preparedToolScopeIsFrozenBeforeTheHumanGateInTheRealLoop() {
     var ai = new ScriptedAiService(List.of(
         ScriptedResponse.toolCall("scoped-call", "core_search_index", "{\"query\":\"test\"}"),

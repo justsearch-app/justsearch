@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class WorkflowGateRegistry {
 
-  private record Gate(CompletableFuture<Boolean> future, io.justsearch.agent.api.PendingToolApproval approval) {}
+  private record Gate(CompletableFuture<Boolean> future, io.justsearch.agent.api.PendingToolApproval approval,
+      String workflowSessionId, String enclosingSessionId) {}
 
   private final Map<String, Gate> gates = new ConcurrentHashMap<>();
 
@@ -28,8 +29,14 @@ public final class WorkflowGateRegistry {
 
   /** Keep display on this live gate only; public events receive approval.detail(), never its preview. */
   public CompletableFuture<Boolean> create(String callId, io.justsearch.agent.api.PendingToolApproval approval) {
+    return create(callId, approval, null, null);
+  }
+
+  /** Associations are read projections for reattachment, never permission or execution authority. */
+  public CompletableFuture<Boolean> create(String callId, io.justsearch.agent.api.PendingToolApproval approval,
+      String workflowSessionId, String enclosingSessionId) {
     CompletableFuture<Boolean> future = new CompletableFuture<>();
-    gates.put(callId, new Gate(future, approval));
+    gates.put(callId, new Gate(future, approval, workflowSessionId, enclosingSessionId));
     return future;
   }
 
@@ -37,6 +44,16 @@ public final class WorkflowGateRegistry {
     if (callId == null || callId.isBlank()) return java.util.Optional.empty();
     var gate = gates.get(callId);
     return gate == null ? java.util.Optional.empty() : java.util.Optional.ofNullable(gate.approval());
+  }
+
+  public java.util.List<io.justsearch.agent.api.AgentEvent.PendingApproval> pendingApprovals(String sessionId) {
+    if (sessionId == null || sessionId.isBlank()) return java.util.List.of();
+    return gates.values().stream()
+        .filter(g -> !g.future().isDone() && g.approval() != null)
+        .filter(g -> sessionId.equals(g.workflowSessionId()) || sessionId.equals(g.enclosingSessionId()))
+        .map(g -> g.approval().detail())
+        .sorted(java.util.Comparator.comparing(io.justsearch.agent.api.AgentEvent.PendingApproval::callId))
+        .toList();
   }
 
   /**

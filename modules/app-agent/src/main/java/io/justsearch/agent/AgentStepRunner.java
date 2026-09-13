@@ -114,6 +114,11 @@ final class AgentStepRunner {
    * Tempdoc 560 WS5 — late-bind the streaming workflow-as-tool runner (set by {@code LocalApiServer}
    * once {@code WorkflowShapeRunner} exists). Idempotent; safe to call before the first agent run.
    */
+  List<AgentEvent.PendingApproval> pendingWorkflowApprovals(String sessionId) {
+    var runner = workflowToolRunner;
+    return runner == null ? List.of() : runner.pendingApprovals(sessionId);
+  }
+
   void setWorkflowToolRunner(io.justsearch.agent.api.registry.WorkflowToolRunner runner) {
     this.workflowToolRunner = runner;
   }
@@ -985,7 +990,7 @@ final class AgentStepRunner {
           // operation or an unscoped run. `call` itself (used below for loop-guard/history) stays
           // the LLM's original, unscoped arguments.
           if (streamingWorkflow) {
-            toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink, session.engineContext());
+            toolResult = wfRunner.run(op.id(), scopedCall.arguments(), sink, session.engineContext(), session.isBackground());
           } else {
             // Tempdoc 561 P-A1: thread the agent sessionId so the dispatched call stamps it as the
             // ledger correlationId (the History join key).

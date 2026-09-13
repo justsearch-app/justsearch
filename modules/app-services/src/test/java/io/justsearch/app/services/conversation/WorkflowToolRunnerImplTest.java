@@ -24,12 +24,12 @@ final class WorkflowToolRunnerImplTest {
   private static final OperationRef DEMO_OP = new OperationRef("core.workflow-demo-compose");
 
   private WorkflowToolRunnerImpl runnerWith(WorkflowToolRunnerImpl.WorkflowExecutor executor) {
-    return new WorkflowToolRunnerImpl(CoreWorkflowCatalog.catalog(), executor);
+    return new WorkflowToolRunnerImpl(CoreWorkflowCatalog.catalog(), executor, new WorkflowGateRegistry());
   }
 
   @Test
   void handlesOnlyProjectedWorkflowRefs() {
-    WorkflowToolRunnerImpl runner = runnerWith((body, audience, sink, engineContext) -> {});
+    WorkflowToolRunnerImpl runner = runnerWith((body, audience, sink, engineContext, background) -> {});
     assertTrue(runner.handles(DEMO_OP), "a projected workflow op is handled");
     assertFalse(
         runner.handles(new OperationRef("core.restart-worker")), "a normal op is not handled");
@@ -42,7 +42,7 @@ final class WorkflowToolRunnerImplTest {
   void streamsNodeProgressAsAgentProgressAndReturnsFinalResponse() {
     // A fake workflow run that emits the real SSE vocabulary, terminating in `done`.
     WorkflowToolRunnerImpl.WorkflowExecutor fake =
-        (body, audience, sink, engineContext) -> {
+        (body, audience, sink, engineContext, background) -> {
           // The runner sets the body itself — assert it routed the right workflow.
           assertEquals("core.demo-compose", body.get("workflowId"));
           sink.accept(new SseEvent("session_started", Map.of("sessionId", "s1")));
@@ -73,7 +73,7 @@ final class WorkflowToolRunnerImplTest {
   @Test
   void workflowErrorBecomesAFailureResultNotAnException() {
     WorkflowToolRunnerImpl.WorkflowExecutor failing =
-        (body, audience, sink, engineContext) ->
+        (body, audience, sink, engineContext, background) ->
             sink.accept(new SseEvent("error", Map.of("error", "node n1 blew up")));
     List<AgentEvent> events = new ArrayList<>();
     OperationResult result = runnerWith(failing).run(DEMO_OP, "{}", events::add, io.justsearch.app.services.TestEngineContexts.internal());
@@ -84,7 +84,7 @@ final class WorkflowToolRunnerImplTest {
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"medium", "high"})
   void nestedWorkflowApprovalControlsRemainAnswerable(String risk) {
-    WorkflowToolRunnerImpl.WorkflowExecutor fake = (body, audience, sink, context) -> {
+    WorkflowToolRunnerImpl.WorkflowExecutor fake = (body, audience, sink, context, background) -> {
       sink.accept(new SseEvent("tool_call_pending", Map.of("callId", "inner-call", "toolName", "core.test",
           "arguments", "{\"public\":true}", "risk", risk)));
       sink.accept(new SseEvent("tool_call_approved", Map.of("callId", "inner-call")));
@@ -110,7 +110,7 @@ final class WorkflowToolRunnerImplTest {
   @Test
   void executorThrowBecomesAFailureResult() {
     WorkflowToolRunnerImpl.WorkflowExecutor throwing =
-        (body, audience, sink, engineContext) -> {
+        (body, audience, sink, engineContext, background) -> {
           throw new IllegalStateException("engine offline");
         };
     OperationResult result = runnerWith(throwing).run(DEMO_OP, "{}", e -> {}, io.justsearch.app.services.TestEngineContexts.internal());

@@ -520,7 +520,8 @@ public final class AgentLoopService implements AgentService {
                     session.toolCallsExecuted(),
                     session.messages().size(),
                     session.activeAgentId(),
-                    session.pendingApprovals(),
+                    java.util.stream.Stream.concat(session.pendingApprovals().stream(),
+                        stepRunner.pendingWorkflowApprovals(sessionId).stream()).toList(),
                     session.autonomyLevel().name(),
                     session.parkSnapshot(),
                     TraceContext.none()));

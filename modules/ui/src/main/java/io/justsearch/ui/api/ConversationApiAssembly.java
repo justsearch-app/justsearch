@@ -69,16 +69,18 @@ final class ConversationApiAssembly {
     // lazily through a holder (live-only: a workflow tool is never invoked before the agent runs).
     final io.justsearch.app.services.conversation.WorkflowShapeRunner[] wfShapeRunnerHolder =
         new io.justsearch.app.services.conversation.WorkflowShapeRunner[1];
+    var workflowGateRegistry =
+        new io.justsearch.app.services.conversation.WorkflowGateRegistry();
     final io.justsearch.agent.api.registry.WorkflowToolRunner wfToolRunner =
         new io.justsearch.app.services.conversation.WorkflowToolRunnerImpl(
             io.justsearch.app.services.conversation.CoreWorkflowCatalog.catalog(),
-            (body, aud, sink, engineContext) -> {
+            (body, aud, sink, engineContext, background) -> {
               io.justsearch.app.services.conversation.WorkflowShapeRunner r = wfShapeRunnerHolder[0];
               if (r == null) {
                 throw new IllegalStateException("WorkflowShapeRunner not yet wired");
               }
-              r.run(body, aud, sink, engineContext);
-            });
+              r.run(body, aud, sink, engineContext, background);
+            }, workflowGateRegistry);
     Supplier<io.justsearch.agent.api.AgentService> rawAgentSupplier =
         b.agentService != null
             ? () -> b.agentService
@@ -331,8 +333,6 @@ final class ConversationApiAssembly {
     // engine, which is constructed below with this runner in its list.
     final io.justsearch.app.services.conversation.ConversationEngine[] engineHolder =
         new io.justsearch.app.services.conversation.ConversationEngine[1];
-    var workflowGateRegistry =
-        new io.justsearch.app.services.conversation.WorkflowGateRegistry();
     io.justsearch.app.services.conversation.WorkflowShapeRunner workflowShapeRunner = null;
     if (b.HeadAssembly != null) {
       var gatedExecutor =
@@ -356,7 +356,7 @@ final class ConversationApiAssembly {
               () -> b.HeadAssembly.substrate().operations().operations(),
               gatedExecutor,
               workflowGateRegistry,
-              sharedRunEvents);
+              sharedRunEvents, b.HeadAssembly.substrate().conversation().intentGateEvaluator());
       // Tempdoc 560 WS5 — publish the runner into the holder the workflow-tool bridge reads lazily.
       wfShapeRunnerHolder[0] = workflowShapeRunner;
     }

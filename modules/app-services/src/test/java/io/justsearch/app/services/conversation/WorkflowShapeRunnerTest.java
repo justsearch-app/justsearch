@@ -60,6 +60,12 @@ import org.junit.jupiter.api.Test;
  */
 class WorkflowShapeRunnerTest {
 
+  private static io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator() {
+    return new io.justsearch.app.services.intent.IntentGateEvaluator(
+        new io.justsearch.app.services.intent.CoreTrustEvaluator(),
+        io.justsearch.app.services.intent.CoreIntentSourceCatalog.catalog());
+  }
+
   private static Operation op(String id, RiskTier risk) {
     OperationRef ref = new OperationRef(id);
     return new Operation(
@@ -99,11 +105,25 @@ class WorkflowShapeRunnerTest {
     OperationCatalog agentTools =
         OperationCatalog.of("vendor.x", List.of(op("vendor.x.add", RiskTier.LOW)));
     OperationCatalog coreOps = OperationCatalog.of("core", List.of());
-    BackendIntentRouter router =
-        (intent, provenance, engineContext) -> {
-          contextSink.accept(engineContext);
-          return new IntentDispatchResult.Dispatched(dispatchResult);
-        };
+    BackendIntentRouter router = new BackendIntentRouter() {
+      @Override public io.justsearch.agent.api.registry.OperationDispatchPlan prepare(
+          io.justsearch.agent.api.registry.Intent intent,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance,
+          EngineContext context, String key, boolean includePreview) {
+        return new io.justsearch.agent.api.registry.OperationDispatchPlan.Ready("workflow-key", null, Optional.empty());
+      }
+      @Override public IntentDispatchResult dispatch(io.justsearch.agent.api.registry.Intent intent,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance, EngineContext context) {
+        throw new AssertionError("Workflow must retain its plan through dispatch");
+      }
+      @Override public IntentDispatchResult dispatch(io.justsearch.agent.api.registry.Intent intent,
+          io.justsearch.agent.api.registry.InvocationProvenance provenance, EngineContext context,
+          String key, java.util.UUID nonce) {
+        assertEquals("workflow-key", key);
+        contextSink.accept(context);
+        return new IntentDispatchResult.Dispatched(dispatchResult);
+      }
+    };
     GatedOperationExecutor gated =
         new GatedOperationExecutor(() -> router, () -> null, TransportTag.WORKFLOW);
     ConversationEngine engine =
@@ -114,7 +134,7 @@ class WorkflowShapeRunnerTest {
         () -> agentTools,
         () -> coreOps,
         gated,
-        new WorkflowGateRegistry());
+        new WorkflowGateRegistry(), gateEvaluator());
   }
 
   private static List<String> names(List<SseEvent> events) {
@@ -230,7 +250,7 @@ class WorkflowShapeRunnerTest {
                 () -> (intent, provenance, engineContext) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
                 () -> null,
                 TransportTag.WORKFLOW),
-            new WorkflowGateRegistry());
+            new WorkflowGateRegistry(), gateEvaluator());
     List<SseEvent> events = new CopyOnWriteArrayList<>();
 
     r.run(Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui());
@@ -386,7 +406,7 @@ class WorkflowShapeRunnerTest {
                 () -> (intent, provenance, engineContext) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
                 () -> null,
                 TransportTag.WORKFLOW),
-            new WorkflowGateRegistry());
+            new WorkflowGateRegistry(), gateEvaluator());
 
     r.run(Map.of("workflowId", "core.t-llm"), Audience.USER, new CopyOnWriteArrayList<>()::add, io.justsearch.app.services.TestEngineContexts.ui());
 
@@ -433,7 +453,7 @@ class WorkflowShapeRunnerTest {
                 () -> (intent, provenance, engineContext) -> new IntentDispatchResult.Dispatched(OperationResult.success("x")),
                 () -> null,
                 TransportTag.WORKFLOW),
-            new WorkflowGateRegistry());
+            new WorkflowGateRegistry(), gateEvaluator());
     List<SseEvent> events = new CopyOnWriteArrayList<>();
 
     r.run(Map.of("workflowId", "core.t-llm2"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.ui());

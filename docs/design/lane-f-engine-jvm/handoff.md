@@ -53,8 +53,11 @@ reply/announcement/cancellation lifetime and private full-target display;
 Agent preparation-reference carry-through now passes978 represented cases at1024,
 including the full684-case agent suite and the scope-order negative1022;
 [agent proof](evidence/C2/agent-continuation.md).
-Next: connect workflow preparation-reference carry-through and the frontend private lookup,
-including nested approval snapshot reattachment,
+Workflow preparation-reference carry-through, declared confirmation floors and
+nested approval snapshots now pass2155 cases at1027 (one inherited UI skip);
+[workflow proof](evidence/C2/workflow-continuation.md).
+Next: preserve background posture through LlmStep shape delegation (the concrete
+section0/plan item), then connect the frontend private lookup,
 then remaining ingress and integrated C2-3 acceptance. Hosted v3 proof remains
 required; the earlier hosted b713 correction acceptance certified v2.
 See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.

@@ -350,3 +350,16 @@ public JSON for a prepared call. SSE and ledger remain routing/metadata only. Th
 a derived display projection, not a second execution authority or durable payload.
 Backend transport proof owns this item; long-path visual presentation must be checked
 and wrapped before C2-3 acceptance, alongside agent/workflow gate consumers.
+
+### Nested LLM delegation posture (September13)
+
+Direct workflow tool/gate background refusal does not cover an LlmStep delegating
+into another agent shape. The existing ConversationEngine always calls the shape
+runner with an engine-built body, already overwriting the server-owned
+recordsToThread projection. Reuse that ownership pattern for a backgroundRun
+projection, with an explicit boolean engine overload. Public engine ingress defaults
+to interactive and overwrites any supplied backgroundRun value; an enclosing workflow
+passes its server posture explicitly. ToolIteratingShapeRunner must use the background
+AgentService overload, and a nested WorkflowShapeRunner must preserve the projected
+posture. Do not infer it from urgency/survival: those axes are independent. This is
+the next bounded implementation item, before frontend lookup and C2-3 acceptance.

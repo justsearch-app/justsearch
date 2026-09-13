@@ -62,6 +62,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   private final Supplier<OperationCatalog> coreOperationsSupplier;
   private final GatedOperationExecutor gatedExecutor;
   private final WorkflowGateRegistry gateRegistry;
+  private final io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator;
   // Tempdoc 565 §15.C — the shared, shape-agnostic run event log: the workflow run persists + indexes
   // through it (same space as agent runs), so the unified thread projects it as a mode of the one
   // window. noop() on the test-only path (the run still streams; it just isn't persisted).
@@ -73,7 +74,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
       Supplier<OperationCatalog> agentToolsSupplier,
       Supplier<OperationCatalog> coreOperationsSupplier,
       GatedOperationExecutor gatedExecutor,
-      WorkflowGateRegistry gateRegistry) {
+      WorkflowGateRegistry gateRegistry, io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator) {
     this(
         engineSupplier,
         workflowCatalog,
@@ -81,7 +82,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
         coreOperationsSupplier,
         gatedExecutor,
         gateRegistry,
-        io.justsearch.agent.RunEventStore.noop());
+        io.justsearch.agent.RunEventStore.noop(), gateEvaluator);
   }
 
   public WorkflowShapeRunner(
@@ -91,7 +92,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
       Supplier<OperationCatalog> coreOperationsSupplier,
       GatedOperationExecutor gatedExecutor,
       WorkflowGateRegistry gateRegistry,
-      io.justsearch.agent.RunEventStore runEvents) {
+      io.justsearch.agent.RunEventStore runEvents,
+      io.justsearch.app.services.intent.IntentGateEvaluator gateEvaluator) {
     this.engineSupplier = Objects.requireNonNull(engineSupplier, "engineSupplier");
     this.workflowCatalog = Objects.requireNonNull(workflowCatalog, "workflowCatalog");
     this.agentToolsSupplier = Objects.requireNonNull(agentToolsSupplier, "agentToolsSupplier");
@@ -100,6 +102,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     this.gatedExecutor = Objects.requireNonNull(gatedExecutor, "gatedExecutor");
     this.gateRegistry = Objects.requireNonNull(gateRegistry, "gateRegistry");
     this.runEvents = Objects.requireNonNull(runEvents, "runEvents");
+    this.gateEvaluator = Objects.requireNonNull(gateEvaluator, "gateEvaluator");
   }
 
   @Override
@@ -109,6 +112,12 @@ public final class WorkflowShapeRunner implements ShapeRunner {
 
   @Override
   public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext incomingContext) {
+    run(body, audience, sink, incomingContext, false);
+  }
+
+  /** Background is supplied by the enclosing server run, never parsed from public workflow arguments. */
+  public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink,
+      EngineContext incomingContext, boolean background) {
     WorkflowRef workflowId = resolveWorkflowId(body);
     Workflow workflow = workflowCatalog.findById(workflowId).orElse(null);
     if (workflow == null) {
@@ -182,7 +191,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
         switch (node) {
           case WorkflowNode.LlmStep step -> lastOutput = runLlmStep(step, lastOutput, audience, psink, engineContext);
           case WorkflowNode.GateStep step -> {
-            if (!runGateStep(step, psink)) {
+            if (!runGateStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background)) {
               // User declined at the gate — terminate the workflow cleanly.
               psink.accept(
                   new SseEvent(
@@ -198,7 +207,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
             }
           }
           case WorkflowNode.ToolStep step -> {
-            ToolOutcome outcome = runToolStep(step, psink, engineContext);
+            ToolOutcome outcome = runToolStep(step, psink, engineContext, incomingContext.sessionId().orElse(null), background);
             if (outcome.cancelled()) {
               psink.accept(
                   new SseEvent(
@@ -303,16 +312,21 @@ public final class WorkflowShapeRunner implements ShapeRunner {
   }
 
   /** GateStep — surface a consent prompt and block on the user. Returns true iff approved. */
-  private boolean runGateStep(WorkflowNode.GateStep step, Consumer<SseEvent> sink) {
+  private boolean runGateStep(WorkflowNode.GateStep step, Consumer<SseEvent> sink,
+      EngineContext context, String enclosingSessionId, boolean background) {
     if (step.confirm() instanceof ConfirmStrategy.None) {
       return true; // no confirmation required
     }
     RiskTier risk = riskOf(step.confirm());
-    return awaitApproval(sink, UUID.randomUUID().toString(), "(confirm)", "{}", risk);
+    var behavior = gateEvaluator.agentGate(risk, io.justsearch.agent.api.registry.AutonomyLevel.ASSIST,
+        false, step.confirm());
+    return awaitApproval(sink, UUID.randomUUID().toString(), "(confirm)", "{}", risk,
+        behavior, Optional.empty(), context, enclosingSessionId, background);
   }
 
   /** ToolStep — resolve the op, gate it if required, then route the approved call. */
-  private ToolOutcome runToolStep(WorkflowNode.ToolStep step, Consumer<SseEvent> sink, EngineContext engineContext) {
+  private ToolOutcome runToolStep(WorkflowNode.ToolStep step, Consumer<SseEvent> sink,
+      EngineContext engineContext, String enclosingSessionId, boolean background) {
     Operation op = resolveOperation(step.operation().value());
     if (op == null) {
       // Validation passed against the live catalog, so absence here is a race (server disconnected
@@ -326,16 +340,28 @@ public final class WorkflowShapeRunner implements ShapeRunner {
     String toolName = op.id().value();
     String args = step.argumentsJson();
 
-    if (gatedExecutor.requiresApproval(op)) {
-      if (!awaitApproval(sink, callId, toolName, args, op.policy().risk())) {
-        return ToolOutcome.cancelledOutcome();
-      }
+    var behavior = gateEvaluator.agentGate(op.policy().risk(),
+        io.justsearch.agent.api.registry.AutonomyLevel.ASSIST,
+        op.policy().undoSupported() || op.policy().inverseOperationRef().isPresent(), op.policy().confirm());
+    if (behavior == io.justsearch.agent.api.registry.GateBehavior.DENY
+        || (background && behavior != io.justsearch.agent.api.registry.GateBehavior.AUTO)) {
+      awaitApproval(sink, callId, toolName, args, op.policy().risk(), behavior, Optional.empty(),
+          engineContext, enclosingSessionId, background);
+      return ToolOutcome.cancelledOutcome();
+    }
+    var plan = gatedExecutor.prepare(op, args, engineContext, null,
+        behavior != io.justsearch.agent.api.registry.GateBehavior.AUTO);
+    if (!(plan instanceof io.justsearch.agent.api.registry.OperationDispatchPlan.Recorded)
+        && behavior != io.justsearch.agent.api.registry.GateBehavior.AUTO) {
+      var preview = ((io.justsearch.agent.api.registry.OperationDispatchPlan.Ready) plan).approvalPreview();
+      if (!awaitApproval(sink, callId, toolName, args, op.policy().risk(), behavior, preview,
+          engineContext, enclosingSessionId, background)) return ToolOutcome.cancelledOutcome();
     }
 
     sink.accept(new SseEvent("tool_exec_started", Map.of("callId", callId, "toolName", toolName)));
     OperationResult result;
     try {
-      result = gatedExecutor.routeApproved(op, args, engineContext);
+      result = gatedExecutor.routePrepared(op, args, plan, engineContext);
     } catch (RuntimeException e) {
       LOG.warn("Workflow tool step '{}' dispatch failed", step.nodeId(), e);
       result = OperationResult.failure("Execution error: " + e.getMessage());
@@ -360,11 +386,20 @@ public final class WorkflowShapeRunner implements ShapeRunner {
    * to mirror the agent surface's authorization vocabulary so the FE can reuse its approval flow.
    */
   private boolean awaitApproval(
-      Consumer<SseEvent> sink, String callId, String toolName, String argsJson, RiskTier risk) {
+      Consumer<SseEvent> sink, String callId, String toolName, String argsJson, RiskTier risk,
+      io.justsearch.agent.api.registry.GateBehavior behavior,
+      Optional<io.justsearch.agent.api.registry.OperationApprovalPreview> preview,
+      EngineContext context, String enclosingSessionId, boolean background) {
+    if (behavior == io.justsearch.agent.api.registry.GateBehavior.DENY || background) {
+      sink.accept(new SseEvent("tool_call_rejected", Map.of("callId", callId, "reason",
+          background ? "Background workflow cannot wait for human approval" : "Operation denied by current policy")));
+      return false;
+    }
     var detail = new io.justsearch.agent.api.AgentEvent.PendingApproval(callId, toolName, argsJson,
-        risk.name().toLowerCase(java.util.Locale.ROOT), risk == RiskTier.HIGH ? "typed_confirm" : "inline_confirm");
+        risk.name().toLowerCase(java.util.Locale.ROOT), behavior.name().toLowerCase(java.util.Locale.ROOT));
     CompletableFuture<Boolean> gate = gateRegistry.create(callId,
-        new io.justsearch.agent.api.PendingToolApproval(detail, Optional.empty()));
+        new io.justsearch.agent.api.PendingToolApproval(detail, preview),
+        context.sessionId().orElseThrow(), enclosingSessionId);
     boolean approved;
     try {
       // Announcing the call can synchronously deliver its reply; the future must already exist.
@@ -375,7 +410,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
                   "callId", callId,
                   "toolName", toolName,
                   "arguments", argsJson,
-                  "risk", risk.name().toLowerCase(java.util.Locale.ROOT))));
+                  "risk", risk.name().toLowerCase(java.util.Locale.ROOT),
+                  "gateBehavior", behavior.name().toLowerCase(java.util.Locale.ROOT))));
       try {
         approved = gate.get(GATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       } catch (Exception e) {

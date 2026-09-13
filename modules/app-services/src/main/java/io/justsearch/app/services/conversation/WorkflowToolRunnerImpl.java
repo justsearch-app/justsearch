@@ -32,15 +32,17 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
   /** The single behavior this bridge needs from {@code WorkflowShapeRunner} — its {@code run}. */
   @FunctionalInterface
   public interface WorkflowExecutor {
-    void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext);
+    void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext, boolean background);
   }
 
   private final WorkflowCatalog workflowCatalog;
   private final WorkflowExecutor executor;
+  private final WorkflowGateRegistry gateRegistry;
 
-  public WorkflowToolRunnerImpl(WorkflowCatalog workflowCatalog, WorkflowExecutor executor) {
+  public WorkflowToolRunnerImpl(WorkflowCatalog workflowCatalog, WorkflowExecutor executor, WorkflowGateRegistry gateRegistry) {
     this.workflowCatalog = Objects.requireNonNull(workflowCatalog, "workflowCatalog");
     this.executor = Objects.requireNonNull(executor, "executor");
+    this.gateRegistry = Objects.requireNonNull(gateRegistry, "gateRegistry");
   }
 
   @Override
@@ -53,6 +55,17 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
 
   @Override
   public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink, EngineContext engineContext) {
+    return run(ref, argumentsJson, sink, engineContext, false);
+  }
+
+  @Override
+  public java.util.List<AgentEvent.PendingApproval> pendingApprovals(String sessionId) {
+    return gateRegistry.pendingApprovals(sessionId);
+  }
+
+  @Override
+  public OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink,
+      EngineContext engineContext, boolean background) {
     WorkflowRef workflowRef = WorkflowOperationProjection.workflowRefFor(ref).orElse(null);
     if (workflowRef == null || workflowCatalog.findById(workflowRef).isEmpty()) {
       return OperationResult.failure("Not a projected workflow tool: " + ref.value());
@@ -76,6 +89,9 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
               if (fr != null) {
                 finalResponse[0] = fr.toString();
               }
+              if (Boolean.TRUE.equals(ev.payload().get("cancelled"))) {
+                errorMessage[0] = finalResponse[0].isBlank() ? "Workflow cancelled" : finalResponse[0];
+              }
             }
             case "error" -> {
               Object err = ev.payload().get("error");
@@ -93,7 +109,7 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
       // model's argumentsJson is intentionally not threaded through (an empty-object schema is
       // projected) — see WorkflowOperationProjection.
       executor.run(
-          Map.of("workflowId", workflowRef.value()), Audience.AGENT, sseSink, engineContext);
+          Map.of("workflowId", workflowRef.value()), Audience.AGENT, sseSink, engineContext, background);
     } catch (RuntimeException e) {
       // Host owns truth (§4.5): a runner failure becomes a result the model can recover from, never
       // an exception that tears down the agent loop.
@@ -116,7 +132,10 @@ public final class WorkflowToolRunnerImpl implements WorkflowToolRunner {
         var risk = io.justsearch.agent.api.registry.RiskTier.valueOf(
             requiredText(event, "risk").toUpperCase(java.util.Locale.ROOT));
         // The workflow explicitly waits for confirmation. An outer AUTO dial cannot remove it.
-        var gate = risk == io.justsearch.agent.api.registry.RiskTier.HIGH
+        var declaredGate = event.payload().get("gateBehavior");
+        var gate = declaredGate instanceof String value
+            ? io.justsearch.agent.api.registry.GateBehavior.valueOf(value.toUpperCase(java.util.Locale.ROOT))
+            : risk == io.justsearch.agent.api.registry.RiskTier.HIGH
             ? io.justsearch.agent.api.registry.GateBehavior.TYPED_CONFIRM
             : io.justsearch.agent.api.registry.GateBehavior.INLINE_CONFIRM;
         yield new AgentEvent.ToolCallPendingApproval(requiredText(event, "callId"),
