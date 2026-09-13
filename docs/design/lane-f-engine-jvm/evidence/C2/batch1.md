@@ -1,7 +1,13 @@
 # C2 batch1 acceptance reconciliation
 
-Status: batch1 complete at6a4059352 on2026-09-12. C2 as a stage remains open.
-C2-2 is next; no owner input or approval is pending. Merge placement stays F/PR1.
+Status: historical batch1 proof at6a4059352 on2026-09-12, reopened September13
+for R7's installed operations-row witness and R9's later schema reproof. C2 remains
+open; [the correction batch](review-correction-september13.md) governs next work.
+No owner input or approval is pending. Merge placement stays F/PR1.
+
+R7's [installed816 operations-row proof](review-r7-installed-row.md) now passes,
+including a failing installed substrate-bypass control. The six keyed C2-11
+scenarios and R9's schema reconciliation are still open; this is not batch closure.
 
 ## Implemented boundary
 

@@ -43,6 +43,8 @@ scope addition is recorded under the next item's section0.1, never silently expa
    two wrong-side crash witnesses; PMD and UI integration-test compilation pass.
 7. **R7 OPEN — installed proof/status.** C2-11 must inspect operations and fail on
    substrate reversion; correct batch1/handoff claims and execute its specified tier.
+   [Installed816 and bypass-negative817](review-r7-installed-row.md) prove the
+   foundation witness; six keyed C2-11 scenarios and final batch review remain open.
 8. **R8 OPEN — swallowed failures.** Background terminalization, failed root walks,
    post-commit queue notifications, bridge snapshot reset/coalescing and launcher close
    all need their specific runnable regressions without suppressing failures.

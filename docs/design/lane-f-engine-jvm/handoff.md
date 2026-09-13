@@ -5,7 +5,9 @@ The earlier per-PR approval requirements below are historical and superseded.
 The orchestrator verifies, reviews and merges autonomously through the repository
 queue; no owner reply is needed for #708 or #717.
 
-Latest state: C1 COMPLETE; C2 batch1 COMPLETE; C2-2 implementation is in progress.
+Latest state: C1 COMPLETE; C2 is open. Batch1's historical foundation proof is
+reopened for the C2-11 operations-row witness (R7) and later schema reproof (R9);
+C2-2 implementation remains in progress.
 
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),
 adopted at429115fec. New ingestion work is paused. R1 async persistence observability passes its named
@@ -16,8 +18,9 @@ typed admission reasons pass88 cases and five negative controls. R5 bounded hist
 schema v2 and the registered hourly timer pass228 cases and the item gate at810.
 The terminal write now returns its committed snapshot so retention cannot race
 completion publication. R6's named acceptance-before-effect child-JVM kill passes
-at814, with two wrong-side controls. Next is R7's installed operations-row proof,
-followed by swallowed-failure fixes,
+at814, with two wrong-side controls. R7's installed operations-row proof passes816,
+and restoring the former acceptance bypass fails817. The six keyed C2-11 scenarios
+remain open. Next is R8's swallowed-failure fixes, followed by
 checklist and evidence findings. Root owns corrections; one final independent review per batch.
 The prior next-step ingestion notes below are superseded by that ordered batch.
 

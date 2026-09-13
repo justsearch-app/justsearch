@@ -50,6 +50,7 @@ export async function exerciseProcessingReplay(c) {
   const afterDeath = jobStateFor(path.basename(file));
   requireThat(afterDeath?.state === 'PROCESSING',
     `must remain PROCESSING after actual death, not just earlier: ${JSON.stringify(afterDeath)}`);
+  if (c.observeAfterDeath) await c.observeAfterDeath();
   const afterRead = readJson(supervisorFile);
   requireThat(afterRead?.runId === first.runId && afterRead.state === 'restarting'
     && afterRead.incarnation === first.incarnation,

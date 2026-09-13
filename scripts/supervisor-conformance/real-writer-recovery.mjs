@@ -76,6 +76,7 @@ const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
 const child = spawn(process.execPath, [
   runner, 'start', '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
   '--ui-port', String(port), '--data-dir', data, '--session-id', 'writer-recovery-live',
+  '--lease-duration-sec', '600',
 ], { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let output = '';
 let ownedRunId = null;

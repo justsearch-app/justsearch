@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(7 * 60)
 final class OperationResumeE2ETest {
   @Test
-  void processingReplayThenRetryDoesNotDuplicateTheDocument() throws Exception {
+  void recordedOutcomeSurvivesCrashAndProcessingRetryDoesNotDuplicateTheDocument() throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("operation");
   }
 }

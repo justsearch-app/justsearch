@@ -128,6 +128,8 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("PROCESSING_REPLAY_PASS"), output);
       if ("operation".equals(scenario)) {
         assertTrue(output.contains("OPERATION_RETRY_NO_DUPLICATES_PASS"), output);
+        assertTrue(output.contains("OPERATION_ROW_AFTER_DEATH"), output);
+        assertTrue(output.contains("OPERATION_ROW_AFTER_RESTART"), output);
       }
     } else {
       assertTrue(output.contains("LOCK_SURVIVAL_PASS"), output);
