@@ -72,6 +72,9 @@ class OperationStoreArchitectureTest {
   }
 
   static final class UnauthorizedStore implements OperationStore {
+    @Override public io.justsearch.app.api.operations.OperationOutcomeView outcome(String key) {
+      throw new UnsupportedOperationException();
+    }
     @Override public Acceptance accept(String key,
         io.justsearch.app.api.operations.OperationDescriptor descriptor,
         io.justsearch.core.context.EngineContext context,

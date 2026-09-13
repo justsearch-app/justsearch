@@ -1,0 +1,121 @@
+{
+  "revision": "9a72be964 + launcher query fixture correction",
+  "command": "./gradlew.bat :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:app-launcher:pmdTest --continue --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 35,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 15
+  },
+  "tasks": [
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 15
+    }
+  ],
+  "negative": "1095 compileTestJava fails exactly because UnauthorizedStore omits outcome(String).",
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-launcher-negative1095.txt",
+      "bytes": 35476,
+      "sha256": "408efe8bf409752e73561c61972757b4fc0124a2ae90b42473907df236ccf0c5"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096.txt",
+      "bytes": 38125,
+      "sha256": "bcee4d58b24458c6f109a8498b6fbd3f0e7caa429f0d4caef54fa126b84caf30"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-counts.json",
+      "bytes": 556,
+      "sha256": "1e6a9027d39c78261ee044e846edd3ba9adda61f022c1dba7b997dd1ebc8498f"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.AttributesUseRuleTest.xml",
+      "bytes": 479,
+      "sha256": "8164b62497377d64b857ca57ced795e09ad253388b2b90e3b91dd48a70e7d7a5"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.BoundaryRulesTest.xml",
+      "bytes": 481,
+      "sha256": "e52e38129005e01f5151132798dac167b285206c66acb0524a20c5979f385a63"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ClosurePropertyTest.xml",
+      "bytes": 467,
+      "sha256": "6d869ae6c5cf63e8cc34b8c8fb4d41a61fd753d952c6d2b00755cc3f33c84528"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.EnvRegistryDirectReadTest.xml",
+      "bytes": 490,
+      "sha256": "21737b166cf4dfe9584e6e8a3e736f1d42799326d5227c0af4e689b1f37adccb"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExecutorArchitectureTest.xml",
+      "bytes": 483,
+      "sha256": "1e85260d6b3b1fc4d564215fec30cdbd72520cb74eb5eac32d25589a0dfd78d1"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExtractionParserConfinementTest.xml",
+      "bytes": 506,
+      "sha256": "9320cf5f031ac0589e937324971144ccf56f3904e58496b6d562139b7350f38a"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.GpuProbeAccessTest.xml",
+      "bytes": 576,
+      "sha256": "ffab1e71d8e8a34c5df66104da993fcd388a5809054248655bac2601d3fb307c"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.IndexWriterOwnershipTest.xml",
+      "bytes": 620,
+      "sha256": "90cd00d0c00a60c0f7b8745786b13eacd446d12ac5960bb5bee1539366e6edb4"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml",
+      "bytes": 2261,
+      "sha256": "6446643998675fd7f90876c659e4da0a6929bf67efa7c6a70d725e1bcac9d3bc"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LibraryResolveHashOnlyCallerPin.xml",
+      "bytes": 655,
+      "sha256": "580c96a54d5c827122a9b56b593f1efbfc51ce2fa4aaae7ce4d4a9454a9bb4aa"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OperationStoreArchitectureTest.xml",
+      "bytes": 1042,
+      "sha256": "db64eb08250ed0e32d4b1c02f6998bfddf365c780ff1aba354b00fc853d5f06f"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OrtRunChokePointTest.xml",
+      "bytes": 489,
+      "sha256": "febbbfa392a4eef38b916ea5c936bfe37f64dc3d8093a1b37d2b8d720b37ef0b"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.Slf4jOnlyRuleTest.xml",
+      "bytes": 473,
+      "sha256": "06c6af6cf90b3769d898b06abe5ce0fb98894e00c7ed3cb5cc09651601e1054a"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.VramDetectorAccessTest.xml",
+      "bytes": 480,
+      "sha256": "105ff6a8d4726f98f41bd8d210c39211ff988c5b601cae53a54a2ffe3d7c07ec"
+    },
+    {
+      "path": "tmp/c2-4-launcher1096-xml/app-launcher/test/TEST-io.justsearch.app.launcher.WireShapeMandateTest.xml",
+      "bytes": 488,
+      "sha256": "9ad56b679d6fafe71d011ee4799a140299b08a804f967a53e36afe1d7fe68b5e"
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "bytes": 6288,
+      "sha256": "bc9b393cbd6a06e164b8f4677de6ab198864926113f33aa32e7cd6620d1a5f07"
+    }
+  ]
+}

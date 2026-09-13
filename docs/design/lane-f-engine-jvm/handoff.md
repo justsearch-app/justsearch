@@ -30,7 +30,9 @@ Host/Origin rejection; the owned stack is stopped. Route captures now reflect th
 live Engine. [Query proof](evidence/C2/keyed-outcome-query.md) records intermediate
 failures and evidence. Continue the C2-4 durable recent-history swap, completion
 projection/replay and SSE boundary; neither C2-4 nor batch2 is closed. Hosted proof
-remains pending external runner allocation.
+remains pending external runner allocation. A post-cut compile check caught the
+launcher architecture fixture missing outcome(String);1096 passes after its
+correction. Include launcher tests for every subsequent OperationStore port edit.
 
 Final independent correction verification is clear at **b713307ea**. Full905 passes
 in9m30s with10158 represented cases, zero failures/errors and35 inherited skips;

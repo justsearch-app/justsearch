@@ -72,3 +72,14 @@ source/raw SHA-256 inventories. Raw artifacts are in this worktree's tmp directo
 including final/negative XML and live probes/campaign records. Retain through lane
 acceptance plus30days and export before releasing the worktree. Full1059's required
 hosted boundary and C2-4's remaining acceptance are not waived by this commit.
+
+## Launcher fixture correction after the query cut
+
+1095 proves a compile omission at9a72be964: the deliberately unauthorized
+OperationStore implementation in OperationStoreArchitectureTest lacked the new
+outcome method. Implement that method as unsupported, retaining the architecture
+negative fixture.1096 passes35 represented cases,0 failures/errors and launcher test PMD.
+The launcher test source set now belongs in every store-port change's focused
+verification set. [Exact proof](keyed-outcome-launcher-verification.json). This
+corrects the missing consumer compilation; it does not expand the earlier78-case
+claim into a full integrated pass.
