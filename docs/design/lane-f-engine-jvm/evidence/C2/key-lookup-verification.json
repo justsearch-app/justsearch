@@ -1,0 +1,51 @@
+{
+  "revision": "11254a1e0 + validated lookup and isolated refusal witnesses",
+  "command": "gradlew.bat :modules:app-api:test :modules:app-observability:test --tests *OperationKeyLookupTest --tests *OperationAttemptRunnerTest --tests *OperationRetentionTest --tests *SqliteOperationStoreTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest :modules:app-api:pmdMain :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-launcher:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 294,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 62
+  },
+  "tasks": [
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 55,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 15
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "negative": {
+    "run": "908",
+    "tests": 10,
+    "intendedFailures": 9,
+    "control": "Checked lookup temporarily replaced with existing raw find semantics; exact source restored from tmp/c2-3-lookup906-correct.java."
+  },
+  "scope": "C2-3 validated lookup prerequisite; HTTP/MCP key ingress, prepared persistence and approval not yet implemented."
+}

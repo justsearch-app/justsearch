@@ -81,6 +81,10 @@ class OperationStoreArchitectureTest {
     @Override public java.util.Optional<io.justsearch.app.api.operations.OperationRecord> find(String key) {
       return java.util.Optional.empty();
     }
+    @Override public java.util.Optional<io.justsearch.app.api.operations.OperationRecord> lookup(String key,
+        io.justsearch.app.api.operations.OperationDescriptor descriptor) {
+      return java.util.Optional.empty();
+    }
     @Override public boolean start(long id) { return false; }
     @Override public boolean resume(long id) { return false; }
     @Override public io.justsearch.app.api.operations.OperationRecord rejectBeforeStart(long id, io.justsearch.app.api.operations.OperationReceipt receipt) {

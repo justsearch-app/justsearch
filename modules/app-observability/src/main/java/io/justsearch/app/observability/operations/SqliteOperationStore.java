@@ -273,31 +273,12 @@ public final class SqliteOperationStore implements OperationStore {
       InvocationProvenance provenance) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(descriptor, "descriptor");
-    long keyTime;
-    try { keyTime = OperationKeys.timestampMillis(key); }
-    catch (IllegalArgumentException invalid) {
-      throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, invalid);
-    }
+    long keyTime = validatedKeyTime(key);
     String identity = canonicalIdentity(descriptor.identityJson());
     return locked(() -> transaction(() -> {
-      var existing = findRow(key);
-      if (existing.isPresent()) {
-        OperationDescriptor prior = existing.get().descriptor();
-        if (prior.kind() != descriptor.kind()
-            || !Objects.equals(prior.operationRef(), descriptor.operationRef())
-            || !prior.identityJson().equals(identity)) {
-          throw new OperationStoreException(OperationStoreException.Code.OPERATION_KEY_REUSED, null);
-        }
-        return new Acceptance(existing.get(), false);
-      }
+      var existing = lookupRow(key, keyTime, descriptor, identity);
+      if (existing.isPresent()) return new Acceptance(existing.get(), false);
       long now = clock.millis();
-      if (keyTime > now + FUTURE_SKEW_MS) {
-        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
-      }
-      if (keyTime < readHistorySince()) {
-        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
-            readHistorySince() - now);
-      }
       pruneToLimit(ROW_CAP - 1);
       if (rowCount() >= ROW_CAP) {
         throw new OperationStoreException(OperationStoreException.Code.OPERATIONS_CAPACITY, null);
@@ -323,6 +304,45 @@ public final class SqliteOperationStore implements OperationStore {
       }
       return new Acceptance(findRow(key).orElseThrow(() -> new SQLException("Accepted row is missing")), true);
     }));
+  }
+
+  @Override
+  public java.util.Optional<OperationRecord> lookup(String key, OperationDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    long keyTime = validatedKeyTime(key);
+    String identity = canonicalIdentity(descriptor.identityJson());
+    return locked(() -> lookupRow(key, keyTime, descriptor, identity));
+  }
+
+  private static long validatedKeyTime(String key) {
+    try { return OperationKeys.timestampMillis(key); }
+    catch (IllegalArgumentException invalid) {
+      throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, invalid);
+    }
+  }
+
+  private java.util.Optional<OperationRecord> lookupRow(String key, long keyTime,
+      OperationDescriptor descriptor, String identity) throws SQLException {
+    var existing = findRow(key);
+    if (existing.isPresent()) {
+      OperationDescriptor prior = existing.get().descriptor();
+      if (prior.kind() != descriptor.kind()
+          || !Objects.equals(prior.operationRef(), descriptor.operationRef())
+          || !prior.identityJson().equals(identity)) {
+        throw new OperationStoreException(OperationStoreException.Code.OPERATION_KEY_REUSED, null);
+      }
+      return existing;
+    }
+    long now = clock.millis();
+    if (keyTime > now + FUTURE_SKEW_MS) {
+      throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+    }
+    long historySince = readHistorySince();
+    if (keyTime < historySince) {
+      throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+          historySince - now);
+    }
+    return java.util.Optional.empty();
   }
 
   private static String canonicalIdentity(String json) {

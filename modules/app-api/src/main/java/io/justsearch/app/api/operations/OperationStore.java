@@ -18,6 +18,13 @@ public interface OperationStore extends AutoCloseable {
   /** Row-first lookup: callers compare a missing key's timestamp with historySinceMillis(). */
   java.util.Optional<OperationRecord> find(String key);
 
+  /**
+   * Read before preparation: validates the key and compares public identity before returning a row.
+   * A missing retained-window key returns empty; expired/future/invalid keys refuse without writing.
+   * This is not authority to execute: acceptance repeats the comparison under its transaction.
+   */
+  java.util.Optional<OperationRecord> lookup(String key, OperationDescriptor descriptor);
+
   /** Only ACCEPTED can start; repeated starts cannot execute another body. */
   boolean start(long id);
 

@@ -34,6 +34,9 @@ public interface OperationAttemptRunner {
   /** Must return before scheduling or any other effect; storage failure propagates. */
   PreparedAttempt accept(Request request);
 
+  /** Validated row lookup before pure preparation; an existing attempt never authorizes a new effect. */
+  java.util.Optional<PreparedAttempt> lookup(Request request);
+
   /**
    * Called after admission. An existing acceptance never executes the supplied body.
    * Non-dispatched producers use this same port: commit their effect inside the body and return

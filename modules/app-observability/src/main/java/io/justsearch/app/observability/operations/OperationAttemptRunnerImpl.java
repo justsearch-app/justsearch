@@ -63,6 +63,12 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
   }
 
+  @Override
+  public Optional<PreparedAttempt> lookup(Request request) {
+    return store.lookup(request.key(), request.descriptor())
+        .map(row -> new Prepared(controlFor(row), row, true));
+  }
+
   private Control controlFor(OperationRecord row) {
     if (row.state().terminal()) {
       Control completed = new Control(row);
