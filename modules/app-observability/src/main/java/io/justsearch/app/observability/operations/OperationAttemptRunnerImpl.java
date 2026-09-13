@@ -66,7 +66,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       if (!this.ownedKinds.containsAll(Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE))) {
         throw new IllegalArgumentException("Settings owner requires both settings kinds");
       }
-      settingsOwner.inspectRecovery(interrupted.stream().filter(row -> settingsKind(row.descriptor().kind())).toList());
+      var settingsRows = interrupted.stream().filter(row -> settingsKind(row.descriptor().kind())).toList();
+      // More than one armed row is already unresolved; do not load up to the entire row cap's
+      // private payloads merely to reach that verdict. Only the sole armed row can need decoding.
+      boolean soleArmed = settingsRows.stream().filter(row -> row.expectedSettingsRevision() != null).limit(2).count() == 1;
+      settingsOwner.inspectRecovery(settingsRows.stream().map(row -> settingsRecoveryInput(row, soleArmed)).toList());
       reconcileOwned(OperationKind.SETTINGS_APPLY, settingsOwner::reconcile);
       reconcileOwned(OperationKind.RECONFIGURE, settingsOwner::reconcile);
     }
@@ -75,6 +79,20 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           && !this.ownedKinds.contains(row.descriptor().kind())) {
         finishObserved(new Control(row), OperationState.FAILED, new OperationReceipt("interrupted_by_restart", null));
       }
+    }
+  }
+
+  private SettingsCommitOwner.RecoveryInput settingsRecoveryInput(OperationRecord row, boolean soleArmed) {
+    if (!soleArmed || row.expectedSettingsRevision() == null) {
+      return new SettingsCommitOwner.RecoveryInput(row, Optional.empty());
+    }
+    try {
+      return new SettingsCommitOwner.RecoveryInput(row, store.acceptedPreparation(row.id()));
+    } catch (IllegalArgumentException malformed) {
+      // Invalid stored nonce/payload must not prevent an exact live file witness from resolving
+      // commitment. Missing preparation never grants absent-history reset/precommit authority.
+      LOG.warn("Settings operation {} has malformed accepted preparation", row.id());
+      return new SettingsCommitOwner.RecoveryInput(row, Optional.empty());
     }
   }
 

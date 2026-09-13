@@ -19,7 +19,7 @@ import java.util.UUID;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Seals frozen preparation with the application's existing cipher; never an authority to execute. */
-final class PreparedInvocationCodec {
+public final class PreparedInvocationCodec {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   private final StoreCipher cipher;
 
@@ -102,6 +102,22 @@ final class PreparedInvocationCodec {
       // Jackson/crypto exception text can contain input fragments. Do not expose it as a cause.
       throw new IllegalArgumentException("Invalid persisted preparation");
     }
+  }
+
+  /**
+   * Decodes the metadata-only preparation used by early recovery before cipher setup.
+   *
+   * <p>Content-bearing preparations are always sealed and cannot be recovered through this
+   * entrypoint. The existing decoder remains the single envelope and binding validator.
+   */
+  public static OperationPreparation decodeMetadata(OperationPreparedPayload stored, String key,
+      UUID nonce, OperationDescriptor descriptor) {
+    Objects.requireNonNull(stored, "stored");
+    if (stored.sealed()) {
+      throw new IllegalArgumentException("Metadata preparation must be unsealed");
+    }
+    return new PreparedInvocationCodec(StoreCipher.disabled()).decode(stored, key, nonce, descriptor)
+        .preparation();
   }
 
   private void requireKey() {

@@ -546,6 +546,40 @@ final class SettingsCommitCoordinatorTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"missing", "malformed-nonce", "malformed-envelope"})
+  void exactCommittedFileWinsEvenWhenAcceptedPreparationCannotBeDecoded(String variant) throws Exception {
+    Path db = temp.resolve("committed-invalid-preparation-" + variant + ".db");
+    Path file = temp.resolve("committed-invalid-preparation-" + variant + ".json");
+    String key;
+    try (var operations = new SqliteOperationStore(db)) {
+      var row = row(operations, OperationKind.SETTINGS_APPLY);
+      key = row.key();
+      operations.start(row.id());
+      operations.armSettingsRevision(row.id(), 4);
+      writeWitness(new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file), 5, key);
+      if (!variant.equals("missing")) {
+        String nonce = variant.equals("malformed-nonce")
+            ? "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" : java.util.UUID.randomUUID().toString();
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+            var update = connection.prepareStatement("UPDATE operations SET preparation_nonce=?, "
+                + "preparation_sealed=0, preparation_payload='not-an-envelope' WHERE id=?")) {
+          update.setString(1, nonce);
+          update.setLong(2, row.id());
+          assertEquals(1, update.executeUpdate());
+        }
+      }
+    }
+    try (var reopened = new SqliteOperationStore(db)) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, file);
+      var owner = coordinator(settings, new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings())));
+      new OperationAttemptRunnerImpl(reopened, CLOCK, SETTINGS_KINDS, owner);
+      assertEquals(OperationState.COMPLETE, reopened.find(key).orElseThrow().state());
+      assertEquals(new SettingsWitness(5, key), settings.inspect().witness());
+      assertFalse(owner.recoveryIssue().toCompletableFuture().isDone());
+    }
+  }
+
   @Test
   void bootUnchangedWitnessFailsAndExactNewWitnessCompletes() throws Exception {
     bootDecision("boot-unchanged", 4, 4, false, OperationState.FAILED,
@@ -581,7 +615,12 @@ final class SettingsCommitCoordinatorTest {
       var owner = new SettingsCommitCoordinator(settings,
           new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings())), () -> {},
           candidate -> OperationResult.success("prepared"));
-      new OperationAttemptRunnerImpl(operations, CLOCK, SETTINGS_KINDS, owner);
+      var boundedReads = org.mockito.Mockito.spy(operations);
+      org.mockito.Mockito.doThrow(new AssertionError("Multiple armed rows must not load private payloads"))
+          .when(boundedReads).acceptedPreparation(org.mockito.Mockito.anyLong());
+      new OperationAttemptRunnerImpl(boundedReads, CLOCK, SETTINGS_KINDS, owner);
+      org.mockito.Mockito.verify(boundedReads, org.mockito.Mockito.never())
+          .acceptedPreparation(org.mockito.Mockito.anyLong());
       assertEquals(SettingsCommitOwner.RecoveryReason.MULTIPLE_ARMED_ROWS,
           owner.recoveryIssue().toCompletableFuture().join().reason());
       assertEquals(OperationState.RUNNING, operations.find(first.key()).orElseThrow().state());

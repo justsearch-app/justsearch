@@ -198,18 +198,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   }
 
   @Override
-  public void inspectRecovery(List<OperationRecord> rows) {
+  public void inspectRecovery(List<RecoveryInput> rows) {
     mutex.lock();
     try {
       if (inspected || fence != null) throw new IllegalStateException("Settings recovery already inspected");
       inspected = true;
-      var armed = List.copyOf(rows).stream().filter(row -> row.expectedSettingsRevision() != null).toList();
+      var armed = List.copyOf(rows).stream().filter(input -> input.row().expectedSettingsRevision() != null).toList();
       if (armed.size() > 1) {
         block(new RecoveryIssue(RecoveryReason.MULTIPLE_ARMED_ROWS, null));
         return;
       }
       if (armed.isEmpty()) return;
-      OperationRecord row = armed.getFirst();
+      OperationRecord row = armed.getFirst().row();
       recoveredId = row.id();
       recoveredDecision = new OperationAttemptRunner.Reconciliation.Wait();
       if (!store.mode().isWritable()) {

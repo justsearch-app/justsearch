@@ -4,6 +4,8 @@ package io.justsearch.app.api.settings;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationRecord;
+import io.justsearch.app.api.operations.OperationStore;
+import java.util.Optional;
 import io.justsearch.agent.api.registry.OperationResult;
 import java.util.List;
 import java.util.Map;
@@ -79,8 +81,16 @@ public interface SettingsCommitOwner {
   /** Retain any matching fence and request the composition root's ordered restart outside locks. */
   void retainForRestart(long id, Throwable failure);
 
+  /** Private boot input; the runner reads accepted preparation before calling the owner outside SQL locks. */
+  record RecoveryInput(OperationRecord row, Optional<OperationStore.Preparation> preparation) {
+    public RecoveryInput {
+      Objects.requireNonNull(row, "row");
+      Objects.requireNonNull(preparation, "preparation");
+    }
+  }
+
   /** Inspect the complete open settings set before any per-row reconciliation or producer starts. */
-  void inspectRecovery(List<OperationRecord> rows);
+  void inspectRecovery(List<RecoveryInput> rows);
 
   OperationAttemptRunner.Reconciliation reconcile(OperationRecord row);
 }

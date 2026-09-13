@@ -22,6 +22,11 @@ rejects an eighth tool; fresh hosted success remains required. [Evidence](eviden
 Windows-native success is not installed-v5 recovery proof.
 
 **Immediate next items (2026-09-13): C2-6 recovery reset, then producer and Health migration.**
+The [accepted recovery input/metadata decoder](evidence/C2/settings-recovery-input.md) passes
+121 executed cases plus PMD/format; register gates also pass. Negative1309 catches lost accepted
+payload and missing key binding; negative1312 catches eager multiple-row loading and swallowed
+SQL failure. Restored1313 reuses identical final sources. The fixed reset schema
+and owner must now consume that input and revalidate the quarantine fingerprint before arming.
 The [quarantine identity reader](evidence/C2/settings-quarantine.md) now passes71 executed
 cases plus PMD/format, with a content-digest negative control and byte-exact restoration.
 It supplies read-only evidence; fixed accepted-preparation decoding and reset owner integration

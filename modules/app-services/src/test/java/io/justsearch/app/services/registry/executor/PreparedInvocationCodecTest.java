@@ -96,6 +96,64 @@ class PreparedInvocationCodecTest {
     assertEquals(original, codec.decode(stored, key, nonce, original.descriptor()));
   }
 
+  @Test
+  void metadataEntryPointDecodesWithoutCipherSetup() {
+    var codec = new PreparedInvocationCodec(StoreCipher.disabled());
+    var original = envelope(codec, OperationPreparation.Content.METADATA);
+    var stored = codec.encode(original);
+
+    assertEquals(original.preparation(),
+        PreparedInvocationCodec.decodeMetadata(stored, key, nonce, original.descriptor()));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"key", "nonce", "descriptor"})
+  void metadataEntryPointRejectsReboundPreparationWithoutInputLeakage(String changedField) {
+    var codec = new PreparedInvocationCodec(StoreCipher.disabled());
+    var original = envelope(codec, OperationPreparation.Content.METADATA);
+    var stored = codec.encode(original);
+    String expectedKey = changedField.equals("key") ? OperationKeys.generate(Clock.systemUTC()) : key;
+    UUID expectedNonce = changedField.equals("nonce") ? UUID.randomUUID() : nonce;
+    var expectedDescriptor = changedField.equals("descriptor")
+        ? OperationDescriptor.invocation(original.descriptor().kind(), original.descriptor().operationRef(), "{}", false)
+        : original.descriptor();
+
+    var error = assertThrows(IllegalArgumentException.class,
+        () -> PreparedInvocationCodec.decodeMetadata(stored, expectedKey, expectedNonce, expectedDescriptor));
+    assertEquals("Invalid persisted preparation", error.getMessage());
+    assertNull(error.getCause());
+  }
+
+  @Test
+  void metadataEntryPointRejectsSealedPayloadWithBoundedError() {
+    var error = assertThrows(IllegalArgumentException.class,
+        () -> PreparedInvocationCodec.decodeMetadata(new OperationPreparedPayload(true, "sealed-value"),
+            key, nonce, descriptor));
+
+    assertEquals("Metadata preparation must be unsealed", error.getMessage());
+    assertNull(error.getCause());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"malformed", "future", "content"})
+  void metadataEntryPointRejectsMalformedOrRelabelledPayloadWithoutInputLeakage(String variant) {
+    var codec = new PreparedInvocationCodec(StoreCipher.disabled());
+    var original = envelope(codec, OperationPreparation.Content.METADATA);
+    var stored = codec.encode(original);
+    String bad = switch (variant) {
+      case "malformed" -> "private note";
+      case "future" -> stored.value().replace("\"version\":1", "\"version\":2");
+      case "content" -> stored.value().replace("\"METADATA\"", "\"CONTENT\"");
+      default -> throw new AssertionError(variant);
+    };
+
+    var error = assertThrows(IllegalArgumentException.class,
+        () -> PreparedInvocationCodec.decodeMetadata(
+            new OperationPreparedPayload(false, bad), key, nonce, original.descriptor()));
+    assertEquals("Invalid persisted preparation", error.getMessage());
+    assertNull(error.getCause());
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"key", "nonce", "identity"})
   void ciphertextCannotBeReboundToAnotherKeyNonceOrPublicIdentity(String changedField) {

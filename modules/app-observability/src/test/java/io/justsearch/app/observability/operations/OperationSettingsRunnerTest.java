@@ -524,6 +524,56 @@ final class OperationSettingsRunnerTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void bootPassesOnlyAcceptedPreparationOutsideSqlLocksAndKeepsMalformedRowsUnresolved(boolean malformed) throws Exception {
+    String name = "recovery-preparation-" + malformed;
+    var prepared = new io.justsearch.app.api.operations.OperationStore.Preparation(java.util.UUID.randomUUID(),
+        new io.justsearch.app.api.operations.OperationPreparedPayload(false, "{\"frozenEvidence\":\"original\"}"));
+    String key = OperationKeys.generate(CLOCK);
+    long id;
+    try (var store = store(name)) {
+      var identity = descriptor(OperationKind.SETTINGS_APPLY);
+      store.savePreparation(key, identity, prepared);
+      var row = store.acceptPrepared(key, identity, context(), null, prepared.nonce()).record();
+      id = row.id();
+      store.start(id);
+      store.armSettingsRevision(id, 0);
+      if (malformed) execute(storePath(name), "UPDATE operations SET preparation_nonce='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' WHERE id=" + id);
+    }
+    try (var reopened = store(name); var reads = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      var owner = new FakeOwner(reopened, ApplyMode.COMMIT);
+      owner.inspectionProbe = () -> {
+        try { assertEquals(id, reads.submit(() -> reopened.find(key).orElseThrow().id()).get(3, java.util.concurrent.TimeUnit.SECONDS)); }
+        catch (Exception failure) { throw new AssertionError("Owner callback must run outside the SQL lock", failure); }
+      };
+      runner(reopened, owner);
+      assertEquals(1, owner.recoveryInputs.size());
+      var input = owner.recoveryInputs.getFirst();
+      assertEquals(id, input.row().id());
+      assertEquals(Optional.ofNullable(malformed ? null : prepared), input.preparation());
+      assertEquals(OperationState.RUNNING, reopened.find(key).orElseThrow().state());
+      assertEquals(0, owner.applyCalls);
+    }
+  }
+
+  @Test
+  void acceptedPreparationStorageFailureCannotBecomeAnEmptyRecoveryInput() throws Exception {
+    try (var store = store("recovery-storage-failure")) {
+      var row = store.accept(OperationKeys.generate(CLOCK), descriptor(OperationKind.SETTINGS_APPLY), context(), null).record();
+      store.start(row.id());
+      store.armSettingsRevision(row.id(), 0);
+      var failingReads = org.mockito.Mockito.spy(store);
+      var failure = new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, new java.sql.SQLException("read failed"));
+      org.mockito.Mockito.doThrow(failure).when(failingReads).acceptedPreparation(row.id());
+      var owner = new FakeOwner(store, ApplyMode.COMMIT);
+      assertSame(failure, assertThrows(OperationStoreException.class,
+          () -> new OperationAttemptRunnerImpl(failingReads, CLOCK, SETTINGS_KINDS, owner)));
+      assertTrue(owner.recoveryInputs.isEmpty());
+      assertEquals(OperationState.RUNNING, store.find(row.key()).orElseThrow().state());
+    }
+  }
+
   private OperationAttemptRunnerImpl runner(SqliteOperationStore store, FakeOwner owner) {
     var runner = new OperationAttemptRunnerImpl(store, CLOCK, SETTINGS_KINDS, owner);
     owner.events.clear();
@@ -580,6 +630,8 @@ final class OperationSettingsRunnerTest {
     private final List<Long> markerObservations = new ArrayList<>();
     private final List<OperationState> releaseStates = new ArrayList<>();
     private final List<String> inspectedKeys = new ArrayList<>();
+    private List<RecoveryInput> recoveryInputs = List.of();
+    private Runnable inspectionProbe = () -> {};
     private final List<String> reconciledKeys = new ArrayList<>();
     private int applyCalls;
     private int releaseCalls;
@@ -648,9 +700,11 @@ final class OperationSettingsRunnerTest {
     }
 
     @Override
-    public void inspectRecovery(List<OperationRecord> rows) {
+    public void inspectRecovery(List<RecoveryInput> rows) {
       events.add("inspect:" + rows.size());
-      inspectedKeys.addAll(rows.stream().map(OperationRecord::key).toList());
+      inspectedKeys.addAll(rows.stream().map(input -> input.row().key()).toList());
+      recoveryInputs = List.copyOf(rows);
+      inspectionProbe.run();
     }
 
     @Override

@@ -257,3 +257,23 @@ preparation beside each settings recovery row outside SQL locks. The fixed setti
 schema is validated before authorizing absent-history recovery; exact live commitment is
 classified first and does not depend on decoding. Reset producer classification, confirmation,
 Health and full public writer migration remain required in C2-6.
+
+
+## 2026-09-13 accepted recovery input cut
+
+The runner supplies a private RecoveryInput of row plus optional accepted preparation only
+when exactly one settings row is armed. Count lightweight rows first (stop counting at two);
+multiple armed rows must reach blocked Health without loading their potentially large payloads. Null-marker rows require no private-payload read because they cannot
+have crossed file commitment. Read the payload before calling inspectRecovery; no SQL lock
+is held during owner inspection. This leaves OperationRecord, history and public wire payloads
+unchanged. A malformed stored nonce/payload validation exception becomes unavailable preparation
+with a bounded row-id diagnostic, so it cannot prevent exact live-witness classification.
+It never authorizes absent-history recovery. SQL storage failures still propagate; this is not
+a catch-and-default around database availability.
+
+PreparedInvocationCodec exposes only a public static metadata decode entrypoint; its constructor,
+full envelope and content methods remain package-scoped. It rejects sealed input and reuses the
+existing disabled-cipher metadata validation, including version, key, nonce, descriptor/public
+identity and content classification. No duplicate envelope, arbitrary decoder callback or
+startup cipher dependency is introduced. The next fixed settings-reset schema consumes this
+validated metadata and the quarantine fingerprint; this foundation alone grants no reset.
