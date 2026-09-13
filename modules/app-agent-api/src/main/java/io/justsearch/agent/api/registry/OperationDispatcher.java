@@ -74,6 +74,13 @@ public interface OperationDispatcher {
       InvocationProvenance provenance,
       java.util.Optional<String> confirmationToken, EngineContext engineContext);
 
+  /** Canonical keyed ingress. Implementations must never silently discard a supplied key. */
+  default OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
+    if (operationKey != null) throw new UnsupportedOperationException("Keyed dispatch is unavailable");
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext);
+  }
+
   /**
    * Undo a previous execution identified by {@code executionId}. Returns a typed
    * failure (not throwing) when the operation's policy does not support undo.
@@ -104,6 +111,13 @@ public interface OperationDispatcher {
       String executionId,
       InvocationProvenance provenance,
       java.util.Optional<String> confirmationToken, EngineContext engineContext);
+
+  /** Undo uses the same key contract; its canonical identity includes the target execution id. */
+  default OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
+    if (operationKey != null) throw new UnsupportedOperationException("Keyed undo is unavailable");
+    return undo(op, executionId, provenance, confirmationToken, engineContext);
+  }
 
   /**
    * The canonical arguments JSON of an undo invocation: {@code {"executionId":"<id>"}}.

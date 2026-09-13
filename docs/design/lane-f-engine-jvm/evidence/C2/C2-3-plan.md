@@ -1,7 +1,8 @@
 # C2-3: key identity, prepared invocation and approval
 
 Status: active implementation plan, 2026-09-13, grounded at11254a1e0.
-The validated lookup prerequisite passes final909; ingress and preparation remain open. R1–R10 are accepted; this record owns the next C2 item. No prepared
+The validated lookup prerequisite passes final909; keyed dispatcher SPI and receipt
+access pass final913. HTTP/MCP ingress and persisted preparation remain open. R1–R10 are accepted; this record owns the next C2 item. No prepared
 producer is active and no C2-3 completion is claimed.
 
 ## Current seams and intended behavior

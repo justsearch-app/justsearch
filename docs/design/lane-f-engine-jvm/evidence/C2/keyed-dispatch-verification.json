@@ -1,0 +1,49 @@
+{
+  "revision": "382b19a5c + keyed dispatcher and receipt trust guard",
+  "command": "gradlew.bat :modules:app-agent-api:test :modules:app-services:test --tests '*OperationExecutorImplTest' :modules:app-agent-api:pmdMain :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 333,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 46
+  },
+  "tasks": [
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 41
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 94,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "negative": [
+    {
+      "run": "910",
+      "tests": 11,
+      "intendedFailures": 3,
+      "control": "Bypass early lookup: two repeated preparation assertions and spent-capsule retry fail."
+    },
+    {
+      "run": "912",
+      "tests": 7,
+      "intendedFailures": 1,
+      "control": "Untrusted-plugin known-row receipt before the sandbox guard."
+    }
+  ],
+  "scope": "Keyed dispatcher SPI and receipt branch. HTTP/MCP key delivery and frozen prepared persistence remain open."
+}

@@ -89,6 +89,137 @@ final class OperationExecutorImplTest {
     if (operationStore != null) operationStore.close();
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void keyedRetryLooksUpBeforePreparationAndNeverStartsAnotherEffect(boolean asynchronous) {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.keyed-retry");
+    var prepares = new java.util.concurrent.atomic.AtomicInteger();
+    var effects = new java.util.concurrent.atomic.AtomicInteger();
+    var completion = new java.util.concurrent.CompletableFuture<OperationResult>();
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationPreparation prepare(String args, InvocationProvenance provenance, EngineContext context) {
+        if (prepares.incrementAndGet() != 1) throw new IllegalStateException("The frozen target now exists");
+        return OperationPreparation.passthrough(args);
+      }
+      @Override public OperationResult execute(String args, EngineContext context) {
+        throw new AssertionError("Recorded adapter must be used");
+      }
+      @Override public OperationExecution executeRecorded(String args, InvocationProvenance provenance,
+          EngineContext context, OperationRecordHandle record) {
+        effects.incrementAndGet();
+        return asynchronous ? new OperationExecution(OperationResult.success("started"), completion)
+            : OperationExecution.finished(OperationResult.success("private-result"));
+      }
+    });
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
+    var op = makeOp(id, TrustTier.CORE, false);
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    var provenance = io.justsearch.app.services.intent.EngineProvenance.invocation(
+        context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    var first = executor.dispatch(op, "{}", provenance, Optional.empty(), context, key);
+    assertEquals(key, first.structuredData().get("operationKey"));
+    var retry = executor.dispatch(op, "{}", provenance, Optional.empty(), context, key);
+    assertTrue(retry.success());
+    assertEquals(key, retry.structuredData().get("operationKey"));
+    assertEquals(1, prepares.get());
+    assertEquals(1, effects.get());
+    assertFalse(retry.message().contains("private-result"));
+    var conflict = assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
+        () -> executor.dispatch(op, "{\"changed\":true}", provenance, Optional.empty(), context, key));
+    assertEquals(io.justsearch.app.api.operations.OperationStoreException.Code.OPERATION_KEY_REUSED, conflict.code());
+    assertEquals(1, prepares.get(), "Conflict must precede preparation too");
+    completion.complete(OperationResult.success("finished"));
+  }
+
+  @Test
+  void keyedReceiptDoesNotConsumeApprovalAgainButFreshMutationStillRequiresIt() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.keyed-approved");
+    var effects = new java.util.concurrent.atomic.AtomicInteger();
+    handlers.register(id, (args, context) -> { effects.incrementAndGet(); return OperationResult.success("done"); });
+    var capsule = new ConsentCapsuleService();
+    var executor = latticeExecutorWithCapsule(handlers, capsule);
+    var op = makeHighOp(id);
+    var context = io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON);
+    var provenance = InvocationProvenance.fromEngineContext(context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    String token = capsule.mint(id.value(), "{}");
+    assertTrue(executor.dispatch(op, "{}", provenance, Optional.of(token), context, key).success());
+    assertFalse(capsule.verifyAndConsume(token, id.value(), "{}"), "The first mutation consumed its capsule");
+    assertTrue(executor.dispatch(op, "{}", provenance, Optional.empty(), context, key).success());
+    String freshKey = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    assertThrows(ConfirmationRequiredException.class,
+        () -> executor.dispatch(op, "{}", provenance, Optional.of(token), context, freshKey));
+    assertEquals(1, effects.get());
+  }
+
+  @Test
+  void keyedUndoReturnsItsReceiptAndRejectsAnotherTarget() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.keyed-undo");
+    var effects = new java.util.concurrent.atomic.AtomicInteger();
+    handlers.register(id, new OperationHandler() {
+      @Override public OperationResult execute(String args, EngineContext context) { throw new AssertionError("invoke"); }
+      @Override public OperationResult undo(String executionId, EngineContext context) {
+        effects.incrementAndGet(); return OperationResult.success("undone");
+      }
+    });
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
+    var op = makeOp(id, TrustTier.CORE, true);
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+    var provenance = io.justsearch.app.services.intent.EngineProvenance.invocation(
+        context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    assertTrue(executor.undo(op, "target-1", provenance, Optional.empty(), context, key).success());
+    assertTrue(executor.undo(op, "target-1", provenance, Optional.empty(), context, key).success());
+    var conflict = assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
+        () -> executor.undo(op, "target-2", provenance, Optional.empty(), context, key));
+    assertEquals(io.justsearch.app.api.operations.OperationStoreException.Code.OPERATION_KEY_REUSED, conflict.code());
+    assertEquals(1, effects.get());
+  }
+
+  @Test
+  void keyedReceiptStillRefusesHardStopAndInvalidProvenance() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.keyed-stop");
+    handlers.register(id, (args, context) -> OperationResult.success("done"));
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, null, Map.of(), Clock.systemUTC(),
+        new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog(), null, new ConsentCapsuleService());
+    var hardStop = new GlobalHardStop();
+    executor.setGlobalHardStop(hardStop);
+    var op = makeOp(id, TrustTier.CORE, false);
+    var context = io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON);
+    var provenance = InvocationProvenance.fromEngineContext(context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    assertTrue(executor.dispatch(op, "{}", provenance, Optional.empty(), context, key).success());
+    hardStop.engage();
+    var agent = agentLoop();
+    assertThrows(TrustGateDeniedException.class, () -> executor.dispatch(op, "{}", agent,
+        Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(agent), key));
+    assertThrows(IllegalArgumentException.class,
+        () -> executor.dispatch(op, "{}", agent, Optional.empty(), context, key));
+    assertTrue(executor.dispatch(op, "{}", provenance, Optional.empty(), context, key).success());
+  }
+
+  @Test
+  void keyedReceiptCannotBypassTheUntrustedPluginBoundary() {
+    var handlers = new HandlerRegistry();
+    var id = new OperationRef("core.keyed-plugin");
+    handlers.register(id, (args, context) -> OperationResult.success("done"));
+    var executor = new OperationExecutorImpl(attempts, admission, handlers);
+    var context = io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.BUTTON);
+    var provenance = InvocationProvenance.fromEngineContext(context, ExecutorTag.UI, Instant.now(), Optional.empty());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+    assertTrue(executor.dispatch(makeOp(id, TrustTier.CORE, false), "{}", provenance,
+        Optional.empty(), context, key).success());
+    assertThrows(IllegalArgumentException.class, () -> executor.dispatch(
+        makeOp(id, TrustTier.TRUSTED_PLUGIN, false), "{}", provenance, Optional.empty(), context, key));
+    assertThrows(UnsupportedOperationException.class, () -> executor.dispatch(
+        makeOp(id, TrustTier.UNTRUSTED_PLUGIN, false), "{}", provenance, Optional.empty(), context, key));
+  }
+
   @Test
   void unactivatedReplayPlanCannotEnterTheCurrentRowIdentity() throws Exception {
     var handlers = new HandlerRegistry();
@@ -311,7 +442,13 @@ final class OperationExecutorImplTest {
     });
     var response = new OperationExecutorImpl(attempts, admission, handlers).dispatch(
         makeOp(id, TrustTier.CORE, false), "{}", io.justsearch.app.services.TestEngineContexts.internal());
-    org.junit.jupiter.api.Assertions.assertSame(refusal, response);
+    var metadata = new java.util.HashMap<>(response.structuredData());
+    String key = (String) metadata.remove("operationKey");
+    Object rowId = metadata.remove("operationRecordId");
+    assertEquals(operationStore.find(key).orElseThrow().id(), rowId);
+    assertEquals(refusal, new OperationResult(response.success(), response.message(), response.executionId(),
+        metadata, response.errorCode(), response.errorDetails(), response.retryable()),
+        "All typed refusal fields survive alongside the required durable key metadata");
     assertGenericFailedAttempt(code);
     org.mockito.Mockito.verifyNoInteractions(admission);
   }

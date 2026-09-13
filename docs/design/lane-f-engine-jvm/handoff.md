@@ -22,6 +22,12 @@ See [the final review record](evidence/C2/final-independent-review.md). No new
 producer is activated yet. Continue C2-3's keyed
 lookup before preparation, separated prepared payload and approval carry-through.
 
+C2-3 is now in progress: validated lookup is committed at382b19a5c with294 passing
+represented cases at909. The keyed dispatcher SPI/receipt branch passes333 cases
+at913 after negative910/912. Next: connect HTTP invoke/undo key delivery and typed
+failure mapping, then prepared persistence, pending approval and remaining ingress.
+See [C2-3 plan](evidence/C2/C2-3-plan.md). No prepared producer is active.
+
 The following paragraphs retain the pre-review correction checkpoints; current
 acceptance is governed by the summary above and the correction batch checklist.
 

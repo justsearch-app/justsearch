@@ -332,6 +332,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       String argumentsJson,
       InvocationProvenance provenance,
       Optional<String> confirmationToken, EngineContext engineContext) {
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext, null);
+  }
+
+  @Override
+  public OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
     Objects.requireNonNull(op, "op");
     Objects.requireNonNull(argumentsJson, "argumentsJson");
     Objects.requireNonNull(provenance, "provenance");
@@ -343,6 +349,8 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     // dispatch is unrestricted (callers within the head process are trusted to claim
     // their actual transport); {@code UNTRUSTED_PLUGIN} throws below regardless.
     validateProvenance(op, provenance);
+    var existing = existingInvocation(op, argumentsJson, provenance, engineContext, operationKey, false);
+    if (existing.isPresent()) return existing.get();
 
     // Slice 487 §4.4: (SourceTier × RiskTier) → GateBehavior lattice. Runs between
     // validateProvenance (transport spoofing defense) and inputValidator.validate
@@ -351,16 +359,16 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       enforceTrustLattice(op, argumentsJson, provenance, confirmationToken, engineContext);
     }
 
-    return executeAttempt(op, argumentsJson, provenance, engineContext, null);
+    return executeAttempt(op, argumentsJson, provenance, engineContext, null, operationKey);
   }
 
   /** Pure preparation freezes scope; acceptance still precedes all effects and refusals. */
   private OperationResult executeAttempt(Operation op, String argumentsJson,
-      InvocationProvenance provenance, EngineContext context, String undoId) {
+      InvocationProvenance provenance, EngineContext context, String undoId, String operationKey) {
     Instant startedAt = clock.instant();
     PreparedInvocation invocation = prepareInvocation(op, argumentsJson, provenance, context, undoId != null);
     // Every declaration has a record kind. Audit only controls history projection.
-    OperationAttemptRunner.PreparedAttempt prepared = attempts.accept(new OperationAttemptRunner.Request(null,
+    OperationAttemptRunner.PreparedAttempt prepared = attempts.accept(new OperationAttemptRunner.Request(operationKey,
         invocation.descriptor(), context, provenance));
     if (prepared.existing()) {
       return attempts.start(prepared, ignored -> {
@@ -384,12 +392,13 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       OperationResult refusal = preflight(op, invocation.refusal());
       if (refusal != null) {
         attempts.rejectBeforeStart(prepared, refusal.errorCode().orElse("HANDLER_FAILED"));
-        return refusal;
+        return recordedResponse(refusal, prepared.accepted());
       }
       if (invocation.failure() != null) throw invocation.failure();
       try (var work = admission.attach(context)) {
-        return attempts.start(prepared,
-            handle -> invokeOwnedHandler(op, invocation, provenance, work, undoId, handle)).response();
+        var result = attempts.start(prepared,
+            handle -> invokeOwnedHandler(op, invocation, provenance, work, undoId, handle));
+        return recordedResponse(result.response(), result.record());
       }
     } catch (io.justsearch.app.api.EngineAdmissionException failure) {
       try { attempts.rejectBeforeStart(prepared, failure.reason().name()); }
@@ -400,6 +409,36 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       catch (RuntimeException storageFailure) { failure.addSuppressed(storageFailure); }
       throw failure;
     }
+  }
+
+  private Optional<OperationResult> existingInvocation(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext context, String operationKey, boolean undo) {
+    if (operationKey == null) return Optional.empty();
+    if (op.provenance().tier() == TrustTier.UNTRUSTED_PLUGIN) {
+      throw new UnsupportedOperationException("Untrusted plugin operations require V1.5 sandbox infrastructure");
+    }
+    // A receipt is a metadata read, not a second authorization of the mutation. Preserve the
+    // current hard stop and provenance validation without consuming a spent consent capsule.
+    if (intentGateEvaluator != null) {
+      var verdict = intentGateEvaluator.evaluate(op.policy().risk(), provenance.transport());
+      if (verdict.gateBehavior() == GateBehavior.DENY) {
+        throw new TrustGateDeniedException(op.id(), verdict.sourceTier());
+      }
+    }
+    var identity = OperationDescriptor.invocation(op.policy().recordKind(), op.id().value(), argumentsJson, undo);
+    return attempts.lookup(new OperationAttemptRunner.Request(operationKey, identity, context, provenance))
+        .map(found -> attempts.start(found, ignored -> {
+          throw new IllegalStateException("Existing lookup cannot execute another effect");
+        }).response());
+  }
+
+  private static OperationResult recordedResponse(OperationResult response,
+      io.justsearch.app.api.operations.OperationRecord record) {
+    Map<String, Object> metadata = new java.util.HashMap<>(response.structuredData());
+    metadata.put("operationKey", record.key());
+    metadata.put("operationRecordId", record.id());
+    return new OperationResult(response.success(), response.message(), response.executionId(), metadata,
+        response.errorCode(), response.errorDetails(), response.retryable());
   }
 
   private record PreparedInvocation(OperationHandler handler, OperationPreparation value,
@@ -661,6 +700,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       String executionId,
       InvocationProvenance provenance,
       Optional<String> confirmationToken, EngineContext engineContext) {
+    return undo(op, executionId, provenance, confirmationToken, engineContext, null);
+  }
+
+  @Override
+  public OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
     Objects.requireNonNull(op, "op");
     Objects.requireNonNull(executionId, "executionId");
     Objects.requireNonNull(provenance, "provenance");
@@ -673,11 +718,14 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     }
     // Same order as dispatch: transport-spoofing defense, then the lattice.
     validateProvenance(op, provenance);
+    var existing = existingInvocation(op, OperationDispatcher.undoArguments(executionId),
+        provenance, engineContext, operationKey, true);
+    if (existing.isPresent()) return existing.get();
     if (intentGateEvaluator != null) {
       enforceTrustLattice(
           op, OperationDispatcher.undoArguments(executionId), provenance, confirmationToken, engineContext);
     }
-    return executeAttempt(op, OperationDispatcher.undoArguments(executionId), provenance, engineContext, executionId);
+    return executeAttempt(op, OperationDispatcher.undoArguments(executionId), provenance, engineContext, executionId, operationKey);
   }
 
   /**
