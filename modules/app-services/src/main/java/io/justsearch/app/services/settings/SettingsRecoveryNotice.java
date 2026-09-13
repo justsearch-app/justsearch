@@ -2,6 +2,7 @@
 package io.justsearch.app.services.settings;
 
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.observability.health.AssertedCondition;
 import io.justsearch.app.observability.health.ConditionStatus;
 import io.justsearch.app.observability.health.ConditionStore;
@@ -43,6 +44,40 @@ public final class SettingsRecoveryNotice {
   private static final String REASON = "SettingsResetFromCorrupt";
 
   private SettingsRecoveryNotice() {}
+
+  /** Observe the fixed owner's first unresolved issue, including one reported before Health existed. */
+  public static void observeCommitRecovery(SettingsCommitOwner owner, ConditionStore conditionStore,
+      HealthEventChangeRegistry changeRegistry, Source source, Clock clock) {
+    var unused = owner.recoveryIssue().thenAccept(issue -> {
+      try {
+        String reason = switch (issue.reason()) {
+          case UNREADABLE_WITNESS -> "SettingsWitnessUnreadable";
+          case CONTRADICTORY_WITNESS -> "SettingsWitnessContradictory";
+          case MULTIPLE_ARMED_ROWS -> "MultipleSettingsCommits";
+          case PERSISTENCE_DISABLED -> "SettingsPersistenceDisabled";
+        };
+        String message = switch (issue.reason()) {
+          case UNREADABLE_WITNESS -> "Settings history cannot be verified. Settings changes are paused until recovery completes.";
+          case CONTRADICTORY_WITNESS -> "Saved settings disagree with an unfinished change. Settings changes are paused to preserve the available history.";
+          case MULTIPLE_ARMED_ROWS -> "Several settings changes have unresolved outcomes. Settings changes are paused to preserve the available history.";
+          case PERSISTENCE_DISABLED -> "An unfinished settings change needs writable storage for recovery. Settings changes are paused.";
+        };
+        String code = LifecycleReasonCode.SETTINGS_RECOVERY_REQUIRED.code();
+        Instant now = Instant.now(clock);
+        var condition = new AssertedCondition(SUBJECT, ConditionStatus.TRUE, reason, now,
+            Optional.of(message), Optional.empty(), List.of());
+        var event = new HealthEvent(code, now, source, Severity.ERROR, Optional.of(code), condition);
+        var transition = conditionStore.upsert(event);
+        if (transition != ConditionStore.Transition.UNCHANGED) {
+          changeRegistry.broadcast(transition == ConditionStore.Transition.ADDED
+              ? HealthEventChangeRegistry.Kind.CONDITION_ADDED : HealthEventChangeRegistry.Kind.CONDITION_MODIFIED, event);
+        }
+      } catch (RuntimeException publicationFailure) {
+        log.error("Failed to publish settings recovery condition: reason={} record={}",
+            issue.reason(), issue.operationRecordId(), publicationFailure);
+      }
+    });
+  }
 
   /** Assert the condition. The message names the backup FILE only, never its full path. */
   public static void publish(

@@ -27,6 +27,8 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 ## 0. Provenance
 
+- 2026-09-14: C2-6 projects the fixed owner's sticky recovery signal into the existing Health ConditionStore from HeadlessApp, where both owner and Health already exist. One settings.recovery_required condition carries the four typed owner causes as PascalCase condition reasons and plain messages. It survives ordinary corruption-notice clearing and resets with the successor process; no new durable marker, observer registry or HeadAssembly parameter is needed. Implementation proof remains in the C2 checklist.
+
 - 2026-09-14: C2-6 reset producer is integrated with direct service/runner injection and pre-startup owner composition; independent review is clear. Focused1376 and adjacent1375 pass. Hosted checkpoint29d4c8233 passed all13 CI jobs; later code retains its own proof obligations. [Current handoff](handoff.md), [producer evidence](evidence/C2/settings-reset-producer.md).
 
 - 2026-09-13: C2-6 retires the settingsResetFn controller callback and its formerly inherent composition slot. Direct ServicePhase injection of UiSettingsStore and the existing OperationAttemptRunner is simpler than another late-binding holder; HeadlessApp composes the fixed SettingsCommitCoordinator before runner recovery and the index fork. Launcher keeps its IN_MEMORY settings mode and refuses reset preparation; it has no ordered restart authority. No second writer or restart service is introduced. Production reset proof and remaining all-writer/witness/Health acceptance are tracked in C2.

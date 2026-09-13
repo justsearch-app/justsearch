@@ -21,8 +21,13 @@ Final1376 passes71 focused cases (cached,3 existing skips), PMD/format/UI integr
 adjacent1375 executes3175 cases/505 suites,3 existing skips, no failures/errors.
 [Producer evidence and exact limits](evidence/C2/settings-reset-producer.md).
 
-Next: project the fixed owner's sticky recovery issue into Health, migrate every other
-settings writer using its captured full witness, expose atomic snapshot/witness GET and
+Reset producer is pushed at `a9509882a`. The sticky recovery Health projection passes
+independent review,235 focused cases and full build1379; live1384 proves the initial
+Health SSE error and retained contradictory row/witness. [Health proof/limits](evidence/C2/settings-recovery-health.md).
+Use a revision-local MCP client for live work; the app-attached server still runs main's
+retired two-process tooling. Keep that client alive through capture and owned shutdown.
+
+Next: migrate every other settings writer using its captured full witness, expose atomic snapshot/witness GET and
 keyed frontend ingress, then run live public-wire and installed successor-bootstrap proof.
 C2-6/C2-11 and D1/D2/E/F remain open. Do not substitute callback tests for installed proof.
 

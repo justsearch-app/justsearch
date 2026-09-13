@@ -1181,6 +1181,9 @@ public class HeadlessApp {
       // condition substrate exists, and take the notice back down when they re-author settings.
       if (bootstrap != null && bootstrap.substrate() != null && bootstrap.substrate().health() != null) {
         var settingsHealth = bootstrap.substrate().health();
+        io.justsearch.app.services.settings.SettingsRecoveryNotice.observeCommitRecovery(
+            settingsOwner, settingsHealth.conditionStore(), settingsHealth.changes(),
+            settingsHealth.headSource(), java.time.Clock.systemUTC());
         settingsRecovery.ifPresent(
                 recovery ->
                     io.justsearch.app.services.settings.SettingsRecoveryNotice.publish(

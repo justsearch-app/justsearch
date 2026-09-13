@@ -16,6 +16,10 @@
       "why": "Fail-closed boot refusal (tempdoc 884 item 23): the Head throws at LocalApiServer construction before the loopback bind, so no readiness envelope, ConditionStore or SSE stream exists to carry it. The operator sees it in the fatal log line and the process exit; there is no UI to word it in."
     },
     {
+      "code": "settings.recovery_required",
+      "why": "Sticky Health ConditionStore projection of the fixed settings owner's four typed recovery causes. SettingsRecoveryNotice supplies the user-facing message; this code never enters the readiness envelope or wordCauses."
+    },
+    {
       "code": "settings.reset_from_corrupt",
       "why": "Head-owned ConditionStore condition (SettingsRecoveryNotice, tempdoc 882 item 24); never on the readiness envelope, so never reaches wordCauses. The user sees it on the Health surface, which renders conditions with the Java-side message."
     },
