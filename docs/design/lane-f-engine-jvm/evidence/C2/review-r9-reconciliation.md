@@ -85,3 +85,14 @@ Raw logs and XML live at tmp/c2-review-r9-* in the lane worktree. Retain through
 lane acceptance plus30 days and export before releasing the worktree. The final
 command/count record is review-r9-verification.json. No missing or failed check is
 counted as completion; R10/full batch and independent review remain outstanding.
+
+## September13 final-review checklist correction
+
+The independent review found the living C2 §8 row still stopped at jobs14 → 15,
+despite the earlier current amendment. The owning row now names jobs14 → 15 → 16,
+operations1 → 2, content_hash's absent C2-8 consumer, and the concrete migration,
+store-register/self-test, Rust updater and release-descriptor gates. The current
+register entries and existing migration tests were reread; no schema or executable
+source changes in this correction. `git diff --check` passes. Full900 is running
+against2168d1245 for the consolidated implementation corrections; this checklist
+edit does not claim a new test run or relabel the historical R9 results above.

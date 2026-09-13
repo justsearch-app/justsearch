@@ -409,6 +409,8 @@ it is history, not a second current contract. Evidence records retain the experi
 
 | 2026-09-13 | **C2 R8 transaction cleanup native-order correction.** Preliminary890 crashes in Xerial NativeDB.set_update_listener because feed close removes listeners after its connection closes. Keep retirement in the existing outer queue unlock: deliver frozen confirmed deltas, close/detach the feed while native SQLite remains alive, then close the failed connection and attach any cleanup failure to the preserved primary cause. The existing transaction failure prevents reentrant or captured-feed reads/writes during this sequence. This avoids another projection lifecycle flag or detached-listener state. | R8; retained890 native crash stack; same correction before commit |
 
+| 2026-09-13 | **C2 R9 final-review correction: living schema checklist.** Reconcile C2 section8 with the existing R9 amendment: jobs14 → 15 → 16 and operations1 → 2, content_hash unconsumed until C2-8, and the current migration, store-gate, updater and release compatibility checks. Preserve dated batch1 proof as history. This corrects the checklist, not either schema. | R9; final review finding6; governing register and migration tests unchanged |
+
 
 **2026-09-10 corrections from the inference-host design audits** (four read-only audits at
 `4229f1091`, `docs/design/inference-host/evidence/audits/`), inside decided lines: (a) sections

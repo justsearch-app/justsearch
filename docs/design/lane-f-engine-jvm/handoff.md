@@ -16,8 +16,9 @@ cases at877. R10 canonical index-root aliases and dangling junction refusal pass
 cases at881, with negative controls878/880. Lock close/metadata ownership and index
 shutdown propagation pass87 cases at887 after negative884/886. Queue transaction
 cleanup passes78 cases at899 after negative889/892/898 and a corrected native cleanup
-ordering crash at890. The living schema checklist and historical commit-proof
-mapping remain from the same final review. Fresh integrated
+ordering crash at890. The living schema checklist is reconciled; historical
+commit-proof mapping remains. Consolidated full900 runs at2168d1245, and the
+independent reviewer is verifying the implementation corrections. Fresh integrated
 proof follows the consolidated corrections.
 
 Current priority is the [September13 review correction batch](evidence/C2/review-correction-september13.md),
